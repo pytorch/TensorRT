@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=7474ebce"></script>
+    <script src="../../../_static/documentation_options.js?v=7580b7c2"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -621,7 +621,7 @@ import torch_tensorrt
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>class GeLU(torch.nn.Module):
-    def __init__(self, mode=&quot;tanh&quot;):
+    def __init__(self, mode="tanh"):
         super().__init__()
         self.mode = mode
 
@@ -629,8 +629,8 @@ import torch_tensorrt
         return torch.nn.functional.gelu(x, approximate=self.mode)
 
 
-my_mod = GeLU(mode=&quot;tanh&quot;).to(&quot;cuda&quot;).eval()
-ex_input = torch.randn(2, 5).to(&quot;cuda&quot;)
+my_mod = GeLU(mode="tanh").to("cuda").eval()
+ex_input = torch.randn(2, 5).to("cuda")
 </pre></div>
 </div>
 </div>
@@ -675,7 +675,7 @@ from torch_tensorrt.dynamo.conversion import ConversionContext
     torch.ops.aten.gelu.default,
     # Validators are functions that determine that given a specific node, if it can be converted by the converter
     capability_validator=lambda node, settings: (
-        &quot;approximate&quot; in node.kwargs and node.kwargs[&quot;approximate&quot;] == &quot;tanh&quot;
+        "approximate" in node.kwargs and node.kwargs["approximate"] == "tanh"
     ),
     # Can this converter be used in cases where the input shapes are dynamic
     supports_dynamic_shapes=True,
@@ -728,7 +728,7 @@ implementations. In this case, we will use the Torch-TensorRT <code class="docut
     mul = lambda x, y: impl.elementwise.mul(
         ctx,
         target,
-        name=f&quot;mul_{get_op_count()}&quot;,
+        name=f"mul_{get_op_count()}",
         source_ir=SourceIR.ATEN,
         lhs_val=x,
         rhs_val=y,
@@ -736,19 +736,19 @@ implementations. In this case, we will use the Torch-TensorRT <code class="docut
     add = lambda x, y: impl.elementwise.add(
         ctx,
         target,
-        name=f&quot;add_{get_op_count()}&quot;,
+        name=f"add_{get_op_count()}",
         source_ir=SourceIR.ATEN,
         lhs_val=x,
         rhs_val=y,
     )
     tanh = lambda x: impl.activation.tanh(
-        ctx, target, name=f&quot;tanh_{get_op_count()}&quot;, source_ir=SourceIR.ATEN, input_val=x
+        ctx, target, name=f"tanh_{get_op_count()}", source_ir=SourceIR.ATEN, input_val=x
     )
 
     # So we know that our custom converter is being run instead of the standard one
-    print(&quot;\n\n---------------------------&quot;)
-    print(&quot;Using custom GeLU converter&quot;)
-    print(&quot;---------------------------\n\n&quot;)
+    print("\n\n---------------------------")
+    print("Using custom GeLU converter")
+    print("---------------------------\n\n")
 
     x_7 = mul(args[0], 0.5)
     x_8 = mul(args[0], 0.79788456080000003)
@@ -787,7 +787,7 @@ with torch.no_grad():
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>print(
-    f&quot;tanh approximations are close: {torch.allclose(my_standard_gelu(ex_input), my_custom_gelu(ex_input))}&quot;
+    f"tanh approximations are close: {torch.allclose(my_standard_gelu(ex_input), my_custom_gelu(ex_input))}"
 )
 </pre></div>
 </div>
@@ -797,7 +797,7 @@ with torch.no_grad():
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>my_mod_erf = GeLU(mode=&quot;none&quot;).to(&quot;cuda&quot;).eval()
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>my_mod_erf = GeLU(mode="none").to("cuda").eval()
 my_gelu_erf = torch_tensorrt.compile(
     my_mod_erf, arg_inputs=(ex_input,), min_block_size=1
 )

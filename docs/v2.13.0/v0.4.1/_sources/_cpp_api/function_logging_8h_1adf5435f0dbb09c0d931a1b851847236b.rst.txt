@@ -1,0 +1,13 @@
+.. _exhale_function_logging_8h_1adf5435f0dbb09c0d931a1b851847236b:
+
+Function trtorch::logging::set_reportable_log_level
+===================================================
+
+- Defined in :ref:`file_cpp_include_trtorch_logging.h`
+
+
+Function Documentation
+----------------------
+
+
+.. doxygenfunction:: trtorch::logging::set_reportable_log_level(Level)

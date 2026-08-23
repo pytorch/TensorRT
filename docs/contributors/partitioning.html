@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=7474ebce"></script>
+    <script src="../_static/documentation_options.js?v=7580b7c2"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -590,7 +590,7 @@ use TensorRT’s output allocator for these ops rather than pre-allocating fixed
     <span class="n">graph_module</span><span class="p">,</span>
     <span class="n">torch_executed_ops</span><span class="o">=</span><span class="nb">set</span><span class="p">(),</span>
 <span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">n_supported</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">n_total</span><span class="si">}</span><span class="s2"> ops supported by TensorRT&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">n_supported</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">n_total</span><span class="si">}</span><span class="s2"> ops supported by TensorRT"</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>This calls <code class="docutils literal notranslate"><span class="pre">is_node_supported()</span></code> on every <code class="docutils literal notranslate"><span class="pre">call_function</span></code> node and prints a
@@ -646,10 +646,10 @@ PyTorch regardless of converter availability.</p></li>
     <span class="n">gm</span><span class="p">,</span>
     <span class="n">min_block_size</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
     <span class="n">backend_support_map</span><span class="o">=</span><span class="p">{</span>
-        <span class="s2">&quot;tensorrt&quot;</span><span class="p">:</span> <span class="nb">set</span><span class="p">(</span><span class="n">DYNAMO_CONVERTERS</span><span class="o">.</span><span class="n">keys</span><span class="p">()),</span>
-        <span class="s2">&quot;inductor&quot;</span><span class="p">:</span> <span class="n">my_inductor_ops</span><span class="p">,</span>
+        <span class="s2">"tensorrt"</span><span class="p">:</span> <span class="nb">set</span><span class="p">(</span><span class="n">DYNAMO_CONVERTERS</span><span class="o">.</span><span class="n">keys</span><span class="p">()),</span>
+        <span class="s2">"inductor"</span><span class="p">:</span> <span class="n">my_inductor_ops</span><span class="p">,</span>
     <span class="p">},</span>
-    <span class="n">backend_priority</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;tensorrt&quot;</span><span class="p">,</span> <span class="s2">&quot;inductor&quot;</span><span class="p">],</span>
+    <span class="n">backend_priority</span><span class="o">=</span><span class="p">[</span><span class="s2">"tensorrt"</span><span class="p">,</span> <span class="s2">"inductor"</span><span class="p">],</span>
 <span class="p">)</span>
 </pre></div>
 </div>
@@ -786,9 +786,9 @@ PyTorch fallback include: no converter registered, operator explicitly set via
 <span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">()</span>
 <span class="n">ts_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">script</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
 <span class="n">trt_model</span> <span class="o">=</span> <span class="n">torchtrt</span><span class="o">.</span><span class="n">ts</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">ts_model</span><span class="p">,</span> <span class="o">**</span><span class="p">{</span>
-    <span class="s2">&quot;min_block_size&quot;</span><span class="p">:</span> <span class="mi">3</span><span class="p">,</span>
-    <span class="s2">&quot;torch_executed_ops&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;aten::add&quot;</span><span class="p">],</span>
-    <span class="s2">&quot;torch_executed_modules&quot;</span><span class="p">:</span> <span class="p">[],</span>
+    <span class="s2">"min_block_size"</span><span class="p">:</span> <span class="mi">3</span><span class="p">,</span>
+    <span class="s2">"torch_executed_ops"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"aten::add"</span><span class="p">],</span>
+    <span class="s2">"torch_executed_modules"</span><span class="p">:</span> <span class="p">[],</span>
 <span class="p">})</span>
 </pre></div>
 </div>

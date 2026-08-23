@@ -21,6 +21,7 @@ falls through to scatter.
 import torch
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt import Input
 
 from .harness import DispatchTestCase
 
@@ -75,6 +76,24 @@ class TestSliceScatterFallback(DispatchTestCase):
         cache = torch.randn(2, 4, 16, 8)
         update = torch.randn(2, 4, 8, 8)
         self.run_test(module, [cache, update])
+
+    def test_fallback_dynamic_shape(self):
+        module = _SliceScatterNotInputModule(2, 1, 60, step=3)
+        input_specs = [
+            Input(
+                min_shape=(2, 4, 64, 8),
+                opt_shape=(3, 4, 64, 12),
+                max_shape=(4, 4, 64, 16),
+                dtype=torch.float32,
+            ),
+            Input(
+                min_shape=(2, 4, 20, 8),
+                opt_shape=(3, 4, 20, 12),
+                max_shape=(4, 4, 20, 16),
+                dtype=torch.float32,
+            ),
+        ]
+        self.run_test_with_dynamic_shape(module, input_specs)
 
     def test_full_overwrite_is_identity(self):
         """When start=0, end=dim_size, step=1, the converter short-circuits

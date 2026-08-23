@@ -1,0 +1,13 @@
+.. _exhale_function_trtorch_8h_1ad39358d5c1f523ab2a528d054860e9d7:
+
+Function trtorch::EmbedEngineInNewModule
+========================================
+
+- Defined in :ref:`file_cpp_include_trtorch_trtorch.h`
+
+
+Function Documentation
+----------------------
+
+
+.. doxygenfunction:: trtorch::EmbedEngineInNewModule(const std::string&, CompileSpec::Device)

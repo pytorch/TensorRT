@@ -86,6 +86,7 @@ def trace(
     dim_registry = build_dim_registry(arg_inputs, kwarg_inputs)
     dynamic_shapes = get_dynamic_shapes_args(mod, arg_inputs, dim_registry)
     dynamic_shapes.update(get_dynamic_shapes_kwargs(kwarg_inputs, dim_registry))
+    logger.debug("Derived dynamic_shapes for export: %s", dynamic_shapes)
 
     export_context = nullcontext()
 
@@ -137,6 +138,10 @@ def build_dim_registry(arg_inputs: Any, kwarg_inputs: Any) -> dict[str, Any]:
     """
     registry: dict[str, Any] = {}
     bounds: dict[str, tuple[int, int]] = {}
+    # {name: ["input_ids[0]", ...]} -- every axis fused under each name. Recorded
+    # during the loop because ``registry`` only keeps name -> Dim, losing the
+    # link back to the inputs that contributed it.
+    usage: dict[str, list[str]] = {}
     for inp in _collect_inputs(arg_inputs) + _collect_inputs(kwarg_inputs):
         shared_dims = getattr(inp, "shared_dims", None)
         if not shared_dims or inp.shape_mode != Input._ShapeMode.DYNAMIC:
@@ -146,16 +151,32 @@ def build_dim_registry(arg_inputs: Any, kwarg_inputs: Any) -> dict[str, Any]:
         max_shape = inp.shape["max_shape"]
         for axis, dim_name in shared_dims.items():
             lo, hi = int(min_shape[axis]), int(max_shape[axis])
+            site = f"{inp.name or '<unnamed>'}[{axis}]"
             if dim_name in bounds:
                 if bounds[dim_name] != (lo, hi):
                     raise ValueError(
                         f"Dimension name '{dim_name}' is used with conflicting ranges "
-                        f"{bounds[dim_name]} and {(lo, hi)}. A shared named dimension "
+                        f"{bounds[dim_name]} on {', '.join(usage[dim_name])} and "
+                        f"{(lo, hi)} on {site}. A shared named dimension "
                         f"must have identical (min, max) on every input that uses it."
                     )
             else:
                 bounds[dim_name] = (lo, hi)
                 registry[dim_name] = Dim(dim_name, min=lo, max=hi)
+            usage.setdefault(dim_name, []).append(site)
+
+    if registry:
+        logger.info(
+            "Resolved %d shared dynamic dim(s) from Input specs: %s. Axes listed "
+            "under one name are exported as a single symbol and are therefore "
+            "constrained equal at runtime.",
+            len(registry),
+            "; ".join(
+                f"'{name}' -> [{bounds[name][0]}, {bounds[name][1]}] on "
+                f"{', '.join(usage[name])}"
+                for name in registry
+            ),
+        )
     return registry
 
 

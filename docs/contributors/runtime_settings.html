@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=7474ebce"></script>
+    <script src="../_static/documentation_options.js?v=7580b7c2"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -591,15 +591,15 @@ through context managers (scoped) or direct assignment (persistent):</p>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.runtime</span><span class="w"> </span><span class="kn">import</span> <span class="n">RuntimeSettings</span><span class="p">,</span> <span class="n">runtime_config</span><span class="p">,</span> <span class="n">runtime_cache</span>
 
 <span class="c1"># Scoped override for a with-block:</span>
-<span class="k">with</span> <span class="n">runtime_config</span><span class="p">(</span><span class="n">trt_model</span><span class="p">,</span> <span class="n">cuda_graph_strategy</span><span class="o">=</span><span class="s2">&quot;whole_graph_capture&quot;</span><span class="p">):</span>
+<span class="k">with</span> <span class="n">runtime_config</span><span class="p">(</span><span class="n">trt_model</span><span class="p">,</span> <span class="n">cuda_graph_strategy</span><span class="o">=</span><span class="s2">"whole_graph_capture"</span><span class="p">):</span>
     <span class="n">out</span> <span class="o">=</span> <span class="n">trt_model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
 
 <span class="c1"># A shared, disk-backed kernel cache across every engine under the target:</span>
-<span class="k">with</span> <span class="n">runtime_cache</span><span class="p">(</span><span class="n">trt_model</span><span class="p">,</span> <span class="s2">&quot;/path/to/cache.bin&quot;</span><span class="p">):</span>
+<span class="k">with</span> <span class="n">runtime_cache</span><span class="p">(</span><span class="n">trt_model</span><span class="p">,</span> <span class="s2">"/path/to/cache.bin"</span><span class="p">):</span>
     <span class="n">out</span> <span class="o">=</span> <span class="n">trt_model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
 
 <span class="c1"># Persistent assignment:</span>
-<span class="n">trt_model</span><span class="o">.</span><span class="n">runtime_settings</span> <span class="o">=</span> <span class="n">RuntimeSettings</span><span class="p">(</span><span class="n">runtime_cache</span><span class="o">=</span><span class="s2">&quot;/path/to/cache.bin&quot;</span><span class="p">)</span>
+<span class="n">trt_model</span><span class="o">.</span><span class="n">runtime_settings</span> <span class="o">=</span> <span class="n">RuntimeSettings</span><span class="p">(</span><span class="n">runtime_cache</span><span class="o">=</span><span class="s2">"/path/to/cache.bin"</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>See the user guide for the full surface, including

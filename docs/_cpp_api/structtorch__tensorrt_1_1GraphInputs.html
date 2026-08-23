@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=7474ebce"></script>
+    <script src="../_static/documentation_options.js?v=7580b7c2"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -59,7 +59,7 @@
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Struct Input" href="structtorch__tensorrt_1_1Input.html" />
-    <link rel="prev" title="Struct TRTDeleter" href="structtorch__tensorrt_1_1executorch__backend_1_1TRTDeleter.html" />
+    <link rel="prev" title="Struct WsBudget" href="structtorch__tensorrt_1_1executorch__backend_1_1WsBudget.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   </head>
@@ -438,6 +438,7 @@ document.write(`
 <li class="toctree-l2"><a class="reference internal" href="../py_api/logging.html">torch_tensorrt.logging</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../py_api/runtime.html">torch_tensorrt.runtime</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../py_api/kernels.html">torch_tensorrt.kernels</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../py_api/executorch.html">torch_tensorrt.executorch</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../cli/torchtrtc.html">torchtrtc</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../indices/supported_ops.html">Operators Supported</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../py_api/ts.html">torch_tensorrt.ts</a></li>
@@ -453,22 +454,24 @@ document.write(`
 <li class="toctree-l3"><a class="reference internal" href="namespace_torch_tensorrt__logging.html">Namespace torch_tensorrt::logging</a></li>
 <li class="toctree-l3"><a class="reference internal" href="namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1Device.html">Struct Device</a></li>
+<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1AliasedBinding.html">Struct AliasedBinding</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle.html">Struct EngineHandle</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1InputProfileBounds.html">Struct InputProfileBounds</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1TensorRTBlobHeader.html">Struct TensorRTBlobHeader</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1TRTDeleter.html">Struct TRTDeleter</a></li>
+<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1WsBudget.html">Struct WsBudget</a></li>
 <li class="toctree-l3 current active"><a class="current reference internal" href="#">Struct GraphInputs</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1Input.html">Struct Input</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1torchscript_1_1CompileSpec.html">Struct CompileSpec</a></li>
 <li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1DataType.html">Class DataType</a></li>
 <li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1Device_1_1DeviceType.html">Class Device::DeviceType</a></li>
-<li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1CudaStreamGuard.html">Class CudaStreamGuard</a></li>
 <li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1TensorRTBackend.html">Class TensorRTBackend</a></li>
 <li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1TRTLogger.html">Class TRTLogger</a></li>
 <li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html">Class TensorFormat</a></li>
 <li class="toctree-l3"><a class="reference internal" href="enum_torch__tensorrt_8h_1a3fbe5d72e4fc624dbd038853079620eb.html">Enum EngineCapability</a></li>
 <li class="toctree-l3"><a class="reference internal" href="enum_logging_8h_1a130f65408ad8cbaee060f05e8db69558.html">Enum Level</a></li>
 <li class="toctree-l3"><a class="reference internal" href="function_torch__tensorrt_8h_1ad6a4ee8ca6c8f6e5519eb1128ec7f4a1.html">Function torch_tensorrt::dump_build_info</a></li>
+<li class="toctree-l3"><a class="reference internal" href="function_WeightStreamingBudget_8h_1ad04b467472f3cbcb8d5d02a35ec73b40.html">Function torch_tensorrt::executorch_backend::parse_weight_streaming_budget</a></li>
 <li class="toctree-l3"><a class="reference internal" href="function_torch__tensorrt_8h_1ac4ab8313ae72c2c899ea31548b528528.html">Function torch_tensorrt::get_build_info</a></li>
 <li class="toctree-l3"><a class="reference internal" href="function_logging_8h_1a56e110feaaba2c3fd44bd201fd21a76a.html">Function torch_tensorrt::logging::get_is_colored_output_on</a></li>
 <li class="toctree-l3"><a class="reference internal" href="function_logging_8h_1a0593f776f469c20469e2f729fc7861a3.html">Function torch_tensorrt::logging::get_logging_prefix</a></li>
@@ -482,6 +485,7 @@ document.write(`
 <li class="toctree-l3"><a class="reference internal" href="function_torch__tensorrt_8h_1a6e19490a08fb1553c9dd347a5ae79db9.html">Function torch_tensorrt::torchscript::compile</a></li>
 <li class="toctree-l3"><a class="reference internal" href="function_torch__tensorrt_8h_1ae8d56472106eeef37fbe51ff7f40c9b2.html">Function torch_tensorrt::torchscript::convert_method_to_trt_engine</a></li>
 <li class="toctree-l3"><a class="reference internal" href="function_torch__tensorrt_8h_1a81f9783517335dda877d8cfcf38987c9.html">Function torch_tensorrt::torchscript::embed_engine_in_new_module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="variable_WeightStreamingBudget_8h_1ad1ed7a6ead3130000477ab49482906ff.html">Variable torch_tensorrt::executorch_backend::kWeightStreamingBudgetKey</a></li>
 <li class="toctree-l3"><a class="reference internal" href="define_macros_8h_1a18d295a837ac71add5578860b55e5502.html">Define STR</a></li>
 <li class="toctree-l3"><a class="reference internal" href="define_macros_8h_1a31398a6d4d27e28817afb0f0139e909e.html">Define TORCH_TENSORRT_MAJOR_VERSION</a></li>
 <li class="toctree-l3"><a class="reference internal" href="define_macros_8h_1a35703561b26b1a9d2738ad7d58b27827.html">Define TORCH_TENSORRT_MINOR_VERSION</a></li>
@@ -601,12 +605,12 @@ document.write(`
                   
 <div class="prev-next-area">
     <a class="left-prev"
-       href="structtorch__tensorrt_1_1executorch__backend_1_1TRTDeleter.html"
+       href="structtorch__tensorrt_1_1executorch__backend_1_1WsBudget.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">Struct TRTDeleter</p>
+        <p class="prev-next-title">Struct WsBudget</p>
       </div>
     </a>
     <a class="right-next"

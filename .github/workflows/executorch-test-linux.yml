@@ -64,13 +64,13 @@ jobs:
         chmod +x "${RUNNER_TEMP}/bin/bazel"
         export PATH="${RUNNER_TEMP}/bin:${PATH}"
 
-        python -m pip install pyyaml executorch
+        python -m pip install pyyaml "executorch==1.4.1"
         # Keep this diagnostic until the native runtime initialization crash is understood.
         ulimit -c unlimited || true
         if command -v gdb >/dev/null 2>&1; then
-          gdb --batch -ex "set pagination off" -ex run -ex "thread apply all bt" --args python -u -X faulthandler -c 'import torch; print(torch.__version__, torch.version.cuda); from torch_tensorrt_executorch_runtime import BACKEND_NAME, get_runtime; print(1); runtime = get_runtime(); print(2); assert runtime.backend_registry.is_available(BACKEND_NAME); assert runtime.backend_registry.is_available("XnnpackBackend")'
+          gdb --batch -ex "set pagination off" -ex run -ex "thread apply all bt" --args python -u -X faulthandler -c 'import torch; print(torch.__version__, torch.version.cuda); from torch_tensorrt_executorch_runtime import BACKEND_NAME, get_runtime; print(1); runtime = get_runtime(); print(2); assert runtime.backend_registry.is_available(BACKEND_NAME); assert runtime.backend_registry.is_available("XnnpackBackend"); assert runtime.backend_registry.is_available("CudaBackend")'
         else
-          PYTHONFAULTHANDLER=1 python -u -X faulthandler -c 'import torch; print(torch.__version__, torch.version.cuda); from torch_tensorrt_executorch_runtime import BACKEND_NAME, get_runtime; print(1); runtime = get_runtime(); print(2); assert runtime.backend_registry.is_available(BACKEND_NAME); assert runtime.backend_registry.is_available("XnnpackBackend")'
+          PYTHONFAULTHANDLER=1 python -u -X faulthandler -c 'import torch; print(torch.__version__, torch.version.cuda); from torch_tensorrt_executorch_runtime import BACKEND_NAME, get_runtime; print(1); runtime = get_runtime(); print(2); assert runtime.backend_registry.is_available(BACKEND_NAME); assert runtime.backend_registry.is_available("XnnpackBackend"); assert runtime.backend_registry.is_available("CudaBackend")'
         fi
 
         source tests/py/utils/ci_helpers.sh
@@ -82,7 +82,10 @@ jobs:
         export EXECUTORCH_ROOT="${EXECUTORCH_SOURCE_DIR}"
         python examples/torchtrt_executorch_example/export_static_shape.py \
           --model_path="${RUNNER_TEMP}/torchtrt-python.pte"
+        python examples/torchtrt_executorch_example/export_kv_cache_decode.py \
+          --model_path="${RUNNER_TEMP}/torchtrt-kv-cache-decode.pte"
         .github/scripts/verify-executorch-reference-runner.sh \
-          "${RUNNER_TEMP}/torchtrt-python.pte"
+          "${RUNNER_TEMP}/torchtrt-python.pte" \
+          "${RUNNER_TEMP}/torchtrt-kv-cache-decode.pte"
         python examples/executorch_reference_runner/load_model.py \
           --model_path="${RUNNER_TEMP}/torchtrt-python.pte" --num_runs=1

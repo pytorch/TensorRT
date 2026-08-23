@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=7474ebce"></script>
+    <script src="../_static/documentation_options.js?v=7580b7c2"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -787,7 +787,7 @@ with the one that <code class="docutils literal notranslate"><span class="pre">t
 <p>The fix is to extract the <code class="docutils literal notranslate"><span class="pre">FakeTensorMode</span></code> from the <em>original</em> placeholder’s
 <code class="docutils literal notranslate"><span class="pre">meta[&quot;val&quot;].fake_mode</span></code> and reuse it.  The new fake tensor is then constructed
 by appending a concrete <code class="docutils literal notranslate"><span class="pre">2</span></code> to the symbolic shape list:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">orig_fake</span> <span class="o">=</span> <span class="n">input_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">]</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">orig_fake</span> <span class="o">=</span> <span class="n">input_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">]</span>
 <span class="n">sym_shape</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">orig_fake</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">+</span> <span class="p">[</span><span class="mi">2</span><span class="p">]</span>
 <span class="k">with</span> <span class="n">orig_fake</span><span class="o">.</span><span class="n">fake_mode</span><span class="p">:</span>
     <span class="n">fake_tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">sym_shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">new_dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
@@ -830,7 +830,7 @@ are not <code class="docutils literal notranslate"><span class="pre">view_as_rea
         <span class="n">out</span> <span class="o">=</span> <span class="n">b</span><span class="p">(</span><span class="n">my_real_impl</span><span class="p">,</span> <span class="n">re</span><span class="p">,</span> <span class="n">im</span><span class="p">)</span>
         <span class="c1"># If the output is still a complex-layout [..., 2] tensor, annotate it.</span>
         <span class="c1"># (Not needed if using _inline_cat_re_im, which sets the flag automatically.)</span>
-        <span class="n">out</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;is_complex_layout&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"is_complex_layout"</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
         <span class="n">node</span><span class="o">.</span><span class="n">replace_all_uses_with</span><span class="p">(</span><span class="n">out</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">erase_node</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
     <span class="k">return</span> <span class="kc">True</span>

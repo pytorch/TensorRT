@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=7474ebce"></script>
+    <script src="../../../_static/documentation_options.js?v=7580b7c2"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -586,7 +586,7 @@ import torch_tensorrt
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>model = MixedPytorchAutocastModel().cuda().eval()
-inputs = (torch.randn((8, 3, 32, 32), dtype=torch.float32, device=&quot;cuda&quot;),)
+inputs = (torch.randn((8, 3, 32, 32), dtype=torch.float32, device="cuda"),)
 ep = torch.export.export(model, inputs)
 calibration_dataloader = torch.utils.data.DataLoader(
     torch.utils.data.TensorDataset(*inputs), batch_size=2, shuffle=False
@@ -607,8 +607,8 @@ pytorch_outs = model(*inputs)
     min_block_size=1,
     enable_autocast=True,
     autocast_low_precision_type=torch.bfloat16,
-    autocast_excluded_nodes={&quot;^conv1$&quot;, &quot;relu&quot;},
-    autocast_excluded_ops={&quot;torch.ops.aten.flatten.using_ints&quot;},
+    autocast_excluded_nodes={"^conv1$", "relu"},
+    autocast_excluded_ops={"torch.ops.aten.flatten.using_ints"},
     autocast_max_output_threshold=512,
     autocast_max_depth_of_reduction=None,
     autocast_calibration_dataloader=calibration_dataloader,
@@ -638,18 +638,18 @@ should_be_bf16 = [autocast_outs[3], autocast_outs[4], autocast_outs[6]]
 
 assert all(
     a.dtype == torch.float32 for a in should_be_fp32
-), &quot;Some Autocast outputs are not float32!&quot;
+), "Some Autocast outputs are not float32!"
 assert all(
     a.dtype == torch.float16 for a in should_be_fp16
-), &quot;Some Autocast outputs are not float16!&quot;
+), "Some Autocast outputs are not float16!"
 assert all(
     a.dtype == torch.bfloat16 for a in should_be_bf16
-), &quot;Some Autocast outputs are not bfloat16!&quot;
+), "Some Autocast outputs are not bfloat16!"
 for i, (a, w) in enumerate(zip(autocast_outs, pytorch_outs)):
     assert torch.allclose(
         a.to(torch.float32), w.to(torch.float32), atol=1e-2, rtol=1e-2
-    ), f&quot;Autocast and Pytorch outputs do not match! autocast_outs[{i}] = {a}, pytorch_outs[{i}] = {w}&quot;
-print(&quot;All dtypes and values match!&quot;)
+    ), f"Autocast and Pytorch outputs do not match! autocast_outs[{i}] = {a}, pytorch_outs[{i}] = {w}"
+print("All dtypes and values match!")
 </pre></div>
 </div>
 </div>

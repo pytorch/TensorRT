@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=7474ebce"></script>
+    <script src="../_static/documentation_options.js?v=7580b7c2"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -515,12 +515,12 @@ torch.jit.trace’d compiled FX GraphModules is supported for FX and Dyanmo work
 (given a previously created calibration cache). For example we can compile our lenet model by setting our preferred operating
 precision and input size. This new TorchScript file can be loaded into Python (note: you need to <code class="docutils literal notranslate"><span class="pre">import</span> <span class="pre">torch_tensorrt</span></code> before loading
 these compiled modules because the compiler extends the PyTorch the deserializer and runtime to execute compiled modules).</p>
-<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>❯<span class="w"> </span>torchtrtc<span class="w"> </span>-p<span class="w"> </span>f16<span class="w"> </span>lenet_scripted.ts<span class="w"> </span>trt_lenet_scripted.ts<span class="w"> </span><span class="s2">&quot;(1,1,32,32)&quot;</span>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>❯<span class="w"> </span>torchtrtc<span class="w"> </span>-p<span class="w"> </span>f16<span class="w"> </span>lenet_scripted.ts<span class="w"> </span>trt_lenet_scripted.ts<span class="w"> </span><span class="s2">"(1,1,32,32)"</span>
 
 ❯<span class="w"> </span>python3
 Python<span class="w"> </span><span class="m">3</span>.6.9<span class="w"> </span><span class="o">(</span>default,<span class="w"> </span>Apr<span class="w"> </span><span class="m">18</span><span class="w"> </span><span class="m">2020</span>,<span class="w"> </span><span class="m">01</span>:56:04<span class="o">)</span>
 <span class="o">[</span>GCC<span class="w"> </span><span class="m">8</span>.4.0<span class="o">]</span><span class="w"> </span>on<span class="w"> </span>linux
-Type<span class="w"> </span><span class="s2">&quot;help&quot;</span>,<span class="w"> </span><span class="s2">&quot;copyright&quot;</span>,<span class="w"> </span><span class="s2">&quot;credits&quot;</span><span class="w"> </span>or<span class="w"> </span><span class="s2">&quot;license&quot;</span><span class="w"> </span><span class="k">for</span><span class="w"> </span>more<span class="w"> </span>information.
+Type<span class="w"> </span><span class="s2">"help"</span>,<span class="w"> </span><span class="s2">"copyright"</span>,<span class="w"> </span><span class="s2">"credits"</span><span class="w"> </span>or<span class="w"> </span><span class="s2">"license"</span><span class="w"> </span><span class="k">for</span><span class="w"> </span>more<span class="w"> </span>information.
 &gt;&gt;&gt;<span class="w"> </span>import<span class="w"> </span>torch
 &gt;&gt;&gt;<span class="w"> </span>import<span class="w"> </span>torch_tensorrt
 &gt;&gt;&gt;<span class="w"> </span><span class="nv">ts_model</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>torch.jit.load<span class="o">(</span>“trt_lenet_scripted.ts”<span class="o">)</span>
@@ -533,11 +533,11 @@ Type<span class="w"> </span><span class="s2">&quot;help&quot;</span>,<span class
 <span id="ts-in-cc"></span><h3>Working with TorchScript in C++<a class="headerlink" href="#working-with-torchscript-in-c" title="Link to this heading">#</a></h3>
 <p>If we are developing an application to deploy with C++, we can save either our traced or scripted module using <code class="docutils literal notranslate"><span class="pre">torch.jit.save</span></code>
 which will serialize the TorchScript code, weights and other information into a package. This is also where our dependency on Python ends.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">torch_script_module</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;lenet.jit.pt&quot;</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">torch_script_module</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">"lenet.jit.pt"</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>From here we can now load our TorchScript module in C++</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;torch/script.h&gt;</span><span class="c1"> // One-stop header.</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;torch/script.h&gt;</span><span class="w"> </span><span class="c1">// One-stop header.</span>
 
 <span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span>
 <span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;memory&gt;</span>
@@ -546,14 +546,14 @@ which will serialize the TorchScript code, weights and other information into a 
 <span class="w">    </span><span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">Module</span><span class="w"> </span><span class="k">module</span><span class="p">;</span>
 <span class="w">    </span><span class="k">try</span><span class="w"> </span><span class="p">{</span>
 <span class="w">        </span><span class="c1">// Deserialize the ScriptModule from a file using torch::jit::load().</span>
-<span class="w">        </span><span class="k">module</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">load</span><span class="p">(</span><span class="s">&quot;&lt;PATH TO SAVED TS MOD&gt;&quot;</span><span class="p">);</span>
+<span class="w">        </span><span class="k">module</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">load</span><span class="p">(</span><span class="s">"&lt;PATH TO SAVED TS MOD&gt;"</span><span class="p">);</span>
 <span class="w">    </span><span class="p">}</span>
 <span class="w">    </span><span class="k">catch</span><span class="w"> </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">c10</span><span class="o">::</span><span class="n">Error</span><span class="o">&amp;</span><span class="w"> </span><span class="n">e</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">        </span><span class="n">std</span><span class="o">::</span><span class="n">cerr</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;error loading the model</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
+<span class="w">        </span><span class="n">std</span><span class="o">::</span><span class="n">cerr</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">"error loading the model</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
 <span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span>
 <span class="w">    </span><span class="p">}</span>
 
-<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;ok</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">"ok</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
 </pre></div>
 </div>
 <p>You can do full training and inference in C++ with PyTorch / LibTorch if you would like, you can even define your modules in C++ and
@@ -578,8 +578,8 @@ For instance we can do inference with our LeNet module like this:</p>
 <p>We are also at the point where we can compile and optimize our module with Torch-TensorRT, but instead of in a JIT fashion we must do it ahead-of-time (AOT) i.e. before we start doing actual inference work
 since it takes a bit of time to optimize the module, it would not make sense to do this every time you run the module or even the first time you run it.</p>
 <p>With our module loaded, we can feed it into the Torch-TensorRT compiler. When we do so we must provide some information on the expected input size and also configure any additional settings.</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch/script.h&quot;</span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch_tensorrt/torch_tensorrt.h&quot;</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">"torch/script.h"</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"torch_tensorrt/torch_tensorrt.h"</span>
 <span class="p">...</span>
 
 <span class="w">    </span><span class="n">mod</span><span class="p">.</span><span class="n">to</span><span class="p">(</span><span class="n">at</span><span class="o">::</span><span class="n">kCUDA</span><span class="p">);</span>
@@ -593,8 +593,8 @@ since it takes a bit of time to optimize the module, it would not make sense to 
 </div>
 <p>That’s it! Now the graph runs primarily not with the JIT compiler but using TensorRT (though we execute the graph using the JIT runtime).</p>
 <p>We can also set settings like operating precision to run in FP16.</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch/script.h&quot;</span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch_tensorrt/torch_tensorrt.h&quot;</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">"torch/script.h"</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"torch_tensorrt/torch_tensorrt.h"</span>
 <span class="p">...</span>
 
 <span class="w">    </span><span class="n">mod</span><span class="p">.</span><span class="n">to</span><span class="p">(</span><span class="n">at</span><span class="o">::</span><span class="n">kCUDA</span><span class="p">);</span>
@@ -609,34 +609,34 @@ since it takes a bit of time to optimize the module, it would not make sense to 
 </pre></div>
 </div>
 <p>And now we are running the module in FP16 precision. You can then save the module to load later.</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="n">trt_mod</span><span class="p">.</span><span class="n">save</span><span class="p">(</span><span class="s">&quot;&lt;PATH TO SAVED TRT/TS MOD&gt;&quot;</span><span class="p">)</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="n">trt_mod</span><span class="p">.</span><span class="n">save</span><span class="p">(</span><span class="s">"&lt;PATH TO SAVED TRT/TS MOD&gt;"</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>Torch-TensorRT compiled TorchScript modules are loaded in the same way as normal TorchScript module. Make sure your deployment application is linked against <code class="docutils literal notranslate"><span class="pre">libtorchtrt.so</span></code></p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch/script.h&quot;</span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch_tensorrt/torch_tensorrt.h&quot;</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">"torch/script.h"</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"torch_tensorrt/torch_tensorrt.h"</span>
 
 <span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">argc</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">argv</span><span class="p">[])</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">Module</span><span class="w"> </span><span class="k">module</span><span class="p">;</span>
 <span class="w">    </span><span class="k">try</span><span class="w"> </span><span class="p">{</span>
 <span class="w">        </span><span class="c1">// Deserialize the ScriptModule from a file using torch::jit::load().</span>
-<span class="w">        </span><span class="k">module</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">load</span><span class="p">(</span><span class="s">&quot;&lt;PATH TO SAVED TRT/TS MOD&gt;&quot;</span><span class="p">);</span>
+<span class="w">        </span><span class="k">module</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">load</span><span class="p">(</span><span class="s">"&lt;PATH TO SAVED TRT/TS MOD&gt;"</span><span class="p">);</span>
 <span class="w">    </span><span class="p">}</span>
 <span class="w">    </span><span class="k">catch</span><span class="w"> </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">c10</span><span class="o">::</span><span class="n">Error</span><span class="o">&amp;</span><span class="w"> </span><span class="n">e</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">        </span><span class="n">std</span><span class="o">::</span><span class="n">cerr</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;error loading the model</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
+<span class="w">        </span><span class="n">std</span><span class="o">::</span><span class="n">cerr</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">"error loading the model</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
 <span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span>
 <span class="w">    </span><span class="p">}</span>
 
 <span class="w">    </span><span class="n">torch</span><span class="o">::</span><span class="n">Tensor</span><span class="w"> </span><span class="n">in</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">randn</span><span class="p">({</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">},</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">kCUDA</span><span class="p">);</span>
 <span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">out</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mod</span><span class="p">.</span><span class="n">forward</span><span class="p">(</span><span class="n">in</span><span class="p">);</span>
 
-<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;ok</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">"ok</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
 <span class="p">}</span>
 </pre></div>
 </div>
 <p>If you want to save the engine produced by Torch-TensorRT to use in a TensorRT application you can use the <code class="docutils literal notranslate"><span class="pre">ConvertGraphToTRTEngine</span></code> API.</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch/script.h&quot;</span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch_tensorrt/torch_tensorrt.h&quot;</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">"torch/script.h"</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"torch_tensorrt/torch_tensorrt.h"</span>
 <span class="p">...</span>
 
 <span class="w">    </span><span class="n">mod</span><span class="p">.</span><span class="n">to</span><span class="p">(</span><span class="n">at</span><span class="o">::</span><span class="n">kCUDA</span><span class="p">);</span>
@@ -647,8 +647,8 @@ since it takes a bit of time to optimize the module, it would not make sense to 
 <span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">torch_tensorrt</span><span class="o">::</span><span class="n">core</span><span class="o">::</span><span class="n">ir</span><span class="o">::</span><span class="n">Input</span><span class="o">&gt;</span><span class="w"> </span><span class="n">inputs</span><span class="p">{</span><span class="n">torch_tensorrt</span><span class="o">::</span><span class="n">core</span><span class="o">::</span><span class="n">ir</span><span class="o">::</span><span class="n">Input</span><span class="p">({</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">224</span><span class="p">,</span><span class="w"> </span><span class="mi">224</span><span class="p">})};</span>
 <span class="w">    </span><span class="n">torch_tensorrt</span><span class="o">::</span><span class="n">ts</span><span class="o">::</span><span class="n">CompileSpec</span><span class="w"> </span><span class="nf">cfg</span><span class="p">(</span><span class="n">inputs</span><span class="p">);</span>
 <span class="w">    </span><span class="n">cfg</span><span class="p">.</span><span class="n">enabled_precisions</span><span class="p">.</span><span class="n">insert</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">kHALF</span><span class="p">);</span>
-<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">trt_mod</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch_tensorrt</span><span class="o">::</span><span class="n">ts</span><span class="o">::</span><span class="n">convert_method_to_trt_engine</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;forward&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">cfg</span><span class="p">);</span>
-<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">ofstream</span><span class="w"> </span><span class="n">out</span><span class="p">(</span><span class="s">&quot;/tmp/engine_converted_from_jit.trt&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">trt_mod</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch_tensorrt</span><span class="o">::</span><span class="n">ts</span><span class="o">::</span><span class="n">convert_method_to_trt_engine</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span><span class="w"> </span><span class="s">"forward"</span><span class="p">,</span><span class="w"> </span><span class="n">cfg</span><span class="p">);</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">ofstream</span><span class="w"> </span><span class="n">out</span><span class="p">(</span><span class="s">"/tmp/engine_converted_from_jit.trt"</span><span class="p">);</span>
 <span class="w">    </span><span class="n">out</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">engine</span><span class="p">;</span>
 <span class="w">    </span><span class="n">out</span><span class="p">.</span><span class="n">close</span><span class="p">();</span>
 </pre></div>
@@ -706,7 +706,7 @@ to the user or moves into the graph construction phase. Here Torch-TensorRT crea
 by the Torch-TensorRT runtime.</p>
 <p>Here is the graph that you get back after compilation is complete:</p>
 <div class="highlight-none notranslate"><div class="highlight"><pre><span></span>graph(%self_1 : __torch__.lenet, %input_0 : Tensor):
-    %1 : ...trt.Engine = prim::GetAttr[name=&quot;lenet&quot;](%self_1)
+    %1 : ...trt.Engine = prim::GetAttr[name="lenet"](%self_1)
     %3 : Tensor[] = prim::ListConstruct(%input_0)
     %4 : Tensor[] = trt::execute_engine(%3, %1)
     %5 : Tensor = prim::ListUnpack(%4)
@@ -731,7 +731,7 @@ the relu converter to be run on it, producing an activation layer in the TensorR
 to support your module.</p>
 <p>Shipped with the Torch-TensorRT distribution are the internal core API headers. You can therefore access the converter registry and add a converter for the op you need.</p>
 <p>For example, if we try to compile a graph with a build of Torch-TensorRT that doesn’t support the flatten operation (<code class="docutils literal notranslate"><span class="pre">aten::flatten</span></code>) you may see this error:</p>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>terminate called after throwing an instance of &#39;torch_tensorrt::Error&#39;
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>terminate called after throwing an instance of 'torch_tensorrt::Error'
 what():  [enforce fail at core/conversion/conversion.cpp:109] Expected converter to be true but got false
 Unable to convert node: %input.1 : Tensor = aten::flatten(%x.1, %11, %5) # x.py:25:0 (conversion.AddLayer)
 Schema: aten::flatten.using_ints(Tensor self, int start_dim=0, int end_dim=-1) -&gt; (Tensor)
@@ -747,13 +747,13 @@ will take the state of the conversion, the node/operation in question to convert
 Arguments are passed as a vector of inspectable unions of TensorRT <code class="docutils literal notranslate"><span class="pre">ITensors</span></code> and Torch <code class="docutils literal notranslate"><span class="pre">IValues</span></code> in the order arguments are listed in the schema.</p>
 <p>Below is a implementation of a <code class="docutils literal notranslate"><span class="pre">aten::flatten</span></code> converter that we can use in our application. You have full access to the Torch and TensorRT libraries in the converter implementation. So
 for example we can quickly get the output size by just running the operation in PyTorch instead of implementing the full calculation outself like we do below for this flatten converter.</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch/script.h&quot;</span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch_tensorrt/torch_tensorrt.h&quot;</span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch_tensorrt/core/conversion/converters/converters.h&quot;</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">"torch/script.h"</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"torch_tensorrt/torch_tensorrt.h"</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"torch_tensorrt/core/conversion/converters/converters.h"</span>
 
 <span class="k">static</span><span class="w"> </span><span class="k">auto</span><span class="w"> </span><span class="n">flatten_converter</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch_tensorrt</span><span class="o">::</span><span class="n">core</span><span class="o">::</span><span class="n">conversion</span><span class="o">::</span><span class="n">converters</span><span class="o">::</span><span class="n">RegisterNodeConversionPatterns</span><span class="p">()</span>
 <span class="w">    </span><span class="p">.</span><span class="n">pattern</span><span class="p">({</span>
-<span class="w">        </span><span class="s">&quot;aten::flatten.using_ints(Tensor self, int start_dim=0, int end_dim=-1) -&gt; (Tensor)&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s">"aten::flatten.using_ints(Tensor self, int start_dim=0, int end_dim=-1) -&gt; (Tensor)"</span><span class="p">,</span>
 <span class="w">        </span><span class="p">[](</span><span class="n">torch_tensorrt</span><span class="o">::</span><span class="n">core</span><span class="o">::</span><span class="n">conversion</span><span class="o">::</span><span class="n">ConversionCtx</span><span class="o">*</span><span class="w"> </span><span class="n">ctx</span><span class="p">,</span>
 <span class="w">           </span><span class="k">const</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">Node</span><span class="o">*</span><span class="w"> </span><span class="n">n</span><span class="p">,</span>
 <span class="w">           </span><span class="n">torch_tensorrt</span><span class="o">::</span><span class="n">core</span><span class="o">::</span><span class="n">conversion</span><span class="o">::</span><span class="n">converters</span><span class="o">::</span><span class="n">args</span><span class="o">&amp;</span><span class="w"> </span><span class="n">args</span><span class="p">)</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="p">{</span>

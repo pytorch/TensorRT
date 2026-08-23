@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=7474ebce"></script>
+    <script src="../../_static/documentation_options.js?v=7580b7c2"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -639,7 +639,7 @@ available in the Windows TRT runtime or require OS-specific binaries):</p>
 </pre></div>
 </div>
 <p><strong>Step 3 — Save the compiled module</strong></p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="s2">&quot;model_windows.ep&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="s2">"model_windows.ep"</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
 </pre></div>
 </div>
 <p><strong>Step 4 — Load and run on Windows</strong></p>
@@ -647,7 +647,7 @@ available in the Windows TRT runtime or require OS-specific binaries):</p>
 <code class="docutils literal notranslate"><span class="pre">libtorchtrt_runtime.so</span></code> / <code class="docutils literal notranslate"><span class="pre">torchtrt_runtime.dll</span></code> is on the library path.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># On Windows:</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
-<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;model_windows.ep&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
+<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">"model_windows.ep"</span><span class="p">)</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
 <span class="n">output</span> <span class="o">=</span> <span class="n">trt_gm</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
 </pre></div>
 </div>
@@ -692,10 +692,10 @@ deployment GPU may have a different architecture within the Ampere+ generation:<
 containing <code class="docutils literal notranslate"><span class="pre">TorchTensorRTModule</span></code> submodules with Windows-compatible engine bytes.
 Save and load via the standard Torch-TensorRT save/load API:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Save (Linux)</span>
-<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="s2">&quot;model_windows.ep&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
+<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="s2">"model_windows.ep"</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
 
 <span class="c1"># Load (Windows)</span>
-<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;model_windows.ep&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
+<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">"model_windows.ep"</span><span class="p">)</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
 <span class="n">trt_gm</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
 </pre></div>
 </div>

@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=7474ebce"></script>
+    <script src="../_static/documentation_options.js?v=7580b7c2"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -606,7 +606,7 @@ dispatches to refit automatically:</p>
 
 <span class="c1"># Weight update (e.g. HuggingFace diffusers LoRA load_lora_weights)</span>
 <span class="n">pipeline</span><span class="o">.</span><span class="n">unet</span> <span class="o">=</span> <span class="n">mutable</span>
-<span class="n">pipeline</span><span class="o">.</span><span class="n">load_lora_weights</span><span class="p">(</span><span class="s2">&quot;path/to/lora&quot;</span><span class="p">)</span>
+<span class="n">pipeline</span><span class="o">.</span><span class="n">load_lora_weights</span><span class="p">(</span><span class="s2">"path/to/lora"</span><span class="p">)</span>
 <span class="c1"># → intercepted; refit triggered automatically, no recompilation</span>
 
 <span class="c1"># If the model architecture changes (new adapter inserts layers),</span>
@@ -622,7 +622,7 @@ dispatches to refit automatically:</p>
 <p>During conversion the FX interpreter inspects each <code class="docutils literal notranslate"><span class="pre">INetworkDefinition</span></code> layer that
 carries learnable weights (convolutions, deconvolutions, BatchNorm, LayerNorm,
 constant layers) and records a mapping:</p>
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="w"> </span><span class="s">&quot;pytorch.param.name&quot;</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">trt_layer_index</span><span class="w"> </span><span class="p">}</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="w"> </span><span class="s">"pytorch.param.name"</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">trt_layer_index</span><span class="w"> </span><span class="p">}</span>
 </pre></div>
 </div>
 <p>This map is serialized alongside the engine bytes and stored as part of the
@@ -632,11 +632,11 @@ constant layers) and records a mapping:</p>
     <span class="n">inputs</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Input</span><span class="p">],</span>
     <span class="n">settings</span><span class="p">:</span> <span class="n">CompilationSettings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(),</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Run the interpreter and find the weight mapping between</span>
-<span class="sd">    the exported program&#39;s state_dict and TensorRT engine weights.</span>
+<span class="sd">    the exported program's state_dict and TensorRT engine weights.</span>
 <span class="sd">    Returns: { trt_weight_name -&gt; numpy weight array }</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 </pre></div>
 </div>
 </section>

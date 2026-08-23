@@ -100,6 +100,7 @@ def insert_engine_to_cache(
             settings,
             interpreter_result.requires_output_allocator,
             interpreter_result.requires_native_multidevice,
+            interpreter_result.aliased_io,
         ),
     )
     logger.info(f"Engine with hash: {hash_val} was successfully inserted into cache")
@@ -137,6 +138,7 @@ def pull_cached_engine(
             cached_engine_compilation_settings,
             requires_output_allocator,
             requires_native_multidevice,
+            aliased_io,
         ) = cached_data
 
         setting_compatiblity, incompattible_settings = settings_are_compatible(
@@ -195,6 +197,7 @@ def pull_cached_engine(
             requires_output_allocator=requires_output_allocator,
             requires_native_multidevice=requires_native_multidevice,
             symbolic_shape_expressions=symbolic_shape_expressions,
+            aliased_io=aliased_io,
         )
     return None
 

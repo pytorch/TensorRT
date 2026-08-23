@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=7474ebce"></script>
+    <script src="../../../_static/documentation_options.js?v=7580b7c2"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -512,7 +512,7 @@ document.write(`
     <span class="n">explicit_batch_dimension</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
     <span class="n">lower_precision</span><span class="o">=</span><span class="n">LowerPrecision</span><span class="o">.</span><span class="n">FP16</span><span class="p">,</span>
     <span class="n">verbose_log</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-    <span class="n">timing_cache_prefix</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">,</span>
+    <span class="n">timing_cache_prefix</span><span class="o">=</span><span class="s2">""</span><span class="p">,</span>
     <span class="n">save_timing_cache</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
     <span class="n">cuda_graph_batch_size</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span>
     <span class="n">dynamic_batch</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
@@ -521,7 +521,7 @@ document.write(`
     <span class="n">correctness_atol</span><span class="o">=</span><span class="mf">1e-1</span><span class="p">,</span>
     <span class="n">correctness_rtol</span><span class="o">=</span><span class="mf">1e-1</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Takes in original module, input and lowering setting, run lowering workflow to turn module</span>
 <span class="sd">    into lowered module, or so called TRTModule.</span>
 
@@ -541,10 +541,10 @@ document.write(`
 <span class="sd">        use_experimental_fx_rt: Uses the next generation TRTModule which supports both Python and TorchScript based execution (including in C++).</span>
 <span class="sd">    Returns:</span>
 <span class="sd">        A torch.nn.Module lowered by TensorRT.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="n">use_experimental_fx_rt</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">explicit_batch_dimension</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-            <span class="s2">&quot;The experimental unifed runtime only supports explicit batch. Please make sure to set explicit_batch_dimension=True when use_experimental_fx_rt=True&quot;</span>
+            <span class="s2">"The experimental unifed runtime only supports explicit batch. Please make sure to set explicit_batch_dimension=True when use_experimental_fx_rt=True"</span>
         <span class="p">)</span>
 
     <span class="n">lower_setting</span> <span class="o">=</span> <span class="n">LowerSetting</span><span class="p">(</span>
@@ -581,22 +581,22 @@ document.write(`
         <span class="k">return</span> <span class="n">LowerTrtInterpreter</span><span class="p">(</span><span class="n">lower_setting</span><span class="p">,</span> <span class="n">timing_cache_manager</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mod</span><span class="p">,</span> <span class="nb">input</span><span class="p">,</span> <span class="n">split_name</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TRTInterpreterResult</span><span class="p">:</span>
-        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">lower_setting</span><span class="o">.</span><span class="n">input_specs</span><span class="p">,</span> <span class="s2">&quot;Can&#39;t find input specs for lowering!&quot;</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">lower_setting</span><span class="o">.</span><span class="n">input_specs</span><span class="p">,</span> <span class="s2">"Can't find input specs for lowering!"</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;split_name=</span><span class="si">{</span><span class="n">split_name</span><span class="si">}</span><span class="s2">, input_specs=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">lower_setting</span><span class="o">.</span><span class="n">input_specs</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">"split_name=</span><span class="si">{</span><span class="n">split_name</span><span class="si">}</span><span class="s2">, input_specs=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">lower_setting</span><span class="o">.</span><span class="n">input_specs</span><span class="si">}</span><span class="s2">"</span>
         <span class="p">)</span>
 
         <span class="c1"># Prepare algorithm selector and timing_cache for TRTInterpreter</span>
         <span class="n">algo_selector</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">lower_setting</span><span class="o">.</span><span class="n">algo_selector</span><span class="p">:</span>
-            <span class="n">algo_selector</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">lower_setting</span><span class="o">.</span><span class="n">algo_selector</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">split_name</span><span class="si">}</span><span class="s2">.json&quot;</span><span class="p">)</span>
+            <span class="n">algo_selector</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">lower_setting</span><span class="o">.</span><span class="n">algo_selector</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">split_name</span><span class="si">}</span><span class="s2">.json"</span><span class="p">)</span>
         <span class="n">cache_data</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">timing_cache_manager</span><span class="p">:</span>
             <span class="k">try</span><span class="p">:</span>
                 <span class="n">cache_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">timing_cache_manager</span><span class="o">.</span><span class="n">get_timing_cache_trt</span><span class="p">(</span><span class="n">split_name</span><span class="p">)</span>
-                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Timing cache is used!&quot;</span><span class="p">)</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"Timing cache is used!"</span><span class="p">)</span>
             <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Cannot load timing cache for </span><span class="si">{</span><span class="n">split_name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Cannot load timing cache for </span><span class="si">{</span><span class="n">split_name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
                 <span class="n">cache_data</span> <span class="o">=</span> <span class="kc">None</span>
 
         <span class="n">interpreter</span> <span class="o">=</span> <span class="n">TRTInterpreter</span><span class="p">(</span>
@@ -654,10 +654,10 @@ document.write(`
     <span class="k">def</span><span class="w"> </span><span class="nf">lower_pass</span><span class="p">(</span>
         <span class="n">mod</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="nb">input</span><span class="p">:</span> <span class="n">Input</span><span class="p">,</span> <span class="n">lower_setting</span><span class="p">:</span> <span class="n">LowerSetting</span><span class="p">,</span> <span class="n">module_name</span><span class="p">:</span> <span class="nb">str</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Create a module transformation pass which lowers an `fx.GraphModule` into a</span>
 <span class="sd">        `TRTModule`</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">interpreter</span> <span class="o">=</span> <span class="n">create_trt_interpreter</span><span class="p">(</span><span class="n">lower_setting</span><span class="p">)</span>
         <span class="n">interp_res</span><span class="p">:</span> <span class="n">TRTInterpreterResult</span> <span class="o">=</span> <span class="n">interpreter</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="nb">input</span><span class="p">,</span> <span class="n">module_name</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">lower_setting</span><span class="o">.</span><span class="n">use_experimental_rt</span><span class="p">:</span>
@@ -675,7 +675,7 @@ document.write(`
                 <span class="n">name</span><span class="o">=</span><span class="n">module_name</span><span class="p">,</span>
                 <span class="n">input_binding_names</span><span class="o">=</span><span class="n">interp_res</span><span class="o">.</span><span class="n">input_names</span><span class="p">,</span>
                 <span class="n">output_binding_names</span><span class="o">=</span><span class="n">interp_res</span><span class="o">.</span><span class="n">output_names</span><span class="p">,</span>
-                <span class="n">target_device</span><span class="o">=</span><span class="n">Device</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;cuda:</span><span class="si">{</span><span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">current_device</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">),</span>
+                <span class="n">target_device</span><span class="o">=</span><span class="n">Device</span><span class="p">(</span><span class="sa">f</span><span class="s2">"cuda:</span><span class="si">{</span><span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">current_device</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span><span class="p">),</span>
                 <span class="c1"># cuda_graph_batch_size=lower_setting.cuda_graph_batch_size, # NOTE: Not sure what this is supposed to do</span>
             <span class="p">)</span>
             <span class="k">return</span> <span class="n">trt_module</span>
@@ -694,7 +694,7 @@ document.write(`
 
 <span class="nd">@dc</span><span class="o">.</span><span class="n">dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Lowerer</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Lowers a module using fx2trt.</span>
+<span class="w">    </span><span class="sd">"""Lowers a module using fx2trt.</span>
 
 <span class="sd">    This is a composable class to facilitate fx2trt. A normal fx2trt process</span>
 <span class="sd">    composes of the following passes to transform an `fx.GraphModule`:</span>
@@ -712,7 +712,7 @@ document.write(`
 <span class="sd">        4. Wraps the executable TRT engine into `TRTModule`, which is an `nn.Module`.</span>
 <span class="sd">        5. The converted submodule is then set back onto the top-level module</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">lower_pass_manager_builder</span><span class="p">:</span> <span class="n">LowerPassManagerBuilder</span>
 
@@ -722,8 +722,8 @@ document.write(`
         <span class="n">lower_setting</span><span class="p">:</span> <span class="n">LowerSetting</span><span class="p">,</span>
         <span class="n">interpreter_builder</span><span class="p">:</span> <span class="n">Callable</span> <span class="o">=</span> <span class="n">create_lower_trt_interpreter</span><span class="p">,</span>
         <span class="n">split_func</span><span class="p">:</span> <span class="n">Callable</span> <span class="o">=</span> <span class="n">default_split_function</span><span class="p">,</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Lowerer&quot;</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Instantiate a `Lowerer` instance.&quot;&quot;&quot;</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Lowerer"</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Instantiate a `Lowerer` instance."""</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">lower_setting</span><span class="o">.</span><span class="n">is_aten</span><span class="p">:</span>
             <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
                 <span class="n">lower_pass_manager_builder</span><span class="o">=</span><span class="n">LowerPassManagerBuilder</span><span class="p">(</span>

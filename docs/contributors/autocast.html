@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=7474ebce"></script>
+    <script src="../_static/documentation_options.js?v=7580b7c2"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -567,7 +567,7 @@ similar to
     <span class="n">min_block_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
     <span class="n">enable_autocast</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">low_precision_type</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float16</span><span class="p">,</span>   <span class="c1"># target low-precision dtype</span>
-    <span class="n">nodes_to_exclude</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;^conv2d$&quot;</span><span class="p">},</span>       <span class="c1"># regex patterns → keep fp32</span>
+    <span class="n">nodes_to_exclude</span><span class="o">=</span><span class="p">{</span><span class="s2">"^conv2d$"</span><span class="p">},</span>       <span class="c1"># regex patterns → keep fp32</span>
     <span class="n">targets_to_exclude</span><span class="o">=</span><span class="p">{},</span>
     <span class="n">data_max</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span>                        <span class="c1"># threshold for data-sensitive ops</span>
     <span class="n">max_depth_of_reduction</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
@@ -597,7 +597,7 @@ overflow in fp16).</p></li>
 <p>All other nodes are assigned the <code class="docutils literal notranslate"><span class="pre">low_precision_type</span></code>.</p>
 <p>For the example CNN in the RFC, the classifier output is:</p>
 <div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Low Precision:  relu, max_pool2d, conv2d_1, relu_1, max_pool2d_1, flatten
-High Precision: conv2d  (matches nodes_to_exclude=&quot;^conv2d$&quot;)
+High Precision: conv2d  (matches nodes_to_exclude="^conv2d$")
 </pre></div>
 </div>
 </section>

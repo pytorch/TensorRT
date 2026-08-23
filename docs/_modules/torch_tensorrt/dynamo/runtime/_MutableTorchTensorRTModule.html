@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../../_static/documentation_options.js?v=7474ebce"></script>
+    <script src="../../../../_static/documentation_options.js?v=7580b7c2"></script>
     <script src="../../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -500,7 +500,7 @@ document.write(`
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_is_modelopt_quantized</span><span class="p">(</span><span class="n">model</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return True if the model has been quantized with the modelopt library.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Return True if the model has been quantized with the modelopt library."""</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="kn">from</span><span class="w"> </span><span class="nn">modelopt.torch.quantization.nn</span><span class="w"> </span><span class="kn">import</span> <span class="n">TensorQuantizer</span>
 
@@ -523,7 +523,7 @@ document.write(`
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">RefitFlag</span><span class="p">):</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_state</span> <span class="o">=</span> <span class="n">state</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid state: </span><span class="si">{</span><span class="n">state</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Invalid state: </span><span class="si">{</span><span class="n">state</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">get_state</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RefitFlag</span><span class="p">:</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_state</span>
@@ -536,7 +536,7 @@ document.write(`
 <div class="viewcode-block" id="MutableTorchTensorRTModule">
 <a class="viewcode-back" href="../../../../py_api/torch_tensorrt.html#torch_tensorrt.MutableTorchTensorRTModule">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">MutableTorchTensorRTModule</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Initialize a MutableTorchTensorRTModule to seamlessly manipulate it like a regular PyTorch module.</span>
 <span class="sd">    All TensorRT compilation and refitting processes are handled automatically as you work with the module.</span>
 <span class="sd">    Any changes to its attributes or loading a different state_dict will trigger refitting or recompilation,</span>
@@ -545,7 +545,7 @@ document.write(`
 <span class="sd">    The MutableTorchTensorRTModule takes a PyTorch module and a set of configuration settings for the compiler.</span>
 <span class="sd">    Once compilation is complete, the module maintains the connection between the TensorRT graph module and the original PyTorch module.</span>
 <span class="sd">    Any modifications made to the MutableTorchTensorRTModule will be reflected in both the TensorRT graph module and the original PyTorch module.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
 <div class="viewcode-block" id="MutableTorchTensorRTModule.__init__">
 <a class="viewcode-back" href="../../../../py_api/torch_tensorrt.html#torch_tensorrt.MutableTorchTensorRTModule.__init__">[docs]</a>
@@ -560,7 +560,7 @@ document.write(`
         <span class="n">weight_streaming_budget</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 
 <span class="sd">        Arguments:</span>
 <span class="sd">            pytorch_model (torch.nn.module): Source module that needs to be accelerated</span>
@@ -568,7 +568,7 @@ document.write(`
 <span class="sd">        Keyword Arguments:</span>
 <span class="sd">            device (Union(torch_tensorrt.Device, torch.device, dict)): Target device for TensorRT engines to run on ::</span>
 
-<span class="sd">                device=torch_tensorrt.Device(&quot;dla:1&quot;, allow_gpu_fallback=True)</span>
+<span class="sd">                device=torch_tensorrt.Device("dla:1", allow_gpu_fallback=True)</span>
 
 <span class="sd">            disable_tf32 (bool): Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas</span>
 <span class="sd">            assume_dynamic_shape_support (bool): Setting this to true enables the converters work for both dynamic and static shapes. Default: False</span>
@@ -591,14 +591,14 @@ document.write(`
 <span class="sd">            optimization_level: (Optional[int]): Setting a higher optimization level allows TensorRT to spend longer engine building time searching for more optimization options. The resulting engine may have better performance compared to an engine built with a lower optimization level. The default optimization level is 3. Valid values include integers from 0 to the maximum optimization level, which is currently 5. Setting it to be greater than the maximum level results in identical behavior to the maximum level.</span>
 <span class="sd">            use_fast_partitioner: (bool): Use the adjacency based partitioning scheme instead of the global partitioner. Adjacency partitioning is faster but may not be optimal. Use the global paritioner (``False``) if looking for best performance</span>
 <span class="sd">            enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.</span>
-<span class="sd">            dryrun (bool): Toggle for &quot;Dryrun&quot; mode, running everything except conversion to TRT and logging outputs</span>
+<span class="sd">            dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs</span>
 <span class="sd">            hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)</span>
 <span class="sd">            timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX.</span>
 <span class="sd">            lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.</span>
 <span class="sd">            **kwargs: Any,</span>
 <span class="sd">        Returns:</span>
 <span class="sd">            MutableTorchTensorRTModule</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="c1"># The order to initialize this module is</span>
         <span class="c1"># 1. Set init_finished to False</span>
         <span class="c1"># 2. Initialize all attributes</span>
@@ -607,13 +607,13 @@ document.write(`
         <span class="c1"># After initialization, no new attribute should be added to the module __dict__</span>
         <span class="c1"># Otherwise, it will cause undefined behavior</span>
 
-        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;init_finished&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">"init_finished"</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">refit_state</span> <span class="o">=</span> <span class="n">RefitState</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">pytorch_model</span> <span class="o">=</span> <span class="n">_make_refit_change_trigger</span><span class="p">(</span><span class="n">pytorch_model</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">refit_state</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">original_model</span> <span class="o">=</span> <span class="n">pytorch_model</span>
         <span class="k">if</span> <span class="n">pytorch_model</span><span class="o">.</span><span class="n">training</span><span class="p">:</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-                <span class="s2">&quot;The model may be in training mode, which may affect the performance of the compiled model!&quot;</span>
+                <span class="s2">"The model may be in training mode, which may affect the performance of the compiled model!"</span>
             <span class="p">)</span>
         <span class="c1"># Process settings</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">gm</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span>
@@ -628,7 +628,7 @@ document.write(`
         <span class="bp">self</span><span class="o">.</span><span class="n">trt_device</span> <span class="o">=</span> <span class="n">to_torch_tensorrt_device</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
         <span class="k">assert</span> <span class="p">(</span>
             <span class="ow">not</span> <span class="n">immutable_weights</span>
-        <span class="p">),</span> <span class="s2">&quot;`immutable_weights has to be False for a MutableTorchTensorRTModule&quot;</span>
+        <span class="p">),</span> <span class="s2">"`immutable_weights has to be False for a MutableTorchTensorRTModule"</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">arg_dynamic_shapes</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">kwarg_dynamic_shapes</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
@@ -637,8 +637,8 @@ document.write(`
         <span class="bp">self</span><span class="o">.</span><span class="n">state_dict_metadata</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_store_state_dict_metadata</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">enable_weight_streaming</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;enable_weight_streaming&quot;</span><span class="p">]</span>
-            <span class="k">if</span> <span class="s2">&quot;enable_weight_streaming&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span>
+            <span class="n">kwargs</span><span class="p">[</span><span class="s2">"enable_weight_streaming"</span><span class="p">]</span>
+            <span class="k">if</span> <span class="s2">"enable_weight_streaming"</span> <span class="ow">in</span> <span class="n">kwargs</span>
             <span class="k">else</span> <span class="kc">False</span>
         <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">weight_streaming_ctx</span> <span class="o">=</span> <span class="kc">None</span>
@@ -646,7 +646,7 @@ document.write(`
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">enable_weight_streaming</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">weight_streaming_budget</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-                    <span class="s2">&quot;Weight stremaing budget is not set. Using auto weight streaming budget&quot;</span>
+                    <span class="s2">"Weight stremaing budget is not set. Using auto weight streaming budget"</span>
                 <span class="p">)</span>
 
         <span class="bp">cls</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span>
@@ -665,7 +665,7 @@ document.write(`
         <span class="n">args_dynamic_shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]],</span>
         <span class="n">kwargs_dynamic_shape</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Set the dynamic shape range. The shape hint should EXACTLY follow arg_inputs and kwarg_inputs passed to the forward function</span>
 <span class="sd">        and should not omit any entries (except None in the kwarg_inputs). If there is a nested dict/list in the input, the dynamic shape for that entry should also be an nested dict/list.</span>
 <span class="sd">        If the dynamic shape is not required for an input, an empty dictionary should be given as the shape hint for that input.</span>
@@ -675,9 +675,9 @@ document.write(`
 <span class="sd">        def forward(a, b, c=0, d=0):</span>
 <span class="sd">            pass</span>
 
-<span class="sd">        seq_len = torch.export.Dim(&quot;seq_len&quot;, min=1, max=10)</span>
+<span class="sd">        seq_len = torch.export.Dim("seq_len", min=1, max=10)</span>
 <span class="sd">        args_dynamic_shape = ({0: seq_len}, {}) # b does not have a dynamic shape</span>
-<span class="sd">        kwargs_dynamic_shape = {&#39;c&#39;: {0, seq_len}, &#39;d&#39;: {}} # d does not have a dynamic shape</span>
+<span class="sd">        kwargs_dynamic_shape = {'c': {0, seq_len}, 'd': {}} # d does not have a dynamic shape</span>
 <span class="sd">        set_expected_dynamic_shape_range(args_dynamic_shape, kwargs_dynamic_shape)</span>
 <span class="sd">        # Later when you call the function</span>
 <span class="sd">        forward(*(a, b), **{c:..., d:...})</span>
@@ -686,13 +686,13 @@ document.write(`
 <span class="sd">        Arguments:</span>
 <span class="sd">            args_dynamic_shape (tuple[dict[Any, Any]]): Dynamic shape hint for the arg_inputs,</span>
 <span class="sd">            kwargs_dynamic_shape: (dict[str, Any]): Dynamic shape hint for the kwarg_inputs</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span>
             <span class="n">args_dynamic_shape</span><span class="p">,</span> <span class="nb">tuple</span>
-        <span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;args dynamic shape has to be a tuple, but got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">args_dynamic_shape</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">),</span> <span class="sa">f</span><span class="s2">"args dynamic shape has to be a tuple, but got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">args_dynamic_shape</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
         <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span>
             <span class="n">kwargs_dynamic_shape</span><span class="p">,</span> <span class="nb">dict</span>
-        <span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;args dynamic shape has to be a dictionary, but got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">kwargs_dynamic_shape</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">),</span> <span class="sa">f</span><span class="s2">"args dynamic shape has to be a dictionary, but got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">kwargs_dynamic_shape</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">kwarg_dynamic_shapes</span> <span class="o">=</span> <span class="n">kwargs_dynamic_shape</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">arg_dynamic_shapes</span> <span class="o">=</span> <span class="n">args_dynamic_shape</span>
 
@@ -770,13 +770,13 @@ document.write(`
 <div class="viewcode-block" id="MutableTorchTensorRTModule.refit_gm">
 <a class="viewcode-back" href="../../../../py_api/torch_tensorrt.html#torch_tensorrt.MutableTorchTensorRTModule.refit_gm">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">refit_gm</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Refit the TRT graph module with any updates.</span>
 <span class="sd">        This function should be called whenever the weight values get changed but the weight structure remains</span>
 <span class="sd">        the same.</span>
 <span class="sd">        MutableTorchTensorRTModule automatically catches weight value updates and call this function to refit the module.</span>
 <span class="sd">        If it fails to catch the changes, please call this function manually to update the TRT graph module.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">exp_program</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">original_model</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">to_torch_device</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">trt_device</span><span class="p">))</span>
@@ -828,7 +828,7 @@ document.write(`
                 <span class="k">assert</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">quantize_op</span><span class="o">.</span><span class="n">default</span>
             <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
                 <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-                    <span class="s2">&quot;Unable to import quantization op. Please install modelopt library (https://github.com/NVIDIA/TensorRT-Model-Optimizer?tab=readme-ov-file#installation) to add support for compiling quantized models&quot;</span>
+                    <span class="s2">"Unable to import quantization op. Please install modelopt library (https://github.com/NVIDIA/TensorRT-Model-Optimizer?tab=readme-ov-file#installation) to add support for compiling quantized models"</span>
                 <span class="p">)</span>
             <span class="k">with</span> <span class="n">export_torch_mode</span><span class="p">():</span>
                 <span class="k">return</span> <span class="n">export_fn</span><span class="p">()</span>
@@ -838,12 +838,12 @@ document.write(`
 <div class="viewcode-block" id="MutableTorchTensorRTModule.compile">
 <a class="viewcode-back" href="../../../../py_api/torch_tensorrt.html#torch_tensorrt.MutableTorchTensorRTModule.compile">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">compile</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        (Re)compile the TRT graph module using the PyTorch module.</span>
 <span class="sd">        This function should be called whenever the weight structure get changed (shape, more layers...)</span>
 <span class="sd">        MutableTorchTensorRTModule automatically catches weight value updates and call this function to recompile.</span>
 <span class="sd">        If it fails to catch the changes, please call this function manually to recompile the TRT graph module.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="c1"># Export the module</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">original_model</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">to_torch_device</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">trt_device</span><span class="p">))</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">exp_program</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_exported_program</span><span class="p">()</span>
@@ -854,7 +854,7 @@ document.write(`
             <span class="n">immutable_weights</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
             <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">additional_settings</span><span class="p">,</span>
         <span class="p">)</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">additional_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;offload_module_to_cpu&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">additional_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"offload_module_to_cpu"</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
             <span class="n">deallocate_module</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">original_model</span><span class="p">)</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">enable_weight_streaming</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">set_weight_streaming_ctx</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">weight_streaming_budget</span><span class="p">)</span></div>
@@ -863,10 +863,10 @@ document.write(`
 <div class="viewcode-block" id="MutableTorchTensorRTModule.set_weight_streaming_ctx">
 <a class="viewcode-back" href="../../../../py_api/torch_tensorrt.html#torch_tensorrt.MutableTorchTensorRTModule.set_weight_streaming_ctx">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">set_weight_streaming_ctx</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">requested_budget</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Set the weight streaming budget. If budget is not set, then automatic weight streaming budget</span>
 <span class="sd">        is used.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">weight_streaming_ctx</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">weight_streaming</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">gm</span><span class="p">)</span>
         <span class="n">requested_budget</span> <span class="o">=</span> <span class="p">(</span>
             <span class="n">requested_budget</span>
@@ -879,13 +879,13 @@ document.write(`
     <span class="k">def</span><span class="w"> </span><span class="nf">_validate_inputs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">arg_inputs</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">kwarg_inputs</span><span class="p">:</span>
-            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;First time compilation initiated. This may take some time.&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"First time compilation initiated. This may take some time."</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">refit_state</span><span class="o">.</span><span class="n">set_state</span><span class="p">(</span><span class="n">RefitFlag</span><span class="o">.</span><span class="n">NEEDS_RECOMPILE</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_store_inputs</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">)</span>
             <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">arg_dynamic_shapes</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">kwarg_dynamic_shapes</span><span class="p">:</span>
                 <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_validates_dynamic_hints</span><span class="p">():</span>
                     <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-                        <span class="s2">&quot;Invalid dynamic shape hint. Compiling module for the provided input shapes (static)&quot;</span>
+                        <span class="s2">"Invalid dynamic shape hint. Compiling module for the provided input shapes (static)"</span>
                     <span class="p">)</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">arg_dynamic_shapes</span> <span class="o">=</span> <span class="kc">None</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">kwarg_dynamic_shapes</span> <span class="o">=</span> <span class="kc">None</span>
@@ -898,14 +898,14 @@ document.write(`
             <span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">MutableTorchTensorRTModule</span><span class="o">.</span><span class="n">_check_inputs_shape</span><span class="p">(</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">kwarg_inputs</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">,</span> <span class="n">dynamic_shapes</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">kwarg_dynamic_shapes</span>
             <span class="p">):</span>
-                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Input change detected.&quot;</span><span class="p">)</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"Input change detected."</span><span class="p">)</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">refit_state</span><span class="o">.</span><span class="n">set_state</span><span class="p">(</span><span class="n">RefitFlag</span><span class="o">.</span><span class="n">NEEDS_RECOMPILE</span><span class="p">)</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">_store_inputs</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">)</span>
         <span class="k">except</span> <span class="n">DynamicShapeOutOfRangeException</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Input change detected.&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"Input change detected."</span><span class="p">)</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-                <span class="s2">&quot;Provided inputs are outside the set expected shape range, recompiling module for the provided input shapes (static)&quot;</span>
+                <span class="s2">"Provided inputs are outside the set expected shape range, recompiling module for the provided input shapes (static)"</span>
             <span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">arg_dynamic_shapes</span> <span class="o">=</span> <span class="kc">None</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">kwarg_dynamic_shapes</span> <span class="o">=</span> <span class="kc">None</span>
@@ -915,21 +915,21 @@ document.write(`
     <span class="k">def</span><span class="w"> </span><span class="nf">_validates_dynamic_hints</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">arg_dynamic_shapes</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">arg_inputs</span><span class="p">:</span>
-                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;arg_dynamic_shape is not provided!&quot;</span><span class="p">)</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">"arg_dynamic_shape is not provided!"</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">arg_dynamic_shapes</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">arg_inputs</span><span class="p">):</span>
                 <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;Warning: The length of arg_inputs is </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">arg_inputs</span><span class="p">)</span><span class="si">}</span><span class="s2"> but the length of arg_dynamic_shape is </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">arg_dynamic_shapes</span><span class="p">)</span><span class="si">}</span><span class="s2">!&quot;</span>
+                    <span class="sa">f</span><span class="s2">"Warning: The length of arg_inputs is </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">arg_inputs</span><span class="p">)</span><span class="si">}</span><span class="s2"> but the length of arg_dynamic_shape is </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">arg_dynamic_shapes</span><span class="p">)</span><span class="si">}</span><span class="s2">!"</span>
                 <span class="p">)</span>
                 <span class="k">return</span> <span class="kc">False</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">kwarg_dynamic_shapes</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">kwarg_inputs</span><span class="p">:</span>
-                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;kwarg_dynamic_shape is not provided!&quot;</span><span class="p">)</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">"kwarg_dynamic_shape is not provided!"</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">kwarg_dynamic_shapes</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">kwarg_inputs</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
                 <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;kwarg_inputs has </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">kwarg_inputs</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span><span class="si">}</span><span class="s2"> but kwarg_dynamic_shape has </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">kwarg_dynamic_shapes</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span><span class="si">}</span><span class="s2">! You may need to exclude keyword arguments with value None.&quot;</span>
+                    <span class="sa">f</span><span class="s2">"kwarg_inputs has </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">kwarg_inputs</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span><span class="si">}</span><span class="s2"> but kwarg_dynamic_shape has </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">kwarg_dynamic_shapes</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span><span class="si">}</span><span class="s2">! You may need to exclude keyword arguments with value None."</span>
                 <span class="p">)</span>
                 <span class="k">return</span> <span class="kc">False</span>
 
@@ -963,13 +963,13 @@ document.write(`
                 <span class="p">)</span>
 
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;Invalid input type </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span><span class="si">}</span><span class="s2"> encountered in the input. &quot;</span>
-            <span class="o">+</span> <span class="s2">&quot;Allowed input types: {torch_tensorrt.Input, torch.Tensor, list, tuple, dict}&quot;</span>
+            <span class="sa">f</span><span class="s2">"Invalid input type </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span><span class="si">}</span><span class="s2"> encountered in the input. "</span>
+            <span class="o">+</span> <span class="s2">"Allowed input types: {torch_tensorrt.Input, torch.Tensor, list, tuple, dict}"</span>
         <span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
         <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
-            <span class="s2">&quot;Direct calls to </span><span class="si">{self.__class__}</span><span class="s2">.forward() are currently broken by due to https://github.com/pytorch/pytorch/issues/157183. Either call </span><span class="si">{self.__class__}</span><span class="s2">(...) directly or use </span><span class="si">{self.__class__}</span><span class="s2">._forward as a work around&quot;</span>
+            <span class="s2">"Direct calls to </span><span class="si">{self.__class__}</span><span class="s2">.forward() are currently broken by due to https://github.com/pytorch/pytorch/issues/157183. Either call </span><span class="si">{self.__class__}</span><span class="s2">(...) directly or use </span><span class="si">{self.__class__}</span><span class="s2">._forward as a work around"</span>
         <span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_forward</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
@@ -985,18 +985,18 @@ document.write(`
 
         <span class="c1"># Step 3: Refit/recompile accordingly</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">refit_state</span><span class="o">.</span><span class="n">get_state</span><span class="p">()</span> <span class="o">==</span> <span class="n">RefitFlag</span><span class="o">.</span><span class="n">NEEDS_RECOMPILE</span><span class="p">:</span>
-            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;(Re)Compiling the engine...&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"(Re)Compiling the engine..."</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">compile</span><span class="p">()</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_store_state_dict_metadata</span><span class="p">()</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">refit_state</span><span class="o">.</span><span class="n">set_state</span><span class="p">(</span><span class="n">RefitFlag</span><span class="o">.</span><span class="n">LIVE</span><span class="p">)</span>
 
         <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">refit_state</span><span class="o">.</span><span class="n">get_state</span><span class="p">()</span> <span class="o">==</span> <span class="n">RefitFlag</span><span class="o">.</span><span class="n">NEEDS_REFIT</span><span class="p">:</span>
-            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Model weight change detected. Refitting the module...&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"Model weight change detected. Refitting the module..."</span><span class="p">)</span>
             <span class="k">try</span><span class="p">:</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">refit_gm</span><span class="p">()</span>
             <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
                 <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
-                <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Model refit failed. Recompiling the graph module.&quot;</span><span class="p">)</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">"Model refit failed. Recompiling the graph module."</span><span class="p">)</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">compile</span><span class="p">()</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">_store_state_dict_metadata</span><span class="p">()</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">refit_state</span><span class="o">.</span><span class="n">set_state</span><span class="p">(</span><span class="n">RefitFlag</span><span class="o">.</span><span class="n">LIVE</span><span class="p">)</span>
@@ -1011,9 +1011,9 @@ document.write(`
 
     <span class="k">def</span><span class="w"> </span><span class="nf">to</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-            <span class="s2">&quot;Trying to move the original PyTorch model. This will cause CPU offloading failing and increase GPU memory usage.&quot;</span>
-            <span class="o">+</span> <span class="s2">&quot;If this is absolute necessary, please call module.pytorch_model.to(...) </span><span class="se">\n</span><span class="s2">&quot;</span>
-            <span class="o">+</span> <span class="s2">&quot;The model is still on the original device.&quot;</span>
+            <span class="s2">"Trying to move the original PyTorch model. This will cause CPU offloading failing and increase GPU memory usage."</span>
+            <span class="o">+</span> <span class="s2">"If this is absolute necessary, please call module.pytorch_model.to(...) </span><span class="se">\n</span><span class="s2">"</span>
+            <span class="o">+</span> <span class="s2">"The model is still on the original device."</span>
         <span class="p">)</span>
 
     <span class="nd">@property</span>
@@ -1025,7 +1025,7 @@ document.write(`
         <span class="n">result</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span>
         <span class="n">memo</span><span class="p">[</span><span class="nb">id</span><span class="p">(</span><span class="bp">self</span><span class="p">)]</span> <span class="o">=</span> <span class="n">result</span>
         <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-            <span class="k">if</span> <span class="n">k</span> <span class="o">!=</span> <span class="s2">&quot;pytorch_model&quot;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">k</span> <span class="o">!=</span> <span class="s2">"pytorch_model"</span><span class="p">:</span>
                 <span class="nb">setattr</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">deepcopy</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">memo</span><span class="p">))</span>
         <span class="n">result</span><span class="o">.</span><span class="n">pytorch_model</span> <span class="o">=</span> <span class="n">_make_refit_change_trigger</span><span class="p">(</span>
             <span class="n">result</span><span class="o">.</span><span class="n">original_model</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">refit_state</span>
@@ -1042,9 +1042,9 @@ document.write(`
             <span class="c1"># this object has it</span>
             <span class="k">return</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
 
-        <span class="k">if</span> <span class="s2">&quot;pytorch_model&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="p">:</span>
+        <span class="k">if</span> <span class="s2">"pytorch_model"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">AttributeError</span><span class="p">(</span>
-                <span class="s2">&quot;Module is not properly initiated. Pytorch model is not found in the module.&quot;</span>
+                <span class="s2">"Module is not properly initiated. Pytorch model is not found in the module."</span>
             <span class="p">)</span>
 
         <span class="k">return</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pytorch_model</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
@@ -1089,7 +1089,7 @@ document.write(`
                 <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="ow">and</span> <span class="n">a</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">b</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
                     <span class="k">if</span> <span class="n">dynamic_shapes</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                         <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-                            <span class="s2">&quot;Dynamic shape is not properly set but the input shape is changed!&quot;</span>
+                            <span class="s2">"Dynamic shape is not properly set but the input shape is changed!"</span>
                         <span class="p">)</span>
                         <span class="k">return</span> <span class="kc">False</span>
                     <span class="k">else</span><span class="p">:</span>
@@ -1111,7 +1111,7 @@ document.write(`
                 <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">va</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="ow">and</span> <span class="n">va</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">vb</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
                     <span class="k">if</span> <span class="n">dynamic_shapes</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                         <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-                            <span class="s2">&quot;Dynamic shape is not properly set but the input shape is changed!&quot;</span>
+                            <span class="s2">"Dynamic shape is not properly set but the input shape is changed!"</span>
                         <span class="p">)</span>
                         <span class="k">return</span> <span class="kc">False</span>
                     <span class="k">else</span><span class="p">:</span>
@@ -1136,13 +1136,13 @@ document.write(`
             <span class="k">if</span> <span class="n">axis_0</span> <span class="o">!=</span> <span class="n">axis_1</span><span class="p">:</span>
                 <span class="k">if</span> <span class="n">i</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">dynamic_shape</span><span class="p">:</span>
                     <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-                        <span class="s2">&quot;Dynamic shape does not include the axis on which input changes!&quot;</span>
+                        <span class="s2">"Dynamic shape does not include the axis on which input changes!"</span>
                     <span class="p">)</span>
                     <span class="k">return</span> <span class="kc">False</span>
                 <span class="n">dyn</span> <span class="o">=</span> <span class="n">dynamic_shape</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
                 <span class="k">if</span> <span class="n">axis_1</span> <span class="o">&gt;</span> <span class="n">dyn</span><span class="o">.</span><span class="n">max</span> <span class="ow">or</span> <span class="n">axis_1</span> <span class="o">&lt;</span> <span class="n">dyn</span><span class="o">.</span><span class="n">min</span><span class="p">:</span>
                     <span class="k">raise</span> <span class="n">DynamicShapeOutOfRangeException</span><span class="p">(</span>
-                        <span class="sa">f</span><span class="s2">&quot;Dimension (</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">) of new input tensor is not the range of supported shapes (saw: (</span><span class="si">{</span><span class="n">axis_1</span><span class="si">}</span><span class="s2">), expected: [</span><span class="si">{</span><span class="n">dyn</span><span class="o">.</span><span class="n">min</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">dyn</span><span class="o">.</span><span class="n">max</span><span class="si">}</span><span class="s2">])&quot;</span>
+                        <span class="sa">f</span><span class="s2">"Dimension (</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">) of new input tensor is not the range of supported shapes (saw: (</span><span class="si">{</span><span class="n">axis_1</span><span class="si">}</span><span class="s2">), expected: [</span><span class="si">{</span><span class="n">dyn</span><span class="o">.</span><span class="n">min</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">dyn</span><span class="o">.</span><span class="n">max</span><span class="si">}</span><span class="s2">])"</span>
                     <span class="p">)</span>
 
         <span class="k">return</span> <span class="kc">True</span>
@@ -1154,7 +1154,7 @@ document.write(`
             <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
                 <span class="k">for</span> <span class="n">axis</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">obj</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
                     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">dynamic_shapes</span><span class="o">.</span><span class="n">_Dim</span><span class="p">):</span>
-                        <span class="n">name</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">v</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;&#39;&quot;</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+                        <span class="n">name</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">v</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">"'"</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">"."</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
                         <span class="c1"># We use string of the hash to be the unique identifier of Dim object</span>
                         <span class="n">dims</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="nb">hash</span><span class="p">(</span><span class="n">v</span><span class="p">)),</span> <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">v</span><span class="o">.</span><span class="n">min</span><span class="p">,</span> <span class="n">v</span><span class="o">.</span><span class="n">max</span><span class="p">))</span>
                         <span class="n">obj</span><span class="p">[</span><span class="n">axis</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="nb">hash</span><span class="p">(</span><span class="n">v</span><span class="p">))</span>
@@ -1234,16 +1234,16 @@ document.write(`
         <span class="k">return</span> <span class="n">module</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_reset_stateful_cache</span><span class="p">(</span><span class="n">obj</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Does nothing. Support Huggingface CPU offload hooks. Override the huggingface cache reset function because we don&#39;t want the TRT module to be handled by HuggingFace.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Does nothing. Support Huggingface CPU offload hooks. Override the huggingface cache reset function because we don't want the TRT module to be handled by HuggingFace.</span>
+<span class="sd">        """</span>
         <span class="k">return</span></div>
 
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">recursively_remove_trigger</span><span class="p">(</span><span class="n">obj</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
     <span class="c1"># Not safe: If the object has a circular reference (such as a doubly linkded list), this will cause infinite recursion</span>
-    <span class="k">if</span> <span class="n">obj</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;ChangeTriggerWrapper&quot;</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">obj</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">==</span> <span class="s2">"ChangeTriggerWrapper"</span><span class="p">:</span>
         <span class="n">obj</span> <span class="o">=</span> <span class="n">obj</span><span class="o">.</span><span class="n">instance</span>
 
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
@@ -1253,11 +1253,11 @@ document.write(`
         <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">obj</span><span class="p">):</span>
             <span class="n">obj</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">recursively_remove_trigger</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="s2">&quot;__dict__&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="p">(</span><span class="nb">type</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="s2">"__dict__"</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="p">(</span><span class="nb">type</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)):</span>
             <span class="k">return</span> <span class="n">obj</span>
         <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">obj</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-            <span class="k">if</span> <span class="n">k</span><span class="p">[:</span><span class="mi">2</span><span class="p">]</span> <span class="o">!=</span> <span class="s2">&quot;__&quot;</span> <span class="ow">or</span> <span class="n">k</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">:]</span> <span class="o">!=</span> <span class="s2">&quot;__&quot;</span><span class="p">:</span>
-                <span class="c1"># We don&#39;t want to touch some built in attribute such as __dict__</span>
+            <span class="k">if</span> <span class="n">k</span><span class="p">[:</span><span class="mi">2</span><span class="p">]</span> <span class="o">!=</span> <span class="s2">"__"</span> <span class="ow">or</span> <span class="n">k</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">:]</span> <span class="o">!=</span> <span class="s2">"__"</span><span class="p">:</span>
+                <span class="c1"># We don't want to touch some built in attribute such as __dict__</span>
                 <span class="nb">setattr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">recursively_remove_trigger</span><span class="p">(</span><span class="n">v</span><span class="p">))</span>
 
     <span class="k">return</span> <span class="n">obj</span>
@@ -1272,7 +1272,7 @@ document.write(`
         <span class="c1"># of ChangeTriggerWrapper, instead of the object itself, thus be recursively wrapped by ChangeTriggerWrapper.</span>
 
         <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obj</span><span class="p">:</span> <span class="n">Any</span><span class="p">):</span>
-            <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;instance&quot;</span><span class="p">,</span> <span class="n">obj</span><span class="p">)</span>
+            <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">"instance"</span><span class="p">,</span> <span class="n">obj</span><span class="p">)</span>
 
         <span class="k">def</span><span class="w"> </span><span class="fm">__getattr__</span><span class="p">(</span>
             <span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
@@ -1282,7 +1282,7 @@ document.write(`
                 <span class="c1"># Whenever the user retrieve an attribute that could be related to weights, we set the state to UNKNOWN</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">_on_change</span><span class="p">()</span>
             <span class="k">if</span> <span class="p">(</span>
-                <span class="nb">hasattr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="s2">&quot;__dict__&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">ModuleList</span><span class="p">,</span> <span class="nb">list</span><span class="p">))</span>
+                <span class="nb">hasattr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="s2">"__dict__"</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">ModuleList</span><span class="p">,</span> <span class="nb">list</span><span class="p">))</span>
             <span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
                 <span class="n">obj</span><span class="p">,</span> <span class="n">ChangeTriggerWrapper</span>
             <span class="p">):</span>  <span class="c1"># prevent nesting wrapper</span>
@@ -1292,8 +1292,8 @@ document.write(`
         <span class="k">def</span><span class="w"> </span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
             <span class="c1"># If we need to set __dict__ or instance, we directly set it to the trigger wrapper.</span>
             <span class="c1"># Enable setting __dict__ is because PyTorch proxy uses __new__ to initialize a shallow copy</span>
-            <span class="c1"># of a module and explicit set the __dict__. If we don&#39;t set __dict__ it will get infinite recursion.</span>
-            <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;__dict__&quot;</span><span class="p">,</span> <span class="s2">&quot;instance&quot;</span><span class="p">]:</span>
+            <span class="c1"># of a module and explicit set the __dict__. If we don't set __dict__ it will get infinite recursion.</span>
+            <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">"__dict__"</span><span class="p">,</span> <span class="s2">"instance"</span><span class="p">]:</span>
                 <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
                 <span class="k">return</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_on_change</span><span class="p">()</span>
@@ -1311,7 +1311,7 @@ document.write(`
         <span class="k">def</span><span class="w"> </span><span class="nf">_on_change</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">refit_state</span><span class="o">.</span><span class="n">set_state</span><span class="p">(</span><span class="n">RefitFlag</span><span class="o">.</span><span class="n">UNKNOWN</span><span class="p">)</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-                <span class="s2">&quot;Attribute modification detected. The module will be refitted later.&quot;</span>
+                <span class="s2">"Attribute modification detected. The module will be refitted later."</span>
             <span class="p">)</span>
 
         <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>

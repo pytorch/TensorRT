@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=7474ebce"></script>
+    <script src="../../_static/documentation_options.js?v=7580b7c2"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -623,13 +623,13 @@ will run in TRT vs. PyTorch.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
     <span class="n">exp_program</span><span class="p">,</span>
     <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
-    <span class="n">dryrun</span><span class="o">=</span><span class="s2">&quot;/tmp/partition_report.txt&quot;</span><span class="p">,</span>
+    <span class="n">dryrun</span><span class="o">=</span><span class="s2">"/tmp/partition_report.txt"</span><span class="p">,</span>
 <span class="p">)</span>
 </pre></div>
 </div>
 <p><code class="docutils literal notranslate"><span class="pre">dryrun</span></code> is a <code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.CompilationSettings</span></code> parameter and can
 also be passed via <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code>:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s2">&quot;tensorrt&quot;</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;dryrun&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">})</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s2">"tensorrt"</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="p">{</span><span class="s2">"dryrun"</span><span class="p">:</span> <span class="kc">True</span><span class="p">})</span>
 <span class="n">trt_model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>  <span class="c1"># report printed on first forward pass</span>
 </pre></div>
 </div>
@@ -707,7 +707,7 @@ optimal. For mixed models, the recommendation helps you balance coverage vs. ove
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Step 1: run dryrun with a loose min_block_size to see the full partition map</span>
 <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
     <span class="n">exp_program</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
-    <span class="n">dryrun</span><span class="o">=</span><span class="s2">&quot;/tmp/report_loose.txt&quot;</span><span class="p">,</span>
+    <span class="n">dryrun</span><span class="o">=</span><span class="s2">"/tmp/report_loose.txt"</span><span class="p">,</span>
     <span class="n">min_block_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
 <span class="p">)</span>
 
@@ -734,7 +734,7 @@ optimal. For mixed models, the recommendation helps you balance coverage vs. ove
 <li><p>Check the converter’s capability validator:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.partitioning</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_graph_converter_support</span>
 <span class="n">n_supported</span><span class="p">,</span> <span class="n">n_total</span> <span class="o">=</span> <span class="n">get_graph_converter_support</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">torch_executed_ops</span><span class="o">=</span><span class="nb">set</span><span class="p">())</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">n_supported</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">n_total</span><span class="si">}</span><span class="s2"> ops supported&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">n_supported</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">n_total</span><span class="si">}</span><span class="s2"> ops supported"</span><span class="p">)</span>
 </pre></div>
 </div>
 </li>
@@ -749,7 +749,7 @@ confirm.</p></li>
 <h2>Saving the Report<a class="headerlink" href="#saving-the-report" title="Link to this heading">#</a></h2>
 <p>Pass a string path to <code class="docutils literal notranslate"><span class="pre">dryrun</span></code> to persist the report:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
-    <span class="n">exp_program</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span> <span class="n">dryrun</span><span class="o">=</span><span class="s2">&quot;/tmp/report.txt&quot;</span>
+    <span class="n">exp_program</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span> <span class="n">dryrun</span><span class="o">=</span><span class="s2">"/tmp/report.txt"</span>
 <span class="p">)</span>
 </pre></div>
 </div>
@@ -757,7 +757,7 @@ confirm.</p></li>
 Remove the old file manually before rerunning.</p>
 <p>The dryrun output is also available at <code class="docutils literal notranslate"><span class="pre">DEBUG</span></code> log level even when <code class="docutils literal notranslate"><span class="pre">dryrun=False</span></code>:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
-<span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">&quot;torch_tensorrt&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+<span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">"torch_tensorrt"</span><span class="p">)</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>

@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=7474ebce"></script>
+    <script src="../../../_static/documentation_options.js?v=7580b7c2"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -608,17 +608,17 @@ import torch_tensorrt
 from accelerate import PartialState
 from diffusers import DiffusionPipeline
 
-model_id = &quot;CompVis/stable-diffusion-v1-4&quot;
+model_id = "CompVis/stable-diffusion-v1-4"
 
 # Instantiate Stable Diffusion Pipeline with FP16 weights
 pipe = DiffusionPipeline.from_pretrained(
-    model_id, revision=&quot;fp16&quot;, torch_dtype=torch.float16
+    model_id, revision="fp16", torch_dtype=torch.float16
 )
 
 distributed_state = PartialState()
 pipe = pipe.to(distributed_state.device)
 
-backend = &quot;torch_tensorrt&quot;
+backend = "torch_tensorrt"
 
 # Optimize the UNet portion with Torch-TensorRT
 pipe.unet = torch.compile(  # %%
@@ -628,8 +628,8 @@ pipe.unet = torch.compile(  # %%
     pipe.unet,
     backend=backend,
     options={
-        &quot;truncate_long_and_double&quot;: True,
-        &quot;precision&quot;: torch.float16,
+        "truncate_long_and_double": True,
+        "precision": torch.float16,
     },
     dynamic=False,
 )
@@ -645,9 +645,9 @@ torch_tensorrt.runtime.set_multi_device_safe_mode(True)
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Assume there are 2 processes (2 devices)
-with distributed_state.split_between_processes([&quot;a dog&quot;, &quot;a cat&quot;]) as prompt:
+with distributed_state.split_between_processes(["a dog", "a cat"]) as prompt:
     result = pipe(prompt).images[0]
-    result.save(f&quot;result_{distributed_state.process_index}.png&quot;)
+    result.save(f"result_{distributed_state.process_index}.png")
 </pre></div>
 </div>
 </div>

@@ -1,0 +1,13 @@
+.. _exhale_function_trtorch_8h_1a726f6e7091b6b7be45b5a4275b2ffb10:
+
+Function trtorch::dump_build_info
+=================================
+
+- Defined in :ref:`file_cpp_include_trtorch_trtorch.h`
+
+
+Function Documentation
+----------------------
+
+
+.. doxygenfunction:: trtorch::dump_build_info()
