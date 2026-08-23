@@ -79,8 +79,9 @@ jobs:
         export PATH="${RUNNER_TEMP}/bin:${PATH}"
         bazel --version
 
-        # ExecuTorch's CUDA wheels are published only on the PyTorch nightly index, and the
-        # pin is a dev version, which the requirement itself already admits.
+        # ExecuTorch's CUDA wheels are published only on the PyTorch nightly index, so the
+        # channel is needed. No --pre: a specifier naming a prerelease admits prereleases by
+        # itself, and --pre would apply to every other requirement in the same command too.
         # CU_VERSION selects the row's own channel, which is what keeps the runtime the
         # delegate links to the same CUDA build as the rest of the job.
         EXECUTORCH_INDEX_URL="https://download.pytorch.org/whl/nightly/${CU_VERSION}"

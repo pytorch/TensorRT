@@ -48,7 +48,8 @@ local_torch = use_repo_rule("//toolchains:local_torch.bzl", "local_torch")
 # This commit must be the one the pinned ExecuTorch wheel was built from, because the delegate
 # compiles headers from this tree and links the runtime out of that wheel. Every wheel records
 # its source in executorch/version.py as git_version, and tests/py/dynamo/executorch/
-# test_executorch_pin.py asserts the two agree, so bump both pins together.
+# test_executorch_pin.py checks the two agree wherever the pinned wheel is the one installed,
+# so bump both pins together.
 new_git_repository(
     name = "executorch",
     build_file = "@//third_party/executorch:BUILD",

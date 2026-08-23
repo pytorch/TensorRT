@@ -64,7 +64,10 @@ fi
 if [[ ${PLATFORM} == win32 ]]; then
     python -m pip install ${RUNNER_ARTIFACT_DIR}/torch_tensorrt*.whl
 else
-    python -m pip install /opt/torch-tensorrt-builds/torch_tensorrt*.whl --use-deprecated=legacy-resolver
+    # The nightly channel is needed because this glob also matches the ExecuTorch runtime wheel,
+    # whose install_requires names an ExecuTorch dev build that is published only there.
+    python -m pip install /opt/torch-tensorrt-builds/torch_tensorrt*.whl --use-deprecated=legacy-resolver \
+        --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}"
 fi
 
 echo -e "Running test script";

@@ -27,12 +27,15 @@ def _executorch_requirement() -> str:
     # Read the pin the way the drift test does, so this file is not a second
     # place to edit when it moves. Regex rather than yaml: the runner declares
     # no runtime dependencies of its own and importing it should not add one.
+    #
+    # Exact, not a range: the nightly channel gains a member every day, so a
+    # range would install whatever is newest while the delegate is compiled
+    # from the pinned commit. Pairing them is the point.
     text = (REPO_ROOT / "dev_dep_versions.yml").read_text()
     version = dict(re.findall(r'^(__\w+__): "([^"]+)"', text, re.MULTILINE))[
         "__executorch_version__"
     ]
-    major, minor = version.split(".")[:2]
-    return f"executorch>={version},<{major}.{int(minor) + 1}"
+    return f"executorch=={version}"
 
 
 # Known transient cudagraph/TRT-driver flake signatures. Expand ONLY with
