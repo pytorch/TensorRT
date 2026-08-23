@@ -14,6 +14,7 @@ from torch_tensorrt.dynamo.conversion.impl import (
     full,
     grid,
     index_copy,
+    linalg,
     linear,
     matmul,
     nccl_ops,

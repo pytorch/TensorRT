@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=7474ebce"></script>
+    <script src="../../../_static/documentation_options.js?v=7580b7c2"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -537,13 +537,13 @@ from torch.export import export
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>B, H, S_MAX, D = 1, 4, 16, 8
-cache_proto = torch.zeros(B, H, S_MAX, D, device=&quot;cuda&quot;)
-update_proto = torch.ones(B, H, 1, D, device=&quot;cuda&quot;)
+cache_proto = torch.zeros(B, H, S_MAX, D, device="cuda")
+update_proto = torch.ones(B, H, 1, D, device="cuda")
 
 ep = export(KVStep().cuda(), (cache_proto.clone(), update_proto.clone()))
 compiled = torch_tensorrt.compile(
     ep,
-    ir=&quot;dynamo&quot;,
+    ir="dynamo",
     inputs=[cache_proto.clone(), update_proto.clone()],
     enabled_precisions={torch.float32},
     min_block_size=1,
@@ -561,9 +561,9 @@ compiled = torch_tensorrt.compile(
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>for _, mod in compiled.named_modules():
-    if hasattr(mod, &quot;aliased_io&quot;) and mod.aliased_io:
+    if hasattr(mod, "aliased_io") and mod.aliased_io:
         for out, (inp, kind) in mod.aliased_io.items():
-            print(f&quot;  {out}  &lt;-aliased-&gt;  {inp}  (kind={kind})&quot;)
+            print(f"  {out}  &lt;-aliased-&gt;  {inp}  (kind={kind})")
 </pre></div>
 </div>
 </div>
@@ -575,17 +575,17 @@ compiled = torch_tensorrt.compile(
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>cache = torch.zeros(B, H, S_MAX, D, device=&quot;cuda&quot;)
-update = torch.ones(B, H, 1, D, device=&quot;cuda&quot;) * 7.0
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>cache = torch.zeros(B, H, S_MAX, D, device="cuda")
+update = torch.ones(B, H, 1, D, device="cuda") * 7.0
 cache_id_before = id(cache)
 cache_ptr_before = cache.data_ptr()
 
 returned = compiled(cache, update)
 
-print(f&quot;\nreturned: {returned.item()}  (expected {7.0 * H * D})&quot;)
-print(f&quot;cache.sum(): {cache.sum().item()}  (expected {7.0 * H * D})&quot;)
-print(f&quot;id preserved: {id(cache) == cache_id_before}&quot;)
-print(f&quot;data_ptr preserved: {cache.data_ptr() == cache_ptr_before}&quot;)
+print(f"\nreturned: {returned.item()}  (expected {7.0 * H * D})")
+print(f"cache.sum(): {cache.sum().item()}  (expected {7.0 * H * D})")
+print(f"id preserved: {id(cache) == cache_id_before}")
+print(f"data_ptr preserved: {cache.data_ptr() == cache_ptr_before}")
 </pre></div>
 </div>
 </div>
@@ -597,10 +597,10 @@ print(f&quot;data_ptr preserved: {cache.data_ptr() == cache_ptr_before}&quot;)
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>cache = torch.zeros(B, H, S_MAX, D, device=&quot;cuda&quot;)
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>cache = torch.zeros(B, H, S_MAX, D, device="cuda")
 for step, scale in enumerate([1.0, 5.0, 0.0]):
-    compiled(cache, torch.ones(B, H, 1, D, device=&quot;cuda&quot;) * scale)
-    print(f&quot;step {step}: cache.sum() = {cache.sum().item()}&quot;)
+    compiled(cache, torch.ones(B, H, 1, D, device="cuda") * scale)
+    print(f"step {step}: cache.sum() = {cache.sum().item()}")
 </pre></div>
 </div>
 </div>

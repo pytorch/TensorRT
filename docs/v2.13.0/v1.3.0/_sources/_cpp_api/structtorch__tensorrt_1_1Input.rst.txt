@@ -1,0 +1,26 @@
+.. _exhale_struct_structtorch__tensorrt_1_1Input:
+
+Struct Input
+============
+
+- Defined in :ref:`file_cpp_include_torch_tensorrt_torch_tensorrt.h`
+
+
+Inheritance Relationships
+-------------------------
+
+Base Type
+*********
+
+- ``public CustomClassHolder``
+
+
+Struct Documentation
+--------------------
+
+
+.. doxygenstruct:: torch_tensorrt::Input
+   :project: Torch-TensorRT
+   :members:
+   :protected-members:
+   :undoc-members:

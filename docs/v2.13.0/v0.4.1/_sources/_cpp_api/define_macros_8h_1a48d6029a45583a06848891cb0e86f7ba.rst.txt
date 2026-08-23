@@ -1,0 +1,13 @@
+.. _exhale_define_macros_8h_1a48d6029a45583a06848891cb0e86f7ba:
+
+Define TRTORCH_MAJOR_VERSION
+============================
+
+- Defined in :ref:`file_cpp_include_trtorch_macros.h`
+
+
+Define Documentation
+--------------------
+
+
+.. doxygendefine:: TRTORCH_MAJOR_VERSION

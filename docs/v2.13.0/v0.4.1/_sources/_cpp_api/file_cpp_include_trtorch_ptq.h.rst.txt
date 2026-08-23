@@ -1,0 +1,82 @@
+
+.. _file_cpp_include_trtorch_ptq.h:
+
+File ptq.h
+==========
+
+|exhale_lsh| :ref:`Parent directory <dir_cpp_include_trtorch>` (``cpp/include/trtorch``)
+
+.. |exhale_lsh| unicode:: U+021B0 .. UPWARDS ARROW WITH TIP LEFTWARDS
+
+.. contents:: Contents
+   :local:
+   :backlinks: none
+
+Definition (``cpp/include/trtorch/ptq.h``)
+------------------------------------------
+
+
+.. toctree::
+   :maxdepth: 1
+
+   program_listing_file_cpp_include_trtorch_ptq.h.rst
+
+
+
+
+
+Includes
+--------
+
+
+- ``NvInfer.h``
+
+- ``fstream``
+
+- ``iostream``
+
+- ``iterator``
+
+- ``memory``
+
+- ``sstream``
+
+- ``string``
+
+- ``torch/torch.h``
+
+- ``trtorch/logging.h`` (:ref:`file_cpp_include_trtorch_logging.h`)
+
+- ``vector``
+
+
+
+
+
+
+Namespaces
+----------
+
+
+- :ref:`namespace_trtorch`
+
+- :ref:`namespace_trtorch__ptq`
+
+
+Classes
+-------
+
+
+- :ref:`exhale_class_classtrtorch_1_1ptq_1_1Int8CacheCalibrator`
+
+- :ref:`exhale_class_classtrtorch_1_1ptq_1_1Int8Calibrator`
+
+
+Functions
+---------
+
+
+- :ref:`exhale_function_ptq_8h_1a5f33b142bc2f3f2aaf462270b3ad7e31`
+
+- :ref:`exhale_function_ptq_8h_1a4422781719d7befedb364cacd91c6247`
+

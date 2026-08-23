@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=7474ebce"></script>
+    <script src="../../../_static/documentation_options.js?v=7580b7c2"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -476,10 +476,12 @@ document.write(`
   <h1>Source code for torch_tensorrt.dynamo._exporter</h1><div class="highlight"><pre>
 <span></span><span class="kn">import</span><span class="w"> </span><span class="nn">base64</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">copy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">operator</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Tuple</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">Tuple</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.utils._pytree</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pytree</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch._export.non_strict_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_constraints</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch._guards</span><span class="w"> </span><span class="kn">import</span> <span class="n">detect_fake_mode</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch._library.fake_class_registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">FakeScriptObject</span>
@@ -495,8 +497,11 @@ document.write(`
     <span class="n">OutputSpec</span><span class="p">,</span>
     <span class="n">TensorArgument</span><span class="p">,</span>
 <span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.fx.graph</span><span class="w"> </span><span class="kn">import</span> <span class="n">_PyTreeCodeGen</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._features</span><span class="w"> </span><span class="kn">import</span> <span class="n">ENABLED_FEATURES</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._TorchTensorRTModule</span><span class="w"> </span><span class="kn">import</span> <span class="n">ENGINE_IDX</span><span class="p">,</span> <span class="n">NAME_IDX</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_resolve_lifted_custom_obj</span><span class="p">(</span>
@@ -506,10 +511,10 @@ document.write(`
     <span class="c1"># graph-signature FQN and renames the placeholder node, so constants[node.name]</span>
     <span class="c1"># misses. Resolve name -&gt; FQN through the signature mapping; the direct</span>
     <span class="c1"># name/target lookup is only for legacy programs that carry no such mapping.</span>
-    <span class="n">constants</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">exp_program</span><span class="p">,</span> <span class="s2">&quot;constants&quot;</span><span class="p">,</span> <span class="p">{})</span> <span class="ow">or</span> <span class="p">{}</span>
-    <span class="n">sig</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">exp_program</span><span class="p">,</span> <span class="s2">&quot;graph_signature&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="n">constants</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">exp_program</span><span class="p">,</span> <span class="s2">"constants"</span><span class="p">,</span> <span class="p">{})</span> <span class="ow">or</span> <span class="p">{}</span>
+    <span class="n">sig</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">exp_program</span><span class="p">,</span> <span class="s2">"graph_signature"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
     <span class="n">name_to_fqn</span> <span class="o">=</span> <span class="p">(</span>
-        <span class="nb">getattr</span><span class="p">(</span><span class="n">sig</span><span class="p">,</span> <span class="s2">&quot;inputs_to_lifted_custom_objs&quot;</span><span class="p">,</span> <span class="p">{})</span> <span class="ow">or</span> <span class="p">{}</span>
+        <span class="nb">getattr</span><span class="p">(</span><span class="n">sig</span><span class="p">,</span> <span class="s2">"inputs_to_lifted_custom_objs"</span><span class="p">,</span> <span class="p">{})</span> <span class="ow">or</span> <span class="p">{}</span>
         <span class="k">if</span> <span class="n">sig</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
         <span class="k">else</span> <span class="p">{}</span>
     <span class="p">)</span>
@@ -541,14 +546,16 @@ document.write(`
     <span class="n">cross_compile_module</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">use_legacy_exporter</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ExportedProgram</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Export the result of TensorRT compilation into the desired output format.</span>
+<span class="w">    </span><span class="sd">"""Export the result of TensorRT compilation into the desired output format.</span>
 
 <span class="sd">    Arguments:</span>
 <span class="sd">        gm (torch.fx.GraphModule): Compiled Torch-TensorRT module, generated by ``torch_tensorrt.dynamo.compile``</span>
 <span class="sd">        inputs (torch.Tensor): Torch input tensors</span>
 <span class="sd">        cross_compile_module (bool): Flag to indicated whether it is cross_compilation enabled or not</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">patched_module</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">cross_compile_module</span><span class="p">)</span>
+<span class="sd">    """</span>
+    <span class="n">patched_module</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span>
+        <span class="n">gm</span><span class="p">,</span> <span class="n">cross_compile_module</span><span class="p">,</span> <span class="n">expose_aliased_mutations</span><span class="o">=</span><span class="nb">bool</span><span class="p">(</span><span class="n">use_legacy_exporter</span><span class="p">)</span>
+    <span class="p">)</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">use_legacy_exporter</span><span class="p">:</span>
         <span class="n">args</span> <span class="o">=</span> <span class="p">()</span>
         <span class="k">if</span> <span class="n">arg_inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -574,8 +581,9 @@ document.write(`
 <span class="k">def</span><span class="w"> </span><span class="nf">transform</span><span class="p">(</span>
     <span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span>
     <span class="n">cross_compile_module</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">expose_aliased_mutations</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Transforms the graphmodule by inlining Pytorch and TensorRT submodules.</span>
 <span class="sd">    Inlining collapses submodules into nodes which is necessary for torch.export</span>
 <span class="sd">    serialization.</span>
@@ -586,13 +594,13 @@ document.write(`
 <span class="sd">        cross_compile_module (bool): Flag to indicated whether it is cross_compilation enabled or not</span>
 
 <span class="sd">    Returns an inlined torch.fx.GraphModule</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="c1"># Make a copy the graph since this function transforms the input graph and changes it&#39;s attributes.</span>
+<span class="sd">    """</span>
+    <span class="c1"># Make a copy the graph since this function transforms the input graph and changes it's attributes.</span>
     <span class="c1"># This transformed graph is meant to be consumed by `create_trt_exp_program`</span>
     <span class="n">gm</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="n">gm</span><span class="p">)</span>
 
     <span class="c1"># Inline TensorRT submodules</span>
-    <span class="n">inline_trt_modules</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">cross_compile_module</span><span class="p">)</span>
+    <span class="n">inline_trt_modules</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">cross_compile_module</span><span class="p">,</span> <span class="n">expose_aliased_mutations</span><span class="p">)</span>
 
     <span class="c1"># Inline pytorch submodules</span>
     <span class="n">inline_torch_modules</span><span class="p">(</span><span class="n">gm</span><span class="p">)</span>
@@ -608,7 +616,7 @@ document.write(`
 <span class="k">def</span><span class="w"> </span><span class="nf">lift</span><span class="p">(</span>
     <span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span> <span class="n">graph_signature</span><span class="p">:</span> <span class="n">Any</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span> <span class="n">ExportGraphSignature</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Given an unlifted fx.GraphModule, lift all parameters, buffers into placeholders.</span>
 <span class="sd">    Arguments:</span>
 <span class="sd">        gm (torch.fx.GraphModule): Unlifted GraphModule which contains parameters and buffers as get_attr nodes.</span>
@@ -616,15 +624,15 @@ document.write(`
 <span class="sd">        After lifting, this graph_signature will be modified with the parameters and buffers added appropriately.</span>
 <span class="sd">    Returns:</span>
 <span class="sd">        A lifted fx.GraphModule, modified graph_signature and a new state_dict</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="c1"># Get the state_dict of graph_module. This is different from exported_program.state_dict</span>
-    <span class="c1"># exp_program.state_dict contains parameters and buffers whereas a graph_module&#39;s state_dict</span>
+    <span class="c1"># exp_program.state_dict contains parameters and buffers whereas a graph_module's state_dict</span>
     <span class="c1"># has all parameters registered as torch.tensors.</span>
     <span class="n">state_dict</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">state_dict</span><span class="p">()</span>
     <span class="n">constants</span> <span class="o">=</span> <span class="p">{}</span>
 
     <span class="n">fake_mode</span> <span class="o">=</span> <span class="n">detect_fake_mode</span><span class="p">(</span>
-        <span class="nb">tuple</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">]</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span> <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;placeholder&quot;</span><span class="p">)</span>
+        <span class="nb">tuple</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">]</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span> <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"placeholder"</span><span class="p">)</span>
     <span class="p">)</span>
     <span class="k">assert</span> <span class="n">fake_mode</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
 
@@ -638,7 +646,7 @@ document.write(`
     <span class="c1"># Locate the user input to insert new placeholders before them</span>
     <span class="n">first_user_input</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">:</span>
-        <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;placeholder&quot;</span> <span class="ow">and</span> <span class="n">node</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="n">graph_signature</span><span class="o">.</span><span class="n">user_inputs</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"placeholder"</span> <span class="ow">and</span> <span class="n">node</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="n">graph_signature</span><span class="o">.</span><span class="n">user_inputs</span><span class="p">:</span>
             <span class="n">first_user_input</span> <span class="o">=</span> <span class="n">node</span>
             <span class="k">break</span>
 
@@ -646,7 +654,7 @@ document.write(`
     <span class="c1"># The input_specs should be of the form [params, buffers, constant_tensors, custom_obj, user_inputs]</span>
     <span class="n">non_user_input_idx</span> <span class="o">=</span> <span class="mi">0</span>
     <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">:</span>
-        <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;get_attr&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"get_attr"</span><span class="p">:</span>
             <span class="n">lift_val</span> <span class="o">=</span> <span class="kc">None</span>
             <span class="n">input_kind</span> <span class="o">=</span> <span class="kc">None</span>
 
@@ -660,10 +668,14 @@ document.write(`
                 <span class="n">input_kind</span> <span class="o">=</span> <span class="n">InputKind</span><span class="o">.</span><span class="n">CONSTANT_TENSOR</span>
 
                 <span class="c1"># state_dict has these parameters/buffers as torch.Tensors. We override them as torch.nn.Parameter/torch.Tensors respectively.</span>
-                <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">named_parameters</span><span class="p">():</span>
+                <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">param</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">named_parameters</span><span class="p">():</span>
                     <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">target</span> <span class="o">==</span> <span class="n">name</span><span class="p">:</span>
                         <span class="n">input_kind</span> <span class="o">=</span> <span class="n">InputKind</span><span class="o">.</span><span class="n">PARAMETER</span>
-                        <span class="n">state_dict</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Parameter</span><span class="p">(</span><span class="n">state_dict</span><span class="p">[</span><span class="n">name</span><span class="p">])</span>
+                        <span class="c1"># state_dict() drops requires_grad and Parameter defaults it</span>
+                        <span class="c1"># to True, which an integer weight cannot have.</span>
+                        <span class="n">state_dict</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Parameter</span><span class="p">(</span>
+                            <span class="n">state_dict</span><span class="p">[</span><span class="n">name</span><span class="p">],</span> <span class="n">requires_grad</span><span class="o">=</span><span class="n">param</span><span class="o">.</span><span class="n">requires_grad</span>
+                        <span class="p">)</span>
                         <span class="k">break</span>
                 <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">named_buffers</span><span class="p">():</span>
                     <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">target</span> <span class="o">==</span> <span class="n">name</span><span class="p">:</span>
@@ -674,16 +686,16 @@ document.write(`
 
             <span class="c1"># Replace get_attr nodes with placeholder nodes and copy metadata.</span>
             <span class="k">with</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">inserting_before</span><span class="p">(</span><span class="n">first_user_input</span><span class="p">):</span>
-                <span class="c1"># Ensure name doesn&#39;t contain period as it is used for submodules</span>
-                <span class="n">const_placeholder_name</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">,</span> <span class="s2">&quot;_&quot;</span><span class="p">)</span>
+                <span class="c1"># Ensure name doesn't contain period as it is used for submodules</span>
+                <span class="n">const_placeholder_name</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">"."</span><span class="p">,</span> <span class="s2">"_"</span><span class="p">)</span>
                 <span class="n">const_placeholder_node</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">placeholder</span><span class="p">(</span><span class="n">const_placeholder_name</span><span class="p">)</span>
                 <span class="c1"># Copy the node meta into this new placeholder node</span>
                 <span class="n">const_placeholder_node</span><span class="o">.</span><span class="n">meta</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">meta</span>
                 <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">lift_val</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
-                    <span class="c1"># Fakify the source constant through the graph&#39;s own fake_mode</span>
+                    <span class="c1"># Fakify the source constant through the graph's own fake_mode</span>
                     <span class="c1"># so the placeholder meta preserves its dtype, device and</span>
                     <span class="c1"># stride without allocating a real tensor on lift_val.device.</span>
-                    <span class="n">const_placeholder_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">fake_mode</span><span class="o">.</span><span class="n">from_tensor</span><span class="p">(</span>
+                    <span class="n">const_placeholder_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">]</span> <span class="o">=</span> <span class="n">fake_mode</span><span class="o">.</span><span class="n">from_tensor</span><span class="p">(</span>
                         <span class="n">lift_val</span><span class="p">,</span> <span class="n">static_shapes</span><span class="o">=</span><span class="kc">True</span>
                     <span class="p">)</span>
 
@@ -701,7 +713,7 @@ document.write(`
                 <span class="n">input_spec_arg</span> <span class="o">=</span> <span class="n">TensorArgument</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">const_placeholder_node</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
                 <span class="k">if</span> <span class="n">input_kind</span> <span class="o">==</span> <span class="n">InputKind</span><span class="o">.</span><span class="n">CUSTOM_OBJ</span><span class="p">:</span>
                     <span class="n">input_spec_arg</span> <span class="o">=</span> <span class="n">CustomObjArgument</span><span class="p">(</span>
-                        <span class="n">name</span><span class="o">=</span><span class="n">const_placeholder_node</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">class_fqn</span><span class="o">=</span><span class="s2">&quot;&quot;</span>
+                        <span class="n">name</span><span class="o">=</span><span class="n">const_placeholder_node</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">class_fqn</span><span class="o">=</span><span class="s2">""</span>
                     <span class="p">)</span>
                 <span class="n">graph_signature</span><span class="o">.</span><span class="n">input_specs</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span>
                     <span class="n">non_user_input_idx</span><span class="p">,</span>
@@ -709,6 +721,12 @@ document.write(`
                         <span class="n">kind</span><span class="o">=</span><span class="n">input_kind</span><span class="p">,</span>
                         <span class="n">arg</span><span class="o">=</span><span class="n">input_spec_arg</span><span class="p">,</span>
                         <span class="n">target</span><span class="o">=</span><span class="n">node</span><span class="o">.</span><span class="n">target</span><span class="p">,</span>
+                        <span class="c1"># torch&gt;=2.3 requires an explicit persistent flag on BUFFER</span>
+                        <span class="c1"># specs. state_dict() excludes non-persistent buffers by</span>
+                        <span class="c1"># construction, so any buffer reaching this in-state_dict</span>
+                        <span class="c1"># branch is persistent (non-persistent buffers take the</span>
+                        <span class="c1"># not-in-state_dict path above and are lifted as constants).</span>
+                        <span class="n">persistent</span><span class="o">=</span><span class="p">(</span><span class="kc">True</span> <span class="k">if</span> <span class="n">input_kind</span> <span class="o">==</span> <span class="n">InputKind</span><span class="o">.</span><span class="n">BUFFER</span> <span class="k">else</span> <span class="kc">None</span><span class="p">),</span>
                     <span class="p">),</span>
                 <span class="p">)</span>
                 <span class="n">non_user_input_idx</span> <span class="o">+=</span> <span class="mi">1</span>
@@ -724,83 +742,48 @@ document.write(`
     <span class="k">return</span> <span class="n">gm</span><span class="p">,</span> <span class="n">graph_signature</span><span class="p">,</span> <span class="n">state_dict</span><span class="p">,</span> <span class="n">constants</span>
 
 
-<span class="k">def</span><span class="w"> </span><span class="nf">get_duplicate_nodes</span><span class="p">(</span>
-    <span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span> <span class="n">submodule</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Any</span><span class="p">],</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Any</span><span class="p">]]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    We check if there are duplicate nodes when we copy submodule graph into gm.</span>
-<span class="sd">    Handle the case where the subgraph input placeholders are same as</span>
-<span class="sd">    gm placeholders. This happens when the first submodule in the graph is</span>
-<span class="sd">    a pytorch submodule</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">submodule_placeholder_inputs</span> <span class="o">=</span> <span class="p">[</span>
-        <span class="n">node</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">submodule</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span> <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;placeholder&quot;</span>
-    <span class="p">]</span>
-    <span class="n">submodule_input_node_names</span> <span class="o">=</span> <span class="p">[</span><span class="n">node</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">submodule_placeholder_inputs</span><span class="p">]</span>
-    <span class="n">gm_node_names</span> <span class="o">=</span> <span class="p">[</span><span class="n">node</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">]</span>
-    <span class="n">submodule_duplicate_inputs</span> <span class="o">=</span> <span class="p">[</span>
-        <span class="n">node</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">submodule_placeholder_inputs</span> <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="n">gm_node_names</span>
-    <span class="p">]</span>
-    <span class="n">gm_duplicate_inputs</span> <span class="o">=</span> <span class="p">[</span>
-        <span class="n">node</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span> <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="n">submodule_input_node_names</span>
-    <span class="p">]</span>
-    <span class="k">return</span> <span class="n">submodule_duplicate_inputs</span><span class="p">,</span> <span class="n">gm_duplicate_inputs</span>
-
-
 <span class="k">def</span><span class="w"> </span><span class="nf">inline_torch_modules</span><span class="p">(</span><span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Inline a submodule within the parent graph (gm). All `call_module` nodes</span>
 <span class="sd">    should be replaced by their nodes in the submodule.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="c1"># Clean the graph</span>
     <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">eliminate_dead_code</span><span class="p">()</span>
     <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">lint</span><span class="p">()</span>
 
     <span class="k">for</span> <span class="n">gm_node</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">:</span>
-        <span class="k">if</span> <span class="n">gm_node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;call_module&quot;</span> <span class="ow">and</span> <span class="s2">&quot;_run_on_gpu&quot;</span> <span class="ow">in</span> <span class="n">gm_node</span><span class="o">.</span><span class="n">name</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">gm_node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"call_module"</span> <span class="ow">and</span> <span class="s2">"_run_on_gpu"</span> <span class="ow">in</span> <span class="n">gm_node</span><span class="o">.</span><span class="n">name</span><span class="p">:</span>
             <span class="n">submodule</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">gm_node</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
             <span class="k">with</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">inserting_before</span><span class="p">(</span><span class="n">gm_node</span><span class="p">):</span>
                 <span class="c1"># Get inputs of submodule node which are most likely outputs of a previous TRT node</span>
                 <span class="c1"># or a placeholder of the main graph</span>
                 <span class="n">submodule_inputs</span> <span class="o">=</span> <span class="n">gm_node</span><span class="o">.</span><span class="n">args</span>
 
-                <span class="n">submodule_duplicate_inputs</span><span class="p">,</span> <span class="n">gm_duplicate_inputs</span> <span class="o">=</span> <span class="n">get_duplicate_nodes</span><span class="p">(</span>
-                    <span class="n">gm</span><span class="p">,</span> <span class="n">submodule</span>
-                <span class="p">)</span>
-                <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">submodule_duplicate_inputs</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">gm_duplicate_inputs</span><span class="p">)</span>
-                <span class="c1"># Avoid creating new copies of duplicate inputs by creating a mapping</span>
-                <span class="n">val_map</span> <span class="o">=</span> <span class="p">{}</span>
-                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">submodule_duplicate_inputs</span><span class="p">)):</span>
-                    <span class="n">val_map</span><span class="p">[</span><span class="n">submodule_duplicate_inputs</span><span class="p">[</span><span class="n">i</span><span class="p">]]</span> <span class="o">=</span> <span class="n">gm_duplicate_inputs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
-
-                <span class="c1"># Copy all nodes in the submodule into gm and</span>
-                <span class="c1"># store the output node of this submodule which is now present in gm</span>
+                <span class="c1"># Copy the submodule's nodes into gm, then wire its inputs POSITIONALLY.</span>
+                <span class="c1">#</span>
+                <span class="c1"># We deliberately do NOT pre-seed val_map by matching submodule input</span>
+                <span class="c1"># placeholders to gm nodes by NAME. Name matching silently binds an</span>
+                <span class="c1"># input to the WRONG node when names collide (e.g. a _run_on_gpu input</span>
+                <span class="c1"># placeholder whose name matches a different engine's getitem), which</span>
+                <span class="c1"># rewires a consumer to the wrong producer and orphans the real one --</span>
+                <span class="c1"># the orphan is then pruned by dead-code elimination, leaving a delegate</span>
+                <span class="c1"># short an output at runtime. It also leaks a mixed submodule's</span>
+                <span class="c1"># computed-intermediate inputs as spurious graph inputs. gm_node.args is</span>
+                <span class="c1"># the authoritative, ordered list of the real inputs, so we let</span>
+                <span class="c1"># graph_copy create a fresh (auto-renamed on collision) placeholder for</span>
+                <span class="c1"># every submodule input and rewire each to submodule_inputs[i] by</span>
+                <span class="c1"># position, then erase it.</span>
+                <span class="n">val_map</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
                 <span class="n">submodule_output</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">graph_copy</span><span class="p">(</span><span class="n">submodule</span><span class="o">.</span><span class="n">graph</span><span class="p">,</span> <span class="n">val_map</span><span class="p">)</span>
 
-                <span class="c1"># Get their references (since we copied) in the parent graph (gm)</span>
-                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">submodule_duplicate_inputs</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
-                    <span class="n">submodule_placeholder_input_names</span> <span class="o">=</span> <span class="p">[</span>
-                        <span class="n">node</span><span class="o">.</span><span class="n">name</span>
-                        <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">submodule</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span>
-                        <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;placeholder&quot;</span>
-                    <span class="p">]</span>
-                    <span class="n">gm_added_placeholder_inputs</span> <span class="o">=</span> <span class="p">[</span>
-                        <span class="n">node</span>
-                        <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span>
-                        <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="n">submodule_placeholder_input_names</span>
-                    <span class="p">]</span>
-
-                    <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">submodule_inputs</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">gm_added_placeholder_inputs</span><span class="p">)</span>
-
-                    <span class="c1"># Replace the added placeholder inputs with original inputs to this submodule node</span>
-                    <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">gm_added_placeholder_inputs</span><span class="p">)):</span>
-                        <span class="n">gm_added_placeholder_inputs</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span><span class="o">.</span><span class="n">replace_all_uses_with</span><span class="p">(</span>
-                            <span class="n">submodule_inputs</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
-                        <span class="p">)</span>
-
-                    <span class="c1"># Erase the placeholder input nodes in the gm</span>
-                    <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">gm_added_placeholder_inputs</span><span class="p">)):</span>
-                        <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">erase_node</span><span class="p">(</span><span class="n">gm_added_placeholder_inputs</span><span class="p">[</span><span class="n">idx</span><span class="p">])</span>
+                <span class="n">submodule_placeholders</span> <span class="o">=</span> <span class="p">[</span>
+                    <span class="n">node</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">submodule</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span> <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"placeholder"</span>
+                <span class="p">]</span>
+                <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">submodule_placeholders</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">submodule_inputs</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">submodule_placeholder</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">submodule_placeholders</span><span class="p">):</span>
+                    <span class="n">copied_placeholder</span> <span class="o">=</span> <span class="n">val_map</span><span class="p">[</span><span class="n">submodule_placeholder</span><span class="p">]</span>
+                    <span class="n">copied_placeholder</span><span class="o">.</span><span class="n">replace_all_uses_with</span><span class="p">(</span><span class="n">submodule_inputs</span><span class="p">[</span><span class="n">idx</span><span class="p">])</span>
+                    <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">erase_node</span><span class="p">(</span><span class="n">copied_placeholder</span><span class="p">)</span>
 
                 <span class="c1"># Replace the pytorch submodule node (call_module) with the inlined subgraph output</span>
                 <span class="c1"># Special handling when submodule returns multiple outputs (tuple)</span>
@@ -810,7 +793,7 @@ document.write(`
                     <span class="n">getitem_users</span> <span class="o">=</span> <span class="p">[</span>
                         <span class="n">user</span>
                         <span class="k">for</span> <span class="n">user</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="n">gm_node</span><span class="o">.</span><span class="n">users</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
-                        <span class="k">if</span> <span class="n">user</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;call_function&quot;</span>
+                        <span class="k">if</span> <span class="n">user</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"call_function"</span>
                         <span class="ow">and</span> <span class="n">user</span><span class="o">.</span><span class="n">target</span> <span class="ow">is</span> <span class="n">operator</span><span class="o">.</span><span class="n">getitem</span>
                     <span class="p">]</span>
                     <span class="k">for</span> <span class="n">user</span> <span class="ow">in</span> <span class="n">getitem_users</span><span class="p">:</span>
@@ -818,13 +801,13 @@ document.write(`
                         <span class="n">_</span><span class="p">,</span> <span class="n">idx</span> <span class="o">=</span> <span class="n">user</span><span class="o">.</span><span class="n">args</span>
                         <span class="c1"># Replace this getitem with the actual node from the tuple</span>
                         <span class="n">user</span><span class="o">.</span><span class="n">replace_all_uses_with</span><span class="p">(</span><span class="n">submodule_output</span><span class="p">[</span><span class="n">idx</span><span class="p">])</span>
-                        <span class="c1"># Erase the getitem node since it&#39;s no longer needed</span>
+                        <span class="c1"># Erase the getitem node since it's no longer needed</span>
                         <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">erase_node</span><span class="p">(</span><span class="n">user</span><span class="p">)</span>
                 <span class="k">else</span><span class="p">:</span>
                     <span class="c1"># Single output - normal replacement</span>
                     <span class="n">gm_node</span><span class="o">.</span><span class="n">replace_all_uses_with</span><span class="p">(</span><span class="n">submodule_output</span><span class="p">)</span>
 
-                <span class="c1"># copy the attributes of the submodule into gm (graph_copy doesn&#39;t do this)</span>
+                <span class="c1"># copy the attributes of the submodule into gm (graph_copy doesn't do this)</span>
                 <span class="n">copy_submodule_attributes</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">submodule</span><span class="p">,</span> <span class="n">gm_node</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
 
             <span class="c1"># Erase the pytorch submodule (call_module) node</span>
@@ -836,14 +819,14 @@ document.write(`
 <span class="k">def</span><span class="w"> </span><span class="nf">copy_submodule_attributes</span><span class="p">(</span>
     <span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span> <span class="n">submodule</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span> <span class="n">submodule_name</span><span class="p">:</span> <span class="nb">str</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    The submodule parameters are available in the parent gm&#39;s state_dict, but they have</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    The submodule parameters are available in the parent gm's state_dict, but they have</span>
 <span class="sd">    the submodule name as a prefix in their keys. For eg: gm.state_dict() would have</span>
 <span class="sd">    _run_on_gpu_0.conv.weight etc. Since we graph copied the submodule into gm, we should</span>
-<span class="sd">    also copy it&#39;s parameters and buffers into gm without the submodule namespace as prefix.</span>
+<span class="sd">    also copy it's parameters and buffers into gm without the submodule namespace as prefix.</span>
 <span class="sd">    _assign_attr does exactly that. It creates a module for eg: conv, adds an attribute weight</span>
 <span class="sd">    to it and adds this conv module as an attribute to parent gm.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">torch.export.unflatten</span><span class="w"> </span><span class="kn">import</span> <span class="n">_assign_attr</span><span class="p">,</span> <span class="n">_AttrKind</span>
 
     <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">submodule</span><span class="o">.</span><span class="n">named_parameters</span><span class="p">():</span>
@@ -860,21 +843,38 @@ document.write(`
     <span class="n">kwarg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">dynamic_shapes</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ExportedProgram</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Creates a new Exported Program. This function takes an torch.fx.GraphModule which has TRT engines</span>
+<span class="w">    </span><span class="sd">"""Creates a new Exported Program. This function takes an torch.fx.GraphModule which has TRT engines</span>
 <span class="sd">    and constructs an Exported Program object with the new IO node names and state_dict</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
-    <span class="n">input_nodes</span> <span class="o">=</span> <span class="p">[</span><span class="n">node</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span> <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;placeholder&quot;</span><span class="p">]</span>
-    <span class="n">output_nodes</span> <span class="o">=</span> <span class="p">[</span><span class="n">node</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span> <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;output&quot;</span><span class="p">]</span>
+    <span class="n">input_nodes</span> <span class="o">=</span> <span class="p">[</span><span class="n">node</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span> <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"placeholder"</span><span class="p">]</span>
+    <span class="n">output_nodes</span> <span class="o">=</span> <span class="p">[</span><span class="n">node</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span> <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"output"</span><span class="p">]</span>
     <span class="k">assert</span> <span class="n">output_nodes</span>
     <span class="n">output_nodes</span> <span class="o">=</span> <span class="n">output_nodes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="c1"># Outputs tagged by `_expose_aliased_buffer_mutations` become BUFFER_MUTATION</span>
+    <span class="c1"># specs (their `_kv_mutation_target` meta names the backing buffer); the rest</span>
+    <span class="c1"># are ordinary user outputs, used below to rebuild the user-facing out_spec.</span>
+    <span class="n">user_output_nodes</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">node</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">output_nodes</span> <span class="k">if</span> <span class="s2">"_kv_mutation_target"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">meta</span>
+    <span class="p">]</span>
 
     <span class="n">input_specs</span> <span class="o">=</span> <span class="p">[</span>
         <span class="n">InputSpec</span><span class="p">(</span><span class="n">InputKind</span><span class="o">.</span><span class="n">USER_INPUT</span><span class="p">,</span> <span class="n">TensorArgument</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="p">),</span> <span class="n">node</span><span class="o">.</span><span class="n">target</span><span class="p">)</span>
         <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">input_nodes</span>
     <span class="p">]</span>
     <span class="n">output_specs</span> <span class="o">=</span> <span class="p">[</span>
-        <span class="n">OutputSpec</span><span class="p">(</span><span class="n">OutputKind</span><span class="o">.</span><span class="n">USER_OUTPUT</span><span class="p">,</span> <span class="n">TensorArgument</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="p">),</span> <span class="n">node</span><span class="o">.</span><span class="n">target</span><span class="p">)</span>
+        <span class="p">(</span>
+            <span class="n">OutputSpec</span><span class="p">(</span>
+                <span class="n">OutputKind</span><span class="o">.</span><span class="n">BUFFER_MUTATION</span><span class="p">,</span>
+                <span class="n">TensorArgument</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="p">),</span>
+                <span class="n">node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"_kv_mutation_target"</span><span class="p">],</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="s2">"_kv_mutation_target"</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">meta</span>
+            <span class="k">else</span> <span class="n">OutputSpec</span><span class="p">(</span>
+                <span class="n">OutputKind</span><span class="o">.</span><span class="n">USER_OUTPUT</span><span class="p">,</span> <span class="n">TensorArgument</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="p">),</span> <span class="n">node</span><span class="o">.</span><span class="n">target</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
         <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">output_nodes</span>
     <span class="p">]</span>
 
@@ -882,14 +882,53 @@ document.write(`
         <span class="n">input_specs</span><span class="o">=</span><span class="n">input_specs</span><span class="p">,</span> <span class="n">output_specs</span><span class="o">=</span><span class="n">output_specs</span>
     <span class="p">)</span>
 
+    <span class="c1"># A hybrid TRT+CUDA GraphModule from dynamo.compile carries a plain fx.CodeGen</span>
+    <span class="c1"># (no pytree_info): the module already returns a flat tuple, so rebuild</span>
+    <span class="c1"># in_spec/out_spec from the example inputs (or, when none are supplied,</span>
+    <span class="c1"># positionally from the graph placeholders) and the flat graph outputs. With</span>
+    <span class="c1"># inputs supplied this matches retrace=True, which traces the same flat module</span>
+    <span class="c1"># and likewise cannot re-nest.</span>
+    <span class="n">codegen</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">_codegen</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">codegen</span><span class="p">,</span> <span class="n">_PyTreeCodeGen</span><span class="p">):</span>
+        <span class="n">in_spec</span> <span class="o">=</span> <span class="n">codegen</span><span class="o">.</span><span class="n">pytree_info</span><span class="o">.</span><span class="n">in_spec</span>
+        <span class="n">out_spec</span> <span class="o">=</span> <span class="n">codegen</span><span class="o">.</span><span class="n">pytree_info</span><span class="o">.</span><span class="n">out_spec</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">example_args</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">)</span> <span class="k">if</span> <span class="n">arg_inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">()</span>
+        <span class="n">example_kwargs</span> <span class="o">=</span> <span class="n">kwarg_inputs</span> <span class="ow">or</span> <span class="p">{}</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">example_args</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">example_kwargs</span> <span class="ow">and</span> <span class="n">input_nodes</span><span class="p">:</span>
+            <span class="c1"># Reachable with no example inputs (save(retrace=False) passes</span>
+            <span class="c1"># arg_inputs=()); flattening them gives a 0-leaf spec that mismatches</span>
+            <span class="c1"># the placeholders and fails only later, so size it from them instead.</span>
+            <span class="n">in_spec</span> <span class="o">=</span> <span class="n">pytree</span><span class="o">.</span><span class="n">tree_flatten</span><span class="p">((</span><span class="nb">tuple</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">input_nodes</span><span class="p">))),</span> <span class="p">{}))[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># pytree flattens kwargs in dict insertion order, but the graph</span>
+            <span class="c1"># consumes placeholders positionally, so kwargs passed out of</span>
+            <span class="c1"># signature order would silently bind to the wrong input. Each kwarg</span>
+            <span class="c1"># placeholder's target is its key, so when the trailing placeholder</span>
+            <span class="c1"># targets match the kwarg keys, reorder the kwargs into that order.</span>
+            <span class="k">if</span> <span class="n">example_kwargs</span><span class="p">:</span>
+                <span class="n">kwarg_targets</span> <span class="o">=</span> <span class="p">[</span>
+                    <span class="n">node</span><span class="o">.</span><span class="n">target</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">input_nodes</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">example_args</span><span class="p">)</span> <span class="p">:]</span>
+                <span class="p">]</span>
+                <span class="k">if</span> <span class="nb">set</span><span class="p">(</span><span class="n">kwarg_targets</span><span class="p">)</span> <span class="o">==</span> <span class="nb">set</span><span class="p">(</span><span class="n">example_kwargs</span><span class="p">):</span>
+                    <span class="n">example_kwargs</span> <span class="o">=</span> <span class="p">{</span><span class="n">key</span><span class="p">:</span> <span class="n">example_kwargs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">kwarg_targets</span><span class="p">}</span>
+            <span class="n">in_spec</span> <span class="o">=</span> <span class="n">pytree</span><span class="o">.</span><span class="n">tree_flatten</span><span class="p">((</span><span class="n">example_args</span><span class="p">,</span> <span class="n">example_kwargs</span><span class="p">))[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="c1"># out_spec describes the user-visible return structure only; buffer</span>
+        <span class="c1"># mutations are stripped before unflatten.</span>
+        <span class="n">out_spec</span> <span class="o">=</span> <span class="n">pytree</span><span class="o">.</span><span class="n">tree_flatten</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">user_output_nodes</span><span class="p">))[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">assert</span> <span class="n">in_spec</span><span class="o">.</span><span class="n">num_leaves</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">input_nodes</span><span class="p">),</span> <span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"create_trt_exp_program: in_spec has </span><span class="si">{</span><span class="n">in_spec</span><span class="o">.</span><span class="n">num_leaves</span><span class="si">}</span><span class="s2"> leaves but "</span>
+            <span class="sa">f</span><span class="s2">"the graph has </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">input_nodes</span><span class="p">)</span><span class="si">}</span><span class="s2"> input placeholder(s)"</span>
+        <span class="p">)</span>
+
     <span class="n">module_call_graph</span> <span class="o">=</span> <span class="p">[</span>
         <span class="n">ModuleCallEntry</span><span class="p">(</span>
-            <span class="s2">&quot;&quot;</span><span class="p">,</span>
+            <span class="s2">""</span><span class="p">,</span>
             <span class="n">ModuleCallSignature</span><span class="p">(</span>
                 <span class="n">inputs</span><span class="o">=</span><span class="p">[],</span>
                 <span class="n">outputs</span><span class="o">=</span><span class="p">[],</span>
-                <span class="n">in_spec</span><span class="o">=</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">_codegen</span><span class="o">.</span><span class="n">pytree_info</span><span class="o">.</span><span class="n">in_spec</span><span class="p">,</span>
-                <span class="n">out_spec</span><span class="o">=</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">_codegen</span><span class="o">.</span><span class="n">pytree_info</span><span class="o">.</span><span class="n">out_spec</span><span class="p">,</span>
+                <span class="n">in_spec</span><span class="o">=</span><span class="n">in_spec</span><span class="p">,</span>
+                <span class="n">out_spec</span><span class="o">=</span><span class="n">out_spec</span><span class="p">,</span>
             <span class="p">),</span>
         <span class="p">)</span>
     <span class="p">]</span>
@@ -901,17 +940,17 @@ document.write(`
     <span class="c1">#   1. dynamic_shapes + example inputs available: delegate to make_constraints()</span>
     <span class="c1">#      from torch._export, which maps Dim(min, max) specs onto the SymInt</span>
     <span class="c1">#      expressions from the fake tensors.  make_constraints() requires</span>
-    <span class="c1">#      gm.meta[&quot;inline_constraints&quot;] to be a dict; TRT graph modules don&#39;t</span>
+    <span class="c1">#      gm.meta["inline_constraints"] to be a dict; TRT graph modules don't</span>
     <span class="c1">#      set it so we default it to {} if absent.</span>
     <span class="c1">#   2. No dynamic_shapes (or no example inputs): harvest every SymInt free</span>
-    <span class="c1">#      symbol from placeholder meta[&quot;val&quot;] shapes and look up its bound</span>
+    <span class="c1">#      symbol from placeholder meta["val"] shapes and look up its bound</span>
     <span class="c1">#      directly in the shape_env.  This is the retrace=False path where the</span>
-    <span class="c1">#      caller didn&#39;t supply inputs.</span>
+    <span class="c1">#      caller didn't supply inputs.</span>
     <span class="n">fake_mode</span> <span class="o">=</span> <span class="n">detect_fake_mode</span><span class="p">(</span>
         <span class="nb">tuple</span><span class="p">(</span>
-            <span class="n">node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">]</span>
+            <span class="n">node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">]</span>
             <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span>
-            <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;placeholder&quot;</span> <span class="ow">and</span> <span class="s2">&quot;val&quot;</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">meta</span>
+            <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"placeholder"</span> <span class="ow">and</span> <span class="s2">"val"</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">meta</span>
         <span class="p">)</span>
     <span class="p">)</span>
     <span class="n">range_constraints</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
@@ -921,8 +960,8 @@ document.write(`
         <span class="p">)</span>
         <span class="k">if</span> <span class="n">dynamic_shapes</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">has_inputs</span><span class="p">:</span>
             <span class="c1"># Path 1: use make_constraints to honor user-specified Dim bounds.</span>
-            <span class="k">if</span> <span class="s2">&quot;inline_constraints&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">meta</span><span class="p">:</span>
-                <span class="n">gm</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;inline_constraints&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">if</span> <span class="s2">"inline_constraints"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">meta</span><span class="p">:</span>
+                <span class="n">gm</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"inline_constraints"</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
             <span class="n">combined_args</span> <span class="o">=</span> <span class="n">_combine_args</span><span class="p">(</span>
                 <span class="n">gm</span><span class="p">,</span>
                 <span class="nb">tuple</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">)</span> <span class="k">if</span> <span class="n">arg_inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">(),</span>
@@ -939,9 +978,9 @@ document.write(`
             <span class="c1"># Path 2: harvest bounds from shape_env for any SymInt dims present.</span>
             <span class="n">shape_env</span> <span class="o">=</span> <span class="n">fake_mode</span><span class="o">.</span><span class="n">shape_env</span>
             <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">:</span>
-                <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">!=</span> <span class="s2">&quot;placeholder&quot;</span> <span class="ow">or</span> <span class="s2">&quot;val&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">meta</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">!=</span> <span class="s2">"placeholder"</span> <span class="ow">or</span> <span class="s2">"val"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">meta</span><span class="p">:</span>
                     <span class="k">continue</span>
-                <span class="n">val</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">]</span>
+                <span class="n">val</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">]</span>
                 <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
                     <span class="k">continue</span>
                 <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">val</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
@@ -970,14 +1009,181 @@ document.write(`
     <span class="k">return</span> <span class="n">trt_exp_program</span>
 
 
+<span class="k">def</span><span class="w"> </span><span class="nf">_declare_aliased_kv_mutations_on_ep</span><span class="p">(</span>
+    <span class="n">exp_program</span><span class="p">:</span> <span class="n">ExportedProgram</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ExportedProgram</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Post-export pass: declare each engine's aliased KV output as a</span>
+<span class="sd">    BUFFER_MUTATION of its caller-owned buffer input.</span>
+
+<span class="sd">    Runs on both save() paths (retrace=True and retrace=False); it is idempotent</span>
+<span class="sd">    because it skips buffers that already carry a BUFFER_MUTATION spec (see</span>
+<span class="sd">    already_exposed below), so the legacy exporter's transform-time declaration is</span>
+<span class="sd">    not duplicated.</span>
+
+<span class="sd">    torch.export produces execute_engine nodes whose meta['val'] covers only the</span>
+<span class="sd">    user outputs (the aliased KV outputs are network bindings excluded at the fx</span>
+<span class="sd">    boundary), so the KV buffers -- though BUFFER inputs -- are never recorded as</span>
+<span class="sd">    mutated and get frozen downstream. This surfaces each aliased output as a</span>
+<span class="sd">    getitem and declares it a BUFFER_MUTATION of the aliased input's buffer,</span>
+<span class="sd">    mirroring create_trt_exp_program's handling on the retrace=False path. Returns</span>
+<span class="sd">    exp_program unchanged when no engine has aliased KV outputs.</span>
+<span class="sd">    """</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._serialized_engine_layout</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+        <span class="n">ALIASED_IO_IDX</span><span class="p">,</span>
+        <span class="n">INPUT_BINDING_NAMES_IDX</span><span class="p">,</span>
+        <span class="n">OUTPUT_BINDING_NAMES_IDX</span><span class="p">,</span>
+        <span class="n">deserialize_binding_names</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._TorchTensorRTModule</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+        <span class="n">deserialize_aliased_io</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Guard the import so a non-executorch save() (e.g. output_format=</span>
+    <span class="c1"># "exported_program" with no aliased KV outputs) doesn't hard-require the</span>
+    <span class="c1"># optional [executorch] extra: with no executorch there's no aliased_io to</span>
+    <span class="c1"># read and no declaration to make, so return unchanged.</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch.backend</span><span class="w"> </span><span class="kn">import</span> <span class="n">_get_engine_info_for_node</span>
+    <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">exp_program</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_estr</span><span class="p">(</span><span class="n">engine_info</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Any</span><span class="p">],</span> <span class="n">idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">idx</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">idx</span> <span class="o">&gt;=</span> <span class="nb">len</span><span class="p">(</span><span class="n">engine_info</span><span class="p">)</span> <span class="ow">or</span> <span class="n">engine_info</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">""</span>
+        <span class="n">v</span> <span class="o">=</span> <span class="n">engine_info</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">v</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">"utf-8"</span><span class="p">,</span> <span class="s2">"replace"</span><span class="p">)</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">)</span> <span class="k">else</span> <span class="nb">str</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>
+
+    <span class="n">gm</span> <span class="o">=</span> <span class="n">exp_program</span><span class="o">.</span><span class="n">graph_module</span>
+    <span class="n">sig</span> <span class="o">=</span> <span class="n">exp_program</span><span class="o">.</span><span class="n">graph_signature</span>
+    <span class="n">inputs_to_buffers</span> <span class="o">=</span> <span class="n">sig</span><span class="o">.</span><span class="n">inputs_to_buffers</span>
+    <span class="n">output_node</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">n</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span> <span class="k">if</span> <span class="n">n</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"output"</span><span class="p">)</span>
+    <span class="n">exec_target</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">execute_engine</span><span class="o">.</span><span class="n">default</span>
+
+    <span class="c1"># Seeded from the incoming signature, not empty: exposure is decided both by</span>
+    <span class="c1"># the exporter (the legacy one declares at transform time) and by save()'s</span>
+    <span class="c1"># per-format branch, so this pass can run on a program whose mutations are</span>
+    <span class="c1"># already declared. Re-declaring appends a second spec for the same buffer and</span>
+    <span class="c1"># the ExportedProgram verifier then rejects the output ordering.</span>
+    <span class="n">already_exposed</span><span class="p">:</span> <span class="n">Set</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="n">spec</span><span class="o">.</span><span class="n">target</span>
+        <span class="k">for</span> <span class="n">spec</span> <span class="ow">in</span> <span class="n">sig</span><span class="o">.</span><span class="n">output_specs</span>
+        <span class="k">if</span> <span class="n">spec</span><span class="o">.</span><span class="n">kind</span> <span class="o">==</span> <span class="n">OutputKind</span><span class="o">.</span><span class="n">BUFFER_MUTATION</span> <span class="ow">and</span> <span class="n">spec</span><span class="o">.</span><span class="n">target</span>
+    <span class="p">}</span>
+    <span class="n">mutation_outputs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">Node</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">!=</span> <span class="s2">"call_function"</span> <span class="ow">or</span> <span class="n">node</span><span class="o">.</span><span class="n">target</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">exec_target</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">engine_info</span> <span class="o">=</span> <span class="n">_get_engine_info_for_node</span><span class="p">(</span><span class="n">exp_program</span><span class="p">,</span> <span class="n">node</span><span class="p">)</span>
+        <span class="n">aliased_io</span> <span class="o">=</span> <span class="n">deserialize_aliased_io</span><span class="p">(</span><span class="n">_estr</span><span class="p">(</span><span class="n">engine_info</span><span class="p">,</span> <span class="n">ALIASED_IO_IDX</span><span class="p">))</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">aliased_io</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">in_names</span> <span class="o">=</span> <span class="n">deserialize_binding_names</span><span class="p">(</span>
+            <span class="n">_estr</span><span class="p">(</span><span class="n">engine_info</span><span class="p">,</span> <span class="n">INPUT_BINDING_NAMES_IDX</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">out_names</span> <span class="o">=</span> <span class="n">deserialize_binding_names</span><span class="p">(</span>
+            <span class="n">_estr</span><span class="p">(</span><span class="n">engine_info</span><span class="p">,</span> <span class="n">OUTPUT_BINDING_NAMES_IDX</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">input_nodes</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">val_list</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">])</span>
+        <span class="k">for</span> <span class="n">out_name</span> <span class="ow">in</span> <span class="n">out_names</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">out_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">aliased_io</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">in_name</span> <span class="o">=</span> <span class="n">aliased_io</span><span class="p">[</span><span class="n">out_name</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+            <span class="c1"># The alias map comes from the engine's own bindings, so an entry that does</span>
+            <span class="c1"># not resolve to a delegate input arg means the map and the engine disagree.</span>
+            <span class="c1"># The mutation is then left undeclared and only surfaces as a delegate arity</span>
+            <span class="c1"># error at execute, so log which output was dropped.</span>
+            <span class="k">if</span> <span class="n">in_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">in_names</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                    <span class="s2">"Aliased output </span><span class="si">%s</span><span class="s2"> references input </span><span class="si">%s</span><span class="s2">, which is not an engine "</span>
+                    <span class="s2">"input binding; leaving the mutation undeclared."</span><span class="p">,</span>
+                    <span class="n">out_name</span><span class="p">,</span>
+                    <span class="n">in_name</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="k">continue</span>
+            <span class="n">ii</span> <span class="o">=</span> <span class="n">in_names</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">in_name</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">ii</span> <span class="o">&gt;=</span> <span class="nb">len</span><span class="p">(</span><span class="n">input_nodes</span><span class="p">):</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                    <span class="s2">"Aliased output </span><span class="si">%s</span><span class="s2"> maps to input index </span><span class="si">%d</span><span class="s2">, out of range for </span><span class="si">%d</span><span class="s2"> "</span>
+                    <span class="s2">"delegate args; leaving the mutation undeclared."</span><span class="p">,</span>
+                    <span class="n">out_name</span><span class="p">,</span>
+                    <span class="n">ii</span><span class="p">,</span>
+                    <span class="nb">len</span><span class="p">(</span><span class="n">input_nodes</span><span class="p">),</span>
+                <span class="p">)</span>
+                <span class="k">continue</span>
+            <span class="n">buf_node</span> <span class="o">=</span> <span class="n">input_nodes</span><span class="p">[</span><span class="n">ii</span><span class="p">]</span>
+            <span class="n">buf_fqn</span> <span class="o">=</span> <span class="n">inputs_to_buffers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">buf_node</span><span class="p">,</span> <span class="s2">"name"</span><span class="p">,</span> <span class="kc">None</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">buf_fqn</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="c1"># A caller-supplied cache that is not a registered buffer: there is no</span>
+                <span class="c1"># buffer to declare a mutation of, and the engine still has the output</span>
+                <span class="c1"># binding, so the delegate ends up one arg short at execute.</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                    <span class="s2">"Aliased output </span><span class="si">%s</span><span class="s2"> updates </span><span class="si">%s</span><span class="s2"> in place, but that input is not a "</span>
+                    <span class="s2">"registered buffer, so no buffer mutation is declared for it."</span><span class="p">,</span>
+                    <span class="n">out_name</span><span class="p">,</span>
+                    <span class="n">in_name</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="n">buf_fqn</span> <span class="ow">in</span> <span class="n">already_exposed</span><span class="p">:</span>
+                <span class="c1"># Already declared, by this pass for another engine sharing the buffer</span>
+                <span class="c1"># or by the exporter at transform time. Expected, not a fault.</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="s2">"Buffer </span><span class="si">%s</span><span class="s2"> already carries a mutation spec; skipping aliased "</span>
+                    <span class="s2">"output </span><span class="si">%s</span><span class="s2">."</span><span class="p">,</span>
+                    <span class="n">buf_fqn</span><span class="p">,</span>
+                    <span class="n">out_name</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="k">continue</span>
+            <span class="n">oi</span> <span class="o">=</span> <span class="n">out_names</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">out_name</span><span class="p">)</span>
+            <span class="k">while</span> <span class="nb">len</span><span class="p">(</span><span class="n">val_list</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="n">oi</span><span class="p">:</span>
+                <span class="n">val_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">buf_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">])</span>
+            <span class="n">val_list</span><span class="p">[</span><span class="n">oi</span><span class="p">]</span> <span class="o">=</span> <span class="n">buf_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">]</span>
+            <span class="k">with</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">inserting_after</span><span class="p">(</span><span class="n">node</span><span class="p">):</span>
+                <span class="n">getitem_node</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">call_function</span><span class="p">(</span><span class="n">operator</span><span class="o">.</span><span class="n">getitem</span><span class="p">,</span> <span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">oi</span><span class="p">))</span>
+            <span class="n">getitem_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">]</span> <span class="o">=</span> <span class="n">buf_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">]</span>
+            <span class="n">already_exposed</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">buf_fqn</span><span class="p">)</span>
+            <span class="n">mutation_outputs</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">getitem_node</span><span class="p">,</span> <span class="n">buf_fqn</span><span class="p">))</span>
+        <span class="n">node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">val_list</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">mutation_outputs</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">exp_program</span>
+
+    <span class="c1"># BUFFER_MUTATION outputs must precede USER_OUTPUTs (ExportedProgram verifier).</span>
+    <span class="n">out_args</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">output_node</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="n">output_node</span><span class="o">.</span><span class="n">args</span> <span class="o">=</span> <span class="p">(</span><span class="nb">tuple</span><span class="p">([</span><span class="n">g</span> <span class="k">for</span> <span class="n">g</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">mutation_outputs</span><span class="p">]</span> <span class="o">+</span> <span class="n">out_args</span><span class="p">),)</span>
+    <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">lint</span><span class="p">()</span>
+    <span class="n">gm</span><span class="o">.</span><span class="n">recompile</span><span class="p">()</span>
+
+    <span class="n">new_output_specs</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">OutputSpec</span><span class="p">(</span><span class="n">OutputKind</span><span class="o">.</span><span class="n">BUFFER_MUTATION</span><span class="p">,</span> <span class="n">TensorArgument</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">g</span><span class="o">.</span><span class="n">name</span><span class="p">),</span> <span class="n">fqn</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">g</span><span class="p">,</span> <span class="n">fqn</span> <span class="ow">in</span> <span class="n">mutation_outputs</span>
+    <span class="p">]</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="n">sig</span><span class="o">.</span><span class="n">output_specs</span><span class="p">)</span>
+    <span class="n">new_signature</span> <span class="o">=</span> <span class="n">ExportGraphSignature</span><span class="p">(</span>
+        <span class="n">input_specs</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="n">sig</span><span class="o">.</span><span class="n">input_specs</span><span class="p">),</span> <span class="n">output_specs</span><span class="o">=</span><span class="n">new_output_specs</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">ExportedProgram</span><span class="p">(</span>
+        <span class="n">root</span><span class="o">=</span><span class="n">gm</span><span class="p">,</span>
+        <span class="n">graph</span><span class="o">=</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="p">,</span>
+        <span class="n">graph_signature</span><span class="o">=</span><span class="n">new_signature</span><span class="p">,</span>
+        <span class="n">state_dict</span><span class="o">=</span><span class="n">exp_program</span><span class="o">.</span><span class="n">state_dict</span><span class="p">,</span>
+        <span class="n">range_constraints</span><span class="o">=</span><span class="n">exp_program</span><span class="o">.</span><span class="n">range_constraints</span><span class="p">,</span>
+        <span class="n">module_call_graph</span><span class="o">=</span><span class="n">exp_program</span><span class="o">.</span><span class="n">module_call_graph</span><span class="p">,</span>
+        <span class="n">example_inputs</span><span class="o">=</span><span class="n">exp_program</span><span class="o">.</span><span class="n">example_inputs</span><span class="p">,</span>
+        <span class="n">constants</span><span class="o">=</span><span class="n">exp_program</span><span class="o">.</span><span class="n">constants</span><span class="p">,</span>
+        <span class="n">verifiers</span><span class="o">=</span><span class="n">exp_program</span><span class="o">.</span><span class="n">verifiers</span><span class="p">,</span>
+    <span class="p">)</span>
+
+
 <span class="k">def</span><span class="w"> </span><span class="nf">inline_trt_modules</span><span class="p">(</span>
-    <span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span> <span class="n">cross_compile_module</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span>
+    <span class="n">cross_compile_module</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">expose_aliased_mutations</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Replace TRT submodules with trt engine nodes.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">named_children</span><span class="p">():</span>
-        <span class="k">if</span> <span class="s2">&quot;_run_on_acc&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">name</span><span class="p">:</span>
+        <span class="k">if</span> <span class="s2">"_run_on_acc"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">name</span><span class="p">:</span>
             <span class="k">continue</span>
         <span class="c1"># Get the TRT submodule</span>
         <span class="n">trt_module</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
@@ -988,23 +1194,23 @@ document.write(`
         <span class="n">trt_module_node</span> <span class="o">=</span> <span class="n">trt_module_node</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
         <span class="k">assert</span> <span class="n">trt_module_node</span><span class="o">.</span><span class="n">args</span>
 
-        <span class="k">if</span> <span class="s2">&quot;val&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">trt_module_node</span><span class="o">.</span><span class="n">meta</span><span class="p">:</span>
+        <span class="k">if</span> <span class="s2">"val"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">trt_module_node</span><span class="o">.</span><span class="n">meta</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;trt_module_node: </span><span class="si">{</span><span class="n">trt_module_node</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2"> does not have the metadata which should be set during dynamo compile_module step.&quot;</span>
+                <span class="sa">f</span><span class="s2">"trt_module_node: </span><span class="si">{</span><span class="n">trt_module_node</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2"> does not have the metadata which should be set during dynamo compile_module step."</span>
             <span class="p">)</span>
-        <span class="n">num_outputs</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">trt_module_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">])</span>
+        <span class="n">num_outputs</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">trt_module_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">])</span>
         <span class="c1"># Insert a call_function node to perform inference on TRT engine</span>
         <span class="k">with</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">inserting_before</span><span class="p">(</span><span class="n">trt_module_node</span><span class="p">):</span>
             <span class="k">if</span> <span class="n">cross_compile_module</span><span class="p">:</span>
                 <span class="n">engine_info</span> <span class="o">=</span> <span class="n">trt_module</span><span class="o">.</span><span class="n">_pack_engine_info</span><span class="p">()</span>
                 <span class="n">engine_bytes</span> <span class="o">=</span> <span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span>
-                <span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64encode</span><span class="p">(</span><span class="n">engine_bytes</span><span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span>
+                <span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64encode</span><span class="p">(</span><span class="n">engine_bytes</span><span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">"utf-8"</span><span class="p">)</span>
                 <span class="n">trt_node</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">call_function</span><span class="p">(</span>
                     <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">no_op_placeholder_for_execute_engine</span><span class="o">.</span><span class="n">default</span><span class="p">,</span>
                     <span class="p">(</span><span class="n">trt_module_node</span><span class="o">.</span><span class="n">args</span><span class="p">,</span> <span class="o">*</span><span class="n">engine_info</span><span class="p">),</span>
                 <span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
-                <span class="n">engine_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_engine&quot;</span>
+                <span class="n">engine_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_engine"</span>
                 <span class="nb">setattr</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">engine_name</span><span class="p">,</span> <span class="n">trt_module</span><span class="o">.</span><span class="n">engine</span><span class="p">)</span>
                 <span class="n">engine_node</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">get_attr</span><span class="p">(</span><span class="n">engine_name</span><span class="p">)</span>
 
@@ -1012,17 +1218,17 @@ document.write(`
                     <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">execute_engine</span><span class="o">.</span><span class="n">default</span><span class="p">,</span>
                     <span class="p">(</span><span class="n">trt_module_node</span><span class="o">.</span><span class="n">args</span><span class="p">,</span> <span class="n">engine_node</span><span class="p">),</span>
                 <span class="p">)</span>
-                <span class="n">engine_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">CustomObjArgument</span><span class="p">(</span>
-                    <span class="n">name</span><span class="o">=</span><span class="n">engine_node</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">class_fqn</span><span class="o">=</span><span class="s2">&quot;&quot;</span>
+                <span class="n">engine_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">]</span> <span class="o">=</span> <span class="n">CustomObjArgument</span><span class="p">(</span>
+                    <span class="n">name</span><span class="o">=</span><span class="n">engine_node</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">class_fqn</span><span class="o">=</span><span class="s2">""</span>
                 <span class="p">)</span>
             <span class="k">assert</span> <span class="n">num_outputs</span> <span class="o">&gt;</span> <span class="mi">0</span>
-            <span class="n">trt_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">trt_module_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">]</span>
+            <span class="n">trt_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">]</span> <span class="o">=</span> <span class="n">trt_module_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">]</span>
 
         <span class="k">if</span> <span class="n">num_outputs</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
             <span class="c1"># Insert getitem nodes as outputs (for export serialization to work)</span>
             <span class="k">with</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">inserting_after</span><span class="p">(</span><span class="n">trt_node</span><span class="p">):</span>
                 <span class="n">getitem_output</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">call_function</span><span class="p">(</span><span class="n">operator</span><span class="o">.</span><span class="n">getitem</span><span class="p">,</span> <span class="p">(</span><span class="n">trt_node</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
-                <span class="n">getitem_output</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">trt_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">]</span>
+                <span class="n">getitem_output</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">]</span> <span class="o">=</span> <span class="n">trt_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">]</span>
             <span class="n">trt_module_node</span><span class="o">.</span><span class="n">replace_all_uses_with</span><span class="p">(</span><span class="n">getitem_output</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="c1"># Multiple outputs case:</span>
@@ -1031,12 +1237,138 @@ document.write(`
             <span class="n">trt_module_node</span><span class="o">.</span><span class="n">replace_all_uses_with</span><span class="p">(</span><span class="n">trt_node</span><span class="p">)</span>
             <span class="n">getitem_nodes</span> <span class="o">=</span> <span class="n">trt_node</span><span class="o">.</span><span class="n">users</span>
             <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">getitem_node</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">getitem_nodes</span><span class="p">):</span>
-                <span class="n">getitem_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">trt_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">][</span><span class="n">idx</span><span class="p">]</span>
+                <span class="n">getitem_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">]</span> <span class="o">=</span> <span class="n">trt_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">][</span><span class="n">idx</span><span class="p">]</span>
+
+        <span class="c1"># Expose the engine's aliased (KV-cache) outputs as graph-level buffer</span>
+        <span class="c1"># mutations so the ExecuTorch path sees a real mutable buffer instead of</span>
+        <span class="c1"># a frozen constant. Only on the legacy (create_trt_exp_program) path,</span>
+        <span class="c1"># which declares the BUFFER_MUTATION specs; on the torch.export path the</span>
+        <span class="c1"># extra outputs would just perturb the user outputs (see save()'s</span>
+        <span class="c1"># post-export declaration for retrace=True). Non-cross-compile only.</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">cross_compile_module</span> <span class="ow">and</span> <span class="n">expose_aliased_mutations</span><span class="p">:</span>
+            <span class="n">_expose_aliased_buffer_mutations</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">trt_node</span><span class="p">,</span> <span class="n">trt_module</span><span class="p">,</span> <span class="n">num_outputs</span><span class="p">)</span>
 
         <span class="c1"># Erase the TRT submodule (call_module) node.</span>
         <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">erase_node</span><span class="p">(</span><span class="n">trt_module_node</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">gm</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_expose_aliased_buffer_mutations</span><span class="p">(</span>
+    <span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span>
+    <span class="n">trt_node</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">Node</span><span class="p">,</span>
+    <span class="n">trt_module</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="n">num_user_outputs</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Surface an engine's aliased KV-cache outputs as graph buffer mutations.</span>
+
+<span class="sd">    The interpreter appends aliased layer outputs (e.g. ``IKVCacheUpdateLayer``)</span>
+<span class="sd">    to the engine's network bindings *after* the fx output boundary, so</span>
+<span class="sd">    ``trt_node.meta["val"]`` (and the partitioner-emitted getitems) only cover</span>
+<span class="sd">    the user outputs. Here we add a ``getitem`` for each aliased output binding</span>
+<span class="sd">    and route it to the graph output tagged as a buffer mutation of the aliased</span>
+<span class="sd">    input's backing buffer. ``create_trt_exp_program`` turns the tag into a</span>
+<span class="sd">    ``BUFFER_MUTATION`` OutputSpec, so ``torch.export``/``to_edge`` record the</span>
+<span class="sd">    cache in ``buffers_to_mutate`` -- without a graph ``copy_`` that</span>
+<span class="sd">    functionalization would fold away (the aliased output shares the buffer's</span>
+<span class="sd">    storage, so a ``copy_`` from it is a no-op self-copy).</span>
+<span class="sd">    """</span>
+    <span class="n">aliased_io</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">trt_module</span><span class="p">,</span> <span class="s2">"aliased_io"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">aliased_io</span><span class="p">:</span>
+        <span class="k">return</span>
+
+    <span class="n">in_names</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">trt_module</span><span class="p">,</span> <span class="s2">"input_binding_names"</span><span class="p">,</span> <span class="p">[]))</span>
+    <span class="n">out_names</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">trt_module</span><span class="p">,</span> <span class="s2">"output_binding_names"</span><span class="p">,</span> <span class="p">[]))</span>
+    <span class="n">input_arg_nodes</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">trt_node</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+    <span class="c1"># Only get_attr nodes backed by a *registered buffer* can be declared</span>
+    <span class="c1"># BUFFER_MUTATION targets; a get_attr that lift() would classify as a</span>
+    <span class="c1"># constant (not in named_buffers) is not a valid mutation target.</span>
+    <span class="n">registered_buffers</span> <span class="o">=</span> <span class="p">{</span><span class="n">name</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">named_buffers</span><span class="p">()}</span>
+
+    <span class="c1"># A buffer can be declared mutated at most once in the graph signature.</span>
+    <span class="c1"># Multiple engines can alias the same backing buffer (they share its</span>
+    <span class="c1"># storage), so dedup exposures across engines.</span>
+    <span class="n">already_exposed</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"_kv_exposed_mutation_targets"</span><span class="p">,</span> <span class="nb">set</span><span class="p">())</span>
+
+    <span class="n">output_node</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">node</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span> <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"output"</span><span class="p">)</span>
+
+    <span class="n">val_list</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">trt_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">])</span>
+    <span class="n">new_mutation_outputs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">Node</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">oi</span><span class="p">,</span> <span class="n">out_name</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">out_names</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">out_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">aliased_io</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">in_name</span> <span class="o">=</span> <span class="n">aliased_io</span><span class="p">[</span><span class="n">out_name</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+        <span class="c1"># The two checks below are internal invariant violations: aliased_io is</span>
+        <span class="c1"># built from the engine's own bindings, so an aliased output must map to a</span>
+        <span class="c1"># real input arg.</span>
+        <span class="c1"># If it doesn't, the mutation can't be wired and its in-place update would be</span>
+        <span class="c1"># silently dropped (a corrupted cache) -- fail loudly rather than degrade.</span>
+        <span class="k">if</span> <span class="n">in_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">in_names</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"Aliased output </span><span class="si">{</span><span class="n">out_name</span><span class="si">!r}</span><span class="s2"> references input </span><span class="si">{</span><span class="n">in_name</span><span class="si">!r}</span><span class="s2"> which is "</span>
+                <span class="s2">"not an engine input binding -- the engine's aliased_io map is "</span>
+                <span class="s2">"inconsistent with its input bindings."</span>
+            <span class="p">)</span>
+        <span class="n">ii</span> <span class="o">=</span> <span class="n">in_names</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">in_name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">ii</span> <span class="o">&gt;=</span> <span class="nb">len</span><span class="p">(</span><span class="n">input_arg_nodes</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"Aliased output </span><span class="si">{</span><span class="n">out_name</span><span class="si">!r}</span><span class="s2"> -&gt; input </span><span class="si">{</span><span class="n">in_name</span><span class="si">!r}</span><span class="s2"> maps to arg index "</span>
+                <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ii</span><span class="si">}</span><span class="s2">, out of range for </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">input_arg_nodes</span><span class="p">)</span><span class="si">}</span><span class="s2"> delegate args -- the "</span>
+                <span class="s2">"engine's aliased_io map is inconsistent with the delegate args."</span>
+            <span class="p">)</span>
+        <span class="n">buffer_node</span> <span class="o">=</span> <span class="n">input_arg_nodes</span><span class="p">[</span><span class="n">ii</span><span class="p">]</span>
+        <span class="n">buf_target</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">buffer_node</span><span class="p">,</span> <span class="s2">"target"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">buffer_node</span><span class="o">.</span><span class="n">op</span> <span class="o">!=</span> <span class="s2">"get_attr"</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">buf_target</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="s2">"Aliased input </span><span class="si">%s</span><span class="s2"> for engine output </span><span class="si">%s</span><span class="s2"> is not a buffer get_attr "</span>
+                <span class="s2">"(op=</span><span class="si">%s</span><span class="s2">); skipping buffer-mutation exposure."</span><span class="p">,</span>
+                <span class="n">in_name</span><span class="p">,</span>
+                <span class="n">out_name</span><span class="p">,</span>
+                <span class="n">buffer_node</span><span class="o">.</span><span class="n">op</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">continue</span>
+        <span class="k">if</span> <span class="n">buf_target</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">registered_buffers</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="s2">"Aliased input </span><span class="si">%s</span><span class="s2"> for engine output </span><span class="si">%s</span><span class="s2"> resolves to get_attr </span><span class="si">%s</span><span class="s2"> "</span>
+                <span class="s2">"which is not a registered buffer; skipping buffer-mutation exposure."</span><span class="p">,</span>
+                <span class="n">in_name</span><span class="p">,</span>
+                <span class="n">out_name</span><span class="p">,</span>
+                <span class="n">buf_target</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">continue</span>
+        <span class="k">if</span> <span class="n">buf_target</span> <span class="ow">in</span> <span class="n">already_exposed</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="s2">"Buffer </span><span class="si">%s</span><span class="s2"> (engine output </span><span class="si">%s</span><span class="s2"> / input </span><span class="si">%s</span><span class="s2">) already exposed as a "</span>
+                <span class="s2">"mutation by another engine; skipping duplicate."</span><span class="p">,</span>
+                <span class="n">buf_target</span><span class="p">,</span>
+                <span class="n">out_name</span><span class="p">,</span>
+                <span class="n">in_name</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">continue</span>
+        <span class="n">already_exposed</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">buf_target</span><span class="p">)</span>
+
+        <span class="c1"># Ensure the engine node advertises at least oi+1 outputs so getitem(oi)</span>
+        <span class="c1"># is in range; the aliased output has the shape/dtype of its input buffer.</span>
+        <span class="k">while</span> <span class="nb">len</span><span class="p">(</span><span class="n">val_list</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="n">oi</span><span class="p">:</span>
+            <span class="n">val_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">buffer_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">])</span>
+        <span class="n">val_list</span><span class="p">[</span><span class="n">oi</span><span class="p">]</span> <span class="o">=</span> <span class="n">buffer_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">]</span>
+
+        <span class="k">with</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">inserting_after</span><span class="p">(</span><span class="n">trt_node</span><span class="p">):</span>
+            <span class="n">getitem_node</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">call_function</span><span class="p">(</span><span class="n">operator</span><span class="o">.</span><span class="n">getitem</span><span class="p">,</span> <span class="p">(</span><span class="n">trt_node</span><span class="p">,</span> <span class="n">oi</span><span class="p">))</span>
+        <span class="n">getitem_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">]</span> <span class="o">=</span> <span class="n">buffer_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">]</span>
+        <span class="n">getitem_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"_kv_mutation_target"</span><span class="p">]</span> <span class="o">=</span> <span class="n">buf_target</span>
+        <span class="n">new_mutation_outputs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">getitem_node</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">new_mutation_outputs</span><span class="p">:</span>
+        <span class="k">return</span>
+
+    <span class="n">trt_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">val_list</span><span class="p">)</span>
+    <span class="c1"># BUFFER_MUTATION outputs must precede USER_OUTPUTs (the ExportedProgram</span>
+    <span class="c1"># verifier treats output_nodes[num_tokens:num_tokens+num_mutations] as the</span>
+    <span class="c1"># mutations), so prepend.</span>
+    <span class="n">out_args</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">output_node</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="n">output_node</span><span class="o">.</span><span class="n">args</span> <span class="o">=</span> <span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">new_mutation_outputs</span> <span class="o">+</span> <span class="n">out_args</span><span class="p">),)</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">replace_execute_engine_no_op_node</span><span class="p">(</span>
@@ -1045,19 +1377,19 @@ document.write(`
     <span class="n">gm</span> <span class="o">=</span> <span class="n">exp_program</span><span class="o">.</span><span class="n">graph_module</span>
     <span class="n">no_op_placeholder_nodes</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">:</span>
-        <span class="k">if</span> <span class="s2">&quot;no_op_placeholder_for_execute_engine&quot;</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="p">:</span>
+        <span class="k">if</span> <span class="s2">"no_op_placeholder_for_execute_engine"</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="p">:</span>
             <span class="n">no_op_placeholder_nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
     <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">no_op_placeholder_nodes</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span>
     <span class="k">for</span> <span class="n">no_op_placeholder_node</span> <span class="ow">in</span> <span class="n">no_op_placeholder_nodes</span><span class="p">:</span>
-        <span class="k">if</span> <span class="s2">&quot;val&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">no_op_placeholder_node</span><span class="o">.</span><span class="n">meta</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;metadata info is missing for the node: </span><span class="si">{</span><span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="s2">"val"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">no_op_placeholder_node</span><span class="o">.</span><span class="n">meta</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"metadata info is missing for the node: </span><span class="si">{</span><span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
         <span class="k">with</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">inserting_before</span><span class="p">(</span><span class="n">no_op_placeholder_node</span><span class="p">):</span>
             <span class="n">packed_engine_info</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">no_op_placeholder_node</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
             <span class="n">engine_bytes</span> <span class="o">=</span> <span class="n">packed_engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span>
             <span class="n">engine_name</span> <span class="o">=</span> <span class="n">packed_engine_info</span><span class="p">[</span><span class="n">NAME_IDX</span><span class="p">]</span>
 
             <span class="n">packed_engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64decode</span><span class="p">(</span>
-                <span class="n">engine_bytes</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span>
+                <span class="n">engine_bytes</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">"utf-8"</span><span class="p">)</span>
             <span class="p">)</span>
             <span class="k">if</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torch_tensorrt_runtime</span><span class="p">:</span>
                 <span class="n">trt_engine</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">classes</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">Engine</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">packed_engine_info</span><span class="p">))</span>
@@ -1072,15 +1404,15 @@ document.write(`
                 <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">execute_engine</span><span class="o">.</span><span class="n">default</span><span class="p">,</span>
                 <span class="p">(</span><span class="n">no_op_placeholder_node</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">engine_node</span><span class="p">),</span>
             <span class="p">)</span>
-            <span class="n">trt_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">no_op_placeholder_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">]</span>
-            <span class="n">engine_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">CustomObjArgument</span><span class="p">(</span>
-                <span class="n">name</span><span class="o">=</span><span class="n">engine_node</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">class_fqn</span><span class="o">=</span><span class="s2">&quot;&quot;</span>
+            <span class="n">trt_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">]</span> <span class="o">=</span> <span class="n">no_op_placeholder_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">]</span>
+            <span class="n">engine_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">]</span> <span class="o">=</span> <span class="n">CustomObjArgument</span><span class="p">(</span>
+                <span class="n">name</span><span class="o">=</span><span class="n">engine_node</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">class_fqn</span><span class="o">=</span><span class="s2">""</span>
             <span class="p">)</span>
 
         <span class="n">no_op_placeholder_node</span><span class="o">.</span><span class="n">replace_all_uses_with</span><span class="p">(</span><span class="n">trt_node</span><span class="p">)</span>
         <span class="n">getitem_nodes</span> <span class="o">=</span> <span class="n">trt_node</span><span class="o">.</span><span class="n">users</span>
         <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">getitem_node</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">getitem_nodes</span><span class="p">):</span>
-            <span class="n">getitem_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">trt_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">][</span><span class="n">idx</span><span class="p">]</span>
+            <span class="n">getitem_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">]</span> <span class="o">=</span> <span class="n">trt_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">][</span><span class="n">idx</span><span class="p">]</span>
 
         <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">erase_node</span><span class="p">(</span><span class="n">no_op_placeholder_node</span><span class="p">)</span>
 

@@ -10,9 +10,16 @@ import dataclasses
 import json
 import struct
 from dataclasses import dataclass, field
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
+# A blob carrying aliased_io means something different to a parser that ignores it:
+# the runtime would bind each aliased output to its own allocation instead of the
+# input it aliases, and return wrong results rather than fail. The only field a
+# pre-aliasing parser validates is the magic, so aliased blobs carry TR02 and it
+# rejects them. Blobs without aliased_io keep TR01 and stay readable everywhere.
 TENSORRT_MAGIC = b"TR01"
+TENSORRT_MAGIC_ALIASED_IO = b"TR02"
+SUPPORTED_MAGICS = (TENSORRT_MAGIC, TENSORRT_MAGIC_ALIASED_IO)
 HEADER_FORMAT = "<4sIIIQ8s"
 HEADER_SIZE = struct.calcsize(HEADER_FORMAT)
 
@@ -32,6 +39,11 @@ class TensorRTIOBinding:
 @dataclass
 class TensorRTBlobMetadata:
     io_bindings: List[TensorRTIOBinding] = field(default_factory=list)
+    # Aliased output->input bindings: out_name -> (in_name, kind). "kind" is an
+    # AliasKind value ("kv_cache_update" or "user"); the C++ backend binds each
+    # aliased engine output to its aliased input's tensor (in-place) so the
+    # update lands in the caller-owned buffer.
+    aliased_io: Dict[str, Tuple[str, str]] = field(default_factory=dict)
     hardware_compatible: bool = False
     device_id: int = 0
     serialized_metadata: str = ""
@@ -50,6 +62,12 @@ class TensorRTBlobMetadata:
                 }
                 for binding in self.io_bindings
             ],
+            # List form (not a dict) so the small C++ parser can walk it like
+            # io_bindings. Emitted right after io_bindings, before the scalars.
+            "aliased_io": [
+                {"output": out, "input": inp, "kind": kind}
+                for out, (inp, kind) in self.aliased_io.items()
+            ],
             "hardware_compatible": self.hardware_compatible,
             "device_id": self.device_id,
             "serialized_metadata": self.serialized_metadata,
@@ -67,8 +85,13 @@ class TensorRTBlobMetadata:
             )
             for binding in parsed.get("io_bindings", [])
         ]
+        aliased_io = {
+            b["output"]: (b["input"], b.get("kind", "kv_cache_update"))
+            for b in parsed.get("aliased_io", [])
+        }
         return cls(
             io_bindings=io_bindings,
+            aliased_io=aliased_io,
             hardware_compatible=parsed.get("hardware_compatible", False),
             device_id=parsed.get("device_id", 0),
             serialized_metadata=parsed.get("serialized_metadata", ""),
@@ -83,7 +106,7 @@ def serialize_engine(engine_bytes: bytes, metadata: TensorRTBlobMetadata) -> byt
     reserved = b"\x01" + b"\x00" * 7
     header = struct.pack(
         HEADER_FORMAT,
-        TENSORRT_MAGIC,
+        TENSORRT_MAGIC_ALIASED_IO if metadata.aliased_io else TENSORRT_MAGIC,
         metadata_offset,
         len(metadata_json),
         engine_offset,
@@ -100,7 +123,7 @@ def deserialize_engine(blob: bytes) -> Tuple[bytes, TensorRTBlobMetadata]:
     magic, metadata_offset, metadata_size, engine_offset, engine_size, _ = (
         struct.unpack(HEADER_FORMAT, blob[:HEADER_SIZE])
     )
-    if magic != TENSORRT_MAGIC:
+    if magic not in SUPPORTED_MAGICS:
         raise ValueError(f"Invalid magic: {magic!r}")
     if engine_offset % 16 != 0:
         raise ValueError(f"Engine offset is not 16-byte aligned: {engine_offset}")

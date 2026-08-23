@@ -1,0 +1,2000 @@
+<!DOCTYPE html>
+<html>
+ <head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
+  <meta content="width=device-width,initial-scale=1" name="viewport"/>
+  <meta content="ie=edge" http-equiv="x-ua-compatible"/>
+  <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
+  <meta content="Copied to clipboard" name="lang:clipboard.copied"/>
+  <meta content="en" name="lang:search.language"/>
+  <meta content="True" name="lang:search.pipeline.stopwords"/>
+  <meta content="True" name="lang:search.pipeline.trimmer"/>
+  <meta content="No matching documents" name="lang:search.result.none"/>
+  <meta content="1 matching document" name="lang:search.result.one"/>
+  <meta content="# matching documents" name="lang:search.result.other"/>
+  <meta content="[\s\-]+" name="lang:search.tokenizer"/>
+  <link crossorigin="" href="https://fonts.gstatic.com/" rel="preconnect"/>
+  <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,500,700|Roboto:300,400,400i,700&amp;display=fallback" rel="stylesheet"/>
+  <style>
+   body,
+      input {
+        font-family: "Roboto", "Helvetica Neue", Helvetica, Arial, sans-serif
+      }
+
+      code,
+      kbd,
+      pre {
+        font-family: "Roboto Mono", "Courier New", Courier, monospace
+      }
+  </style>
+  <link href="../_static/stylesheets/application.css" rel="stylesheet"/>
+  <link href="../_static/stylesheets/application-palette.css" rel="stylesheet"/>
+  <link href="../_static/stylesheets/application-fixes.css" rel="stylesheet"/>
+  <link href="../_static/fonts/material-icons.css" rel="stylesheet"/>
+  <meta content="84bd00" name="theme-color"/>
+  <script src="../_static/javascripts/modernizr.js">
+  </script>
+  <title>
+   Torch-TensorRT Getting Started - CitriNet — Torch-TensorRT v1.1.0 documentation
+  </title>
+  <link href="../_static/pygments.css" rel="stylesheet" type="text/css"/>
+  <link href="../_static/material.css" rel="stylesheet" type="text/css"/>
+  <link href="../_static/collapsible-lists/css/tree_view.css" rel="stylesheet" type="text/css"/>
+  <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js">
+  </script>
+  <script src="../_static/jquery.js">
+  </script>
+  <script src="../_static/underscore.js">
+  </script>
+  <script src="../_static/doctools.js">
+  </script>
+  <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js">
+  </script>
+  <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
+  </script>
+  <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
+  </script>
+  <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+  </script>
+  <script>
+   window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}
+  </script>
+  <link href="../genindex.html" rel="index" title="Index"/>
+  <link href="../search.html" rel="search" title="Search"/>
+  <link href="dynamic-shapes.html" rel="next" title="Torch-TensorRT - Using Dynamic Shapes"/>
+  <link href="../tutorials/using_dla.html" rel="prev" title="DLA"/>
+ </head>
+ <body data-md-color-accent="light-green" data-md-color-primary="light-green" dir="ltr">
+  <svg class="md-svg">
+   <defs data-children-count="0">
+    <svg height="448" id="__github" viewbox="0 0 416 448" width="416" xmlns="http://www.w3.org/2000/svg">
+     <path d="M160 304q0 10-3.125 20.5t-10.75 19T128 352t-18.125-8.5-10.75-19T96 304t3.125-20.5 10.75-19T128 256t18.125 8.5 10.75 19T160 304zm160 0q0 10-3.125 20.5t-10.75 19T288 352t-18.125-8.5-10.75-19T256 304t3.125-20.5 10.75-19T288 256t18.125 8.5 10.75 19T320 304zm40 0q0-30-17.25-51T296 232q-10.25 0-48.75 5.25Q229.5 240 208 240t-39.25-2.75Q130.75 232 120 232q-29.5 0-46.75 21T56 304q0 22 8 38.375t20.25 25.75 30.5 15 35 7.375 37.25 1.75h42q20.5 0 37.25-1.75t35-7.375 30.5-15 20.25-25.75T360 304zm56-44q0 51.75-15.25 82.75-9.5 19.25-26.375 33.25t-35.25 21.5-42.5 11.875-42.875 5.5T212 416q-19.5 0-35.5-.75t-36.875-3.125-38.125-7.5-34.25-12.875T37 371.5t-21.5-28.75Q0 312 0 260q0-59.25 34-99-6.75-20.5-6.75-42.5 0-29 12.75-54.5 27 0 47.5 9.875t47.25 30.875Q171.5 96 212 96q37 0 70 8 26.25-20.5 46.75-30.25T376 64q12.75 25.5 12.75 54.5 0 21.75-6.75 42 34 40 34 99.5z" fill="currentColor">
+     </path>
+    </svg>
+   </defs>
+  </svg>
+  <input class="md-toggle" data-md-toggle="drawer" id="__drawer" type="checkbox"/>
+  <input class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
+  <label class="md-overlay" data-md-component="overlay" for="__drawer">
+  </label>
+  <a class="md-skip" href="#_notebooks/CitriNet-example" tabindex="1">
+   Skip to content
+  </a>
+  <header class="md-header" data-md-component="header">
+   <nav class="md-header-nav md-grid">
+    <div class="md-flex navheader">
+     <div class="md-flex__cell md-flex__cell--shrink">
+      <a class="md-header-nav__button md-logo" href="../index.html" title="Torch-TensorRT v1.1.0 documentation">
+       <i class="md-icon">
+        
+       </i>
+      </a>
+     </div>
+     <div class="md-flex__cell md-flex__cell--shrink">
+      <label class="md-icon md-icon--menu md-header-nav__button" for="__drawer">
+      </label>
+     </div>
+     <div class="md-flex__cell md-flex__cell--stretch">
+      <div class="md-flex__ellipsis md-header-nav__title" data-md-component="title">
+       <span class="md-header-nav__topic">
+        Torch-TensorRT
+       </span>
+       <span class="md-header-nav__topic">
+        Torch-TensorRT Getting Started - CitriNet
+       </span>
+      </div>
+     </div>
+     <div class="md-flex__cell md-flex__cell--shrink">
+      <label class="md-icon md-icon--search md-header-nav__button" for="__search">
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+       <label class="md-search__overlay" for="__search">
+       </label>
+       <div class="md-search__inner" role="search">
+        <form action="../search.html" class="md-search__form" method="get" name="search">
+         <input autocapitalize="off" autocomplete="off" class="md-search__input" data-md-component="query" data-md-state="active" name="q" placeholder="Search" spellcheck="false" type="text"/>
+         <label class="md-icon md-search__icon" for="__search">
+         </label>
+         <button class="md-icon md-search__icon" data-md-component="reset" tabindex="-1" type="reset">
+          
+         </button>
+        </form>
+        <div class="md-search__output">
+         <div class="md-search__scrollwrap" data-md-scrollfix="">
+          <div class="md-search-result" data-md-component="result">
+           <div class="md-search-result__meta">
+            Type to start searching
+           </div>
+           <ol class="md-search-result__list">
+           </ol>
+          </div>
+         </div>
+        </div>
+       </div>
+      </div>
+     </div>
+     <div class="md-flex__cell md-flex__cell--shrink">
+      <div class="md-header-nav__source">
+       <a class="md-source" data-md-source="github" href="https://github.com/nvidia/Torch-TensorRT/" title="Go to repository">
+        <div class="md-source__icon">
+         <svg height="28" viewbox="0 0 24 24" width="28" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+          <use height="24" width="24" xlink:href="#__github">
+          </use>
+         </svg>
+        </div>
+        <div class="md-source__repository">
+         Torch-TensorRT
+        </div>
+       </a>
+      </div>
+     </div>
+     <div class="md-flex__cell md-flex__cell--shrink dropdown">
+      <button class="dropdownbutton">
+       Versions
+      </button>
+      <div class="dropdown-content md-hero">
+       <a href="https://nvidia.github.io/Torch-TensorRT/" title="master">
+        master
+       </a>
+       <a href="https://nvidia.github.io/Torch-TensorRT/v1.1.0/" title="v1.1.0">
+        v1.1.0
+       </a>
+       <a href="https://nvidia.github.io/Torch-TensorRT/v1.0.0/" title="v1.0.0">
+        v1.0.0
+       </a>
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.4.1/" title="v0.4.1">
+        v0.4.1
+       </a>
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.4.0/" title="v0.4.0">
+        v0.4.0
+       </a>
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.3.0/" title="v0.3.0">
+        v0.3.0
+       </a>
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.2.0/" title="v0.2.0">
+        v0.2.0
+       </a>
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.1.0/" title="v0.1.0">
+        v0.1.0
+       </a>
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.0.3/" title="v0.0.3">
+        v0.0.3
+       </a>
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.0.2/" title="v0.0.2">
+        v0.0.2
+       </a>
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.0.1/" title="v0.0.1">
+        v0.0.1
+       </a>
+      </div>
+     </div>
+    </div>
+   </nav>
+  </header>
+  <div class="md-container">
+   <nav class="md-tabs" data-md-component="tabs">
+    <div class="md-tabs__inner md-grid">
+     <ul class="md-tabs__list">
+      <li class="md-tabs__item">
+       <a class="md-tabs__link" href="../index.html">
+        Torch-TensorRT v1.1.0 documentation
+       </a>
+      </li>
+     </ul>
+    </div>
+   </nav>
+   <main class="md-main">
+    <div class="md-main__inner md-grid" data-md-component="container">
+     <div class="md-sidebar md-sidebar--primary" data-md-component="navigation">
+      <div class="md-sidebar__scrollwrap">
+       <div class="md-sidebar__inner">
+        <nav class="md-nav md-nav--primary" data-md-level="0">
+         <label class="md-nav__title md-nav__title--site" for="__drawer">
+          <a class="md-nav__button md-logo" href="../index.html" title="Torch-TensorRT v1.1.0 documentation">
+           <i class="md-icon">
+            
+           </i>
+          </a>
+          <a href="../index.html" title="Torch-TensorRT v1.1.0 documentation">
+           Torch-TensorRT
+          </a>
+         </label>
+         <div class="md-nav__source">
+          <a class="md-source" data-md-source="github" href="https://github.com/nvidia/Torch-TensorRT/" title="Go to repository">
+           <div class="md-source__icon">
+            <svg height="28" viewbox="0 0 24 24" width="28" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+             <use height="24" width="24" xlink:href="#__github">
+             </use>
+            </svg>
+           </div>
+           <div class="md-source__repository">
+            Torch-TensorRT
+           </div>
+          </a>
+         </div>
+         <ul class="md-nav__list">
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             Getting Started
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/installation.html">
+            Installation
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/getting_started_with_cpp_api.html">
+            Getting Started with C++
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/getting_started_with_python_api.html">
+            Using Torch-TensorRT in Python
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/creating_torchscript_module_in_python.html">
+            Creating a TorchScript Module
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/creating_torchscript_module_in_python.html#working-with-torchscript-in-python">
+            Working with TorchScript in Python
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">
+            Saving TorchScript Module to Disk
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/ptq.html">
+            Post Training Quantization (PTQ)
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/torchtrtc.html">
+            torchtrtc
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/use_from_pytorch.html">
+            Using Torch-TensorRT Directly From PyTorch
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/runtime.html">
+            Deploying Torch-TensorRT Programs
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/using_dla.html">
+            DLA
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             Notebooks
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <input class="md-toggle md-nav__toggle" data-md-toggle="toc" id="__toc" type="checkbox"/>
+           <label class="md-nav__link md-nav__link--active" for="__toc">
+            Torch-TensorRT Getting Started - CitriNet
+           </label>
+           <a class="md-nav__link md-nav__link--active" href="#">
+            Torch-TensorRT Getting Started - CitriNet
+           </a>
+           <nav class="md-nav md-nav--secondary">
+            <label class="md-nav__title" for="__toc">
+             Contents
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix="">
+             <li class="md-nav__item">
+              <a class="md-nav__link" href="#notebooks-citrinet-example--page-root">
+               Torch-TensorRT Getting Started - CitriNet
+              </a>
+              <nav class="md-nav">
+               <ul class="md-nav__list">
+                <li class="md-nav__item">
+                 <a class="md-nav__link" href="#Overview">
+                  Overview
+                 </a>
+                 <nav class="md-nav">
+                  <ul class="md-nav__list">
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#Learning-objectives">
+                     Learning objectives
+                    </a>
+                   </li>
+                  </ul>
+                 </nav>
+                </li>
+                <li class="md-nav__item">
+                 <a class="md-nav__link" href="#Content">
+                  Content
+                 </a>
+                 <nav class="md-nav">
+                  <ul class="md-nav__list">
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#Benchmark-utility">
+                     Benchmark utility
+                    </a>
+                   </li>
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#FP32-(single-precision)">
+                     FP32 (single precision)
+                    </a>
+                   </li>
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#FP16-(half-precision)">
+                     FP16 (half precision)
+                    </a>
+                   </li>
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#What’s-next">
+                     What’s next
+                    </a>
+                   </li>
+                  </ul>
+                 </nav>
+                </li>
+               </ul>
+              </nav>
+             </li>
+             <li class="md-nav__item">
+              <a class="md-nav__extra_link" href="../_sources/_notebooks/CitriNet-example.ipynb.txt">
+               Show Source
+              </a>
+             </li>
+            </ul>
+           </nav>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="dynamic-shapes.html">
+            Torch-TensorRT - Using Dynamic Shapes
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="EfficientNet-example.html">
+            Torch-TensorRT Getting Started - EfficientNet-B0
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="Hugging-Face-BERT.html">
+            Masked Language Modeling (MLM) with Hugging Face BERT Transformer
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="lenet-getting-started.html">
+            Torch-TensorRT Getting Started - LeNet
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="Resnet50-example.html">
+            Torch-TensorRT Getting Started - ResNet 50
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="ssd-object-detection-demo.html">
+            Object Detection with Torch-TensorRT (SSD)
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="vgg-qat.html">
+            Deploying Quantization Aware Trained models in INT8 using Torch-TensorRT
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             Python API Documenation
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/torch_tensorrt.html">
+            torch_tensorrt
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/logging.html">
+            torch_tensorrt.logging
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/ptq.html">
+            torch_tensorrt.ptq
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/ts.html">
+            torch_tensorrt.ts
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             C++ API Documenation
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_cpp_api/torch_tensort_cpp.html">
+            Torch-TensorRT C++ API
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_cpp_api/namespace_torch_tensorrt.html">
+            Namespace torch_tensorrt
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_cpp_api/namespace_torch_tensorrt__logging.html">
+            Namespace torch_tensorrt::logging
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_cpp_api/namespace_torch_tensorrt__torchscript.html">
+            Namespace torch_tensorrt::torchscript
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_cpp_api/namespace_torch_tensorrt__ptq.html">
+            Namespace torch_tensorrt::ptq
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             Contributor Documentation
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../contributors/system_overview.html">
+            System Overview
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../contributors/writing_converters.html">
+            Writing Converters
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../contributors/useful_links.html">
+            Useful Links for Torch-TensorRT Development
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             Indices
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../indices/supported_ops.html">
+            Operators Supported
+           </a>
+          </li>
+         </ul>
+        </nav>
+       </div>
+      </div>
+     </div>
+     <div class="md-sidebar md-sidebar--secondary" data-md-component="toc">
+      <div class="md-sidebar__scrollwrap">
+       <div class="md-sidebar__inner">
+        <nav class="md-nav md-nav--secondary">
+         <label class="md-nav__title" for="__toc">
+          Contents
+         </label>
+         <ul class="md-nav__list" data-md-scrollfix="">
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="#notebooks-citrinet-example--page-root">
+            Torch-TensorRT Getting Started - CitriNet
+           </a>
+           <nav class="md-nav">
+            <ul class="md-nav__list">
+             <li class="md-nav__item">
+              <a class="md-nav__link" href="#Overview">
+               Overview
+              </a>
+              <nav class="md-nav">
+               <ul class="md-nav__list">
+                <li class="md-nav__item">
+                 <a class="md-nav__link" href="#Learning-objectives">
+                  Learning objectives
+                 </a>
+                </li>
+               </ul>
+              </nav>
+             </li>
+             <li class="md-nav__item">
+              <a class="md-nav__link" href="#Content">
+               Content
+              </a>
+              <nav class="md-nav">
+               <ul class="md-nav__list">
+                <li class="md-nav__item">
+                 <a class="md-nav__link" href="#Benchmark-utility">
+                  Benchmark utility
+                 </a>
+                </li>
+                <li class="md-nav__item">
+                 <a class="md-nav__link" href="#FP32-(single-precision)">
+                  FP32 (single precision)
+                 </a>
+                </li>
+                <li class="md-nav__item">
+                 <a class="md-nav__link" href="#FP16-(half-precision)">
+                  FP16 (half precision)
+                 </a>
+                </li>
+                <li class="md-nav__item">
+                 <a class="md-nav__link" href="#What’s-next">
+                  What’s next
+                 </a>
+                </li>
+               </ul>
+              </nav>
+             </li>
+            </ul>
+           </nav>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__extra_link" href="../_sources/_notebooks/CitriNet-example.ipynb.txt">
+            Show Source
+           </a>
+          </li>
+          <li class="md-nav__item" id="searchbox">
+          </li>
+         </ul>
+        </nav>
+       </div>
+      </div>
+     </div>
+     <div class="md-content">
+      <article class="md-content__inner md-typeset" role="main">
+       <style>
+        /* CSS for nbsphinx extension */
+
+/* remove conflicting styling from Sphinx themes */
+div.nbinput.container div.prompt *,
+div.nboutput.container div.prompt *,
+div.nbinput.container div.input_area pre,
+div.nboutput.container div.output_area pre,
+div.nbinput.container div.input_area .highlight,
+div.nboutput.container div.output_area .highlight {
+    border: none;
+    padding: 0;
+    margin: 0;
+    box-shadow: none;
+}
+
+div.nbinput.container > div[class*=highlight],
+div.nboutput.container > div[class*=highlight] {
+    margin: 0;
+}
+
+div.nbinput.container div.prompt *,
+div.nboutput.container div.prompt * {
+    background: none;
+}
+
+div.nboutput.container div.output_area .highlight,
+div.nboutput.container div.output_area pre {
+    background: unset;
+}
+
+div.nboutput.container div.output_area div.highlight {
+    color: unset;  /* override Pygments text color */
+}
+
+/* avoid gaps between output lines */
+div.nboutput.container div[class*=highlight] pre {
+    line-height: normal;
+}
+
+/* input/output containers */
+div.nbinput.container,
+div.nboutput.container {
+    display: -webkit-flex;
+    display: flex;
+    align-items: flex-start;
+    margin: 0;
+    width: 100%;
+}
+@media (max-width: 540px) {
+    div.nbinput.container,
+    div.nboutput.container {
+        flex-direction: column;
+    }
+}
+
+/* input container */
+div.nbinput.container {
+    padding-top: 5px;
+}
+
+/* last container */
+div.nblast.container {
+    padding-bottom: 5px;
+}
+
+/* input prompt */
+div.nbinput.container div.prompt pre {
+    color: #307FC1;
+}
+
+/* output prompt */
+div.nboutput.container div.prompt pre {
+    color: #BF5B3D;
+}
+
+/* all prompts */
+div.nbinput.container div.prompt,
+div.nboutput.container div.prompt {
+    width: 4.5ex;
+    padding-top: 5px;
+    position: relative;
+    user-select: none;
+}
+
+div.nbinput.container div.prompt > div,
+div.nboutput.container div.prompt > div {
+    position: absolute;
+    right: 0;
+    margin-right: 0.3ex;
+}
+
+@media (max-width: 540px) {
+    div.nbinput.container div.prompt,
+    div.nboutput.container div.prompt {
+        width: unset;
+        text-align: left;
+        padding: 0.4em;
+    }
+    div.nboutput.container div.prompt.empty {
+        padding: 0;
+    }
+
+    div.nbinput.container div.prompt > div,
+    div.nboutput.container div.prompt > div {
+        position: unset;
+    }
+}
+
+/* disable scrollbars on prompts */
+div.nbinput.container div.prompt pre,
+div.nboutput.container div.prompt pre {
+    overflow: hidden;
+}
+
+/* input/output area */
+div.nbinput.container div.input_area,
+div.nboutput.container div.output_area {
+    -webkit-flex: 1;
+    flex: 1;
+    overflow: auto;
+}
+@media (max-width: 540px) {
+    div.nbinput.container div.input_area,
+    div.nboutput.container div.output_area {
+        width: 100%;
+    }
+}
+
+/* input area */
+div.nbinput.container div.input_area {
+    border: 1px solid #e0e0e0;
+    border-radius: 2px;
+    /*background: #f5f5f5;*/
+}
+
+/* override MathJax center alignment in output cells */
+div.nboutput.container div[class*=MathJax] {
+    text-align: left !important;
+}
+
+/* override sphinx.ext.imgmath center alignment in output cells */
+div.nboutput.container div.math p {
+    text-align: left;
+}
+
+/* standard error */
+div.nboutput.container div.output_area.stderr {
+    background: #fdd;
+}
+
+/* ANSI colors */
+.ansi-black-fg { color: #3E424D; }
+.ansi-black-bg { background-color: #3E424D; }
+.ansi-black-intense-fg { color: #282C36; }
+.ansi-black-intense-bg { background-color: #282C36; }
+.ansi-red-fg { color: #E75C58; }
+.ansi-red-bg { background-color: #E75C58; }
+.ansi-red-intense-fg { color: #B22B31; }
+.ansi-red-intense-bg { background-color: #B22B31; }
+.ansi-green-fg { color: #00A250; }
+.ansi-green-bg { background-color: #00A250; }
+.ansi-green-intense-fg { color: #007427; }
+.ansi-green-intense-bg { background-color: #007427; }
+.ansi-yellow-fg { color: #DDB62B; }
+.ansi-yellow-bg { background-color: #DDB62B; }
+.ansi-yellow-intense-fg { color: #B27D12; }
+.ansi-yellow-intense-bg { background-color: #B27D12; }
+.ansi-blue-fg { color: #208FFB; }
+.ansi-blue-bg { background-color: #208FFB; }
+.ansi-blue-intense-fg { color: #0065CA; }
+.ansi-blue-intense-bg { background-color: #0065CA; }
+.ansi-magenta-fg { color: #D160C4; }
+.ansi-magenta-bg { background-color: #D160C4; }
+.ansi-magenta-intense-fg { color: #A03196; }
+.ansi-magenta-intense-bg { background-color: #A03196; }
+.ansi-cyan-fg { color: #60C6C8; }
+.ansi-cyan-bg { background-color: #60C6C8; }
+.ansi-cyan-intense-fg { color: #258F8F; }
+.ansi-cyan-intense-bg { background-color: #258F8F; }
+.ansi-white-fg { color: #C5C1B4; }
+.ansi-white-bg { background-color: #C5C1B4; }
+.ansi-white-intense-fg { color: #A1A6B2; }
+.ansi-white-intense-bg { background-color: #A1A6B2; }
+
+.ansi-default-inverse-fg { color: #FFFFFF; }
+.ansi-default-inverse-bg { background-color: #000000; }
+
+.ansi-bold { font-weight: bold; }
+.ansi-underline { text-decoration: underline; }
+
+
+div.nbinput.container div.input_area div[class*=highlight] > pre,
+div.nboutput.container div.output_area div[class*=highlight] > pre,
+div.nboutput.container div.output_area div[class*=highlight].math,
+div.nboutput.container div.output_area.rendered_html,
+div.nboutput.container div.output_area > div.output_javascript,
+div.nboutput.container div.output_area:not(.rendered_html) > img{
+    padding: 5px;
+    margin: 0;
+}
+
+/* fix copybtn overflow problem in chromium (needed for 'sphinx_copybutton') */
+div.nbinput.container div.input_area > div[class^='highlight'],
+div.nboutput.container div.output_area > div[class^='highlight']{
+    overflow-y: hidden;
+}
+
+/* hide copybtn icon on prompts (needed for 'sphinx_copybutton') */
+.prompt a.copybtn {
+    display: none;
+}
+
+/* Some additional styling taken form the Jupyter notebook CSS */
+div.rendered_html table {
+  border: none;
+  border-collapse: collapse;
+  border-spacing: 0;
+  color: black;
+  font-size: 12px;
+  table-layout: fixed;
+}
+div.rendered_html thead {
+  border-bottom: 1px solid black;
+  vertical-align: bottom;
+}
+div.rendered_html tr,
+div.rendered_html th,
+div.rendered_html td {
+  text-align: right;
+  vertical-align: middle;
+  padding: 0.5em 0.5em;
+  line-height: normal;
+  white-space: normal;
+  max-width: none;
+  border: none;
+}
+div.rendered_html th {
+  font-weight: bold;
+}
+div.rendered_html tbody tr:nth-child(odd) {
+  background: #f5f5f5;
+}
+div.rendered_html tbody tr:hover {
+  background: rgba(66, 165, 245, 0.2);
+}
+       </style>
+       <div class="nbinput nblast docutils container">
+        <div class="prompt highlight-none notranslate">
+         <div class="highlight">
+          <pre><span></span>[1]:
+</pre>
+         </div>
+        </div>
+        <div class="input_area highlight-ipython3 notranslate">
+         <div class="highlight">
+          <pre>
+<span></span># Copyright 2019 NVIDIA Corporation. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
+</pre>
+         </div>
+        </div>
+       </div>
+       <p>
+        <img alt="4d96ac27a5a34ed59ac554678759720a" src="http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png"/>
+       </p>
+       <section id="Torch-TensorRT-Getting-Started---CitriNet">
+        <h1 id="notebooks-citrinet-example--page-root">
+         Torch-TensorRT Getting Started - CitriNet
+         <a class="headerlink" href="#notebooks-citrinet-example--page-root" title="Permalink to this headline">
+          ¶
+         </a>
+        </h1>
+        <section id="Overview">
+         <h2 id="Overview">
+          Overview
+          <a class="headerlink" href="#Overview" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <p>
+          <a class="reference external" href="https://docs.nvidia.com/deeplearning/nemo/user-guide/docs/en/main/asr/models.html#citrinet">
+           Citrinet
+          </a>
+          is an acoustic model used for the speech to text recognition task. It is a version of
+          <a class="reference external" href="https://arxiv.org/pdf/1910.10261.pdf">
+           QuartzNet
+          </a>
+          that extends
+          <a class="reference external" href="https://arxiv.org/pdf/2005.03191.pdf">
+           ContextNet
+          </a>
+          , utilizing subword encoding (via Word Piece tokenization) and Squeeze-and-Excitation(SE) mechanism and are therefore smaller than QuartzNet models.
+         </p>
+         <p>
+          CitriNet models take in audio segments and transcribe them to letter, byte pair, or word piece sequences.
+         </p>
+         <p>
+          <img alt="alt" class="no-scaled-link" src="https://docs.nvidia.com/deeplearning/nemo/user-guide/docs/en/main/_images/jasper_vertical.png" style="width: 50%;"/>
+         </p>
+         <section id="Learning-objectives">
+          <h3 id="Learning-objectives">
+           Learning objectives
+           <a class="headerlink" href="#Learning-objectives" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <p>
+           This notebook demonstrates the steps for optimizing a pretrained CitriNet model with Torch-TensorRT, and running it to test the speedup obtained.
+          </p>
+         </section>
+        </section>
+        <section id="Content">
+         <h2 id="Content">
+          Content
+          <a class="headerlink" href="#Content" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <ol class="arabic simple">
+          <li>
+           <p>
+            <a class="reference external" href="#1">
+             Requirements
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference external" href="#2">
+             Download Citrinet model
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference external" href="#3">
+             Create Torch-TensorRT modules
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference external" href="#4">
+             Benchmark Torch-TensorRT models
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference external" href="#5">
+             Conclusion
+            </a>
+           </p>
+          </li>
+         </ol>
+         <p>
+          ## 1. Requirements
+         </p>
+         <p>
+          Follow the steps in
+          <a class="reference external" href="README.md">
+           README
+          </a>
+          to prepare a Docker container, within which you can run this notebook. This notebook assumes that you are within a Jupyter environment in a docker container with Torch-TensorRT installed, such as an NGC monthly release of
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            nvcr.io/nvidia/pytorch:&lt;yy.mm&gt;-py3
+           </span>
+          </code>
+          (where
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            yy
+           </span>
+          </code>
+          indicates the last two numbers of a calendar year, and
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            mm
+           </span>
+          </code>
+          indicates the month in two-digit numerical form)
+         </p>
+         <p>
+          Now that you are in the docker, the next step is to install the required dependencies.
+         </p>
+         <div class="nbinput docutils container">
+          <div class="prompt highlight-none notranslate">
+           <div class="highlight">
+            <pre><span></span>[2]:
+</pre>
+           </div>
+          </div>
+          <div class="input_area highlight-ipython3 notranslate">
+           <div class="highlight">
+            <pre>
+<span></span># Install dependencies
+!pip install wget
+!apt-get update &amp;&amp; DEBIAN_FRONTEND=noninteractive  apt-get install -y libsndfile1 ffmpeg
+!pip install Cython
+
+## Install NeMo
+!pip install nemo_toolkit[all]==1.5.1
+</pre>
+           </div>
+          </div>
+         </div>
+         <div class="nboutput nblast docutils container">
+          <div class="prompt empty docutils container">
+          </div>
+          <div class="output_area docutils container">
+           <div class="highlight">
+            <pre>
+Looking in indexes: https://pypi.org/simple, https://pypi.ngc.nvidia.com
+Requirement already satisfied: wget in /opt/conda/lib/python3.8/site-packages (3.2)
+<span class="ansi-yellow-fg">WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv</span>
+Hit:1 http://security.ubuntu.com/ubuntu focal-security InRelease
+Hit:2 http://archive.ubuntu.com/ubuntu focal InRelease
+Hit:3 http://archive.ubuntu.com/ubuntu focal-updates InRelease
+Hit:4 http://archive.ubuntu.com/ubuntu focal-backports InRelease
+Reading package lists... Done
+Reading package lists... Done
+Building dependency tree
+Reading state information... Done
+libsndfile1 is already the newest version (1.0.28-7ubuntu0.1).
+ffmpeg is already the newest version (7:4.2.4-1ubuntu0.1).
+0 upgraded, 0 newly installed, 0 to remove and 22 not upgraded.
+Looking in indexes: https://pypi.org/simple, https://pypi.ngc.nvidia.com
+Requirement already satisfied: Cython in /opt/conda/lib/python3.8/site-packages (0.29.28)
+<span class="ansi-yellow-fg">WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv</span>
+Looking in indexes: https://pypi.org/simple, https://pypi.ngc.nvidia.com
+Requirement already satisfied: nemo_toolkit[all]==1.5.1 in /opt/conda/lib/python3.8/site-packages (1.5.1)
+Requirement already satisfied: numpy&gt;=1.18.2 in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (1.22.3)
+Requirement already satisfied: onnx&gt;=1.7.0 in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (1.10.1)
+Requirement already satisfied: python-dateutil in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (2.8.2)
+Requirement already satisfied: tqdm&gt;=4.41.0 in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (4.63.0)
+Requirement already satisfied: sentencepiece&lt;1.0.0 in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (0.1.96)
+Requirement already satisfied: wget in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (3.2)
+Requirement already satisfied: numba in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (0.53.1)
+Requirement already satisfied: torch in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (1.12.0a0+2c916ef)
+Requirement already satisfied: unidecode in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (1.3.4)
+Requirement already satisfied: frozendict in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (2.3.2)
+Requirement already satisfied: wrapt in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (1.14.0)
+Requirement already satisfied: scikit-learn in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (0.24.2)
+Requirement already satisfied: ruamel.yaml in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (0.17.21)
+Requirement already satisfied: pesq in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (0.0.3)
+Requirement already satisfied: torchvision in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (0.13.0a0)
+Requirement already satisfied: gdown in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (4.4.0)
+Requirement already satisfied: editdistance in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (0.6.0)
+Requirement already satisfied: boto3 in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (1.21.45)
+Requirement already satisfied: isort[requirements]&lt;5 in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (4.3.21)
+Requirement already satisfied: hydra-core&gt;=1.1.0 in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (1.1.2)
+Requirement already satisfied: youtokentome&gt;=1.0.5 in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (1.0.6)
+Requirement already satisfied: pytorch-lightning&gt;=1.5.0 in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (1.6.1)
+Requirement already satisfied: jieba in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (0.42.1)
+Requirement already satisfied: fasttext in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (0.9.2)
+Requirement already satisfied: soundfile in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (0.10.3.post1)
+Requirement already satisfied: kaldiio in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (2.17.2)
+Requirement already satisfied: pangu in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (4.0.6.1)
+Requirement already satisfied: kaldi-python-io in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (1.2.2)
+Requirement already satisfied: parameterized in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (0.8.1)
+Requirement already satisfied: h5py in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (3.6.0)
+Requirement already satisfied: rapidfuzz in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (2.0.10)
+Requirement already satisfied: marshmallow in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (3.15.0)
+Requirement already satisfied: opencc in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (1.1.3)
+Requirement already satisfied: braceexpand in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (0.1.7)
+Requirement already satisfied: omegaconf&gt;=2.1.0 in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (2.1.2)
+Requirement already satisfied: sphinx in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (4.4.0)
+Requirement already satisfied: pillow in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (9.0.0)
+Requirement already satisfied: wordninja==2.0.0 in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (2.0.0)
+Requirement already satisfied: torch-stft in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (0.1.4)
+Requirement already satisfied: sox in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (1.4.1)
+Requirement already satisfied: librosa in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (0.9.1)
+Requirement already satisfied: regex in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (2022.3.15)
+Requirement already satisfied: sacrebleu[ja] in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (2.0.0)
+Requirement already satisfied: black==19.10b0 in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (19.10b0)
+Requirement already satisfied: pydub in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (0.25.1)
+Requirement already satisfied: sphinxcontrib-bibtex in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (2.4.2)
+Requirement already satisfied: inflect in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (5.5.2)
+Requirement already satisfied: pyannote.core in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (4.4)
+Requirement already satisfied: packaging in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (21.3)
+Requirement already satisfied: kaldi-io in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (0.9.4)
+Requirement already satisfied: pyannote.metrics in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (3.2)
+Requirement already satisfied: g2p-en in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (2.1.0)
+Requirement already satisfied: matplotlib in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (3.5.1)
+Requirement already satisfied: torchmetrics&gt;=0.4.1rc0 in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (0.8.0)
+Requirement already satisfied: nltk&gt;=3.6.5 in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (3.7)
+Requirement already satisfied: pyyaml&lt;6 in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (5.4.1)
+Requirement already satisfied: scipy in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (1.6.3)
+Requirement already satisfied: ipywidgets in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (7.7.0)
+Requirement already satisfied: pytest in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (6.2.5)
+Requirement already satisfied: pandas in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (1.3.5)
+Requirement already satisfied: pytest-runner in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (6.0.0)
+Requirement already satisfied: transformers&gt;=4.0.1 in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (4.18.0)
+Requirement already satisfied: sacremoses&gt;=0.0.43 in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (0.0.49)
+Requirement already satisfied: pystoi in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (0.3.3)
+Requirement already satisfied: attrdict in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (2.0.1)
+Requirement already satisfied: webdataset&lt;=0.1.62,&gt;=0.1.48 in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (0.1.62)
+Requirement already satisfied: wandb in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (0.12.15)
+Requirement already satisfied: pypinyin in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (0.46.0)
+Requirement already satisfied: attrs&gt;=18.1.0 in /opt/conda/lib/python3.8/site-packages (from black==19.10b0-&gt;nemo_toolkit[all]==1.5.1) (21.4.0)
+Requirement already satisfied: appdirs in /opt/conda/lib/python3.8/site-packages (from black==19.10b0-&gt;nemo_toolkit[all]==1.5.1) (1.4.4)
+Requirement already satisfied: typed-ast&gt;=1.4.0 in /opt/conda/lib/python3.8/site-packages (from black==19.10b0-&gt;nemo_toolkit[all]==1.5.1) (1.5.3)
+Requirement already satisfied: pathspec&lt;1,&gt;=0.6 in /opt/conda/lib/python3.8/site-packages (from black==19.10b0-&gt;nemo_toolkit[all]==1.5.1) (0.9.0)
+Requirement already satisfied: click&gt;=6.5 in /opt/conda/lib/python3.8/site-packages (from black==19.10b0-&gt;nemo_toolkit[all]==1.5.1) (8.0.4)
+Requirement already satisfied: toml&gt;=0.9.4 in /opt/conda/lib/python3.8/site-packages (from black==19.10b0-&gt;nemo_toolkit[all]==1.5.1) (0.10.2)
+Requirement already satisfied: antlr4-python3-runtime==4.8 in /opt/conda/lib/python3.8/site-packages (from hydra-core&gt;=1.1.0-&gt;nemo_toolkit[all]==1.5.1) (4.8)
+Requirement already satisfied: importlib-resources&lt;5.3 in /opt/conda/lib/python3.8/site-packages (from hydra-core&gt;=1.1.0-&gt;nemo_toolkit[all]==1.5.1) (5.2.3)
+Requirement already satisfied: zipp&gt;=3.1.0 in /opt/conda/lib/python3.8/site-packages (from importlib-resources&lt;5.3-&gt;hydra-core&gt;=1.1.0-&gt;nemo_toolkit[all]==1.5.1) (3.7.0)
+Requirement already satisfied: pip-api in /opt/conda/lib/python3.8/site-packages (from isort[requirements]&lt;5-&gt;nemo_toolkit[all]==1.5.1) (0.0.29)
+Requirement already satisfied: pipreqs in /opt/conda/lib/python3.8/site-packages (from isort[requirements]&lt;5-&gt;nemo_toolkit[all]==1.5.1) (0.4.11)
+Requirement already satisfied: fonttools&gt;=4.22.0 in /opt/conda/lib/python3.8/site-packages (from matplotlib-&gt;nemo_toolkit[all]==1.5.1) (4.31.2)
+Requirement already satisfied: kiwisolver&gt;=1.0.1 in /opt/conda/lib/python3.8/site-packages (from matplotlib-&gt;nemo_toolkit[all]==1.5.1) (1.4.0)
+Requirement already satisfied: pyparsing&gt;=2.2.1 in /opt/conda/lib/python3.8/site-packages (from matplotlib-&gt;nemo_toolkit[all]==1.5.1) (3.0.7)
+Requirement already satisfied: cycler&gt;=0.10 in /opt/conda/lib/python3.8/site-packages (from matplotlib-&gt;nemo_toolkit[all]==1.5.1) (0.11.0)
+Requirement already satisfied: joblib in /opt/conda/lib/python3.8/site-packages (from nltk&gt;=3.6.5-&gt;nemo_toolkit[all]==1.5.1) (1.1.0)
+Requirement already satisfied: typing-extensions&gt;=3.6.2.1 in /opt/conda/lib/python3.8/site-packages (from onnx&gt;=1.7.0-&gt;nemo_toolkit[all]==1.5.1) (4.1.1)
+Requirement already satisfied: six in /opt/conda/lib/python3.8/site-packages (from onnx&gt;=1.7.0-&gt;nemo_toolkit[all]==1.5.1) (1.16.0)
+Requirement already satisfied: protobuf&gt;=3.12.2 in /opt/conda/lib/python3.8/site-packages (from onnx&gt;=1.7.0-&gt;nemo_toolkit[all]==1.5.1) (3.19.4)
+Requirement already satisfied: pyDeprecate&lt;0.4.0,&gt;=0.3.1 in /opt/conda/lib/python3.8/site-packages (from pytorch-lightning&gt;=1.5.0-&gt;nemo_toolkit[all]==1.5.1) (0.3.2)
+Requirement already satisfied: tensorboard&gt;=2.2.0 in /opt/conda/lib/python3.8/site-packages (from pytorch-lightning&gt;=1.5.0-&gt;nemo_toolkit[all]==1.5.1) (2.8.0)
+Requirement already satisfied: fsspec[http]!=2021.06.0,&gt;=2021.05.0 in /opt/conda/lib/python3.8/site-packages (from pytorch-lightning&gt;=1.5.0-&gt;nemo_toolkit[all]==1.5.1) (2022.2.0)
+Requirement already satisfied: requests in /opt/conda/lib/python3.8/site-packages (from fsspec[http]!=2021.06.0,&gt;=2021.05.0-&gt;pytorch-lightning&gt;=1.5.0-&gt;nemo_toolkit[all]==1.5.1) (2.27.1)
+Requirement already satisfied: aiohttp in /opt/conda/lib/python3.8/site-packages (from fsspec[http]!=2021.06.0,&gt;=2021.05.0-&gt;pytorch-lightning&gt;=1.5.0-&gt;nemo_toolkit[all]==1.5.1) (3.8.1)
+Requirement already satisfied: werkzeug&gt;=0.11.15 in /opt/conda/lib/python3.8/site-packages (from tensorboard&gt;=2.2.0-&gt;pytorch-lightning&gt;=1.5.0-&gt;nemo_toolkit[all]==1.5.1) (2.0.3)
+Requirement already satisfied: markdown&gt;=2.6.8 in /opt/conda/lib/python3.8/site-packages (from tensorboard&gt;=2.2.0-&gt;pytorch-lightning&gt;=1.5.0-&gt;nemo_toolkit[all]==1.5.1) (3.3.6)
+Requirement already satisfied: setuptools&gt;=41.0.0 in /opt/conda/lib/python3.8/site-packages (from tensorboard&gt;=2.2.0-&gt;pytorch-lightning&gt;=1.5.0-&gt;nemo_toolkit[all]==1.5.1) (59.5.0)
+Requirement already satisfied: google-auth-oauthlib&lt;0.5,&gt;=0.4.1 in /opt/conda/lib/python3.8/site-packages (from tensorboard&gt;=2.2.0-&gt;pytorch-lightning&gt;=1.5.0-&gt;nemo_toolkit[all]==1.5.1) (0.4.6)
+Requirement already satisfied: google-auth&lt;3,&gt;=1.6.3 in /opt/conda/lib/python3.8/site-packages (from tensorboard&gt;=2.2.0-&gt;pytorch-lightning&gt;=1.5.0-&gt;nemo_toolkit[all]==1.5.1) (2.6.2)
+Requirement already satisfied: wheel&gt;=0.26 in /opt/conda/lib/python3.8/site-packages (from tensorboard&gt;=2.2.0-&gt;pytorch-lightning&gt;=1.5.0-&gt;nemo_toolkit[all]==1.5.1) (0.37.1)
+Requirement already satisfied: grpcio&gt;=1.24.3 in /opt/conda/lib/python3.8/site-packages (from tensorboard&gt;=2.2.0-&gt;pytorch-lightning&gt;=1.5.0-&gt;nemo_toolkit[all]==1.5.1) (1.44.0)
+Requirement already satisfied: tensorboard-data-server&lt;0.7.0,&gt;=0.6.0 in /opt/conda/lib/python3.8/site-packages (from tensorboard&gt;=2.2.0-&gt;pytorch-lightning&gt;=1.5.0-&gt;nemo_toolkit[all]==1.5.1) (0.6.1)
+Requirement already satisfied: tensorboard-plugin-wit&gt;=1.6.0 in /opt/conda/lib/python3.8/site-packages (from tensorboard&gt;=2.2.0-&gt;pytorch-lightning&gt;=1.5.0-&gt;nemo_toolkit[all]==1.5.1) (1.8.1)
+Requirement already satisfied: absl-py&gt;=0.4 in /opt/conda/lib/python3.8/site-packages (from tensorboard&gt;=2.2.0-&gt;pytorch-lightning&gt;=1.5.0-&gt;nemo_toolkit[all]==1.5.1) (1.0.0)
+Requirement already satisfied: cachetools&lt;6.0,&gt;=2.0.0 in /opt/conda/lib/python3.8/site-packages (from google-auth&lt;3,&gt;=1.6.3-&gt;tensorboard&gt;=2.2.0-&gt;pytorch-lightning&gt;=1.5.0-&gt;nemo_toolkit[all]==1.5.1) (5.0.0)
+Requirement already satisfied: pyasn1-modules&gt;=0.2.1 in /opt/conda/lib/python3.8/site-packages (from google-auth&lt;3,&gt;=1.6.3-&gt;tensorboard&gt;=2.2.0-&gt;pytorch-lightning&gt;=1.5.0-&gt;nemo_toolkit[all]==1.5.1) (0.2.8)
+Requirement already satisfied: rsa&lt;5,&gt;=3.1.4 in /opt/conda/lib/python3.8/site-packages (from google-auth&lt;3,&gt;=1.6.3-&gt;tensorboard&gt;=2.2.0-&gt;pytorch-lightning&gt;=1.5.0-&gt;nemo_toolkit[all]==1.5.1) (4.8)
+Requirement already satisfied: requests-oauthlib&gt;=0.7.0 in /opt/conda/lib/python3.8/site-packages (from google-auth-oauthlib&lt;0.5,&gt;=0.4.1-&gt;tensorboard&gt;=2.2.0-&gt;pytorch-lightning&gt;=1.5.0-&gt;nemo_toolkit[all]==1.5.1) (1.3.1)
+Requirement already satisfied: importlib-metadata&gt;=4.4 in /opt/conda/lib/python3.8/site-packages (from markdown&gt;=2.6.8-&gt;tensorboard&gt;=2.2.0-&gt;pytorch-lightning&gt;=1.5.0-&gt;nemo_toolkit[all]==1.5.1) (4.11.3)
+Requirement already satisfied: pyasn1&lt;0.5.0,&gt;=0.4.6 in /opt/conda/lib/python3.8/site-packages (from pyasn1-modules&gt;=0.2.1-&gt;google-auth&lt;3,&gt;=1.6.3-&gt;tensorboard&gt;=2.2.0-&gt;pytorch-lightning&gt;=1.5.0-&gt;nemo_toolkit[all]==1.5.1) (0.4.8)
+Requirement already satisfied: charset-normalizer~=2.0.0 in /opt/conda/lib/python3.8/site-packages (from requests-&gt;fsspec[http]!=2021.06.0,&gt;=2021.05.0-&gt;pytorch-lightning&gt;=1.5.0-&gt;nemo_toolkit[all]==1.5.1) (2.0.12)
+Requirement already satisfied: certifi&gt;=2017.4.17 in /opt/conda/lib/python3.8/site-packages (from requests-&gt;fsspec[http]!=2021.06.0,&gt;=2021.05.0-&gt;pytorch-lightning&gt;=1.5.0-&gt;nemo_toolkit[all]==1.5.1) (2021.10.8)
+Requirement already satisfied: idna&lt;4,&gt;=2.5 in /opt/conda/lib/python3.8/site-packages (from requests-&gt;fsspec[http]!=2021.06.0,&gt;=2021.05.0-&gt;pytorch-lightning&gt;=1.5.0-&gt;nemo_toolkit[all]==1.5.1) (3.3)
+Requirement already satisfied: urllib3&lt;1.27,&gt;=1.21.1 in /opt/conda/lib/python3.8/site-packages (from requests-&gt;fsspec[http]!=2021.06.0,&gt;=2021.05.0-&gt;pytorch-lightning&gt;=1.5.0-&gt;nemo_toolkit[all]==1.5.1) (1.26.8)
+Requirement already satisfied: oauthlib&gt;=3.0.0 in /opt/conda/lib/python3.8/site-packages (from requests-oauthlib&gt;=0.7.0-&gt;google-auth-oauthlib&lt;0.5,&gt;=0.4.1-&gt;tensorboard&gt;=2.2.0-&gt;pytorch-lightning&gt;=1.5.0-&gt;nemo_toolkit[all]==1.5.1) (3.2.0)
+Requirement already satisfied: huggingface-hub&lt;1.0,&gt;=0.1.0 in /opt/conda/lib/python3.8/site-packages (from transformers&gt;=4.0.1-&gt;nemo_toolkit[all]==1.5.1) (0.5.1)
+Requirement already satisfied: tokenizers!=0.11.3,&lt;0.13,&gt;=0.11.1 in /opt/conda/lib/python3.8/site-packages (from transformers&gt;=4.0.1-&gt;nemo_toolkit[all]==1.5.1) (0.12.1)
+Requirement already satisfied: filelock in /opt/conda/lib/python3.8/site-packages (from transformers&gt;=4.0.1-&gt;nemo_toolkit[all]==1.5.1) (3.6.0)
+Requirement already satisfied: frozenlist&gt;=1.1.1 in /opt/conda/lib/python3.8/site-packages (from aiohttp-&gt;fsspec[http]!=2021.06.0,&gt;=2021.05.0-&gt;pytorch-lightning&gt;=1.5.0-&gt;nemo_toolkit[all]==1.5.1) (1.3.0)
+Requirement already satisfied: yarl&lt;2.0,&gt;=1.0 in /opt/conda/lib/python3.8/site-packages (from aiohttp-&gt;fsspec[http]!=2021.06.0,&gt;=2021.05.0-&gt;pytorch-lightning&gt;=1.5.0-&gt;nemo_toolkit[all]==1.5.1) (1.7.2)
+Requirement already satisfied: async-timeout&lt;5.0,&gt;=4.0.0a3 in /opt/conda/lib/python3.8/site-packages (from aiohttp-&gt;fsspec[http]!=2021.06.0,&gt;=2021.05.0-&gt;pytorch-lightning&gt;=1.5.0-&gt;nemo_toolkit[all]==1.5.1) (4.0.2)
+Requirement already satisfied: multidict&lt;7.0,&gt;=4.5 in /opt/conda/lib/python3.8/site-packages (from aiohttp-&gt;fsspec[http]!=2021.06.0,&gt;=2021.05.0-&gt;pytorch-lightning&gt;=1.5.0-&gt;nemo_toolkit[all]==1.5.1) (6.0.2)
+Requirement already satisfied: aiosignal&gt;=1.1.2 in /opt/conda/lib/python3.8/site-packages (from aiohttp-&gt;fsspec[http]!=2021.06.0,&gt;=2021.05.0-&gt;pytorch-lightning&gt;=1.5.0-&gt;nemo_toolkit[all]==1.5.1) (1.2.0)
+Requirement already satisfied: s3transfer&lt;0.6.0,&gt;=0.5.0 in /opt/conda/lib/python3.8/site-packages (from boto3-&gt;nemo_toolkit[all]==1.5.1) (0.5.2)
+Requirement already satisfied: botocore&lt;1.25.0,&gt;=1.24.45 in /opt/conda/lib/python3.8/site-packages (from boto3-&gt;nemo_toolkit[all]==1.5.1) (1.24.45)
+Requirement already satisfied: jmespath&lt;2.0.0,&gt;=0.7.1 in /opt/conda/lib/python3.8/site-packages (from boto3-&gt;nemo_toolkit[all]==1.5.1) (1.0.0)
+Requirement already satisfied: pybind11&gt;=2.2 in /opt/conda/lib/python3.8/site-packages (from fasttext-&gt;nemo_toolkit[all]==1.5.1) (2.9.1)
+Requirement already satisfied: distance&gt;=0.1.3 in /opt/conda/lib/python3.8/site-packages (from g2p-en-&gt;nemo_toolkit[all]==1.5.1) (0.1.3)
+Requirement already satisfied: beautifulsoup4 in /opt/conda/lib/python3.8/site-packages (from gdown-&gt;nemo_toolkit[all]==1.5.1) (4.10.0)
+Requirement already satisfied: soupsieve&gt;1.2 in /opt/conda/lib/python3.8/site-packages (from beautifulsoup4-&gt;gdown-&gt;nemo_toolkit[all]==1.5.1) (2.3.1)
+Requirement already satisfied: ipython-genutils~=0.2.0 in /opt/conda/lib/python3.8/site-packages (from ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (0.2.0)
+Requirement already satisfied: ipython&gt;=4.0.0 in /opt/conda/lib/python3.8/site-packages (from ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (8.1.1)
+Requirement already satisfied: ipykernel&gt;=4.5.1 in /opt/conda/lib/python3.8/site-packages (from ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (6.9.2)
+Requirement already satisfied: jupyterlab-widgets&gt;=1.0.0 in /opt/conda/lib/python3.8/site-packages (from ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (1.1.0)
+Requirement already satisfied: widgetsnbextension~=3.6.0 in /opt/conda/lib/python3.8/site-packages (from ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (3.6.0)
+Requirement already satisfied: traitlets&gt;=4.3.1 in /opt/conda/lib/python3.8/site-packages (from ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (5.1.1)
+Requirement already satisfied: nbformat&gt;=4.2.0 in /opt/conda/lib/python3.8/site-packages (from ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (5.2.0)
+Requirement already satisfied: jupyter-client&lt;8.0 in /opt/conda/lib/python3.8/site-packages (from ipykernel&gt;=4.5.1-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (7.1.2)
+Requirement already satisfied: psutil in /opt/conda/lib/python3.8/site-packages (from ipykernel&gt;=4.5.1-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (5.9.0)
+Requirement already satisfied: tornado&lt;7.0,&gt;=4.2 in /opt/conda/lib/python3.8/site-packages (from ipykernel&gt;=4.5.1-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (6.1)
+Requirement already satisfied: debugpy&lt;2.0,&gt;=1.0.0 in /opt/conda/lib/python3.8/site-packages (from ipykernel&gt;=4.5.1-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (1.5.1)
+Requirement already satisfied: nest-asyncio in /opt/conda/lib/python3.8/site-packages (from ipykernel&gt;=4.5.1-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (1.5.4)
+Requirement already satisfied: matplotlib-inline&lt;0.2.0,&gt;=0.1.0 in /opt/conda/lib/python3.8/site-packages (from ipykernel&gt;=4.5.1-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (0.1.3)
+Requirement already satisfied: pickleshare in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (0.7.5)
+Requirement already satisfied: decorator in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (5.1.1)
+Requirement already satisfied: pygments&gt;=2.4.0 in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (2.11.2)
+Requirement already satisfied: stack-data in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (0.2.0)
+Requirement already satisfied: prompt-toolkit!=3.0.0,!=3.0.1,&lt;3.1.0,&gt;=2.0.0 in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (3.0.27)
+Requirement already satisfied: backcall in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (0.2.0)
+Requirement already satisfied: jedi&gt;=0.16 in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (0.18.1)
+Requirement already satisfied: pexpect&gt;4.3 in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (4.8.0)
+Requirement already satisfied: parso&lt;0.9.0,&gt;=0.8.0 in /opt/conda/lib/python3.8/site-packages (from jedi&gt;=0.16-&gt;ipython&gt;=4.0.0-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (0.8.3)
+Requirement already satisfied: entrypoints in /opt/conda/lib/python3.8/site-packages (from jupyter-client&lt;8.0-&gt;ipykernel&gt;=4.5.1-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (0.4)
+Requirement already satisfied: pyzmq&gt;=13 in /opt/conda/lib/python3.8/site-packages (from jupyter-client&lt;8.0-&gt;ipykernel&gt;=4.5.1-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (22.3.0)
+Requirement already satisfied: jupyter-core&gt;=4.6.0 in /opt/conda/lib/python3.8/site-packages (from jupyter-client&lt;8.0-&gt;ipykernel&gt;=4.5.1-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (4.9.2)
+Requirement already satisfied: jsonschema!=2.5.0,&gt;=2.4 in /opt/conda/lib/python3.8/site-packages (from nbformat&gt;=4.2.0-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (4.4.0)
+Requirement already satisfied: pyrsistent!=0.17.0,!=0.17.1,!=0.17.2,&gt;=0.14.0 in /opt/conda/lib/python3.8/site-packages (from jsonschema!=2.5.0,&gt;=2.4-&gt;nbformat&gt;=4.2.0-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (0.18.1)
+Requirement already satisfied: ptyprocess&gt;=0.5 in /opt/conda/lib/python3.8/site-packages (from pexpect&gt;4.3-&gt;ipython&gt;=4.0.0-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (0.7.0)
+Requirement already satisfied: wcwidth in /opt/conda/lib/python3.8/site-packages (from prompt-toolkit!=3.0.0,!=3.0.1,&lt;3.1.0,&gt;=2.0.0-&gt;ipython&gt;=4.0.0-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (0.2.5)
+Requirement already satisfied: notebook&gt;=4.4.1 in /opt/conda/lib/python3.8/site-packages (from widgetsnbextension~=3.6.0-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (6.4.1)
+Requirement already satisfied: Send2Trash&gt;=1.5.0 in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (1.8.0)
+Requirement already satisfied: prometheus-client in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (0.13.1)
+Requirement already satisfied: terminado&gt;=0.8.3 in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (0.13.3)
+Requirement already satisfied: jinja2 in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (3.0.3)
+Requirement already satisfied: nbconvert in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (6.4.4)
+Requirement already satisfied: argon2-cffi in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (21.3.0)
+Requirement already satisfied: argon2-cffi-bindings in /opt/conda/lib/python3.8/site-packages (from argon2-cffi-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (21.2.0)
+Requirement already satisfied: cffi&gt;=1.0.1 in /opt/conda/lib/python3.8/site-packages (from argon2-cffi-bindings-&gt;argon2-cffi-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (1.15.0)
+Requirement already satisfied: pycparser in /opt/conda/lib/python3.8/site-packages (from cffi&gt;=1.0.1-&gt;argon2-cffi-bindings-&gt;argon2-cffi-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (2.21)
+Requirement already satisfied: MarkupSafe&gt;=2.0 in /opt/conda/lib/python3.8/site-packages (from jinja2-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (2.1.1)
+Requirement already satisfied: resampy&gt;=0.2.2 in /opt/conda/lib/python3.8/site-packages (from librosa-&gt;nemo_toolkit[all]==1.5.1) (0.2.2)
+Requirement already satisfied: pooch&gt;=1.0 in /opt/conda/lib/python3.8/site-packages (from librosa-&gt;nemo_toolkit[all]==1.5.1) (1.6.0)
+Requirement already satisfied: audioread&gt;=2.1.5 in /opt/conda/lib/python3.8/site-packages (from librosa-&gt;nemo_toolkit[all]==1.5.1) (2.1.9)
+Requirement already satisfied: llvmlite&lt;0.37,&gt;=0.36.0rc1 in /opt/conda/lib/python3.8/site-packages (from numba-&gt;nemo_toolkit[all]==1.5.1) (0.36.0)
+Requirement already satisfied: threadpoolctl&gt;=2.0.0 in /opt/conda/lib/python3.8/site-packages (from scikit-learn-&gt;nemo_toolkit[all]==1.5.1) (3.1.0)
+Requirement already satisfied: defusedxml in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (0.7.1)
+Requirement already satisfied: nbclient&lt;0.6.0,&gt;=0.5.0 in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (0.5.13)
+Requirement already satisfied: bleach in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (4.1.0)
+Requirement already satisfied: mistune&lt;2,&gt;=0.8.1 in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (0.8.4)
+Requirement already satisfied: pandocfilters&gt;=1.4.1 in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (1.5.0)
+Requirement already satisfied: testpath in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (0.6.0)
+Requirement already satisfied: jupyterlab-pygments in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (0.1.2)
+Requirement already satisfied: webencodings in /opt/conda/lib/python3.8/site-packages (from bleach-&gt;nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (0.5.1)
+Requirement already satisfied: pytz&gt;=2017.3 in /opt/conda/lib/python3.8/site-packages (from pandas-&gt;nemo_toolkit[all]==1.5.1) (2021.3)
+Requirement already satisfied: pip in /opt/conda/lib/python3.8/site-packages (from pip-api-&gt;isort[requirements]&lt;5-&gt;nemo_toolkit[all]==1.5.1) (21.2.4)
+Requirement already satisfied: yarg in /opt/conda/lib/python3.8/site-packages (from pipreqs-&gt;isort[requirements]&lt;5-&gt;nemo_toolkit[all]==1.5.1) (0.1.9)
+Requirement already satisfied: docopt in /opt/conda/lib/python3.8/site-packages (from pipreqs-&gt;isort[requirements]&lt;5-&gt;nemo_toolkit[all]==1.5.1) (0.6.2)
+Requirement already satisfied: simplejson&gt;=3.8.1 in /opt/conda/lib/python3.8/site-packages (from pyannote.core-&gt;nemo_toolkit[all]==1.5.1) (3.17.6)
+Requirement already satisfied: sortedcontainers&gt;=2.0.4 in /opt/conda/lib/python3.8/site-packages (from pyannote.core-&gt;nemo_toolkit[all]==1.5.1) (2.4.0)
+Requirement already satisfied: tabulate&gt;=0.7.7 in /opt/conda/lib/python3.8/site-packages (from pyannote.metrics-&gt;nemo_toolkit[all]==1.5.1) (0.8.9)
+Requirement already satisfied: pyannote.database&gt;=4.0.1 in /opt/conda/lib/python3.8/site-packages (from pyannote.metrics-&gt;nemo_toolkit[all]==1.5.1) (4.1.3)
+Requirement already satisfied: sympy&gt;=1.1 in /opt/conda/lib/python3.8/site-packages (from pyannote.metrics-&gt;nemo_toolkit[all]==1.5.1) (1.10.1)
+Requirement already satisfied: typer[all]&gt;=0.2.1 in /opt/conda/lib/python3.8/site-packages (from pyannote.database&gt;=4.0.1-&gt;pyannote.metrics-&gt;nemo_toolkit[all]==1.5.1) (0.4.0)
+Requirement already satisfied: mpmath&gt;=0.19 in /opt/conda/lib/python3.8/site-packages (from sympy&gt;=1.1-&gt;pyannote.metrics-&gt;nemo_toolkit[all]==1.5.1) (1.2.1)
+Requirement already satisfied: colorama&lt;0.5.0,&gt;=0.4.3 in /opt/conda/lib/python3.8/site-packages (from typer[all]&gt;=0.2.1-&gt;pyannote.database&gt;=4.0.1-&gt;pyannote.metrics-&gt;nemo_toolkit[all]==1.5.1) (0.4.4)
+Requirement already satisfied: shellingham&lt;2.0.0,&gt;=1.3.0 in /opt/conda/lib/python3.8/site-packages (from typer[all]&gt;=0.2.1-&gt;pyannote.database&gt;=4.0.1-&gt;pyannote.metrics-&gt;nemo_toolkit[all]==1.5.1) (1.4.0)
+Requirement already satisfied: py&gt;=1.8.2 in /opt/conda/lib/python3.8/site-packages (from pytest-&gt;nemo_toolkit[all]==1.5.1) (1.11.0)
+Requirement already satisfied: iniconfig in /opt/conda/lib/python3.8/site-packages (from pytest-&gt;nemo_toolkit[all]==1.5.1) (1.1.1)
+Requirement already satisfied: pluggy&lt;2.0,&gt;=0.12 in /opt/conda/lib/python3.8/site-packages (from pytest-&gt;nemo_toolkit[all]==1.5.1) (1.0.0)
+Requirement already satisfied: jarowinkler&lt;1.1.0,&gt;=1.0.2 in /opt/conda/lib/python3.8/site-packages (from rapidfuzz-&gt;nemo_toolkit[all]==1.5.1) (1.0.2)
+Requirement already satisfied: PySocks!=1.5.7,&gt;=1.5.6 in /opt/conda/lib/python3.8/site-packages (from requests-&gt;fsspec[http]!=2021.06.0,&gt;=2021.05.0-&gt;pytorch-lightning&gt;=1.5.0-&gt;nemo_toolkit[all]==1.5.1) (1.7.1)
+Requirement already satisfied: ruamel.yaml.clib&gt;=0.2.6 in /opt/conda/lib/python3.8/site-packages (from ruamel.yaml-&gt;nemo_toolkit[all]==1.5.1) (0.2.6)
+Requirement already satisfied: portalocker in /opt/conda/lib/python3.8/site-packages (from sacrebleu[ja]-&gt;nemo_toolkit[all]==1.5.1) (2.4.0)
+Requirement already satisfied: ipadic&lt;2.0,&gt;=1.0 in /opt/conda/lib/python3.8/site-packages (from sacrebleu[ja]-&gt;nemo_toolkit[all]==1.5.1) (1.0.0)
+Requirement already satisfied: mecab-python3==1.0.3 in /opt/conda/lib/python3.8/site-packages (from sacrebleu[ja]-&gt;nemo_toolkit[all]==1.5.1) (1.0.3)
+Requirement already satisfied: sphinxcontrib-htmlhelp&gt;=2.0.0 in /opt/conda/lib/python3.8/site-packages (from sphinx-&gt;nemo_toolkit[all]==1.5.1) (2.0.0)
+Requirement already satisfied: alabaster&lt;0.8,&gt;=0.7 in /opt/conda/lib/python3.8/site-packages (from sphinx-&gt;nemo_toolkit[all]==1.5.1) (0.7.12)
+Requirement already satisfied: babel&gt;=1.3 in /opt/conda/lib/python3.8/site-packages (from sphinx-&gt;nemo_toolkit[all]==1.5.1) (2.9.1)
+Requirement already satisfied: sphinxcontrib-serializinghtml&gt;=1.1.5 in /opt/conda/lib/python3.8/site-packages (from sphinx-&gt;nemo_toolkit[all]==1.5.1) (1.1.5)
+Requirement already satisfied: sphinxcontrib-devhelp in /opt/conda/lib/python3.8/site-packages (from sphinx-&gt;nemo_toolkit[all]==1.5.1) (1.0.2)
+Requirement already satisfied: sphinxcontrib-jsmath in /opt/conda/lib/python3.8/site-packages (from sphinx-&gt;nemo_toolkit[all]==1.5.1) (1.0.1)
+Requirement already satisfied: sphinxcontrib-qthelp in /opt/conda/lib/python3.8/site-packages (from sphinx-&gt;nemo_toolkit[all]==1.5.1) (1.0.3)
+Requirement already satisfied: snowballstemmer&gt;=1.1 in /opt/conda/lib/python3.8/site-packages (from sphinx-&gt;nemo_toolkit[all]==1.5.1) (2.2.0)
+Requirement already satisfied: imagesize in /opt/conda/lib/python3.8/site-packages (from sphinx-&gt;nemo_toolkit[all]==1.5.1) (1.3.0)
+Requirement already satisfied: sphinxcontrib-applehelp in /opt/conda/lib/python3.8/site-packages (from sphinx-&gt;nemo_toolkit[all]==1.5.1) (1.0.2)
+Requirement already satisfied: docutils&lt;0.18,&gt;=0.14 in /opt/conda/lib/python3.8/site-packages (from sphinx-&gt;nemo_toolkit[all]==1.5.1) (0.17.1)
+Requirement already satisfied: pybtex-docutils&gt;=1.0.0 in /opt/conda/lib/python3.8/site-packages (from sphinxcontrib-bibtex-&gt;nemo_toolkit[all]==1.5.1) (1.0.1)
+Requirement already satisfied: pybtex&gt;=0.24 in /opt/conda/lib/python3.8/site-packages (from sphinxcontrib-bibtex-&gt;nemo_toolkit[all]==1.5.1) (0.24.0)
+Requirement already satisfied: latexcodec&gt;=1.0.4 in /opt/conda/lib/python3.8/site-packages (from pybtex&gt;=0.24-&gt;sphinxcontrib-bibtex-&gt;nemo_toolkit[all]==1.5.1) (2.0.1)
+Requirement already satisfied: pure-eval in /opt/conda/lib/python3.8/site-packages (from stack-data-&gt;ipython&gt;=4.0.0-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (0.2.2)
+Requirement already satisfied: asttokens in /opt/conda/lib/python3.8/site-packages (from stack-data-&gt;ipython&gt;=4.0.0-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (2.0.5)
+Requirement already satisfied: executing in /opt/conda/lib/python3.8/site-packages (from stack-data-&gt;ipython&gt;=4.0.0-&gt;ipywidgets-&gt;nemo_toolkit[all]==1.5.1) (0.8.3)
+Requirement already satisfied: pathtools in /opt/conda/lib/python3.8/site-packages (from wandb-&gt;nemo_toolkit[all]==1.5.1) (0.1.2)
+Requirement already satisfied: setproctitle in /opt/conda/lib/python3.8/site-packages (from wandb-&gt;nemo_toolkit[all]==1.5.1) (1.2.3)
+Requirement already satisfied: GitPython&gt;=1.0.0 in /opt/conda/lib/python3.8/site-packages (from wandb-&gt;nemo_toolkit[all]==1.5.1) (3.1.27)
+Requirement already satisfied: sentry-sdk&gt;=1.0.0 in /opt/conda/lib/python3.8/site-packages (from wandb-&gt;nemo_toolkit[all]==1.5.1) (1.5.10)
+Requirement already satisfied: shortuuid&gt;=0.5.0 in /opt/conda/lib/python3.8/site-packages (from wandb-&gt;nemo_toolkit[all]==1.5.1) (1.0.8)
+Requirement already satisfied: docker-pycreds&gt;=0.4.0 in /opt/conda/lib/python3.8/site-packages (from wandb-&gt;nemo_toolkit[all]==1.5.1) (0.4.0)
+Requirement already satisfied: promise&lt;3,&gt;=2.0 in /opt/conda/lib/python3.8/site-packages (from wandb-&gt;nemo_toolkit[all]==1.5.1) (2.3)
+Requirement already satisfied: gitdb&lt;5,&gt;=4.0.1 in /opt/conda/lib/python3.8/site-packages (from GitPython&gt;=1.0.0-&gt;wandb-&gt;nemo_toolkit[all]==1.5.1) (4.0.9)
+Requirement already satisfied: smmap&lt;6,&gt;=3.0.1 in /opt/conda/lib/python3.8/site-packages (from gitdb&lt;5,&gt;=4.0.1-&gt;GitPython&gt;=1.0.0-&gt;wandb-&gt;nemo_toolkit[all]==1.5.1) (5.0.0)
+<span class="ansi-yellow-fg">WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv</span>
+</pre>
+           </div>
+          </div>
+         </div>
+         <p>
+          ## 2. Download Citrinet model
+         </p>
+         <p>
+          Next, we download a pretrained Nemo Citrinet model and convert it to a Torchscript module:
+         </p>
+         <div class="nbinput nblast docutils container">
+          <div class="prompt highlight-none notranslate">
+           <div class="highlight">
+            <pre><span></span>[3]:
+</pre>
+           </div>
+          </div>
+          <div class="input_area highlight-ipython3 notranslate">
+           <div class="highlight">
+            <pre>
+<span></span>import nemo
+import torch
+
+import nemo.collections.asr as nemo_asr
+from nemo.core import typecheck
+typecheck.set_typecheck_enabled(False)
+</pre>
+           </div>
+          </div>
+         </div>
+         <div class="nbinput docutils container">
+          <div class="prompt highlight-none notranslate">
+           <div class="highlight">
+            <pre><span></span>[4]:
+</pre>
+           </div>
+          </div>
+          <div class="input_area highlight-ipython3 notranslate">
+           <div class="highlight">
+            <pre>
+<span></span>variant = 'stt_en_citrinet_256'
+
+print(f"Downloading and saving {variant}...")
+asr_model = nemo_asr.models.EncDecCTCModelBPE.from_pretrained(model_name=variant)
+asr_model.export(f"{variant}.ts")
+</pre>
+           </div>
+          </div>
+         </div>
+         <div class="nboutput docutils container">
+          <div class="prompt empty docutils container">
+          </div>
+          <div class="output_area docutils container">
+           <div class="highlight">
+            <pre>
+Downloading and saving stt_en_citrinet_256...
+[NeMo I 2022-04-21 23:12:45 cloud:56] Found existing object /root/.cache/torch/NeMo/NeMo_1.5.1/stt_en_citrinet_256/91a9cc5850784b2065e8a0aa3d526fd9/stt_en_citrinet_256.nemo.
+[NeMo I 2022-04-21 23:12:45 cloud:62] Re-using file from: /root/.cache/torch/NeMo/NeMo_1.5.1/stt_en_citrinet_256/91a9cc5850784b2065e8a0aa3d526fd9/stt_en_citrinet_256.nemo
+[NeMo I 2022-04-21 23:12:45 common:728] Instantiating model from pre-trained checkpoint
+[NeMo I 2022-04-21 23:12:46 mixins:146] Tokenizer SentencePieceTokenizer initialized with 1024 tokens
+</pre>
+           </div>
+          </div>
+         </div>
+         <div class="nboutput docutils container">
+          <div class="prompt empty docutils container">
+          </div>
+          <div class="output_area stderr docutils container">
+           <div class="highlight">
+            <pre>
+[NeMo W 2022-04-21 23:12:47 modelPT:130] If you intend to do training or fine-tuning, please call the ModelPT.setup_training_data() method and provide a valid configuration file to setup the train data loader.
+    Train config :
+    manifest_filepath: null
+    sample_rate: 16000
+    batch_size: 32
+    trim_silence: true
+    max_duration: 16.7
+    shuffle: true
+    is_tarred: false
+    tarred_audio_filepaths: null
+    use_start_end_token: false
+
+[NeMo W 2022-04-21 23:12:47 modelPT:137] If you intend to do validation, please call the ModelPT.setup_validation_data() or ModelPT.setup_multiple_validation_data() method and provide a valid configuration file to setup the validation data loader(s).
+    Validation config :
+    manifest_filepath: null
+    sample_rate: 16000
+    batch_size: 32
+    shuffle: false
+    use_start_end_token: false
+
+[NeMo W 2022-04-21 23:12:47 modelPT:143] Please call the ModelPT.setup_test_data() or ModelPT.setup_multiple_test_data() method and provide a valid configuration file to setup the test data loader(s).
+    Test config :
+    manifest_filepath: null
+    sample_rate: 16000
+    batch_size: 32
+    shuffle: false
+    use_start_end_token: false
+
+</pre>
+           </div>
+          </div>
+         </div>
+         <div class="nboutput docutils container">
+          <div class="prompt empty docutils container">
+          </div>
+          <div class="output_area docutils container">
+           <div class="highlight">
+            <pre>
+[NeMo I 2022-04-21 23:12:47 features:265] PADDING: 16
+[NeMo I 2022-04-21 23:12:47 features:282] STFT using torch
+</pre>
+           </div>
+          </div>
+         </div>
+         <div class="nboutput docutils container">
+          <div class="prompt empty docutils container">
+          </div>
+          <div class="output_area stderr docutils container">
+           <div class="highlight">
+            <pre>
+[NeMo W 2022-04-21 23:12:47 nemo_logging:349] /opt/conda/lib/python3.8/site-packages/nemo/collections/asr/parts/preprocessing/features.py:315: FutureWarning: Pass sr=16000, n_fft=512 as keyword args. From version 0.10 passing these as positional arguments will result in an error
+      librosa.filters.mel(sample_rate, self.n_fft, n_mels=nfilt, fmin=lowfreq, fmax=highfreq), dtype=torch.float
+
+</pre>
+           </div>
+          </div>
+         </div>
+         <div class="nboutput docutils container">
+          <div class="prompt empty docutils container">
+          </div>
+          <div class="output_area docutils container">
+           <div class="highlight">
+            <pre>
+[NeMo I 2022-04-21 23:12:49 save_restore_connector:149] Model EncDecCTCModelBPE was successfully restored from /root/.cache/torch/NeMo/NeMo_1.5.1/stt_en_citrinet_256/91a9cc5850784b2065e8a0aa3d526fd9/stt_en_citrinet_256.nemo.
+</pre>
+           </div>
+          </div>
+         </div>
+         <div class="nboutput docutils container">
+          <div class="prompt empty docutils container">
+          </div>
+          <div class="output_area stderr docutils container">
+           <div class="highlight">
+            <pre>
+[NeMo W 2022-04-21 23:12:49 export_utils:198] Swapped 0 modules
+[NeMo W 2022-04-21 23:12:49 conv_asr:73] Turned off 235 masked convolutions
+[NeMo W 2022-04-21 23:12:49 export_utils:198] Swapped 0 modules
+[NeMo W 2022-04-21 23:12:50 nemo_logging:349] /opt/conda/lib/python3.8/site-packages/torch/jit/_trace.py:916: UserWarning: `optimize` is deprecated and has no effect. Use `with torch.jit.optimized_execution() instead
+      warnings.warn(
+
+[NeMo W 2022-04-21 23:12:50 nemo_logging:349] /opt/conda/lib/python3.8/site-packages/torch/_jit_internal.py:668: LightningDeprecationWarning: The `LightningModule.model_size` property was deprecated in v1.5 and will be removed in v1.7. Please use the `pytorch_lightning.utilities.memory.get_model_size_mb`.
+      if hasattr(mod, name):
+
+[NeMo W 2022-04-21 23:12:50 nemo_logging:349] /opt/conda/lib/python3.8/site-packages/torch/_jit_internal.py:669: LightningDeprecationWarning: The `LightningModule.model_size` property was deprecated in v1.5 and will be removed in v1.7. Please use the `pytorch_lightning.utilities.memory.get_model_size_mb`.
+      item = getattr(mod, name)
+
+[NeMo W 2022-04-21 23:12:50 nemo_logging:349] /opt/conda/lib/python3.8/site-packages/torch/_jit_internal.py:668: LightningDeprecationWarning: `LightningModule.use_amp` was deprecated in v1.6 and will be removed in v1.8. Please use `Trainer.amp_backend`.
+      if hasattr(mod, name):
+
+[NeMo W 2022-04-21 23:12:50 nemo_logging:349] /opt/conda/lib/python3.8/site-packages/torch/_jit_internal.py:669: LightningDeprecationWarning: `LightningModule.use_amp` was deprecated in v1.6 and will be removed in v1.8. Please use `Trainer.amp_backend`.
+      item = getattr(mod, name)
+
+</pre>
+           </div>
+          </div>
+         </div>
+         <div class="nboutput nblast docutils container">
+          <div class="prompt highlight-none notranslate">
+           <div class="highlight">
+            <pre><span></span>[4]:
+</pre>
+           </div>
+          </div>
+          <div class="output_area docutils container">
+           <div class="highlight">
+            <pre>
+(['stt_en_citrinet_256.ts'],
+ ['nemo.collections.asr.models.ctc_bpe_models.EncDecCTCModelBPE exported to ONNX'])
+</pre>
+           </div>
+          </div>
+         </div>
+         <section id="Benchmark-utility">
+          <h3 id="Benchmark-utility">
+           Benchmark utility
+           <a class="headerlink" href="#Benchmark-utility" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <p>
+           Let us define a helper benchmarking function, then benchmark the original Pytorch model.
+          </p>
+          <div class="nbinput docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[5]:
+</pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
+<span></span>from __future__ import print_function
+from __future__ import absolute_import
+from __future__ import division
+
+import argparse
+import timeit
+import numpy as np
+import torch
+import torch_tensorrt as trtorch
+import torch.backends.cudnn as cudnn
+
+def benchmark(model, input_tensor, num_loops, model_name, batch_size):
+    def timeGraph(model, input_tensor, num_loops):
+        print("Warm up ...")
+        with torch.no_grad():
+            for _ in range(20):
+                features = model(input_tensor)
+
+        torch.cuda.synchronize()
+        print("Start timing ...")
+        timings = []
+        with torch.no_grad():
+            for i in range(num_loops):
+                start_time = timeit.default_timer()
+                features = model(input_tensor)
+                torch.cuda.synchronize()
+                end_time = timeit.default_timer()
+                timings.append(end_time - start_time)
+                # print("Iteration {}: {:.6f} s".format(i, end_time - start_time))
+        return timings
+    def printStats(graphName, timings, batch_size):
+        times = np.array(timings)
+        steps = len(times)
+        speeds = batch_size / times
+        time_mean = np.mean(times)
+        time_med = np.median(times)
+        time_99th = np.percentile(times, 99)
+        time_std = np.std(times, ddof=0)
+        speed_mean = np.mean(speeds)
+        speed_med = np.median(speeds)
+        msg = ("\n%s =================================\n"
+                "batch size=%d, num iterations=%d\n"
+                "  Median samples/s: %.1f, mean: %.1f\n"
+                "  Median latency (s): %.6f, mean: %.6f, 99th_p: %.6f, std_dev: %.6f\n"
+                ) % (graphName,
+                    batch_size, steps,
+                    speed_med, speed_mean,
+                    time_med, time_mean, time_99th, time_std)
+        print(msg)
+    timings = timeGraph(model, input_tensor, num_loops)
+    printStats(model_name, timings, batch_size)
+
+precisions_str = 'fp32' # Precision (default=fp32, fp16)
+variant = 'stt_en_citrinet_256' # Nemo Citrinet variant
+batch_sizes = [1, 8, 32, 128] # Batch sizes (default=1,8,32,128)
+trt = False # If True, infer with Torch-TensorRT engine. Else, infer with Pytorch model.
+precision = torch.float32 if precisions_str =='fp32' else torch.float16
+
+for batch_size in batch_sizes:
+    if trt:
+        model_name = f"{variant}_bs{batch_size}_{precision}.torch-tensorrt"
+    else:
+        model_name = f"{variant}.ts"
+
+    print(f"Loading model: {model_name}")
+    # Load traced model to CPU first
+    model = torch.jit.load(model_name).cuda()
+    cudnn.benchmark = True
+    # Create random input tensor of certain size
+    torch.manual_seed(12345)
+    input_shape=(batch_size, 80, 1488)
+    input_tensor = torch.randn(input_shape).cuda()
+
+    # Timing graph inference
+    benchmark(model, input_tensor, 50, model_name, batch_size)
+</pre>
+            </div>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area docutils container">
+            <div class="highlight">
+             <pre>
+Loading model: stt_en_citrinet_256.ts
+Warm up ...
+Start timing ...
+
+stt_en_citrinet_256.ts =================================
+batch size=1, num iterations=50
+  Median samples/s: 102.0, mean: 102.0
+  Median latency (s): 0.009802, mean: 0.009803, 99th_p: 0.009836, std_dev: 0.000014
+
+Loading model: stt_en_citrinet_256.ts
+Warm up ...
+Start timing ...
+
+stt_en_citrinet_256.ts =================================
+batch size=8, num iterations=50
+  Median samples/s: 429.1, mean: 429.1
+  Median latency (s): 0.018642, mean: 0.018643, 99th_p: 0.018670, std_dev: 0.000014
+
+Loading model: stt_en_citrinet_256.ts
+Warm up ...
+Start timing ...
+
+stt_en_citrinet_256.ts =================================
+batch size=32, num iterations=50
+  Median samples/s: 551.3, mean: 551.2
+  Median latency (s): 0.058047, mean: 0.058053, 99th_p: 0.058375, std_dev: 0.000106
+
+Loading model: stt_en_citrinet_256.ts
+Warm up ...
+Start timing ...
+
+stt_en_citrinet_256.ts =================================
+batch size=128, num iterations=50
+  Median samples/s: 594.1, mean: 594.1
+  Median latency (s): 0.215434, mean: 0.215446, 99th_p: 0.215806, std_dev: 0.000116
+
+</pre>
+            </div>
+           </div>
+          </div>
+          <p>
+           Confirming the GPU we are using here:
+          </p>
+          <div class="nbinput docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[6]:
+</pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
+<span></span>!nvidia-smi
+</pre>
+            </div>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area docutils container">
+            <div class="highlight">
+             <pre>
+Thu Apr 21 23:13:32 2022
++-----------------------------------------------------------------------------+
+| NVIDIA-SMI 510.47.03    Driver Version: 510.47.03    CUDA Version: 11.6     |
+|-------------------------------+----------------------+----------------------+
+| GPU  Name        Persistence-M| Bus-Id        Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp  Perf  Pwr:Usage/Cap|         Memory-Usage | GPU-Util  Compute M. |
+|                               |                      |               MIG M. |
+|===============================+======================+======================|
+|   0  NVIDIA TITAN V      On   | 00000000:17:00.0 Off |                  N/A |
+| 38%   55C    P2    42W / 250W |   2462MiB / 12288MiB |      0%      Default |
+|                               |                      |                  N/A |
++-------------------------------+----------------------+----------------------+
+|   1  NVIDIA TITAN V      On   | 00000000:65:00.0 Off |                  N/A |
+| 28%   39C    P8    26W / 250W |    112MiB / 12288MiB |      0%      Default |
+|                               |                      |                  N/A |
++-------------------------------+----------------------+----------------------+
+
++-----------------------------------------------------------------------------+
+| Processes:                                                                  |
+|  GPU   GI   CI        PID   Type   Process name                  GPU Memory |
+|        ID   ID                                                   Usage      |
+|=============================================================================|
+|    0   N/A  N/A      3909      G                                       4MiB |
+|    0   N/A  N/A      6047      C                                    2453MiB |
+|    1   N/A  N/A      3909      G                                      39MiB |
+|    1   N/A  N/A      4161      G                                      67MiB |
++-----------------------------------------------------------------------------+
+</pre>
+            </div>
+           </div>
+          </div>
+          <p>
+           ## 3. Create Torch-TensorRT modules
+          </p>
+          <p>
+           In this step, we optimize the Citrinet Torchscript module with Torch-TensorRT with various precisions and batch sizes.
+          </p>
+          <div class="nbinput docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[10]:
+</pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
+<span></span>import torch
+import torch.nn as nn
+import torch_tensorrt as torchtrt
+import argparse
+
+variant = "stt_en_citrinet_256"
+precisions = [torch.float, torch.half]
+batch_sizes = [1,8,32,128]
+
+model = torch.jit.load(f"{variant}.ts")
+
+for precision in precisions:
+    for batch_size in batch_sizes:
+        compile_settings = {
+            "inputs": [torchtrt.Input(shape=[batch_size, 80, 1488])],
+            "enabled_precisions": {precision},
+            "workspace_size": 2000000000,
+            "truncate_long_and_double": True,
+        }
+        print(f"Generating Torchscript-TensorRT module for batchsize {batch_size} precision {precision}")
+        trt_ts_module = torchtrt.compile(model, **compile_settings)
+        torch.jit.save(trt_ts_module, f"{variant}_bs{batch_size}_{precision}.torch-tensorrt")
+</pre>
+            </div>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area docutils container">
+            <div class="highlight">
+             <pre>
+Generating Torchscript-TensorRT module for batchsize 1 precision torch.float32
+Generating Torchscript-TensorRT module for batchsize 8 precision torch.float32
+Generating Torchscript-TensorRT module for batchsize 32 precision torch.float32
+Generating Torchscript-TensorRT module for batchsize 128 precision torch.float32
+Generating Torchscript-TensorRT module for batchsize 1 precision torch.float16
+Generating Torchscript-TensorRT module for batchsize 8 precision torch.float16
+Generating Torchscript-TensorRT module for batchsize 32 precision torch.float16
+Generating Torchscript-TensorRT module for batchsize 128 precision torch.float16
+</pre>
+            </div>
+           </div>
+          </div>
+          <p>
+           ## 4. Benchmark Torch-TensorRT models
+          </p>
+          <p>
+           Finally, we are ready to benchmark the Torch-TensorRT optimized Citrinet models.
+          </p>
+         </section>
+         <section id="FP32-(single-precision)">
+          <h3 id="FP32-(single-precision)">
+           FP32 (single precision)
+           <a class="headerlink" href="#FP32-(single-precision)" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <div class="nbinput docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[13]:
+</pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
+<span></span>precisions_str = 'fp32' # Precision (default=fp32, fp16)
+batch_sizes = [1, 8, 32, 128] # Batch sizes (default=1,8,32,128)
+precision = torch.float32 if precisions_str =='fp32' else torch.float16
+trt = True
+
+for batch_size in batch_sizes:
+    if trt:
+        model_name = f"{variant}_bs{batch_size}_{precision}.torch-tensorrt"
+    else:
+        model_name = f"{variant}.ts"
+
+    print(f"Loading model: {model_name}")
+    # Load traced model to CPU first
+    model = torch.jit.load(model_name).cuda()
+    cudnn.benchmark = True
+    # Create random input tensor of certain size
+    torch.manual_seed(12345)
+    input_shape=(batch_size, 80, 1488)
+    input_tensor = torch.randn(input_shape).cuda()
+
+    # Timing graph inference
+    benchmark(model, input_tensor, 50, model_name, batch_size)
+</pre>
+            </div>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area docutils container">
+            <div class="highlight">
+             <pre>
+Loading model: stt_en_citrinet_256_bs1_torch.float32.torch-tensorrt
+Warm up ...
+Start timing ...
+
+stt_en_citrinet_256_bs1_torch.float32.torch-tensorrt =================================
+batch size=1, num iterations=50
+  Median samples/s: 242.2, mean: 218.0
+  Median latency (s): 0.004128, mean: 0.004825, 99th_p: 0.008071, std_dev: 0.001270
+
+Loading model: stt_en_citrinet_256_bs8_torch.float32.torch-tensorrt
+Warm up ...
+Start timing ...
+
+stt_en_citrinet_256_bs8_torch.float32.torch-tensorrt =================================
+batch size=8, num iterations=50
+  Median samples/s: 729.9, mean: 709.0
+  Median latency (s): 0.010961, mean: 0.011388, 99th_p: 0.016114, std_dev: 0.001256
+
+Loading model: stt_en_citrinet_256_bs32_torch.float32.torch-tensorrt
+Warm up ...
+Start timing ...
+
+stt_en_citrinet_256_bs32_torch.float32.torch-tensorrt =================================
+batch size=32, num iterations=50
+  Median samples/s: 955.6, mean: 953.4
+  Median latency (s): 0.033488, mean: 0.033572, 99th_p: 0.035722, std_dev: 0.000545
+
+Loading model: stt_en_citrinet_256_bs128_torch.float32.torch-tensorrt
+Warm up ...
+Start timing ...
+
+stt_en_citrinet_256_bs128_torch.float32.torch-tensorrt =================================
+batch size=128, num iterations=50
+  Median samples/s: 1065.8, mean: 1069.4
+  Median latency (s): 0.120097, mean: 0.119708, 99th_p: 0.121618, std_dev: 0.001260
+
+</pre>
+            </div>
+           </div>
+          </div>
+         </section>
+         <section id="FP16-(half-precision)">
+          <h3 id="FP16-(half-precision)">
+           FP16 (half precision)
+           <a class="headerlink" href="#FP16-(half-precision)" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <div class="nbinput docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[14]:
+</pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
+<span></span>precisions_str = 'fp16' # Precision (default=fp32, fp16)
+batch_sizes = [1, 8, 32, 128] # Batch sizes (default=1,8,32,128)
+precision = torch.float32 if precisions_str =='fp32' else torch.float16
+
+for batch_size in batch_sizes:
+    if trt:
+        model_name = f"{variant}_bs{batch_size}_{precision}.torch-tensorrt"
+    else:
+        model_name = f"{variant}.ts"
+
+    print(f"Loading model: {model_name}")
+    # Load traced model to CPU first
+    model = torch.jit.load(model_name).cuda()
+    cudnn.benchmark = True
+    # Create random input tensor of certain size
+    torch.manual_seed(12345)
+    input_shape=(batch_size, 80, 1488)
+    input_tensor = torch.randn(input_shape).cuda()
+
+    # Timing graph inference
+    benchmark(model, input_tensor, 50, model_name, batch_size)
+</pre>
+            </div>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area docutils container">
+            <div class="highlight">
+             <pre>
+Loading model: stt_en_citrinet_256_bs1_torch.float16.torch-tensorrt
+Warm up ...
+Start timing ...
+
+stt_en_citrinet_256_bs1_torch.float16.torch-tensorrt =================================
+batch size=1, num iterations=50
+  Median samples/s: 288.9, mean: 272.9
+  Median latency (s): 0.003462, mean: 0.003774, 99th_p: 0.006846, std_dev: 0.000820
+
+Loading model: stt_en_citrinet_256_bs8_torch.float16.torch-tensorrt
+Warm up ...
+Start timing ...
+
+stt_en_citrinet_256_bs8_torch.float16.torch-tensorrt =================================
+batch size=8, num iterations=50
+  Median samples/s: 1201.0, mean: 1190.9
+  Median latency (s): 0.006661, mean: 0.006733, 99th_p: 0.008453, std_dev: 0.000368
+
+Loading model: stt_en_citrinet_256_bs32_torch.float16.torch-tensorrt
+Warm up ...
+Start timing ...
+
+stt_en_citrinet_256_bs32_torch.float16.torch-tensorrt =================================
+batch size=32, num iterations=50
+  Median samples/s: 1538.2, mean: 1516.4
+  Median latency (s): 0.020804, mean: 0.021143, 99th_p: 0.024492, std_dev: 0.000973
+
+Loading model: stt_en_citrinet_256_bs128_torch.float16.torch-tensorrt
+Warm up ...
+Start timing ...
+
+stt_en_citrinet_256_bs128_torch.float16.torch-tensorrt =================================
+batch size=128, num iterations=50
+  Median samples/s: 1792.0, mean: 1777.0
+  Median latency (s): 0.071428, mean: 0.072057, 99th_p: 0.076796, std_dev: 0.001351
+
+</pre>
+            </div>
+           </div>
+          </div>
+          <p>
+           ## 5. Conclusion
+          </p>
+          <p>
+           In this notebook, we have walked through the complete process of optimizing the Citrinet model with Torch-TensorRT. On an A100 GPU, with Torch-TensorRT, we observe a speedup of ~
+           <strong>
+            2.4X
+           </strong>
+           with FP32, and ~
+           <strong>
+            2.9X
+           </strong>
+           with FP16 at batchsize of 128.
+          </p>
+         </section>
+         <section id="What’s-next">
+          <h3 id="What’s-next">
+           What’s next
+           <a class="headerlink" href="#What’s-next" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <p>
+           Now it’s time to try Torch-TensorRT on your own model. Fill out issues at
+           <a class="reference external" href="https://github.com/NVIDIA/Torch-TensorRT">
+            https://github.com/NVIDIA/Torch-TensorRT
+           </a>
+           . Your involvement will help future development of Torch-TensorRT.
+          </p>
+          <div class="nbinput nblast docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[ ]:
+</pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
+<span></span>
+</pre>
+            </div>
+           </div>
+          </div>
+         </section>
+        </section>
+       </section>
+      </article>
+     </div>
+    </div>
+   </main>
+  </div>
+  <footer class="md-footer">
+   <div class="md-footer-nav">
+    <nav class="md-footer-nav__inner md-grid">
+     <a class="md-flex md-footer-nav__link md-footer-nav__link--prev" href="../tutorials/using_dla.html" rel="prev" title="DLA">
+      <div class="md-flex__cell md-flex__cell--shrink">
+       <i class="md-icon md-icon--arrow-back md-footer-nav__button">
+       </i>
+      </div>
+      <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
+       <span class="md-flex__ellipsis">
+        <span class="md-footer-nav__direction">
+         Previous
+        </span>
+        DLA
+       </span>
+      </div>
+     </a>
+     <a class="md-flex md-footer-nav__link md-footer-nav__link--next" href="dynamic-shapes.html" rel="next" title="Torch-TensorRT - Using Dynamic Shapes">
+      <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
+       <span class="md-flex__ellipsis">
+        <span class="md-footer-nav__direction">
+         Next
+        </span>
+        Torch-TensorRT - Using Dynamic Shapes
+       </span>
+      </div>
+      <div class="md-flex__cell md-flex__cell--shrink">
+       <i class="md-icon md-icon--arrow-forward md-footer-nav__button">
+       </i>
+      </div>
+     </a>
+    </nav>
+   </div>
+   <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+     <div class="md-footer-copyright">
+      <div class="md-footer-copyright__highlight">
+       © Copyright 2021, NVIDIA Corporation.
+      </div>
+      Created using
+      <a href="http://www.sphinx-doc.org/">
+       Sphinx
+      </a>
+      4.3.0.
+             and
+      <a href="https://github.com/bashtage/sphinx-material/">
+       Material for
+              Sphinx
+      </a>
+     </div>
+    </div>
+   </div>
+  </footer>
+  <script src="../_static/javascripts/application.js">
+  </script>
+  <script>
+   app.initialize({version: "1.0.4", url: {base: ".."}})
+  </script>
+ </body>
+</html>

@@ -1,0 +1,13 @@
+.. _exhale_enum_logging_8h_1a130f65408ad8cbaee060f05e8db69558:
+
+Enum Level
+==========
+
+- Defined in :ref:`file_cpp_include_torch_tensorrt_logging.h`
+
+
+Enum Documentation
+------------------
+
+
+.. doxygenenum:: torch_tensorrt::logging::Level

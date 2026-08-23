@@ -50,8 +50,8 @@ local_torch = use_repo_rule("//toolchains:local_torch.bzl", "local_torch")
 new_git_repository(
     name = "executorch",
     build_file = "@//third_party/executorch:BUILD",
-    # executorch==1.3.1
-    commit = "e2f18eb23c45bd22ca332b0b8b49a81de304b472",
+    # executorch==1.4.1
+    commit = "e4d02f41f7909e8ed5bf4a14ffc520d733453d9f",
     patch_cmds = [
         "find . -mindepth 2 \\( -name BUILD -o -name BUILD.bazel \\) -delete",
         "mkdir executorch && find . -mindepth 1 -maxdepth 1 ! -name executorch ! -name BUILD ! -name BUILD.bazel ! -name REPO.bazel -exec cp -a {} executorch/ \\;",
@@ -73,6 +73,9 @@ new_local_repository(
 
 # CUDA should be installed on the system locally
 # for linux x86_64 and aarch64
+# Jobs that render MODULE.bazel from toolchains/ci_workspaces/MODULE.bazel.tmpl substitute
+# ${CUDA_HOME} here. Jobs that use this file directly, such as .github/workflows/uv-update.yml,
+# need a container that actually provides the path below.
 new_local_repository(
     name = "cuda",
     build_file = "@//third_party/cuda:BUILD",

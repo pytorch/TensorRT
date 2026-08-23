@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=7474ebce"></script>
+    <script src="../../../_static/documentation_options.js?v=7580b7c2"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -495,6 +495,7 @@ document.write(`
     <span class="n">CPU_MEMORY_BUDGET</span><span class="p">,</span>
     <span class="n">DECOMPOSE_ATTENTION</span><span class="p">,</span>
     <span class="n">DISABLE_TF32</span><span class="p">,</span>
+    <span class="n">DISABLED_CONSTANT_FOLD_EXCLUSIONS</span><span class="p">,</span>
     <span class="n">DLA_GLOBAL_DRAM_SIZE</span><span class="p">,</span>
     <span class="n">DLA_LOCAL_DRAM_SIZE</span><span class="p">,</span>
     <span class="n">DLA_SRAM_SIZE</span><span class="p">,</span>
@@ -525,6 +526,7 @@ document.write(`
     <span class="n">TILING_OPTIMIZATION_LEVEL</span><span class="p">,</span>
     <span class="n">TIMING_CACHE_PATH</span><span class="p">,</span>
     <span class="n">TRUNCATE_DOUBLE</span><span class="p">,</span>
+    <span class="n">USE_COMPLEX_DECOMPOSITION</span><span class="p">,</span>
     <span class="n">USE_DISTRIBUTED_MODE_TRACE</span><span class="p">,</span>
     <span class="n">USE_FAST_PARTITIONER</span><span class="p">,</span>
     <span class="n">USE_FP32_ACC</span><span class="p">,</span>
@@ -534,11 +536,25 @@ document.write(`
 <span class="p">)</span>
 
 
+<span class="k">def</span><span class="w"> </span><span class="nf">_normalize_disabled_constant_fold_exclusions</span><span class="p">(</span>
+    <span class="n">rule_ids</span><span class="p">:</span> <span class="n">Collection</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Set</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+    <span class="c1"># Deferred import: torch_tensorrt.dynamo.lowering.passes imports this module,</span>
+    <span class="c1"># so importing the rule registry at module scope would be circular. Reaching</span>
+    <span class="c1"># for the core directly is safe from any point of that cycle because it</span>
+    <span class="c1"># depends on nothing but torch.</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.lowering.constant_fold_exclusions._core</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+        <span class="n">validate_disabled_constant_fold_exclusions</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">validate_disabled_constant_fold_exclusions</span><span class="p">(</span><span class="n">rule_ids</span><span class="p">)</span>
+
+
 <div class="viewcode-block" id="CompilationSettings">
 <a class="viewcode-back" href="../../../user_guide/compilation/torch_compile.html#torch_tensorrt.dynamo.CompilationSettings">[docs]</a>
 <span class="nd">@dataclass</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">CompilationSettings</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Compilation settings for Torch-TensorRT Dynamo Paths</span>
+<span class="w">    </span><span class="sd">"""Compilation settings for Torch-TensorRT Dynamo Paths</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        workspace_size (int): Workspace TRT is allowed to use for the module (0 is default)</span>
@@ -555,7 +571,7 @@ document.write(`
 <span class="sd">            or only a selected subset of them</span>
 <span class="sd">        device (Device): GPU to compile the model on</span>
 <span class="sd">        require_full_compilation (bool): Whether to require the graph is fully compiled in TensorRT.</span>
-<span class="sd">            Only applicable for `ir=&quot;dynamo&quot;`; has no effect for `torch.compile` path</span>
+<span class="sd">            Only applicable for `ir="dynamo"`; has no effect for `torch.compile` path</span>
 <span class="sd">        assume_dynamic_shape_support (bool): Setting this to true enables the converters work for both dynamic and static shapes. Default: False</span>
 <span class="sd">        disable_tf32 (bool): Whether to disable TF32 computation for TRT layers</span>
 <span class="sd">        sparse_weights (bool): Whether to allow the builder to use sparse weights</span>
@@ -564,7 +580,7 @@ document.write(`
 <span class="sd">        dla_sram_size (int): Fast software managed RAM used by DLA to communicate within a layer.</span>
 <span class="sd">        dla_local_dram_size (int): Host RAM used by DLA to share intermediate tensor data across operations</span>
 <span class="sd">        dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution</span>
-<span class="sd">        dryrun (Union[bool, str]): Toggle &quot;Dryrun&quot; mode, which runs everything through partitioning, short of conversion to</span>
+<span class="sd">        dryrun (Union[bool, str]): Toggle "Dryrun" mode, which runs everything through partitioning, short of conversion to</span>
 <span class="sd">            TRT Engines. Prints detailed logs of the graph structure and nature of partitioning. Optionally saves the</span>
 <span class="sd">            output to a file if a string path is specified</span>
 <span class="sd">        hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)</span>
@@ -581,7 +597,7 @@ document.write(`
 <span class="sd">        enable_weight_streaming (bool): Enable weight streaming.</span>
 <span class="sd">        enable_cross_compile_for_windows (bool): By default this is False means TensorRT engines can only be executed on the same platform where they were built.</span>
 <span class="sd">            True will enable cross-platform compatibility which allows the engine to be built on Linux and run on Windows</span>
-<span class="sd">        tiling_optimization_level (str): The optimization level of tiling strategies. A higher level allows TensorRT to spend more time searching for better tiling strategy. We currently support [&quot;none&quot;, &quot;fast&quot;, &quot;moderate&quot;, &quot;full&quot;].</span>
+<span class="sd">        tiling_optimization_level (str): The optimization level of tiling strategies. A higher level allows TensorRT to spend more time searching for better tiling strategy. We currently support ["none", "fast", "moderate", "full"].</span>
 <span class="sd">        l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).</span>
 <span class="sd">        use_distributed_mode_trace (bool):  Using aot_autograd to trace the graph. This is enabled when DTensors or distributed tensors are present in distributed model</span>
 <span class="sd">        enable_autocast (bool): Whether to enable autocast.</span>
@@ -597,9 +613,14 @@ document.write(`
 <span class="sd">            instead of using the attention converters. When combined with ``use_fp32_acc=True``,</span>
 <span class="sd">            decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only</span>
 <span class="sd">            the final output back to FP16.</span>
+<span class="sd">        disabled_constant_fold_exclusions (Collection[str]): IDs of predefined</span>
+<span class="sd">            Torch-TensorRT rules to disable. Rules are registered by lowering</span>
+<span class="sd">            implementations and enabled by default; compilation users do not</span>
+<span class="sd">            need to register them. Disabling a rule makes its matching nodes</span>
+<span class="sd">            foldable. Default is empty.</span>
 <span class="sd">        attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.</span>
 <span class="sd">        fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">workspace_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">WORKSPACE_SIZE</span>
     <span class="n">min_block_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">MIN_BLOCK_SIZE</span>
@@ -609,6 +630,7 @@ document.write(`
     <span class="n">version_compatible</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">VERSION_COMPATIBLE</span>
     <span class="n">optimization_level</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="n">OPTIMIZATION_LEVEL</span>
     <span class="n">truncate_double</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">TRUNCATE_DOUBLE</span>
+    <span class="n">use_complex_decomposition</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">USE_COMPLEX_DECOMPOSITION</span>
     <span class="n">use_fast_partitioner</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">USE_FAST_PARTITIONER</span>
     <span class="n">enable_experimental_decompositions</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">ENABLE_EXPERIMENTAL_DECOMPOSITIONS</span>
     <span class="n">device</span><span class="p">:</span> <span class="n">Device</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">default_device</span><span class="p">)</span>
@@ -656,8 +678,18 @@ document.write(`
     <span class="n">cpu_memory_budget</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="n">CPU_MEMORY_BUDGET</span>
     <span class="n">dynamically_allocate_resources</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">DYNAMICALLY_ALLOCATE_RESOURCES</span>
     <span class="n">decompose_attention</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">DECOMPOSE_ATTENTION</span>
+    <span class="n">disabled_constant_fold_exclusions</span><span class="p">:</span> <span class="n">Collection</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">DISABLED_CONSTANT_FOLD_EXCLUSIONS</span>
+    <span class="p">)</span>
     <span class="n">attn_bias_is_causal</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">ATTN_BIAS_IS_CAUSAL</span>
     <span class="n">fallback_data_dependent_ops</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">FALLBACK_DATA_DEPENDENT_OPS</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">disabled_constant_fold_exclusions</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">_normalize_disabled_constant_fold_exclusions</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">disabled_constant_fold_exclusions</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">__getstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
         <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.conversion._ConverterRegistry</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
@@ -665,47 +697,53 @@ document.write(`
         <span class="p">)</span>
 
         <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
-        <span class="n">state</span><span class="p">[</span><span class="s2">&quot;torch_executed_ops&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="n">state</span><span class="p">[</span><span class="s2">"torch_executed_ops"</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
             <span class="n">op</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="k">else</span> <span class="n">ConverterRegistry</span><span class="o">.</span><span class="n">qualified_name_or_str</span><span class="p">(</span><span class="n">op</span><span class="p">)</span>
-            <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">state</span><span class="p">[</span><span class="s2">&quot;torch_executed_ops&quot;</span><span class="p">]</span>
+            <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">state</span><span class="p">[</span><span class="s2">"torch_executed_ops"</span><span class="p">]</span>
         <span class="p">}</span>
         <span class="k">return</span> <span class="n">state</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">__setstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">state</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;use_python_runtime&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
-        <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;fallback_data_dependent_ops&quot;</span><span class="p">,</span> <span class="n">FALLBACK_DATA_DEPENDENT_OPS</span><span class="p">)</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">"use_python_runtime"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">state</span><span class="p">[</span><span class="s2">"disabled_constant_fold_exclusions"</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">_normalize_disabled_constant_fold_exclusions</span><span class="p">(</span>
+                <span class="n">state</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"disabled_constant_fold_exclusions"</span><span class="p">,</span> <span class="p">())</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"fallback_data_dependent_ops"</span><span class="p">,</span> <span class="n">FALLBACK_DATA_DEPENDENT_OPS</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">state</span><span class="p">)</span></div>
 
 
 
 <span class="c1"># If any of the following setting is changed, the engine should be rebuilt.</span>
 <span class="n">_SETTINGS_TO_BE_ENGINE_INVARIANT</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s2">&quot;max_aux_streams&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;version_compatible&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;optimization_level&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;disable_tf32&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;sparse_weights&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;engine_capability&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;hardware_compatible&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;refit_identical_engine_weights&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;immutable_weights&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;enable_weight_streaming&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;tiling_optimization_level&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;l2_limit_for_tiling&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;enable_autocast&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;autocast_low_precision_type&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;autocast_excluded_nodes&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;autocast_excluded_ops&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;autocast_max_output_threshold&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;autocast_max_depth_of_reduction&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;autocast_calibration_dataloader&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;decompose_attention&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;attn_bias_is_causal&quot;</span><span class="p">,</span>
+    <span class="s2">"max_aux_streams"</span><span class="p">,</span>
+    <span class="s2">"version_compatible"</span><span class="p">,</span>
+    <span class="s2">"optimization_level"</span><span class="p">,</span>
+    <span class="s2">"disable_tf32"</span><span class="p">,</span>
+    <span class="s2">"sparse_weights"</span><span class="p">,</span>
+    <span class="s2">"engine_capability"</span><span class="p">,</span>
+    <span class="s2">"hardware_compatible"</span><span class="p">,</span>
+    <span class="s2">"refit_identical_engine_weights"</span><span class="p">,</span>
+    <span class="s2">"immutable_weights"</span><span class="p">,</span>
+    <span class="s2">"enable_weight_streaming"</span><span class="p">,</span>
+    <span class="s2">"tiling_optimization_level"</span><span class="p">,</span>
+    <span class="s2">"l2_limit_for_tiling"</span><span class="p">,</span>
+    <span class="s2">"enable_autocast"</span><span class="p">,</span>
+    <span class="s2">"autocast_low_precision_type"</span><span class="p">,</span>
+    <span class="s2">"autocast_excluded_nodes"</span><span class="p">,</span>
+    <span class="s2">"autocast_excluded_ops"</span><span class="p">,</span>
+    <span class="s2">"autocast_max_output_threshold"</span><span class="p">,</span>
+    <span class="s2">"autocast_max_depth_of_reduction"</span><span class="p">,</span>
+    <span class="s2">"autocast_calibration_dataloader"</span><span class="p">,</span>
+    <span class="s2">"decompose_attention"</span><span class="p">,</span>
+    <span class="s2">"disabled_constant_fold_exclusions"</span><span class="p">,</span>
+    <span class="s2">"attn_bias_is_causal"</span><span class="p">,</span>
 <span class="p">}</span>
 
 
-<span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">trt</span><span class="o">.</span><span class="n">SerializationFlag</span><span class="p">,</span> <span class="s2">&quot;INCLUDE_REFIT&quot;</span><span class="p">):</span>  <span class="c1"># for TensorRT &lt; 10.14</span>
-    <span class="n">_SETTINGS_TO_BE_ENGINE_INVARIANT</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s2">&quot;strip_engine_weights&quot;</span><span class="p">)</span>
+<span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">trt</span><span class="o">.</span><span class="n">SerializationFlag</span><span class="p">,</span> <span class="s2">"INCLUDE_REFIT"</span><span class="p">):</span>  <span class="c1"># for TensorRT &lt; 10.14</span>
+    <span class="n">_SETTINGS_TO_BE_ENGINE_INVARIANT</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s2">"strip_engine_weights"</span><span class="p">)</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">settings_are_compatible</span><span class="p">(</span>

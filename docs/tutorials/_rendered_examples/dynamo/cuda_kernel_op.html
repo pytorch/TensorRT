@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=7474ebce"></script>
+    <script src="../../../_static/documentation_options.js?v=7580b7c2"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -643,30 +643,30 @@ import torch_tensorrt.kernels as ttk
 # flattened output. Output shape == input shape (``SameAs(0)``).
 #
 # Schema cheatsheet:
-#   - SameAs(&quot;x&quot;)       output has the same shape and dtype as input ``x``
+#   - SameAs("x")       output has the same shape and dtype as input ``x``
 #                       (an integer index into the tensor-only input list is
 #                       also accepted, but names survive input reordering)
-#   - Numel(&quot;x&quot;)        pass ``x.numel()`` to the kernel as an int extra
+#   - Numel("x")        pass ``x.numel()`` to the kernel as an int extra
 #   - Elementwise(flat) 1-D launch over the flattened output; any input rank
 #                       works (the kernel just sees a contiguous buffer).
 
-CU_SIGMOID = &quot;&quot;&quot;
-extern &quot;C&quot; __global__ void my_sigmoid(
+CU_SIGMOID = """
+extern "C" __global__ void my_sigmoid(
         const float* __restrict__ x, int n, float* __restrict__ y) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i &lt; n) y[i] = 1.0f / (1.0f + __expf(-x[i]));
 }
-&quot;&quot;&quot;
+"""
 
 ttk.cuda_kernel_op(
-    &quot;kern_ex::sigmoid&quot;,
+    "kern_ex::sigmoid",
     ttk.KernelSpec(
         kernel_source=CU_SIGMOID,
-        kernel_name=&quot;my_sigmoid&quot;,
-        inputs=[ttk.InputDecl(&quot;x&quot;)],
-        outputs=[ttk.OutputDecl(&quot;y&quot;, shape=ttk.SameAs(&quot;x&quot;))],
-        extras=[ttk.Numel(&quot;x&quot;)],
-        geometry=ttk.Elementwise(block=(256,), layout=&quot;flat&quot;),
+        kernel_name="my_sigmoid",
+        inputs=[ttk.InputDecl("x")],
+        outputs=[ttk.OutputDecl("y", shape=ttk.SameAs("x"))],
+        extras=[ttk.Numel("x")],
+        geometry=ttk.Elementwise(block=(256,), layout="flat"),
     ),
     supports_dynamic_shapes=True,
 )
@@ -677,26 +677,26 @@ ttk.cuda_kernel_op(
 # ---------------------------------------------------------------------------
 # Same flat geometry, but the kernel takes two input pointers. Multiple
 # inputs work fine as long as they line up with the output (here all the
-# same shape). The extras still come from a single named input — ``Numel(&quot;a&quot;)``
+# same shape). The extras still come from a single named input — ``Numel("a")``
 # resolves to ``a.numel()`` and is passed as an int after the input pointers.
 
-CU_ADD = &quot;&quot;&quot;
-extern &quot;C&quot; __global__ void my_add(
+CU_ADD = """
+extern "C" __global__ void my_add(
         const float* a, const float* b, int n, float* c) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i &lt; n) c[i] = a[i] + b[i];
 }
-&quot;&quot;&quot;
+"""
 
 ttk.cuda_kernel_op(
-    &quot;kern_ex::add&quot;,
+    "kern_ex::add",
     ttk.KernelSpec(
         kernel_source=CU_ADD,
-        kernel_name=&quot;my_add&quot;,
-        inputs=[ttk.InputDecl(&quot;a&quot;), ttk.InputDecl(&quot;b&quot;)],
-        outputs=[ttk.OutputDecl(&quot;c&quot;, shape=ttk.SameAs(&quot;a&quot;))],
-        extras=[ttk.Numel(&quot;a&quot;)],
-        geometry=ttk.Elementwise(block=(256,), layout=&quot;flat&quot;),
+        kernel_name="my_add",
+        inputs=[ttk.InputDecl("a"), ttk.InputDecl("b")],
+        outputs=[ttk.OutputDecl("c", shape=ttk.SameAs("a"))],
+        extras=[ttk.Numel("a")],
+        geometry=ttk.Elementwise(block=(256,), layout="flat"),
     ),
 )
 
@@ -704,7 +704,7 @@ ttk.cuda_kernel_op(
 # ---------------------------------------------------------------------------
 # Case 3: ``ScalarInput`` — pass a runtime float / int / bool by value
 # ---------------------------------------------------------------------------
-# Use ``ScalarInput(&quot;alpha&quot;, float)`` when your kernel needs a scalar that can
+# Use ``ScalarInput("alpha", float)`` when your kernel needs a scalar that can
 # vary per call (e.g. a leaky-relu slope, dropout probability, scale factor).
 # The scalar lands in the kernel signature *between* the tensor pointers and
 # the extras, in source order.
@@ -712,34 +712,34 @@ ttk.cuda_kernel_op(
 # Scalars are represented as TensorRT plugin attributes during compilation and
 # forwarded by value to the CUDA kernel.
 
-CU_SCALE = &quot;&quot;&quot;
-extern &quot;C&quot; __global__ void my_scale(
+CU_SCALE = """
+extern "C" __global__ void my_scale(
         const float* x, float alpha, int n, float* y) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i &lt; n) y[i] = alpha * x[i];
 }
-&quot;&quot;&quot;
+"""
 
 ttk.cuda_kernel_op(
-    &quot;kern_ex::scale&quot;,
+    "kern_ex::scale",
     ttk.KernelSpec(
         kernel_source=CU_SCALE,
-        kernel_name=&quot;my_scale&quot;,
-        inputs=[ttk.InputDecl(&quot;x&quot;), ttk.ScalarInput(&quot;alpha&quot;, float)],
-        # Naming the source input is especially handy here: ``SameAs(&quot;x&quot;)``
+        kernel_name="my_scale",
+        inputs=[ttk.InputDecl("x"), ttk.ScalarInput("alpha", float)],
+        # Naming the source input is especially handy here: ``SameAs("x")``
         # stays correct even though a non-tensor ``ScalarInput`` sits between
         # the tensors in declaration order.
-        outputs=[ttk.OutputDecl(&quot;y&quot;, shape=ttk.SameAs(&quot;x&quot;))],
-        extras=[ttk.Numel(&quot;x&quot;)],
-        geometry=ttk.Elementwise(block=(256,), layout=&quot;flat&quot;),
+        outputs=[ttk.OutputDecl("y", shape=ttk.SameAs("x"))],
+        extras=[ttk.Numel("x")],
+        geometry=ttk.Elementwise(block=(256,), layout="flat"),
     ),
 )
 
 
 # ---------------------------------------------------------------------------
-# Case 4: Elementwise(layout=&quot;nd&quot;) — N-D launch geometry
+# Case 4: Elementwise(layout="nd") — N-D launch geometry
 # ---------------------------------------------------------------------------
-# Use ``layout=&quot;nd&quot;`` when the kernel indexes the output via 2-D / 3-D thread
+# Use ``layout="nd"`` when the kernel indexes the output via 2-D / 3-D thread
 # coordinates rather than a flat index — e.g. for innermost-axis coalescing
 # or per-row block parallelism. Mapping convention:
 #
@@ -747,12 +747,12 @@ ttk.cuda_kernel_op(
 #   block[1]   -&gt; next-innermost                -&gt; grid_y / block_y
 #   leading axes beyond ``len(block)`` fold into grid_z
 #
-# Here we declare ``DimSize(&quot;x&quot;, 0)`` and ``DimSize(&quot;x&quot;, 1)`` so the kernel
+# Here we declare ``DimSize("x", 0)`` and ``DimSize("x", 1)`` so the kernel
 # receives ``H`` and ``W`` directly instead of having to back them out of
 # ``numel``.
 
-CU_RELU_2D = &quot;&quot;&quot;
-extern &quot;C&quot; __global__ void my_relu_2d(
+CU_RELU_2D = """
+extern "C" __global__ void my_relu_2d(
         const float* x, int H, int W, float* y) {
     int j = blockIdx.x * blockDim.x + threadIdx.x;  // innermost
     int i = blockIdx.y * blockDim.y + threadIdx.y;
@@ -760,17 +760,17 @@ extern &quot;C&quot; __global__ void my_relu_2d(
     float v = x[i * W + j];
     y[i * W + j] = v &gt; 0.f ? v : 0.f;
 }
-&quot;&quot;&quot;
+"""
 
 ttk.cuda_kernel_op(
-    &quot;kern_ex::relu_2d&quot;,
+    "kern_ex::relu_2d",
     ttk.KernelSpec(
         kernel_source=CU_RELU_2D,
-        kernel_name=&quot;my_relu_2d&quot;,
-        inputs=[ttk.InputDecl(&quot;x&quot;)],
-        outputs=[ttk.OutputDecl(&quot;y&quot;, shape=ttk.SameAs(&quot;x&quot;))],
-        extras=[ttk.DimSize(&quot;x&quot;, 0), ttk.DimSize(&quot;x&quot;, 1)],  # H, W
-        geometry=ttk.Elementwise(block=(16, 16), layout=&quot;nd&quot;),
+        kernel_name="my_relu_2d",
+        inputs=[ttk.InputDecl("x")],
+        outputs=[ttk.OutputDecl("y", shape=ttk.SameAs("x"))],
+        extras=[ttk.DimSize("x", 0), ttk.DimSize("x", 1)],  # H, W
+        geometry=ttk.Elementwise(block=(16, 16), layout="nd"),
     ),
 )
 
@@ -787,8 +787,8 @@ ttk.cuda_kernel_op(
 # The kernel below assumes ``block_size == 256`` (matching the Reduction
 # spec) because it uses a fixed-size shared-memory buffer.
 
-CU_ROW_SUM = &quot;&quot;&quot;
-extern &quot;C&quot; __global__ void my_row_sum(
+CU_ROW_SUM = """
+extern "C" __global__ void my_row_sum(
         const float* x, int D, float* y) {
     int row = blockIdx.x;
     const float* xr = x + row * D;
@@ -803,16 +803,16 @@ extern &quot;C&quot; __global__ void my_row_sum(
     }
     if (threadIdx.x == 0) y[row] = sbuf[0];
 }
-&quot;&quot;&quot;
+"""
 
 ttk.cuda_kernel_op(
-    &quot;kern_ex::row_sum&quot;,
+    "kern_ex::row_sum",
     ttk.KernelSpec(
         kernel_source=CU_ROW_SUM,
-        kernel_name=&quot;my_row_sum&quot;,
-        inputs=[ttk.InputDecl(&quot;x&quot;)],
-        outputs=[ttk.OutputDecl(&quot;y&quot;, shape=ttk.ReduceDims(&quot;x&quot;, (-1,)))],
-        extras=[ttk.DimSize(&quot;x&quot;, -1)],
+        kernel_name="my_row_sum",
+        inputs=[ttk.InputDecl("x")],
+        outputs=[ttk.OutputDecl("y", shape=ttk.ReduceDims("x", (-1,)))],
+        extras=[ttk.DimSize("x", -1)],
         geometry=ttk.Reduction(reduce_dims=(-1,), block_size=256),
     ),
 )
@@ -823,12 +823,12 @@ ttk.cuda_kernel_op(
 # ---------------------------------------------------------------------------
 # ``repeat2`` duplicates each element: ``y[2*i] = y[2*i + 1] = x[i]``. The
 # output shape ``(2 * n,)`` is not expressible as ``SameAs`` or
-# ``ReduceDims``, so the declarative DSL doesn&#39;t cover it. Instead, pass
+# ``ReduceDims``, so the declarative DSL doesn't cover it. Instead, pass
 # ``meta_fn`` / ``eager_fn`` / ``aot_fn`` directly — the corresponding
 # ``KernelSpec`` fields (``outputs``, ``geometry``) drop out.
 
-CU_REPEAT2 = &quot;&quot;&quot;
-extern &quot;C&quot; __global__ void repeat2_kernel(
+CU_REPEAT2 = """
+extern "C" __global__ void repeat2_kernel(
         const float* __restrict__ x, const int n, float* __restrict__ y) {
     const int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i &lt; n) {
@@ -837,19 +837,19 @@ extern &quot;C&quot; __global__ void repeat2_kernel(
         y[2 * i + 1] = v;
     }
 }
-&quot;&quot;&quot;
+"""
 
 _repeat2_device = _Device()
 _repeat2_device.set_current()
 _repeat2_opts = _ProgramOptions(
-    std=&quot;c++17&quot;,
-    arch=f&quot;sm_{_repeat2_device.arch}&quot;,
-    include_path=[&quot;/usr/local/cuda/include&quot;],
+    std="c++17",
+    arch=f"sm_{_repeat2_device.arch}",
+    include_path=["/usr/local/cuda/include"],
 )
 _repeat2_kernel = (
-    _Program(CU_REPEAT2, code_type=&quot;c++&quot;, options=_repeat2_opts)
-    .compile(&quot;ptx&quot;, name_expressions=(&quot;repeat2_kernel&quot;,))
-    .get_kernel(&quot;repeat2_kernel&quot;)
+    _Program(CU_REPEAT2, code_type="c++", options=_repeat2_opts)
+    .compile("ptx", name_expressions=("repeat2_kernel",))
+    .get_kernel("repeat2_kernel")
 )
 
 
@@ -891,11 +891,11 @@ def _repeat2_aot(inputs, outputs, tactic):
 
 
 ttk.cuda_kernel_op(
-    &quot;kern_ex::repeat2&quot;,
+    "kern_ex::repeat2",
     ttk.KernelSpec(
         kernel_source=CU_REPEAT2,
-        kernel_name=&quot;repeat2_kernel&quot;,
-        inputs=[ttk.InputDecl(&quot;x&quot;)],
+        kernel_name="repeat2_kernel",
+        inputs=[ttk.InputDecl("x")],
         # outputs / geometry omitted — supplied via overrides below.
     ),
     meta_fn=_repeat2_meta,
@@ -913,15 +913,15 @@ ttk.cuda_kernel_op(
 # appended to the kernel argument list in declaration order, matching the
 # calling-convention contract.
 #
-# The op&#39;s torch schema is auto-derived as ``-&gt; (Tensor, Tensor)`` so callers
+# The op's torch schema is auto-derived as ``-&gt; (Tensor, Tensor)`` so callers
 # unpack with ``s, c = torch.ops.kern_ex.sin_cos(x)``. Each output gets its
-# own ``OutputDecl.shape`` — here both are ``SameAs(&quot;x&quot;)`` because sin/cos
+# own ``OutputDecl.shape`` — here both are ``SameAs("x")`` because sin/cos
 # are elementwise — but you can mix ``SameAs`` and ``ReduceDims`` freely for
 # multi-output kernels with different output shapes (e.g. mean + variance
 # from a single reduction pass).
 
-CU_SIN_COS = &quot;&quot;&quot;
-extern &quot;C&quot; __global__ void my_sin_cos(
+CU_SIN_COS = """
+extern "C" __global__ void my_sin_cos(
         const float* __restrict__ x, int n,
         float* __restrict__ s, float* __restrict__ c) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -930,20 +930,20 @@ extern &quot;C&quot; __global__ void my_sin_cos(
         c[i] = __cosf(x[i]);
     }
 }
-&quot;&quot;&quot;
+"""
 
 ttk.cuda_kernel_op(
-    &quot;kern_ex::sin_cos&quot;,
+    "kern_ex::sin_cos",
     ttk.KernelSpec(
         kernel_source=CU_SIN_COS,
-        kernel_name=&quot;my_sin_cos&quot;,
-        inputs=[ttk.InputDecl(&quot;x&quot;)],
+        kernel_name="my_sin_cos",
+        inputs=[ttk.InputDecl("x")],
         outputs=[
-            ttk.OutputDecl(&quot;s&quot;, shape=ttk.SameAs(&quot;x&quot;)),
-            ttk.OutputDecl(&quot;c&quot;, shape=ttk.SameAs(&quot;x&quot;)),
+            ttk.OutputDecl("s", shape=ttk.SameAs("x")),
+            ttk.OutputDecl("c", shape=ttk.SameAs("x")),
         ],
-        extras=[ttk.Numel(&quot;x&quot;)],
-        geometry=ttk.Elementwise(block=(256,), layout=&quot;flat&quot;),
+        extras=[ttk.Numel("x")],
+        geometry=ttk.Elementwise(block=(256,), layout="flat"),
     ),
     supports_dynamic_shapes=True,
 )
@@ -1000,7 +1000,7 @@ class SinCosModel(torch.nn.Module):
 
 
 def _allclose(out, ref) -&gt; bool:
-    &quot;&quot;&quot;Compare a (possibly multi-output) result tuple against a reference.&quot;&quot;&quot;
+    """Compare a (possibly multi-output) result tuple against a reference."""
     if isinstance(out, (tuple, list)):
         return all(torch.allclose(o, r, atol=1e-2, rtol=1e-2) for o, r in zip(out, ref))
     return torch.allclose(out, ref, atol=1e-2, rtol=1e-2)
@@ -1008,9 +1008,9 @@ def _allclose(out, ref) -&gt; bool:
 
 def _run(name, model, inputs, ref, *, compile_trt=True):
     eager_out = model(*inputs)
-    print(f&quot;[{name}] eager matches reference:&quot;, _allclose(eager_out, ref))
+    print(f"[{name}] eager matches reference:", _allclose(eager_out, ref))
     if not compile_trt:
-        print(f&quot;[{name}] TRT compile skipped (see case docstring)&quot;)
+        print(f"[{name}] TRT compile skipped (see case docstring)")
         return
     trt_model = torch_tensorrt.compile(
         model,
@@ -1021,50 +1021,50 @@ def _run(name, model, inputs, ref, *, compile_trt=True):
     with torch.no_grad():
         for _ in range(5):
             out = trt_model(*inputs)
-            assert _allclose(out, ref), f&quot;{name}: mismatch&quot;
-    print(f&quot;[{name}] TRT compile + run successful&quot;)
+            assert _allclose(out, ref), f"{name}: mismatch"
+    print(f"[{name}] TRT compile + run successful")
 
 
-if __name__ == &quot;__main__&quot;:
+if __name__ == "__main__":
     # Case 1: sigmoid (Elementwise flat, single input)
-    x = torch.randn(4, 128, device=&quot;cuda&quot;, dtype=torch.float32)
-    _run(&quot;sigmoid&quot;, SigmoidModel().cuda().eval(), (x,), torch.sigmoid(x))
+    x = torch.randn(4, 128, device="cuda", dtype=torch.float32)
+    _run("sigmoid", SigmoidModel().cuda().eval(), (x,), torch.sigmoid(x))
 
     # Case 2: add (Elementwise flat, two inputs)
-    a = torch.randn(256, device=&quot;cuda&quot;, dtype=torch.float32)
-    b = torch.randn(256, device=&quot;cuda&quot;, dtype=torch.float32)
-    _run(&quot;add&quot;, AddModel().cuda().eval(), (a, b), a + b)
+    a = torch.randn(256, device="cuda", dtype=torch.float32)
+    b = torch.randn(256, device="cuda", dtype=torch.float32)
+    _run("add", AddModel().cuda().eval(), (a, b), a + b)
 
     # Case 3: scale (ScalarInput)
     alpha = 2.5
     _run(
-        &quot;scale&quot;,
+        "scale",
         ScaleModel(alpha).cuda().eval(),
         (x,),
         alpha * x,
     )
 
     # Case 4: relu_2d (Elementwise nd, 2-D block)
-    x2d = torch.randn(33, 47, device=&quot;cuda&quot;, dtype=torch.float32)
-    _run(&quot;relu_2d&quot;, Relu2DModel().cuda().eval(), (x2d,), torch.relu(x2d))
+    x2d = torch.randn(33, 47, device="cuda", dtype=torch.float32)
+    _run("relu_2d", Relu2DModel().cuda().eval(), (x2d,), torch.relu(x2d))
 
     # Case 5: row_sum (Reduction along last axis)
-    xr = torch.randn(8, 256, device=&quot;cuda&quot;, dtype=torch.float32)
-    _run(&quot;row_sum&quot;, RowSumModel().cuda().eval(), (xr,), xr.sum(-1))
+    xr = torch.randn(8, 256, device="cuda", dtype=torch.float32)
+    _run("row_sum", RowSumModel().cuda().eval(), (xr,), xr.sum(-1))
 
     # Case 6: repeat2 (override path — shape-changing kernel)
-    xrep = torch.randn(1024, device=&quot;cuda&quot;, dtype=torch.float32)
+    xrep = torch.randn(1024, device="cuda", dtype=torch.float32)
     _run(
-        &quot;repeat2&quot;,
+        "repeat2",
         Repeat2Model().cuda().eval(),
         (xrep,),
         torch.repeat_interleave(xrep, 2, dim=0),
     )
 
     # Case 7: sin_cos (multi-output — single kernel emits two tensors)
-    xsc = torch.randn(7, 31, device=&quot;cuda&quot;, dtype=torch.float32)
+    xsc = torch.randn(7, 31, device="cuda", dtype=torch.float32)
     _run(
-        &quot;sin_cos&quot;,
+        "sin_cos",
         SinCosModel().cuda().eval(),
         (xsc,),
         (torch.sin(xsc), torch.cos(xsc)),

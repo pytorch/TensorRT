@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=7474ebce"></script>
+    <script src="../../../_static/documentation_options.js?v=7580b7c2"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -526,10 +526,10 @@ from transformers import BertModel
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Initialize model with float precision and sample inputs
-model = BertModel.from_pretrained(&quot;bert-base-uncased&quot;).to(&quot;cuda&quot;).eval()
+model = BertModel.from_pretrained("bert-base-uncased").to("cuda").eval()
 inputs = [
-    torch.randint(0, 2, (1, 14), dtype=torch.int32).to(&quot;cuda&quot;),
-    torch.randint(0, 2, (1, 14), dtype=torch.int32).to(&quot;cuda&quot;),
+    torch.randint(0, 2, (1, 14), dtype=torch.int32).to("cuda"),
+    torch.randint(0, 2, (1, 14), dtype=torch.int32).to("cuda"),
 ]
 </pre></div>
 </div>
@@ -562,15 +562,15 @@ torch_executed_ops = {}
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Define backend compilation keyword arguments
 compilation_kwargs = {
-    &quot;workspace_size&quot;: workspace_size,
-    &quot;min_block_size&quot;: min_block_size,
-    &quot;torch_executed_ops&quot;: torch_executed_ops,
+    "workspace_size": workspace_size,
+    "min_block_size": min_block_size,
+    "torch_executed_ops": torch_executed_ops,
 }
 
 # Build and compile the model with torch.compile, using Torch-TensorRT backend
 optimized_model = torch.compile(
     model,
-    backend=&quot;torch_tensorrt&quot;,
+    backend="torch_tensorrt",
     dynamic=False,
     options=compilation_kwargs,
 )
@@ -589,8 +589,8 @@ with torch.no_grad():
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Does not cause recompilation (same batch size as input)
 new_inputs = [
-    torch.randint(0, 2, (1, 14), dtype=torch.int32).to(&quot;cuda&quot;),
-    torch.randint(0, 2, (1, 14), dtype=torch.int32).to(&quot;cuda&quot;),
+    torch.randint(0, 2, (1, 14), dtype=torch.int32).to("cuda"),
+    torch.randint(0, 2, (1, 14), dtype=torch.int32).to("cuda"),
 ]
 with torch.no_grad():
     new_outputs = optimized_model(*new_inputs)
@@ -603,8 +603,8 @@ with torch.no_grad():
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Does cause recompilation (new batch size)
 new_inputs = [
-    torch.randint(0, 2, (4, 14), dtype=torch.int32).to(&quot;cuda&quot;),
-    torch.randint(0, 2, (4, 14), dtype=torch.int32).to(&quot;cuda&quot;),
+    torch.randint(0, 2, (4, 14), dtype=torch.int32).to("cuda"),
+    torch.randint(0, 2, (4, 14), dtype=torch.int32).to("cuda"),
 ]
 with torch.no_grad():
     new_outputs = optimized_model(*new_inputs)

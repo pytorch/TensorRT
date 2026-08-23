@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=7474ebce"></script>
+    <script src="../../_static/documentation_options.js?v=7580b7c2"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -725,9 +725,9 @@ updated BatchNorm state dict and maps them to the correct fused TRT layer.</p>
 <section id="saving-and-loading-refitted-modules">
 <h2>Saving and Loading Refitted Modules<a class="headerlink" href="#saving-and-loading-refitted-modules" title="Link to this heading">#</a></h2>
 <p>Refitted modules can be saved and loaded exactly like any other compiled module:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">refitted</span><span class="p">,</span> <span class="s2">&quot;model_v2.ep&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">refitted</span><span class="p">,</span> <span class="s2">"model_v2.ep"</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
 <span class="c1"># later:</span>
-<span class="n">refitted</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;model_v2.ep&quot;</span><span class="p">)</span>
+<span class="n">refitted</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">"model_v2.ep"</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>

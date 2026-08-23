@@ -230,7 +230,12 @@ jobs:
             apt-get update
             apt-get install -y curl git
           fi
-          curl -L -o /mambaforge.sh https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-aarch64.sh
+          # Pin the installer. The shared setup-binary-builds action installs
+          # conda=25.3.0 into this base env, and conda 25.3.0 has no Python 3.14
+          # build. Miniforge releases newer than this one put the base env on
+          # Python 3.14, which makes that install unsatisfiable and fails every
+          # aarch64 wheel build. Bump this tag only together with that pin.
+          curl -fL -o /mambaforge.sh https://github.com/conda-forge/miniforge/releases/download/26.3.2-3/Miniforge3-Linux-aarch64.sh
           chmod +x /mambaforge.sh
           /mambaforge.sh -b -p /opt/conda
           rm /mambaforge.sh
@@ -460,7 +465,10 @@ jobs:
       test-infra-repository: ${{ inputs.test-infra-repository }}
       test-infra-ref: ${{ inputs.test-infra-ref }}
       build-matrix: ${{ inputs.build-matrix }}
-      architecture: ${{ inputs.architecture }}
+      # setup-binary-upload builds its artifact name from this input. RTX wheels
+      # use the same suffix as the build and test jobs; keep the actual build
+      # architecture above unchanged.
+      architecture: ${{ inputs.architecture }}${{ inputs.use-rtx && '_rtx' || '' }}
       trigger-event: ${{ inputs.trigger-event }}
       upload-to-pypi: ${{ inputs.upload-to-pypi }}
       wheel-upload-path: ${{ inputs.wheel-upload-path }}

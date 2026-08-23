@@ -3,6 +3,7 @@ import operator
 import warnings
 from typing import Any, Callable, Optional, Union
 
+import tensorrt as trt
 import torch
 from torch.fx.node import Target
 from torch_tensorrt import _enums
@@ -17,9 +18,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     set_layer_name,
     to_torch,
 )
-from torch_tensorrt.dynamo.types import TRTElementWiseOp, TRTTensor
-
-import tensorrt as trt
+from torch_tensorrt.dynamo.types import TRTDataType, TRTElementWiseOp, TRTTensor
 
 logger = logging.getLogger(__name__)
 
@@ -127,10 +126,26 @@ def convert_binary_elementwise(
     # Note that the dtype here is supposed to be the same as the scalar
     # dtype but we don't have a way to detect whether it makes sense for the
     # scalar to be float or half. Hence we go with the lhs dtype.
+    def _scalar_wrap_dtype(
+        tensor_dtype: TRTDataType, scalar: Union[float, int, bool]
+    ) -> TRTDataType:
+        # bool combined with a non-bool scalar promotes to numeric (e.g.
+        # bool * int -> int64), not bool -- wrapping the scalar as bool
+        # here would make the later promotion step a no-op bool/bool match.
+        # Hit by PyTorch's upstream complex-acos decomposition, which computes
+        # sign(x) as signbit(x) * 2 - 1 (see complex_decomposition_adapter.py).
+        if tensor_dtype == trt.DataType.BOOL and not isinstance(scalar, bool):
+            torch_tensor_dtype = _enums.dtype._from(tensor_dtype).to(torch.dtype)
+            promoted = torch.result_type(
+                torch.empty([1], dtype=torch_tensor_dtype), scalar
+            )
+            return _enums.dtype._from(promoted).to(trt.DataType)
+        return tensor_dtype
+
     if is_lhs_trt_tensor and isinstance(rhs_val, (float, int, bool)):
-        rhs_val = to_torch(rhs_val, dtype=lhs_dtype)
+        rhs_val = to_torch(rhs_val, dtype=_scalar_wrap_dtype(lhs_dtype, rhs_val))
     if is_rhs_trt_tensor and isinstance(lhs_val, (float, int, bool)):
-        lhs_val = to_torch(lhs_val, dtype=rhs_dtype)
+        lhs_val = to_torch(lhs_val, dtype=_scalar_wrap_dtype(rhs_dtype, lhs_val))
     lhs_val = get_trt_tensor(ctx, lhs_val, f"{name}_lhs", lhs_dtype)
     rhs_val = get_trt_tensor(ctx, rhs_val, f"{name}_rhs", rhs_dtype)
 
@@ -147,6 +162,19 @@ def convert_binary_elementwise(
         )
     )
     trt_promoted_type = promoted_type.to(trt.DataType)
+
+    # TensorRT's elementwise layer only accepts bool operands for genuine
+    # boolean logic ops (AND/OR/XOR). Two bool operands (e.g. mask * mask)
+    # correctly promote to bool by PyTorch's own rules, but every other op
+    # (PROD, SUM, comparisons, ...) rejects bool inputs outright -- fall
+    # back to a numeric type first, matching how PyTorch eager already
+    # treats e.g. bool_tensor * bool_tensor as numeric under the hood.
+    if trt_promoted_type == trt.DataType.BOOL and op_type not in (
+        trt.ElementWiseOperation.AND,
+        trt.ElementWiseOperation.OR,
+        trt.ElementWiseOperation.XOR,
+    ):
+        trt_promoted_type = _enums.dtype._from(torch.int32).to(trt.DataType)
 
     if trt_promoted_type != lhs_val.dtype:
         lhs_val = cast_trt_tensor(

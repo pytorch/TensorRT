@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=7474ebce"></script>
+    <script src="../_static/documentation_options.js?v=7580b7c2"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -523,9 +523,9 @@ which you can provide to Torch-TensorRT to run INT8 Calibration during compilati
 <div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="linenos"> 1</span><span class="c1">//cpp/ptq/datasets/cifar10.h</span>
 <span class="linenos"> 2</span><span class="cp">#pragma once</span>
 <span class="linenos"> 3</span>
-<span class="linenos"> 4</span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch/data/datasets/base.h&quot;</span>
-<span class="linenos"> 5</span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch/data/example.h&quot;</span>
-<span class="linenos"> 6</span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch/types.h&quot;</span>
+<span class="linenos"> 4</span><span class="cp">#include</span><span class="w"> </span><span class="cpf">"torch/data/datasets/base.h"</span>
+<span class="linenos"> 5</span><span class="cp">#include</span><span class="w"> </span><span class="cpf">"torch/data/example.h"</span>
+<span class="linenos"> 6</span><span class="cp">#include</span><span class="w"> </span><span class="cpf">"torch/types.h"</span>
 <span class="linenos"> 7</span>
 <span class="linenos"> 8</span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;cstddef&gt;</span>
 <span class="linenos"> 9</span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;string&gt;</span>
@@ -582,7 +582,7 @@ some take time, then define the preprocessing to apply to the images in the data
 </pre></div>
 </div>
 <p>Next we create a calibrator from the <code class="docutils literal notranslate"><span class="pre">calibration_dataloader</span></code> using the calibrator factory (found in <code class="docutils literal notranslate"><span class="pre">torch_tensorrt/ptq.h</span></code>):</p>
-<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch_tensorrt/ptq.h&quot;</span>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">"torch_tensorrt/ptq.h"</span>
 <span class="p">...</span>
 
 <span class="k">auto</span><span class="w"> </span><span class="n">calibrator</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch_tensorrt</span><span class="o">::</span><span class="n">ptq</span><span class="o">::</span><span class="n">make_int8_calibrator</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">calibration_dataloader</span><span class="p">),</span><span class="w"> </span><span class="n">calibration_cache_file</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">);</span>
@@ -620,7 +620,7 @@ CIFAR10 to deploying in INT8 with Torch-TensorRT here: <a class="github referenc
 <p>Torch-TensorRT Python API provides an easy and convenient way to use pytorch dataloaders with TensorRT calibrators. <code class="docutils literal notranslate"><span class="pre">DataLoaderCalibrator</span></code> class can be used to create
 a TensorRT calibrator by providing desired configuration. The following code demonstrates an example on how to use it</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">testing_dataset</span> <span class="o">=</span> <span class="n">torchvision</span><span class="o">.</span><span class="n">datasets</span><span class="o">.</span><span class="n">CIFAR10</span><span class="p">(</span>
-    <span class="n">root</span><span class="o">=</span><span class="s2">&quot;./data&quot;</span><span class="p">,</span>
+    <span class="n">root</span><span class="o">=</span><span class="s2">"./data"</span><span class="p">,</span>
     <span class="n">train</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
     <span class="n">download</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">transform</span><span class="o">=</span><span class="n">transforms</span><span class="o">.</span><span class="n">Compose</span><span class="p">(</span>
@@ -636,27 +636,27 @@ a TensorRT calibrator by providing desired configuration. The following code dem
 <span class="p">)</span>
 <span class="n">calibrator</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">ptq</span><span class="o">.</span><span class="n">DataLoaderCalibrator</span><span class="p">(</span>
     <span class="n">testing_dataloader</span><span class="p">,</span>
-    <span class="n">cache_file</span><span class="o">=</span><span class="s2">&quot;./calibration.cache&quot;</span><span class="p">,</span>
+    <span class="n">cache_file</span><span class="o">=</span><span class="s2">"./calibration.cache"</span><span class="p">,</span>
     <span class="n">use_cache</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
     <span class="n">algo_type</span><span class="o">=</span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">ptq</span><span class="o">.</span><span class="n">CalibrationAlgo</span><span class="o">.</span><span class="n">ENTROPY_CALIBRATION_2</span><span class="p">,</span>
-    <span class="n">device</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">&quot;cuda:0&quot;</span><span class="p">),</span>
+    <span class="n">device</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">"cuda:0"</span><span class="p">),</span>
 <span class="p">)</span>
 
 <span class="n">trt_mod</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">inputs</span><span class="o">=</span><span class="p">[</span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">Input</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">))],</span>
                                     <span class="n">enabled_precisions</span><span class="o">=</span><span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">int8</span><span class="p">},</span>
                                     <span class="n">calibrator</span><span class="o">=</span><span class="n">calibrator</span><span class="p">,</span>
                                     <span class="n">device</span><span class="o">=</span><span class="p">{</span>
-                                         <span class="s2">&quot;device_type&quot;</span><span class="p">:</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">DeviceType</span><span class="o">.</span><span class="n">GPU</span><span class="p">,</span>
-                                         <span class="s2">&quot;gpu_id&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
-                                         <span class="s2">&quot;dla_core&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
-                                         <span class="s2">&quot;allow_gpu_fallback&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
-                                         <span class="s2">&quot;disable_tf32&quot;</span><span class="p">:</span> <span class="kc">False</span>
+                                         <span class="s2">"device_type"</span><span class="p">:</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">DeviceType</span><span class="o">.</span><span class="n">GPU</span><span class="p">,</span>
+                                         <span class="s2">"gpu_id"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                                         <span class="s2">"dla_core"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                                         <span class="s2">"allow_gpu_fallback"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+                                         <span class="s2">"disable_tf32"</span><span class="p">:</span> <span class="kc">False</span>
                                      <span class="p">})</span>
 </pre></div>
 </div>
 <p>In the cases where there is a pre-existing calibration cache file that users want to use, <code class="docutils literal notranslate"><span class="pre">CacheCalibrator</span></code> can be used without any dataloaders. The following example demonstrates how
 to use <code class="docutils literal notranslate"><span class="pre">CacheCalibrator</span></code> to use in INT8 mode.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">calibrator</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">ptq</span><span class="o">.</span><span class="n">CacheCalibrator</span><span class="p">(</span><span class="s2">&quot;./calibration.cache&quot;</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">calibrator</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">ptq</span><span class="o">.</span><span class="n">CacheCalibrator</span><span class="p">(</span><span class="s2">"./calibration.cache"</span><span class="p">)</span>
 
 <span class="n">trt_mod</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">inputs</span><span class="o">=</span><span class="p">[</span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">Input</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">])],</span>
                                       <span class="n">enabled_precisions</span><span class="o">=</span><span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">int8</span><span class="p">},</span>

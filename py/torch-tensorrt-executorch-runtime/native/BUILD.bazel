@@ -43,6 +43,10 @@ cmake(
     lib_source = ":delegate_sources",
     out_include_dir = "",
     out_shared_libs = [
+        # The extensions carry a DT_NEEDED on both of these and ExecuTorch's own wheel
+        # ships neither, so this one has to.
+        "libaoti_cuda_shims.so",
+        "libextension_cuda.so",
         "_portable_lib.so",
         "data_loader.so",
     ],
