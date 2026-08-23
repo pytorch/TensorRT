@@ -744,9 +744,14 @@ def test_public_save_forwards_lowering_kwargs_graphmodule_no_retrace(
 
     calls = _stub_save_as_executorch(monkeypatch)
     # retrace=False routes through the dynamo exporter (TRT-specific graph surgery);
-    # stub it so the test isolates save()'s option extraction + forwarding.
-    sentinel_ep = object()
-    monkeypatch.setattr(_exporter, "export", lambda *a, **k: sentinel_ep)
+    # stub it so the test isolates save()'s option extraction + forwarding. The stub
+    # returns a real ExportedProgram because save() runs
+    # _declare_aliased_kv_mutations_on_ep over the exporter's result before forwarding
+    # it, and that pass reads .graph_module / .graph_signature. This program has no
+    # engine nodes, so the pass returns it unchanged and the identity assertion below
+    # still pins exactly what the exporter produced.
+    stub_ep = torch.export.export(_AddOne(), (torch.randn(2, 2),))
+    monkeypatch.setattr(_exporter, "export", lambda *a, **k: stub_ep)
 
     methods = {"get_max_seq_len": 128}
     passes = [object()]
@@ -769,7 +774,7 @@ def test_public_save_forwards_lowering_kwargs_graphmodule_no_retrace(
     )
 
     assert len(calls) == 1
-    assert calls[0]["module"] is sentinel_ep
+    assert calls[0]["module"] is stub_ep
     _assert_lowering_kwargs_forwarded(calls[0]["kwargs"], methods, passes, cfg)
 
 
