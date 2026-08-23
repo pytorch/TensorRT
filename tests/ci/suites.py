@@ -266,7 +266,8 @@ _L2: list[Suite] = [
         platforms=("linux-x86_64",),
     ),
     Suite(
-        # Standard: the automatic-plugin trio. RTX: the whole automatic_plugin dir.
+        # Standard: the automatic-plugin pair. RTX: the whole automatic_plugin
+        # directory, except the Linux-only FlashInfer test below.
         # (The redundant conversion/ re-run from the old l2_plugin is dropped.)
         "plugins-automatic",
         tier="l2",
@@ -275,9 +276,21 @@ _L2: list[Suite] = [
         paths=(
             "automatic_plugin/test_automatic_plugin.py",
             "automatic_plugin/test_automatic_plugin_with_attrs.py",
-            "automatic_plugin/test_flashinfer_rmsnorm.py",
         ),
-        overrides={"rtx": {"paths": ("automatic_plugin/",)}},
+        overrides={
+            "rtx": {
+                "paths": ("automatic_plugin/",),
+                "keyword": "not test_flashinfer_rmsnorm",
+            }
+        },
+    ),
+    Suite(
+        "plugins-flashinfer",
+        tier="l2",
+        lanes=("nightly",),
+        jobs="auto",
+        paths=("automatic_plugin/test_flashinfer_rmsnorm.py",),
+        platforms=("linux-x86_64",),
     ),
     Suite(
         "kernels",

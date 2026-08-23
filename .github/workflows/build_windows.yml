@@ -228,6 +228,11 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cuda-version: ${{ env.CU_VERSION }}
           arch: ${{ inputs.cross-compile && 'arm64' || inputs.architecture }}
+      # setup-binary-builds supplies the x64 artifact name. Match Linux by
+      # reserving the unsuffixed name for standard TensorRT and suffixing RTX.
+      - name: Mark x64 TensorRT-RTX artifact
+        if: ${{ inputs.architecture == 'x64' && inputs.cross-compile == false && inputs.use-rtx }}
+        run: echo "ARTIFACT_NAME=${ARTIFACT_NAME}_rtx" >> "${GITHUB_ENV}"
       - name: Export binary-build version for ARM64 cross build
         if: inputs.cross-compile
         working-directory: ${{ inputs.repository }}
@@ -572,8 +577,12 @@ jobs:
           if [[ "${{ inputs.cross-compile }}" == "true" ]]; then
             artifact_cuda_version="cu134"
             artifact_name="${ARTIFACT_NAME/_${CU_VERSION}_/_${artifact_cuda_version}_}"
+            artifact_name="${artifact_name}${{ inputs.use-rtx && '_rtx' || '' }}"
           else
-            artifact_name="${REPOSITORY//\//_}_${REF//\//_}_${PYTHON_VERSION}_${artifact_cuda_version}_${ARCH}"
+            # Standard and RTX builds share the same Python/CUDA matrix. Include
+            # the backend so their concurrent uploads cannot overwrite or merge
+            # into one artifact that a test from either channel may download.
+            artifact_name="${REPOSITORY//\//_}_${REF//\//_}_${PYTHON_VERSION}_${artifact_cuda_version}_${ARCH}${{ inputs.use-rtx && '_rtx' || '' }}"
           fi
           echo "ARTIFACT_NAME=${artifact_name}" >> "${GITHUB_ENV}"
       - name: Upload wheel to GitHub
@@ -606,7 +615,10 @@ jobs:
       test-infra-ref: ${{ inputs.test-infra-ref }}
       build-matrix: ${{ needs.prepare-upload.outputs.build-matrix }}
       trigger-event: ${{ inputs.trigger-event }}
-      architecture: ${{ inputs.cross-compile && 'arm64' || inputs.architecture }}
+      # setup-binary-upload builds its artifact name from this input. RTX wheels
+      # use the same suffix as the build and test jobs; keep the actual build
+      # architecture above unchanged.
+      architecture: ${{ inputs.cross-compile && 'arm64' || inputs.architecture }}${{ inputs.use-rtx && '_rtx' || '' }}
     secrets:
       R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
       R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}

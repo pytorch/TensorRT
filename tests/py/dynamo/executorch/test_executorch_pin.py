@@ -10,8 +10,11 @@ compatible patch release, and a build input that takes a range could resolve an 
 the artifact was not compiled against.
 """
 
+import ast
+import os
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
@@ -31,11 +34,12 @@ NAMED_COMMIT = re.compile(r"executorch[_a-z]*[^0-9a-f]*([0-9a-f]{40})", re.IGNOR
 # Requirements that end up in metadata someone resolves at install time. A patch release off
 # the same branch has to stay installable, so these take the range. Everything else pins
 # exactly: a build input compiled against one wheel, or a comment labelling a source sha.
+# Only literal requirements land here. setup.py and tests/ci/runner.py derive theirs from
+# dev_dep_versions.yml, so the search below no longer sees them and
+# test_derived_requirements_match_the_pin covers them instead.
 RANGE_SITES = frozenset(
     {
-        "setup.py",
         "justfile",
-        "tests/ci/runner.py",
     }
 )
 
@@ -97,6 +101,72 @@ def test_every_requirement_matches_the_pin() -> None:
 
     assert found, "no ExecuTorch requirement found, so this test is not looking"
     assert not wrong, "\n  ".join(["", *wrong])
+
+
+def _setup_py_requirement(version: str) -> str:
+    # setup.py cannot be imported here, importing it starts a build, so lift out the
+    # statements that derive the requirement and evaluate only those.
+    derived = {"_executorch_major", "_executorch_minor", "EXECUTORCH_REQUIREMENT"}
+    statements = [
+        node
+        for node in ast.parse((REPO_ROOT / "setup.py").read_text()).body
+        if isinstance(node, ast.Assign)
+        and derived
+        & {
+            name.id
+            for target in node.targets
+            for name in ast.walk(target)
+            if isinstance(name, ast.Name)
+        }
+    ]
+    assert statements, "setup.py no longer derives EXECUTORCH_REQUIREMENT"
+
+    namespace: dict = {"__executorch_version__": version}
+    exec(compile(ast.Module(statements, []), "setup.py", "exec"), namespace)
+    return namespace["EXECUTORCH_REQUIREMENT"]
+
+
+def _runner_requirement(root: Path) -> str:
+    # A subprocess rather than an import, so pointing the runner at another tree cannot
+    # leave a reloaded module behind for whatever runs next.
+    return subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from tests.ci.runner import _executorch_requirement; "
+            "print(_executorch_requirement())",
+        ],
+        cwd=REPO_ROOT,
+        env={**os.environ, "TRT_REPO_ROOT": str(root)},
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+
+
+def test_derived_requirements_match_the_pin() -> None:
+    # setup.py and tests/ci/runner.py build their requirement from the pin, so the search
+    # above cannot see them. Check the strings they produce instead.
+    version = _versions()["__executorch_version__"]
+    major, minor, _ = version.split(".")
+    expected = f"executorch>={version},<{major}.{int(minor) + 1}"
+
+    assert _setup_py_requirement(version) == expected
+    assert _runner_requirement(REPO_ROOT) == expected
+
+
+def test_derived_requirements_roll_the_minor_over(tmp_path: Path) -> None:
+    # The upper bound is a version, not a decimal: 1.9 has to become 1.10, not 1.1.
+    # Spelled through a variable because the search above reads this file too, and a
+    # written-out requirement here would read as a site that drifted from the pin.
+    version = "1.9.0"
+    expected = f"executorch>={version},<1.10"
+    (tmp_path / "dev_dep_versions.yml").write_text(
+        f'__executorch_version__: "{version}"\n'
+    )
+
+    assert _setup_py_requirement(version) == expected
+    assert _runner_requirement(tmp_path) == expected
 
 
 def test_every_source_commit_matches_the_pin() -> None:
