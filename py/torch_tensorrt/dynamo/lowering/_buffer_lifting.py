@@ -340,27 +340,54 @@ def assert_no_kv_alias_markers_survived(
     every call, so the markers are read back here, where the fault can still be named.
 
     Called with the lowered graph and ``gm.meta['_no_kv_alias_writes']`` as recorded
-    before lowering. A marked write is a graph output by then, so it cannot be
-    eliminated; missing means rewritten.
+    before lowering, and the two sets must match exactly. They diverge three ways: a
+    recorded name keeps its node but loses the marker, so a pass rebuilt the node
+    without its meta; an unrecorded node gains a marker while every recorded one keeps
+    its own, so a pass copied the meta; or a recorded name goes missing and an
+    unrecorded node gains a marker, so a pass replaced the node and the meta travelled
+    with it. The third is the one the passes in ``post_lowering`` actually produce,
+    because each carries a node's meta onto that node's own replacement.
     """
-    marked = list(marked_writes)
-    if not marked:
-        return
+    expected = set(marked_writes)
     by_name = {node.name: node for node in gm.graph.nodes}
-    lost = [
+    lost = sorted(
         name
-        for name in marked
+        for name in expected
         if name not in by_name or not by_name[name].meta.get("_trt_no_kv_alias")
-    ]
-    if lost:
-        raise RuntimeError(
-            "lift_mutated_buffers marked these buffer writes as copy-back-only "
-            "(node.meta['_trt_no_kv_alias']) so the converter would not alias them, "
-            f"but the marker did not survive lowering: {lost}. A pass in "
-            "post_lowering rebuilt or replaced the node without carrying its meta "
-            "over. Without the marker the engine aliases a buffer whose new value "
-            "is also a graph output, and the compiled module raises on every call."
+    )
+    gained = sorted(
+        name
+        for name, node in by_name.items()
+        if name not in expected and node.meta.get("_trt_no_kv_alias")
+    )
+    if not lost and not gained:
+        return
+    if lost and gained:
+        detail = (
+            f"{lost} are gone and {gained} carry the marker instead, so a pass "
+            "replaced the node and the meta travelled with it"
         )
+    elif lost:
+        detail = (
+            f"the marker is gone from {lost} and no other node carries it, so a pass "
+            "rebuilt the node without its meta"
+        )
+    else:
+        detail = (
+            f"{gained} carry the marker but were never marked, so a pass copied the "
+            "meta onto another node"
+        )
+    # What raising here prevents: a marker rebuilt away lets the converter alias a
+    # write whose new value is also a graph output, and the module raises on every
+    # call; a marker copied onto a node the classifier chose to alias makes the
+    # converter refuse that aliasing, which the predicted-KV cross-check then reports
+    # as a partitioning failure that never happened; and a marker that travelled with
+    # a replacement cannot be shown from here to have landed on the write the
+    # classifier meant.
+    raise RuntimeError(
+        "lift_mutated_buffers set node.meta['_trt_no_kv_alias'] markers before "
+        f"lowering that no longer match the lowered graph: {detail}."
+    )
 
 
 def lift_mutated_buffers(

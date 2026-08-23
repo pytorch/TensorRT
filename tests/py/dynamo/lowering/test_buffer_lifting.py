@@ -1117,15 +1117,38 @@ class TestNoKvAliasMarkerSurvival(TestCase):
     def test_stripped_marker_raises(self):
         gm, name = self._marked_gm()
         next(n for n in gm.graph.nodes if n.name == name).meta.pop("_trt_no_kv_alias")
-        with self.assertRaisesRegex(RuntimeError, "did not survive lowering"):
+        with self.assertRaisesRegex(RuntimeError, "no other node carries it"):
             assert_no_kv_alias_markers_survived(gm, [name])
 
-    def test_replaced_node_raises(self):
-        """A marked write is a graph output by then, so it cannot be eliminated;
-        gone means some pass rewrote it, and the rewrite carried no marker."""
+    def test_replacement_carrying_the_marker_raises(self):
+        """The reachable shape. Every pass in ``post_lowering`` that carries a node's
+        meta onto a replacement erases the original in the same block, so the recorded
+        name goes missing *and* an unrecorded node gains the marker. Reporting only
+        the missing half would say the meta was dropped when it was in fact carried,
+        and predict aliasing when the marker's presence prevents it."""
         gm, name = self._marked_gm()
-        with self.assertRaisesRegex(RuntimeError, "did not survive lowering"):
-            assert_no_kv_alias_markers_survived(gm, [name + "_rewritten"])
+        with self.assertRaisesRegex(RuntimeError, "carry the marker instead"):
+            assert_no_kv_alias_markers_survived(gm, [name + "_original"])
+
+    def test_marker_on_an_unmarked_node_raises(self):
+        """A marker on a node that was never marked, with every recorded marker still
+        in place: a pass copied the meta rather than moving it. The converter then
+        refuses to alias a write the classifier chose to alias, which the predicted-KV
+        cross-check reports as a partitioning failure -- the wrong cause."""
+        gm, name = self._marked_gm()
+        other = next(n for n in gm.graph.nodes if n.op == "placeholder")
+        other.meta["_trt_no_kv_alias"] = True
+        with self.assertRaisesRegex(RuntimeError, "were never marked"):
+            assert_no_kv_alias_markers_survived(gm, [name])
+
+    def test_marker_appearing_where_none_was_recorded_raises(self):
+        """The empty-expected case is checked too. Nothing recorded before lowering and
+        a marker present after it is the copied-meta fault with no recorded marker to
+        compare against; returning early on an empty set would skip it in the case
+        that occurs most, since most graphs mark nothing."""
+        gm, _name = self._marked_gm()
+        with self.assertRaisesRegex(RuntimeError, "were never marked"):
+            assert_no_kv_alias_markers_survived(gm, [])
 
 
 class TestHiddenCopybackOutputs(TestCase):
