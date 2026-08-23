@@ -116,10 +116,9 @@ def resolve_slice_scatter_write(
     dropped on the strength of that prediction, so if the two derivations disagree
     the aliasing never materializes and the write-back is lost.
 
-    ``step`` is read only where the converter itself reads it — the full-overwrite
-    shortcut. ``_kv_eligible`` ignores ``step``, so a strided write with concrete
-    bounds takes the KV path; whether it should is a separate question this does
-    not settle.
+    ``step`` is read here for the full-overwrite shortcut and, on the converter side,
+    only by the scatter fallback; the KV fast path never reads it. See the note on the
+    ``OK`` return for what that costs a strided write the KV path accepts.
     """
     if not isinstance(dim, int) or not -len(cache_shape) <= dim < len(cache_shape):
         return None, None, None, KVWriteStatus.BAD_DIM
@@ -152,6 +151,11 @@ def resolve_slice_scatter_write(
     if not (isinstance(start, int) and isinstance(end, int) and isinstance(step, int)):
         return None, None, None, KVWriteStatus.DYNAMIC_BOUNDS
 
+    # `step` is passed through untouched, and `try_emit_kv_cache_update` never reads
+    # it: a strided write the KV fast path accepts is classified and lowered as if it
+    # were contiguous, so `cache[:, :, 0:8:2, :]` lands in slots 0, 1, 2, 3 rather than
+    # 0, 2, 4, 6, silently. Known wrong and unfixed. The scatter fallback below does
+    # honour `step` (`test_fallback_step_two`), so only the KV path miscompiles.
     return start, end, step, KVWriteStatus.OK
 
 

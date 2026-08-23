@@ -611,13 +611,29 @@ class TestSliceScatterDerivationIsShared(TestCase):
         pos = graph.placeholder("pos")
         self.assertFalse(self._classify((2, 4, 16, 8), (2, 4, 1, 8), 2, pos, 4))
 
-    def test_strided_write_still_takes_the_kv_path(self):
-        """Guard against the shared derivation quietly changing ``step``
-        handling: ``_kv_eligible`` does not look at ``step``, so a strided write
-        with concrete bounds is classified as KV-eligible. Whether it should be
-        is a separate question this test deliberately does not settle -- it only
-        pins the answer against accidental change."""
-        self.assertTrue(self._classify((2, 4, 16, 8), (2, 4, 4, 8), 2, 0, 8, 2))
+    def test_step_is_returned_unchanged(self):
+        """``step`` passes through the shared derivation untouched, which is what
+        both sides need: the derivation reads it for the full-overwrite shortcut, and
+        on the converter side only the scatter fallback reads it.
+
+        This deliberately says nothing about how a strided write is *classified*. One
+        the KV fast path accepts is lowered wrong, because that path ignores ``step``
+        -- ``cache[:, :, 0:8:2, :]`` writes slots 0, 1, 2, 3 rather than 0, 2, 4, 6 --
+        and that is a known, unfixed bug. One that falls through to the scatter
+        fallback is lowered correctly (``test_fallback_step_two``). Asserting the
+        current classification would make the eventual fix arrive looking like a
+        regression and force whoever lands it to delete a passing test."""
+        from torch_tensorrt.dynamo.conversion.impl.slice_scatter import (
+            KVWriteStatus,
+            resolve_slice_scatter_write,
+        )
+
+        shape = (2, 4, 16, 8)
+        for step in (1, 2, 3):
+            self.assertEqual(
+                resolve_slice_scatter_write(shape, 2, 0, 8, step),
+                (0, 8, step, KVWriteStatus.OK),
+            )
 
     def test_resolve_reports_the_converter_early_exits(self):
         """Each status comes back with the bounds its contract promises, since a
