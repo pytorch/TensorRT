@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import glob
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -20,6 +21,19 @@ from .suites import SUITES, Suite, Variant, by_name
 REPO_ROOT = Path(
     os.environ.get("TRT_REPO_ROOT", str(Path(__file__).resolve().parents[2]))
 )
+
+
+def _executorch_requirement() -> str:
+    # Read the pin the way the drift test does, so this file is not a second
+    # place to edit when it moves. Regex rather than yaml: the runner declares
+    # no runtime dependencies of its own and importing it should not add one.
+    text = (REPO_ROOT / "dev_dep_versions.yml").read_text()
+    version = dict(re.findall(r'^(__\w+__): "([^"]+)"', text, re.MULTILINE))[
+        "__executorch_version__"
+    ]
+    major, minor = version.split(".")[:2]
+    return f"executorch>={version},<{major}.{int(minor) + 1}"
+
 
 # Known transient cudagraph/TRT-driver flake signatures. Expand ONLY with
 # concrete evidence — a broad regex hides real bugs.
@@ -119,7 +133,8 @@ def _setup_commands(step: str) -> list[tuple[list[str], Path]]:
     if step == "executorch":
         return [
             (
-                launcher + ["-m", "pip", "install", "pyyaml", "executorch>=1.4.1,<1.5"],
+                launcher
+                + ["-m", "pip", "install", "pyyaml", _executorch_requirement()],
                 REPO_ROOT,
             )
         ]
