@@ -135,9 +135,12 @@ def _setup_commands(step: str) -> list[tuple[list[str], Path]]:
         return [(launcher + ["hub.py"], REPO_ROOT / "tests/modules")]
     if step == "executorch":
         # ExecuTorch's CUDA wheels are published only on the PyTorch nightly index, so the
-        # channel is needed here. cu130 matches the torch index pyproject.toml resolves
-        # against by default, rather than dev_dep_versions.yml's __cuda_version__, which this
-        # file does not read.
+        # channel is needed here. Derived from CU_VERSION rather than fixed, because the
+        # executorch suite is nightly-only and the nightly matrix runs cu132 rows as well as
+        # cu130 ones; a fixed channel would install a CUDA 13.0 runtime into a 13.2 job. The
+        # cu130 default is for a local run with no CU_VERSION set, and matches the torch index
+        # pyproject.toml resolves against by default.
+        cuda = os.environ.get("CU_VERSION", "cu130")
         return [
             (
                 launcher
@@ -147,7 +150,7 @@ def _setup_commands(step: str) -> list[tuple[list[str], Path]]:
                     "install",
                     "pyyaml",
                     "--extra-index-url",
-                    "https://download.pytorch.org/whl/nightly/cu130",
+                    f"https://download.pytorch.org/whl/nightly/{cuda}",
                     _executorch_requirement(),
                 ],
                 REPO_ROOT,
