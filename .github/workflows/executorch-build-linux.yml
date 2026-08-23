@@ -79,7 +79,12 @@ jobs:
         export PATH="${RUNNER_TEMP}/bin:${PATH}"
         bazel --version
 
-        python -m pip install pyyaml "executorch==1.4.1"
+        # ExecuTorch's CUDA wheels are published only on the PyTorch nightly index, and the
+        # pin is a dev version, which the requirement itself already admits.
+        # CU_VERSION selects the row's own channel, which is what keeps the runtime the
+        # delegate links to the same CUDA build as the rest of the job.
+        EXECUTORCH_INDEX_URL="https://download.pytorch.org/whl/nightly/${CU_VERSION}"
+        python -m pip install pyyaml --extra-index-url "${EXECUTORCH_INDEX_URL}" "executorch==1.5.0.dev20260822"
         export TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION="$(python -c 'import importlib.metadata; print(importlib.metadata.version("torch-tensorrt"))')"
 
         # The downloaded wheel has to carry the C++ runtime. A wheel built with
@@ -126,7 +131,7 @@ jobs:
         export EXECUTORCH_SOURCE_DIR="$(dirname "${executorch_cmake_location%%:*}")"
         export EXECUTORCH_ROOT="${EXECUTORCH_SOURCE_DIR}"
         # this is to verify the end user's workflow
-        python -m pip install pyyaml "executorch>=1.4.1,<1.5"
+        python -m pip install pyyaml --extra-index-url "${EXECUTORCH_INDEX_URL}" "executorch>=1.5.0.dev20260822,<1.6"
         python examples/torchtrt_executorch_example/export_static_shape.py \
           --model_path="${RUNNER_TEMP}/torchtrt-reference-runner.pte"
         .github/scripts/verify-executorch-reference-runner.sh \

@@ -85,7 +85,12 @@ summary *args:
 # Install optional test deps so model/kernels/quantization/executorch suites run
 install-test-ext:
     uv pip install --group test-ext --group kernels --group quantization
-    uv pip install pyyaml "executorch>=1.4.1,<1.5"
+    # ExecuTorch's CUDA wheels are only on the PyTorch nightly index, and the pin is a dev
+    # version, which the requirement itself already admits. cu130 matches the
+    # torch index this project resolves against by default.
+    uv pip install pyyaml \
+      --extra-index-url https://download.pytorch.org/whl/nightly/cu130 \
+      "executorch>=1.5.0.dev20260822,<1.6"
 
 # ── Linting ───────────────────────────────────────────────────────────────────
 
