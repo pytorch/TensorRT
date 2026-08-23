@@ -858,7 +858,8 @@ def save(
         raise ImportError(
             "Saving in ExecuTorch format requires the executorch package "
             "with executorch.exir. Install with: pip install "
-            "\"torch_tensorrt[executorch]\" to use output_format='executorch'."
+            '"torch_tensorrt[executorch]" --extra-index-url '
+            "https://download.pytorch.org/whl/nightly/cu130 to use output_format='executorch'."
         )
     if output_format == "executorch":
         # Every executorch option is popped above, so a leftover kwarg is a typo. Fail
@@ -1406,7 +1407,8 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
     except ImportError:
         raise ImportError(
             "ExecuTorch is not installed. Install with: pip install "
-            "\"torch_tensorrt[executorch]\" to use output_format='executorch'."
+            '"torch_tensorrt[executorch]" --extra-index-url '
+            "https://download.pytorch.org/whl/nightly/cu130 to use output_format='executorch'."
         )
     import torch_tensorrt.dynamo.runtime.meta_ops.register_meta_ops  # noqa: F401
 
