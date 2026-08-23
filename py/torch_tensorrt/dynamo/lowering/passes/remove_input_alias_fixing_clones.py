@@ -17,7 +17,7 @@ def remove_input_alias_fixing_clones(
 
     See: https://github.com/pytorch/pytorch/issues/108079
 
-    ``lowering._buffer_lifting._reads_the_cache_as_a_network_input`` runs before this
+    ``lowering._buffer_lifting._effective_cache_input`` runs before this
     pass and reproduces the condition below to predict whether a mutated buffer's
     write will reach the converter reading a direct network input. Loosening the
     condition -- or deleting the pass, as the TODO above invites -- invalidates that

@@ -1121,7 +1121,10 @@ def aten_ops_gather(
 
 
 def _index_copy_kv_eligible(
-    node: Node, settings: Optional[CompilationSettings] = None
+    node: Node,
+    settings: Optional[CompilationSettings] = None,
+    *,
+    input_node: Optional[Node] = None,
 ) -> bool:
     """Validator for the KV-cache fast path of ``aten.index_copy.default``.
 
@@ -1139,10 +1142,18 @@ def _index_copy_kv_eligible(
 
     Cases that fail this validator fall through to
     ``aten_ops_index_copy_fallback``.
+
+    ``input_node`` overrides which node the input checks are applied to. The
+    partitioner never passes it: by the time this runs as a capability validator,
+    lowering has settled what the input is. The pre-conversion classifier in
+    ``lowering/_buffer_lifting.py`` runs before that and passes the node lowering
+    will leave behind, which is not always ``node.args[0]``.
     """
     if len(node.args) < 4:
         return False
-    input_node, dim, _index_node, src_node = node.args[:4]
+    if input_node is None:
+        input_node = node.args[0]  # type: ignore[assignment]
+    dim, _index_node, src_node = node.args[1:4]
 
     if not isinstance(input_node, Node) or input_node.op != "placeholder":
         return False

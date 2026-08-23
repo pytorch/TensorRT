@@ -90,8 +90,9 @@ def _write_op_is_torch_executed(
     )
 
 
-def _reads_the_cache_as_a_network_input(cache_node: torch.fx.Node) -> bool:
-    """Whether the converter will see this write's cache argument as a network input.
+def _effective_cache_input(cache_node: torch.fx.Node) -> Optional[torch.fx.Node]:
+    """The node the converter will see as this write's cache argument, if it is a
+    network input, else ``None``.
 
     A lifted buffer is a placeholder, and ``emit_kv_cache_update_layer`` aliases the
     cache only when the argument it is handed is one -- anything else has no input
@@ -121,7 +122,7 @@ def _reads_the_cache_as_a_network_input(cache_node: torch.fx.Node) -> bool:
     ``min_block_size``, not only at ``min_block_size=1``.
     """
     if cache_node.op == "placeholder":
-        return True
+        return cache_node
     if not (
         cache_node.op == "call_function"
         and cache_node.target is torch.ops.aten.clone.default
@@ -129,9 +130,12 @@ def _reads_the_cache_as_a_network_input(cache_node: torch.fx.Node) -> bool:
         and isinstance(cache_node.args[0], torch.fx.Node)
         and cache_node.args[0].op == "placeholder"
     ):
-        return False
-    users = list(cache_node.args[0].users)
-    return len(users) == 1 and users[0] is cache_node
+        return None
+    placeholder = cache_node.args[0]
+    users = list(placeholder.users)
+    if len(users) == 1 and users[0] is cache_node:
+        return placeholder
+    return None
 
 
 def _kv_write_will_alias(
@@ -168,11 +172,10 @@ def _kv_write_will_alias(
         return False
     # The KV layer aliases the cache only if it is a direct network input; after
     # lifting, the mutated buffer is a placeholder the write op reads from.
-    if not (
-        args
-        and isinstance(args[0], torch.fx.Node)
-        and _reads_the_cache_as_a_network_input(args[0])
-    ):
+    if not (args and isinstance(args[0], torch.fx.Node)):
+        return False
+    cache_input = _effective_cache_input(args[0])
+    if cache_input is None:
         return False
 
     if value_node.target is torch.ops.aten.index_copy.default:
@@ -180,7 +183,11 @@ def _kv_write_will_alias(
             _index_copy_kv_eligible,
         )
 
-        return bool(_index_copy_kv_eligible(value_node))
+        # The validator applies its own placeholder check to args[0], and here that
+        # can still be the clone lowering is about to erase. Point it at what the
+        # converter will be handed instead; the partitioner, running after lowering,
+        # passes nothing and reads args[0] itself.
+        return bool(_index_copy_kv_eligible(value_node, input_node=cache_input))
 
     if value_node.target is torch.ops.aten.slice_scatter.default:
         from torch_tensorrt.dynamo.conversion.impl.slice_scatter import (

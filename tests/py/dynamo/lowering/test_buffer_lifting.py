@@ -714,8 +714,68 @@ class TestCacheMustReachTheConverterAsANetworkInput(TestCase):
         )
         return _kv_write_will_alias(node, cls.CACHE)
 
+    @staticmethod
+    def _classify_index_copy(through_clone, extra_reader=False):
+        """Same, for ``index_copy``, whose converter applies its own placeholder
+        check to ``args[0]`` rather than relying on the binding name."""
+        from torch_tensorrt.dynamo.lowering._buffer_lifting import _kv_write_will_alias
+
+        cache_shape, src_shape = (1, 4, 16, 8), (1, 4, 1, 8)
+        graph = torch.fx.Graph()
+        buffer = graph.placeholder("buf_cache")
+        buffer.meta["val"] = torch.empty(cache_shape, device="meta")
+        cache_arg = buffer
+        if through_clone:
+            cache_arg = graph.call_function(
+                torch.ops.aten.clone.default, args=(buffer,)
+            )
+        if extra_reader:
+            graph.call_function(torch.ops.aten.sum.default, args=(buffer,))
+        index = graph.placeholder("index")
+        index.meta["val"] = torch.empty((1,), dtype=torch.int64, device="meta")
+        src = graph.placeholder("src")
+        src.meta["val"] = torch.empty(src_shape, device="meta")
+        node = graph.call_function(
+            torch.ops.aten.index_copy.default, args=(cache_arg, 2, index, src)
+        )
+        return _kv_write_will_alias(node, cache_shape)
+
     def test_direct_placeholder_is_kv(self):
         self.assertTrue(self._classify(lambda _graph, buffer: buffer))
+
+    def test_index_copy_through_a_sole_use_clone_is_kv(self):
+        """``_index_copy_kv_eligible`` checks ``args[0]`` itself, so peeling the
+        clone for the binding-name question is not enough -- the validator has to be
+        pointed at the same node, or an ``index_copy`` decode write through a clone
+        is filed copy-back and the engine aliases it anyway."""
+        self.assertTrue(self._classify_index_copy(through_clone=False))
+        self.assertTrue(self._classify_index_copy(through_clone=True))
+
+    def test_index_copy_through_a_shared_clone_is_not_kv(self):
+        self.assertFalse(
+            self._classify_index_copy(through_clone=True, extra_reader=True)
+        )
+
+    def test_index_copy_validator_still_reads_args0_by_default(self):
+        """The partitioner passes no override and must go on seeing the node's own
+        input: by the time it runs, lowering has settled what that is."""
+        from torch_tensorrt.dynamo.conversion.aten_ops_converters import (
+            _index_copy_kv_eligible,
+        )
+
+        graph = torch.fx.Graph()
+        buffer = graph.placeholder("buf_cache")
+        buffer.meta["val"] = torch.empty((1, 4, 16, 8), device="meta")
+        clone = graph.call_function(torch.ops.aten.clone.default, args=(buffer,))
+        clone.meta["val"] = torch.empty((1, 4, 16, 8), device="meta")
+        index = graph.placeholder("index")
+        src = graph.placeholder("src")
+        src.meta["val"] = torch.empty((1, 4, 1, 8), device="meta")
+        node = graph.call_function(
+            torch.ops.aten.index_copy.default, args=(clone, 2, index, src)
+        )
+        self.assertFalse(_index_copy_kv_eligible(node))
+        self.assertTrue(_index_copy_kv_eligible(node, input_node=buffer))
 
     def test_clone_of_a_sole_use_placeholder_is_kv(self):
         """``clone -> scatter -> copy_`` is the ordinary shape when the post-write
@@ -1285,6 +1345,40 @@ class TestCompileSeam(TestCase):
         )
         self.assertEqual(aliased, {"buf_k"})
 
+        out = trt_gm(*args)
+        self.assertEqual(len(out), 1)
+        self.assertTrue(torch.allclose(out[0].cpu(), expected.cpu(), atol=1e-3))
+        self.assertTrue(torch.allclose(trt_gm.k.cpu(), expected_cache.cpu(), atol=1e-3))
+
+    def test_compile_runs_a_cloned_index_copy_write_and_writes_it_back(self):
+        """The `index_copy` decode shape of the same case: a per-step cache-position
+        write through a clone. Its validator checks `args[0]` on its own account, so
+        this fails for a different reason than the `slice_scatter` one even though
+        the model shape and the symptom are the same."""
+
+        class M(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("k", torch.zeros(1, 2, 16, 4).cuda())
+
+            def forward(self, x, pos):
+                k = self.k.clone()
+                k = k.index_copy(2, pos, x)
+                self.k.copy_(k)
+                return k.sum(dim=-1)
+
+        args = (
+            torch.full((1, 2, 1, 4), 3.0).cuda(),
+            torch.tensor([3], dtype=torch.int64).cuda(),
+        )
+        model = M().cuda().eval()
+        with torch.no_grad():
+            expected = model(*args).clone()
+            expected_cache = model.k.clone()
+
+        trt_gm = self._compile(M().cuda().eval(), args, min_block_size=1)
+
+        self.assertEqual(trt_gm.meta.get("_copyback_mutation_buffers", []), [])
         out = trt_gm(*args)
         self.assertEqual(len(out), 1)
         self.assertTrue(torch.allclose(out[0].cpu(), expected.cpu(), atol=1e-3))
