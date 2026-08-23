@@ -2711,6 +2711,20 @@ def bitwise_type_validator(
         rhs_meta = rhs_val.meta.get("tensor_meta")
         if lhs_meta is None or rhs_meta is None:
             return False
+
+        # TensorRT produces incorrect results for bitwise AND/OR when the
+        # `other` operand is a rank-0 tensor. Let the partitioner keep this
+        # operation in PyTorch until the TensorRT issue is resolved.
+        if (
+            node.target
+            in (
+                torch.ops.aten.bitwise_and.Tensor,
+                torch.ops.aten.bitwise_or.Tensor,
+            )
+            and len(rhs_meta.shape) == 0
+        ):
+            return False
+
         return lhs_meta.dtype in supported_type and rhs_meta.dtype in supported_type
 
     elif node.target in scalar_targets:
