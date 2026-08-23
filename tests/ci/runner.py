@@ -131,10 +131,22 @@ def _setup_commands(step: str) -> list[tuple[list[str], Path]]:
     if step == "hub":
         return [(launcher + ["hub.py"], REPO_ROOT / "tests/modules")]
     if step == "executorch":
+        # ExecuTorch's CUDA wheels are published only on the PyTorch nightly index, so the
+        # channel is needed here. cu130 matches the torch index pyproject.toml resolves
+        # against by default, rather than dev_dep_versions.yml's __cuda_version__, which this
+        # file does not read.
         return [
             (
                 launcher
-                + ["-m", "pip", "install", "pyyaml", _executorch_requirement()],
+                + [
+                    "-m",
+                    "pip",
+                    "install",
+                    "pyyaml",
+                    "--extra-index-url",
+                    "https://download.pytorch.org/whl/nightly/cu130",
+                    _executorch_requirement(),
+                ],
                 REPO_ROOT,
             )
         ]
