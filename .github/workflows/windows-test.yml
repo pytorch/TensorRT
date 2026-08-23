@@ -105,6 +105,12 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cuda-version: ${{ env.CU_VERSION }}
           arch: ${{ env.ARCH }}
+      # The default matrix entries have matrix.tensorrt == '', so their
+      # download branch uses ARTIFACT_NAME rather than DOWNLOAD_ARTIFACT_NAME.
+      # Keep it aligned with the RTX build artifact.
+      - name: Mark TensorRT-RTX artifact
+        if: ${{ inputs.use-rtx }}
+        run: echo "ARTIFACT_NAME=${ARTIFACT_NAME}_rtx" >> "${GITHUB_ENV}"
       - name: Shorten Conda environment path
         if: inputs.architecture == 'x64'
         run: |
