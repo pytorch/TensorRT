@@ -56,10 +56,19 @@ def test_save_as_executorch_uses_public_lowering_and_persists_data(
         backend_config=backend_config,
     )
 
+    # The complete set of lowering options _save_as_executorch forwards. The five this
+    # test does not pass are still forwarded explicitly, as None or False rather than
+    # left out. backend_config is absent by design -- it is not a lowering option and is
+    # routed to to_executorch() below.
     export.assert_called_once_with(
         source,
         partitioners=partitioners,
         compile_specs=compile_specs,
+        transform_passes=None,
+        compile_config=None,
+        constant_methods=None,
+        generate_etrecord=False,
+        weight_streaming_budget_per_engine=None,
     )
     edge.to_executorch.assert_called_once_with(config=backend_config)
     program.write_to_file.assert_called_once()
