@@ -615,7 +615,10 @@ jobs:
       test-infra-ref: ${{ inputs.test-infra-ref }}
       build-matrix: ${{ needs.prepare-upload.outputs.build-matrix }}
       trigger-event: ${{ inputs.trigger-event }}
-      architecture: ${{ inputs.cross-compile && 'arm64' || inputs.architecture }}
+      # setup-binary-upload builds its artifact name from this input. RTX wheels
+      # use the same suffix as the build and test jobs; keep the actual build
+      # architecture above unchanged.
+      architecture: ${{ inputs.cross-compile && 'arm64' || inputs.architecture }}${{ inputs.use-rtx && '_rtx' || '' }}
     secrets:
       R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
       R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}

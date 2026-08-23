@@ -465,7 +465,10 @@ jobs:
       test-infra-repository: ${{ inputs.test-infra-repository }}
       test-infra-ref: ${{ inputs.test-infra-ref }}
       build-matrix: ${{ inputs.build-matrix }}
-      architecture: ${{ inputs.architecture }}
+      # setup-binary-upload builds its artifact name from this input. RTX wheels
+      # use the same suffix as the build and test jobs; keep the actual build
+      # architecture above unchanged.
+      architecture: ${{ inputs.architecture }}${{ inputs.use-rtx && '_rtx' || '' }}
       trigger-event: ${{ inputs.trigger-event }}
       upload-to-pypi: ${{ inputs.upload-to-pypi }}
       wheel-upload-path: ${{ inputs.wheel-upload-path }}
