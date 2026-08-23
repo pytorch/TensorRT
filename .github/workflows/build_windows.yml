@@ -616,7 +616,7 @@ jobs:
     needs: [build, prepare-upload]
     uses: pytorch/test-infra/.github/workflows/_binary_upload.yml@main
     # if it is the release wheel or tarball, then skip upload to pytorch index(release wheel are uploaded to pypi)
-    if: ${{ inputs.skip-binary-upload == false && inputs.is-release-wheel == false && inputs.is-release-tarball == false }}
+    if: ${{ inputs.python-only == false && inputs.skip-binary-upload == false && inputs.is-release-wheel == false && inputs.is-release-tarball == false }}
     with:
       repository: ${{ inputs.repository }}
       ref: ${{ inputs.ref }}
