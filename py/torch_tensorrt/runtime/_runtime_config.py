@@ -583,6 +583,15 @@ def apply_runtime_settings(
     ``RuntimeSettings(runtime_cache=None)`` or supply a
     :class:`RuntimeCache` explicitly.
 
+    **Warm-load is also the caller's responsibility.**  When a
+    :class:`TorchTensorRTModule` is present it calls :meth:`RuntimeCache.load`
+    automatically (via ``_resolve_runtime_cache``), so cached kernels are
+    available from the first execute without any caller action.  For module-less
+    engines there is no equivalent hook — the caller must call
+    :meth:`RuntimeCache.load` (or :meth:`RuntimeCache.load_from_stream`) before
+    passing the handle to :func:`apply_runtime_settings`, or the engine will
+    start with an empty cache regardless of what is on disk.
+
     Settings are never serialized; they do not survive
     :func:`torch_tensorrt.save`.  Re-apply after each :func:`torch_tensorrt.load`.
     """

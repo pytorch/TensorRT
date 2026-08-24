@@ -8,6 +8,7 @@ Tests that use save/load run both the module (in-process) and module-less
 * names apply_runtime_settings in the error message
 """
 
+import io
 import os
 import tempfile
 import unittest
@@ -210,6 +211,53 @@ class TestApplyRuntimeSettingsModuleLess(TestCase):
             # Running via ep.module() uses the same engine objects -> cache populated.
             _ = loaded_gm(*inputs)
             self.assertTrue(cache.has_cache())
+        finally:
+            try:
+                os.unlink(cache_path)
+            except OSError:
+                pass
+
+    def test_warm_load_bytes_transferred(self):
+        """Caller must call .load() / .load_from_stream() to warm the cache before attach.
+
+        The module path auto-calls load() via _resolve_runtime_cache; there is no
+        equivalent hook on the module-less path.  Verify warm bytes actually land:
+        load_from_stream returns a byte count, so assertGreater(..., 0) is the
+        non-vacuous check.
+        """
+        compiled, inputs = _compile_simple()
+        _, loaded_gm = _save_load(compiled, inputs)
+
+        # Pass 1: populate a cache to get real bytes on disk.
+        with tempfile.NamedTemporaryFile(suffix=".bin", delete=False) as f:
+            cache_path = f.name
+        try:
+            cache_populate = RuntimeCache(path=cache_path, autosave_on_del=False)
+            apply_runtime_settings(
+                loaded_gm, RuntimeSettings(runtime_cache=cache_populate)
+            )
+            _ = loaded_gm(*inputs)
+            cache_populate.save()
+            with open(cache_path, "rb") as fh:
+                saved_bytes = fh.read()
+            self.assertGreater(len(saved_bytes), 0, "first save produced empty file")
+
+            # Pass 2: warm a new cache from those bytes via load_from_stream.
+            _, loaded_gm2 = _save_load(compiled, inputs)
+            cache_warm = RuntimeCache(autosave_on_del=False)
+            n_bytes = cache_warm.load_from_stream(io.BytesIO(saved_bytes))
+            self.assertGreater(
+                n_bytes,
+                0,
+                "load_from_stream transferred 0 bytes — warm load did nothing",
+            )
+
+            n_engines = apply_runtime_settings(
+                loaded_gm2, RuntimeSettings(runtime_cache=cache_warm)
+            )
+            self.assertGreaterEqual(n_engines, 1)
+            _ = loaded_gm2(*inputs)
+            self.assertTrue(cache_warm.has_cache())
         finally:
             try:
                 os.unlink(cache_path)
