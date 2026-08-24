@@ -426,25 +426,9 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
 
     def _send_to_engine(self, rs: RuntimeSettings) -> None:
         """Push ``rs`` to whichever engine flavor is attached."""
-        from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
-        from torch_tensorrt.runtime._runtime_cache import _to_torchbind_handle
-        from torch_tensorrt.runtime._runtime_config import (
-            _CUDA_GRAPH_STRATEGY_MAP,
-            _DYNAMIC_SHAPES_KERNEL_STRATEGY_MAP,
-        )
+        from torch_tensorrt.runtime._runtime_config import _send_settings_to_engine
 
-        if isinstance(self.engine, TRTEngine):
-            self.engine.update_runtime_settings(rs)
-        else:
-            # Strategies cross the boundary as ints (TorchBind ``int64_t``,
-            # mirroring the nvinfer1 enum integers on the cpp side).
-            self.get_engine().update_runtime_settings(
-                _DYNAMIC_SHAPES_KERNEL_STRATEGY_MAP[
-                    rs.dynamic_shapes_kernel_specialization_strategy
-                ],
-                _CUDA_GRAPH_STRATEGY_MAP[rs.cuda_graph_strategy],
-                _to_torchbind_handle(rs.runtime_cache),
-            )
+        _send_settings_to_engine(self.engine, rs)
 
     def setup_engine(self) -> None:
         """

@@ -414,3 +414,25 @@ def set_dynamic_shapes_kernel_strategy(
     return runtime_config(
         target_or_targets, dynamic_shapes_kernel_specialization_strategy=strategy
     )
+
+
+def _send_settings_to_engine(engine: Any, rs: RuntimeSettings) -> None:
+    """Push ``rs`` to whichever TRT engine flavor is attached.
+
+    Dispatches on engine flavor: Python ``TRTEngine`` uses the native
+    ``update_runtime_settings`` method; torchbind engines expect int-valued
+    strategies and a torchbind handle rather than the Python facade.
+    """
+    from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
+    from torch_tensorrt.runtime._runtime_cache import _to_torchbind_handle
+
+    if isinstance(engine, TRTEngine):
+        engine.update_runtime_settings(rs)
+    else:
+        engine.update_runtime_settings(
+            _DYNAMIC_SHAPES_KERNEL_STRATEGY_MAP[
+                rs.dynamic_shapes_kernel_specialization_strategy
+            ],
+            _CUDA_GRAPH_STRATEGY_MAP[rs.cuda_graph_strategy],
+            _to_torchbind_handle(rs.runtime_cache),
+        )
