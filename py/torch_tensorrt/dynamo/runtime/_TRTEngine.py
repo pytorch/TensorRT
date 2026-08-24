@@ -829,8 +829,29 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         the enqueue stream). Used by auto-selection, which switches on
         ``_engine_stream`` before ``execute_async_v3``. Mirrors the C++ runtime.
         """
-        if self.num_optimization_profiles <= 1:
+        # An index this engine does not have cannot be honored. A single-profile
+        # engine is the one case where that is not a mistake to fail on: it has
+        # profile 0 and nothing to switch to, so a pin aimed at some other engine
+        # is ignored with a warning rather than raising. A multi-profile engine
+        # handed an index it lacks could have done something different, and a
+        # negative index is a computed value gone wrong on any engine, so both
+        # stay errors -- silently running on mistuned kernels is worse than
+        # stopping. Kept identical to the C++ runtime, which this mirrors.
+        #
+        # Reachable only by calling the engine directly; optimization_profile()
+        # validates the index first.
+        if self.num_optimization_profiles <= 1 and profile_index > 0:
+            logger.warning(
+                f"Ignoring optimization profile index {profile_index}: this engine has "
+                f"{self.num_optimization_profiles} optimization profile(s), so it stays on "
+                f"profile {self._active_profile_index}."
+            )
             return
+        if not 0 <= profile_index < self.num_optimization_profiles:
+            raise ValueError(
+                f"Optimization profile index {profile_index} is out of range: this engine "
+                f"has {self.num_optimization_profiles} optimization profile(s)."
+            )
         if profile_index == self._active_profile_index:
             return
         self.context.set_optimization_profile_async(profile_index, stream.cuda_stream)

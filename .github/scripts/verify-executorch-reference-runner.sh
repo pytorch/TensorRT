@@ -285,6 +285,12 @@ require_tar_entry "torch_tensorrt/bin/example_executorch_runner"
 require_tar_entry "torch_tensorrt/lib/libextension_cuda.so"
 require_tar_entry "torch_tensorrt/examples/executorch_reference_runner/kv_cache_decode_check.cpp"
 require_tar_entry "torch_tensorrt/BUILD"
+# Every source the packaged CMakeLists.txt names must ship. A missing one aborts
+# the configure step below for all targets, not just the one that needs it, so
+# check them here to fail at packaging with a clear message instead.
+require_tar_entry "torch_tensorrt/examples/executorch_reference_runner/main.cpp"
+require_tar_entry "torch_tensorrt/examples/executorch_reference_runner/multi_profile_main.cpp"
+require_tar_entry "torch_tensorrt/examples/executorch_reference_runner/multi_profile_benchmark.cpp"
 
 export TORCH_TENSORRT_ROOT="${verify_root}/torch_tensorrt"
 export TORCHTRT_EXECUTORCH_SOURCE_DIR="${TORCH_TENSORRT_ROOT}/src/torch_tensorrt/executorch"
@@ -305,7 +311,14 @@ fi
 
 cmake "${cmake_args[@]}"
 
-build_targets=(example_executorch_runner)
+# The multi-profile targets are built but not run: they need a Gemma-3 .pte and a
+# GPU. Compiling them here is what keeps the packaged sources from rotting, since
+# nothing else in CI touches them.
+build_targets=(
+  example_executorch_runner
+  example_executorch_multi_profile_runner
+  example_executorch_multi_profile_benchmark
+)
 if [[ -n "${kv_model_path}" ]]; then
   build_targets+=(kv_cache_decode_check)
 fi

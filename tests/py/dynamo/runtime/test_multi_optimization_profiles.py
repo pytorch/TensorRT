@@ -240,6 +240,19 @@ class TestMultiProfileRuntime(TestCase):
             with optimization_profile(self.trt_gm, 99):
                 self.trt_gm(self.decode_in)
 
+    def test_engine_level_out_of_range_index_raises(self):
+        # Driving the engine directly skips optimization_profile()'s validation,
+        # so the engine has to reject an index it cannot honor rather than warn
+        # and keep running on whatever profile is loaded. These engines have two
+        # profiles, so there is no single-profile tolerance to fall back on.
+        # Only the exception type differs by runtime: ValueError from the Python
+        # engine, RuntimeError from the C++ TORCHTRT_CHECK.
+        for e in self._trt_engines(self.trt_gm):
+            with self.assertRaises((ValueError, RuntimeError)):
+                e.set_active_profile(e.num_optimization_profiles)
+            with self.assertRaises((ValueError, RuntimeError)):
+                e.set_active_profile(-1)
+
     def test_non_int_profile_raises(self):
         with self.assertRaises(TypeError):
             with optimization_profile(self.trt_gm, "decode"):
