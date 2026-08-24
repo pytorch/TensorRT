@@ -256,19 +256,6 @@ _L2: list[Suite] = [
         jobs=_HEAVY,
     ),
     Suite(
-        # Separate from the executorch suite below because it needs none of what that one needs:
-        # no GPU, no ExecuTorch, not even torch. Keeping it here in the nightly-only suite meant
-        # the drift checks never ran on a PR or on a push to main, which is exactly when a pin
-        # goes stale. Text and metadata only, so it is cheap enough for every lane.
-        "executorch-pin",
-        tier="l0",
-        lanes=("fast", "full", "nightly"),
-        paths=("executorch/test_executorch_pin.py",),
-        jobs="auto",
-        variants=("standard",),
-        platforms=("linux-x86_64",),
-    ),
-    Suite(
         "executorch",
         tier="l2",
         lanes=("nightly",),
