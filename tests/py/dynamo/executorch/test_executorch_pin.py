@@ -62,6 +62,7 @@ NAMED_COMMIT = re.compile(r"executorch[_a-z]*[^0-9a-f]*([0-9a-f]{40})", re.IGNOR
 # with the path.
 # An explicit opt-out token rather than prose. "verify the end user's workflow" is a sentence
 # someone can write, or paste, above a requirement without meaning to license a range there.
+PAIRING_TEST = "test_the_pinned_commit_is_the_pinned_wheels_own_source"
 USER_WORKFLOW_MARKER = "pin-check: range-ok"
 
 # The files expected to pin ExecuTorch, mapped to how many sites each must carry, excluding
@@ -618,3 +619,24 @@ def test_the_pin_check_runs_in_ci():
     assert re.search(
         r"uv pip install --system[^\n]*\bpyyaml\b", workflow
     ), "the job that runs this file does not install pyyaml, which _pinned_versions() shells out to"
+
+
+@pytest.mark.unit
+def test_the_pairing_check_survives_the_gpu_lane_deselection() -> None:
+    """The one test here that needs a real ExecuTorch must not be deselected with the rest.
+
+    Every other test in this file is a source-consistency check, so the GPU lane deselects the
+    whole module by name to avoid paying for them twice. ``-k`` matches the module name in the
+    test id, so a bare ``not test_executorch_pin`` drops the pairing check too, and that check
+    only means anything where ExecuTorch is installed. It was silently unreachable: it skips
+    when the wheel is not the pinned one, which is every environment except this lane.
+    """
+    for path in ("tests/ci/suites.py", "tests/py/utils/ci_helpers.sh"):
+        text = (REPO_ROOT / path).read_text(encoding="utf-8")
+        assert (
+            "not test_executorch_pin" in text
+        ), f"{path} no longer deselects this module"
+        assert PAIRING_TEST in text, (
+            f"{path} deselects the whole module without keeping {PAIRING_TEST}, so the only "
+            "check that needs a real ExecuTorch installed runs nowhere"
+        )

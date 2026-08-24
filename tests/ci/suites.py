@@ -260,7 +260,12 @@ _L2: list[Suite] = [
         tier="l2",
         lanes=("nightly",),
         paths=("executorch/",),
-        keyword="not test_executorch_pin",
+        keyword=(
+            # The pairing test is the one check here that needs a real ExecuTorch installed, so
+            # this lane is the only place it can run. Everything else in that file is a
+            # source-consistency check the lint job already covers.
+            "not test_executorch_pin or test_the_pinned_commit_is_the_pinned_wheels_own_source"
+        ),
         setup=("executorch",),
         jobs="auto",
         variants=("standard",),
