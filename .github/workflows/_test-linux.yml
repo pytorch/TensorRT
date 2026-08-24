@@ -99,6 +99,7 @@ jobs:
       pre-script: ${{ matrix.pre-script }}
       # python-only swaps in the env_vars_python_only.txt (sets PYTHON_ONLY=1).
       env-var-script: ${{ inputs.python-only && 'packaging/env_vars_python_only.txt' || matrix.env-var-script }}
+      python-only: ${{ inputs.python-only }}
       post-script: ${{ matrix.post-script }}
       package-name: ${{ matrix.package-name }}
       smoke-test-script: ${{ matrix.smoke-test-script }}
@@ -141,6 +142,7 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: packaging/pre_build_script.sh
+      python-only: ${{ inputs.python-only }}
       use-rtx: ${{ inputs.use-rtx }}
       # Per-suite runner from the manifest; "" falls back to matrix.validation_runner.
       runner: ${{ matrix.runner }}

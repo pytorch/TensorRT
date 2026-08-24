@@ -91,6 +91,7 @@ jobs:
     with:
       lane: python-only
       build-flavor: python-only
+      python-only: true
       name-prefix: "Python-only "
       raw-matrix: ${{ needs.generate-matrix.outputs.matrix }}
 
@@ -102,6 +103,7 @@ jobs:
     with:
       lane: python-only
       build-flavor: python-only-rtx
+      python-only: true
       use-rtx: true
       name-prefix: "Python-only RTX "
       raw-matrix: ${{ needs.generate-matrix.outputs.matrix }}
