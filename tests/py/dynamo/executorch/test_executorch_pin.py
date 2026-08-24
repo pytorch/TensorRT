@@ -61,6 +61,22 @@ RANGE_SITES: frozenset[str] = frozenset()
 # with the path.
 USER_WORKFLOW_MARKER = "verify the end user's workflow"
 
+# The files expected to pin ExecuTorch to a version, excluding dev_dep_versions.yml itself.
+# Asserted as a set of files rather than a line count because a site that loses its version stops
+# matching the search rather than reporting a mismatch, and because the line count legitimately
+# differs between this branch and the stacked runtime-wheel change.
+_EXPECTED_REQUIREMENT_FILES = {
+    ".github/workflows/executorch-build-linux.yml",
+    ".github/workflows/executorch-test-linux.yml",
+    "MODULE.bazel",
+    "docker/MODULE.bazel.docker",
+    "docker/MODULE.bazel.ngc",
+    "justfile",
+    "py/torch-tensorrt-executorch-runtime/README.md",
+    "py/torch-tensorrt-executorch-runtime/pyproject.toml",
+    "toolchains/ci_workspaces/MODULE.bazel.tmpl",
+}
+
 
 def _git(*arguments: str) -> str:
     return subprocess.run(
@@ -104,7 +120,10 @@ def _expected(path: str, number: int, version: str) -> str:
         return f"executorch=={version}"
 
     major, minor = _release_line(version)
-    return f"executorch>={version},<{major}.{int(minor) + 1}"
+    # Only the top-level setup.py carries the Linux marker. It is the site uv resolves for the
+    # win32 required-environment, where PyPI's candidates stop below this floor.
+    marker = "; platform_system == 'Linux'" if path == "setup.py" and number > 1 else ""
+    return f"executorch>={version},<{major}.{int(minor) + 1}{marker}"
 
 
 def test_every_requirement_matches_the_pin() -> None:
@@ -112,6 +131,7 @@ def test_every_requirement_matches_the_pin() -> None:
 
     wrong = []
     found = 0
+    seen = set()
     for line in _git(
         "grep", "-nI", "-E", r"executorch ?(===|==|>=|<=|~=|!=|<|>) ?[0-9]"
     ).splitlines():
@@ -121,10 +141,20 @@ def test_every_requirement_matches_the_pin() -> None:
         expected = _expected(path, int(number), version)
         for actual in REQUIREMENT.findall(text):
             found += 1
+            seen.add(path)
             if actual != expected:
                 wrong.append(f"{path}:{number} has {actual}, expected {expected}")
 
     assert found, "no ExecuTorch requirement found, so this test is not looking"
+    # The set of files, not just "nonzero": a site that drops its version entirely stops matching
+    # the search and silently leaves the result set, which is exactly how a lost pin would look.
+    assert seen == _EXPECTED_REQUIREMENT_FILES, (
+        "the set of files pinning ExecuTorch changed.\n"
+        f"  no longer pinning: {sorted(_EXPECTED_REQUIREMENT_FILES - seen)}\n"
+        f"  newly pinning:     {sorted(seen - _EXPECTED_REQUIREMENT_FILES)}\n"
+        "A file that lost its version does not appear in the search at all, so check for one "
+        "that now names bare `executorch` before updating the expected set."
+    )
     assert not wrong, "\n  ".join(["", *wrong])
 
 
@@ -180,19 +210,48 @@ def test_derived_requirements_match_the_pin() -> None:
     version = _versions()["__executorch_version__"]
     major, minor = _release_line(version)
 
+    # The Linux marker is part of the requirement: the extra has to resolve for the win32 entry
+    # in pyproject.toml's uv required-environments, where the only candidates are PyPI's and they
+    # stop below this floor, so without it `uv lock` fails outright.
     assert _setup_py_requirement(version) == (
-        f"executorch>={version},<{major}.{int(minor) + 1}"
+        f"executorch>={version},<{major}.{int(minor) + 1}; platform_system == 'Linux'"
     )
     assert _runner_requirement(REPO_ROOT) == f"executorch=={version}"
 
 
-def test_the_runner_follows_the_row_s_cuda_version() -> None:
-    # The executorch suite is nightly-only, and the nightly matrix runs cu132 rows as well as
-    # cu130 ones, so a fixed channel would install a CUDA 13.0 ExecuTorch into a CUDA 13.2 job.
-    # PRs pin to cu130, which is why this cannot be caught by watching PR CI.
-    source = (REPO_ROOT / "tests/ci/runner.py").read_text(encoding="utf-8")
-    assert 'os.environ.get("CU_VERSION", "cu130")' in source
-    assert "nightly/cu130" not in source, "the channel is hardcoded again"
+def test_the_runner_follows_the_row_s_cuda_version(monkeypatch) -> None:
+    """Call the runner and read the URL it builds, rather than matching its source.
+
+    The executorch suite is nightly-only, and the nightly matrix runs cu132 rows as well as cu130
+    ones, so a fixed channel would install a CUDA 13.0 ExecuTorch into a CUDA 13.2 job. PRs pin to
+    cu130, which is why watching PR CI cannot catch it. A source-text assertion could not catch it
+    either: keeping the ``os.environ.get`` line while hardcoding the URL passes one.
+    """
+    sys.path.insert(0, str(REPO_ROOT / "tests"))
+    try:
+        from ci import runner
+    finally:
+        sys.path.pop(0)
+
+    def channel_for(cu_version: str | None) -> str:
+        if cu_version is None:
+            monkeypatch.delenv("CU_VERSION", raising=False)
+        else:
+            monkeypatch.setenv("CU_VERSION", cu_version)
+        commands = runner._setup_commands("executorch")
+        urls = [
+            argument
+            for command, _ in commands
+            for argument in command
+            if "download.pytorch.org" in argument
+        ]
+        assert len(urls) == 1, f"expected one index URL, got {urls}"
+        return urls[0]
+
+    assert channel_for("cu132").endswith("/nightly/cu132")
+    assert channel_for("cu130").endswith("/nightly/cu130")
+    # Unset is a local run, and matches the index pyproject.toml resolves against by default.
+    assert channel_for(None).endswith("/nightly/cu130")
 
 
 def test_derived_requirements_roll_the_minor_over(tmp_path: Path) -> None:
@@ -204,7 +263,10 @@ def test_derived_requirements_roll_the_minor_over(tmp_path: Path) -> None:
         f'__executorch_version__: "{version}"\n'
     )
 
-    assert _setup_py_requirement(version) == f"executorch>={version},<1.10"
+    assert (
+        _setup_py_requirement(version)
+        == f"executorch>={version},<1.10; platform_system == 'Linux'"
+    )
     # No upper bound to roll over, but it must still track the pin it is given.
     assert _runner_requirement(tmp_path) == f"executorch=={version}"
 
@@ -247,9 +309,11 @@ def test_the_pinned_commit_is_the_pinned_wheels_own_source() -> None:
     # deliberately omits so one pin serves every CUDA row. Compare the part they share.
     if installed_version.split("+")[0] != expected_version:
         # No evidence either way rather than a mismatch to report: only the wheel the pin names
-        # carries the commit the pin should agree with. Every install path in this repository
-        # now requests the pin exactly, so arriving here means the environment was built some
-        # other way, and that wheel's commit says nothing about whether the two pins agree.
+        # carries the commit the pin should agree with. Every CI install path that builds or
+        # tests the delegate requests the pin exactly -- the one deliberate range is the
+        # end-user install rehearsal in executorch-build-linux.yml -- so arriving here usually
+        # means the environment was built some other way, and that wheel's commit says nothing
+        # about whether the two pins agree.
         pytest.skip(
             f"the installed ExecuTorch is {installed_version}, not the pinned "
             f"{expected_version}, so its commit says nothing about whether the pins agree"
@@ -267,6 +331,7 @@ def test_every_source_commit_matches_the_pin() -> None:
 
     wrong = []
     found = 0
+    seen = set()
     for path in _git("grep", "-lI", "-E", 'name = "executorch"').split():
         for match in BAZEL_COMMIT.finditer((REPO_ROOT / path).read_text()):
             found += 1
