@@ -159,8 +159,10 @@ trt_tier_l2_dynamo_core() {
 }
 
 trt_tier_executorch() {
+    # The pin checks are excluded here because the lint workflow already runs them on a CPU
+    # runner; this tier needs a GPU and a built wheel, which they do not.
     ( cd "${TRT_REPO_ROOT}/tests/py/dynamo"
-      _trt_py -m pytest -ra $(_trt_nproc auto) --junitxml="$(_trt_xml executorch_tests_results)" executorch/ "$@" )
+      _trt_py -m pytest -ra $(_trt_nproc auto) --junitxml="$(_trt_xml executorch_tests_results)" -k "not test_executorch_pin" executorch/ "$@" )
 }
 
 trt_tier_l2_plugin() {
