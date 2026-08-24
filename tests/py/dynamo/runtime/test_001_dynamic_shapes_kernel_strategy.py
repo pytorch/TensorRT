@@ -5,7 +5,7 @@ import torch_tensorrt as torchtrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt._features import ENABLED_FEATURES
-from torch_tensorrt.runtime import RuntimeSettings
+from torch_tensorrt.runtime import RuntimeSettings, apply_runtime_settings
 
 _STRATEGIES = [("lazy",), ("eager",), ("none",)]
 
@@ -42,20 +42,11 @@ def _compile_dynamic_conv(strategy):
         min_block_size=1,
     )
     torch._dynamo.reset()
-    _apply_runtime_settings(
+    apply_runtime_settings(
         compiled,
         RuntimeSettings(dynamic_shapes_kernel_specialization_strategy=strategy),
     )
     return compiled
-
-
-def _apply_runtime_settings(compiled, rs):
-    """Apply ``RuntimeSettings`` to every inner ``TorchTensorRTModule``."""
-    from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
-
-    for _, mod in compiled.named_modules():
-        if isinstance(mod, TorchTensorRTModule):
-            mod.runtime_settings = rs
 
 
 def _compile_simple(*, runtime_settings=None):
@@ -77,7 +68,7 @@ def _compile_simple(*, runtime_settings=None):
     )
     torch._dynamo.reset()
     if runtime_settings is not None:
-        _apply_runtime_settings(compiled, runtime_settings)
+        apply_runtime_settings(compiled, runtime_settings)
     return compiled
 
 

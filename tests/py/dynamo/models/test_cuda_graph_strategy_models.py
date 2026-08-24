@@ -5,18 +5,7 @@ import torch.nn.functional as F
 import torch_tensorrt as torchtrt
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt._features import ENABLED_FEATURES
-from torch_tensorrt.runtime import RuntimeSettings
-
-
-def _apply_runtime_settings(compiled, rs):
-    """Walk a compiled module and apply RuntimeSettings to every TRT submodule."""
-    from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
-        TorchTensorRTModule,
-    )
-
-    for _, m in compiled.named_modules():
-        if isinstance(m, TorchTensorRTModule):
-            m.runtime_settings = rs
+from torch_tensorrt.runtime import RuntimeSettings, apply_runtime_settings
 
 
 class ConvModel(torch.nn.Module):
@@ -71,7 +60,7 @@ class TestCudaGraphStrategyModels(TestCase):
             use_python_runtime=True,
             min_block_size=1,
         )
-        _apply_runtime_settings(
+        apply_runtime_settings(
             compiled, RuntimeSettings(cuda_graph_strategy="whole_graph_capture")
         )
         torch._dynamo.reset()
@@ -105,7 +94,7 @@ class TestCudaGraphStrategyModels(TestCase):
             use_python_runtime=True,
             min_block_size=1,
         )
-        _apply_runtime_settings(
+        apply_runtime_settings(
             compiled, RuntimeSettings(cuda_graph_strategy="disabled")
         )
         torch._dynamo.reset()
@@ -145,7 +134,7 @@ class TestCudaGraphStrategyDynamic(TestCase):
             use_python_runtime=True,
             min_block_size=1,
         )
-        _apply_runtime_settings(
+        apply_runtime_settings(
             compiled, RuntimeSettings(cuda_graph_strategy="whole_graph_capture")
         )
         torch._dynamo.reset()
@@ -181,7 +170,7 @@ class TestCudaGraphStrategyDynamic(TestCase):
             use_python_runtime=True,
             min_block_size=1,
         )
-        _apply_runtime_settings(
+        apply_runtime_settings(
             compiled, RuntimeSettings(cuda_graph_strategy="whole_graph_capture")
         )
         torch._dynamo.reset()

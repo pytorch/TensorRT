@@ -11,6 +11,7 @@ from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.runtime import (
     RuntimeCache,
     RuntimeSettings,
+    apply_runtime_settings,
     runtime_config,
 )
 
@@ -18,15 +19,6 @@ from torch_tensorrt.runtime import (
 class SimpleModel(torch.nn.Module):
     def forward(self, x):
         return torch.relu(x) + 1.0
-
-
-def _apply_runtime_settings(compiled, rs):
-    """Apply ``RuntimeSettings`` to every inner ``TorchTensorRTModule``."""
-    from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
-
-    for _, mod in compiled.named_modules():
-        if isinstance(mod, TorchTensorRTModule):
-            mod.runtime_settings = rs
 
 
 def _compile_simple(*, runtime_settings=None):
@@ -47,7 +39,7 @@ def _compile_simple(*, runtime_settings=None):
     )
     torch._dynamo.reset()
     if runtime_settings is not None:
-        _apply_runtime_settings(compiled, runtime_settings)
+        apply_runtime_settings(compiled, runtime_settings)
     return compiled
 
 
@@ -310,7 +302,7 @@ class TestStateDictRoundTripRuntimeSettings(TestCase):
         dst.load_state_dict(state)  # routes through set_extra_state
         # B2 used to AttributeError on the next line because the slot
         # wasn't initialized after ``set_extra_state``.
-        _apply_runtime_settings(
+        apply_runtime_settings(
             dst, RuntimeSettings(cuda_graph_strategy="whole_graph_capture")
         )
 
