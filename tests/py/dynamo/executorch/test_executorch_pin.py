@@ -56,12 +56,13 @@ NAMED_COMMIT = re.compile(r"executorch[_a-z]*[^0-9a-f]*([0-9a-f]{40})", re.IGNOR
 #
 # Empty today: the only literal range left was the justfile's install recipe, and it installs
 # the wheel the delegate is compiled against, so it pins exactly like the rest.
-RANGE_SITES: frozenset[str] = frozenset()
 
 # A step that exists to reproduce what a user runs belongs to the range group even inside a
 # file that otherwise pins build inputs, so the marker travels with the line rather than
 # with the path.
-USER_WORKFLOW_MARKER = "verify the end user's workflow"
+# An explicit opt-out token rather than prose. "verify the end user's workflow" is a sentence
+# someone can write, or paste, above a requirement without meaning to license a range there.
+USER_WORKFLOW_MARKER = "pin-check: range-ok"
 
 # The files expected to pin ExecuTorch, mapped to how many sites each must carry, excluding
 # dev_dep_versions.yml itself. A count per file rather than just the set of files, because a site
@@ -133,16 +134,19 @@ def _versions() -> dict:
 
 
 def _wants_range(path: str, number: int) -> bool:
-    if path in RANGE_SITES:
-        return True
-
-    # Scan upward rather than reading one fixed line, so reformatting the workflow cannot
-    # silently reclassify the requirement and fail the build for an unrelated reason.
+    # Scan upward past blanks and comment lines, so an explanatory line between the opt-out and
+    # the requirement neither reclassifies the site nor fails the build for a cosmetic reason.
+    # Only a comment carrying the token licenses a range; the first line of real content stops
+    # the scan, so the opt-out cannot leak onto an unrelated requirement further down.
     lines = (REPO_ROOT / path).read_text().splitlines()
     for line in reversed(lines[: number - 1]):
-        if not line.strip():
+        stripped = line.strip()
+        if not stripped:
             continue
-        return USER_WORKFLOW_MARKER in line
+        if not stripped.startswith("#"):
+            return False
+        if USER_WORKFLOW_MARKER in stripped:
+            return True
     return False
 
 
@@ -233,7 +237,7 @@ def _runner_requirement(root: Path) -> str:
     ).stdout.strip()
 
 
-def test_derived_requirements_match_the_pin() -> None:
+def test_derived_requirements_match_the_pin(monkeypatch) -> None:
     # setup.py and tests/ci/runner.py build their requirement from the pin, so the search
     # above cannot see them. Check the strings they produce instead.
     #
@@ -255,7 +259,7 @@ def test_derived_requirements_match_the_pin() -> None:
     # The argument list CI actually runs, not just the string the helper derives. Dropping the
     # requirement from the setup command left every one of these tests green: the step still
     # succeeds, having installed no ExecuTorch, and the suite then skips on importorskip.
-    sys.path.insert(0, str(REPO_ROOT / "tests"))
+    monkeypatch.syspath_prepend(str(REPO_ROOT / "tests"))
     from ci.runner import _executorch_requirement, _setup_commands
 
     argv = [arg for command, _cwd in _setup_commands("executorch") for arg in command]
@@ -274,7 +278,19 @@ def test_derived_requirements_match_the_pin() -> None:
         if isinstance(node, ast.Assign)
         and any(getattr(t, "id", None) == "EXTRAS_REQUIRE" for t in node.targets)
     )
+    # The published extras have to exist, or the loop below iterates nothing and deleting both
+    # keys is indistinguishable from them being correct. Only these two: an unrelated future extra
+    # has no reason to name ExecuTorch, and requiring it of every key made this test the one that
+    # turns red when someone adds "debug".
+    published = {"executorch", "all"}
+    present = {key.value for key in extras.keys if isinstance(key, ast.Constant)}
+    assert published <= present, (
+        f"setup.py must publish the {sorted(published)} extras, but EXTRAS_REQUIRE has "
+        f"{sorted(present)}. Every documented install command names one of them."
+    )
     for key, value in zip(extras.keys, extras.values):
+        if getattr(key, "value", None) not in published:
+            continue
         named = [
             element.id
             for element in getattr(value, "elts", [])
@@ -317,7 +333,7 @@ def test_the_runner_follows_the_row_s_cuda_version(monkeypatch) -> None:
     cu130, which is why watching PR CI cannot catch it. A source-text assertion could not catch it
     either: keeping the ``os.environ.get`` line while hardcoding the URL passes one.
     """
-    sys.path.insert(0, str(REPO_ROOT / "tests"))
+    monkeypatch.syspath_prepend(str(REPO_ROOT / "tests"))
     try:
         from ci import runner
     finally:
@@ -371,7 +387,7 @@ def test_the_pinned_commit_is_the_pinned_wheels_own_source() -> None:
     Every published wheel records the commit it was built from, so the pairing is checkable
     rather than a convention.
 
-    Skipped rather than failed whenever the installed wheel is not the one the pin names — not
+    Skipped rather than failed whenever the installed wheel is not the one the pin names, not
     installed at all, a different member of a floating range, or built without git provenance.
     None of those say anything about whether the two pins agree, and this file stays readable
     offline.
@@ -455,7 +471,7 @@ def test_a_failed_setup_step_stops_the_suite(monkeypatch, setup_rc, expected):
     which the channel eventually prunes. Replacing the ``return rc`` with ``continue`` kept every
     other test in this file green, so assert on ``run_suite`` itself.
     """
-    sys.path.insert(0, str(REPO_ROOT / "tests"))
+    monkeypatch.syspath_prepend(str(REPO_ROOT / "tests"))
     from ci import runner
 
     calls: list[list[str]] = []
@@ -486,7 +502,7 @@ def test_a_failed_setup_step_stops_the_suite(monkeypatch, setup_rc, expected):
 @pytest.mark.unit
 @pytest.mark.xfail(
     reason="uv.lock is regenerated by uv-update.yml on push to main, not by hand",
-    strict=False,
+    strict=True,
 )
 def test_the_lockfile_records_the_same_executorch_range_as_setup_py():
     """``uv.lock`` caches what ``setup.py`` declares, so it drifts when the pin moves.
@@ -519,3 +535,86 @@ def test_the_lockfile_records_the_same_executorch_range_as_setup_py():
         f"uv.lock records executorch {sorted(recorded)} but the pin derives {expected!r}. "
         "Run `uv lock --refresh` and commit the result."
     )
+
+
+@pytest.mark.unit
+def test_every_printed_install_instruction_names_the_nightly_channel():
+    """Every ``[executorch]`` install instruction has to carry the nightly index.
+
+    ExecuTorch is published only to the nightly CUDA channel, so an instruction without
+    ``--extra-index-url`` resolves nothing and the user gets a bare "no matching distribution".
+    The property had regressed and been re-fixed three times across this change with nothing
+    asserting it, which is the signature of a property no test covers.
+
+    Whole files rather than single lines: every one of these instructions wraps, so the extra and
+    the index land on different lines and a line-oriented check sees neither together. Tracked
+    files only, so a stale build directory cannot fail this.
+    """
+    tracked = subprocess.run(
+        ["git", "ls-files", "-z"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.split("\0")
+
+    # Two shapes need the channel: an instruction naming the [executorch] extra, and the CI
+    # install of a locally built torch-tensorrt wheel, whose ExecuTorch dependency resolves from
+    # the same index. The second is the site that regressed most often and carries no extra.
+    extra = re.compile(
+        r"""torch[-_]tensorrt\[[^]]*executorch[^]]*\]|torch_tensorrt\*\.whl"""
+    )
+    missing = []
+    for name in tracked:
+        if not name or not name.endswith(
+            (".py", ".sh", ".md", ".yml", ".yaml", ".rst", ".txt")
+        ):
+            continue
+        # This file states the rule; it is not itself an instruction.
+        if name == "tests/py/dynamo/executorch/test_executorch_pin.py":
+            continue
+        # docs/ is Sphinx output committed to the tree. Its sources live in docsrc/, which is
+        # where a correction has to go, so flagging the generated copy sends the fix to a file
+        # the next docs build overwrites.
+        if name.startswith("docs/"):
+            continue
+        path = REPO_ROOT / name
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for match in extra.finditer(text):
+            # The instruction is the pip invocation, so bound the window at the surrounding
+            # blank-line-separated block rather than guessing a fixed number of lines.
+            start = text.rfind("\n\n", 0, match.start()) + 1
+            end = text.find("\n\n", match.end())
+            block = text[start : end if end != -1 else len(text)]
+            if "download.pytorch.org/whl/nightly" not in block:
+                line = text.count("\n", 0, match.start()) + 1
+                missing.append(f"{name}:{line}")
+
+    assert not missing, (
+        "these ExecuTorch install instructions do not name the nightly channel, so they "
+        f"resolve no ExecuTorch at all: {missing}"
+    )
+
+
+@pytest.mark.unit
+def test_the_pin_check_runs_in_ci():
+    """This file has to be invoked by something, or its assertions never execute.
+
+    Two suites deselect it by name so it does not need an installed ExecuTorch on a GPU runner,
+    which leaves the lint job as the only path that runs it. Deleting that step is invisible
+    otherwise: every test here still passes locally while nothing runs them in CI.
+    """
+    workflow = (REPO_ROOT / ".github/workflows/linter.yml").read_text(encoding="utf-8")
+    assert (
+        "test_executorch_pin.py" in workflow
+    ), "no CI job invokes this file, so nothing here runs on a pull request"
+    # And it needs pytest, which neither requirements.txt nor dependency-groups.lint provides.
+    # Without this the step exits 1 on "No module named pytest" before running any assertion.
+    assert re.search(
+        r"uv pip install --system[^\n]*\bpytest\b", workflow
+    ), "the job that runs this file does not install pytest, so the step cannot execute"
+    assert re.search(
+        r"uv pip install --system[^\n]*\bpyyaml\b", workflow
+    ), "the job that runs this file does not install pyyaml, which _pinned_versions() shells out to"
