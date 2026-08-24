@@ -372,22 +372,29 @@ class _RuntimeConfigContextManager:
         self._saved: Dict[Any, RuntimeSettings] = {}
 
     def __enter__(self) -> Union["torch.nn.Module", Tuple["torch.nn.Module", ...]]:
-        # Deferred import to avoid a circular dependency at module-load time.
-        from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
-            TorchTensorRTModule,
-        )
+        # Drain the traversal before mutating; raise on unsupported engines
+        # before any settings are changed.
+        engines = list(_iter_trt_engines(list(self._targets)))
 
-        for target in self._targets:
-            for _, mod in target.named_modules():
-                if isinstance(mod, TorchTensorRTModule) and mod.engine is not None:
-                    current = mod.runtime_settings
-                    if mod in self._saved:
-                        # The same TRTModule appears under multiple targets in the
-                        # list (or the tree contains a cycle). Don't snapshot twice.
-                        continue
-                    self._saved[mod] = current
-                    merged = current.merge(**self._overrides)
-                    mod.runtime_settings = merged
+        module_less = [(owner, eng) for owner, eng in engines if owner is None]
+        if module_less:
+            raise TypeError(
+                f"runtime_config() encountered {len(module_less)} module-less "
+                "TRT engine(s) that it cannot snapshot and restore on exit. "
+                "Use apply_runtime_settings() for engines loaded without a "
+                "TorchTensorRTModule (e.g. via torch_tensorrt.load())."
+            )
+
+        for owner, _ in engines:
+            if owner in self._saved:
+                # The same TRTModule appears under multiple targets in the
+                # list (or the tree contains a cycle). Don't snapshot twice.
+                continue
+            current = owner.runtime_settings
+            self._saved[owner] = current
+            merged = current.merge(**self._overrides)
+            owner.runtime_settings = merged
+
         return self._targets if self._yield_tuple else self._targets[0]
 
     def __exit__(self, *args: Any) -> None:
