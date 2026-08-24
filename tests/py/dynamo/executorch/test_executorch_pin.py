@@ -204,6 +204,8 @@ def _expected(path: str, number: int, version: str) -> str:
 # The bazel repositories annotate their pinned commit with the wheel it corresponds to, in a
 # comment, because bazel fetches by commit and has no requirement string to carry. Those are the
 # only comment sites that count as pins, and the commit beside them is checked separately.
+_PUBLISHED_NIGHTLY_CHANNELS = frozenset({"cu124", "cu126", "cu128", "cu130", "cu132"})
+
 _ANNOTATED_COMMIT_SITES = frozenset(
     {
         "MODULE.bazel",
@@ -668,8 +670,13 @@ def test_every_printed_install_instruction_names_the_nightly_channel():
     # Two shapes need the channel: an instruction naming the [executorch] extra, and the CI
     # install of a locally built torch-tensorrt wheel, whose ExecuTorch dependency resolves from
     # the same index. The second is the site that regressed most often and carries no extra.
+    # The local-path spelling counts too. Matching only the named-distribution form left the four
+    # sites that write "pip install .[executorch]" unguarded: the nightly index could be deleted
+    # from all four with this test green.
     extra = re.compile(
-        r"""torch[-_]tensorrt\[[^]]*executorch[^]]*\]|torch_tensorrt\*\.whl"""
+        r"""torch[-_]tensorrt\[[^]]*executorch[^]]*\]"""
+        r"""|(?<![\w./-])\.\[[^]]*executorch[^]]*\]"""
+        r"""|torch_tensorrt\*\.whl"""
     )
     missing = []
     for name in tracked:
@@ -695,9 +702,23 @@ def test_every_printed_install_instruction_names_the_nightly_channel():
             start = text.rfind("\n\n", 0, match.start()) + 1
             end = text.find("\n\n", match.end())
             block = text[start : end if end != -1 else len(text)]
-            if "download.pytorch.org/whl/nightly" not in block:
-                line = text.count("\n", 0, match.start()) + 1
-                missing.append(f"{name}:{line}")
+            line = text.count("\n", 0, match.start()) + 1
+            channel = re.search(
+                r"download\.pytorch\.org/whl/nightly(?:/(cu\d+))?", block
+            )
+            if not channel:
+                missing.append(f"{name}:{line} names no nightly channel")
+                continue
+            # A substring proves a string sits nearby, not that it resolves anything. Rewriting
+            # every channel in the tree to a nonexistent cu999 left this green. Not compared
+            # against __cuda_version__: five sites legitimately say cu130 while the pin says 13.2,
+            # and the index really does carry the pinned ExecuTorch under both.
+            suffix = channel.group(1)
+            if suffix and suffix not in _PUBLISHED_NIGHTLY_CHANNELS:
+                missing.append(
+                    f"{name}:{line} installs from nightly/{suffix}, which the project does not "
+                    f"publish for; expected one of {sorted(_PUBLISHED_NIGHTLY_CHANNELS)}"
+                )
 
     assert not missing, (
         "these ExecuTorch install instructions do not name the nightly channel, so they "
