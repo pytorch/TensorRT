@@ -27,6 +27,8 @@ Functions
 
 .. autofunction:: enable_output_allocator
 
+.. autofunction:: apply_runtime_settings
+
 Runtime backend
 ---------------
 

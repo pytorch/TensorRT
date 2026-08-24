@@ -14,6 +14,7 @@ from torch_tensorrt.runtime._pre_allocated_outputs import enable_pre_allocated_o
 from torch_tensorrt.runtime._runtime_cache import RuntimeCache, runtime_cache
 from torch_tensorrt.runtime._runtime_config import (
     RuntimeSettings,
+    apply_runtime_settings,
     runtime_config,
     set_dynamic_shapes_kernel_strategy,
 )
