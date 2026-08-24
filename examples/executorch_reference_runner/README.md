@@ -98,8 +98,12 @@ build-executorch-reference-runner/lib/libexecutorch_trt_backend.a
 Install the complete prebuilt Python runtime and delegate:
 
 ```bash
-pip install "torch-tensorrt[executorch]"
+pip install "torch-tensorrt[executorch]" \
+  --extra-index-url https://download.pytorch.org/whl/nightly/cu130
 ```
+
+The index is required, not optional: the extra's ExecuTorch floor names a dev build, and PyPI's
+`executorch` stops below it, so without the nightly channel pip reports no matching distribution.
 
 Load and run the model without an ExecuTorch checkout or native build:
 
@@ -109,9 +113,11 @@ python examples/executorch_reference_runner/load_model.py \
   --num_runs=1
 ```
 
-The extra installs `executorch` and the matching
-`torch-tensorrt-executorch-runtime` wheel. That wheel contains an ExecuTorch
-Python runtime with `TensorRTBackend` linked into its backend registry.
+The extra installs `executorch` only. The
+`torch-tensorrt-executorch-runtime` requirement in the top-level `setup.py` is
+commented out until that wheel is published to the PyTorch index, so install it
+separately for now. That wheel contains an ExecuTorch Python runtime with
+`TensorRTBackend` linked into its backend registry.
 
 ### C++
 

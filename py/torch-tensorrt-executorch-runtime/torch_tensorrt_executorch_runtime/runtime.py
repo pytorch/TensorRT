@@ -15,7 +15,8 @@ def _get_runtime() -> _Runtime:
     except ImportError as error:
         raise ImportError(
             "ExecuTorch Python inference requires the prebuilt delegate. "
-            'Install it with: pip install "torch-tensorrt[executorch]"'
+            'Install it with: pip install "torch-tensorrt[executorch]" '
+            "--extra-index-url https://download.pytorch.org/whl/nightly/cu130"
         ) from error
     return get_runtime()
 

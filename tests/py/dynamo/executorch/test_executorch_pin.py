@@ -18,8 +18,10 @@ commit named two different ExecuTorch trees.
 import ast
 import os
 import re
+import shlex
 import subprocess
 import sys
+from collections import Counter
 from pathlib import Path
 
 import pytest
@@ -61,21 +63,60 @@ RANGE_SITES: frozenset[str] = frozenset()
 # with the path.
 USER_WORKFLOW_MARKER = "verify the end user's workflow"
 
-# The files expected to pin ExecuTorch to a version, excluding dev_dep_versions.yml itself.
-# Asserted as a set of files rather than a line count because a site that loses its version stops
-# matching the search rather than reporting a mismatch, and because the line count legitimately
-# differs between this branch and the stacked runtime-wheel change.
-_EXPECTED_REQUIREMENT_FILES = {
-    ".github/workflows/executorch-build-linux.yml",
-    ".github/workflows/executorch-test-linux.yml",
-    "MODULE.bazel",
-    "docker/MODULE.bazel.docker",
-    "docker/MODULE.bazel.ngc",
-    "justfile",
-    "py/torch-tensorrt-executorch-runtime/README.md",
-    "py/torch-tensorrt-executorch-runtime/pyproject.toml",
-    "toolchains/ci_workspaces/MODULE.bazel.tmpl",
+# The files expected to pin ExecuTorch, mapped to how many sites each must carry, excluding
+# dev_dep_versions.yml itself. A count per file rather than just the set of files, because a site
+# that loses its version stops matching the search entirely rather than reporting a mismatch, and
+# two of these files carry more than one site, so a set of paths let either quietly drop one. A
+# minimum rather than an exact count, since the stacked runtime-wheel change removes one README
+# site and an exact count could not hold on both branches.
+_EXPECTED_REQUIREMENT_SITES = {
+    ".github/workflows/executorch-build-linux.yml": 2,
+    ".github/workflows/executorch-test-linux.yml": 1,
+    "MODULE.bazel": 1,
+    "docker/MODULE.bazel.docker": 1,
+    "docker/MODULE.bazel.ngc": 1,
+    "justfile": 1,
+    "py/torch-tensorrt-executorch-runtime/README.md": 1,
+    "py/torch-tensorrt-executorch-runtime/pyproject.toml": 1,
+    "toolchains/ci_workspaces/MODULE.bazel.tmpl": 1,
 }
+
+# Same idea for the source commit the delegate compiles from. Five sites, not four: the
+# reference-runner README names the ref as a shell default, which the old nonzero check could
+# not distinguish from the four MODULE.bazel files.
+_EXPECTED_COMMIT_SITES = {
+    "MODULE.bazel": 1,
+    "docker/MODULE.bazel.docker": 1,
+    "docker/MODULE.bazel.ngc": 1,
+    "toolchains/ci_workspaces/MODULE.bazel.tmpl": 1,
+    "examples/executorch_reference_runner/README.md": 1,
+}
+
+
+def _assert_every_site_present(
+    seen: "Counter[str]", expected: dict[str, int], what: str
+) -> None:
+    """Require every expected file to still carry at least its expected number of sites.
+
+    A site that drops its version or commit stops matching the search rather than reporting a
+    mismatch, so counting is the only way to notice it left.
+    """
+    short = {
+        path: (count, seen.get(path, 0))
+        for path, count in expected.items()
+        if seen.get(path, 0) < count
+    }
+    unexpected = sorted(set(seen) - set(expected))
+    assert not short and not unexpected, (
+        f"the set of sites {what} changed.\n"
+        + "".join(
+            f"  {path} carries {actual} of {want} expected sites\n"
+            for path, (want, actual) in sorted(short.items())
+        )
+        + "".join(f"  {path} is new and unaccounted for\n" for path in unexpected)
+        + "A site that lost its pin does not appear in the search at all, so look for one that "
+        "now names a bare reference before updating the expected counts."
+    )
 
 
 def _git(*arguments: str) -> str:
@@ -131,7 +172,7 @@ def test_every_requirement_matches_the_pin() -> None:
 
     wrong = []
     found = 0
-    seen = set()
+    seen: Counter[str] = Counter()
     for line in _git(
         "grep", "-nI", "-E", r"executorch ?(===|==|>=|<=|~=|!=|<|>) ?[0-9]"
     ).splitlines():
@@ -141,20 +182,12 @@ def test_every_requirement_matches_the_pin() -> None:
         expected = _expected(path, int(number), version)
         for actual in REQUIREMENT.findall(text):
             found += 1
-            seen.add(path)
+            seen[path] += 1
             if actual != expected:
                 wrong.append(f"{path}:{number} has {actual}, expected {expected}")
 
     assert found, "no ExecuTorch requirement found, so this test is not looking"
-    # The set of files, not just "nonzero": a site that drops its version entirely stops matching
-    # the search and silently leaves the result set, which is exactly how a lost pin would look.
-    assert seen == _EXPECTED_REQUIREMENT_FILES, (
-        "the set of files pinning ExecuTorch changed.\n"
-        f"  no longer pinning: {sorted(_EXPECTED_REQUIREMENT_FILES - seen)}\n"
-        f"  newly pinning:     {sorted(seen - _EXPECTED_REQUIREMENT_FILES)}\n"
-        "A file that lost its version does not appear in the search at all, so check for one "
-        "that now names bare `executorch` before updating the expected set."
-    )
+    _assert_every_site_present(seen, _EXPECTED_REQUIREMENT_SITES, "pinning ExecuTorch")
     assert not wrong, "\n  ".join(["", *wrong])
 
 
@@ -217,6 +250,29 @@ def test_derived_requirements_match_the_pin() -> None:
         f"executorch>={version},<{major}.{int(minor) + 1}; platform_system == 'Linux'"
     )
     assert _runner_requirement(REPO_ROOT) == f"executorch=={version}"
+
+    # docgen builds its overlay with a shell substitution, so neither the literal search nor the
+    # two helpers above can see it: `$(` is not a digit. Run the command it embeds and compare
+    # what it prints, which fails if the line is deleted or the key is renamed.
+    workflow = (REPO_ROOT / ".github/workflows/docgen.yml").read_text(encoding="utf-8")
+    embedded = re.search(r'"executorch==\$\((python3 -c \'[^\']+\')\)"', workflow)
+    assert embedded, (
+        ".github/workflows/docgen.yml no longer pins ExecuTorch alongside the extra. It installs "
+        "with --pre from the nightly channel, so without the pin it resolves through the range "
+        "and takes whichever dev build is newest that day."
+    )
+    printed = subprocess.run(
+        # The interpreter running the test, not the workflow's bare `python3`, which need not
+        # have pyyaml here. The argument list is the workflow's own.
+        [sys.executable, *shlex.split(embedded.group(1))[1:]],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    assert (
+        printed == version
+    ), f"docgen would install executorch=={printed}, pin says {version}"
 
 
 def test_the_runner_follows_the_row_s_cuda_version(monkeypatch) -> None:
@@ -331,10 +387,11 @@ def test_every_source_commit_matches_the_pin() -> None:
 
     wrong = []
     found = 0
-    seen = set()
+    seen: Counter[str] = Counter()
     for path in _git("grep", "-lI", "-E", 'name = "executorch"').split():
         for match in BAZEL_COMMIT.finditer((REPO_ROOT / path).read_text()):
             found += 1
+            seen[path] += 1
             if match.group(1) != commit:
                 wrong.append(f"{path} compiles {match.group(1)}")
 
@@ -344,8 +401,10 @@ def test_every_source_commit_matches_the_pin() -> None:
             continue
         for actual in NAMED_COMMIT.findall(text):
             found += 1
+            seen[path] += 1
             if actual != commit:
                 wrong.append(f"{path}:{number} uses {actual}")
 
     assert found, "no ExecuTorch source commit found, so this test is not looking"
+    _assert_every_site_present(seen, _EXPECTED_COMMIT_SITES, "naming the source commit")
     assert not wrong, f"pin says {commit}:\n  " + "\n  ".join(wrong)
