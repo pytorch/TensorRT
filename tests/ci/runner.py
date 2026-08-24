@@ -220,7 +220,18 @@ def run_suite(
             print(f"==> setup[{step}]: {shlex.join(argv)}", flush=True)
             rc = subprocess.run(argv, cwd=scwd, env=env).returncode
             if rc != 0:
-                print(f"::warning::setup step {step!r} exited {rc}", flush=True)
+                # Fail rather than warn and continue. Most of the executorch suite gates on
+                # pytest.importorskip, so a failed install skips those files, leaves the rest
+                # passing, and reports success with a populated junit xml -- the run looks green
+                # precisely when the thing it exists to test is absent. This matters more now
+                # that the ExecuTorch pin names a nightly build, which is pruned from the
+                # channel eventually; when that happens this has to be loud.
+                print(
+                    f"::error::setup step {step!r} exited {rc}, so the suite cannot test what "
+                    "it was asked to test",
+                    flush=True,
+                )
+                return rc
 
     print(f"==> {suite.name} [{variant}]: {shlex.join(pytest_cmd)}", flush=True)
     rc = subprocess.run(pytest_cmd, cwd=cwd, env=env).returncode
