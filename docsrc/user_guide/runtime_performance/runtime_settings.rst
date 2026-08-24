@@ -29,8 +29,8 @@ emits a ``UserWarning``.
 
 ----
 
-The three ways to apply settings
---------------------------------
+The four ways to apply settings
+-------------------------------
 
 Direct assignment — permanent
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -135,6 +135,57 @@ Stream-mode behavior:
 * On enter: ``stream.read()`` once, bytes deserialized into the cache.
 * On exit: cache serialized, ``stream.write(bytes)`` once.
 * ``rc.path`` reports ``""`` in stream-mode.
+
+``apply_runtime_settings(...)`` — permanent apply for AOT artifacts
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Engines loaded with :func:`torch_tensorrt.load` have no
+:class:`TorchTensorRTModule`.  :func:`~torch_tensorrt.runtime.runtime_config`
+and :func:`~torch_tensorrt.runtime.runtime_cache` cannot restore settings on
+exit for such engines (there is no getter on the torchbind engine) and will
+raise if they encounter one.  Use the permanent-apply entry point instead:
+
+.. code-block:: python
+
+    import torch_tensorrt
+    from torch_tensorrt.runtime import RuntimeCache, RuntimeSettings, apply_runtime_settings
+
+    ep = torch_tensorrt.load("model.ep")
+    gm = ep.module()
+
+    cache = RuntimeCache(path="/var/cache/jit.bin")
+    cache.load()  # warm from disk if it exists
+
+    n = apply_runtime_settings(
+        gm,
+        RuntimeSettings(
+            cuda_graph_strategy="whole_graph_capture",
+            runtime_cache=cache,
+        ),
+    )
+    print(f"Applied to {n} engine(s)")
+    out = gm(x)
+    cache.save()  # persist newly JIT'd kernels
+
+**Ownership rule:** ``settings.runtime_cache`` must be ``None`` or a
+:class:`RuntimeCache` you own -- a path string raises ``TypeError`` because
+there is no module to build and save the handle.  If you call
+``apply_runtime_settings(gm, RuntimeSettings())`` (the default
+``runtime_cache`` is a path string), you will hit this error.
+Pass ``runtime_cache=None`` or a :class:`RuntimeCache`.
+
+:func:`apply_runtime_settings` also accepts a :class:`~torch.export.ExportedProgram`
+directly (the :func:`torch_tensorrt.load` return value), which is equivalent to
+passing ``ep.module()``:
+
+.. code-block:: python
+
+    apply_runtime_settings(ep, RuntimeSettings(runtime_cache=cache))
+
+.. note::
+
+   Runtime settings are never serialized.  They do not survive
+   :func:`torch_tensorrt.save`; re-apply after each :func:`torch_tensorrt.load`.
 
 ----
 
@@ -431,3 +482,5 @@ Quick reference
      - ``RuntimeSettings(runtime_cache=None)`` or ``runtime_cache(mod, "")``
    * - Non-cuda-graph settings alongside cudagraphs capture
      - nest ``runtime_config(...)`` *outside* ``enable_cudagraphs(...)``
+   * - Set a runtime knob on a loaded artifact (no module)
+     - ``apply_runtime_settings(gm_or_ep, RuntimeSettings(...))``
