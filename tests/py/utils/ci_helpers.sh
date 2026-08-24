@@ -160,7 +160,9 @@ trt_tier_l2_dynamo_core() {
 
 trt_tier_executorch() {
     # The pin checks are excluded here because the lint workflow already runs them on a CPU
-    # runner; this tier needs a GPU and a built wheel, which they do not.
+    # runner; this tier needs a GPU and a built wheel, which they do not. The one exception is
+    # kept by name: it compares the pinned commit against the installed wheel's own recorded
+    # source, so it needs an ExecuTorch the lint runner does not have and skips everywhere else.
     ( cd "${TRT_REPO_ROOT}/tests/py/dynamo"
       _trt_py -m pytest -ra $(_trt_nproc auto) --junitxml="$(_trt_xml executorch_tests_results)" -k "not test_executorch_pin or test_the_pinned_commit_is_the_pinned_wheels_own_source" executorch/ "$@" )
 }

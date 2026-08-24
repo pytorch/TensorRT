@@ -17,6 +17,7 @@ commit named two different ExecuTorch trees.
 
 import ast
 import os
+import pathlib
 import re
 import shlex
 import subprocess
@@ -34,9 +35,36 @@ VERSIONS = REPO_ROOT / "dev_dep_versions.yml"
 # that drifted from the pin, and it should be visible to the search rather than silently
 # exempt. Operators are named through the pattern rather than spelled out in prose here,
 # because the search below reads this file too and an example would read as such a site.
+# The whole specifier set, not just its first clause. Capturing up to the first comma compared
+# equal on "executorch==PIN,!=PIN", a specifier that excludes the very version it appears to pin,
+# and rejected the legal PEP 508 spelling with spaces around the operator.
 REQUIREMENT = re.compile(
-    r"executorch\s*(?:===|==|>=|<=|~=|!=|<|>)\s*[0-9][^\"'\s,`]*(?:,\s*<[0-9.]+)?"
+    r"executorch\s*(?:===|==|>=|<=|~=|!=|<|>)\s*[^\"'\s`,]+"
+    r"(?:\s*,\s*(?:===|==|>=|<=|~=|!=|<|>)\s*[^\"'\s`,]+)*"
 )
+
+
+def _requirement_disagrees(actual: str, expected: str, version: str) -> str:
+    """Why ``actual`` is not the pinned requirement, or an empty string if it is.
+
+    Compares parsed specifier sets rather than matched text. Raw text equality could not see a
+    clause the pattern did not capture, and treated whitespace the specification allows as drift.
+    """
+    from packaging.requirements import InvalidRequirement, Requirement
+
+    try:
+        parsed = Requirement(actual)
+        wanted = Requirement(expected)
+    except InvalidRequirement as error:
+        return f"which is not a valid requirement ({error})"
+    if parsed.name != wanted.name:
+        return f"which names {parsed.name}, not {wanted.name}"
+    if not parsed.specifier.contains(version, prereleases=True):
+        return f"whose specifier excludes the pinned {version}"
+    if set(parsed.specifier) != set(wanted.specifier):
+        return f"expected {expected}"
+    return ""
+
 
 # The bazel repository puts the commit on its own line, so this one has to run against file
 # contents rather than a git grep line.
@@ -173,6 +201,34 @@ def _expected(path: str, number: int, version: str) -> str:
     return f"executorch>={version},<{major}.{int(minor) + 1}{marker}"
 
 
+# The bazel repositories annotate their pinned commit with the wheel it corresponds to, in a
+# comment, because bazel fetches by commit and has no requirement string to carry. Those are the
+# only comment sites that count as pins, and the commit beside them is checked separately.
+_ANNOTATED_COMMIT_SITES = frozenset(
+    {
+        "MODULE.bazel",
+        "docker/MODULE.bazel.docker",
+        "docker/MODULE.bazel.ngc",
+        "toolchains/ci_workspaces/MODULE.bazel.tmpl",
+    }
+)
+
+
+def _is_commented_out(path: str, text: str) -> bool:
+    """Whether this requirement sits in a comment rather than in live configuration.
+
+    A comment is not a pin: a site could be gutted to a bare ``executorch`` while the exact pin
+    lived on in a comment in the same file, which kept the per-file minimum satisfied and left the
+    real requirement unpinned.
+    """
+    if path in _ANNOTATED_COMMIT_SITES:
+        return False
+    stripped = text.strip()
+    if path.endswith((".md", ".rst", ".txt")):
+        return False
+    return stripped.startswith(("#", "//", "/*", "*"))
+
+
 def test_every_requirement_matches_the_pin() -> None:
     version = _versions()["__executorch_version__"]
 
@@ -185,12 +241,18 @@ def test_every_requirement_matches_the_pin() -> None:
         path, number, text = line.split(":", 2)
         if path == VERSIONS.name:
             continue
+        if _is_commented_out(path, text):
+            # A comment is not a pin. Counting raw matches meant a site could be gutted to a bare
+            # "executorch" while the exact pin lived on in a comment in the same file, keeping the
+            # per-file minimum satisfied.
+            continue
         expected = _expected(path, int(number), version)
         for actual in REQUIREMENT.findall(text):
             found += 1
             seen[path] += 1
-            if actual != expected:
-                wrong.append(f"{path}:{number} has {actual}, expected {expected}")
+            reason = _requirement_disagrees(actual, expected, version)
+            if reason:
+                wrong.append(f"{path}:{number} has {actual}, {reason}")
 
     assert found, "no ExecuTorch requirement found, so this test is not looking"
     _assert_every_site_present(seen, _EXPECTED_REQUIREMENT_SITES, "pinning ExecuTorch")
@@ -607,36 +669,118 @@ def test_the_pin_check_runs_in_ci():
     which leaves the lint job as the only path that runs it. Deleting that step is invisible
     otherwise: every test here still passes locally while nothing runs them in CI.
     """
-    workflow = (REPO_ROOT / ".github/workflows/linter.yml").read_text(encoding="utf-8")
+    # Parse the workflow and assert inside the owning job. Searching the file as one blob could
+    # not tell which job it was reading, so an identical install line in a sibling job that has no
+    # pin check satisfied it, and deleting the real one stayed green. A commented-out step also
+    # vanishes from the parse, where a text search still finds it.
+    import yaml
+
+    workflow = yaml.safe_load(
+        (REPO_ROOT / ".github/workflows/linter.yml").read_text(encoding="utf-8")
+    )
+    # Match a live pytest invocation, not the filename anywhere in the script. Neutralising the
+    # command and leaving it in a shell comment satisfied a plain substring test.
+    invocation = re.compile(
+        rf"^\s*[^#\n]*\bpytest\b[^\n]*{re.escape(pathlib.Path(__file__).name)}",
+        re.MULTILINE,
+    )
+    owning = [
+        (name, job, step)
+        for name, job in workflow["jobs"].items()
+        for step in job.get("steps", [])
+        if invocation.search(step.get("run") or "")
+    ]
+    assert owning, "no CI job invokes this file, so nothing here runs on a pull request"
+    name, job, step = owning[0]
+
+    # A falsy condition disables the step while leaving every string in place.
+    condition = str(step.get("if", "always()"))
+    assert condition in {
+        "always()",
+        "success()",
+        "success() || failure()",
+    }, f"the pin check in {name} runs under {condition!r}, which may never be true"
     assert (
-        "test_executorch_pin.py" in workflow
-    ), "no CI job invokes this file, so nothing here runs on a pull request"
-    # And it needs pytest, which neither requirements.txt nor dependency-groups.lint provides.
-    # Without this the step exits 1 on "No module named pytest" before running any assertion.
-    assert re.search(
-        r"uv pip install --system[^\n]*\bpytest\b", workflow
-    ), "the job that runs this file does not install pytest, so the step cannot execute"
-    assert re.search(
-        r"uv pip install --system[^\n]*\bpyyaml\b", workflow
-    ), "the job that runs this file does not install pyyaml, which _pinned_versions() shells out to"
+        "--collect-only" not in step["run"]
+    ), f"the pin check in {name} only collects tests, so no assertion executes"
+
+    # pytest and pyyaml must be installed by an earlier step of the SAME job: neither
+    # requirements.txt nor dependency-groups.lint carries them, and without them the step exits 1
+    # on "No module named pytest" before running any assertion.
+    steps = job["steps"]
+    earlier = "\n".join(s.get("run") or "" for s in steps[: steps.index(step)])
+    for package in ("pytest", "pyyaml"):
+        assert re.search(
+            rf"uv pip install --system[^\n]*\b{package}\b", earlier
+        ), f"job {name} does not install {package} before the pin check, so the step cannot run"
 
 
 @pytest.mark.unit
 def test_the_pairing_check_survives_the_gpu_lane_deselection() -> None:
     """The one test here that needs a real ExecuTorch must not be deselected with the rest.
 
-    Every other test in this file is a source-consistency check, so the GPU lane deselects the
-    whole module by name to avoid paying for them twice. ``-k`` matches the module name in the
+    Every other test in this file is a source-consistency check, so the executorch tier deselects
+    the whole module by name to avoid paying for them twice. ``-k`` matches the module name in the
     test id, so a bare ``not test_executorch_pin`` drops the pairing check too, and that check
-    only means anything where ExecuTorch is installed. It was silently unreachable: it skips
-    when the wheel is not the pinned one, which is every environment except this lane.
+    only means anything where ExecuTorch is installed, which is nowhere the lint job runs.
+
+    Two routes reach this tier: the nightly manifest suite in ``tests/ci/suites.py``, and
+    ``executorch-test-linux.yml``, which installs the pinned wheel and runs on pull requests once
+    the runtime build succeeds. Both go through one of the two keyword expressions checked here.
     """
-    for path in ("tests/ci/suites.py", "tests/py/utils/ci_helpers.sh"):
+    # Run pytest's own collection under each expression rather than grepping for the name. A
+    # string test passes on "and" in place of "or", which collects nothing at all, and on the
+    # name surviving only in a comment. Both leave the pairing check unreachable.
+    module = pathlib.Path(__file__).name
+    for path, pattern in (
+        ("tests/ci/suites.py", r'keyword=\(\s*(?:#[^\n]*\n\s*)*"([^"]+)"'),
+        # Anchored on the executorch junitxml name, because the file passes -k in several
+        # functions and the first match belongs to a different tier.
+        (
+            "tests/py/utils/ci_helpers.sh",
+            r'executorch_tests_results[^\n]*?-k "([^"]+)"',
+        ),
+    ):
         text = (REPO_ROOT / path).read_text(encoding="utf-8")
+        found = re.search(pattern, text)
         assert (
-            "not test_executorch_pin" in text
-        ), f"{path} no longer deselects this module"
-        assert PAIRING_TEST in text, (
-            f"{path} deselects the whole module without keeping {PAIRING_TEST}, so the only "
-            "check that needs a real ExecuTorch installed runs nowhere"
+            found
+        ), f"{path} no longer passes a single -k expression this test can read"
+        keyword = found.group(1)
+        assert "not test_executorch_pin" in keyword, (
+            f"{path} no longer deselects this module, so the source-consistency checks here "
+            "would run twice"
+        )
+        selected = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "pytest",
+                str(pathlib.Path(__file__).parent),
+                "--collect-only",
+                "-q",
+                "--noconftest",
+                "-p",
+                "no:cacheprovider",
+                "-o",
+                "addopts=",
+                "-k",
+                keyword,
+            ],
+            capture_output=True,
+            text=True,
+            cwd=REPO_ROOT,
+        ).stdout
+        assert f"{module}::{PAIRING_TEST}" in selected, (
+            f"{path} runs pytest with -k {keyword!r}, which does not select {PAIRING_TEST}, so "
+            "the only check that needs a real ExecuTorch installed runs nowhere"
+        )
+        others = [
+            line
+            for line in selected.splitlines()
+            if module in line and PAIRING_TEST not in line
+        ]
+        assert not others, (
+            f"{path} selects {len(others)} other tests from this module, which the lane "
+            f"deselects deliberately: {others[:2]}"
         )
