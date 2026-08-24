@@ -1148,6 +1148,9 @@ def save(
             # whichever exporter produced the program. aot_inductor is left
             # undeclared: whether an aliased in-place mutation survives
             # functionalization under inductor is unverified.
+            #
+            # Copy-back is gated per-branch below: the legacy exporter declares it
+            # itself and consumes the trailing values while doing so.
             if not retrace:
                 from torch_tensorrt.dynamo._exporter import export
 
@@ -1172,6 +1175,22 @@ def save(
                 from torch_tensorrt.dynamo._exporter import (
                     _declare_aliased_kv_mutations_on_ep,
                 )
+
+                # On this path the legacy exporter is what declares copy-back, except
+                # under output_format="executorch", where torch_tensorrt.executorch
+                # .export() declares it for whatever source shape it is handed. The
+                # remaining combination leaves it undeclared.
+                if (
+                    not _use_legacy
+                    and output_format != "executorch"
+                    and module.meta.get("_copyback_mutation_buffers")
+                ):
+                    logger.warning(
+                        "Module has non-KV mutable buffer(s) needing copy-back, but "
+                        "retrace=False with use_legacy_exporter=False does not declare "
+                        "them. The saved program's signature will not reflect those "
+                        "updates. Use the legacy exporter, or retrace=True."
+                    )
 
                 if output_format == "exported_program":
                     # Must precede normalization, which rewrites the engine constants
@@ -1235,6 +1254,7 @@ def save(
                     if node.op == "placeholder" and "val" in node.meta
                     for dim in getattr(node.meta["val"], "shape", [])
                 )
+                _use_legacy = False
                 if has_symbolic_metadata and dynamic_shapes is not None:
                     from torch_tensorrt.dynamo._exporter import export
 
@@ -1283,6 +1303,16 @@ def save(
                     _declare_aliased_kv_mutations_on_ep,
                 )
 
+                # create_trt_exp_program already declares the copy-back mutations and
+                # consumes their trailing outputs, so what trails the graph on that path
+                # is a genuine user output. Only the torch.export paths leave the values
+                # to be reclassified.
+                _copyback_bufs = (
+                    []
+                    if _use_legacy
+                    else module.meta.get("_copyback_mutation_buffers", [])
+                )
+
                 if output_format == "aot_inductor" and any(
                     getattr(sub, "aliased_io", None)
                     for _sub_name, sub in module.named_modules()
@@ -1297,7 +1327,9 @@ def save(
                 if output_format == "exported_program":
                     # Must precede normalization, which rewrites the engine constants
                     # this pass reads aliased_io from.
-                    exp_program = _declare_aliased_kv_mutations_on_ep(exp_program)
+                    exp_program = _declare_aliased_kv_mutations_on_ep(
+                        exp_program, copyback_buffers=_copyback_bufs
+                    )
                     _normalize_engine_constants_to_python(exp_program)
                     function_overload_with_kwargs(
                         torch.export.save,
@@ -1318,7 +1350,9 @@ def save(
                         package_path=file_path,
                     )
                 elif output_format == "executorch":
-                    exp_program = _declare_aliased_kv_mutations_on_ep(exp_program)
+                    exp_program = _declare_aliased_kv_mutations_on_ep(
+                        exp_program, copyback_buffers=_copyback_bufs
+                    )
                     _save_as_executorch(
                         exp_program,
                         file_path,

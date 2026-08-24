@@ -79,8 +79,8 @@ def _get_engine_info_from_edge_program(edge_program: ExportedProgram) -> List[An
     - no_op_placeholder_for_execute_engine: engine info is embedded directly as
       string args (args[1:]) — used when _replace_execute_engine_for_executorch
       converted the graph before to_edge_transform_and_lower.
-    - execute_engine: engine info is extracted from the ScriptObject via
-      __getstate__() — fallback for graphs not yet converted.
+    - execute_engine: engine info is read off the ScriptObject through
+      :func:`get_engine_info_from_state` — fallback for graphs not yet converted.
 
     Uses schema name comparison (not object identity) so it works for both
     OpOverload and EdgeOpOverload targets.
@@ -91,11 +91,14 @@ def _get_engine_info_from_edge_program(edge_program: ExportedProgram) -> List[An
 
 
 def _get_engine_info_for_node(
-    edge_program: ExportedProgram, node: torch.fx.Node
+    edge_program: ExportedProgram, node: torch.fx.Node, *, metadata_only: bool = False
 ) -> List[Any]:
     # Engine-info extraction for a single TRT node; callable per-partition so a
     # coalesced multi-engine graph can resolve each engine without the
     # whole-program "exactly 1 engine" assumption.
+    #
+    # metadata_only is forwarded verbatim to get_engine_info_from_state; its docstring
+    # states what that flag costs and which slot it leaves unreadable.
     gm = edge_program.graph_module
     name = _schema_name(node.target)
 
@@ -174,8 +177,12 @@ def _get_engine_info_for_node(
             f"'{engine_node.op}'"
         )
 
-    state = engine_obj.__getstate__()
-    return list(state[0] if isinstance(state, tuple) else state)
+    from torch_tensorrt.executorch._export_utils import get_engine_info_from_state
+
+    state: List[Any] = get_engine_info_from_state(
+        engine_obj, metadata_only=metadata_only
+    )
+    return state
 
 
 def _validate_engine_info(engine_info: List[Any]) -> None:

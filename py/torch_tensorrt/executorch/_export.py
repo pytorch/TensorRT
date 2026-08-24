@@ -122,6 +122,29 @@ def _prepare_graph_module(
     )
 
 
+def _copyback_buffers_by_method(
+    source: Any, method_names: tuple[str, ...]
+) -> dict[str, list[str]]:
+    """Per-method copy-back buffer names, read from the source's ``meta``.
+
+    ``compile()`` records the flattened names of the non-KV mutable buffers that
+    need a write-back copy in ``gm.meta["_copyback_mutation_buffers"]``.
+    """
+
+    def _names(obj: Any) -> list[str]:
+        gm = (
+            obj
+            if isinstance(obj, torch.fx.GraphModule)
+            else getattr(obj, "graph_module", None)
+        )
+        meta = getattr(gm, "meta", {}) or {}
+        return list(meta.get("_copyback_mutation_buffers", []) or [])
+
+    if isinstance(source, Mapping):
+        return {name: _names(source[name]) for name in method_names}
+    return {method_names[0]: _names(source)}
+
+
 def _prepare_programs(
     source: ExportedProgram | torch.fx.GraphModule | Mapping[str, ExportedProgram],
     *,
@@ -433,6 +456,7 @@ def export(
 
     import torch_tensorrt.dynamo.runtime.meta_ops.register_meta_ops  # noqa: F401
     from executorch.exir import to_edge_transform_and_lower
+    from torch_tensorrt.dynamo._exporter import _declare_aliased_kv_mutations_on_ep
     from torch_tensorrt.executorch import TensorRTPartitioner, get_edge_compile_config
     from torch_tensorrt.executorch._export_utils import (
         replace_execute_engine,
@@ -448,6 +472,30 @@ def export(
         retrace=retrace,
     )
     program_map = {"forward": programs} if not isinstance(programs, dict) else programs
+    copyback_by_method = _copyback_buffers_by_method(source, method_names)
+    copyback_names = sorted({n for ns in copyback_by_method.values() for n in ns})
+    if copyback_names:
+        # Engine-aliased KV buffers are declared mutated as well, so ExecuTorch
+        # serializes only their shape and dtype too; they are left out of the warning
+        # below on purpose. An aliased write is a cache-position write on the sequence
+        # axis -- the only form IKVCacheUpdateLayer expresses -- and such a model is
+        # assumed to read the cache under that same position, through a bounded slice
+        # or a position mask, so slots no step has written should not reach the
+        # output. Nothing here verifies that; it is a property of the model. On that
+        # assumption initializing a cache buys nothing, and it would cost what is
+        # typically the model's largest tensor, written whole into the .pte.
+        logger.warning(
+            "Copy-back mutable buffer(s) %s are declared mutated, so ExecuTorch "
+            "serializes only their shape and dtype, not their value, unless a pass "
+            'marks them meta["et_init_buffer"]; without that, a buffer read before '
+            "it is written starts from whatever the allocation held. ExecuTorch's "
+            "own warning names InitializedMutableBufferPass for this. That pass "
+            "reads the buffer host-side to serialize it, so it works while the "
+            "buffer is on CPU and segfaults the export, rather than raising, once "
+            "the buffer is CUDA-resident -- which is what exporting the model on "
+            "CUDA leaves behind.",
+            copyback_names,
+        )
     extra_partitioners = _per_method_values(partitioners, method_names, "partitioners")
     _reject_misnamed_partitioners(extra_partitioners)
     method_compile_specs = _per_method_values(
@@ -500,8 +548,25 @@ def export(
     }
     # Zero-engine methods are allowed: later partitioners may claim their ops,
     # or portable operators may remain undelegated.
+
+    # An undeclared copy-back mutation reaches ExecuTorch as a trailing user output that
+    # nothing copies back, and an undeclared engine-aliased KV write does not reach it
+    # at all, since torch.export drops those outputs at the fx boundary. Either way the
+    # buffer loads frozen at its serialized value and never updates. Only the
+    # legacy exporter declares them while building the program, so a retraced program
+    # always needs the declaration and a caller's pre-exported one may or may not; the
+    # pass is idempotent, so every source shape can go through it. It rewrites the
+    # graph's output node in place while returning the rewritten signature on a new
+    # ExportedProgram, so it runs on the staged copy: given the caller's own program it
+    # would leave that program's graph and signature describing different outputs, which
+    # only the ExportedProgram verifier -- reached through save() -- reports. Staging
+    # holds engines and weights by reference, so declaring here costs no extra copy.
     staged_programs = {
-        name: stage_exported_program(program) for name, program in program_map.items()
+        name: _declare_aliased_kv_mutations_on_ep(
+            stage_exported_program(program),
+            copyback_buffers=copyback_by_method.get(name, []),
+        )
+        for name, program in program_map.items()
     }
     rewritten: dict[str, ExportedProgram] = {}
     method_partitioners: dict[str, list[Partitioner]] = {}

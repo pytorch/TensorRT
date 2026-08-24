@@ -42,10 +42,25 @@ ENGINE_BYTES = b"engine-bytes"
 # _TRTEngine.__getstate__ base64-encodes the engine into a str, so that is the shape
 # the rewrite sees in production; raw bytes only come from an in-memory engine info.
 ENGINE_BASE64 = base64.b64encode(ENGINE_BYTES).decode("utf-8")
+# The two copy-back warning tests -- one that the warning fires, one that it stays
+# silent -- both key on this phrase, so a reworded warning cannot leave one of them
+# keyed on text that no message contains.
+COPYBACK_WARNING_ANCHOR = "are declared mutated, so ExecuTorch serializes"
 
 
 class FakeExportedProgram:
-    pass
+    """A program stand-in carrying the graph module and signature ``export()`` reads.
+
+    ``export()`` runs the mutation-declaration pass over every program it is handed, and
+    that pass reads both members. Nothing here is mutated, so the pass finds nothing to
+    declare and hands back the same object.
+    """
+
+    def __init__(self):
+        graph = torch.fx.Graph()
+        graph.output((graph.placeholder("x"),))
+        self.graph_module = torch.fx.GraphModule(torch.nn.Module(), graph)
+        self.graph_signature = SimpleNamespace(inputs_to_buffers={}, output_specs=[])
 
 
 class FakeTensorRTPartitioner:
@@ -1550,6 +1565,66 @@ def test_export_warns_for_multiple_engines(monkeypatch, caplog):
 
     export_module.export(program)
     assert "contains 2 TRT engine calls" in caplog.text
+
+
+@pytest.mark.unit
+def test_export_warns_that_copyback_buffers_load_uninitialized(monkeypatch, caplog):
+    """Declaring a copy-back buffer mutated costs it its serialized initial value, and a
+    model that reads the buffer before writing it needs to know. The warning has to be
+    readable from a terminal with no source in view, so it names the buffers and says
+    what ExecuTorch keeps of them. ExecuTorch's own emitter tells the same user, in the
+    same export, that a pass puts the value back; the warning carries that name only
+    together with the one thing upstream does not say about it -- see below.
+
+    The declaration itself is stubbed out; it has its own coverage in
+    ``test_executorch_export_declares_copyback_for_every_source_shape``, and running it
+    over this stub program would only exercise the stub.
+    """
+    import torch_tensorrt.dynamo._exporter as dynamo_exporter
+
+    program = FakeExportedProgram()
+    program.graph_module.meta["_copyback_mutation_buffers"] = ["conv_state"]
+    export_module, _ = _patch_lowering(monkeypatch)
+    monkeypatch.setattr(
+        dynamo_exporter, "_declare_aliased_kv_mutations_on_ep", lambda ep, **kw: ep
+    )
+
+    export_module.export(program)
+
+    assert "conv_state" in caplog.text
+    assert COPYBACK_WARNING_ANCHOR in caplog.text
+    # The rule is conditional, and saying it unconditionally would be wrong for a
+    # caller who has already supplied the pass: with et_init_buffer set the value is
+    # in the .pte.
+    assert 'unless a pass marks them meta["et_init_buffer"]' in caplog.text
+    assert "starts from whatever the allocation held" in caplog.text
+    # InitializedMutableBufferPass is ExecuTorch's own way to put a mutated buffer's
+    # initial value back, and its emitter names the pass to this same user later in
+    # this same export, saying nothing about where the buffer has to live. The pass
+    # sets et_init_buffer, which makes the emitter serialize the buffer by reading it
+    # host-side through ctypes.cast(spec.storage.data_ptr(), ...); that read segfaults
+    # the process, rather than raising, whenever the buffer is CUDA-resident, which is
+    # what exporting a model on CUDA leaves behind. Withholding the name withholds the
+    # caveat and not the advice, so the name is allowed here -- but only in a message
+    # that carries the caveat with it.
+    naming = [
+        record
+        for record in caplog.records
+        if "InitializedMutableBufferPass" in record.getMessage()
+    ]
+    assert naming
+    for record in naming:
+        assert "segfaults the export" in record.getMessage()
+
+
+@pytest.mark.unit
+def test_export_is_quiet_without_copyback_buffers(monkeypatch, caplog):
+    """Every export would otherwise carry a caveat about a situation it is not in."""
+    export_module, _ = _patch_lowering(monkeypatch)
+
+    export_module.export(FakeExportedProgram())
+
+    assert COPYBACK_WARNING_ANCHOR not in caplog.text
 
 
 @pytest.mark.unit
