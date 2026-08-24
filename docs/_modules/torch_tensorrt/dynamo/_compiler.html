@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=66991156"></script>
+    <script src="../../../_static/documentation_options.js?v=19fba6da"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -521,6 +521,10 @@ document.write(`
     <span class="n">pre_export_lowering</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.lowering._buffer_lifting</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">aliased_input_bindings</span><span class="p">,</span>
+    <span class="n">assert_no_kv_alias_markers_survived</span><span class="p">,</span>
+    <span class="n">assert_predicted_kv_aliased</span><span class="p">,</span>
+    <span class="n">hide_copyback_outputs</span><span class="p">,</span>
     <span class="n">inline_lifted_buffers_into_gm</span><span class="p">,</span>
     <span class="n">lift_mutated_buffers</span><span class="p">,</span>
 <span class="p">)</span>
@@ -1293,7 +1297,11 @@ document.write(`
     <span class="c1"># prerequisite for IKVCacheUpdateLayer / aliased I/O to fire on a</span>
     <span class="c1"># module-held cache). Returns a fresh GraphModule whose forward signature</span>
     <span class="c1"># reflects the new placeholders.</span>
-    <span class="n">gm</span><span class="p">,</span> <span class="n">lifted_buffers</span> <span class="o">=</span> <span class="n">lift_mutated_buffers</span><span class="p">(</span><span class="n">gm</span><span class="p">)</span>
+    <span class="n">gm</span><span class="p">,</span> <span class="n">lifted_buffers</span> <span class="o">=</span> <span class="n">lift_mutated_buffers</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
+    <span class="n">_copyback_mutation_buffers</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"_copyback_mutation_buffers"</span><span class="p">,</span> <span class="p">[])</span>
+    <span class="n">_copyback_bindings</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"_copyback_bindings"</span><span class="p">,</span> <span class="p">[])</span>
+    <span class="n">_predicted_kv_bindings</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"_predicted_kv_bindings"</span><span class="p">,</span> <span class="p">[])</span>
+    <span class="n">_no_kv_alias_writes</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"_no_kv_alias_writes"</span><span class="p">,</span> <span class="p">[])</span>
     <span class="k">if</span> <span class="n">lifted_buffers</span><span class="p">:</span>
         <span class="c1"># Append each lifted buffer as an engine input AFTER the user inputs.</span>
         <span class="c1"># Buffer tensors live on the gm's state; prepare an Input spec for</span>
@@ -1312,6 +1320,12 @@ document.write(`
     <span class="n">gm</span> <span class="o">=</span> <span class="n">post_lowering</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">"CPU memory usage after post_lowering: </span><span class="si">{</span><span class="n">get_cpu_memory_usage</span><span class="p">()</span><span class="si">}</span><span class="s2"> MB"</span><span class="p">)</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">"Lowered Input graph: "</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="p">))</span>
+
+    <span class="c1"># The marker is what keeps a re-routed write out of the engine's aliased_io, and</span>
+    <span class="c1"># it rides on node.meta through every pass above. Read it back before conversion</span>
+    <span class="c1"># so a pass that dropped it is named here rather than surfacing as a module that</span>
+    <span class="c1"># raises on every call.</span>
+    <span class="n">assert_no_kv_alias_markers_survived</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">_no_kv_alias_writes</span><span class="p">)</span>
 
     <span class="c1"># Move the weights in the state_dict to CPU</span>
     <span class="k">if</span> <span class="n">offload_module_to_cpu</span><span class="p">:</span>
@@ -1334,6 +1348,23 @@ document.write(`
         <span class="n">engine_cache</span><span class="p">,</span>
         <span class="n">graph_signature</span><span class="o">=</span><span class="n">exported_program</span><span class="o">.</span><span class="n">graph_signature</span><span class="p">,</span>
     <span class="p">)</span>
+    <span class="k">if</span> <span class="n">_copyback_mutation_buffers</span><span class="p">:</span>
+        <span class="n">trt_gm</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"_copyback_mutation_buffers"</span><span class="p">]</span> <span class="o">=</span> <span class="n">_copyback_mutation_buffers</span>
+    <span class="c1"># Ground-truth check on both directions of the classification: every write lift</span>
+    <span class="c1"># called KV (engine-aliased, so its copy_ was dropped) must appear in a compiled</span>
+    <span class="c1"># engine's aliased_io or its write-back is silently lost, and no write lift</span>
+    <span class="c1"># called copy-back may appear there or the trailing output it added is one the</span>
+    <span class="c1"># runtime truncates while the graph still reads it. Fail loudly for either. A</span>
+    <span class="c1"># dryrun returns before conversion, so there is no ground truth to check against.</span>
+    <span class="n">assert_predicted_kv_aliased</span><span class="p">(</span>
+        <span class="n">aliased_input_bindings</span><span class="p">(</span>
+            <span class="nb">getattr</span><span class="p">(</span><span class="n">sub</span><span class="p">,</span> <span class="s2">"aliased_io"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="k">for</span> <span class="n">_name</span><span class="p">,</span> <span class="n">sub</span> <span class="ow">in</span> <span class="n">trt_gm</span><span class="o">.</span><span class="n">named_children</span><span class="p">()</span>
+        <span class="p">),</span>
+        <span class="n">_predicted_kv_bindings</span><span class="p">,</span>
+        <span class="n">settings</span><span class="p">,</span>
+        <span class="n">engines_built</span><span class="o">=</span><span class="ow">not</span> <span class="n">settings</span><span class="o">.</span><span class="n">dryrun</span><span class="p">,</span>
+        <span class="n">copyback_bindings</span><span class="o">=</span><span class="n">_copyback_bindings</span><span class="p">,</span>
+    <span class="p">)</span>
     <span class="k">if</span> <span class="n">lifted_buffers</span><span class="p">:</span>
         <span class="c1"># Inline buffers into the compiled gm as get_attr nodes + registered</span>
         <span class="c1"># buffers. The resulting gm's forward takes only user inputs; buffers</span>
@@ -1342,6 +1373,12 @@ document.write(`
         <span class="c1"># serializable by torch_tensorrt.save / torch.export (no external</span>
         <span class="c1"># Python wrapper that would be lost on a round-trip).</span>
         <span class="n">trt_gm</span> <span class="o">=</span> <span class="n">inline_lifted_buffers_into_gm</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="n">lifted_buffers</span><span class="p">)</span>
+    <span class="c1"># A copy-back value stays on the output node, where the exporters read it and</span>
+    <span class="c1"># where dead-code elimination cannot reach it, but nothing between here and the</span>
+    <span class="c1"># ExecuTorch runtime writes it into the buffer. Returning it would report a</span>
+    <span class="c1"># mutation the caller cannot act on, so the compiled module keeps the arity of</span>
+    <span class="c1"># the model it was compiled from.</span>
+    <span class="n">hide_copyback_outputs</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">_copyback_mutation_buffers</span><span class="p">))</span>
     <span class="k">return</span> <span class="n">trt_gm</span></div>
 
 
@@ -2284,6 +2321,12 @@ document.write(`
 <span class="sd">    automatically; this lower-level entry point exposes the same machinery</span>
 <span class="sd">    for callers that want to manage the bindings themselves.</span>
 
+<span class="sd">    Only writes the engine can alias in place are supported here. A mutation the</span>
+<span class="sd">    engine cannot alias needs its new value copied back into the buffer after the</span>
+<span class="sd">    call, and this entry point reports neither which output carries which buffer nor</span>
+<span class="sd">    performs the copy, so it raises rather than returning an engine whose buffer</span>
+<span class="sd">    would never update. Use :func:`torch_tensorrt.dynamo.compile` for those models.</span>
+
 <span class="sd">    Arguments:</span>
 <span class="sd">        exported_program (torch.export.ExportedProgram): Source module, running torch.export on a ``torch.nn.Module``</span>
 <span class="sd">        inputs (Optional[Sequence[Sequence[Any]]]): List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using</span>
@@ -2367,6 +2410,11 @@ document.write(`
 <span class="sd">        **kwargs: Any,</span>
 <span class="sd">    Returns:</span>
 <span class="sd">        bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs</span>
+<span class="sd">    Raises:</span>
+<span class="sd">        RuntimeError: if ``lift_mutable_buffers=True`` and the model mutates a buffer</span>
+<span class="sd">            the engine cannot alias in place, or if a write predicted to be aliased is</span>
+<span class="sd">            absent from the built engine's ``aliased_io``. Either way the buffer would</span>
+<span class="sd">            silently never update.</span>
 <span class="sd">    """</span>
 
     <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"debug"</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
@@ -2555,8 +2603,26 @@ document.write(`
     <span class="c1"># resulting bindings at runtime — they are appended after the user inputs</span>
     <span class="c1"># in the order returned here.</span>
     <span class="n">lifted_buffers</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">predicted_kv_bindings</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="k">if</span> <span class="n">lift_mutable_buffers</span><span class="p">:</span>
-        <span class="n">gm</span><span class="p">,</span> <span class="n">lifted_buffers</span> <span class="o">=</span> <span class="n">lift_mutated_buffers</span><span class="p">(</span><span class="n">gm</span><span class="p">)</span>
+        <span class="n">gm</span><span class="p">,</span> <span class="n">lifted_buffers</span> <span class="o">=</span> <span class="n">lift_mutated_buffers</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
+        <span class="c1"># Read before lowering: `gm` is replaced below and the meta does not follow it.</span>
+        <span class="n">predicted_kv_bindings</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"_predicted_kv_bindings"</span><span class="p">,</span> <span class="p">[])</span>
+        <span class="c1"># A write the engine cannot alias in place is classified as copy-back: its</span>
+        <span class="c1"># new value is appended as an extra engine output, and whatever loads the</span>
+        <span class="c1"># serialized program copies that output into the buffer afterwards. This</span>
+        <span class="c1"># entry point returns engine bytes and no program, so it neither reports</span>
+        <span class="c1"># which output carries which buffer nor gives the copy anywhere to be</span>
+        <span class="c1"># declared, and the caller has no way to complete it.</span>
+        <span class="n">copyback_buffers</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"_copyback_mutation_buffers"</span><span class="p">,</span> <span class="p">[])</span>
+        <span class="k">if</span> <span class="n">copyback_buffers</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                <span class="s2">"convert_exported_program_to_serialized_trt_engine cannot express the "</span>
+                <span class="sa">f</span><span class="s2">"write-back for mutable buffer(s) </span><span class="si">{</span><span class="n">copyback_buffers</span><span class="si">}</span><span class="s2">: the engine "</span>
+                <span class="s2">"cannot alias them in place, so the buffers would never update. Use "</span>
+                <span class="s2">"torch_tensorrt.dynamo.compile and save the result, which declares "</span>
+                <span class="s2">"the buffer mutation for the runtime to apply."</span>
+            <span class="p">)</span>
         <span class="k">if</span> <span class="n">lifted_buffers</span><span class="p">:</span>
             <span class="n">buffer_tensors</span> <span class="o">=</span> <span class="p">[</span><span class="n">t</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">lifted_buffers</span><span class="p">]</span>
             <span class="n">buffer_inputs</span> <span class="o">=</span> <span class="n">prepare_inputs</span><span class="p">(</span><span class="n">buffer_tensors</span><span class="p">)</span>
@@ -2656,6 +2722,12 @@ document.write(`
             <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"While interpreting the module got an error: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">e</span>
+
+    <span class="n">assert_predicted_kv_aliased</span><span class="p">(</span>
+        <span class="n">aliased_input_bindings</span><span class="p">([</span><span class="n">interpreter_result</span><span class="o">.</span><span class="n">aliased_io</span><span class="p">]),</span>
+        <span class="n">predicted_kv_bindings</span><span class="p">,</span>
+        <span class="n">settings</span><span class="p">,</span>
+    <span class="p">)</span>
 
     <span class="n">serialized_engine</span><span class="p">:</span> <span class="nb">bytes</span> <span class="o">=</span> <span class="n">interpreter_result</span><span class="o">.</span><span class="n">serialized_engine</span>
     <span class="k">return</span> <span class="n">serialized_engine</span></div>

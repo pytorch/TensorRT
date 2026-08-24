@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=66991156"></script>
+    <script src="../../../_static/documentation_options.js?v=19fba6da"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -478,7 +478,7 @@ document.write(`
 <span class="kn">import</span><span class="w"> </span><span class="nn">copy</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">operator</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">Tuple</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">Tuple</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch.utils._pytree</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pytree</span>
@@ -850,7 +850,49 @@ document.write(`
     <span class="n">input_nodes</span> <span class="o">=</span> <span class="p">[</span><span class="n">node</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span> <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"placeholder"</span><span class="p">]</span>
     <span class="n">output_nodes</span> <span class="o">=</span> <span class="p">[</span><span class="n">node</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span> <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"output"</span><span class="p">]</span>
     <span class="k">assert</span> <span class="n">output_nodes</span>
-    <span class="n">output_nodes</span> <span class="o">=</span> <span class="n">output_nodes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">_output_node</span> <span class="o">=</span> <span class="n">output_nodes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">output_nodes</span> <span class="o">=</span> <span class="n">_output_node</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="c1"># Copy-back mutable buffers (non-KV, e.g. a convolution-state ring-buffer):</span>
+    <span class="c1"># lift_mutated_buffers appended each buffer's new-value as a trailing graph output. Tag it</span>
+    <span class="c1"># BUFFER_MUTATION (reusing the KV `_kv_mutation_target` path) so the runtime</span>
+    <span class="c1"># threads it and ExecuTorch copies it back to the caller-owned buffer, then move</span>
+    <span class="c1"># all mutation outputs before the user outputs (ExportedProgram verifier requires</span>
+    <span class="c1"># BUFFER_MUTATIONs to be contiguous at the front).</span>
+    <span class="n">_copyback</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"_copyback_mutation_buffers"</span><span class="p">,</span> <span class="p">[])</span>
+    <span class="k">if</span> <span class="n">_copyback</span><span class="p">:</span>
+        <span class="c1"># A write-only buffer -- every reader served by the value being written</span>
+        <span class="c1"># -- has a dead get_attr, and `transform` already ran DCE. `lift` derives</span>
+        <span class="c1"># BUFFER input specs from get_attr nodes alone, so without one the</span>
+        <span class="c1"># BUFFER_MUTATION declared below names a buffer the signature never</span>
+        <span class="c1"># declares. An unused get_attr is enough: `lift` rewrites it to a</span>
+        <span class="c1"># placeholder, which fx's dead-code pass never removes. Must be a</span>
+        <span class="c1"># registered buffer, else `lift` makes it a parameter or constant.</span>
+        <span class="n">_attrs</span> <span class="o">=</span> <span class="p">{</span><span class="n">n</span><span class="o">.</span><span class="n">target</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span> <span class="k">if</span> <span class="n">n</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"get_attr"</span><span class="p">}</span>
+        <span class="n">_registered</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">named_buffers</span><span class="p">())</span>
+        <span class="n">_first_node</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="nb">iter</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">_buf</span> <span class="ow">in</span> <span class="n">_copyback</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">_buf</span> <span class="ow">in</span> <span class="n">_attrs</span> <span class="ow">or</span> <span class="n">_buf</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_registered</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="k">with</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">inserting_before</span><span class="p">(</span><span class="n">_first_node</span><span class="p">):</span>
+                <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">get_attr</span><span class="p">(</span><span class="n">_buf</span><span class="p">)</span>
+            <span class="n">_attrs</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">_buf</span><span class="p">)</span>
+
+        <span class="n">_outs</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">output_nodes</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">_n</span><span class="p">,</span> <span class="n">_buf</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">_outs</span><span class="p">[</span><span class="o">-</span><span class="nb">len</span><span class="p">(</span><span class="n">_copyback</span><span class="p">)</span> <span class="p">:],</span> <span class="n">_copyback</span><span class="p">):</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">_n</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">Node</span><span class="p">):</span>
+                <span class="n">_n</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"_kv_mutation_target"</span><span class="p">]</span> <span class="o">=</span> <span class="n">_buf</span>
+        <span class="c1"># Read by _declare_aliased_kv_mutations_on_ep, which must not consume these</span>
+        <span class="c1"># trailing values a second time.</span>
+        <span class="n">gm</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"_copyback_mutations_declared"</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">_is_mut</span><span class="p">(</span><span class="n">_n</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">_n</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">Node</span><span class="p">)</span> <span class="ow">and</span> <span class="s2">"_kv_mutation_target"</span> <span class="ow">in</span> <span class="n">_n</span><span class="o">.</span><span class="n">meta</span>
+
+        <span class="n">output_nodes</span> <span class="o">=</span> <span class="p">[</span><span class="n">_n</span> <span class="k">for</span> <span class="n">_n</span> <span class="ow">in</span> <span class="n">_outs</span> <span class="k">if</span> <span class="n">_is_mut</span><span class="p">(</span><span class="n">_n</span><span class="p">)]</span> <span class="o">+</span> <span class="p">[</span>
+            <span class="n">_n</span> <span class="k">for</span> <span class="n">_n</span> <span class="ow">in</span> <span class="n">_outs</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">_is_mut</span><span class="p">(</span><span class="n">_n</span><span class="p">)</span>
+        <span class="p">]</span>
+        <span class="n">_output_node</span><span class="o">.</span><span class="n">args</span> <span class="o">=</span> <span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">output_nodes</span><span class="p">),)</span>
 
     <span class="c1"># Outputs tagged by `_expose_aliased_buffer_mutations` become BUFFER_MUTATION</span>
     <span class="c1"># specs (their `_kv_mutation_target` meta names the backing buffer); the rest</span>
@@ -1011,22 +1053,45 @@ document.write(`
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_declare_aliased_kv_mutations_on_ep</span><span class="p">(</span>
     <span class="n">exp_program</span><span class="p">:</span> <span class="n">ExportedProgram</span><span class="p">,</span>
+    <span class="n">copyback_buffers</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ExportedProgram</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Post-export pass: declare each engine's aliased KV output as a</span>
-<span class="sd">    BUFFER_MUTATION of its caller-owned buffer input.</span>
+<span class="sd">    BUFFER_MUTATION of its caller-owned buffer input, and reclassify any copy-back</span>
+<span class="sd">    outputs as BUFFER_MUTATIONs of their buffers.</span>
 
-<span class="sd">    Runs on both save() paths (retrace=True and retrace=False); it is idempotent</span>
-<span class="sd">    because it skips buffers that already carry a BUFFER_MUTATION spec (see</span>
-<span class="sd">    already_exposed below), so the legacy exporter's transform-time declaration is</span>
-<span class="sd">    not duplicated.</span>
+<span class="sd">    Safe to call more than once on the same program, by two separate mechanisms. The</span>
+<span class="sd">    KV half skips any buffer that already carries a BUFFER_MUTATION spec (see</span>
+<span class="sd">    already_exposed below), which is also how the legacy exporter's transform-time</span>
+<span class="sd">    declaration survives. The copy-back half cannot skip one buffer at a time, because</span>
+<span class="sd">    it detaches its outputs by position rather than by name; it skips the whole slice</span>
+<span class="sd">    instead, keyed on ``gm.meta['_copyback_mutations_declared']``, which every step</span>
+<span class="sd">    that consumes those trailing values sets.</span>
 
 <span class="sd">    torch.export produces execute_engine nodes whose meta['val'] covers only the</span>
 <span class="sd">    user outputs (the aliased KV outputs are network bindings excluded at the fx</span>
 <span class="sd">    boundary), so the KV buffers -- though BUFFER inputs -- are never recorded as</span>
 <span class="sd">    mutated and get frozen downstream. This surfaces each aliased output as a</span>
 <span class="sd">    getitem and declares it a BUFFER_MUTATION of the aliased input's buffer,</span>
-<span class="sd">    mirroring create_trt_exp_program's handling on the retrace=False path. Returns</span>
-<span class="sd">    exp_program unchanged when no engine has aliased KV outputs.</span>
+<span class="sd">    mirroring create_trt_exp_program's handling on the retrace=False path.</span>
+
+<span class="sd">    Non-KV mutable buffers (e.g. a convolution-state ring-buffer) have no engine</span>
+<span class="sd">    aliasing: lift_mutated_buffers appended their new values as trailing user outputs, which</span>
+<span class="sd">    torch.export kept as the last ``len(copyback_buffers)`` outputs. Those are</span>
+<span class="sd">    reclassified from USER_OUTPUT to BUFFER_MUTATION here so ExecuTorch copies them</span>
+<span class="sd">    back to the caller-owned buffers after the delegate runs.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        exp_program: the retraced ExportedProgram to rewrite.</span>
+<span class="sd">        copyback_buffers: buffer FQNs, in output order, for the trailing copy-back</span>
+<span class="sd">            outputs to reclassify as BUFFER_MUTATION. Threaded from</span>
+<span class="sd">            ``gm.meta['_copyback_mutation_buffers']`` by ``save()``; empty/None means</span>
+<span class="sd">            KV-only (no copy-back).</span>
+
+<span class="sd">    Returns exp_program unchanged when there is nothing to declare: no copy-back</span>
+<span class="sd">    buffers and no engine contributing an aliased KV output -- either because none has</span>
+<span class="sd">    one, or because the optional [executorch] extra is not importable and the engines</span>
+<span class="sd">    cannot be read -- or when the only candidate was a copy-back slice that a previous</span>
+<span class="sd">    run already consumed.</span>
 <span class="sd">    """</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._serialized_engine_layout</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
         <span class="n">ALIASED_IO_IDX</span><span class="p">,</span>
@@ -1038,14 +1103,18 @@ document.write(`
         <span class="n">deserialize_aliased_io</span><span class="p">,</span>
     <span class="p">)</span>
 
-    <span class="c1"># Guard the import so a non-executorch save() (e.g. output_format=</span>
-    <span class="c1"># "exported_program" with no aliased KV outputs) doesn't hard-require the</span>
-    <span class="c1"># optional [executorch] extra: with no executorch there's no aliased_io to</span>
-    <span class="c1"># read and no declaration to make, so return unchanged.</span>
+    <span class="c1"># The [executorch] extra is optional, so this import can fail on a plain install.</span>
+    <span class="n">read_engine_info</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Any</span><span class="p">]]]</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch.backend</span><span class="w"> </span><span class="kn">import</span> <span class="n">_get_engine_info_for_node</span>
+
+        <span class="n">read_engine_info</span> <span class="o">=</span> <span class="n">_get_engine_info_for_node</span>
     <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">exp_program</span>
+        <span class="n">read_engine_info</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+            <span class="s2">"Could not import torch_tensorrt.executorch.backend; engine aliased-KV "</span>
+            <span class="s2">"mutations will not be declared on this program."</span>
+        <span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_estr</span><span class="p">(</span><span class="n">engine_info</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Any</span><span class="p">],</span> <span class="n">idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">idx</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">idx</span> <span class="o">&gt;=</span> <span class="nb">len</span><span class="p">(</span><span class="n">engine_info</span><span class="p">)</span> <span class="ow">or</span> <span class="n">engine_info</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -1070,10 +1139,15 @@ document.write(`
         <span class="k">if</span> <span class="n">spec</span><span class="o">.</span><span class="n">kind</span> <span class="o">==</span> <span class="n">OutputKind</span><span class="o">.</span><span class="n">BUFFER_MUTATION</span> <span class="ow">and</span> <span class="n">spec</span><span class="o">.</span><span class="n">target</span>
     <span class="p">}</span>
     <span class="n">mutation_outputs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">Node</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
-    <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">:</span>
+    <span class="c1"># Reading an engine needs the [executorch] helper imported above; without it</span>
+    <span class="c1"># there is nothing to scan.</span>
+    <span class="n">nodes_to_scan</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span> <span class="k">if</span> <span class="n">read_engine_info</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">()</span>
+    <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">nodes_to_scan</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">!=</span> <span class="s2">"call_function"</span> <span class="ow">or</span> <span class="n">node</span><span class="o">.</span><span class="n">target</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">exec_target</span><span class="p">:</span>
             <span class="k">continue</span>
-        <span class="n">engine_info</span> <span class="o">=</span> <span class="n">_get_engine_info_for_node</span><span class="p">(</span><span class="n">exp_program</span><span class="p">,</span> <span class="n">node</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="n">read_engine_info</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="c1"># Only the binding names and aliased_io are read, never the engine itself.</span>
+        <span class="n">engine_info</span> <span class="o">=</span> <span class="n">read_engine_info</span><span class="p">(</span><span class="n">exp_program</span><span class="p">,</span> <span class="n">node</span><span class="p">,</span> <span class="n">metadata_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
         <span class="n">aliased_io</span> <span class="o">=</span> <span class="n">deserialize_aliased_io</span><span class="p">(</span><span class="n">_estr</span><span class="p">(</span><span class="n">engine_info</span><span class="p">,</span> <span class="n">ALIASED_IO_IDX</span><span class="p">))</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">aliased_io</span><span class="p">:</span>
             <span class="k">continue</span>
@@ -1145,29 +1219,111 @@ document.write(`
             <span class="n">mutation_outputs</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">getitem_node</span><span class="p">,</span> <span class="n">buf_fqn</span><span class="p">))</span>
         <span class="n">node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">val_list</span><span class="p">)</span>
 
-    <span class="k">if</span> <span class="ow">not</span> <span class="n">mutation_outputs</span><span class="p">:</span>
+    <span class="n">copyback_buffers</span> <span class="o">=</span> <span class="n">copyback_buffers</span> <span class="ow">or</span> <span class="p">[]</span>
+    <span class="n">num_copyback</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">copyback_buffers</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">mutation_outputs</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">num_copyback</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">exp_program</span>
 
-    <span class="c1"># BUFFER_MUTATION outputs must precede USER_OUTPUTs (ExportedProgram verifier).</span>
     <span class="n">out_args</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">output_node</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
-    <span class="n">output_node</span><span class="o">.</span><span class="n">args</span> <span class="o">=</span> <span class="p">(</span><span class="nb">tuple</span><span class="p">([</span><span class="n">g</span> <span class="k">for</span> <span class="n">g</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">mutation_outputs</span><span class="p">]</span> <span class="o">+</span> <span class="n">out_args</span><span class="p">),)</span>
+    <span class="n">orig_specs</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">sig</span><span class="o">.</span><span class="n">output_specs</span><span class="p">)</span>
+
+    <span class="n">kv_getitems</span> <span class="o">=</span> <span class="p">[</span><span class="n">g</span> <span class="k">for</span> <span class="n">g</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">mutation_outputs</span><span class="p">]</span>
+    <span class="n">kv_specs</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">OutputSpec</span><span class="p">(</span><span class="n">OutputKind</span><span class="o">.</span><span class="n">BUFFER_MUTATION</span><span class="p">,</span> <span class="n">TensorArgument</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">g</span><span class="o">.</span><span class="n">name</span><span class="p">),</span> <span class="n">fqn</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">g</span><span class="p">,</span> <span class="n">fqn</span> <span class="ow">in</span> <span class="n">mutation_outputs</span>
+    <span class="p">]</span>
+
+    <span class="c1"># Copy-back mutable buffers (non-KV, e.g. a convolution-state ring-buffer): lift</span>
+    <span class="c1"># appended each buffer's new-value as a trailing user output, in copyback_buffers</span>
+    <span class="c1"># order. Those appended values are internal plumbing, so the whole run leaves the</span>
+    <span class="c1"># user outputs whether or not torch.export also recorded the mutation itself. It</span>
+    <span class="c1"># does record it when it recognises the write, and then places that BUFFER_MUTATION</span>
+    <span class="c1"># ahead of the user outputs because the verifier requires mutations to come first;</span>
+    <span class="c1"># re-declaring such a buffer here would describe one mutation twice. So detach the</span>
+    <span class="c1"># full run first and pair it positionally with the full buffer list, then keep only</span>
+    <span class="c1"># the buffers not already declared. Filtering before slicing would pair a value with</span>
+    <span class="c1"># the wrong buffer, and the runtime would copy it into a buffer of a different shape.</span>
+    <span class="n">copyback_getitems</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">Node</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">copyback_specs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">OutputSpec</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">remaining_specs</span> <span class="o">=</span> <span class="n">orig_specs</span>
+    <span class="n">already_mutated</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="n">spec</span><span class="o">.</span><span class="n">target</span>
+        <span class="k">for</span> <span class="n">spec</span> <span class="ow">in</span> <span class="n">orig_specs</span>
+        <span class="k">if</span> <span class="n">spec</span><span class="o">.</span><span class="n">kind</span> <span class="o">==</span> <span class="n">OutputKind</span><span class="o">.</span><span class="n">BUFFER_MUTATION</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">spec</span><span class="o">.</span><span class="n">target</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span>
+    <span class="p">}</span>
+    <span class="c1"># A BUFFER_MUTATION spec does not say whether the trailing value is still there:</span>
+    <span class="c1"># torch.export declares the mutation and leaves the value, while a previous run of</span>
+    <span class="c1"># this pass declares it and consumes the value, so it is the consuming step that</span>
+    <span class="c1"># records the marker.</span>
+    <span class="c1"># The marker is a property of the graph rather than of the buffer list handed in:</span>
+    <span class="c1"># it is set on the GraphModule by whichever step consumed the trailing values, and</span>
+    <span class="c1"># read back off the GraphModule this pass is later given. stage_exported_program</span>
+    <span class="c1"># copies gm.meta's entries into the staged module, so a staged copy sees what its</span>
+    <span class="c1"># source recorded before staging. The two mappings are separate objects, so what a</span>
+    <span class="c1"># staged copy records afterwards is not visible on the source.</span>
+    <span class="k">if</span> <span class="n">num_copyback</span> <span class="ow">and</span> <span class="n">gm</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"_copyback_mutations_declared"</span><span class="p">):</span>
+        <span class="n">num_copyback</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">mutation_outputs</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">exp_program</span>
+    <span class="k">if</span> <span class="n">num_copyback</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">out_args</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">num_copyback</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"Expected at least </span><span class="si">{</span><span class="n">num_copyback</span><span class="si">}</span><span class="s2"> trailing outputs to pair with "</span>
+                <span class="sa">f</span><span class="s2">"copy-back buffers </span><span class="si">{</span><span class="n">copyback_buffers</span><span class="si">}</span><span class="s2">, found only </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">out_args</span><span class="p">)</span><span class="si">}</span><span class="s2">."</span>
+            <span class="p">)</span>
+        <span class="n">trailing</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">out_args</span><span class="p">[</span><span class="o">-</span><span class="n">num_copyback</span><span class="p">:])</span>
+        <span class="n">out_args</span> <span class="o">=</span> <span class="n">out_args</span><span class="p">[:</span><span class="o">-</span><span class="n">num_copyback</span><span class="p">]</span>
+        <span class="n">remaining_specs</span> <span class="o">=</span> <span class="n">orig_specs</span><span class="p">[:</span><span class="o">-</span><span class="n">num_copyback</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">value</span><span class="p">,</span> <span class="n">buf</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">trailing</span><span class="p">,</span> <span class="n">copyback_buffers</span><span class="p">):</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">Node</span><span class="p">)</span> <span class="ow">or</span> <span class="n">buf</span> <span class="ow">in</span> <span class="n">already_mutated</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">copyback_getitems</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+            <span class="n">copyback_specs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="n">OutputSpec</span><span class="p">(</span>
+                    <span class="n">OutputKind</span><span class="o">.</span><span class="n">BUFFER_MUTATION</span><span class="p">,</span> <span class="n">TensorArgument</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">value</span><span class="o">.</span><span class="n">name</span><span class="p">),</span> <span class="n">buf</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+        <span class="n">gm</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"_copyback_mutations_declared"</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+
+    <span class="c1"># BUFFER_MUTATIONs (KV + copy-back) must precede USER_OUTPUTs (verifier).</span>
+    <span class="n">output_node</span><span class="o">.</span><span class="n">args</span> <span class="o">=</span> <span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">kv_getitems</span> <span class="o">+</span> <span class="n">copyback_getitems</span> <span class="o">+</span> <span class="n">out_args</span><span class="p">),)</span>
     <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">lint</span><span class="p">()</span>
     <span class="n">gm</span><span class="o">.</span><span class="n">recompile</span><span class="p">()</span>
 
-    <span class="n">new_output_specs</span> <span class="o">=</span> <span class="p">[</span>
-        <span class="n">OutputSpec</span><span class="p">(</span><span class="n">OutputKind</span><span class="o">.</span><span class="n">BUFFER_MUTATION</span><span class="p">,</span> <span class="n">TensorArgument</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">g</span><span class="o">.</span><span class="n">name</span><span class="p">),</span> <span class="n">fqn</span><span class="p">)</span>
-        <span class="k">for</span> <span class="n">g</span><span class="p">,</span> <span class="n">fqn</span> <span class="ow">in</span> <span class="n">mutation_outputs</span>
-    <span class="p">]</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="n">sig</span><span class="o">.</span><span class="n">output_specs</span><span class="p">)</span>
+    <span class="n">new_output_specs</span> <span class="o">=</span> <span class="n">kv_specs</span> <span class="o">+</span> <span class="n">copyback_specs</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="n">remaining_specs</span><span class="p">)</span>
     <span class="n">new_signature</span> <span class="o">=</span> <span class="n">ExportGraphSignature</span><span class="p">(</span>
         <span class="n">input_specs</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="n">sig</span><span class="o">.</span><span class="n">input_specs</span><span class="p">),</span> <span class="n">output_specs</span><span class="o">=</span><span class="n">new_output_specs</span>
     <span class="p">)</span>
+
+    <span class="c1"># Copy-back outputs were user returns in the retraced program, so torch.export's</span>
+    <span class="c1"># out_spec counts them; after detaching them only the real user outputs remain.</span>
+    <span class="c1"># Rebuild the top-level out_spec (mirroring create_trt_exp_program) so to_edge's</span>
+    <span class="c1"># unflatten sees the right leaf count. Keyed on num_copyback, not on the specs we</span>
+    <span class="c1"># added, because an already-declared buffer still had its value detached above.</span>
+    <span class="n">module_call_graph</span> <span class="o">=</span> <span class="n">exp_program</span><span class="o">.</span><span class="n">module_call_graph</span>
+    <span class="k">if</span> <span class="n">num_copyback</span> <span class="ow">and</span> <span class="n">module_call_graph</span><span class="p">:</span>
+        <span class="n">new_out_spec</span> <span class="o">=</span> <span class="n">pytree</span><span class="o">.</span><span class="n">tree_flatten</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">out_args</span><span class="p">))[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">_e0</span> <span class="o">=</span> <span class="n">module_call_graph</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">_sig0</span> <span class="o">=</span> <span class="n">_e0</span><span class="o">.</span><span class="n">signature</span>
+        <span class="n">module_call_graph</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">ModuleCallEntry</span><span class="p">(</span>
+                <span class="n">_e0</span><span class="o">.</span><span class="n">fqn</span><span class="p">,</span>
+                <span class="n">ModuleCallSignature</span><span class="p">(</span>
+                    <span class="n">inputs</span><span class="o">=</span><span class="n">_sig0</span><span class="o">.</span><span class="n">inputs</span> <span class="k">if</span> <span class="n">_sig0</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">[],</span>
+                    <span class="n">outputs</span><span class="o">=</span><span class="p">[],</span>
+                    <span class="n">in_spec</span><span class="o">=</span><span class="n">_sig0</span><span class="o">.</span><span class="n">in_spec</span> <span class="k">if</span> <span class="n">_sig0</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+                    <span class="n">out_spec</span><span class="o">=</span><span class="n">new_out_spec</span><span class="p">,</span>
+                <span class="p">),</span>
+            <span class="p">)</span>
+        <span class="p">]</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="n">module_call_graph</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+
     <span class="k">return</span> <span class="n">ExportedProgram</span><span class="p">(</span>
         <span class="n">root</span><span class="o">=</span><span class="n">gm</span><span class="p">,</span>
         <span class="n">graph</span><span class="o">=</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="p">,</span>
         <span class="n">graph_signature</span><span class="o">=</span><span class="n">new_signature</span><span class="p">,</span>
         <span class="n">state_dict</span><span class="o">=</span><span class="n">exp_program</span><span class="o">.</span><span class="n">state_dict</span><span class="p">,</span>
         <span class="n">range_constraints</span><span class="o">=</span><span class="n">exp_program</span><span class="o">.</span><span class="n">range_constraints</span><span class="p">,</span>
-        <span class="n">module_call_graph</span><span class="o">=</span><span class="n">exp_program</span><span class="o">.</span><span class="n">module_call_graph</span><span class="p">,</span>
+        <span class="n">module_call_graph</span><span class="o">=</span><span class="n">module_call_graph</span><span class="p">,</span>
         <span class="n">example_inputs</span><span class="o">=</span><span class="n">exp_program</span><span class="o">.</span><span class="n">example_inputs</span><span class="p">,</span>
         <span class="n">constants</span><span class="o">=</span><span class="n">exp_program</span><span class="o">.</span><span class="n">constants</span><span class="p">,</span>
         <span class="n">verifiers</span><span class="o">=</span><span class="n">exp_program</span><span class="o">.</span><span class="n">verifiers</span><span class="p">,</span>

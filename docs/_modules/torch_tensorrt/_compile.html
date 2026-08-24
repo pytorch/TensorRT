@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=66991156"></script>
+    <script src="../../_static/documentation_options.js?v=19fba6da"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -1638,6 +1638,9 @@ document.write(`
             <span class="c1"># whichever exporter produced the program. aot_inductor is left</span>
             <span class="c1"># undeclared: whether an aliased in-place mutation survives</span>
             <span class="c1"># functionalization under inductor is unverified.</span>
+            <span class="c1">#</span>
+            <span class="c1"># Copy-back is gated per-branch below: the legacy exporter declares it</span>
+            <span class="c1"># itself and consumes the trailing values while doing so.</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="n">retrace</span><span class="p">:</span>
                 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._exporter</span><span class="w"> </span><span class="kn">import</span> <span class="n">export</span>
 
@@ -1662,6 +1665,22 @@ document.write(`
                 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._exporter</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
                     <span class="n">_declare_aliased_kv_mutations_on_ep</span><span class="p">,</span>
                 <span class="p">)</span>
+
+                <span class="c1"># On this path the legacy exporter is what declares copy-back, except</span>
+                <span class="c1"># under output_format="executorch", where torch_tensorrt.executorch</span>
+                <span class="c1"># .export() declares it for whatever source shape it is handed. The</span>
+                <span class="c1"># remaining combination leaves it undeclared.</span>
+                <span class="k">if</span> <span class="p">(</span>
+                    <span class="ow">not</span> <span class="n">_use_legacy</span>
+                    <span class="ow">and</span> <span class="n">output_format</span> <span class="o">!=</span> <span class="s2">"executorch"</span>
+                    <span class="ow">and</span> <span class="n">module</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"_copyback_mutation_buffers"</span><span class="p">)</span>
+                <span class="p">):</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                        <span class="s2">"Module has non-KV mutable buffer(s) needing copy-back, but "</span>
+                        <span class="s2">"retrace=False with use_legacy_exporter=False does not declare "</span>
+                        <span class="s2">"them. The saved program's signature will not reflect those "</span>
+                        <span class="s2">"updates. Use the legacy exporter, or retrace=True."</span>
+                    <span class="p">)</span>
 
                 <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">"exported_program"</span><span class="p">:</span>
                     <span class="c1"># Must precede normalization, which rewrites the engine constants</span>
@@ -1725,6 +1744,7 @@ document.write(`
                     <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"placeholder"</span> <span class="ow">and</span> <span class="s2">"val"</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">meta</span>
                     <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">],</span> <span class="s2">"shape"</span><span class="p">,</span> <span class="p">[])</span>
                 <span class="p">)</span>
+                <span class="n">_use_legacy</span> <span class="o">=</span> <span class="kc">False</span>
                 <span class="k">if</span> <span class="n">has_symbolic_metadata</span> <span class="ow">and</span> <span class="n">dynamic_shapes</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
                     <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._exporter</span><span class="w"> </span><span class="kn">import</span> <span class="n">export</span>
 
@@ -1773,6 +1793,16 @@ document.write(`
                     <span class="n">_declare_aliased_kv_mutations_on_ep</span><span class="p">,</span>
                 <span class="p">)</span>
 
+                <span class="c1"># create_trt_exp_program already declares the copy-back mutations and</span>
+                <span class="c1"># consumes their trailing outputs, so what trails the graph on that path</span>
+                <span class="c1"># is a genuine user output. Only the torch.export paths leave the values</span>
+                <span class="c1"># to be reclassified.</span>
+                <span class="n">_copyback_bufs</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="p">[]</span>
+                    <span class="k">if</span> <span class="n">_use_legacy</span>
+                    <span class="k">else</span> <span class="n">module</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"_copyback_mutation_buffers"</span><span class="p">,</span> <span class="p">[])</span>
+                <span class="p">)</span>
+
                 <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">"aot_inductor"</span> <span class="ow">and</span> <span class="nb">any</span><span class="p">(</span>
                     <span class="nb">getattr</span><span class="p">(</span><span class="n">sub</span><span class="p">,</span> <span class="s2">"aliased_io"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
                     <span class="k">for</span> <span class="n">_sub_name</span><span class="p">,</span> <span class="n">sub</span> <span class="ow">in</span> <span class="n">module</span><span class="o">.</span><span class="n">named_modules</span><span class="p">()</span>
@@ -1787,7 +1817,9 @@ document.write(`
                 <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">"exported_program"</span><span class="p">:</span>
                     <span class="c1"># Must precede normalization, which rewrites the engine constants</span>
                     <span class="c1"># this pass reads aliased_io from.</span>
-                    <span class="n">exp_program</span> <span class="o">=</span> <span class="n">_declare_aliased_kv_mutations_on_ep</span><span class="p">(</span><span class="n">exp_program</span><span class="p">)</span>
+                    <span class="n">exp_program</span> <span class="o">=</span> <span class="n">_declare_aliased_kv_mutations_on_ep</span><span class="p">(</span>
+                        <span class="n">exp_program</span><span class="p">,</span> <span class="n">copyback_buffers</span><span class="o">=</span><span class="n">_copyback_bufs</span>
+                    <span class="p">)</span>
                     <span class="n">_normalize_engine_constants_to_python</span><span class="p">(</span><span class="n">exp_program</span><span class="p">)</span>
                     <span class="n">function_overload_with_kwargs</span><span class="p">(</span>
                         <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">save</span><span class="p">,</span>
@@ -1808,7 +1840,9 @@ document.write(`
                         <span class="n">package_path</span><span class="o">=</span><span class="n">file_path</span><span class="p">,</span>
                     <span class="p">)</span>
                 <span class="k">elif</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">"executorch"</span><span class="p">:</span>
-                    <span class="n">exp_program</span> <span class="o">=</span> <span class="n">_declare_aliased_kv_mutations_on_ep</span><span class="p">(</span><span class="n">exp_program</span><span class="p">)</span>
+                    <span class="n">exp_program</span> <span class="o">=</span> <span class="n">_declare_aliased_kv_mutations_on_ep</span><span class="p">(</span>
+                        <span class="n">exp_program</span><span class="p">,</span> <span class="n">copyback_buffers</span><span class="o">=</span><span class="n">_copyback_bufs</span>
+                    <span class="p">)</span>
                     <span class="n">_save_as_executorch</span><span class="p">(</span>
                         <span class="n">exp_program</span><span class="p">,</span>
                         <span class="n">file_path</span><span class="p">,</span>

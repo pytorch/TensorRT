@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=66991156"></script>
+    <script src="../_static/documentation_options.js?v=19fba6da"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -765,6 +765,11 @@ which output binding aliases which input. The higher-level
 <code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.compile()</span></code> does this lifting and threading
 automatically; this lower-level entry point exposes the same machinery
 for callers that want to manage the bindings themselves.</p>
+<p>Only writes the engine can alias in place are supported here. A mutation the
+engine cannot alias needs its new value copied back into the buffer after the
+call, and this entry point reports neither which output carries which buffer nor
+performs the copy, so it raises rather than returning an engine whose buffer
+would never update. Use <code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.compile()</span></code> for those models.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
@@ -860,6 +865,12 @@ foldable. Default is empty.</p></li>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
 <dd class="field-even"><p><em>bytes</em></p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>RuntimeError</strong> – if <code class="docutils literal notranslate"><span class="pre">lift_mutable_buffers=True</span></code> and the model mutates a buffer
+    the engine cannot alias in place, or if a write predicted to be aliased is
+    absent from the built engine’s <code class="docutils literal notranslate"><span class="pre">aliased_io</span></code>. Either way the buffer would
+    silently never update.</p>
 </dd>
 </dl>
 </dd></dl>
