@@ -88,3 +88,12 @@ jobs:
           python3 $GITHUB_WORKSPACE/.github/scripts/run_py_linter.py
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+      # Text and metadata only: no GPU, no ExecuTorch, no built wheel. It belongs on this runner
+      # rather than in the tests/ci manifest, where every suite becomes a CUDA-container job
+      # after `needs: build` -- one GPU row per python/CUDA combination for a check that takes
+      # seconds. --no-header keeps it clear of tests/py/dynamo/conftest.py, which imports torch.
+      - name: Check the ExecuTorch pin is consistent
+        run: |
+          cd $GITHUB_WORKSPACE
+          python3 -m pytest tests/py/dynamo/executorch/test_executorch_pin.py \
+            -q --no-header -p no:cacheprovider --noconftest -o addopts="" 
