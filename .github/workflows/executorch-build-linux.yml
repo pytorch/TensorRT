@@ -131,7 +131,8 @@ jobs:
         executorch_cmake_location="$(bazel query @executorch//:executorch/CMakeLists.txt --output=location)"
         export EXECUTORCH_SOURCE_DIR="$(dirname "${executorch_cmake_location%%:*}")"
         export EXECUTORCH_ROOT="${EXECUTORCH_SOURCE_DIR}"
-        # this is to verify the end user's workflow
+        # pin-check: range-ok -- this is to verify the end user's workflow, which resolves a
+        # range the way a user would rather than the exact artifact the delegate links.
         python -m pip install pyyaml --extra-index-url "${EXECUTORCH_INDEX_URL}" "executorch>=1.5.0.dev20260822,<1.6"
         python examples/torchtrt_executorch_example/export_static_shape.py \
           --model_path="${RUNNER_TEMP}/torchtrt-reference-runner.pte"
