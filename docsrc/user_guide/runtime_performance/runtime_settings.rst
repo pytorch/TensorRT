@@ -174,6 +174,13 @@ there is no module to build and save the handle.  If you call
 ``runtime_cache`` is a path string), you will hit this error.
 Pass ``runtime_cache=None`` or a :class:`RuntimeCache`.
 
+**You own** ``.load()`` **as well as** ``.save()``.  A
+:class:`TorchTensorRTModule` calls :meth:`RuntimeCache.load` automatically when
+it resolves a path string (via ``_resolve_runtime_cache``), so in-process
+compiled models warm the cache implicitly.  There is no equivalent hook on the
+module-less path -- call ``cache.load()`` (shown above) before passing the
+handle, or the engine starts with an empty cache regardless of what is on disk.
+
 :func:`apply_runtime_settings` also accepts a :class:`~torch.export.ExportedProgram`
 directly (the :func:`torch_tensorrt.load` return value), which is equivalent to
 passing ``ep.module()``:
