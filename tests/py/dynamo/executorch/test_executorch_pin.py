@@ -224,9 +224,21 @@ def _is_commented_out(path: str, text: str) -> bool:
     if path in _ANNOTATED_COMMIT_SITES:
         return False
     stripped = text.strip()
-    if path.endswith((".md", ".rst", ".txt")):
-        return False
+    # No exemption for prose. Returning False for .md/.rst/.txt defeated the threat named above,
+    # because it made a comment count as a pin in exactly the files where install commands live: a
+    # README install line gutted to a bare "executorch" passed as long as a decoy "# executorch==<pin>"
+    # sat beside it. A "#" inside a fenced shell block is a shell comment, the same as anywhere else.
     return stripped.startswith(("#", "//", "/*", "*"))
+
+
+def _without_trailing_comment(path: str, text: str) -> str:
+    """``text`` up to a trailing ``#`` or ``//`` comment, unless the site annotates its pin there."""
+    if path in _ANNOTATED_COMMIT_SITES:
+        return text
+    for marker in ("#", "//"):
+        if marker in text:
+            text = text.split(marker, 1)[0]
+    return text
 
 
 def test_every_requirement_matches_the_pin() -> None:
@@ -247,7 +259,12 @@ def test_every_requirement_matches_the_pin() -> None:
             # per-file minimum satisfied.
             continue
         expected = _expected(path, int(number), version)
-        for actual in REQUIREMENT.findall(text):
+        # A trailing comment is not a pin either. Skipping whole-line comments was not enough: a
+        # live install gutted to a bare "executorch" with a decoy "# executorch==<pin>" after it on
+        # the same line kept the per-file count satisfied and left the install unpinned. The
+        # annotated commit sites write their pin as a whole-line comment, which is handled above,
+        # so nothing legitimate is lost here.
+        for actual in REQUIREMENT.findall(_without_trailing_comment(path, text)):
             found += 1
             seen[path] += 1
             reason = _requirement_disagrees(actual, expected, version)
@@ -374,18 +391,20 @@ def test_derived_requirements_match_the_pin(monkeypatch) -> None:
         "with --pre from the nightly channel, so without the pin it resolves through the range "
         "and takes whichever dev build is newest that day."
     )
-    printed = subprocess.run(
-        # The interpreter running the test, not the workflow's bare `python3`, which need not
-        # have pyyaml here. The argument list is the workflow's own.
-        [sys.executable, *shlex.split(embedded.group(1))[1:]],
-        cwd=REPO_ROOT,
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout.strip()
-    assert (
-        printed == version
-    ), f"docgen would install executorch=={printed}, pin says {version}"
+    # Compared as text, not executed. Running it meant whatever that line said got executed on
+    # every pull request: rewriting the one-liner to write a file left the test green and the file
+    # written. It has to read __executorch_version__ out of dev_dep_versions.yml and print nothing
+    # else, which is the property that makes the shell substitution equal the pin.
+    command = embedded.group(1)
+    reads_the_pin = re.fullmatch(
+        r"""python3 -c 'import yaml;print\(yaml\.safe_load\(open\("dev_dep_versions\.yml"\)\)"""
+        r"""\["__executorch_version__"\]\)'""",
+        command,
+    )
+    assert reads_the_pin, (
+        "the docgen pin no longer reads __executorch_version__ out of dev_dep_versions.yml, so "
+        f"what it installs is no longer the pin: {command}"
+    )
 
 
 def test_the_runner_follows_the_row_s_cuda_version(monkeypatch) -> None:
@@ -725,9 +744,20 @@ def test_the_pin_check_runs_in_ci():
         "success()",
         "success() || failure()",
     }, f"the pin check in {name} runs under {condition!r}, which may never be true"
+    # Tokenised, not substring-matched, and every way of neutralising the run counts. "--co" is
+    # pytest's own documented short form of "--collect-only" and slipped past a check for the long
+    # spelling, and "|| true" or continue-on-error discard the exit status entirely.
+    tokens = shlex.split(step["run"].replace("\\\n", " "))
+    for flag in ("--collect-only", "--co", "--help", "-h"):
+        assert (
+            flag not in tokens
+        ), f"the pin check in {name} passes {flag}, so no assertion executes"
     assert (
-        "--collect-only" not in step["run"]
-    ), f"the pin check in {name} only collects tests, so no assertion executes"
+        "||" not in tokens
+    ), f"the pin check in {name} discards its exit status, so a failure cannot fail the job"
+    assert not step.get(
+        "continue-on-error"
+    ), f"the pin check in {name} is continue-on-error, so a failure cannot fail the job"
 
     # pytest and pyyaml must be installed by an earlier step of the SAME job: neither
     # requirements.txt nor dependency-groups.lint carries them, and without them the step exits 1
