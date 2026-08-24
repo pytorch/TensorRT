@@ -19,7 +19,8 @@ table; this converter is the single place that handles it.
 from __future__ import annotations
 
 import logging
-from typing import Optional, Tuple
+from enum import Enum, auto
+from typing import Any, Optional, Tuple
 
 import numpy as np
 import tensorrt as trt
@@ -66,6 +67,96 @@ def _kv_eligible(
             f"write_start({start})+update_len({update_len}) > s_max({s_max})",
         )
     return True, f"eligible (s_max={s_max}, write_start={start}, len={update_len})"
+
+
+class KVWriteStatus(Enum):
+    """How ``resolve_slice_scatter_write`` resolved a write's slice bounds.
+
+    Anything but ``OK`` is one of the converter's early exits, reached before it
+    can emit an IKVCacheUpdateLayer.
+    """
+
+    OK = auto()
+    FULL_OVERWRITE = auto()
+    DYNAMIC_BOUNDS = auto()
+    BAD_DIM = auto()
+
+
+def resolve_slice_scatter_write(
+    cache_shape: Tuple[Any, ...],
+    dim: Any,
+    start: Any,
+    end: Any,
+    step: Any,
+) -> Tuple[Optional[int], Optional[int], Optional[int], KVWriteStatus]:
+    """Resolve ``slice_scatter``'s slice bounds into the form ``_kv_eligible`` takes.
+
+    Returns ``(start, end, step, status)``. Under ``OK`` and ``FULL_OVERWRITE`` the
+    three bounds are Python ``int``s, with the op's defaults filled in and negative
+    indices counted from the end; under ``DYNAMIC_BOUNDS`` and ``BAD_DIM`` all three
+    are ``None``, since nothing resolved. ``status`` is one of:
+
+    * ``OK`` — the bounds are concrete, and the caller goes on to
+      ``_kv_eligible(cache_shape, dim, start, end - start)``.
+    * ``FULL_OVERWRITE`` — the slice spans the whole dim with a step equal to 1, so
+      the converter returns ``src`` and emits no KV layer. ``step`` comes back as the
+      integer 1, which is all this branch establishes: the caller's own step may be a
+      symbolic object that merely compares equal to it, and no caller reads the value
+      under this status.
+    * ``DYNAMIC_BOUNDS`` — a bound is not a Python ``int``, so the converter
+      raises ``NotImplementedError``.
+    * ``BAD_DIM`` — ``dim`` is either not a Python ``int`` or does not index
+      ``cache_shape``; the converter raises ``IndexError`` for both. A
+      ``numpy.int64`` is rejected on the type check even when its value is in range.
+
+    Single source of truth for the arguments ``_kv_eligible`` is called with: the
+    converter below derives them from the TRT tensors, and the pre-conversion
+    predictor in ``lowering/_buffer_lifting.py`` derives them from the fx node. A
+    write is classified before conversion as engine-aliased and has its ``copy_``
+    dropped on the strength of that prediction, so if the two derivations disagree
+    the aliasing never materializes and the write-back is lost.
+
+    ``step`` is read here for the full-overwrite shortcut and, on the converter side,
+    only by the scatter fallback; the KV fast path never reads it. See the note on the
+    ``OK`` return for what that costs a strided write the KV path accepts.
+    """
+    if not isinstance(dim, int) or not -len(cache_shape) <= dim < len(cache_shape):
+        return None, None, None, KVWriteStatus.BAD_DIM
+    dim_size = cache_shape[dim]
+
+    if start is None:
+        start = 0
+    if isinstance(start, int) and start < 0 and isinstance(dim_size, int):
+        start = dim_size + start
+    if end is None:
+        end = dim_size
+    if isinstance(end, int) and end < 0 and isinstance(dim_size, int):
+        end = dim_size + end
+    if step is None:
+        step = 1
+
+    # A slice covering the whole dim is a plain copy of the source whatever `step` is
+    # made of, so it is settled before the bounds are required to be concrete: `step`
+    # only has to compare equal to 1, which a symbolic step can do.
+    if (
+        isinstance(start, int)
+        and isinstance(end, int)
+        and isinstance(dim_size, int)
+        and start == 0
+        and end == dim_size
+        and step == 1
+    ):
+        return start, end, 1, KVWriteStatus.FULL_OVERWRITE
+
+    if not (isinstance(start, int) and isinstance(end, int) and isinstance(step, int)):
+        return None, None, None, KVWriteStatus.DYNAMIC_BOUNDS
+
+    # `step` is passed through untouched, and `try_emit_kv_cache_update` never reads
+    # it: a strided write the KV fast path accepts is classified and lowered as if it
+    # were contiguous, so `cache[:, :, 0:8:2, :]` lands in slots 0, 1, 2, 3 rather than
+    # 0, 2, 4, 6, silently. Known wrong and unfixed. The scatter fallback below does
+    # honour `step` (`test_fallback_step_two`), so only the KV path miscompiles.
+    return start, end, step, KVWriteStatus.OK
 
 
 def input_binding_name(ctx: ConversionContext, tensor: TRTTensor) -> Optional[str]:
@@ -175,39 +266,41 @@ def slice_scatter(
 ) -> TRTTensor:
     """Emit either an IKVCacheUpdateLayer (with aliased I/O) or a scatter sequence."""
     rank = len(input.shape)
-    dim_size = input.shape[dim]
 
-    if start is None:
-        start = 0
-    if isinstance(start, int) and start < 0 and isinstance(dim_size, int):
-        start = dim_size + start
-    if end is None:
-        end = dim_size
-    if isinstance(end, int) and end < 0 and isinstance(dim_size, int):
-        end = dim_size + end
-    if step is None:
-        step = 1
+    start, end, step, status = resolve_slice_scatter_write(
+        tuple(input.shape), dim, start, end, step
+    )
+
+    if status is KVWriteStatus.BAD_DIM:
+        raise IndexError(
+            f"slice_scatter: {dim} of type {type(dim).__name__} is not a valid dim "
+            f"for a rank-{rank} input; dim must be a Python int in [-{rank}, {rank})"
+        )
 
     # Trivial: full overwrite.
-    if (
-        isinstance(start, int)
-        and isinstance(end, int)
-        and isinstance(dim_size, int)
-        and start == 0
-        and end == dim_size
-        and step == 1
-    ):
+    if status is KVWriteStatus.FULL_OVERWRITE:
         return src
 
-    if not (isinstance(start, int) and isinstance(end, int) and isinstance(step, int)):
+    if status is KVWriteStatus.DYNAMIC_BOUNDS:
         raise NotImplementedError(
             "slice_scatter with dynamic start/end/step is not yet supported"
         )
+    # OK is the only status left, and it resolves all three bounds to Python ints.
+    assert start is not None and end is not None and step is not None
 
     update_len = end - start
 
-    # KV fast path.
-    kv_out = try_emit_kv_cache_update(ctx, name, input, src, dim, start, update_len)
+    # KV fast path, unless the write carries _trt_no_kv_alias: the classifier already
+    # filed it copy-back and re-attached its value as a graph output, and a buffer
+    # that is both copy-back and engine-aliased raises on every call.
+    kv_forbidden = ctx.current_node is not None and ctx.current_node.meta.get(
+        "_trt_no_kv_alias"
+    )
+    kv_out = (
+        None
+        if kv_forbidden
+        else try_emit_kv_cache_update(ctx, name, input, src, dim, start, update_len)
+    )
     if kv_out is not None:
         return kv_out
 

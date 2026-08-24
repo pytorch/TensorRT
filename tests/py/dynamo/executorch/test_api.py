@@ -333,6 +333,12 @@ def test_resolve_lifted_custom_obj_unwraps_fake_script_object():
 
 @pytest.mark.unit
 def test_resolve_target_device_uses_partition_engine(monkeypatch):
+    """The device comes from the partition's own engine node, read as metadata only.
+
+    DEVICE_IDX is the only slot wanted, and this runs once per partition on every
+    export that does not pin ``target_device`` -- the default -- so reading the full
+    record would re-serialize each engine to look at one string.
+    """
     pytest.importorskip("executorch.exir")
     from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import DEVICE_IDX
     from torch_tensorrt.executorch import partitioner as P
@@ -342,10 +348,17 @@ def test_resolve_target_device_uses_partition_engine(monkeypatch):
     monkeypatch.setattr(P, "_get_engine_nodes_in", lambda nodes: [engine_node])
     info = ["0"] * (DEVICE_IDX + 1)
     info[DEVICE_IDX] = "2"
-    monkeypatch.setattr(P, "_get_engine_info_for_node", lambda ep, n: info)
+    calls = []
+
+    def _spy(ep, n, **kwargs):
+        calls.append(kwargs)
+        return info
+
+    monkeypatch.setattr(P, "_get_engine_info_for_node", _spy)
 
     partition = types.SimpleNamespace(id=0, nodes=[engine_node])
     assert part._resolve_target_device_for_partition(object(), partition) == b"cuda:2"
+    assert calls == [{"metadata_only": True}]
 
 
 @pytest.mark.unit
@@ -373,7 +386,7 @@ def test_per_partition_distinct_target_devices(monkeypatch):
     # Each partition's engine node carries its own device id as its value.
     monkeypatch.setattr(P, "_get_engine_nodes_in", lambda nodes: [nodes[0]])
 
-    def fake_info(ep, node):
+    def fake_info(ep, node, **kwargs):
         info = ["0"] * (DEVICE_IDX + 1)
         info[DEVICE_IDX] = str(node)
         return info

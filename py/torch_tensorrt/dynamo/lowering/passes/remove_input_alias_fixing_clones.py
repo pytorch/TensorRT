@@ -16,6 +16,17 @@ def remove_input_alias_fixing_clones(
     """Remove the auxiliary clone nodes inserted to fix input aliasing
 
     See: https://github.com/pytorch/pytorch/issues/108079
+
+    ``lowering._buffer_lifting._effective_cache_input`` runs before this
+    pass and reproduces the condition below to predict whether a mutated buffer's
+    write will reach the converter reading a direct network input. Loosening the
+    condition -- or deleting the pass, as the TODO above invites -- invalidates that
+    prediction, and a mis-prediction is not a lost optimization: the write is filed
+    copy-back, its value re-attached as a graph output, the engine aliases the buffer
+    anyway, and the compiled module raises on every call. Keep the two in step, or
+    update the classifier in the same change. ``compile()`` cross-checks the
+    prediction against the built engine either way, so the failure surfaces as an
+    error rather than as a broken module.
     """
     modified_graph = False
 
