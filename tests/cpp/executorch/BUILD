@@ -13,6 +13,7 @@ test_suite(
         ":test_executorch_binding_names",
         ":test_executorch_blob_header",
         ":test_executorch_weight_streaming_budget",
+        ":test_optimization_profile_selection",
         ":test_shared_engines",
         ":test_shared_scratch_backend",
         ":test_shared_scratch_pool",
@@ -83,6 +84,7 @@ cc_test(
     }),
     deps = [
         "//cpp:tensorrt_executorch_backend",
+        "//cpp:tensorrt_executorch_engine_handle_test_access",
         "//cpp:tensorrt_executorch_shared_scratch_pool",
         "//cpp:tensorrt_executorch_shared_scratch_pool_test_hooks",
         "@executorch//:executorch_core",
@@ -100,6 +102,23 @@ cc_test(
         ],
         "//conditions:default": [],
     }),
+)
+
+# Asserts against the profile-selection policy only, so unlike the runtime tests
+# it needs neither a GPU nor a TensorRT engine. It does need TensorRT headers,
+# hence the same platform gate the backend carries.
+cc_test(
+    name = "test_optimization_profile_selection",
+    srcs = ["test_optimization_profile_selection.cpp"],
+    target_compatible_with = select({
+        "//cpp:linux_x86_64": [],
+        "//cpp:sbsa": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "//cpp:tensorrt_executorch_optimization_profile_selection",
+        "@googletest//:gtest_main",
+    ],
 )
 
 # The long timeout is what makes the fork case's per-child deadline mean anything:
@@ -134,6 +153,7 @@ cc_test(
     }),
     deps = [
         "//cpp:tensorrt_executorch_backend",
+        "//cpp:tensorrt_executorch_engine_handle_test_access",
         "//cpp:tensorrt_executorch_shared_engine_key",
         "//cpp:tensorrt_executorch_shared_engine_test_hooks",
         "@executorch//:executorch_core",
@@ -168,6 +188,7 @@ cc_test(
     deps = [
         "//cpp:tensorrt_executorch_backend",
         "//cpp:tensorrt_executorch_blob_header",
+        "//cpp:tensorrt_executorch_engine_handle_test_access",
         "//cpp:tensorrt_executorch_pooled_scratch_install",
         "//cpp:tensorrt_executorch_shared_scratch_pool",
         "//cpp:tensorrt_executorch_shared_scratch_pool_test_hooks",
