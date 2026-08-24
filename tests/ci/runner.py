@@ -220,7 +220,9 @@ def run_suite(
             print(f"==> setup[{step}]: {shlex.join(argv)}", flush=True)
             rc = subprocess.run(argv, cwd=scwd, env=env).returncode
             if rc != 0:
-                # Fail rather than warn and continue. Most of the executorch suite gates on
+                # Fail rather than warn and continue, for every setup step and not just the
+                # executorch one: a suite whose dependencies did not install cannot test what it
+                # was asked to test, whichever step failed. Most of the executorch suite gates on
                 # pytest.importorskip, so a failed install skips those files, leaves the rest
                 # passing, and reports success with a populated junit xml -- the run looks green
                 # precisely when the thing it exists to test is absent. This matters more now
