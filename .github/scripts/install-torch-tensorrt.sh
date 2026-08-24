@@ -70,8 +70,13 @@ else
     # channel, so deriving it would break this install on exactly the test and release runs the
     # index was added for. It is an extra index, not a replacement, and torch is already
     # force-reinstalled from ${INDEX_URL} above, so the pinned torch is not at risk from it.
+    # || exit 1 because line 1's `set -exou pipefail` is commented out and linux-test.yml
+    # concatenates this file ahead of the user script, so a failure here would otherwise be
+    # discarded and the job would die later with an unrelated-looking ImportError. Scoped to the
+    # line this change is responsible for; re-enabling set -e for the whole file is a
+    # pre-existing hazard worth a separate change.
     python -m pip install /opt/torch-tensorrt-builds/torch_tensorrt*.whl --use-deprecated=legacy-resolver \
-        --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}"
+        --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" || exit 1
 fi
 
 echo -e "Running test script";
