@@ -50,11 +50,11 @@ on:
         default: false
         type: boolean
       upload-artifact:
-        description: 'Name to give wheel artifacts uploaded from the repository dist directory'
+        description: 'Name prefix for wheel artifacts uploaded from the repository dist directory. This workflow appends -<python_version>-<desired_cuda>-<architecture>, plus -python-only and -rtx when those inputs are set. Rows that differ only in matrix.tensorrt.version are not separated by it.'
         default: ''
         type: string
       additional-artifact:
-        description: "Optional additional artifact to install alongside the core wheel"
+        description: "Name prefix of an optional additional artifact to install alongside the core wheel. The same suffix is appended, so it lines up with what upload-artifact produced when both calls are given the same build matrix and the same architecture."
         default: ""
         type: string
       use-rtx:
@@ -94,6 +94,10 @@ jobs:
       ARCH: ${{ inputs.architecture }}
       USE_TRT_RTX: ${{ inputs.use-rtx }}
       DOWNLOAD_ARTIFACT_NAME: pytorch_tensorrt_${{ matrix.tensorrt.version }}_${{ matrix.python_version }}_${{ matrix.desired_cuda }}_${{ inputs.architecture }}${{ inputs.python-only && '_python_only' || '' }}${{ inputs.use-rtx && '_rtx' || '' }}
+      # matrix.* and inputs.architecture are out of scope at a workflow_call site, so a
+      # per-row suffix can only be built here. The stem stays with the caller, and the
+      # producer and the consumer have to pass the same one.
+      ARTIFACT_NAME_SUFFIX: ${{ matrix.python_version }}-${{ matrix.desired_cuda }}-${{ inputs.architecture }}${{ inputs.python-only && '-python-only' || '' }}${{ inputs.use-rtx && '-rtx' || '' }}
     name: ${{ inputs.job-name }}-${{ matrix.tensorrt.version }}-${{ matrix.python_version }}-${{ matrix.desired_cuda }}
     runs-on: ${{ inputs.runner != '' && inputs.runner || matrix.validation_runner }}
     container:
@@ -168,7 +172,7 @@ jobs:
         if: ${{ inputs.additional-artifact != '' }}
         uses: actions/download-artifact@v7
         with:
-          name: ${{ inputs.additional-artifact }}
+          name: ${{ inputs.additional-artifact }}-${{ env.ARTIFACT_NAME_SUFFIX }}
           path: /opt/torch-tensorrt-builds/
       - name: Pack script
         continue-on-error: ${{ inputs.continue-on-error }}
@@ -226,7 +230,7 @@ jobs:
         uses: actions/upload-artifact@v6
         if: ${{ inputs.upload-artifact != '' }}
         with:
-          name: ${{ inputs.upload-artifact }}
+          name: ${{ inputs.upload-artifact }}-${{ env.ARTIFACT_NAME_SUFFIX }}
           path: ${{ inputs.repository }}/dist/
           if-no-files-found: error
 
