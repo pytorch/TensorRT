@@ -6,7 +6,6 @@ from types import FunctionType
 from typing import Any, Callable, Tuple
 
 import numpy as np
-import numpy.typing as npt
 import sympy
 import torch
 from sympy import lambdify
@@ -55,10 +54,24 @@ def _patch_trt_validator_issubclass() -> None:
 _patch_trt_validator_issubclass()
 
 
+def np_scalar_attr_annotation(dtype: Any) -> Any:
+    # The annotation TRT expects for a scalar plugin attribute backed by a
+    # 1-element numpy array. Deliberately *not* ``npt.NDArray[dtype]``: numpy
+    # 2.5 redefined ``NDArray`` as a PEP 695 alias
+    # (``type NDArray[ScalarT] = np.ndarray[_AnyShape, np.dtype[ScalarT]]``),
+    # so ``typing.get_origin(npt.NDArray[np.float64])`` is the alias itself
+    # rather than ``np.ndarray``. TRT's ``_is_npt_ndarray`` checks exactly that
+    # origin, so on numpy >= 2.5 every scalar attribute is rejected with
+    # "Attribute '<name>' of type NDArray[numpy.float64] is not a supported
+    # serializable type." Spelling the alias' own expansion keeps the origin
+    # ``np.ndarray`` on every numpy version.
+    return np.ndarray[Any, np.dtype[dtype]]
+
+
 _TORCH_SCHEMA_TYPE_TO_PLUGIN_ATTR_TYPE = {
-    "float": npt.NDArray[np.float64],
-    "int": npt.NDArray[np.int64],
-    "bool": npt.NDArray[np.bool_],
+    "float": np_scalar_attr_annotation(np.float64),
+    "int": np_scalar_attr_annotation(np.int64),
+    "bool": np_scalar_attr_annotation(np.bool_),
 }
 
 

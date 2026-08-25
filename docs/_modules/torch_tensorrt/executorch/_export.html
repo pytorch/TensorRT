@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=66991156"></script>
+    <script src="../../../_static/documentation_options.js?v=1ba7b232"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -601,6 +601,29 @@ document.write(`
     <span class="p">)</span>
 
 
+<span class="k">def</span><span class="w"> </span><span class="nf">_copyback_buffers_by_method</span><span class="p">(</span>
+    <span class="n">source</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">method_names</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">"""Per-method copy-back buffer names, read from the source's ``meta``.</span>
+
+<span class="sd">    ``compile()`` records the flattened names of the non-KV mutable buffers that</span>
+<span class="sd">    need a write-back copy in ``gm.meta["_copyback_mutation_buffers"]``.</span>
+<span class="sd">    """</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_names</span><span class="p">(</span><span class="n">obj</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+        <span class="n">gm</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">obj</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">)</span>
+            <span class="k">else</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="s2">"graph_module"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">meta</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="s2">"meta"</span><span class="p">,</span> <span class="p">{})</span> <span class="ow">or</span> <span class="p">{}</span>
+        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"_copyback_mutation_buffers"</span><span class="p">,</span> <span class="p">[])</span> <span class="ow">or</span> <span class="p">[])</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="n">_names</span><span class="p">(</span><span class="n">source</span><span class="p">[</span><span class="n">name</span><span class="p">])</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">method_names</span><span class="p">}</span>
+    <span class="k">return</span> <span class="p">{</span><span class="n">method_names</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span> <span class="n">_names</span><span class="p">(</span><span class="n">source</span><span class="p">)}</span>
+
+
 <span class="k">def</span><span class="w"> </span><span class="nf">_prepare_programs</span><span class="p">(</span>
     <span class="n">source</span><span class="p">:</span> <span class="n">ExportedProgram</span> <span class="o">|</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span> <span class="o">|</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">ExportedProgram</span><span class="p">],</span>
     <span class="o">*</span><span class="p">,</span>
@@ -914,6 +937,7 @@ document.write(`
 
     <span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime.meta_ops.register_meta_ops</span>  <span class="c1"># noqa: F401</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">executorch.exir</span><span class="w"> </span><span class="kn">import</span> <span class="n">to_edge_transform_and_lower</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._exporter</span><span class="w"> </span><span class="kn">import</span> <span class="n">_declare_aliased_kv_mutations_on_ep</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch</span><span class="w"> </span><span class="kn">import</span> <span class="n">TensorRTPartitioner</span><span class="p">,</span> <span class="n">get_edge_compile_config</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch._export_utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
         <span class="n">replace_execute_engine</span><span class="p">,</span>
@@ -929,6 +953,30 @@ document.write(`
         <span class="n">retrace</span><span class="o">=</span><span class="n">retrace</span><span class="p">,</span>
     <span class="p">)</span>
     <span class="n">program_map</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"forward"</span><span class="p">:</span> <span class="n">programs</span><span class="p">}</span> <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">programs</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span> <span class="k">else</span> <span class="n">programs</span>
+    <span class="n">copyback_by_method</span> <span class="o">=</span> <span class="n">_copyback_buffers_by_method</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="n">method_names</span><span class="p">)</span>
+    <span class="n">copyback_names</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">({</span><span class="n">n</span> <span class="k">for</span> <span class="n">ns</span> <span class="ow">in</span> <span class="n">copyback_by_method</span><span class="o">.</span><span class="n">values</span><span class="p">()</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">ns</span><span class="p">})</span>
+    <span class="k">if</span> <span class="n">copyback_names</span><span class="p">:</span>
+        <span class="c1"># Engine-aliased KV buffers are declared mutated as well, so ExecuTorch</span>
+        <span class="c1"># serializes only their shape and dtype too; they are left out of the warning</span>
+        <span class="c1"># below on purpose. An aliased write is a cache-position write on the sequence</span>
+        <span class="c1"># axis -- the only form IKVCacheUpdateLayer expresses -- and such a model is</span>
+        <span class="c1"># assumed to read the cache under that same position, through a bounded slice</span>
+        <span class="c1"># or a position mask, so slots no step has written should not reach the</span>
+        <span class="c1"># output. Nothing here verifies that; it is a property of the model. On that</span>
+        <span class="c1"># assumption initializing a cache buys nothing, and it would cost what is</span>
+        <span class="c1"># typically the model's largest tensor, written whole into the .pte.</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">"Copy-back mutable buffer(s) </span><span class="si">%s</span><span class="s2"> are declared mutated, so ExecuTorch "</span>
+            <span class="s2">"serializes only their shape and dtype, not their value, unless a pass "</span>
+            <span class="s1">'marks them meta["et_init_buffer"]; without that, a buffer read before '</span>
+            <span class="s2">"it is written starts from whatever the allocation held. ExecuTorch's "</span>
+            <span class="s2">"own warning names InitializedMutableBufferPass for this. That pass "</span>
+            <span class="s2">"reads the buffer host-side to serialize it, so it works while the "</span>
+            <span class="s2">"buffer is on CPU and segfaults the export, rather than raising, once "</span>
+            <span class="s2">"the buffer is CUDA-resident -- which is what exporting the model on "</span>
+            <span class="s2">"CUDA leaves behind."</span><span class="p">,</span>
+            <span class="n">copyback_names</span><span class="p">,</span>
+        <span class="p">)</span>
     <span class="n">extra_partitioners</span> <span class="o">=</span> <span class="n">_per_method_values</span><span class="p">(</span><span class="n">partitioners</span><span class="p">,</span> <span class="n">method_names</span><span class="p">,</span> <span class="s2">"partitioners"</span><span class="p">)</span>
     <span class="n">_reject_misnamed_partitioners</span><span class="p">(</span><span class="n">extra_partitioners</span><span class="p">)</span>
     <span class="n">method_compile_specs</span> <span class="o">=</span> <span class="n">_per_method_values</span><span class="p">(</span>
@@ -981,8 +1029,25 @@ document.write(`
     <span class="p">}</span>
     <span class="c1"># Zero-engine methods are allowed: later partitioners may claim their ops,</span>
     <span class="c1"># or portable operators may remain undelegated.</span>
+
+    <span class="c1"># An undeclared copy-back mutation reaches ExecuTorch as a trailing user output that</span>
+    <span class="c1"># nothing copies back, and an undeclared engine-aliased KV write does not reach it</span>
+    <span class="c1"># at all, since torch.export drops those outputs at the fx boundary. Either way the</span>
+    <span class="c1"># buffer loads frozen at its serialized value and never updates. Only the</span>
+    <span class="c1"># legacy exporter declares them while building the program, so a retraced program</span>
+    <span class="c1"># always needs the declaration and a caller's pre-exported one may or may not; the</span>
+    <span class="c1"># pass is idempotent, so every source shape can go through it. It rewrites the</span>
+    <span class="c1"># graph's output node in place while returning the rewritten signature on a new</span>
+    <span class="c1"># ExportedProgram, so it runs on the staged copy: given the caller's own program it</span>
+    <span class="c1"># would leave that program's graph and signature describing different outputs, which</span>
+    <span class="c1"># only the ExportedProgram verifier -- reached through save() -- reports. Staging</span>
+    <span class="c1"># holds engines and weights by reference, so declaring here costs no extra copy.</span>
     <span class="n">staged_programs</span> <span class="o">=</span> <span class="p">{</span>
-        <span class="n">name</span><span class="p">:</span> <span class="n">stage_exported_program</span><span class="p">(</span><span class="n">program</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">program</span> <span class="ow">in</span> <span class="n">program_map</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+        <span class="n">name</span><span class="p">:</span> <span class="n">_declare_aliased_kv_mutations_on_ep</span><span class="p">(</span>
+            <span class="n">stage_exported_program</span><span class="p">(</span><span class="n">program</span><span class="p">),</span>
+            <span class="n">copyback_buffers</span><span class="o">=</span><span class="n">copyback_by_method</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="p">[]),</span>
+        <span class="p">)</span>
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">program</span> <span class="ow">in</span> <span class="n">program_map</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
     <span class="p">}</span>
     <span class="n">rewritten</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">ExportedProgram</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="n">method_partitioners</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="n">Partitioner</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>

@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=66991156"></script>
+    <script src="../../../_static/documentation_options.js?v=1ba7b232"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -558,8 +558,8 @@ document.write(`
 <span class="sd">    - no_op_placeholder_for_execute_engine: engine info is embedded directly as</span>
 <span class="sd">      string args (args[1:]) — used when _replace_execute_engine_for_executorch</span>
 <span class="sd">      converted the graph before to_edge_transform_and_lower.</span>
-<span class="sd">    - execute_engine: engine info is extracted from the ScriptObject via</span>
-<span class="sd">      __getstate__() — fallback for graphs not yet converted.</span>
+<span class="sd">    - execute_engine: engine info is read off the ScriptObject through</span>
+<span class="sd">      :func:`get_engine_info_from_state` — fallback for graphs not yet converted.</span>
 
 <span class="sd">    Uses schema name comparison (not object identity) so it works for both</span>
 <span class="sd">    OpOverload and EdgeOpOverload targets.</span>
@@ -570,11 +570,14 @@ document.write(`
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_get_engine_info_for_node</span><span class="p">(</span>
-    <span class="n">edge_program</span><span class="p">:</span> <span class="n">ExportedProgram</span><span class="p">,</span> <span class="n">node</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">Node</span>
+    <span class="n">edge_program</span><span class="p">:</span> <span class="n">ExportedProgram</span><span class="p">,</span> <span class="n">node</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">Node</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">metadata_only</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Any</span><span class="p">]:</span>
     <span class="c1"># Engine-info extraction for a single TRT node; callable per-partition so a</span>
     <span class="c1"># coalesced multi-engine graph can resolve each engine without the</span>
     <span class="c1"># whole-program "exactly 1 engine" assumption.</span>
+    <span class="c1">#</span>
+    <span class="c1"># metadata_only is forwarded verbatim to get_engine_info_from_state; its docstring</span>
+    <span class="c1"># states what that flag costs and which slot it leaves unreadable.</span>
     <span class="n">gm</span> <span class="o">=</span> <span class="n">edge_program</span><span class="o">.</span><span class="n">graph_module</span>
     <span class="n">name</span> <span class="o">=</span> <span class="n">_schema_name</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">target</span><span class="p">)</span>
 
@@ -653,8 +656,12 @@ document.write(`
             <span class="sa">f</span><span class="s2">"'</span><span class="si">{</span><span class="n">engine_node</span><span class="o">.</span><span class="n">op</span><span class="si">}</span><span class="s2">'"</span>
         <span class="p">)</span>
 
-    <span class="n">state</span> <span class="o">=</span> <span class="n">engine_obj</span><span class="o">.</span><span class="n">__getstate__</span><span class="p">()</span>
-    <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">state</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="k">else</span> <span class="n">state</span><span class="p">)</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch._export_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_engine_info_from_state</span>
+
+    <span class="n">state</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">get_engine_info_from_state</span><span class="p">(</span>
+        <span class="n">engine_obj</span><span class="p">,</span> <span class="n">metadata_only</span><span class="o">=</span><span class="n">metadata_only</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">state</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_validate_engine_info</span><span class="p">(</span><span class="n">engine_info</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>

@@ -18,10 +18,17 @@ network input — the converter's "input is a placeholder" check fails and
 falls through to scatter.
 """
 
+import unittest
+from types import SimpleNamespace
+
+import numpy as np
 import torch
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
+from torch_tensorrt.dynamo.conversion.impl.slice_scatter import (
+    slice_scatter as slice_scatter_impl,
+)
 
 from .harness import DispatchTestCase
 
@@ -111,6 +118,66 @@ class TestSliceScatterFallback(DispatchTestCase):
         cache = torch.randn(2, 4, 16, 8)
         update = torch.randn(2, 4, 16, 8)
         self.run_test(M(), [cache, update])
+
+
+class TestSliceScatterEarlyExits(unittest.TestCase):
+    """The converter's two raising exits, driven through the converter itself.
+
+    Both are reached before the converter touches anything but ``input.shape``, so
+    ``_call`` passes ``None`` for ``ctx``, ``target``, ``source_ir`` and ``src``, and
+    an object carrying only a shape for the cache. Those five stand-ins are what
+    breaks if either exit is ever moved below a line that reads one of them.
+
+    ``run_test`` reaches neither exit, for a different reason per test. A bound that
+    is not a Python int has no concrete ``aten.slice_scatter`` to be traced into. An
+    out-of-range ``dim`` does trace, but running the traced module raises torch's own
+    "Dimension out of range" ``IndexError`` before any engine is built, so the
+    assertion would be pinning torch's message rather than the converter's. A
+    ``numpy.int64`` ``dim`` never reaches a converter at all: the tracer either
+    refuses the argument type or records a plain ``int``.
+    """
+
+    _CACHE_SHAPE = (2, 4, 16, 8)
+
+    def _call(self, dim, start, end, step):
+        cache = SimpleNamespace(shape=self._CACHE_SHAPE)
+        return slice_scatter_impl(
+            None, None, None, "test_slice_scatter", cache, None, dim, start, end, step
+        )
+
+    def test_dynamic_bound_is_not_implemented(self):
+        # A bound that is not a Python int is what the converter cannot lower; a
+        # bare object stands in for the symbolic value that carries one in a real
+        # dynamic-shape graph, since the resolver discriminates only on int-ness.
+        symbolic_end = object()
+        with self.assertRaisesRegex(
+            NotImplementedError, "dynamic start/end/step is not yet supported"
+        ):
+            self._call(2, 0, symbolic_end, 1)
+
+    def test_out_of_range_dim_is_an_index_error(self):
+        """A Python int outside the rank is rejected on range, not on type, and the
+        message has to say which: the type it prints is the required one, so the range
+        is the only thing that explains the error."""
+        with self.assertRaisesRegex(
+            IndexError,
+            r"^slice_scatter: 9 of type int is not a valid dim for a rank-4 input; "
+            r"dim must be a Python int in \[-4, 4\)$",
+        ):
+            self._call(9, 0, 4, 1)
+
+    def test_non_int_dim_is_an_index_error(self):
+        """An in-range numpy.int64 dim is rejected on type, not on range, and the
+        message has to say which: the value it prints is in range, so the type is the
+        only thing that explains the error. Matching the type name rather than the
+        rendered value keeps this independent of how numpy formats a scalar, which
+        changed in numpy 2.0."""
+        with self.assertRaisesRegex(
+            IndexError,
+            r"^slice_scatter: 2 of type int64 is not a valid dim for a rank-4 input; "
+            r"dim must be a Python int in \[-4, 4\)$",
+        ):
+            self._call(np.int64(2), 0, 4, 1)
 
 
 if __name__ == "__main__":

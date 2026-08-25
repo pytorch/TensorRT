@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=66991156"></script>
+    <script src="../../../_static/documentation_options.js?v=1ba7b232"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -639,7 +639,10 @@ document.write(`
                     <span class="sa">f</span><span class="s2">"expected exactly 1 engine node in partition "</span>
                     <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">getattr</span><span class="p">(</span><span class="n">partition</span><span class="p">,</span><span class="w"> </span><span class="s1">'id'</span><span class="p">,</span><span class="w"> </span><span class="s1">'?'</span><span class="p">)</span><span class="si">}</span><span class="s2">, found </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">engine_nodes</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
                 <span class="p">)</span>
-            <span class="n">engine_info</span> <span class="o">=</span> <span class="n">_get_engine_info_for_node</span><span class="p">(</span><span class="n">exported_program</span><span class="p">,</span> <span class="n">engine_nodes</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+            <span class="c1"># Only DEVICE_IDX is read, never the engine itself.</span>
+            <span class="n">engine_info</span> <span class="o">=</span> <span class="n">_get_engine_info_for_node</span><span class="p">(</span>
+                <span class="n">exported_program</span><span class="p">,</span> <span class="n">engine_nodes</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">metadata_only</span><span class="o">=</span><span class="kc">True</span>
+            <span class="p">)</span>
             <span class="k">return</span> <span class="sa">f</span><span class="s2">"cuda:</span><span class="si">{</span><span class="n">_parse_device_id</span><span class="p">(</span><span class="n">engine_info</span><span class="p">[</span><span class="n">DEVICE_IDX</span><span class="p">])</span><span class="si">}</span><span class="s2">"</span><span class="o">.</span><span class="n">encode</span><span class="p">()</span>
         <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
             <span class="c1"># Broad by design: any extraction failure must fall back, not abort</span>

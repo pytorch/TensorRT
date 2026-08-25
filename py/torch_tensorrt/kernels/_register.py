@@ -147,8 +147,11 @@ def _register_aot_impl(op_name: str, ptx: bytes, spec: CudaPythonSpec) -> None:
     from typing import Tuple, Union  # noqa: F401 – used in annotations dict
 
     import numpy as np
-    import numpy.typing as npt
     import tensorrt.plugin as trtp
+
+    from torch_tensorrt.dynamo.conversion.plugins._generate_plugin import (
+        np_scalar_attr_annotation,
+    )
 
     ns, name = op_name.split("::")
     torch_op = getattr(getattr(torch.ops, ns), name)
@@ -163,11 +166,11 @@ def _register_aot_impl(op_name: str, ptx: bytes, spec: CudaPythonSpec) -> None:
         else:
             attr_arg_names.append(arg.name)
             if arg.type.isSubtypeOf(torch._C.FloatType.get()):
-                attr_annotations[arg.name] = npt.NDArray[np.float64]
+                attr_annotations[arg.name] = np_scalar_attr_annotation(np.float64)
             elif arg.type.isSubtypeOf(torch._C.IntType.get()):
-                attr_annotations[arg.name] = npt.NDArray[np.int64]
+                attr_annotations[arg.name] = np_scalar_attr_annotation(np.int64)
             elif arg.type.isSubtypeOf(torch._C.BoolType.get()):
-                attr_annotations[arg.name] = npt.NDArray[np.bool_]
+                attr_annotations[arg.name] = np_scalar_attr_annotation(np.bool_)
             elif arg.type.isSubtypeOf(torch._C.StringType.get()):
                 attr_annotations[arg.name] = str
             else:
