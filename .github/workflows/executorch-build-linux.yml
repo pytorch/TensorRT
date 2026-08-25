@@ -82,6 +82,13 @@ jobs:
         python -m pip install pyyaml "executorch==1.4.1"
         export TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION="$(python -c 'import importlib.metadata; print(importlib.metadata.version("torch-tensorrt"))')"
 
+        # The downloaded wheel has to carry the C++ runtime. A wheel built with
+        # PYTHON_ONLY=1 has no libtorchtrt.so, which leaves
+        # ENABLED_FEATURES.torch_tensorrt_runtime False, and the export near the
+        # end of this script then fails after the Bazel builds have already run.
+        # Check it here so the wrong wheel is reported as the wrong wheel.
+        python -c 'from torch_tensorrt._features import ENABLED_FEATURES as f; assert f.torch_tensorrt_runtime, f'
+
         # Bazel truncates a failing action's output at 1 MB by default and then
         # prints nothing but the size, which hid the real error behind
         #   stdout ... exceeds maximum size of
