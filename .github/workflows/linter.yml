@@ -82,9 +82,11 @@ jobs:
         run: |
           uv pip install --system -r $GITHUB_WORKSPACE/.github/scripts/requirements.txt
           python3 -c "import tomllib, subprocess; deps = tomllib.load(open('pyproject.toml', 'rb'))['dependency-groups']['lint']; subprocess.run(['uv', 'pip', 'install', '--system'] + deps, check=True)"
-          # The pin check below runs under pytest and shells out to a yaml reader. Neither is in
-          # requirements.txt or dependency-groups.lint, so the step exited 1 without running.
-          uv pip install --system pytest pyyaml
+          # The pin check below runs under pytest and imports yaml to parse the workflows it
+          # asserts about. Neither pytest nor pyyaml is in requirements.txt or
+          # dependency-groups.lint, so the step exited 1 without running.
+          # test_update_executorch_pin imports packaging to order versions the way pip does.
+          uv pip install --system pytest pyyaml packaging
       - name: Lint Python
         run: |
           cd $GITHUB_WORKSPACE
@@ -100,4 +102,14 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE
           python3 -m pytest tests/py/dynamo/executorch/test_executorch_pin.py \
+            -q --no-header -p no:cacheprovider --noconftest -o addopts=""
+      # The pin updater is pure repository tooling: it reads an index, rewrites the pin sites,
+      # and its tests clone the tree and shell out to pytest. No GPU or ExecuTorch, so it runs
+      # here beside the pin check rather than on a CUDA runner, and is excluded from the
+      # executorch e2e suite so it does not run there too.
+      - name: Test the ExecuTorch pin updater
+        if: always()
+        run: |
+          cd $GITHUB_WORKSPACE
+          python3 -m pytest tests/py/dynamo/executorch/test_update_executorch_pin.py \
             -q --no-header -p no:cacheprovider --noconftest -o addopts=""

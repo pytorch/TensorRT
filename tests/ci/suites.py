@@ -283,8 +283,11 @@ _L2: list[Suite] = [
         keyword=(
             # The pairing test is the one check here that needs a real ExecuTorch installed, so
             # it has to survive this deselection. Everything else in that file is a
-            # source-consistency check the lint job already covers.
-            "not test_executorch_pin or test_the_pinned_commit_is_the_pinned_wheels_own_source"
+            # source-consistency check the lint job already covers. The pin updater's own tests
+            # are repository tooling with no GPU or ExecuTorch need, covered by the lint job, so
+            # they are deselected here rather than run in a CUDA container.
+            "(not test_executorch_pin or test_the_pinned_commit_is_the_pinned_wheels_own_source)"
+            " and not test_update_executorch_pin"
         ),
         setup=("executorch",),
         jobs="auto",

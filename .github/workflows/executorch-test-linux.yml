@@ -68,7 +68,7 @@ jobs:
         # --pre would apply to every other requirement in the same command too.
         python -m pip install pyyaml \
           --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" \
-          "executorch==1.5.0.dev20260822"
+          "executorch==1.5.0.dev20260829"
         # The standard wheel build packages the matching runtime wheel in its
         # artifact alongside torch_tensorrt*.whl; install it after the shared
         # core-wheel installer has selected the matrix-matched core wheel.
