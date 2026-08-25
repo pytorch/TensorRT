@@ -229,7 +229,9 @@ The ``executorch`` output format lowers the compiled module to an ExecuTorch
 ``.pte`` program, delegating the TensorRT engines to the Torch-TensorRT ExecuTorch
 backend. It requires the ``executorch`` package, from the PyTorch nightly index
 (``pip install --pre "torch_tensorrt[executorch]" --extra-index-url
-https://download.pytorch.org/whl/nightly/cu130``), and is Linux-only.
+https://download.pytorch.org/whl/nightly/cu130``), and is Linux-only. Add ``--upgrade``
+if a stable ``torch-tensorrt`` is already installed, or pip keeps it and reports that it
+does not provide the ``executorch`` extra.
 
 There are two ways to produce a ``.pte``, and they suit different needs:
 

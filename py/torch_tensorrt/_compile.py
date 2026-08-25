@@ -26,6 +26,7 @@ import torch
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES, needs_cross_compile
 from torch_tensorrt._Input import Input
+from torch_tensorrt._utils import executorch_install_command
 from torch_tensorrt.dynamo.runtime._CudaGraphsTorchTensorRTModule import (
     CudaGraphsTorchTensorRTModule,
 )
@@ -630,9 +631,10 @@ def load(
     if format == "executorch":
         if not _has_executorch_runtime():
             raise ImportError(
-                "Loading an ExecuTorch program requires the prebuilt "
-                "Torch-TensorRT ExecuTorch delegate. Install it with: "
-                "pip install torch-tensorrt-executorch-runtime"
+                "Loading an ExecuTorch program requires the Torch-TensorRT "
+                "ExecuTorch delegate runtime (torch_tensorrt_executorch_runtime), "
+                "which is not yet published to any package index. Build and install "
+                "it from source following py/torch-tensorrt-executorch-runtime/README.md."
             )
         from torch_tensorrt_executorch_runtime.runtime import load as load_executorch
 
@@ -856,11 +858,9 @@ def save(
         )
     if output_format == "executorch" and not _has_executorch_exir():
         raise ImportError(
-            "Saving in ExecuTorch format requires the executorch package "
-            "with executorch.exir, published for Linux only. Install with: "
-            "pip install --pre "
-            '"torch_tensorrt[executorch]" --extra-index-url '
-            "https://download.pytorch.org/whl/nightly/cu130 to use output_format='executorch'."
+            "Saving in ExecuTorch format requires the executorch package with "
+            "executorch.exir, published for Linux only, to use "
+            "output_format='executorch'. Install with: " + executorch_install_command()
         )
     if output_format == "executorch":
         # Every executorch option is popped above, so a leftover kwarg is a typo. Fail
@@ -1407,10 +1407,8 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
         from torch_tensorrt.executorch import export
     except ImportError:
         raise ImportError(
-            "ExecuTorch is not installed, and is published for Linux only. Install "
-            "with: pip install --pre "
-            '"torch_tensorrt[executorch]" --extra-index-url '
-            "https://download.pytorch.org/whl/nightly/cu130 to use output_format='executorch'."
+            "ExecuTorch is not installed, and is published for Linux only, to use "
+            "output_format='executorch'. Install with: " + executorch_install_command()
         )
     import torch_tensorrt.dynamo.runtime.meta_ops.register_meta_ops  # noqa: F401
 
