@@ -3,6 +3,7 @@ import logging
 from typing import Any, Dict, List
 
 import torch
+from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
 
 logger = logging.getLogger(__name__)
@@ -225,7 +226,6 @@ def fake_tensorrt_execute_engine(
         )
 
 
-@torch._library.register_fake_class("tensorrt::Engine")
 class FakeTRTEngine:
     def __init__(self, engine_info: List[str]) -> None:
         self.version = engine_info[torch.ops.tensorrt.ABI_TARGET_IDX()]
@@ -302,6 +302,12 @@ class FakeTRTEngine:
 
     def __getstate__(self) -> Any:
         pass
+
+
+if ENABLED_FEATURES.torch_tensorrt_runtime:
+    # Registration is a side effect; retaining the decorator's return value is
+    # unnecessary and mypy correctly rejects rebinding a class name here.
+    torch._library.register_fake_class("tensorrt::Engine")(FakeTRTEngine)
 
 
 @torch.library.custom_op(  # type: ignore[misc]
