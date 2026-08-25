@@ -19,6 +19,14 @@ filegroup(
     ),
 )
 
+# EXECUTORCH_ENABLE_LOGGING is pinned rather than left to follow
+# CMAKE_BUILD_TYPE. Its default is off in Release, which compiles the archive
+# with ET_LOG_ENABLED=0, but that is a CMake compile definition and
+# rules_foreign_cc harvests only the .a, so the Bazel targets that call into it
+# keep runtime/platform/log.h's default of 1. logf is an inline function whose
+# body is guarded by that macro, so the two halves disagree on its definition
+# and every ET_LOG and ET_CHECK_MSG message reaches an empty vlogf. A runner
+# built that way dies without saying why.
 cmake(
     name = "executorch_core",
     cache_entries = {
@@ -31,6 +39,7 @@ cmake(
         "EXECUTORCH_BUILD_EXTENSION_MODULE": "ON",
         "EXECUTORCH_BUILD_EXTENSION_NAMED_DATA_MAP": "ON",
         "EXECUTORCH_BUILD_PYBIND": "OFF",
+        "EXECUTORCH_ENABLE_LOGGING": "ON",
     },
     install = False,
     lib_source = ":executorch_sources",
@@ -112,6 +121,28 @@ cc_library(
     strip_include_prefix = "executorch",
     deps = [
         ":extension_cuda_shared",
+        "@cuda//:cudart",
+    ],
+)
+
+# The CUDA DeviceAllocator that serves device planned buffers. In the pinned
+# ExecuTorch release this source is compiled only into the CUDA/AOTI delegate,
+# so a binary that delegates to TensorRT alone cannot get one without linking a
+# delegate it never calls. Compile it on its own instead. It has no delegate
+# dependencies: cuda_runtime.h, the caller-stream header already in
+# libextension_cuda.so, and the ExecuTorch runtime headers.
+#
+# This target names a path that goes away when the allocator stops living under
+# backends/cuda upstream, so the pin cannot move forward while it is still here.
+cc_library(
+    name = "executorch_cuda_allocator",
+    srcs = ["executorch/backends/cuda/runtime/cuda_allocator.cpp"],
+    hdrs = ["executorch/backends/cuda/runtime/cuda_allocator.h"],
+    include_prefix = "executorch",
+    strip_include_prefix = "executorch",
+    deps = [
+        ":executorch_headers",
+        ":extension_cuda",
         "@cuda//:cudart",
     ],
 )
