@@ -147,6 +147,21 @@ cc_library(
     ],
 )
 
+# The kernels behind the device copies that an exported program runs around the
+# delegate. In the pinned ExecuTorch release these reach a binary only through
+# the generated kernel library, which this overlay does not build, so compile
+# the two implementations on their own. Registering them is left to
+# //cpp:tensorrt_executorch_device_copy_kernels, because a binary that already
+# gets them from ExecuTorch's own kernel library must not register them twice.
+cc_library(
+    name = "executorch_device_copy_kernels",
+    srcs = ["executorch/kernels/portable/cpu/op__device_copy.cpp"],
+    deps = [
+        ":executorch_core",
+        ":executorch_headers",
+    ],
+)
+
 cc_library(
     name = "executorch_headers",
     hdrs = glob(
