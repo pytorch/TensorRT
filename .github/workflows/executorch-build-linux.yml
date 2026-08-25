@@ -23,6 +23,10 @@ on:
         description: "Test infra reference to use"
         default: ""
         type: string
+      architecture:
+        description: "x86_64 or aarch64. Must match the os the caller generated its matrix for."
+        default: "x86_64"
+        type: string
 
 jobs:
   filter-matrix:
@@ -49,6 +53,7 @@ jobs:
     uses: ./.github/workflows/linux-test.yml
     with:
       job-name: executorch-runtime-build
+      architecture: ${{ inputs.architecture }}
       repository: ${{ inputs.repository }}
       ref: ${{ inputs.ref }}
       test-infra-repository: ${{ inputs.test-infra-repository }}
@@ -85,7 +90,7 @@ jobs:
         # CU_VERSION selects the row's own channel, which is what keeps the runtime the
         # delegate links to the same CUDA build as the rest of the job.
         EXECUTORCH_INDEX_URL="https://download.pytorch.org/whl/nightly/${CU_VERSION}"
-        python -m pip install pyyaml --extra-index-url "${EXECUTORCH_INDEX_URL}" "executorch==1.5.0.dev20260904"
+        python -m pip install pyyaml patchelf --extra-index-url "${EXECUTORCH_INDEX_URL}" "executorch==1.5.0.dev20260904"
         export TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION="$(python -c 'import importlib.metadata; print(importlib.metadata.version("torch-tensorrt"))')"
 
         # The downloaded wheel has to carry the C++ runtime. A wheel built with
@@ -93,7 +98,29 @@ jobs:
         # ENABLED_FEATURES.torch_tensorrt_runtime False, and the export near the
         # end of this script then fails after the Bazel builds have already run.
         # Check it here so the wrong wheel is reported as the wrong wheel.
-        python -c 'from torch_tensorrt._features import ENABLED_FEATURES as f; assert f.torch_tensorrt_runtime, f'
+        #
+        # Checked by looking for the library rather than by importing
+        # torch_tensorrt._features, which reaches torch.cuda.get_device_capability()
+        # while deciding whether it is on Tegra and so needs a GPU. The aarch64
+        # builder has none, and the presence of the file is what this cares about.
+        # Matched exactly, not with a trailing wildcard: a glob of libtorchtrt.so*
+        # also matches a renamed neighbour, so the check passed against a wheel whose
+        # real library had been moved aside.
+        python - <<'PY'
+        import importlib.util
+        import pathlib
+        import sys
+
+        spec = importlib.util.find_spec("torch_tensorrt")
+        assert spec is not None and spec.origin, "torch_tensorrt is not importable"
+        lib = pathlib.Path(spec.origin).parent / "lib" / "libtorchtrt.so"
+        if not lib.is_file():
+            sys.exit(
+                "the downloaded torch-tensorrt wheel ships no libtorchtrt.so, so it is a "
+                "python-only build and the delegate cannot link its C++ runtime"
+            )
+        print(f"torch-tensorrt C++ runtime present: {lib.name}")
+        PY
 
         # Bazel truncates a failing action's output at 1 MB by default and then
         # prints nothing but the size, which hid the real error behind
@@ -105,6 +132,159 @@ jobs:
 
         # Build the no-compile-for-users Python runtime wheel.
         python -m pip wheel --no-build-isolation --no-deps --wheel-dir dist py/torch-tensorrt-executorch-runtime
+        # The point of this wheel is that it carries the TensorRT delegate and leaves the
+        # ExecuTorch runtime to the executorch wheel. Nothing else here would notice it
+        # quietly going back to shipping a second copy of that runtime, and the wheel would
+        # still work, so assert the contents rather than the behavior.
+        python - "$(ls dist/torch_tensorrt_executorch_runtime-*.whl)" <<'PY'
+        import ast, pathlib, re, sys, zipfile
+
+        import yaml
+        # Read the name out of setup.py rather than repeating it, so renaming the delegate
+        # keeps this honest instead of quietly turning the assertion below into a no-op.
+        # Parsed rather than imported: importing setup.py would run setup().
+        source = pathlib.Path("py/torch-tensorrt-executorch-runtime/setup.py").read_text()
+        library, = [
+            node.value.value
+            for node in ast.parse(source).body
+            if isinstance(node, ast.Assign)
+            and any(getattr(t, "id", None) == "DELEGATE_LIBRARY" for t in node.targets)
+        ]
+        names = zipfile.ZipFile(sys.argv[1]).namelist()
+        # ".so" and ".so.<version>" both: libnvinfer.so.10 and libstdc++.so.6 are shared objects
+        # the wheel must not carry, and a suffix test for ".so" alone does not see them.
+        objects = sorted(n for n in names if re.search(r"\.so(\.\d+)*$", n))
+        print("shared libraries in the wheel:", objects)
+        # sys.exit rather than assert throughout: under PYTHONOPTIMIZE or python -O every assert
+        # is compiled out, and this step would print its success message over a bad wheel.
+        def reject(message):
+            sys.exit(f"FATAL: {message}")
+        if len(objects) != 1:
+            reject(f"expected exactly the delegate, got {objects}")
+        # The full expected path, not a suffix: the wheel must ship the ExecuTorch delegate name
+        # inside the package directory, so neither a setuptools-mangled name nor a stray copy in
+        # some other package satisfies this. Under lib/, the same place ExecuTorch keeps its own
+        # backends, so one location serves both the Python loader and the CMake package.
+        expected = "torch_tensorrt_executorch_runtime/lib/" + library
+        if objects[0] != expected:
+            reject(f"expected {expected}, got {objects}")
+        # A C++ consumer links this wheel through its CMake package, the same way it links
+        # ExecuTorch's own backends. Without these two files the delegate is reachable from Python
+        # only, and the shared library above is unusable outside this repo's source tree.
+        for required in (
+            "torch_tensorrt_executorch_runtime/lib/cmake/torchtrt_executorch/torchtrt_executorch-config.cmake",
+            "torch_tensorrt_executorch_runtime/lib/cmake/torchtrt_executorch/torchtrt_executorch-config-version.cmake",
+        ):
+            if required not in names:
+                reject(f"the wheel ships no CMake package: {required} is missing")
+        forbidden = [n for n in names if any(
+            part in n for part in ("_portable_lib", "libexecutorch.so", "libextension_cuda", "libaoti_cuda_shims"))]
+        if forbidden:
+            reject(f"the wheel ships ExecuTorch runtime components: {forbidden}")
+        # The platform tag, because the payload is a Linux ELF object. Dropping
+        # distclass=PlatformDistribution from setup.py yields a py3-none-any wheel that pip would
+        # install into purelib on Windows or macOS, and the content checks above all still pass.
+        tag = pathlib.Path(sys.argv[1]).name.rsplit("-", 1)[-1][: -len(".whl")]
+        # Every platform in a compressed tag, not a substring search: "win_amd64.linux_fake"
+        # contains "linux" and expands to a tag pip will install on Windows.
+        platforms = tag.split(".")
+        alien = [
+            p for p in platforms
+            if not re.fullmatch(r"(many|musl)?linux[0-9_.]*_(x86_64|aarch64|i686)", p)
+        ]
+        if alien or not platforms:
+            reject(f"wheel is tagged {tag}, which would install on non-Linux platforms: {alien}")
+        wheel_metadata = next(
+            (n for n in names if re.fullmatch(r"[^/]+\.dist-info/WHEEL", n)), None)
+        if wheel_metadata is None:
+            reject("wheel carries no dist-info/WHEEL to check Root-Is-Purelib against")
+        purelib = zipfile.ZipFile(sys.argv[1]).read(wheel_metadata).decode()
+        if "Root-Is-Purelib: false" not in purelib:
+            reject(f"wheel declares itself pure python:\n{purelib}")
+        # Requires-Dist, which is where the build environment leaks into the artifact: setup.py
+        # derives the executorch pin from whatever is installed, so a wheel built beside the wrong
+        # version requires that version, and every content check above still passes. A local label
+        # is the same class of problem -- it binds the wheel to one CUDA train, which is why every
+        # requirement is stripped of one with public_version().
+        core_metadata = next(
+            (n for n in names if re.fullmatch(r"[^/]+\.dist-info/METADATA", n)), None)
+        if core_metadata is None:
+            reject("wheel carries no dist-info/METADATA to check Requires-Dist against")
+        metadata = zipfile.ZipFile(sys.argv[1]).read(core_metadata).decode()
+        requires = [
+            r.strip()
+            for r in re.findall(r"^Requires-Dist:\s*(.+)$", metadata, re.MULTILINE)
+        ]
+        pinned = yaml.safe_load(
+            open("dev_dep_versions.yml"))["__executorch_version__"]
+        if f"executorch=={pinned}" not in requires:
+            reject(
+                f"wheel requires {[r for r in requires if 'executorch' in r]} but the "
+                f"repository pins executorch=={pinned}:\n" + "\n".join(requires))
+        # setup.py derives torch-tensorrt, torch, tensorrt-cu13 and nvidia-cuda-runtime from
+        # importlib.metadata the same way it derives executorch, so a wheel built beside the wrong
+        # version of any of them requires that version and every content check above still passes.
+        # torch-tensorrt is the requirement that binds this runtime wheel to the producer that
+        # emitted the program; torch is the framework both were built against. None has a repository
+        # pin to compare a value against -- their version is whatever CI installed -- but the
+        # derivation can still be checked for shape: each must be present and pinned with an exact
+        # "==", so a requirement that went missing or loosened to a range is caught here rather than
+        # shipping. executorch is checked above against the repository pin, which is stricter.
+        for distribution in (
+            "torch-tensorrt",
+            "torch",
+            "tensorrt-cu13",
+            "nvidia-cuda-runtime",
+        ):
+            matched = [
+                r for r in requires
+                if re.match(rf"{re.escape(distribution)}\s*(==|[<>!~ ;]|$)", r)
+            ]
+            if not matched:
+                reject(
+                    f"wheel does not require {distribution}, which setup.py derives from the "
+                    f"build environment:\n" + "\n".join(requires))
+            if not any(
+                re.match(rf"{re.escape(distribution)}==[^;]+", r) for r in matched
+            ):
+                reject(
+                    f"wheel requires {matched} without an exact == pin, so it does not bind "
+                    f"{distribution} to the version it was built beside:\n" + "\n".join(requires))
+        labelled = [r for r in requires if "+" in r.split(";")[0]]
+        if labelled:
+            reject(f"these requirements carry a local version label: {labelled}")
+        print(
+            f"the wheel ships only {objects[0]}, tagged {tag}, requiring "
+            f"executorch=={pinned}")
+        PY
+
+        # Every dependency actually resolves from where the wheel puts it. The ELF guard that runs
+        # at link time compares the whole RUNPATH against what the build asked for and checks one
+        # ExecuTorch symbol, but it cannot resolve anything: in a Bazel output tree the sibling
+        # distributions do not exist yet, so it reasons about the artifact's own metadata rather
+        # than loading it. Here the installed layout exists, so ask the loader instead of inferring:
+        # a pin bump that drops some other ExecuTorch export reaches an undefined symbol at import
+        # time that the link-time guard cannot see. -r resolves data and function symbols, which is
+        # what turns an undefined ExecuTorch symbol into a failure rather than a silent success.
+        # env -u LD_LIBRARY_PATH, because the test lane exports the CUDA site-packages directory
+        # onto LD_LIBRARY_PATH (install-torch-tensorrt.sh), which puts nvidia/cu13/lib on the load
+        # path and lets a missing $ORIGIN/../nvidia/cu13/lib RUNPATH entry resolve here while it
+        # would not on a user's process. Clearing it makes ldd -r see what the user would.
+        python -m pip install --no-deps "$(ls dist/torch_tensorrt_executorch_runtime-*.whl)"
+        # Skip registration for this one call. Importing the package now LOADS the delegate, so a
+        # pin bump that dropped a symbol would abort here with the package's own error and the
+        # ldd -r guard below, which exists to diagnose exactly that, would never run. Resolving
+        # the path is all this needs, and the plain import further down still proves the side
+        # effect works.
+        delegate="$(TORCH_TENSORRT_SKIP_DELEGATE_REGISTRATION=1 python -c 'import torch_tensorrt_executorch_runtime as m; print(m._delegate_path())')"
+        echo "resolving ${delegate} from its installed location"
+        if env -u LD_LIBRARY_PATH ldd -r "${delegate}" 2>&1 | grep -E "not found|undefined symbol" ; then
+          echo "FATAL: the installed delegate has unresolved dependencies, so importing it fails." >&2
+          echo "Either a RUNPATH entry is missing or the pinned ExecuTorch no longer provides a symbol it uses." >&2
+          exit 1
+        fi
+        python -c "import torch_tensorrt_executorch_runtime"
+
         # this is to build the libtorchtrt.tar.gz
         bazel build //:libtorchtrt --compilation_mode opt --config=linux
         # Run the ExecuTorch backend C++ unit tests, which are otherwise only
@@ -142,7 +322,18 @@ jobs:
         python -m venv "${RUNNER_TEMP}/range-check-venv"
         # pin-check: range-ok
         "${RUNNER_TEMP}/range-check-venv/bin/python" -m pip install --no-deps --extra-index-url "${EXECUTORCH_INDEX_URL}" "executorch>=1.5.0.dev20260904,<1.6"
-        python examples/torchtrt_executorch_example/export_static_shape.py \
-          --model_path="${RUNNER_TEMP}/torchtrt-reference-runner.pte"
-        .github/scripts/verify-executorch-reference-runner.sh \
-          "${RUNNER_TEMP}/torchtrt-reference-runner.pte"
+        # The export compiles a TensorRT engine and the reference runner executes it, so both need a
+        # GPU. The aarch64 builders have none: every arm64 runner label is a CPU-only Graviton
+        # instance, which is why the wheel's own SBSA lanes pass run-tests false and build without
+        # testing. Skipped rather than failed, so the aarch64 rows still produce and check an
+        # artifact; the delegate's runtime behaviour stays covered by the x86_64 rows, which run
+        # this on a GPU runner.
+        if python -c 'import torch, sys; sys.exit(0 if torch.cuda.is_available() else 1)'; then
+          python examples/torchtrt_executorch_example/export_static_shape.py \
+            --model_path="${RUNNER_TEMP}/torchtrt-reference-runner.pte"
+          .github/scripts/verify-executorch-reference-runner.sh \
+            "${RUNNER_TEMP}/torchtrt-reference-runner.pte"
+        else
+          echo "No GPU on this runner, so the export and reference runner are skipped." >&2
+          echo "The delegate itself was built and checked above." >&2
+        fi

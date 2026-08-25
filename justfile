@@ -92,7 +92,7 @@ install-test-ext:
     #
     # Exact, not a range: the nightly channel gains a member every day, and the delegate is
     # compiled from the commit this version pairs with.
-    uv pip install pyyaml \
+    uv pip install pyyaml patchelf \
       --extra-index-url https://download.pytorch.org/whl/nightly/cu130 \
       "executorch==1.5.0.dev20260904"
 

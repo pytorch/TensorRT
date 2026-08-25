@@ -45,11 +45,13 @@ new_git_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:git.bzl"
 
 local_torch = use_repo_rule("//toolchains:local_torch.bzl", "local_torch")
 
-# This commit must be the one the pinned ExecuTorch wheel was built from, because the delegate
-# compiles headers from this tree and links the runtime out of that wheel. Every wheel records
-# its source in executorch/version.py as git_version, and tests/py/dynamo/executorch/
-# test_executorch_pin.py checks the two agree wherever the pinned wheel is the one installed,
-# so bump both pins together.
+# This commit must be the one the pinned ExecuTorch wheel was built from. The C++ backend at
+# //cpp and its tests compile against this tree's headers while loading the wheel's runtime at
+# runtime, so the two disagreeing is an ABI mismatch. The Python runtime wheel does not use this
+# pin at all -- it configures against the installed wheel's own CMake package -- so only the C++
+# path depends on the pairing. Every wheel records its source in executorch/version.py as
+# git_version, and tests/py/dynamo/executorch/test_executorch_pin.py checks the two agree
+# wherever the pinned wheel is the one installed, so bump both pins together.
 new_git_repository(
     name = "executorch",
     build_file = "@//third_party/executorch:BUILD",

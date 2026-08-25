@@ -110,8 +110,9 @@ that it does not provide the `executorch` extra.
 The extra installs `executorch` only. The delegate runtime,
 `torch-tensorrt-executorch-runtime`, is not yet published to any index: its requirement in the
 top-level `setup.py` is commented out for that reason. Build and install it from source following
-`py/torch-tensorrt-executorch-runtime/README.md`. That wheel contains an ExecuTorch Python runtime
-with `TensorRTBackend` linked into its backend registry, and loading a `.pte` through the delegate
+`py/torch-tensorrt-executorch-runtime/README.md`. That wheel ships just the TensorRT delegate, a
+single shared library that registers itself with the ExecuTorch runtime from the `executorch`
+distribution rather than bundling a runtime of its own, and loading a `.pte` through the delegate
 needs it.
 
 Then load and run the model:
