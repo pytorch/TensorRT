@@ -688,6 +688,16 @@ if _FX_FE_AVAIL:
 
 package_data = {}
 
+# ExecuTorch export uses the Python fake/meta kernels to represent TensorRT
+# engine calls while lowering. They do not depend on the native Torch-TensorRT
+# runtime, so Python-only wheels must ship them too.
+packages += ["torch_tensorrt.dynamo.runtime.meta_ops"]
+package_dir.update(
+    {
+        "torch_tensorrt.dynamo.runtime.meta_ops": "py/torch_tensorrt/dynamo/runtime/meta_ops",
+    }
+)
+
 if not (PY_ONLY or NO_TS):
     tensorrt_x86_64_external_dir = (
         lambda: subprocess.check_output(
@@ -918,12 +928,11 @@ if not (PY_ONLY or NO_TS):
         )
     ]
 
-    packages += ["torch_tensorrt.ts", "torch_tensorrt.dynamo.runtime.meta_ops"]
+    packages += ["torch_tensorrt.ts"]
 
     package_dir.update(
         {
             "torch_tensorrt.ts": "py/torch_tensorrt/ts",
-            "torch_tensorrt.dynamo.runtime.meta_ops": "py/torch_tensorrt/dynamo/runtime/meta_ops",
         }
     )
 

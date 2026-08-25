@@ -273,8 +273,8 @@ def _apply_weight_streaming_budget(
     """
     from executorch.exir.backend.compile_spec_schema import CompileSpec
     from torch_tensorrt.executorch.partitioner import (
-        normalize_weight_streaming_budget_per_engine,
         WEIGHT_STREAMING_BUDGET_COMPILE_SPEC_KEY,
+        normalize_weight_streaming_budget_per_engine,
     )
 
     for name, specs in method_compile_specs.items():
@@ -438,17 +438,10 @@ def export(
         executorch.exir.EdgeProgramManager: The Edge program, ready for inspection,
         further transformation, or ``to_executorch()``.
     """
-    from torch_tensorrt._features import ENABLED_FEATURES
-
     if platform.system() != "Linux":
         raise ValueError(
             f"The executorch format is only supported on Linux, {platform.system()} "
             "is not a supported platform for this format"
-        )
-    if not ENABLED_FEATURES.torch_tensorrt_runtime:
-        raise RuntimeError(
-            "ExecuTorch export requires the Torch-TensorRT runtime "
-            "(torch_tensorrt_runtime). Reinstall torch_tensorrt with the runtime extension."
         )
     if inputs is not None and arg_inputs is not None:
         raise ValueError("inputs and arg_inputs are mutually exclusive.")
