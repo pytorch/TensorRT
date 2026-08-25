@@ -186,7 +186,13 @@ class TRTRuntimeConfig:
         if self._live is not None:
             return
         self._live = cuda_engine.create_runtime_config()
-        self._apply_settings()
+        try:
+            self._apply_settings()
+        except Exception:
+            # Reset the live config so a later ensure_initialized rebuilds it
+            # instead of short-circuiting on the guard above.
+            self._live = None
+            raise
 
     def reset(self) -> None:
         """Drop the live ``IRuntimeConfig``; the next ``ensure_initialized`` rebuilds."""

@@ -816,6 +816,31 @@ class TestEngineOwnsNoCache(TestCase):
             self.assertTrue(os.path.exists(path))
             self.assertGreater(os.path.getsize(path), 0)
 
+    def test_failed_settings_do_not_leave_a_half_configured_config(self):
+        """A failed apply must raise every time, not just the first.
+
+        ``ensure_initialized`` early-returns when the live ``IRuntimeConfig``
+        exists, so a config left behind by a failed apply would make a retry
+        silently succeed against settings that were never fully applied.
+        """
+        model, inputs = _fresh_conv_model_and_inputs()
+        engine = self._bare_engine(_compile(model, inputs))
+        with tempfile.TemporaryDirectory() as tmp:
+            engine.update_runtime_settings(
+                RuntimeSettings(runtime_cache=os.path.join(tmp, "rc.bin"))
+            )
+            for attempt in range(2):
+                with self.assertRaisesRegex(
+                    TypeError,
+                    "must be None or a RuntimeCache",
+                    msg=f"attempt {attempt + 1} did not raise",
+                ):
+                    engine.execute(list(inputs))
+                self.assertIsNone(
+                    engine._trt_runtime_config._live,
+                    "a half-configured IRuntimeConfig survived the failure",
+                )
+
     def test_path_string_on_an_engine_raises(self):
         """Strings are the module's business; an engine rejects them."""
         model, inputs = _fresh_conv_model_and_inputs()
