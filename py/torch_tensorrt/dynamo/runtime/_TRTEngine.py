@@ -74,7 +74,7 @@ def _current_serialized_platform() -> str:
     """Return the current platform using the engine-metadata representation."""
     platform = Platform.current_platform()
     return (
-        platform._to_serialized_rt_platform()
+        cast(str, platform._to_serialized_rt_platform())
         if ENABLED_FEATURES.torch_tensorrt_runtime
         else str(platform)
     )
@@ -367,6 +367,18 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
 
     def __repr__(self) -> str:
         return self.__str__()
+
+    def serialize_metadata_only(self) -> List[Any]:
+        """Return the serialized layout without base64-encoding the engine bytes.
+
+        This mirrors the C++ runtime accessor used by ExecuTorch export when it
+        only needs engine metadata. The record keeps its normal shape, but the
+        engine slot is deliberately empty; callers that need the engine must
+        use ``__getstate__`` instead.
+        """
+        serialized_info = list(self.serialized_info)
+        serialized_info[ENGINE_IDX] = ""
+        return serialized_info
 
     def __getstate__(self) -> Tuple[List[Any], str]:
         """Return pickle state in the same shape as C++ ``ScriptObject.__getstate__``.
