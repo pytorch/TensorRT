@@ -40,8 +40,8 @@ of the wheel runtime contract.
 export TensorRT_ROOT=/path/to/TensorRT
 
 python -m pip install pyyaml \
-  --extra-index-url https://download.pytorch.org/whl/nightly/cu132 \
-  "executorch==1.5.0.dev20260822"
+  --extra-index-url https://download.pytorch.org/whl/nightly/cu130 \
+  "executorch==1.5.0.dev20260829"
 python -m pip wheel --no-build-isolation --no-deps \
   --wheel-dir dist py/torch-tensorrt-executorch-runtime
 ```
@@ -49,7 +49,7 @@ python -m pip wheel --no-build-isolation --no-deps \
 The native build obtains the ExecuTorch source through Bazel; no separate
 source checkout or `EXECUTORCH_SOURCE_DIR` setting is required. The source
 commit pinned in `MODULE.bazel` is the revision recorded by the
-`executorch==1.5.0.dev20260822` wheel.
+`executorch==1.5.0.dev20260829` wheel.
 
 The static ExecuTorch and delegate archives are intermediate build inputs;
 users receive the final native Python module and do not compile anything.
@@ -75,8 +75,14 @@ GPU should use the ExecuTorch C++ runner.
 
 ## Use
 
+The wheel's dependencies (`executorch`, `torch-tensorrt`, and the CUDA
+runtime) resolve from the PyTorch nightly index, so install it with the same
+channel the build recipe used. `--pre` lets pip select the pinned ExecuTorch
+dev build:
+
 ```bash
-python -m pip install torch-tensorrt-executorch-runtime
+python -m pip install --pre dist/torch_tensorrt_executorch_runtime-*.whl \
+  --extra-index-url https://download.pytorch.org/whl/nightly/cu130
 ```
 
 ```python

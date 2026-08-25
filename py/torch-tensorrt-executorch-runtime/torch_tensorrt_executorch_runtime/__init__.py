@@ -10,7 +10,12 @@ from types import ModuleType
 from typing import Any, Protocol, cast
 
 BACKEND_NAME = "TensorRTBackend"
-_NATIVE_NAME = "executorch.extension.pybindings._portable_lib"
+_NATIVE_NAME = "executorch.extension.pybindings._C"
+# The extension was called _portable_lib before ExecuTorch renamed it to _C, and portable_lib.py
+# imports whichever name its own version uses. Both are claimed so the interception works against
+# either: aliasing only the old name is silently ineffective at the pinned nightly, because nothing
+# imports it any more and the stock _C loads instead, leaving TensorRTBackend unregistered.
+_LEGACY_NATIVE_NAME = "executorch.extension.pybindings._portable_lib"
 _WRAPPER_NAME = "executorch.extension.pybindings.portable_lib"
 _DATA_LOADER_NAME = "executorch.extension.pybindings.data_loader"
 
@@ -44,10 +49,20 @@ def activate() -> ModuleType:
     backend and optimized CPU kernels, so activation preserves the stock
     Python runtime CPU execution capabilities.
     """
-    existing = sys.modules.get(_NATIVE_NAME)
-    if existing is not None and existing.__name__ == __name__ + "._portable_lib":
-        return existing
-    if existing is not None or _WRAPPER_NAME in sys.modules:
+    # Both alias names are inspected: whichever one a given ExecuTorch version uses, an entry there
+    # that is not ours means the stock extension already loaded.
+    claimed = [
+        module
+        for module in (
+            sys.modules.get(_NATIVE_NAME),
+            sys.modules.get(_LEGACY_NATIVE_NAME),
+        )
+        if module is not None
+    ]
+    ours = __name__ + "._portable_lib"
+    if claimed and all(module.__name__ == ours for module in claimed):
+        return claimed[0]
+    if claimed or _WRAPPER_NAME in sys.modules:
         raise DelegateCompatibilityError(
             "ExecuTorch's stock runtime was imported first. Call "
             'torch_tensorrt.load(..., format="executorch") before importing '
@@ -73,6 +88,7 @@ def activate() -> ModuleType:
             "the same release matrix."
         ) from error
     sys.modules[_NATIVE_NAME] = native
+    sys.modules[_LEGACY_NATIVE_NAME] = native
     sys.modules.pop(_WRAPPER_NAME, None)
     return native
 

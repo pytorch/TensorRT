@@ -10,15 +10,12 @@ if TYPE_CHECKING:
 
 
 def _get_runtime() -> _Runtime:
-    try:
-        from torch_tensorrt_executorch_runtime import get_runtime
-    except ImportError as error:
-        raise ImportError(
-            "ExecuTorch Python inference requires the prebuilt delegate, which is "
-            "published for Linux only. Install it with: pip install --pre "
-            '"torch-tensorrt[executorch]" --extra-index-url '
-            "https://download.pytorch.org/whl/nightly/cu130"
-        ) from error
+    # get_runtime is defined at module scope in this package's __init__, from stdlib and local
+    # imports, so importing the name here cannot fail once this submodule is importable. Calling it
+    # can still fail: it imports the ExecuTorch runtime, which raises ModuleNotFoundError when
+    # ExecuTorch is absent, and DelegateCompatibilityError when the delegate is not registered.
+    from torch_tensorrt_executorch_runtime import get_runtime
+
     return get_runtime()
 
 

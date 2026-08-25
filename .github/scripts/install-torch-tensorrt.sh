@@ -62,6 +62,9 @@ fi
 
 # Install Torch-TensorRT
 if [[ ${PLATFORM} == win32 ]]; then
+    # pin-check: no-nightly -- this glob also matches the Linux-only ExecuTorch runtime wheel, but
+    # ExecuTorch publishes no win32 nightly and the [executorch] extra is Linux-only, so this
+    # platform's plain torch-tensorrt install needs no nightly index.
     python -m pip install ${RUNNER_ARTIFACT_DIR}/torch_tensorrt*.whl
 else
     # The nightly channel is needed because this glob also matches the ExecuTorch runtime wheel,

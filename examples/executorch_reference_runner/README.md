@@ -44,7 +44,7 @@ torch_tensorrt/bin/example_executorch_runner
 ```bash
 # Get the ExecuTorch source snapshot this package is built against. Keep this in sync
 # with the executorch commit pinned in MODULE.bazel.
-EXECUTORCH_REF="${EXECUTORCH_REF:-b575a5bc2eab6d671197bc7a920edb7fd0b8fbb7}"
+EXECUTORCH_REF="${EXECUTORCH_REF:-bdf8c941fba42f0d4b62a438443d00458585e0e9}"
 git clone --filter=blob:none --no-checkout \
   https://github.com/pytorch/executorch.git executorch
 pushd executorch
@@ -95,7 +95,7 @@ build-executorch-reference-runner/lib/libexecutorch_trt_backend.a
 
 ### Python
 
-Install the complete prebuilt Python runtime and delegate:
+Install the `executorch` authoring stack, which the `[executorch]` extra pulls in:
 
 ```bash
 pip install --pre "torch-tensorrt[executorch]" \
@@ -104,20 +104,23 @@ pip install --pre "torch-tensorrt[executorch]" \
 
 The index is required, not optional: the extra's ExecuTorch floor names a dev build, and PyPI's
 `executorch` stops below it, so without the nightly channel pip reports no matching distribution.
+If a stable `torch-tensorrt` is already installed, add `--upgrade`, or pip keeps it and reports
+that it does not provide the `executorch` extra.
 
-Load and run the model without an ExecuTorch checkout or native build:
+The extra installs `executorch` only. The delegate runtime,
+`torch-tensorrt-executorch-runtime`, is not yet published to any index: its requirement in the
+top-level `setup.py` is commented out for that reason. Build and install it from source following
+`py/torch-tensorrt-executorch-runtime/README.md`. That wheel contains an ExecuTorch Python runtime
+with `TensorRTBackend` linked into its backend registry, and loading a `.pte` through the delegate
+needs it.
+
+Then load and run the model:
 
 ```bash
 python examples/executorch_reference_runner/load_model.py \
   --model_path=model.pte \
   --num_runs=1
 ```
-
-The extra installs `executorch` only. The
-`torch-tensorrt-executorch-runtime` requirement in the top-level `setup.py` is
-commented out until that wheel is published to the PyTorch index, so install it
-separately for now. That wheel contains an ExecuTorch Python runtime with
-`TensorRTBackend` linked into its backend registry.
 
 ### C++
 
