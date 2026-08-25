@@ -36,13 +36,14 @@ _WARNED_MISSING: set[str] = set()
 
 
 def _warn_missing_accessor(name: str) -> None:
-    """Warn once per accessor that the loaded runtime predates it.
+    """Warn once per accessor that the engine's native runtime predates it.
 
     Without this the only symptom is that export gets slower: the fallback is
     correct, it just re-serializes the whole ICudaEngine and base64-encodes it.
-    It means the Torch-TensorRT C++ library is older than this Python package,
-    i.e. a source or editable build where only the Python half was rebuilt; a
-    wheel ships both halves together, so an unmodified wheel should not see it.
+    The engine may have come from a Torch-TensorRT C++ library older than this
+    Python package.  That can be a mismatched source/editable build, or, for a
+    Python-only wheel, an engine loaded from an external or previously-built
+    native runtime.
     """
     if name in _WARNED_MISSING:
         return
@@ -50,8 +51,9 @@ def _warn_missing_accessor(name: str) -> None:
     logger.warning(
         "TensorRT runtime has no %s(); falling back to full engine serialization "
         "on every read of this engine's info. This is correct but slower, and "
-        "means the Torch-TensorRT C++ library loaded from torch_tensorrt/lib "
-        "predates this Python package -- rebuild the C++ side to avoid it.",
+        "means this engine was created by a Torch-TensorRT C++ runtime that "
+        "predates this Python package. Rebuild or reinstall the matching native "
+        "runtime (or regenerate the engine) to avoid it.",
         name,
     )
 
