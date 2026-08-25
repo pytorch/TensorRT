@@ -21,7 +21,10 @@ from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Argument, Node, Target
 from torch_tensorrt import ENABLED_FEATURES
 from torch_tensorrt._features import needs_not_tensorrt_rtx
-from torch_tensorrt._utils import is_tensorrt_version_supported
+from torch_tensorrt._utils import (
+    is_tensorrt_rtx_version_supported,
+    is_tensorrt_version_supported,
+)
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
@@ -1487,8 +1490,59 @@ def aten_ops_slice(
     )
 
 
+def cumsum_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    # TensorRT-RTX before 1.7 cannot build a refittable cumsum when its loop
+    # trip count is a constant. Standard TensorRT and TensorRT-RTX 1.7+ do not
+    # have this limitation.
+    if (
+        is_tensorrt_rtx_version_supported("1.7")
+        or settings is None
+        or settings.immutable_weights
+    ):
+        return True
+
+    input_node = node.args[0]
+    if not isinstance(input_node, Node):
+        return False
+
+    input_meta = input_node.meta.get("val")
+    if input_meta is None:
+        input_meta = input_node.meta.get("tensor_meta")
+    if input_meta is None:
+        _LOGGER.debug(
+            f"cumsum node {node.name} has no input shape metadata; falling back "
+            "to PyTorch on TensorRT-RTX < 1.7 with refit enabled."
+        )
+        return False
+
+    dim = node.kwargs.get("dim", args_bounds_check(node.args, 1))
+    dim = get_positive_dim(dim, len(input_meta.shape))
+    axis_size = input_meta.shape[dim]
+
+    # A symbolic dimension is converted to a runtime trip count. DYNAMIC_DIM
+    # covers tensor_meta produced by shape propagation instead of export.
+    if isinstance(axis_size, torch.SymInt) or axis_size == DYNAMIC_DIM:
+        return True
+
+    if isinstance(axis_size, int) and axis_size >= 0:
+        _LOGGER.debug(
+            f"cumsum node {node.name} has a static axis {dim} of size {axis_size}; "
+            "TensorRT-RTX < 1.7 cannot build its refittable constant loop trip count."
+        )
+        return False
+
+    _LOGGER.debug(
+        f"cumsum node {node.name} has an unrecognized axis size {axis_size!r}; "
+        "falling back to PyTorch on TensorRT-RTX < 1.7 with refit enabled."
+    )
+    return False
+
+
 @dynamo_tensorrt_converter(
     torch.ops.aten.cumsum.default,
+    capability_validator=cumsum_validator,
     supports_dynamic_shapes=True,
 )
 @enforce_tensor_types(
