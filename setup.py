@@ -206,8 +206,9 @@ else:
 # The delegate is compiled from the ExecuTorch source revision pinned in MODULE.bazel, so the
 # installed wheel should agree with it. The upper bound is the load-bearing half: ExecuTorch's C++
 # runtime API is not stable across minor releases, and an unbounded floor would resolve a future
-# minor against a backend built for this one. Patch releases stay allowed because they come off the
-# same release branch; the exact pin belongs in the runtime package, which does derive it.
+# minor against a backend built for this one. Everything below that ceiling resolves: later 1.5
+# nightlies, a 1.5 release candidate, and 1.5 patch releases alike, since the exact pin belongs in
+# the runtime package, which does derive it.
 # The floor currently names a dev build, because the runtime split the delegate needs does not
 # exist in any ExecuTorch release yet: 1.4.1's executorch/lib carries no standalone linkable
 # runtime, and no CUDA wheel at all.
