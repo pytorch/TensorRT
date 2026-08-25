@@ -28,7 +28,7 @@ Inspect a command:      ``python -m tests.ci run <name> --dry-run``
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
 Tier = Literal["l0", "l1", "l2"]
 # python-only validates the PYTHON_ONLY=1 wheel (no C++ runtime) against the
@@ -107,6 +107,26 @@ class Suite:
         }
         base.update(self.overrides.get(variant, {}))
         return base
+
+    def __post_init__(self) -> None:
+        # Validate the enum-like fields at construction. They are typed as Literal, but nothing
+        # enforces that at runtime, so a typo like lanes=("nightl",) used to define a suite that
+        # every lane filter silently skipped, dropping it from CI with no error anywhere. Checking
+        # here turns that typo into an immediate, located failure when this module is imported.
+        for field_name, allowed in (
+            ("tier", get_args(Tier)),
+            ("lanes", get_args(Lane)),
+            ("variants", get_args(Variant)),
+            ("platforms", get_args(Platform)),
+        ):
+            value = getattr(self, field_name)
+            values = (value,) if isinstance(value, str) else value
+            unknown = [v for v in values if v not in allowed]
+            if unknown:
+                raise ValueError(
+                    f"suite {self.name!r} has unknown {field_name} {unknown}; "
+                    f"expected a subset of {list(allowed)}"
+                )
 
 
 # ── L0 — smoke / fast lane ────────────────────────────────────────────────────

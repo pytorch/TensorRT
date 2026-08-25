@@ -98,7 +98,7 @@ build-executorch-reference-runner/lib/libexecutorch_trt_backend.a
 Install the complete prebuilt Python runtime and delegate:
 
 ```bash
-pip install "torch-tensorrt[executorch]" \
+pip install --pre "torch-tensorrt[executorch]" \
   --extra-index-url https://download.pytorch.org/whl/nightly/cu130
 ```
 

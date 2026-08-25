@@ -387,11 +387,17 @@ def test_derived_requirements_match_the_pin(monkeypatch) -> None:
     # two helpers above can see it: `$(` is not a digit. Run the command it embeds and compare
     # what it prints, which fails if the line is deleted or the key is renamed.
     workflow = (REPO_ROOT / ".github/workflows/docgen.yml").read_text(encoding="utf-8")
-    embedded = re.search(r'"executorch==\$\((python3 -c \'[^\']+\')\)"', workflow)
+    # Anchor to a live line: leading whitespace only, no "#". A commented-out install still
+    # carries the pattern, so a plain search stayed green when the whole step was disabled.
+    embedded = re.search(
+        r'^[ \t]*"executorch==\$\((python3 -c \'[^\']+\')\)"',
+        workflow,
+        re.MULTILINE,
+    )
     assert embedded, (
-        ".github/workflows/docgen.yml no longer pins ExecuTorch alongside the extra. It installs "
-        "with --pre from the nightly channel, so without the pin it resolves through the range "
-        "and takes whichever dev build is newest that day."
+        ".github/workflows/docgen.yml no longer pins ExecuTorch alongside the extra on a live "
+        "line. It installs with --pre from the nightly channel, so without the pin it resolves "
+        "through the range and takes whichever dev build is newest that day."
     )
     # Compared as text, not executed. Running it meant whatever that line said got executed on
     # every pull request: rewriting the one-liner to write a file left the test green and the file
@@ -634,7 +640,7 @@ def test_the_lockfile_records_the_same_executorch_range_as_setup_py():
         for entry in sorted(recorded)
         if any(
             clause.operator in {">=", ">", "==", "~=", "==="}
-            and Version(clause.version.rstrip("*") or "0") > pinned
+            and Version(clause.version.rstrip(".*") or "0") > pinned
             for clause in SpecifierSet(entry)
         )
     ]
@@ -719,6 +725,19 @@ def test_every_printed_install_instruction_names_the_nightly_channel():
                     f"{name}:{line} installs from nightly/{suffix}, which the project does not "
                     f"publish for; expected one of {sorted(_PUBLISHED_NIGHTLY_CHANNELS)}"
                 )
+            # The named-distribution form needs --pre. "torch-tensorrt[executorch]" with no
+            # version pin resolves to the stable PyPI wheel, which carries no executorch extra at
+            # all, so the command exits 0 with a warning and installs nothing the feature needs.
+            # The ".[executorch]" and built-wheel forms already pin executorch to a dev version,
+            # which enables prerelease selection on their own, so they do not need it.
+            named_distribution = re.fullmatch(
+                r"torch[-_]tensorrt\[[^]]*executorch[^]]*\]", match.group(0)
+            )
+            if named_distribution and not re.search(r"(?:^|\s)--pre(?:\s|$)", block):
+                missing.append(
+                    f"{name}:{line} installs {match.group(0)} without --pre, so pip resolves the "
+                    "stable release with no executorch extra rather than the nightly prerelease"
+                )
 
     assert not missing, (
         "these ExecuTorch install instructions do not name the nightly channel, so they "
@@ -743,6 +762,16 @@ def test_the_pin_check_runs_in_ci():
     workflow = yaml.safe_load(
         (REPO_ROOT / ".github/workflows/linter.yml").read_text(encoding="utf-8")
     )
+    # The workflow must actually run on pull requests. PyYAML reads the unquoted "on" key as the
+    # boolean True (the YAML 1.1 "Norway problem"), so accept either spelling, then require a
+    # pull_request trigger. Reducing "on:" to workflow_dispatch left every string in place while
+    # the workflow never fired on a pull request.
+    triggers = workflow.get("on", workflow.get(True))
+    trigger_names = set(triggers) if isinstance(triggers, (dict, list)) else {triggers}
+    assert "pull_request" in trigger_names, (
+        f"linter.yml triggers on {sorted(map(str, trigger_names))}, not pull_request, so the pin "
+        "check never runs when a pull request changes the pin"
+    )
     # Match a live pytest invocation, not the filename anywhere in the script. Neutralising the
     # command and leaving it in a shell comment satisfied a plain substring test.
     invocation = re.compile(
@@ -758,27 +787,38 @@ def test_the_pin_check_runs_in_ci():
     assert owning, "no CI job invokes this file, so nothing here runs on a pull request"
     name, job, step = owning[0]
 
-    # A falsy condition disables the step while leaving every string in place.
-    condition = str(step.get("if", "always()"))
-    assert condition in {
-        "always()",
-        "success()",
-        "success() || failure()",
-    }, f"the pin check in {name} runs under {condition!r}, which may never be true"
+    # A falsy condition disables the step or the whole job while leaving every string in place, so
+    # check both. GitHub treats a bare "false", "${{ false }}" and any always-false expression the
+    # same way, so restrict each to the small set of conditions that can actually be true.
+    live_conditions = {"always()", "success()", "success() || failure()"}
+    step_condition = str(step.get("if", "always()"))
+    assert (
+        step_condition in live_conditions
+    ), f"the pin check step in {name} runs under {step_condition!r}, which may never be true"
+    job_condition = str(job.get("if", "always()"))
+    assert (
+        job_condition in live_conditions
+    ), f"job {name} runs under {job_condition!r}, so the pin check may never dispatch"
     # Tokenised, not substring-matched, and every way of neutralising the run counts. "--co" is
     # pytest's own documented short form of "--collect-only" and slipped past a check for the long
-    # spelling, and "|| true" or continue-on-error discard the exit status entirely.
+    # spelling. "|| true", "; true" and continue-on-error each discard the exit status, the last
+    # two at the step and at the job.
     tokens = shlex.split(step["run"].replace("\\\n", " "))
     for flag in ("--collect-only", "--co", "--help", "-h"):
         assert (
             flag not in tokens
         ), f"the pin check in {name} passes {flag}, so no assertion executes"
-    assert (
-        "||" not in tokens
-    ), f"the pin check in {name} discards its exit status, so a failure cannot fail the job"
+    for terminator in ("||", ";", "&"):
+        assert terminator not in tokens, (
+            f"the pin check in {name} follows pytest with {terminator!r}, so its exit status does "
+            "not fail the step"
+        )
     assert not step.get(
         "continue-on-error"
-    ), f"the pin check in {name} is continue-on-error, so a failure cannot fail the job"
+    ), f"the pin check step in {name} is continue-on-error, so a failure cannot fail the job"
+    assert not job.get(
+        "continue-on-error"
+    ), f"job {name} is continue-on-error, so a failed pin check cannot fail the workflow"
 
     # pytest and pyyaml must be installed by an earlier step of the SAME job: neither
     # requirements.txt nor dependency-groups.lint carries them, and without them the step exits 1
@@ -860,3 +900,44 @@ def test_the_pairing_check_survives_the_gpu_lane_deselection() -> None:
             f"{path} selects {len(others)} other tests from this module, which the lane "
             f"deselects deliberately: {others[:2]}"
         )
+
+    # Proving the -k expression selects the pairing test says nothing about whether either route
+    # is actually wired to run it. Replacing the workflow's `trt_tier_executorch` call with `echo
+    # skipped`, or pointing the executorch suite at a lane name no runner requests, both leave the
+    # checks above green while the test runs nowhere. So assert each route reaches the tier.
+    import yaml
+
+    workflow = yaml.safe_load(
+        (REPO_ROOT / ".github/workflows/executorch-test-linux.yml").read_text(
+            encoding="utf-8"
+        )
+    )
+    scripts = [
+        step.get("with", {}).get("script", "")
+        for job in workflow["jobs"].values()
+        for step in job.get("steps", [])
+    ] + [job.get("with", {}).get("script", "") for job in workflow["jobs"].values()]
+    invokes_tier = any(
+        re.search(r"^\s*trt_tier_executorch\b", script, re.MULTILINE)
+        for script in scripts
+    )
+    assert invokes_tier, (
+        "executorch-test-linux.yml no longer calls trt_tier_executorch, so the pairing check "
+        "never runs on the GPU lane even though its -k expression would select it"
+    )
+
+    # The manifest route: the executorch suite must exist and target a lane a runner requests.
+    # A typo in its lane tuple silently drops it from every matrix, which the suite-name check
+    # above cannot see.
+    import importlib
+
+    suites = importlib.import_module("tests.ci.suites")
+    executorch_suite = next((s for s in suites.SUITES if s.name == "executorch"), None)
+    assert executorch_suite is not None, (
+        "tests/ci/suites.py no longer defines an 'executorch' suite, so the manifest route to the "
+        "pairing check is gone"
+    )
+    assert "nightly" in executorch_suite.lanes, (
+        f"the executorch suite runs on lanes {executorch_suite.lanes!r}, none of which is the "
+        "nightly lane the GPU tier requests, so the pairing check runs nowhere"
+    )

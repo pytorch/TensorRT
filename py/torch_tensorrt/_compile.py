@@ -857,7 +857,8 @@ def save(
     if output_format == "executorch" and not _has_executorch_exir():
         raise ImportError(
             "Saving in ExecuTorch format requires the executorch package "
-            "with executorch.exir. Install with: pip install "
+            "with executorch.exir, published for Linux only. Install with: "
+            "pip install --pre "
             '"torch_tensorrt[executorch]" --extra-index-url '
             "https://download.pytorch.org/whl/nightly/cu130 to use output_format='executorch'."
         )
@@ -1406,7 +1407,8 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
         from torch_tensorrt.executorch import export
     except ImportError:
         raise ImportError(
-            "ExecuTorch is not installed. Install with: pip install "
+            "ExecuTorch is not installed, and is published for Linux only. Install "
+            "with: pip install --pre "
             '"torch_tensorrt[executorch]" --extra-index-url '
             "https://download.pytorch.org/whl/nightly/cu130 to use output_format='executorch'."
         )
