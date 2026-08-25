@@ -441,6 +441,24 @@ if [[ -n "${extra_defs}" ]]; then
   exit 1
 fi
 
+# ET_CHECK_MSG and ET_LOG hand their text to the core archive's vlogf, so an
+# archive compiled with logging off turns every runtime failure in the packaged
+# runner into a bare exit code with no output at all. Prove the runner can still
+# say why it failed, on a path that needs neither a GPU nor a valid model.
+diagnostic_log="${verify_root}/packaged_runner_diagnostic.log"
+if "${packaged_runner}" \
+  --model_path="${verify_root}/no-such-model.pte" >"${diagnostic_log}" 2>&1; then
+  echo "Packaged runner exited 0 on a missing model file" >&2
+  exit 1
+fi
+if ! grep -q "FileDataLoader::from" "${diagnostic_log}"; then
+  echo "Packaged runner gave no diagnostic for a missing model file." >&2
+  echo "ET_LOG_ENABLED likely disagrees between libexecutorch_core.a and the" >&2
+  echo "Bazel targets that call into it. Output was:" >&2
+  cat "${diagnostic_log}" >&2
+  exit 1
+fi
+
 "${runner_path}" \
   --model_path="${model_path}" \
   --num_runs=1 2>&1 | tee "${runner_log}"
@@ -454,8 +472,8 @@ packaged_runner_log="${verify_root}/packaged_runner.log"
 # Assert both precisely. Matching only "shape=" accepts any shape, and matching one
 # 2.0000 anywhere on the values line accepts a line of wrong numbers that happens to
 # contain one right one, so neither catches a stream-ordering regression returning
-# stale or partial output. ET_LOG output is not part of the packaged runner contract
-# and may be compiled out, so nothing here depends on it.
+# stale or partial output. Both lines come from fprintf in the runner, so these
+# assertions hold whatever ET_LOG_ENABLED is set to.
 for _log in "${runner_log}" "${packaged_runner_log}"; do
   if ! grep -q 'output\[0\] shape=\[2,3,4,4\]' "${_log}"; then
     echo "Unexpected output shape in ${_log}:" >&2

@@ -19,6 +19,14 @@ filegroup(
     ),
 )
 
+# EXECUTORCH_ENABLE_LOGGING is pinned rather than left to follow
+# CMAKE_BUILD_TYPE. Its default is off in Release, which compiles the archive
+# with ET_LOG_ENABLED=0, but that is a CMake compile definition and
+# rules_foreign_cc harvests only the .a, so the Bazel targets that call into it
+# keep runtime/platform/log.h's default of 1. logf is an inline function whose
+# body is guarded by that macro, so the two halves disagree on its definition
+# and every ET_LOG and ET_CHECK_MSG message reaches an empty vlogf. A runner
+# built that way dies without saying why.
 cmake(
     name = "executorch_core",
     cache_entries = {
@@ -31,6 +39,7 @@ cmake(
         "EXECUTORCH_BUILD_EXTENSION_MODULE": "ON",
         "EXECUTORCH_BUILD_EXTENSION_NAMED_DATA_MAP": "ON",
         "EXECUTORCH_BUILD_PYBIND": "OFF",
+        "EXECUTORCH_ENABLE_LOGGING": "ON",
     },
     install = False,
     lib_source = ":executorch_sources",
