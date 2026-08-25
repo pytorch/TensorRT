@@ -174,6 +174,91 @@ def test_rewire_leaves_mutations_the_engine_does_not_alias(monkeypatch, mutation
     assert "_torch_tensorrt_aliased_buffer" not in k_buffer.meta
 
 
+def _mixed_program():
+    """One engine, one method, both kinds of mutation at once.
+
+    ``engine(b_k_0, b_state_0, tokens) -> (logits, out_k, out_state)`` where the
+    engine aliases only ``out_k`` onto ``b_k_0``. ``b_state_0`` is the #4459
+    shape: a mutable buffer with no aliasing available, whose new value
+    ``lift_mutated_buffers`` appended as a trailing output for ExecuTorch to copy
+    back. In the graph the two mutations are indistinguishable -- each is a
+    ``getitem`` off the engine node whose buffer is also an engine input.
+    """
+    graph = torch.fx.Graph()
+    k_buffer = graph.placeholder("b_k_0")
+    state_buffer = graph.placeholder("b_state_0")
+    tokens = graph.placeholder("tokens")
+    engine = graph.placeholder("engine")
+    engine_call = graph.call_function(
+        torch.ops.tensorrt.execute_engine.default,
+        ([k_buffer, state_buffer, tokens], engine),
+    )
+    logits = graph.call_function(operator.getitem, (engine_call, 0))
+    k_out = graph.call_function(operator.getitem, (engine_call, 1))
+    state_out = graph.call_function(operator.getitem, (engine_call, 2))
+    graph.output((k_out, state_out, logits))
+    graph_module = torch.fx.GraphModule(torch.nn.Module(), graph)
+
+    signature = SimpleNamespace(
+        inputs_to_buffers={"b_k_0": "k_0", "b_state_0": "state_0"},
+        input_specs=[],
+        output_specs=[
+            OutputSpec(
+                OutputKind.BUFFER_MUTATION, TensorArgument(name=k_out.name), "k_0"
+            ),
+            OutputSpec(
+                OutputKind.BUFFER_MUTATION,
+                TensorArgument(name=state_out.name),
+                "state_0",
+            ),
+            OutputSpec(OutputKind.USER_OUTPUT, TensorArgument(name=logits.name), None),
+        ],
+    )
+    program = SimpleNamespace(
+        graph_module=graph_module,
+        graph_signature=signature,
+        _graph_signature=signature,
+    )
+    return program, k_buffer, state_buffer, k_out, state_out
+
+
+@pytest.mark.unit
+def test_rewire_keeps_the_copyback_in_a_method_that_also_has_an_aliased_kv(monkeypatch):
+    """Zero-copy and a copy-back buffer may share one method, and must not mix.
+
+    Rewiring the copy-back would delete a real update with no error, and refusing
+    the aliased one would give up the whole feature for any model carrying a
+    non-KV mutable buffer beside its cache. The engine's own aliased_io is what
+    separates them: only ``out_k`` is listed, so only ``b_k_0`` is rewired and
+    only its binding name is offered to the backend as elided. ``b_state_0``
+    keeps its delegate output, which is the value ExecuTorch copies back.
+    """
+    program, k_buffer, state_buffer, k_out, state_out = _mixed_program()
+    _patch_engine_metadata(
+        monkeypatch,
+        aliased_io={"out_k": ("k_in", "kv_cache_update")},
+        input_names=["k_in", "state_in", "tokens"],
+        output_names=["logits", "out_k", "out_state"],
+    )
+
+    assert Z.rewire_aliased_mutations_to_buffers(program) == ["out_k"]
+
+    kv_spec, state_spec, _ = program._graph_signature.output_specs
+    assert kv_spec.arg.name == k_buffer.name
+    assert k_buffer.meta["_torch_tensorrt_aliased_buffer"] is True
+    assert k_out not in program.graph_module.graph.nodes
+
+    assert state_spec.kind == OutputKind.BUFFER_MUTATION
+    assert state_spec.target == "state_0"
+    assert state_spec.arg.name == state_out.name
+    assert state_out in program.graph_module.graph.nodes
+    assert program.graph_module.graph.output_node().args[0][1] is state_out
+    # Un-staging keys on this mark, so leaving it off b_state_0 is what keeps the
+    # copy-back buffer's staging copy -- the engine writes that copy and
+    # ExecuTorch copies it back, exactly as without zero-copy.
+    assert "_torch_tensorrt_aliased_buffer" not in state_buffer.meta
+
+
 @pytest.mark.unit
 def test_rewire_is_a_noop_without_aliased_io(monkeypatch):
     program, k_buffer, _ = _kv_program()
@@ -1028,6 +1113,179 @@ def test_aliased_buffer_mark_survives_real_lowering(generate_etrecord):
         if node.op == "placeholder" and node.meta.get("_torch_tensorrt_aliased_buffer")
     ]
     assert marked, "no placeholder kept _torch_tensorrt_aliased_buffer through lowering"
+
+
+class _MixedDecodeStep(torch.nn.Module):
+    """A decode step with an engine-aliased KV cache and a copy-back buffer.
+
+    ``k_cache``/``v_cache`` are written by ``index_copy_`` on the sequence axis,
+    which the converter turns into an aliased engine binding. ``conv_state`` is a
+    ring shift -- a whole-buffer rewrite with no position to alias on -- so
+    ``lift_mutated_buffers`` records it in ``_copyback_mutation_buffers`` and its
+    new value comes back as a trailing delegate output instead.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.embed = torch.nn.Embedding(VOCAB, DIM)
+        self.q = torch.nn.Linear(DIM, HEADS * HEAD_DIM, bias=False)
+        self.k = torch.nn.Linear(DIM, HEADS * HEAD_DIM, bias=False)
+        self.v = torch.nn.Linear(DIM, HEADS * HEAD_DIM, bias=False)
+        self.o = torch.nn.Linear(HEADS * HEAD_DIM, DIM, bias=False)
+        self.lm = torch.nn.Linear(DIM, VOCAB, bias=False)
+        self.register_buffer("k_cache", torch.zeros(1, HEADS, MAX_LEN, HEAD_DIM))
+        self.register_buffer("v_cache", torch.zeros(1, HEADS, MAX_LEN, HEAD_DIM))
+        self.register_buffer("conv_state", torch.zeros(1, DIM, 4))
+
+    def forward(self, tokens: torch.Tensor, input_pos: torch.Tensor) -> torch.Tensor:
+        pos_idx = input_pos.reshape(-1)
+        pos = input_pos.reshape(())
+        x = self.embed(tokens)
+
+        shifted = torch.cat([self.conv_state[:, :, 1:], x.reshape(1, DIM, 1)], dim=2)
+        self.conv_state.copy_(shifted)
+        x = x + self.conv_state.sum(dim=2).reshape(1, 1, DIM)
+
+        def split_heads(proj: torch.Tensor) -> torch.Tensor:
+            return proj.view(1, 1, HEADS, HEAD_DIM).transpose(1, 2)
+
+        q = split_heads(self.q(x))
+        k = split_heads(self.k(x))
+        v = split_heads(self.v(x))
+        self.k_cache.index_copy_(2, pos_idx, k)
+        self.v_cache.index_copy_(2, pos_idx, v)
+        scores = (q @ self.k_cache.transpose(-1, -2)) / (HEAD_DIM**0.5)
+        allowed = torch.arange(MAX_LEN, device=x.device) <= pos
+        bias = torch.where(
+            allowed,
+            torch.zeros((), dtype=x.dtype, device=x.device),
+            torch.full((), torch.finfo(x.dtype).min, dtype=x.dtype, device=x.device),
+        )
+        attn = torch.softmax(scores + bias.view(1, 1, 1, MAX_LEN), dim=-1)
+        out = (attn @ self.v_cache).transpose(1, 2).reshape(1, 1, HEADS * HEAD_DIM)
+        return self.lm(self.o(out))
+
+
+def _real_delegates(graph_module):
+    return [
+        node
+        for node in graph_module.graph.nodes
+        if node.op == "call_function" and node.target is executorch_call_delegate
+    ]
+
+
+def _lowered_module(graph_module, delegate):
+    return getattr(graph_module, delegate.args[0].target)
+
+
+def _assert_marked_buffers_reach_the_engine_unstaged(graph_module):
+    """Every marked buffer is a direct argument of a TensorRT delegate.
+
+    Finalizing a zero-copy program without raising is a weak signal, because both
+    of the completeness raises at the end of ``_unstage_aliased_buffers`` fire off
+    its own bookkeeping: a pass that records each un-staging and then leaves the
+    argument pointing at the staging copy still satisfies them. Only the graph says
+    whether the rewiring happened, and getting it wrong is silent -- the engine
+    writes per-call scratch that is discarded and the cache never updates.
+    """
+    marked = [
+        node
+        for node in graph_module.graph.nodes
+        if node.op == "placeholder" and node.meta.get("_torch_tensorrt_aliased_buffer")
+    ]
+    assert marked, "no buffer was marked for in-place update"
+    reached = {
+        arg
+        for node in _real_delegates(graph_module)
+        if _lowered_module(graph_module, node).backend_id == "TensorRTBackend"
+        for arg in node.args[1:]
+        if isinstance(arg, torch.fx.Node)
+    }
+    for node in marked:
+        assert node in reached, (
+            f"buffer '{node.name}' is marked for in-place update but is not a "
+            "direct argument of any TensorRT delegate -- it either still reaches "
+            "one through a staging copy, or reaches none at all. Either way "
+            "nothing writes the caller's buffer and the cache never updates"
+        )
+
+
+@pytest.mark.skipif(
+    not torch.cuda.is_available(), reason="requires CUDA + TensorRT for a real engine"
+)
+@pytest.mark.parametrize("retrace", [False, True], ids=["legacy", "retrace"])
+def test_zero_copy_kv_keeps_a_copyback_buffer_in_the_same_method(retrace):
+    """A real method holding both kinds of mutable buffer exports and keeps both.
+
+    The KV caches end up bound to their own placeholders -- no value for
+    ExecuTorch to copy, which is the zero copy -- while ``conv_state`` stays bound
+    to a delegate output, which is the value ExecuTorch copies back into it.
+    Losing that distinction in either direction is silent wrong output, so it is
+    pinned on a real engine rather than a stub: the aliased_io the discriminator
+    reads is produced by the converter, not by this test.
+
+    Both exporters are covered because they reach that distinction by different
+    routes, and only one of them is the ``save()`` default. The legacy exporter
+    declares all three mutations while it inlines the engines, so
+    ``_declare_aliased_kv_mutations_on_ep`` finds nothing left to do and the
+    discriminator never runs. Under ``retrace=True`` the retraced program arrives
+    with no mutations declared at all -- torch.export drops the aliased outputs at
+    the fx boundary and leaves the copy-back value as a plain return -- so that
+    pass is what separates the two kinds, by reading each engine's ``aliased_io``.
+    """
+    with torch.no_grad():
+        torch.manual_seed(0)
+        model = _MixedDecodeStep().eval().cuda()
+        tokens = torch.zeros(1, 1, dtype=torch.long).cuda()
+        input_pos = torch.tensor([0], dtype=torch.long).cuda()
+
+        exported_program = torch.export.export(model, (tokens, input_pos))
+        trt_gm = torch_tensorrt.dynamo.compile(
+            exported_program,
+            arg_inputs=(tokens, input_pos),
+            min_block_size=1,
+            truncate_double=True,
+        )
+        assert trt_gm.meta.get("_copyback_mutation_buffers") == ["conv_state"], (
+            "the model no longer produces a copy-back buffer, so this test would "
+            "pass without exercising the combination it exists for"
+        )
+        edge = torch_tensorrt.executorch.export(
+            trt_gm,
+            arg_inputs=(tokens, input_pos),
+            retrace=retrace,
+            zero_copy_kv=True,
+        )
+
+    ep = edge.exported_program()
+    output_args = list(ep.graph_module.graph.output_node().args[0])
+    bound = {
+        spec.target: value
+        for spec, value in zip(ep.graph_signature.output_specs, output_args)
+        if spec.kind == OutputKind.BUFFER_MUTATION
+    }
+    assert set(bound) == {"k_cache", "v_cache", "conv_state"}
+    for name in ("k_cache", "v_cache"):
+        assert bound[name].op == "placeholder", (
+            f"{name} is still satisfied by a delegate output, so ExecuTorch will "
+            "copy it back and zero-copy bought nothing"
+        )
+        assert bound[name].meta.get("_torch_tensorrt_aliased_buffer") is True
+    assert bound["conv_state"].op == "call_function", (
+        "conv_state was rewired to its own placeholder, which deletes the "
+        "copy-back of a buffer no engine writes in place -- a lost update"
+    )
+    assert "_torch_tensorrt_aliased_buffer" not in bound["conv_state"].meta
+
+    # Everything above is the export half. The staging the other half removes does
+    # not exist until PropagateDevicePass runs inside to_executorch, so this is the
+    # earliest point at which the caches can be seen reaching the engine directly.
+    program = edge.to_executorch(
+        config=torch_tensorrt.executorch.zero_copy_backend_config()
+    )
+    _assert_marked_buffers_reach_the_engine_unstaged(
+        program.exported_program().graph_module
+    )
 
 
 # --------------------------------------------------------------------------

@@ -457,6 +457,12 @@ def export(
     -- without it the buffer is still staged and its updates are discarded, with
     no error.
 
+    Only a buffer the engine declares aliased is affected. A method may hold both
+    kinds at once: a mutable buffer with no aliasing available -- a convolution
+    state, say -- keeps its staging copy and the copy-back that writes it, while
+    the aliased caches beside it go zero-copy. The two are told apart by the
+    engine's own ``aliased_io``, not by the graph, in which they look identical.
+
     ``generate_etrecord=True`` is outside the payload sharing described above. It makes
     ExecuTorch deep copy the whole program, so peak memory grows by roughly the size of
     the program including engines.
