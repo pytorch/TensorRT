@@ -97,6 +97,35 @@ class PaddedConv2d(nn.Module):
         return self.conv(F.pad(x, (0, 1, 0, 1)))
 
 
+class Linear(nn.Module):
+    """aten.linear.default: a GEMM the explicit GEMM guards never see.
+
+    Its decomposition into addmm is deliberately disabled, so guarding addmm does
+    not cover it.
+    """
+
+    def __init__(self, dtype=torch.float32):
+        super().__init__()
+        self.linear = nn.Linear(16, 32).to(dtype)
+
+    def forward(self, x):
+        return self.linear(x)
+
+
+class SDPA(nn.Module):
+    """Fused attention: the GEMMs live inside the converter, not in the graph."""
+
+    def forward(self, q, k, v):
+        return torch.ops.aten.scaled_dot_product_attention.default(q, k, v)
+
+
+class EfficientSDPA(nn.Module):
+    def forward(self, q, k, v):
+        return torch.ops.aten._scaled_dot_product_efficient_attention.default(
+            q, k, v, None, False
+        )[0]
+
+
 class Cdist(nn.Module):
     """A GEMM the explicit GEMM guards never see, emitted inside the cdist converter.
 
@@ -228,6 +257,45 @@ class TestTuringCapabilityGuards(TestCase):
         inputs = (torch.randn(1, 4, 8, 8, 8).cuda(),)
         compiled = self._compile(mod, inputs, target_compute_capabilities=[TURING])
         self.assertGreater(_trt_submodule_count(compiled), 0)
+
+    def test_declared_turing_target_falls_back_fp32_linear(self):
+        mod = Linear()
+        inputs = (torch.randn(8, 16).cuda(),)
+        compiled = self._compile(mod, inputs, target_compute_capabilities=[TURING])
+        self.assertEqual(_trt_submodule_count(compiled), 0)
+        self._assert_matches_eager(mod, compiled, inputs)
+
+    def test_declared_turing_target_falls_back_fp32_sdpa(self):
+        mod = SDPA()
+        inputs = tuple(torch.randn(4, 8, 32, 16).cuda() for _ in range(3))
+        compiled = self._compile(
+            mod,
+            inputs,
+            target_compute_capabilities=[TURING],
+            decompose_attention=False,
+        )
+        self.assertEqual(_trt_submodule_count(compiled), 0)
+        self._assert_matches_eager(mod, compiled, inputs)
+
+    def test_declared_turing_target_falls_back_fp32_efficient_sdpa(self):
+        mod = EfficientSDPA()
+        inputs = tuple(torch.randn(4, 8, 32, 16).cuda() for _ in range(3))
+        compiled = self._compile(
+            mod,
+            inputs,
+            target_compute_capabilities=[TURING],
+            decompose_attention=False,
+        )
+        self.assertEqual(_trt_submodule_count(compiled), 0)
+        self._assert_matches_eager(mod, compiled, inputs)
+
+    def test_declared_turing_target_keeps_fp16_linear_on_trt(self):
+        # The GEMM guards key on FP32 only; FP16 GEMMs run fine on Turing.
+        mod = Linear(dtype=torch.half)
+        inputs = (torch.randn(8, 16, dtype=torch.half).cuda(),)
+        compiled = self._compile(mod, inputs, target_compute_capabilities=[TURING])
+        self.assertGreater(_trt_submodule_count(compiled), 0)
+        self._assert_matches_eager(mod, compiled, inputs)
 
     def test_declared_turing_target_falls_back_cdist_p2_compute_mode_1(self):
         # compute_mode=1 is "always use the matrix multiply", whatever the row count.
@@ -452,6 +520,61 @@ class TestTuringNativeFallback(TestCase):
         )
         with torch.no_grad():
             out = compiled(a, b)
+        self.assertFalse(bool(torch.all(out == 0).item()))
+        cos = F.cosine_similarity(
+            ref.flatten().unsqueeze(0), out.flatten().unsqueeze(0)
+        )
+        self.assertGreater(cos.item(), 0.99)
+
+    def test_fp32_linear_dynamic_is_not_silently_zero(self):
+        # Unguarded, this returned an all-zero tensor of the right shape and dtype:
+        # TensorRT-RTX logged a cuDNN graph-compilation failure from enqueueV3 and
+        # returned normally, so the caller saw no error at all.
+        mod = Linear().eval().cuda()
+        x = torch.randn(8, 16).cuda()
+        with torch.no_grad():
+            ref = mod(x)
+        dim = torch.export.Dim("batch", min=1, max=64)
+        ep = torch.export.export(mod, (x,), dynamic_shapes=({0: dim},))
+        compiled = torchtrt.compile(
+            ep,
+            arg_inputs=[x],
+            ir="dynamo",
+            min_block_size=1,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
+            use_python_runtime=True,
+        )
+        with torch.no_grad():
+            out = compiled(x)
+        self.assertFalse(bool(torch.all(out == 0).item()))
+        cos = F.cosine_similarity(
+            ref.flatten().unsqueeze(0), out.flatten().unsqueeze(0)
+        )
+        self.assertGreater(cos.item(), 0.99)
+
+    def test_fp32_sdpa_dynamic_is_not_silently_zero(self):
+        # Same silent failure, reached through a fused attention op instead of a GEMM.
+        mod = SDPA().eval().cuda()
+        qkv = tuple(torch.randn(4, 8, 32, 16).cuda() for _ in range(3))
+        with torch.no_grad():
+            ref = mod(*qkv)
+        dim = torch.export.Dim("batch", min=1, max=16)
+        ep = torch.export.export(
+            mod, qkv, dynamic_shapes=({0: dim}, {0: dim}, {0: dim})
+        )
+        compiled = torchtrt.compile(
+            ep,
+            arg_inputs=list(qkv),
+            ir="dynamo",
+            min_block_size=1,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
+            use_python_runtime=True,
+            decompose_attention=False,
+        )
+        with torch.no_grad():
+            out = compiled(*qkv)
         self.assertFalse(bool(torch.all(out == 0).item()))
         cos = F.cosine_similarity(
             ref.flatten().unsqueeze(0), out.flatten().unsqueeze(0)
