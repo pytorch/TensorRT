@@ -475,6 +475,16 @@ packaged_runner_log="${verify_root}/packaged_runner.log"
 # stale or partial output. Both lines come from fprintf in the runner, so these
 # assertions hold whatever ET_LOG_ENABLED is set to.
 for _log in "${runner_log}" "${packaged_runner_log}"; do
+  # A right answer produced entirely on the host would not prove much here: the
+  # program is delegated to TensorRT, so at least one planned buffer has to be
+  # served by a registered CUDA DeviceAllocator. Pin that, otherwise a model or
+  # a planning change could quietly turn this into a CPU-only test.
+  if ! grep -q 'planned buffer\[[0-9]*\] = [0-9]* bytes on device_type 1' "${_log}"; then
+    echo "No CUDA planned buffer was allocated in ${_log}:" >&2
+    grep 'planned buffer' "${_log}" >&2 || echo "  no planned buffer line at all" >&2
+    exit 1
+  fi
+
   if ! grep -q 'output\[0\] shape=\[2,3,4,4\]' "${_log}"; then
     echo "Unexpected output shape in ${_log}:" >&2
     grep 'output\[0\] shape=' "${_log}" >&2 || echo "  no shape line at all" >&2

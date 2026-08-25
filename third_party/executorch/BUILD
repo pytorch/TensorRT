@@ -125,6 +125,28 @@ cc_library(
     ],
 )
 
+# The CUDA DeviceAllocator that serves device planned buffers. In the pinned
+# ExecuTorch release this source is compiled only into the CUDA/AOTI delegate,
+# so a binary that delegates to TensorRT alone cannot get one without linking a
+# delegate it never calls. Compile it on its own instead. It has no delegate
+# dependencies: cuda_runtime.h, the caller-stream header already in
+# libextension_cuda.so, and the ExecuTorch runtime headers.
+#
+# This target names a path that goes away when the allocator stops living under
+# backends/cuda upstream, so the pin cannot move forward while it is still here.
+cc_library(
+    name = "executorch_cuda_allocator",
+    srcs = ["executorch/backends/cuda/runtime/cuda_allocator.cpp"],
+    hdrs = ["executorch/backends/cuda/runtime/cuda_allocator.h"],
+    include_prefix = "executorch",
+    strip_include_prefix = "executorch",
+    deps = [
+        ":executorch_headers",
+        ":extension_cuda",
+        "@cuda//:cudart",
+    ],
+)
+
 cc_library(
     name = "executorch_headers",
     hdrs = glob(
