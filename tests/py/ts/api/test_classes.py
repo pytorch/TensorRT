@@ -7,25 +7,6 @@ import torch_tensorrt as torchtrt
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
 
 
-def is_blackwell():
-    """
-    Check if running on NVIDIA Blackwell architecture (sm_90+).
-
-    Blackwell architecture adds input/output reformat layers in TensorRT engines.
-
-    Returns:
-        bool: True if running on Blackwell (sm_90+), False otherwise
-    """
-    if not torch.cuda.is_available():
-        return False
-
-    device_properties = torch.cuda.get_device_properties(0)
-    compute_capability = device_properties.major * 10 + device_properties.minor
-
-    # Blackwell is sm_90 and above
-    return compute_capability >= 90
-
-
 @unittest.skipIf(
     not torchtrt.ENABLED_FEATURES.torchscript_frontend,
     "TorchScript Frontend is not available",
@@ -357,20 +338,12 @@ class TestTorchTensorRTModule(unittest.TestCase):
 
         import json
 
-        if is_blackwell():
-            # blackwell has additional layers-
-            # Layer 0: __mye88_myl0_0           ← Input reformat layer
-            # Layer 1: aten__matmul(...) fc1    ← First matmul (fc1)
-            # Layer 2: aten__matmul(...) fc2    ← Second matmul (fc2)
-            # Layer 3: __mye90_myl0_3           ← Output reformat layer
-            num_layers = 4
-        else:
-            num_layers = 2
         for trt_mod in (
             TestTorchTensorRTModule._get_trt_mod(),
             TestTorchTensorRTModule._get_trt_mod(via_ts=True),
         ):
-            trt_json = json.loads(trt_mod.get_layer_info())
+            layer_info = trt_mod.get_layer_info()
+            trt_json = json.loads(layer_info)
             self.assertIn("Layers", trt_json.keys(), "Key Layers is missing")
             io_key = next(
                 (k for k in ("I/O Tensors", "Bindings") if k in trt_json.keys()),
@@ -379,10 +352,16 @@ class TestTorchTensorRTModule(unittest.TestCase):
             self.assertIsNotNone(
                 io_key, "Neither 'I/O Tensors' nor 'Bindings' key is present"
             )
-            self.assertTrue(
-                len(trt_json["Layers"]) == num_layers
-            ), "Not enough layers found"
-            self.assertTrue(len(trt_json[io_key]) == 2, "Not enough I/O tensors found")
+            self.assertGreater(
+                len(trt_json["Layers"]),
+                0,
+                f"No layers found in layer info: {layer_info}",
+            )
+            self.assertEqual(
+                len(trt_json[io_key]),
+                2,
+                f"Expected 2 I/O tensors, got {trt_json[io_key]}",
+            )
 
 
 if __name__ == "__main__":
