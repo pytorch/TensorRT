@@ -1288,6 +1288,262 @@ def test_zero_copy_kv_keeps_a_copyback_buffer_in_the_same_method(retrace):
     )
 
 
+class _SplitRolesDecodeStep(_MixedDecodeStep):
+    """The same two buffer kinds, but on two different TensorRT engines.
+
+    ``torch.sinh`` is pinned out of TensorRT by the test, so the attention half
+    -- which holds the engine-aliased caches -- and the ``conv_state`` half end up
+    in separate partitions. Only the first engine has aliased outputs, and the
+    copy-back output rides on the second.
+    """
+
+    def forward(self, tokens: torch.Tensor, input_pos: torch.Tensor) -> torch.Tensor:
+        pos_idx = input_pos.reshape(-1)
+        pos = input_pos.reshape(())
+        x = self.embed(tokens)
+
+        def split_heads(proj: torch.Tensor) -> torch.Tensor:
+            return proj.view(1, 1, HEADS, HEAD_DIM).transpose(1, 2)
+
+        q = split_heads(self.q(x))
+        k = split_heads(self.k(x))
+        v = split_heads(self.v(x))
+        self.k_cache.index_copy_(2, pos_idx, k)
+        self.v_cache.index_copy_(2, pos_idx, v)
+        scores = (q @ self.k_cache.transpose(-1, -2)) / (HEAD_DIM**0.5)
+        allowed = torch.arange(MAX_LEN, device=x.device) <= pos
+        bias = torch.where(
+            allowed,
+            torch.zeros((), dtype=x.dtype, device=x.device),
+            torch.full((), torch.finfo(x.dtype).min, dtype=x.dtype, device=x.device),
+        )
+        attn = torch.softmax(scores + bias.view(1, 1, 1, MAX_LEN), dim=-1)
+        out = (attn @ self.v_cache).transpose(1, 2).reshape(1, 1, HEADS * HEAD_DIM)
+
+        h = torch.sinh(self.o(out) + x)
+        shifted = torch.cat([self.conv_state[:, :, 1:], h.reshape(1, DIM, 1)], dim=2)
+        self.conv_state.copy_(shifted)
+        return self.lm(h + self.conv_state.sum(dim=2).reshape(1, 1, DIM))
+
+
+@pytest.mark.skipif(
+    not torch.cuda.is_available(), reason="requires CUDA + TensorRT for a real engine"
+)
+@pytest.mark.parametrize("retrace", [False, True], ids=["legacy", "retrace"])
+def test_zero_copy_kv_with_the_copyback_on_a_second_delegate(retrace):
+    """Two TensorRT delegates, one with the aliased caches and one with the copy-back.
+
+    This is the shape ``_delegate_declares_zero_copy`` reasons about: the
+    partitioner must stamp ``zero_copy_kv`` on the KV delegate only, or
+    ``_unstage_aliased_buffers``'s cross-check demands an aliased buffer from the
+    plain compute delegate and the export dies. Finalizing here is the assertion:
+    a wrongly stamped delegate raises inside ``to_executorch``.
+
+    Under ``retrace=True`` this is also the only shape where
+    ``_declare_aliased_kv_mutations_on_ep`` has to pick the aliased engine out of
+    several: it scans every ``execute_engine`` node and skips the ones whose
+    ``aliased_io`` is empty, and the copy-back value it detaches comes off a
+    different engine than the caches it declares. The legacy exporter declares all
+    of that while inlining, so that scan runs only on this parameter.
+    """
+    with torch.no_grad():
+        torch.manual_seed(0)
+        model = _SplitRolesDecodeStep().eval().cuda()
+        tokens = torch.zeros(1, 1, dtype=torch.long).cuda()
+        input_pos = torch.tensor([0], dtype=torch.long).cuda()
+
+        exported_program = torch.export.export(model, (tokens, input_pos))
+        trt_gm = torch_tensorrt.dynamo.compile(
+            exported_program,
+            arg_inputs=(tokens, input_pos),
+            min_block_size=1,
+            truncate_double=True,
+            torch_executed_ops={"torch.ops.aten.sinh.default"},
+        )
+        aliased_per_engine = [
+            bool(getattr(sub, "aliased_io", None)) for _, sub in trt_gm.named_children()
+        ]
+        assert len(aliased_per_engine) > 1 and sum(aliased_per_engine) == 1, (
+            "the model no longer lowers to several engines with the aliasing on "
+            f"exactly one of them ({aliased_per_engine}), so it does not exercise "
+            "the multi-delegate split this test exists for"
+        )
+        assert trt_gm.meta.get("_copyback_mutation_buffers") == ["conv_state"]
+
+        edge = torch_tensorrt.executorch.export(
+            trt_gm,
+            arg_inputs=(tokens, input_pos),
+            retrace=retrace,
+            zero_copy_kv=True,
+        )
+
+    ep = edge.exported_program()
+    graph_module = ep.graph_module
+    output_args = list(graph_module.graph.output_node().args[0])
+    bound = {
+        spec.target: value
+        for spec, value in zip(ep.graph_signature.output_specs, output_args)
+        if spec.kind == OutputKind.BUFFER_MUTATION
+    }
+    assert set(bound) == {"k_cache", "v_cache", "conv_state"}
+    for name in ("k_cache", "v_cache"):
+        assert bound[name].op == "placeholder"
+        assert bound[name].meta.get("_torch_tensorrt_aliased_buffer") is True
+    assert bound["conv_state"].target is operator.getitem
+
+    delegates = _real_delegates(graph_module)
+    assert len(delegates) > 1
+    kv_delegate = next(
+        node
+        for node in delegates
+        if any(
+            isinstance(arg, torch.fx.Node)
+            and arg.meta.get("_torch_tensorrt_aliased_buffer")
+            for arg in node.args[1:]
+        )
+    )
+    copyback_delegate = bound["conv_state"].args[0]
+    assert copyback_delegate in delegates
+    assert copyback_delegate is not kv_delegate, (
+        "the copy-back landed on the same delegate as the aliased caches, so this "
+        "test is running the single-delegate shape again"
+    )
+
+    stamped = [
+        node
+        for node in delegates
+        if any(
+            spec.key == ZERO_COPY_KV_COMPILE_SPEC_KEY
+            for spec in _lowered_module(graph_module, node).compile_specs
+        )
+    ]
+    assert stamped == [kv_delegate], (
+        "the zero-copy spec must sit on the delegate whose engine lost an output "
+        "and on no other; a plain compute delegate carrying it is asked for an "
+        "aliased buffer it never had"
+    )
+
+    # The un-staging cross-check runs here, not above -- and so does the
+    # un-staging itself, which only the finalized graph shows.
+    program = edge.to_executorch(
+        config=torch_tensorrt.executorch.zero_copy_backend_config()
+    )
+    _assert_marked_buffers_reach_the_engine_unstaged(
+        program.exported_program().graph_module
+    )
+
+
+@pytest.mark.skipif(
+    not torch.cuda.is_available(), reason="requires CUDA + TensorRT for a real engine"
+)
+def test_zero_copy_kv_beside_an_executorch_cuda_delegate():
+    """An aliased KV cache in a method that also holds an ExecuTorch CUDA delegate.
+
+    ``erfinv`` has no TensorRT converter, so with a ``CudaPartitioner`` catch-all
+    the method lowers to TensorRT, CudaBackend and TensorRT delegates in sequence.
+    The un-staging must reach into the TensorRT delegate only. What is asserted
+    here is the reachable half -- that only the KV TensorRT delegate is stamped,
+    and that the caches reach it un-staged with a CUDA delegate in the middle.
+    That the gate itself refuses a marked buffer on another backend is pinned by
+    ``test_unstage_raises_for_a_marked_buffer_on_another_backends_delegate``.
+    """
+    cuda_backend = pytest.importorskip("executorch.backends.cuda.cuda_backend")
+    cuda_partitioner = pytest.importorskip("executorch.backends.cuda.cuda_partitioner")
+
+    class _CudaNeighbourDecodeStep(_KVDecodeStep):
+        def __init__(self):
+            super().__init__()
+            # A TensorRT-supported op AFTER erfinv, so the CUDA delegate is
+            # sandwiched between two TensorRT ones. Ending on erfinv would leave
+            # the method with a single TensorRT delegate, and the assertion below
+            # that only the KV delegate carries the zero-copy spec would then hold
+            # whatever the partitioner did.
+            self.tail = torch.nn.Linear(VOCAB, VOCAB, bias=False)
+
+        def forward(self, tokens, input_pos):
+            h = super().forward(tokens, input_pos)
+            return self.tail(torch.erfinv(torch.tanh(h)))
+
+    with torch.no_grad():
+        torch.manual_seed(0)
+        model = _CudaNeighbourDecodeStep().eval().cuda()
+        tokens = torch.zeros(1, 1, dtype=torch.long).cuda()
+        input_pos = torch.tensor([0], dtype=torch.long).cuda()
+
+        exported_program = torch.export.export(model, (tokens, input_pos))
+        trt_gm = torch_tensorrt.dynamo.compile(
+            exported_program,
+            arg_inputs=(tokens, input_pos),
+            min_block_size=1,
+            truncate_double=True,
+        )
+        edge = torch_tensorrt.executorch.export(
+            trt_gm,
+            arg_inputs=(tokens, input_pos),
+            retrace=False,
+            zero_copy_kv=True,
+            partitioners=[
+                cuda_partitioner.CudaPartitioner(
+                    [
+                        cuda_backend.CudaBackend.generate_method_name_compile_spec(
+                            "forward"
+                        )
+                    ]
+                )
+            ],
+        )
+
+    graph_module = edge.exported_program().graph_module
+    delegates = _real_delegates(graph_module)
+    backends = {
+        node: _lowered_module(graph_module, node).backend_id for node in delegates
+    }
+    assert sorted(backends.values()) == [
+        "CudaBackend",
+        "TensorRTBackend",
+        "TensorRTBackend",
+    ], (
+        f"the method no longer lowers to TensorRT/CudaBackend/TensorRT "
+        f"({sorted(backends.values())}), so it does not cover the sandwiched "
+        "CUDA delegate this test exists for"
+    )
+
+    def _marked_args(node):
+        return [
+            arg.name
+            for arg in node.args[1:]
+            if isinstance(arg, torch.fx.Node)
+            and arg.meta.get("_torch_tensorrt_aliased_buffer")
+        ]
+
+    kv_delegates = [node for node in delegates if _marked_args(node)]
+    assert len(kv_delegates) == 1 and backends[kv_delegates[0]] == "TensorRTBackend", (
+        "the aliased buffers must reach exactly one TensorRT delegate; "
+        f"got {[(backends[n], _marked_args(n)) for n in kv_delegates]}"
+    )
+
+    stamped = [
+        node
+        for node in delegates
+        if any(
+            spec.key == ZERO_COPY_KV_COMPILE_SPEC_KEY
+            for spec in _lowered_module(graph_module, node).compile_specs
+        )
+    ]
+    assert stamped == kv_delegates, (
+        "only the delegate whose engine lost an aliased output may carry the "
+        "zero-copy spec; the CUDA delegate and the trailing TensorRT one had no "
+        f"aliased buffer, yet {[backends[n] for n in stamped]} are stamped"
+    )
+
+    program = edge.to_executorch(
+        config=torch_tensorrt.executorch.zero_copy_backend_config()
+    )
+    _assert_marked_buffers_reach_the_engine_unstaged(
+        program.exported_program().graph_module
+    )
+
+
 # --------------------------------------------------------------------------
 # save() path: unlike the direct export()+to_executorch() contract -- two paired
 # calls the caller must not forget -- torch_tensorrt.save() owns both steps, so a
