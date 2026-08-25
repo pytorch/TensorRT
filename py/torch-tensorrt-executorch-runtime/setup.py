@@ -136,7 +136,12 @@ class BazelBuild(build_ext):
             source = built.parent / dependency
             if not source.is_file():
                 raise RuntimeError(f"Bazel did not produce {source}")
-            shutil.copy2(source, output.parent / dependency)
+            destination = output.parent / dependency
+            # ``build_extension`` runs once for each extension.  The first copy
+            # preserves Bazel's read-only mode, so remove it before the second
+            # extension tries to copy the same dependency.
+            destination.unlink(missing_ok=True)
+            shutil.copy2(source, destination)
 
 
 require_cuda_13()
