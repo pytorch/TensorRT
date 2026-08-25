@@ -19,9 +19,10 @@ def _load_module(data: bytes) -> Any:
         from torch_tensorrt_executorch_runtime import activate, get_runtime
     except ImportError as error:
         raise ImportError(
-            "ExecuTorch Python inference requires the prebuilt delegate. "
-            'Install it with: pip install "torch-tensorrt[executorch]" '
-            "--extra-index-url https://download.pytorch.org/whl/nightly/cu130"
+            "ExecuTorch Python inference requires the prebuilt delegate, which is "
+            "published for Linux only. Install it with: pip install --pre "
+            '"torch-tensorrt[executorch]" --extra-index-url '
+            "https://download.pytorch.org/whl/nightly/cu130"
         ) from error
 
     # get_runtime verifies TensorRTBackend is registered; activate returns the native module it
