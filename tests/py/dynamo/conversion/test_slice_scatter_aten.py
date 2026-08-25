@@ -108,29 +108,25 @@ class TestSliceScatterFallback(DispatchTestCase):
         self.run_test_with_dynamic_shape(module, input_specs)
 
     def test_fallback_open_end_step_two(self):
-        """``cache[:, :, ::2, :]`` reaches the converter with ``end == INT64_MAX``,
-        which has to be clamped to the dim: the index range is built with ``np.arange``,
-        which cannot allocate that many entries."""
+        """``cache[:, :, ::2, :]``: the open end has to be clamped to the dim, since the
+        index range is built with ``np.arange``."""
         module = _SliceScatterNotInputModule(2, 0, OPEN_END, step=2)
         cache = torch.randn(2, 4, 16, 8)
         update = torch.randn(2, 4, 8, 8)
         self.run_test(module, [cache, update])
 
     def test_fallback_open_end_interior_start(self):
-        """``cache[:, :, 3:, :]`` — the same open end, from a start that rules out the
-        full-overwrite shortcut, so the clamp is what makes the write 13 slots wide
-        rather than INT64_MAX - 3."""
+        """``cache[:, :, 3:, :]``: a start that rules out the full-overwrite shortcut,
+        so the clamp is what makes the write 13 slots wide and not INT64_MAX - 3."""
         module = _SliceScatterNotInputModule(2, 3, OPEN_END, step=1)
         cache = torch.randn(2, 4, 16, 8)
         update = torch.randn(2, 4, 13, 8)
         self.run_test(module, [cache, update])
 
     def test_fallback_dynamic_sliced_dim(self):
-        """The dim being *written* varies here, which ``test_fallback_dynamic_shape``
-        leaves fixed at 64 while varying the others. Bounds that stand on their own
-        index a dynamic dim as they are, so this is the case the converter keeps; an
-        open end or a negative index on the same dim has nothing to resolve against and
-        is validated away to PyTorch instead (``TestSliceScatterValidator``)."""
+        """The dim being *written* varies here; ``test_fallback_dynamic_shape`` leaves
+        it fixed at 64. Bounds that stand on their own index a dynamic dim as they are;
+        ones that need its size are validated away (``TestSliceScatterValidator``)."""
         module = _SliceScatterNotInputModule(2, 1, 5, step=1)
         input_specs = [
             Input(
@@ -226,29 +222,22 @@ class TestSliceScatterEarlyExits(unittest.TestCase):
             self._call(np.int64(2), 0, 4, 1)
 
     def test_open_end_on_a_dynamic_dim_is_not_implemented(self):
-        """TensorRT reports the dynamic dim as -1, which is no size to clamp an open
-        end against. ``slice_scatter_validator`` keeps these writes out of the engine,
-        so the raise is the backstop for a node it could not read a shape from, and it
-        has to say so rather than leave the -1 looking like a real dim."""
-        with self.assertRaisesRegex(
-            NotImplementedError,
-            r"^slice_scatter: dim 2 of the input is dynamic, and this write's bounds "
-            r"cannot be resolved without its size\.",
-        ):
+        """The -1 TensorRT reports for a dynamic dim is no size to clamp an open end
+        against. ``slice_scatter_validator`` keeps these out of the engine, so this exit
+        is the backstop for a node it could not read a shape from. Matching on the dim
+        is what separates it from the dynamic-bounds exit above, which raises the same
+        type for a slice whose bounds are symbolic on a perfectly static dim."""
+        with self.assertRaises(NotImplementedError) as raised:
             self._call(2, 3, OPEN_END, 1, cache_shape=(2, 4, -1, 8))
+        self.assertIn("dim 2 of the input is dynamic", str(raised.exception))
 
 
 class TestSliceScatterValidator(TestCase):
-    """The validator is what keeps a write the converter cannot lower out of TensorRT,
-    so these check the boundary itself rather than a compile that happens to succeed.
+    """What the validator keeps out of TensorRT, checked directly rather than through a
+    compile that happens to succeed. Nodes are built by hand so the metadata under test
+    is chosen here, the dynamic ones taking their ``SymInt`` dim from a real export."""
 
-    Nodes are built by hand so the shape metadata under test is chosen here and not by
-    whichever tracer a harness test happens to use; the dynamic cases take theirs from
-    a real export, since a genuine ``SymInt`` dim is the thing the partitioner passes.
-    """
-
-    # Bounds stated relative to the dim being written: an open end and a ``None`` end
-    # run to it, a negative index counts back from it.
+    # Bounds that need the size of the dim being written.
     _BOUNDS_NEEDING_THE_DIM = (
         (3, OPEN_END),
         (3, None),
@@ -270,8 +259,8 @@ class TestSliceScatterValidator(TestCase):
 
     @staticmethod
     def _dynamic_seq_node(*slice_args):
-        """A ``slice_scatter`` whose cache has a symbolic dim 2, spliced into an
-        exported graph so the placeholder carries the ``SymInt`` export gives it."""
+        """A ``slice_scatter`` spliced into an exported graph, so its cache placeholder
+        carries the ``SymInt`` dim export gives it."""
 
         class Passthrough(torch.nn.Module):
             def forward(self, cache, update):
@@ -292,10 +281,8 @@ class TestSliceScatterValidator(TestCase):
             )
 
     def test_bounds_relative_to_a_dynamic_dim_are_rejected(self):
-        """An open end and a negative index are both stated relative to the dim being
-        written, so on a dynamic dim there is nothing to resolve them against. Left in
-        the engine, the open end reaches ``np.arange`` as a request for INT64_MAX
-        entries."""
+        """Left in the engine, the open end reaches ``np.arange`` as a request for
+        INT64_MAX entries."""
         for start, end in self._BOUNDS_NEEDING_THE_DIM:
             self.assertFalse(
                 slice_scatter_validator(self._dynamic_seq_node(2, start, end))
@@ -303,22 +290,20 @@ class TestSliceScatterValidator(TestCase):
 
     def test_self_contained_bounds_on_a_dynamic_dim_are_accepted(self):
         """A non-negative concrete bound means the same thing whatever the dim turns out
-        to be, so the converter indexes with it as given and the write stays in TRT."""
+        to be, so the converter indexes with it as given."""
         self.assertTrue(slice_scatter_validator(self._dynamic_seq_node(2, 1, 5)))
 
     def test_a_static_dim_resolves_every_bound(self):
-        """The same bounds on a static dim are all resolvable -- clamped, counted from
-        the end -- so none of them is the validator's business."""
+        """The same bounds on a static dim all resolve -- clamped, or counted from the
+        end -- so none of them is the validator's business."""
         for start, end in self._BOUNDS_NEEDING_THE_DIM:
             self.assertTrue(slice_scatter_validator(self._static_node(2, start, end)))
 
     def test_a_node_without_shape_metadata_is_passed(self):
-        """With no shape to read, the validator cannot tell a dynamic dim from a static
-        one, and rejecting is the more damaging guess: the KV-cache classifier reads the
-        same metadata to decide which writes the engine aliases in place, and vetoing
-        one it classified as aliased fails ``assert_predicted_kv_aliased`` at the end of
-        compile. The converter resolves against the TensorRT shape instead, and raises
-        if that turns out to be dynamic."""
+        """Rejecting is the more damaging guess: the KV-cache classifier reads the same
+        metadata, and vetoing a write it classified as engine-aliased fails
+        ``assert_predicted_kv_aliased``. The converter resolves against the TensorRT
+        shape instead, and raises if that turns out to be dynamic."""
         graph = torch.fx.Graph()
         cache = graph.placeholder("cache")
         src = graph.placeholder("src")
@@ -331,18 +316,21 @@ class TestSliceScatterValidator(TestCase):
 
 @unittest.skipIf(not torch.cuda.is_available(), "Skip because CUDA is not available")
 class TestSliceScatterDynamicDimEndToEnd(TestCase):
-    """``cache[:, :, 3:, :] = update`` on a dynamic sequence dim is the write with no
-    lowering, and the point of the validator is that it compiles anyway -- in PyTorch --
-    instead of failing the build. Only the numerics are asserted: the same write also
-    reaches the converter as a symbolic bound depending on how export encodes the open
-    end, and both routes have to come out right."""
+    """``cache[:, :, 3:, :] = update`` on a dynamic dim is the write with no lowering,
+    and the point of the validator is that the model compiles anyway. The ``+ 1`` gives
+    the engine something to take, so the write has to be partitioned out to PyTorch
+    rather than the whole graph falling back."""
 
     def test_open_end_on_a_dynamic_dim_matches_eager(self):
         class Write(torch.nn.Module):
             def forward(self, cache, update):
-                out = cache.clone()
-                out[:, :, 3:, :] = update
-                return out
+                # The op export emits for `cache[:, :, 3:, :] = update`, written out so
+                # the open end reaches the validator as the sentinel rather than as a
+                # symbolic bound the decomposition pass would rewrite first.
+                written = torch.ops.aten.slice_scatter.default(
+                    cache, update, 2, 3, OPEN_END
+                )
+                return written + 1.0
 
         mod = Write().eval().cuda()
         seq = torch.export.Dim("seq", min=8, max=32)

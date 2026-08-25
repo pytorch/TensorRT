@@ -84,22 +84,15 @@ class KVWriteStatus(Enum):
     BAD_DIM = auto()
 
 
-# torch.export writes INT64_MAX in place of the dim size for an open-ended slice
-# (``x[..., start:]``), and aten clamps it to the dim before slicing. On a 64-bit host
-# ``sys.maxsize`` is that same value, and is what the ``aten.slice`` converter already
-# matches an open end on, so both are accepted here.
+# torch.export uses INT64_MAX as "open end". `sys.maxsize` is the same value and is
+# what the aten.slice converter matches on, so both are accepted.
 _OPEN_END = (sys.maxsize, 2**63 - 1)
 
 
 def _needs_dim_size(bound: Any) -> bool:
-    """Whether ``bound`` is stated relative to the dim being written rather than
-    standing on its own.
-
-    ``None`` and a negative index both are -- one runs to the end of the dim, the
-    other counts back from it -- and so is the open end above, which has to be clamped
-    down to the dim before it can index anything. A non-``int`` bound is not this
-    predicate's business: a symbolic bound is reported as ``DYNAMIC_BOUNDS`` whatever
-    dim it is written on, so it passes here and is caught below.
+    """Whether ``bound`` has to be resolved against the dim being written: ``None`` and
+    an open end run to it, a negative index counts back from it. A non-int bound is
+    reported as ``DYNAMIC_BOUNDS`` instead, so it passes here.
     """
     if bound is None:
         return True
@@ -130,12 +123,10 @@ def resolve_slice_scatter_write(
       under this status.
     * ``DYNAMIC_BOUNDS`` — a bound is not a Python ``int``, so the converter
       raises ``NotImplementedError``.
-    * ``DYNAMIC_DIM_SIZE`` — a bound is stated relative to the dim being written (see
-      :func:`_needs_dim_size`) and that dim is dynamic, so there is no size to resolve
-      it against. ``aten_ops_slice_scatter``'s capability validator rejects these
-      nodes so the partitioner runs them in PyTorch, which is the only lowering they
-      have until the converter gains dynamic bounds; the converter raises if one
-      reaches it anyway.
+    * ``DYNAMIC_DIM_SIZE`` — a bound needs the size of the dim it writes (see
+      :func:`_needs_dim_size`) and that dim is dynamic. ``aten_ops_slice_scatter``'s
+      validator rejects these so the partitioner runs them in PyTorch; the converter
+      raises if one reaches it anyway.
     * ``BAD_DIM`` — ``dim`` is either not a Python ``int`` or does not index
       ``cache_shape``; the converter raises ``IndexError`` for both. A
       ``numpy.int64`` is rejected on the type check even when its value is in range.
@@ -154,11 +145,9 @@ def resolve_slice_scatter_write(
     if not isinstance(dim, int) or not -len(cache_shape) <= dim < len(cache_shape):
         return None, None, None, KVWriteStatus.BAD_DIM
     dim_size = cache_shape[dim]
-    # The same dynamic dim reaches the two callers in two shapes: TensorRT reports it
-    # as ``DYNAMIC_DIM`` (-1) and the fx graph carries a ``SymInt`` for it. Neither
-    # gives a size to resolve a bound against, so both have to be read as dynamic --
-    # folding the -1 into an index is how a dynamic dim used to produce an empty
-    # index range and a write that silently did nothing.
+    # A dynamic dim reaches the converter as DYNAMIC_DIM (-1) and the predictor as a
+    # SymInt; neither is a size, and folding the -1 into an index is how an open-ended
+    # write on a dynamic dim used to resolve to an empty index range.
     dim_is_static = isinstance(dim_size, int) and dim_size >= 0
 
     if start is None:
@@ -176,9 +165,8 @@ def resolve_slice_scatter_write(
             start = dim_size + start
         if isinstance(end, int) and end < 0:
             end = dim_size + end
-        # aten clamps a slice to the dim it is taken from, and so must this: the open
-        # end arrives as INT64_MAX, and the scatter fallback would hand it to
-        # ``np.arange`` as the length of the index range to build.
+        # Aten clamps a slice to its dim, and so must this: unclamped, the open end
+        # reaches the fallback's np.arange as an INT64_MAX-long index range.
         if isinstance(start, int):
             start = min(max(start, 0), dim_size)
         if isinstance(end, int):
@@ -336,12 +324,11 @@ def slice_scatter(
         )
 
     if status is KVWriteStatus.DYNAMIC_DIM_SIZE:
+        # The validator keeps these out of TensorRT, so this is only reachable for a
+        # node it could not read a shape from.
         raise NotImplementedError(
-            f"slice_scatter: dim {dim} of the input is dynamic, and this write's "
-            "bounds cannot be resolved without its size. "
-            "`aten_ops_slice_scatter`'s capability validator keeps these writes out "
-            "of TensorRT, so reaching here means the fx node carried no shape "
-            "metadata for the validator to read."
+            f"slice_scatter: dim {dim} of the input is dynamic, so this write's bounds "
+            "cannot be resolved without its size"
         )
     # OK is the only status left, and it resolves all three bounds to Python ints.
     assert start is not None and end is not None and step is not None
