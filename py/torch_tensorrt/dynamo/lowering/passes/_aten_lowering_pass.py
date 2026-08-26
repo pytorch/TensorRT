@@ -6,6 +6,7 @@ import operator
 from typing import Any, Callable, Optional, Sequence, Union
 
 import torch
+from torch.fx._lazy_graph_module import _LazyGraphModule
 from torch_tensorrt._utils import is_tegra_platform
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes._FakeTensorUpdater import FakeTensorUpdater
@@ -171,14 +172,23 @@ def get_lowering_pass_config(lowering_pass: LoweringPassSignature) -> dict[str, 
 def post_lowering(
     gm: torch.fx.GraphModule, settings: CompilationSettings = CompilationSettings()
 ) -> torch.fx.GraphModule:
-    """Applies the lowering passes to a graph module after torch.export/torch.compile and their decompositions, returns the modified GraphModule"""
+    """Apply post-export lowering and defer code generation until Python execution."""
     logging.debug(
         f"Invoking DynamoPassManager and applying lowering passes: {ATEN_POST_LOWERING_PASSES}"
     )
+
+    if not isinstance(gm, _LazyGraphModule):
+        original_gm = gm
+        gm = _LazyGraphModule.from_graphmodule(original_gm)
+        # GraphModule reconstruction only copies state referenced by graph nodes.
+        # Preserve ExportedProgram metadata and other Torch-TensorRT annotations.
+        gm.__dict__.update(original_gm.__dict__)
+        gm.recompile()
+
     fake_mode = torch._export.utils._detect_fake_mode_from_gm(gm)
     fake_tensor_updater = FakeTensorUpdater(gm)
-    # Batch DCE/lint/recompile across passes: each pass may still call
-    # clean_up_graph_after_modifications, but only the final flush pays for it.
+    # Batch DCE/lint/recompile across passes. LazyGraphModule.recompile only marks
+    # forward dirty; code generation runs if a caller later executes the module.
     set_defer_graph_cleanup(True)
     try:
         gm = ATEN_POST_LOWERING_PASSES(gm, settings)
