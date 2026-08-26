@@ -1,5 +1,7 @@
+import inspect
 import logging
-from typing import Any, Set
+from operator import attrgetter
+from typing import Any, Callable, Optional, Set
 
 import torch
 from torch_tensorrt._utils import sanitized_torch_version
@@ -24,6 +26,85 @@ logger = logging.getLogger(__name__)
 # Do NOT skip materialized folds (e.g. VLA position embedding outputs) — those
 # can be required for TRT legality (int64 indices never reach the converter).
 _MAX_CONSTANT_FOLD_BYTES = 1 << 20  # 1 MiB
+
+# True views that never allocate. ``aten.contiguous`` is ``is_view`` but can
+# materialize; keep executing those so 4531 can still install the copy.
+_ALIASING_VIEW_OP_NAMES = (
+    "permute.default",
+    "transpose.int",
+    "t.default",
+    "view.default",
+    "reshape.default",
+    "squeeze.default",
+    "squeeze.dim",
+    "squeeze.dims",
+    "unsqueeze.default",
+    "expand.default",
+    "slice.Tensor",
+    "select.int",
+    "detach.default",
+    "alias.default",
+    "as_strided.default",
+    "flatten.using_ints",
+    "unflatten.int",
+    "movedim.int",
+    "movedim.intlist",
+)
+
+
+def _resolve_aten_op(name: str) -> Optional[Any]:
+    op: Any = torch.ops.aten
+    for part in name.split("."):
+        op = getattr(op, part, None)
+        if op is None:
+            return None
+    return op
+
+
+_ALIASING_VIEW_OPS: Set[Any] = {
+    op for name in _ALIASING_VIEW_OP_NAMES if (op := _resolve_aten_op(name)) is not None
+}
+
+
+def _named_attr(gm: torch.fx.GraphModule, target: Any) -> Any:
+    if not isinstance(target, str):
+        return None
+    try:
+        return attrgetter(target)(gm)
+    except (AttributeError, ValueError):
+        return None
+
+
+def _source_attr_nbytes(gm: torch.fx.GraphModule, node: torch.fx.Node) -> int:
+    """Bytes of the get_attr tensor at the root of an aliasing-view chain, else 0."""
+    seen: Set[torch.fx.Node] = set()
+    cur: Optional[torch.fx.Node] = node
+    while cur is not None and cur not in seen:
+        seen.add(cur)
+        if cur.op == "get_attr":
+            tensor = _named_attr(gm, cur.target)
+            if isinstance(tensor, torch.Tensor):
+                return int(tensor.numel() * tensor.element_size())
+            return 0
+        if cur.op != "call_function" or cur.target not in _ALIASING_VIEW_OPS:
+            return 0
+        tensor_args = [arg for arg in cur.args if isinstance(arg, torch.fx.Node)]
+        if len(tensor_args) != 1:
+            return 0
+        cur = tensor_args[0]
+    return 0
+
+
+def skip_large_aliased_view_fold(gm: torch.fx.GraphModule, node: torch.fx.Node) -> bool:
+    """Inductor ``skip_folding_node_fn``: True → do not execute this fold.
+
+    Matches the 4531 install skip: large view/permute of a module tensor that
+    would only alias existing storage. Materializing ops (add, contiguous, …)
+    still run.
+    """
+    if node.op != "call_function" or node.target not in _ALIASING_VIEW_OPS:
+        return False
+    return _source_attr_nbytes(gm, node) > _MAX_CONSTANT_FOLD_BYTES
 
 
 def _tensor_reuses_module_storage(
@@ -54,7 +135,11 @@ def constant_fold(
 
     Modifies the graph in-place and replaces node with constants
     """
-    cf = _TorchTensorRTConstantFolder(gm, skip_constructors=False)
+    cf = _TorchTensorRTConstantFolder(
+        gm,
+        skip_constructors=False,
+        skip_folding_node_fn=lambda node: skip_large_aliased_view_fold(gm, node),
+    )
     cf.run()
 
     # The constants are created on CPU to save GPU memory for TensorRT compilation.
@@ -148,7 +233,14 @@ def replace_node_with_constant(
 # https://github.com/pytorch/pytorch/blob/4b881b0da390c1290bb12850ef9daad6f6eb2cb6/torch/_inductor/constant_folding.py#L53-L63
 class _TorchTensorRTConstantFolder(ConstantFolder):  # type: ignore[misc]
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
+        skip_fn = kwargs.get("skip_folding_node_fn")
+        init_params = inspect.signature(ConstantFolder.__init__).parameters
+        if "skip_folding_node_fn" not in init_params:
+            kwargs.pop("skip_folding_node_fn", None)
+            super().__init__(*args, **kwargs)
+            self.skip_folding_node_fn = skip_fn
+        else:
+            super().__init__(*args, **kwargs)
         # Set of known quantization ops to be excluded from constant folding.
         # Currently, we exclude all quantization ops coming from modelopt library.
         self.quantization_ops: Set[torch._ops.OpOverload] = set()
@@ -164,6 +256,20 @@ class _TorchTensorRTConstantFolder(ConstantFolder):  # type: ignore[misc]
             )
         except Exception as e:
             pass
+
+    def run_node(self, node: torch.fx.node.Node) -> Any:
+        # Inductor only consults skip_folding_node_fn when lifted_constant_names
+        # is set. Our cf.run() path has none, so honor the callback here and
+        # return unknown without executing the op.
+        skip_fn: Optional[Callable[[torch.fx.Node], bool]] = getattr(
+            self, "skip_folding_node_fn", None
+        )
+        if skip_fn is not None and node.op == "call_function" and skip_fn(node):
+            logger.debug(
+                "Skipping constant-fold execute for aliased view %s", node.name
+            )
+            return self.unknown_value
+        return super().run_node(node)
 
     # TODO: Update this function when quantization is added
     def is_impure(self, node: torch.fx.node.Node) -> bool:
