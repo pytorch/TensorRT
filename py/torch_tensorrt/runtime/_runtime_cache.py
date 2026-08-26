@@ -222,7 +222,6 @@ class RuntimeCache:
     ``ENABLED_FEATURES.torch_tensorrt_runtime`` is set, else the
     pure-Python :class:`_RuntimeCacheHandle`; both satisfy
     :class:`_RuntimeCacheHandleProtocol` interface which this class uses.
-
     **Identity-based equality.** Two handles wrap distinct underlying
     ``IRuntimeCache`` instances even when they share a path, and the
     runtime treats them as such.
@@ -232,21 +231,36 @@ class RuntimeCache:
         self,
         path: str = "",
         autosave_on_del: bool = False,
+        *,
+        _force_python_backing: bool = False,
     ) -> None:
         # Set the atexit-token slot first so ``__del__`` can safely read it
         # even if a later step in ``__init__`` raises and leaves the object
         # partially constructed.
         self._atexit_token: Optional[Callable[..., None]] = None
 
-        # Pick the backing that matches the active runtime. The torchbind
-        # class ``torch.classes.tensorrt.RuntimeCacheHandle`` is registered by
-        # the C++ shared library; if the .so isn't loaded
+        # Pick the backing that matches the runtime that will consume the
+        # cache. The torchbind class ``torch.classes.tensorrt.RuntimeCacheHandle``
+        # is registered by the C++ shared library; if the .so isn't loaded
         # (``ENABLED_FEATURES.torch_tensorrt_runtime is False``) it doesn't
         # exist as an attribute, so we fall back to the pure-Python
         # ``_RuntimeCacheHandle``. Both satisfy
         # :class:`_RuntimeCacheHandleProtocol`, so the facade methods forward
         # without branching on which backing won.
-        if torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime:
+        #
+        # A loaded .so does not mean the consumer is a cpp engine: a python
+        # ``TRTEngine`` can be built directly from a packed engine tuple while
+        # the .so is loaded. Such a caller sets ``_force_python_backing``,
+        # because ``ensure_cache`` can only materialize through the python
+        # backing. Private and keyword-only on purpose: ``_to_torchbind_handle``
+        # below unwraps a ``RuntimeCache`` straight to ``_handle``, so a
+        # python-backed one reaching a cpp engine would send a plain python
+        # object into a torchbind call and raise. Keeping it out of the public
+        # signature keeps that unreachable from user code.
+        if (
+            torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime
+            and not _force_python_backing
+        ):
             self._handle: _RuntimeCacheHandleProtocol = (
                 torch.classes.tensorrt.RuntimeCacheHandle(path)
             )
@@ -623,9 +637,17 @@ def _to_torchbind_handle(
     if isinstance(rc, torch.ScriptObject):
         return rc
     if isinstance(rc, RuntimeCache):
-        # The facade auto-picks the torchbind sibling on cpp rt (see
-        # ``RuntimeCache.__init__``), so any ``RuntimeCache`` constructed in
-        # this process is already cpp-backed. Unwrap directly.
+        # Checked rather than assumed. The facade normally picks the torchbind
+        # sibling on cpp rt, but ``_force_python_backing`` exists for a python
+        # engine built while the .so is loaded, and unwrapping one of those would
+        # hand a plain python object to a torchbind setter, which raises a type
+        # error naming an internal class.
+        if not isinstance(rc._handle, torch.ScriptObject):
+            raise TypeError(
+                "runtime_cache is backed by the pure-Python handle and cannot be "
+                "passed to a C++ engine. Build it without forcing the Python "
+                "backing, or attach it to a Python engine."
+            )
         return rc._handle
     # Truthy-string check: ``""`` would construct a no-op torchbind handle.
     if isinstance(rc, str) and rc:
