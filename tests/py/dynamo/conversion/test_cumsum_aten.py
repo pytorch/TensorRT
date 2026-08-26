@@ -33,9 +33,7 @@ class TestCumsumConverter(DispatchTestCase):
                 )
             return
 
-        self.run_test(
-            Cumsum(), inputs, immutable_weights=False, use_dynamo_tracer=True
-        )
+        self.run_test(Cumsum(), inputs, immutable_weights=False, use_dynamo_tracer=True)
 
     @parameterized.expand(
         [
@@ -108,10 +106,7 @@ class TestCumsumConverter(DispatchTestCase):
             == opt_shape[positive_dim]
             == max_shape[positive_dim]
         )
-        if (
-            has_static_trip_count
-            and not is_tensorrt_rtx_version_supported("1.7")
-        ):
+        if has_static_trip_count and not is_tensorrt_rtx_version_supported("1.7"):
             with self.assertRaises(UnsupportedOperatorException):
                 self.run_test_with_dynamic_shape(
                     Cumsum(),
