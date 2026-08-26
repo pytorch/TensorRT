@@ -43,6 +43,8 @@ PY
 python -m pip uninstall -y torch torchvision
 python -m pip install --force-reinstall --pre ${TORCHVISION} --index-url ${INDEX_URL} --extra-index-url https://pypi.org/simple
 python -m pip install --force-reinstall --pre ${TORCH} --index-url ${INDEX_URL} --extra-index-url https://pypi.org/simple
+# dynamo-torchao full/nightly suite
+python -m pip install torchao
 
 # If CUDA 13 (cu13), prepend venv's NVIDIA CUDA 13 libs to LD_LIBRARY_PATH
 if [[ "${CU_VERSION}" == cu13* ]]; then
