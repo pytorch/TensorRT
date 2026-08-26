@@ -108,10 +108,15 @@ jobs:
           setup-miniconda: false
           python-version: ${{ env.PYTHON_VERSION }}
           cuda-version: ${{ env.CU_VERSION }}
-          arch: ${{ env.ARCH }}
+          # Same value build_windows.yml passes, so the name built here comes out
+          # identical to the one the build uploaded. ARCH is not set anywhere in
+          # this workflow, so the architecture has to come from the input.
+          arch: ${{ inputs.architecture }}
       # The default matrix entries have matrix.tensorrt == '', so their
       # download branch uses ARTIFACT_NAME rather than DOWNLOAD_ARTIFACT_NAME.
-      # Keep it aligned with the RTX build artifact.
+      # Keep it aligned with the RTX build artifact. The build adds these two
+      # suffixes after the architecture, so they have to stay after the step
+      # above, which is what puts the architecture in the name.
       - name: Mark Python-only artifact
         if: ${{ inputs.python-only }}
         run: echo "ARTIFACT_NAME=${ARTIFACT_NAME}_python_only" >> "${GITHUB_ENV}"
@@ -135,7 +140,7 @@ jobs:
         if: ${{ matrix.tensorrt == '' }}
         uses: actions/download-artifact@v7
         with:
-          name: ${{ env.ARTIFACT_NAME }}${{ inputs.architecture }}
+          name: ${{ env.ARTIFACT_NAME }}
           path: ${{ runner.temp }}/artifacts/
       - name: Download artifacts
         if: ${{ matrix.tensorrt != '' }}

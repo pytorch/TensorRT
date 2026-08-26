@@ -10,6 +10,7 @@ import torch.nn.functional as F
 import torch_tensorrt as torchtrt
 import torch_tensorrt as torch_trt
 from torch import nn
+from torch_tensorrt._utils import is_tensorrt_rtx_version_supported
 from torch_tensorrt.dynamo import refit_module_weights
 from torch_tensorrt.dynamo._refit import (
     construct_refit_mapping,
@@ -832,8 +833,8 @@ def test_refit_multiple_engine_without_weightmap():
     "Refit feature is not supported in Python 3.13 or higher",
 )
 @unittest.skipIf(
-    torch_trt.ENABLED_FEATURES.tensorrt_rtx,
-    "cumsum is not supported on TensorRT-RTX (build_serialized_network returns None on Linux as well as Windows)",
+    not is_tensorrt_rtx_version_supported("1.7"),
+    "Refittable cumsum requires TensorRT-RTX 1.7 or newer",
 )
 @pytest.mark.unit
 def test_refit_cumsum():
