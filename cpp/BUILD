@@ -141,6 +141,37 @@ cc_library(
     ],
 )
 
+# Registration only, kept out of :tensorrt_executorch_backend so that linking
+# the backend into both a shared library and an executable cannot register the
+# allocator twice. Executables that run a TensorRT delegated program depend on
+# this directly.
+#
+# Not part of :executorch_backend_source_files. The CMake build of the reference
+# runner enables the CUDA/AOTI delegate, which already registers this allocator.
+cc_library(
+    name = "tensorrt_executorch_cuda_device_allocator",
+    srcs = [
+        "src/torch_tensorrt/executorch/RegisterCudaDeviceAllocator.cpp",
+    ],
+    alwayslink = True,
+    target_compatible_with = select({
+        ":linux_x86_64": [],
+        ":sbsa": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = select({
+        ":linux_x86_64": [
+            "@executorch//:executorch_cuda_allocator",
+            "@executorch//:executorch_headers",
+        ],
+        ":sbsa": [
+            "@executorch//:executorch_cuda_allocator",
+            "@executorch//:executorch_headers",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
 cc_library(
     name = "tensorrt_executorch_backend",
     srcs = [

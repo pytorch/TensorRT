@@ -2,7 +2,18 @@
 
 import logging
 import operator
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+    cast,
+)
 
 import numpy as np
 import torch
@@ -10,7 +21,10 @@ from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Argument, Node, Target
 from torch_tensorrt import ENABLED_FEATURES
 from torch_tensorrt._features import needs_not_tensorrt_rtx
-from torch_tensorrt._utils import is_tensorrt_version_supported
+from torch_tensorrt._utils import (
+    is_tensorrt_rtx_version_supported,
+    is_tensorrt_version_supported,
+)
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
@@ -486,6 +500,62 @@ def aten_ops_hardtanh(
         args_bounds_check(args, 1, -1.0),
         args_bounds_check(args, 2, 1.0),
     )
+
+
+def _get_glu_dim(args: Tuple[Argument, ...], kwargs: Mapping[str, Argument]) -> int:
+    return cast(int, kwargs.get("dim", args_bounds_check(args, 1, -1)))
+
+
+def glu_validator(node: Node, settings: Optional[CompilationSettings] = None) -> bool:
+    input_meta = node.args[0].meta
+    input_val = input_meta.get("tensor_meta")
+    if input_val is None:
+        input_val = input_meta.get("val")
+    if input_val is None:
+        _LOGGER.warning(
+            "Meta information of input is missing. Unable to validate GLU's "
+            "split dimension, falling back to PyTorch operation."
+        )
+        return False
+
+    input_shape = input_val.shape
+    dim = get_positive_dim(_get_glu_dim(node.args, node.kwargs), len(input_shape))
+    split_dim_size = input_shape[dim]
+
+    return (
+        isinstance(split_dim_size, int)
+        and split_dim_size > 0
+        and split_dim_size % 2 == 0
+    )
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.glu.default,
+    capability_validator=glu_validator,
+    supports_dynamic_shapes=True,
+)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_glu(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    input_val = args[0]
+    dim = get_positive_dim(_get_glu_dim(args, kwargs), len(input_val.shape))
+    split_size = input_val.shape[dim] // 2
+    first, second = impl.split.split(
+        ctx, target, SourceIR.ATEN, f"{name}_split", input_val, split_size, dim
+    )
+    gated = impl.activation.sigmoid(
+        ctx, target, SourceIR.ATEN, f"{name}_sigmoid", second
+    )
+    return impl.elementwise.mul(ctx, target, SourceIR.ATEN, f"{name}_mul", first, gated)
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.sigmoid.default, supports_dynamic_shapes=True)
@@ -1420,8 +1490,59 @@ def aten_ops_slice(
     )
 
 
+def cumsum_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    # TensorRT-RTX before 1.7 cannot build a refittable cumsum when its loop
+    # trip count is a constant. Standard TensorRT and TensorRT-RTX 1.7+ do not
+    # have this limitation.
+    if (
+        is_tensorrt_rtx_version_supported("1.7")
+        or settings is None
+        or settings.immutable_weights
+    ):
+        return True
+
+    input_node = node.args[0]
+    if not isinstance(input_node, Node):
+        return False
+
+    input_meta = input_node.meta.get("val")
+    if input_meta is None:
+        input_meta = input_node.meta.get("tensor_meta")
+    if input_meta is None:
+        _LOGGER.debug(
+            f"cumsum node {node.name} has no input shape metadata; falling back "
+            "to PyTorch on TensorRT-RTX < 1.7 with refit enabled."
+        )
+        return False
+
+    dim = node.kwargs.get("dim", args_bounds_check(node.args, 1))
+    dim = get_positive_dim(dim, len(input_meta.shape))
+    axis_size = input_meta.shape[dim]
+
+    # A symbolic dimension is converted to a runtime trip count. DYNAMIC_DIM
+    # covers tensor_meta produced by shape propagation instead of export.
+    if isinstance(axis_size, torch.SymInt) or axis_size == DYNAMIC_DIM:
+        return True
+
+    if isinstance(axis_size, int) and axis_size >= 0:
+        _LOGGER.debug(
+            f"cumsum node {node.name} has a static axis {dim} of size {axis_size}; "
+            "TensorRT-RTX < 1.7 cannot build its refittable constant loop trip count."
+        )
+        return False
+
+    _LOGGER.debug(
+        f"cumsum node {node.name} has an unrecognized axis size {axis_size!r}; "
+        "falling back to PyTorch on TensorRT-RTX < 1.7 with refit enabled."
+    )
+    return False
+
+
 @dynamo_tensorrt_converter(
     torch.ops.aten.cumsum.default,
+    capability_validator=cumsum_validator,
     supports_dynamic_shapes=True,
 )
 @enforce_tensor_types(
