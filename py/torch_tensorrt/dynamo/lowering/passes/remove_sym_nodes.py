@@ -38,7 +38,7 @@ def remove_sym_nodes(
 
     gm.graph.lint()
     gm.recompile()
-    logger.debug(f"Removed SymInt placeholders:\n{gm.graph}")
+    logger.debug("Removed SymInt placeholders:\n%s", gm.graph)
 
     return gm
 
@@ -93,6 +93,6 @@ def replace_symint_with_sym_size(
 
     gm.graph.lint()
     gm.recompile()
-    logger.debug(f"Added sym_size nodes for SymInt placeholders:\n{gm.graph}")
+    logger.debug("Added sym_size nodes for SymInt placeholders:\n%s", gm.graph)
 
     return gm

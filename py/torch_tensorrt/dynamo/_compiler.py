@@ -415,13 +415,13 @@ def cross_compile_for_windows(
     )
 
     gm = exported_program.module()
-    logger.debug("Input graph: " + str(gm.graph))
+    logger.debug("Input graph:\n%s", gm.graph)
 
     # Apply lowering on the graph module. Note: constant_fold runs inside post_lowering and requires
     # module parameters to still be on GPU, so we must not deallocate before this call.
     gm = post_lowering(gm, settings)
     logger.debug(f"CPU memory usage after post_lowering: {get_cpu_memory_usage()} MB")
-    logger.debug("Lowered Input graph: " + str(gm.graph))
+    logger.debug("Lowered Input graph:\n%s", gm.graph)
 
     # Move the weights in the state_dict to CPU
     if offload_module_to_cpu:
@@ -872,7 +872,7 @@ def compile(
         )
 
         gm = exported_program.module()
-        logger.debug("Input graph: " + str(gm.graph))
+        logger.debug("Input graph:\n%s", gm.graph)
 
         # Lift mutated buffers from get_attr to placeholders BEFORE post_lowering's
         # constant_fold runs, so the engine sees them as input bindings (a
@@ -911,7 +911,7 @@ def compile(
         )
 
     logger.debug(f"CPU memory usage after post_lowering: {get_cpu_memory_usage()} MB")
-    logger.debug("Lowered Input graph: " + str(gm.graph))
+    logger.debug("Lowered Input graph:\n%s", gm.graph)
 
     # The marker is what keeps a re-routed write out of the engine's aliased_io, and
     # it rides on node.meta through every pass above. Read it back before conversion
@@ -1541,7 +1541,7 @@ def compile_module(
             logger.debug(
                 "Submodule in PyTorch: %s\n %s",
                 str(name),
-                str(submodule.graph),
+                submodule.graph,
             )
             # Only undo the explicit compilation-time offload. Otherwise this
             # would relocate parameters that the source graph intentionally
@@ -1596,7 +1596,7 @@ def compile_module(
             "Converting submodule: %s\n Input shapes: %s\n %s",
             str(name),
             [input.shape for input in submodule_inputs],
-            str(submodule.graph),
+            submodule.graph,
         )
 
         # Handle long/double inputs if requested by the user
@@ -2228,7 +2228,7 @@ def convert_exported_program_to_serialized_trt_engine(
 
     gm = exported_program.module()
     # Move the weights in the state_dict to CPU
-    logger.debug("Input graph: " + str(gm.graph))
+    logger.debug("Input graph:\n%s", gm.graph)
 
     # Optional: lift mutated module buffers from get_attr to placeholder so the
     # engine treats them as input bindings (enabling KV-cache aliasing for
@@ -2269,7 +2269,7 @@ def convert_exported_program_to_serialized_trt_engine(
 
     # Apply lowering on the graph module
     gm = post_lowering(gm, settings)
-    logger.debug("Lowered Input graph: " + str(gm.graph))
+    logger.debug("Lowered Input graph:\n%s", gm.graph)
 
     # Move the weights in the state_dict to CPU
     if offload_module_to_cpu:
