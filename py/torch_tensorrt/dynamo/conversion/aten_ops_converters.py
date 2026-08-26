@@ -2593,21 +2593,25 @@ def bitwise_type_validator(
             return False
         return lhs_meta.dtype in supported_type and rhs_meta.dtype in supported_type
 
-    elif node.target in scalar_targets:
-        lhs_val = node.args[0]
-        rhs_val = node.args[1]
-        lhs_meta = lhs_val.meta.get("tensor_meta")
-        if lhs_meta is None:
+    elif node.target in scalar_targets or node.target in scalar_tensor_targets:
+        # For Scalar: args are (tensor, scalar); for Scalar_Tensor: args are (scalar, tensor).
+        is_scalar = node.target in scalar_targets
+        scalar_val = node.args[1] if is_scalar else node.args[0]
+        tensor_val = node.args[0] if is_scalar else node.args[1]
+        tensor_meta = tensor_val.meta.get("tensor_meta")
+        if tensor_meta is None:
             return False
-        return lhs_meta.dtype in supported_type and isinstance(rhs_val, bool)
-
-    elif node.target in scalar_tensor_targets:
-        lhs_val = node.args[0]
-        rhs_val = node.args[1]
-        rhs_meta = rhs_val.meta.get("tensor_meta")
-        if rhs_meta is None:
+        if not (tensor_meta.dtype in supported_type and isinstance(scalar_val, bool)):
             return False
-        return isinstance(lhs_val, bool) and rhs_meta.dtype in supported_type
+        # Myelin bug (fixed in TRT 11.3): absorbing-element boolean constants are
+        # miscompiled as identity (x AND False returns x; x OR True returns x).
+        # Fall back to PyTorch for these cases on affected TRT versions.
+        if not is_tensorrt_version_supported("11.3.0"):
+            is_and_op = node.target in {torch.ops.aten.bitwise_and.Scalar, torch.ops.aten.bitwise_and.Scalar_Tensor}
+            is_or_op = node.target in {torch.ops.aten.bitwise_or.Scalar, torch.ops.aten.bitwise_or.Scalar_Tensor}
+            if (is_and_op and scalar_val is False) or (is_or_op and scalar_val is True):
+                return False
+        return True
 
     else:
         return False
