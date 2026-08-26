@@ -335,11 +335,15 @@ int main(int argc, char** argv) {
   const Stats sw_prefill = summarize(switching.prefill_ms);
   const Stats sw_decode = summarize(switching.decode_ms);
 
+  // --prefill_seq is a flag, so the label has to carry the value that actually ran.
+  char prefill_label[32];
+  snprintf(prefill_label, sizeof(prefill_label), "prefill (seq=%d)", prefill_seq);
+
   printf("prefill-only (every call on the prefill profile)\n");
-  print_stats("prefill (seq=128)", po_prefill);
+  print_stats(prefill_label, po_prefill);
   print_stats("decode  (seq=1)", po_decode);
   printf("\nswitching (each phase on its own profile)\n");
-  print_stats("prefill (seq=128)", sw_prefill);
+  print_stats(prefill_label, sw_prefill);
   print_stats("decode  (seq=1)", sw_decode);
 
   printf("\nwhat switching bought (positive = switching is faster)\n");
