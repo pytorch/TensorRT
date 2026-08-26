@@ -6,8 +6,8 @@ Quantization (INT8 / FP8 / FP4)
 Torch-TensorRT supports post-training quantization (PTQ) with **INT8**, **FP8**, and
 **FP4** precisions via NVIDIA's
 `ModelOpt <https://github.com/NVIDIA/TensorRT-Model-Optimizer>`_ library, and
-**FP8 weight-only**, **static FP8**, **INT4 weight-only**, and **NVFP4
-weight-only** quantization via
+**FP8 weight-only**, **static FP8**, **INT4 weight-only**, **NVFP4
+weight-only**, and **MXFP4** (``MXDynamicActivationMXWeightConfig``) via
 `TorchAO <https://github.com/pytorch/ao>`_. Quantizers insert
 quantize/dequantize (QDQ) nodes into the model graph; Torch-TensorRT then
 converts those nodes into TRT quantization layers and sets the appropriate builder flags.
@@ -30,6 +30,7 @@ Hardware requirements:
 * **FP8**: NVIDIA Hopper (H100) or newer.
 * **INT4 (TorchAO WOQ)**: TensorRT with INT4 constants (TRT ≥ 10.8); storage + DQ, not low-bit MMA.
 * **NVFP4 (TorchAO WOQ)**: TensorRT with FP4 constants (TRT ≥ 10.8); packed FP4 storage + DQ, not native FP4 MMA.
+* **MXFP4 (TorchAO)**: TensorRT with FP4 + E8M0 constants (TRT ≥ 10.8); packed FP4 storage + DQ, not native MXFP4 MMA. There is no MXFP4 weight-only config.
 * **FP4 (ModelOpt NVFP4)**: NVIDIA Blackwell (B100/B200) or newer; requires TensorRT ≥ 10.8.
 
 ----
@@ -291,6 +292,49 @@ See :ref:`quantize_linear_nvfp4_woq` for a toy Linear model and
 
 ----
 
+TorchAO MXFP4 (Dynamic Activation + MX Weight)
+----------------------------------------------
+
+TorchAO MXFP4 stores Linear weights as packed FP4 E2M1 (two values per
+byte) with E8M0 block scales (block size 32). The public config is
+``MXDynamicActivationMXWeightConfig`` — there is no MXFP4 weight-only
+recipe (that is NVFP4 / ``NVFP4WeightOnlyConfig``). Native MXFP4xMXFP4
+kernels need B200/B300. This path uses emulated storage and a weight DQ
+prologue into a high-precision GEMM. Activations stay BF16.
+
+Last two weight dims must be divisible by 32. Parent ``MXTensor`` Linear
+does not emit a DQ op TensorRT can map. Promote weights to
+``MXTensorNonDecomposed`` so export emits
+``torch.ops.torchao_trt.dequantize_mxfp4``. The converter unswizzles TorchAO
+block scales, then builds an FP4 constant, an E8M0 block-scale constant, and
+``IDequantizeLayer``. Myelin accepts FP4 + E8M0 at block size 32; FP4 +
+float32 scales fail at that block size.
+
+Torch-TensorRT marks ``dequantize_mxfp4`` impure in constant folding so the
+packed FP4 weight is not folded into a dense BF16 constant. Compile with
+``immutable_weights=True``.
+
+.. code-block:: python
+
+    quantize_linear_mxfp4(model)
+    model = pre_process_model_for_export(model)
+
+    exp_program = torch.export.export(model, (example_input,), strict=True)
+
+    trt_model = torch_tensorrt.dynamo.compile(
+        exp_program,
+        inputs=[example_input],
+        min_block_size=1,
+        use_explicit_typing=True,
+        require_full_compilation=True,
+        immutable_weights=True,
+    )
+
+See :ref:`quantize_linear_mxfp4` for a toy Linear model and
+:ref:`torch_export_flux_mxfp4` for FLUX.1-dev.
+
+----
+
 TorchAO Static FP8 Quantization
 --------------------------------
 
@@ -341,6 +385,10 @@ For TorchAO NVFP4 weight-only graphs, ``torch.ops.torchao_trt.dequantize_nvfp4.d
 is mapped to two-level ``IDequantizeLayer`` (FP8 block scales restored with the
 global scale, then packed FP4 dequantized into the GEMM input type).
 
+For TorchAO MXFP4 graphs, ``torch.ops.torchao_trt.dequantize_mxfp4.default``
+is mapped to ``IDequantizeLayer`` (packed FP4 + logical E8M0 block scales at
+block size 32).
+
 For ModelOpt FP4, ``torch.ops.tensorrt.dynamic_block_quantize_op.default`` nodes
 are converted via the dynamic block quantize converter, which uses TRT's
 ``add_dynamic_quantize`` API (TRT ≥ 10.8).
@@ -387,6 +435,9 @@ Supported Precision / Hardware Matrix
      - TRT ≥ 10.8
    * - NVFP4 (TorchAO WOQ)
      - GPU with TRT FP4 constants
+     - TRT ≥ 10.8
+   * - MXFP4 (TorchAO)
+     - GPU with TRT FP4 + E8M0 constants
      - TRT ≥ 10.8
    * - FP4 (ModelOpt NVFP4)
      - NVIDIA Blackwell (B100+)
@@ -437,3 +488,10 @@ Troubleshooting
     ``pre_process_model_for_export`` as in :ref:`quantize_linear_nvfp4_woq`.
     Last two Linear dims must be divisible by 16. This path is weight-only DQ
     + BF16 GEMM, not ModelOpt ``dynamic_block_quantize_op``.
+
+**TorchAO MXFP4 weights folded to BF16, or engine has no FP4E2M1 constant**
+    The graph must keep ``torchao_trt.dequantize_mxfp4``. Promote weights with
+    ``pre_process_model_for_export`` as in :ref:`quantize_linear_mxfp4`.
+    Last two Linear dims must be divisible by 32. Pass E8M0 scales (not
+    float32) at block size 32. This is a weight DQ prologue, not native
+    MXFP4xMXFP4 MMA.
