@@ -69,6 +69,6 @@ def fuse_prims_broadcast(
 
     if modified_graph:
         gm = clean_up_graph_after_modifications(gm)
-        logger.debug(f"Graph after fusing prims-broadcast paradigm:\n{gm.graph}")
+        logger.debug("Graph after fusing prims-broadcast paradigm:\n%s", gm.graph)
 
     return gm

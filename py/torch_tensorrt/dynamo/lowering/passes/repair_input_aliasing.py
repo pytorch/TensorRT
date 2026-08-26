@@ -39,6 +39,6 @@ def repair_input_aliasing(
 
     gm.graph.lint()
     gm.recompile()
-    logger.debug(f"Inserted auxiliary clone nodes for placeholders:\n{gm.graph}")
+    logger.debug("Inserted auxiliary clone nodes for placeholders:\n%s", gm.graph)
 
     return gm
