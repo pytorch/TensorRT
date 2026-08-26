@@ -341,10 +341,11 @@ def partition(
     Returns:
         torch.fx.GraphModule, OpSupportTester
     """
-    # Ensure graph is clean prior to partitioning
+    # Ensure graph is clean prior to partitioning. Skip recompile: AccNodesFinder
+    # and split() walk graph.nodes. GraphModule construction of split subgraphs
+    # rebuilds forward() for runtime wrappers and _run_on_gpu fallbacks.
     gm.graph.eliminate_dead_code()
     gm.graph.lint()
-    gm.recompile()
 
     # Construct
     supported_ops = OpSupportTester(torch_executed_ops=torch_executed_ops)

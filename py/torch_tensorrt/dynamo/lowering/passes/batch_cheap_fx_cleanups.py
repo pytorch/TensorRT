@@ -1,8 +1,8 @@
 """Batch cheap, non-conflicting FX cleanups into one graph repair cycle.
 
 Several post-lowering passes only delete/rewrite a few node kinds, then each
-calls ``clean_up_graph_after_modifications`` (DCE + lint + recompile). On large
-graphs that recompile dominates and is paid repeatedly.
+calls ``clean_up_graph_after_modifications`` (DCE + lint, and recompile when
+not deferred). On large graphs that recompile dominates and is paid repeatedly.
 
 Naren's guidance: use one iteration / one cleanup for repairs that do not
 conflict. This pass runs those mutations back-to-back and cleans up once.

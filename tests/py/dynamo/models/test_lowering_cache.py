@@ -100,6 +100,9 @@ class TestDiskLoweringCache(unittest.TestCase):
         self.assertIsNotNone(loaded)
         assert loaded is not None
         self.assertIsInstance(loaded.lowered_module, torch.fx.GraphModule)
+        # post_lowering leaves forward stale; serialize walks graph.nodes.
+        # load() already recompiles the deserialized module.
+        restored_module.recompile()
         torch.testing.assert_close(
             loaded.lowered_module(*self.inputs), restored_module(*self.inputs)
         )
@@ -161,6 +164,7 @@ class TestDiskLoweringCache(unittest.TestCase):
 
         self.assertIsNotNone(loaded)
         assert loaded is not None
+        restored.recompile()
         torch.testing.assert_close(loaded.lowered_module(*inputs), restored(*inputs))
 
     def test_bypasses_non_full_compilation(self) -> None:
