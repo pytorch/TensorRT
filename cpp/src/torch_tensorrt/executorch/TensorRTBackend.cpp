@@ -1672,11 +1672,14 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     case ProfileSelection::kOk:
       break;
     case ProfileSelection::kPinIgnoredSingleProfile:
-      ET_LOG(
-          Info,
-          "TensorRTBackend::execute: ignoring the pin on profile %d; this engine has one profile, "
-          "so it runs profile 0",
-          requested_index);
+      if (!engine->pin_ignored_reported) {
+        engine->pin_ignored_reported = true;
+        ET_LOG(
+            Info,
+            "TensorRTBackend::execute: ignoring the pin on profile %d; this engine has one profile, "
+            "so it runs profile 0 (reported once per engine)",
+            requested_index);
+      }
       break;
     case ProfileSelection::kRequestedProfileUnavailable:
       ET_LOG(
@@ -1704,7 +1707,8 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       return Error::InvalidState;
     }
     engine->profiles.active = profile;
-    ET_LOG(Info, "TensorRTBackend::execute: switched to optimization profile %d", profile);
+    // Debug, not Info: a decode/prefill loop switches on nearly every call.
+    ET_LOG(Debug, "TensorRTBackend::execute: switched to optimization profile %d", profile);
   }
 
   // ------------------------------------------------------------------

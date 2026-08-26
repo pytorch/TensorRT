@@ -87,6 +87,10 @@ struct EngineHandle {
   // profile, and installing it would size the pool for the largest of them.
   bool claims_pooled_scratch = false;
   std::mutex mu;
+  // A pin this engine cannot honor is a property of the caller's guard, not of the
+  // call, so it would otherwise be reported identically on every execute(). One
+  // engine, one report: a decode loop must not turn it into a log flood.
+  bool pin_ignored_reported = false;
 
   ~EngineHandle();
 };
