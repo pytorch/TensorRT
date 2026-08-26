@@ -80,7 +80,6 @@ jobs:
         bazel --version
 
         python -m pip install pyyaml "executorch==1.4.1"
-        export TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION="$(python -c 'import importlib.metadata; print(importlib.metadata.version("torch-tensorrt"))')"
 
         # The downloaded wheel has to carry the C++ runtime. A wheel built with
         # PYTHON_ONLY=1 has no libtorchtrt.so, which leaves
@@ -99,8 +98,10 @@ jobs:
 
         # Build the no-compile-for-users Python runtime wheel.
         python -m pip wheel --no-build-isolation --no-deps --wheel-dir dist py/torch-tensorrt-executorch-runtime
-        # this is to build the libtorchtrt.tar.gz
+        # Package the reference runner alongside the runtime wheel. The test
+        # workflow consumes this exact tarball rather than rebuilding it.
         bazel build //:libtorchtrt --compilation_mode opt --config=linux
+        cp bazel-bin/libtorchtrt.tar.gz dist/libtorchtrt.tar.gz
         # Run the ExecuTorch backend C++ unit tests, which are otherwise only
         # built, never executed. These tests link TensorRT and CUDA, but Bazel's
         # cc_import ships the unversioned libnvinfer.so and libcudart.so while the
@@ -122,12 +123,3 @@ jobs:
         bazel test //tests/cpp/executorch:executorch_backend_tests \
           --compilation_mode opt --config=linux --test_output=errors \
           --test_env=LD_LIBRARY_PATH
-        executorch_cmake_location="$(bazel query @executorch//:executorch/CMakeLists.txt --output=location)"
-        export EXECUTORCH_SOURCE_DIR="$(dirname "${executorch_cmake_location%%:*}")"
-        export EXECUTORCH_ROOT="${EXECUTORCH_SOURCE_DIR}"
-        # this is to verify the end user's workflow
-        python -m pip install pyyaml "executorch>=1.4.1,<1.5"
-        python examples/torchtrt_executorch_example/export_static_shape.py \
-          --model_path="${RUNNER_TEMP}/torchtrt-reference-runner.pte"
-        .github/scripts/verify-executorch-reference-runner.sh \
-          "${RUNNER_TEMP}/torchtrt-reference-runner.pte"

@@ -4,7 +4,7 @@ set +x
 
 # Verifies the documented end-user flow for the ExecuTorch reference runner:
 #
-#   1. Build //:libtorchtrt first so bazel-bin/libtorchtrt.tar.gz exists.
+#   1. Provide a libtorchtrt.tar.gz package, built with //:libtorchtrt.
 #   2. Provide an ExecuTorch source checkout with EXECUTORCH_SOURCE_DIR.
 #   3. Provide a Torch-TensorRT ExecuTorch .pte model.
 #   4. This script unpacks libtorchtrt.tar.gz, configures and builds the
@@ -24,6 +24,8 @@ set +x
 #     and otherwise downloads the archive pinned in MODULE.bazel.
 #   RUNNER_TEMP=/path/to/temp-root
 #     Parent directory for the temporary verification workspace.
+#   LIBTORCHTRT_TARBALL=/path/to/libtorchtrt.tar.gz
+#     Packaged runner tarball to verify. Defaults to bazel-bin/libtorchtrt.tar.gz.
 #   MAX_JOBS=N
 #     Parallelism passed to cmake --build.
 #   TORCHTRT_TENSORRT_DISTDIR=/path/to/cache
@@ -65,9 +67,9 @@ if [[ ! -f "${EXECUTORCH_SOURCE_DIR}/CMakeLists.txt" ]]; then
   exit 1
 fi
 
-tarball="${repo_root}/bazel-bin/libtorchtrt.tar.gz"
+tarball="${LIBTORCHTRT_TARBALL:-${repo_root}/bazel-bin/libtorchtrt.tar.gz}"
 if [[ ! -f "${tarball}" ]]; then
-  echo "Missing ${tarball}; build //:libtorchtrt before running this check" >&2
+  echo "Missing ${tarball}; build //:libtorchtrt or provide LIBTORCHTRT_TARBALL" >&2
   exit 1
 fi
 

@@ -87,7 +87,6 @@ jobs:
         source tests/py/utils/ci_helpers.sh
         trt_tier_executorch
 
-        bazel build //:libtorchtrt --compilation_mode opt --config=linux
         executorch_cmake_location="$(bazel query @executorch//:executorch/CMakeLists.txt --output=location)"
         export EXECUTORCH_SOURCE_DIR="$(dirname "${executorch_cmake_location%%:*}")"
         export EXECUTORCH_ROOT="${EXECUTORCH_SOURCE_DIR}"
@@ -95,6 +94,7 @@ jobs:
           --model_path="${RUNNER_TEMP}/torchtrt-python.pte"
         python examples/torchtrt_executorch_example/export_kv_cache_decode.py \
           --model_path="${RUNNER_TEMP}/torchtrt-kv-cache-decode.pte"
+        export LIBTORCHTRT_TARBALL="/opt/torch-tensorrt-builds/libtorchtrt.tar.gz"
         .github/scripts/verify-executorch-reference-runner.sh \
           "${RUNNER_TEMP}/torchtrt-python.pte" \
           "${RUNNER_TEMP}/torchtrt-kv-cache-decode.pte"

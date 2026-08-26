@@ -9,6 +9,8 @@ import sys
 from types import ModuleType
 from typing import Any, Protocol, cast
 
+__version__ = "0.1.0"
+
 BACKEND_NAME = "TensorRTBackend"
 _NATIVE_NAME = "executorch.extension.pybindings._portable_lib"
 _WRAPPER_NAME = "executorch.extension.pybindings.portable_lib"
