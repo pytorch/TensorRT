@@ -7,9 +7,18 @@ from inspect import signature
 from typing import Any, Optional, Tuple, Union
 
 import torch
-from torch.export import Dim, export
+from torch.export import Dim
 from torch_tensorrt._Input import Input
-from torch_tensorrt.dynamo._defaults import default_device
+from torch_tensorrt.dynamo._defaults import (
+    DECOMPOSE_ATTENTION,
+    ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
+    USE_DISTRIBUTED_MODE_TRACE,
+    USE_FP32_ACC,
+    default_device,
+)
+from torch_tensorrt.dynamo.lowering._export_with_decomps import (
+    export_with_tensorrt_decomps,
+)
 from torch_tensorrt.dynamo.utils import (
     get_torch_inputs,
     is_quantized_by_modelopt,
@@ -29,8 +38,8 @@ def trace(
 ) -> torch.export.ExportedProgram:
     """Exports a ``torch.export.ExportedProgram`` from a ``torch.nn.Module`` or ``torch.fx.GraphModule`` specifically targeting being compiled with Torch-TensorRT
 
-    Exports a ``torch.export.ExportedProgram`` from either a ``torch.nn.Module`` or torch.fx.GraphModule``. Runs specific operator decompositions geared towards
-    compilation by Torch-TensorRT's dynamo frontend.
+    Exports a ``torch.export.ExportedProgram`` from either a ``torch.nn.Module`` or torch.fx.GraphModule``. Applies Torch-TensorRT operator decompositions during
+    that export so ``dynamo.compile`` can skip a second AOT retrace when the decomp table matches.
 
     Arguments:
         mod (torch.nn.Module | torch.fx.GraphModule): Source module to later be compiled by Torch-TensorRT's dynamo fronted
@@ -100,12 +109,21 @@ def trace(
         export_context = export_torch_mode()
 
     with export_context:
-        exp_program = export(
+        exp_program = export_with_tensorrt_decomps(
             mod,
-            tuple(torch_arg_inputs),
+            args=tuple(torch_arg_inputs),
             kwargs=torch_kwarg_inputs,
             dynamic_shapes=dynamic_shapes,
             strict=kwargs.get("strict", False),
+            enable_experimental_decompositions=kwargs.get(
+                "enable_experimental_decompositions",
+                ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
+            ),
+            decompose_attention=kwargs.get("decompose_attention", DECOMPOSE_ATTENTION),
+            use_distributed_mode_trace=kwargs.get(
+                "use_distributed_mode_trace", USE_DISTRIBUTED_MODE_TRACE
+            ),
+            use_fp32_acc=kwargs.get("use_fp32_acc", USE_FP32_ACC),
         )
 
     return exp_program
