@@ -25,9 +25,11 @@ from torch_tensorrt.dynamo.conversion._TRTInterpreter import TRTInterpreter
 from torch_tensorrt.dynamo.conversion.truncate_double import repair_double_inputs
 from torch_tensorrt.dynamo.lowering import (
     clean_up_graph_after_modifications,
-    get_decompositions,
     post_lowering,
     pre_export_lowering,
+)
+from torch_tensorrt.dynamo.lowering._export_with_decomps import (
+    maybe_run_decompositions,
 )
 from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
     ENGINE_IDX,
@@ -257,13 +259,12 @@ def refit_module_weights(
             f"Input graph should be an ExportedProgram but got type {type(new_weight_module)}"
         )
     new_weight_module = pre_export_lowering(new_weight_module, settings)
-    new_weight_module = new_weight_module.run_decompositions(
-        get_decompositions(
-            settings.enable_experimental_decompositions,
-            settings.decompose_attention,
-            settings.use_distributed_mode_trace,
-            use_fp32_acc=settings.use_fp32_acc,
-        )
+    new_weight_module = maybe_run_decompositions(
+        new_weight_module,
+        enable_experimental_decompositions=settings.enable_experimental_decompositions,
+        decompose_attention=settings.decompose_attention,
+        use_distributed_mode_trace=settings.use_distributed_mode_trace,
+        use_fp32_acc=settings.use_fp32_acc,
     )
     new_gm = new_weight_module.module()
 
