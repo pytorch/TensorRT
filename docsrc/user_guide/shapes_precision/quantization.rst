@@ -6,7 +6,7 @@ Quantization (INT8 / FP8 / FP4)
 Torch-TensorRT supports post-training quantization (PTQ) with **INT8**, **FP8**, and
 **FP4** precisions via NVIDIA's
 `ModelOpt <https://github.com/NVIDIA/TensorRT-Model-Optimizer>`_ library, and
-**FP8 weight-only** and **static FP8** quantization via
+**FP8 weight-only**, **static FP8**, and **INT4 weight-only** quantization via
 `TorchAO <https://github.com/pytorch/ao>`_. Quantizers insert
 quantize/dequantize (QDQ) nodes into the model graph; Torch-TensorRT then
 converts those nodes into TRT quantization layers and sets the appropriate builder flags.
@@ -27,6 +27,7 @@ Hardware requirements:
 
 * **INT8**: Any NVIDIA GPU with TensorRT support.
 * **FP8**: NVIDIA Hopper (H100) or newer.
+* **INT4 (TorchAO WOQ)**: TensorRT with INT4 constants (TRT ≥ 10.8); storage + DQ, not low-bit MMA.
 * **FP4 (NVFP4)**: NVIDIA Blackwell (B100/B200) or newer; requires TensorRT ≥ 10.8.
 
 ----
@@ -195,6 +196,57 @@ See :ref:`quantize_linear_fp8_woq` for a toy Linear model and
 
 ----
 
+TorchAO INT4 Weight-Only Quantization
+-------------------------------------
+
+TorchAO group-wise INT4 quantizes Linear weights to 4-bit integers while
+leaving activations in BF16. This is **weight-only storage**: TensorRT keeps an
+INT4 constant and dequantizes into a high-precision GEMM. It is not NVFP4
+Tensor Core MMA.
+
+TensorRT's ``IDequantizeLayer`` rejects nonzero zero-points, so examples use
+TorchAO's **symmetric** ``Int4Tensor.from_hp`` path (the float8-activation
+branch, then restore BF16 as the activation dtype). Default
+``Int4WeightOnlyConfig`` is asymmetric and will fail conversion.
+
+Parent ``Int4Tensor`` Linear dispatches to fused mslk kernels and never calls
+``dequantize()``. Promote weights to ``Int4TensorNonDecomposed`` so export emits
+``torch.ops.torchao.dequantize_affine``. The converter re-packs the unpacked
+int8 qdata into ``trt.DataType.INT4``. Blocked INT4 DQ currently uses an FP32
+DQ output, then a cast back to BF16.
+
+Compile with ``immutable_weights=True``. The converter packs INT4 at build
+time; engine refit would push the graph's int8 qdata at an INT4 prototype
+(``refit weights data type Int8 must equal to weights prototype Int4``).
+
+.. code-block:: python
+
+    quantize_linear_int4_symmetric(model, group_size=128)
+    model = pre_process_model_for_export(model)
+
+    with exclude_dq_from_constant_folding():
+        exp_program = torch.export.export(model, (example_input,), strict=True)
+
+    trt_model = torch_tensorrt.dynamo.compile(
+        exp_program,
+        inputs=[example_input],
+        min_block_size=1,
+        use_explicit_typing=True,
+        require_full_compilation=True,
+        immutable_weights=True,
+    )
+
+Hub checkpoints such as `pytorch/Qwen3-8B-INT4 <https://huggingface.co/pytorch/Qwen3-8B-INT4>`_
+may use HQQ or ``Int4TilePackedTo4dTensor``. Dequantize those weights to dense
+BF16, then re-pack with ``quantize_linear_int4_symmetric`` /
+``convert_hub_int4_to_symmetric_trt``.
+
+See :ref:`quantize_linear_int4_woq` for a toy Linear model,
+:ref:`torch_export_flux_int4_woq` for FLUX.1-dev, and
+:ref:`torch_export_qwen3_int4_woq` for Qwen3-8B.
+
+----
+
 TorchAO Static FP8 Quantization
 --------------------------------
 
@@ -232,8 +284,9 @@ graph (inserted by ModelOpt), the
 (e.g. Conv, Linear) to produce INT8 or FP8 kernel variants.
 
 For TorchAO weight-only graphs, ``torch.ops.torchao.dequantize_affine.default`` is
-mapped to ``IDequantizeLayer`` (weight constant stays FP8/INT, activations stay
-high precision).
+mapped to ``IDequantizeLayer`` (weight constant stays FP8 or INT4, activations stay
+high precision). Group-wise INT4 qdata is re-packed from unpacked int8 into a
+``trt.DataType.INT4`` constant.
 
 For TorchAO static FP8 graphs,
 ``quantize_affine_float8_non_decomposed`` / ``dequantize_affine_float8_non_decomposed``
@@ -281,6 +334,9 @@ Supported Precision / Hardware Matrix
    * - FP8
      - NVIDIA Hopper (H100+)
      - TRT ≥ 8.6
+   * - INT4 (TorchAO WOQ)
+     - Any TRT-capable GPU with INT4 support
+     - TRT ≥ 10.8
    * - FP4 (NVFP4)
      - NVIDIA Blackwell (B100+)
      - TRT ≥ 10.8
@@ -313,3 +369,14 @@ Troubleshooting
     Promote weights with ``pre_process_model_for_export`` and wrap export in
     ``exclude_dq_from_constant_folding`` as in :ref:`quantize_linear_fp8_woq`.
     Install ``torchao`` so the converter and constant-folding exclusion register.
+
+**TorchAO INT4 weights folded to BF16, or engine constants are Int8 not Int4**
+    The graph must keep ``dequantize_affine`` (same preprocess / constant-fold
+    exclusion as FP8 WOQ). Group-wise INT4 also requires the INT4 pack path in
+    the converter; per-channel INT8-style DQ will not emit ``Datatype: Int4``.
+    Use symmetric quantization (zero zero-point) and ``immutable_weights=True``.
+
+**"IDequantizeLayer rejects nonzero zero_point" / INT4 compile fails**
+    TorchAO's default INT4 config is asymmetric. Use
+    ``quantize_linear_int4_symmetric`` (or ``convert_hub_int4_to_symmetric_trt``
+    for Hub checkpoints) as in :ref:`quantize_linear_int4_woq`.
