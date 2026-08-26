@@ -137,8 +137,25 @@ class TensorRTBackend final : public ::executorch::runtime::BackendInterface {
  * profile is the benign case -- it runs profile 0 and logs that the pin did
  * nothing -- while a multi-profile engine that lacks the index fails the
  * execution.
+ *
+ * @warning Name the guard. A discarded temporary is destroyed at the end of the
+ * full-expression that made it, restoring the enclosing request before
+ * forward() is ever called, so the execution runs profile 0 rather than the one
+ * asked for:
+ *
+ * @code
+ * OptimizationProfileGuard(kPrefillProfile);         // no-op, guard already dead
+ * OptimizationProfileGuard::automatic();             // no-op, guard already dead
+ * OptimizationProfileGuard guard(kPrefillProfile);   // correct
+ * auto guard = OptimizationProfileGuard::automatic(); // correct
+ * @endcode
+ *
+ * Both mistakes are compiler warnings rather than a silently mistuned
+ * execution: the pinning constructor and automatic() are each [[nodiscard]]
+ * individually, because GCC applies a class-level [[nodiscard]] only to
+ * returned values, not to a discarded constructor temporary.
  */
-class OptimizationProfileGuard {
+class [[nodiscard]] OptimizationProfileGuard {
  public:
   /**
    * @brief Pin an exact profile by its export-time index.
@@ -150,7 +167,7 @@ class OptimizationProfileGuard {
    *
    * @param profile_index Position in the export-time profile list.
    */
-  explicit OptimizationProfileGuard(int32_t profile_index);
+  [[nodiscard]] explicit OptimizationProfileGuard(int32_t profile_index);
 
   /// @brief Rejected so that OptimizationProfileGuard(true) cannot become index 1.
   OptimizationProfileGuard(bool) = delete;
@@ -164,8 +181,10 @@ class OptimizationProfileGuard {
    * @code
    * auto profile_guard = OptimizationProfileGuard::automatic();
    * @endcode
+   *
+   * @return A guard that must be bound to a name; discarding it selects nothing.
    */
-  static OptimizationProfileGuard automatic();
+  [[nodiscard]] static OptimizationProfileGuard automatic();
 
   ~OptimizationProfileGuard();
   OptimizationProfileGuard(const OptimizationProfileGuard&) = delete;

@@ -123,9 +123,15 @@ def make_inputs(seq_len: int):
 # - index ``0`` -> **decode**: ``seq`` pinned to 1 (a fully static profile)
 # - index ``1`` -> **prefill**: ``seq`` in ``[1, MAX_SEQ]``, tuned at ``PREFILL_SEQ``
 #
-# Profile order matters for auto-selection: the profiles overlap at ``seq == 1``
-# and auto-selection picks the *first* profile whose ``[min, max]`` accepts the
-# input, so declaring ``decode`` first lets it win the ``seq == 1`` overlap.
+# Profile order matters for auto-selection, but only on a rescan. Auto-selection
+# is sticky: it keeps the active profile whenever that profile still accepts the
+# input (switching invalidates the captured CUDA graph and forces shape
+# re-inference), and only when it does not does it rescan and take the *lowest*
+# index that fits. So declaring ``decode`` first wins the ``seq == 1`` overlap on
+# a rescan, but it does not claw ``seq == 1`` back from ``prefill``: prefill's
+# range is ``[1, MAX_SEQ]``, which still fits, so an alternating
+# prefill/decode loop stays on prefill. Pin the profile (below) to make decode
+# run under its own.
 profiles = [
     {"min_shape": (1, 1), "opt_shape": (1, 1), "max_shape": (1, 1)},  # decode
     {

@@ -65,6 +65,10 @@ struct EngineHandle {
   // suffices because a handle runs on a single thread at a time.
   cudaEvent_t inflight_event = nullptr;
   bool inflight_pending = false;
+  // A pin this engine cannot honor is a property of the caller's guard, not of the
+  // call, so it would otherwise be reported identically on every execute(). One
+  // engine, one report: a decode loop must not turn it into a log flood.
+  bool pin_ignored_reported = false;
 
   ~EngineHandle();
 };

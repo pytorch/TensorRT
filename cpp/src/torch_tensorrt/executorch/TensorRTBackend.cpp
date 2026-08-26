@@ -813,11 +813,14 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     case ProfileSelection::kOk:
       break;
     case ProfileSelection::kPinIgnoredSingleProfile:
-      ET_LOG(
-          Info,
-          "TensorRTBackend::execute: ignoring the pin on profile %d; this engine has one profile, "
-          "so it runs profile 0",
-          requested_index);
+      if (!engine->pin_ignored_reported) {
+        engine->pin_ignored_reported = true;
+        ET_LOG(
+            Info,
+            "TensorRTBackend::execute: ignoring the pin on profile %d; this engine has one profile, "
+            "so it runs profile 0 (reported once per engine)",
+            requested_index);
+      }
       break;
     case ProfileSelection::kRequestedProfileUnavailable:
       ET_LOG(
@@ -849,7 +852,8 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     if (mark_err != Error::Ok) {
       return mark_err;
     }
-    ET_LOG(Info, "TensorRTBackend::execute: switched to optimization profile %d", profile);
+    // Debug, not Info: a decode/prefill loop switches on nearly every call.
+    ET_LOG(Debug, "TensorRTBackend::execute: switched to optimization profile %d", profile);
   }
 
   // ------------------------------------------------------------------
@@ -1134,43 +1138,33 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   const bool aliased_reflect_pending = !aliased_reflects.empty();
   const bool must_sync =
       output_staged_to_host || input_staged_from_host || aliased_reflect_pending || !caller_stream_set;
-  if (must_sync) {
-    Error copy_err = Error::Ok;
-    for (auto& output : outputs_needing_copy) {
-      exec_aten::Tensor et_out = args[output.first]->toTensor();
-      cuda_err =
-          cudaMemcpyAsync(et_out.mutable_data_ptr(), output.second, et_out.nbytes(), cudaMemcpyDeviceToHost, stream);
-      if (cuda_err != cudaSuccess) {
-        ET_LOG(
-            Error,
-            "TensorRTBackend::execute: D2H copy failed for output %zu: %s",
-            output.first,
-            cudaGetErrorString(cuda_err));
-        // The enqueue already succeeded, so the engine is still running on the
-        // stream. Drain below before returning, or the next call mutates a live
-        // execution context, which TensorRT forbids.
-        copy_err = Error::InvalidProgram;
-        break;
-      }
-    }
-    cuda_err = cudaStreamSynchronize(stream);
-    engine->inflight_pending = false;
+  if (!must_sync) {
+    // Return with the enqueue still running, which is the contract documented on
+    // CallerStreamGuard use in TensorRTBackend.h: the caller synchronizes its own
+    // stream before reading device-resident outputs. Marking is what makes that
+    // safe -- it is the only thing telling the next execute() and ~EngineHandle to
+    // wait on the completion event before they touch exec_ctx -- so this path must
+    // neither sync (that would quietly make every call blocking) nor skip the mark
+    // (that would let the next call reconfigure a live context).
+    return mark_inflight(*engine, stream);
+  }
+
+  Error copy_err = Error::Ok;
+  for (auto& output : outputs_needing_copy) {
+    exec_aten::Tensor et_out = args[output.first]->toTensor();
+    cuda_err =
+        cudaMemcpyAsync(et_out.mutable_data_ptr(), output.second, et_out.nbytes(), cudaMemcpyDeviceToHost, stream);
     if (cuda_err != cudaSuccess) {
-      ET_LOG(Error, "TensorRTBackend::execute: cudaStreamSynchronize failed: %s", cudaGetErrorString(cuda_err));
-      return Error::InvalidProgram;
-    }
-    if (copy_err != Error::Ok) {
-      return copy_err;
-    }
-  } else {
-    cuda_err = cudaEventRecord(engine->inflight_event, stream);
-    if (cuda_err != cudaSuccess) {
-      // Could not arm the completion marker; drain now so a later execute() or the
-      // destructor never reconfigures or frees exec_ctx while this enqueue runs.
-      ET_LOG(Error, "TensorRTBackend::execute: cudaEventRecord failed: %s", cudaGetErrorString(cuda_err));
-      (void)cudaStreamSynchronize(stream);
-      engine->inflight_pending = false;
-      return Error::InvalidProgram;
+      ET_LOG(
+          Error,
+          "TensorRTBackend::execute: D2H copy failed for output %zu: %s",
+          output.first,
+          cudaGetErrorString(cuda_err));
+      // The enqueue already succeeded, so the engine is still running on the
+      // stream. Drain below before returning, or the next call mutates a live
+      // execution context, which TensorRT forbids.
+      copy_err = Error::InvalidProgram;
+      break;
     }
   }
   cuda_err = cudaStreamSynchronize(stream);
@@ -1179,7 +1173,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     ET_LOG(Error, "TensorRTBackend::execute: cudaStreamSynchronize failed: %s", cudaGetErrorString(cuda_err));
     return Error::InvalidProgram;
   }
-  return Error::Ok;
+  return copy_err;
 }
 
 // ---------------------------------------------------------------------------

@@ -10,9 +10,11 @@ from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
 from torch_tensorrt.runtime import optimization_profile
 
 # Profiles are an ordered list; the list index is the optimization-profile
-# index selected at runtime. Order is meaningful for lazy auto-selection: the
-# decode profile ([1, 1]) and prefill profile ([1, 64]) overlap at seq=1, so we
-# declare decode FIRST (index 0) to make it win the overlap (first-working).
+# index selected at runtime. Order matters on a rescan: the decode profile
+# ([1, 1]) and prefill profile ([1, 64]) overlap at seq=1, and a rescan takes the
+# lowest fitting index, so declaring decode FIRST (index 0) lets it win that
+# overlap. Auto-selection is sticky, though, so it only rescans once the active
+# profile stops fitting -- prefill accepts seq=1 and would keep it.
 DECODE_IDX = 0
 PREFILL_IDX = 1
 
@@ -43,6 +45,19 @@ def _make_profiles_input():
                 "max_shape": (4, 64, 16),
             },  # prefill
         ],
+    )
+
+
+def _compile_mlp_single_profile(model, **kwargs):
+    """Compile with a static input, so the engine has exactly one profile."""
+    example = torch.randn(4, 1, 16, dtype=torch.float16, device="cuda")
+    ep = torch.export.export(model, (example,))
+    return torch_tensorrt.dynamo.compile(
+        ep,
+        arg_inputs=[example],
+        min_block_size=1,
+        enabled_precisions={torch.float16},
+        **kwargs,
     )
 
 
@@ -252,6 +267,47 @@ class TestMultiProfileRuntime(TestCase):
                 e.set_active_profile(e.num_optimization_profiles)
             with self.assertRaises((ValueError, RuntimeError)):
                 e.set_active_profile(-1)
+
+    def test_single_profile_engine_tolerates_a_nonzero_pin(self):
+        # A pin reaches every engine in the module, so an index meant for a
+        # multi-profile sibling lands on single-profile engines too. Those have
+        # profile 0 and nothing to switch to: they must warn and stay on 0 rather
+        # than fail an execution that was never about them (the C++ and Python
+        # runtimes and the ExecuTorch backend all make this same exception).
+        # Only reachable by driving the engine directly: set_optimization_profile
+        # range-checks the index against this engine's profile count first, which
+        # the tail of this test pins down.
+        trt_gm = _compile_mlp_single_profile(self.model)
+        static_in = torch.randn(4, 1, 16, dtype=torch.float16, device="cuda")
+        engines = self._trt_engines(trt_gm)
+        self.assertGreaterEqual(len(engines), 1)
+
+        for e in engines:
+            self.assertEqual(e.num_optimization_profiles, 1)
+            if isinstance(e, TRTEngine):
+                # Python runtime: the warning is a Python log record. The C++
+                # runtime logs through LOG_WARNING, which assertLogs cannot see.
+                with self.assertLogs("torch_tensorrt", level="WARNING") as logs:
+                    e.set_active_profile(1)
+                self.assertTrue(
+                    any("Ignoring optimization profile" in m for m in logs.output)
+                )
+            else:
+                e.set_active_profile(1)
+            self.assertEqual(e._active_profile_index, 0)
+
+        # Tolerating the pin must leave the engine runnable, on profile 0.
+        ref = self.model(static_in)
+        out = trt_gm(static_in)
+        self.assertTrue(torch.allclose(out, ref, atol=1e-2))
+        for e in self._trt_engines(trt_gm):
+            self.assertEqual(e._active_profile_index, 0)
+
+        # The tolerance is engine-level only: the public entry point still
+        # range-checks, so a user pin of 1 here is a mistake, not a no-op.
+        with self.assertRaises(ValueError):
+            with optimization_profile(trt_gm, 1):
+                trt_gm(static_in)
 
     def test_non_int_profile_raises(self):
         with self.assertRaises(TypeError):

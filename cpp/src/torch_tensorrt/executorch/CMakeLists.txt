@@ -174,8 +174,9 @@ add_library(torchtrt::executorch_backend ALIAS torchtrt_executorch_backend)
 add_dependencies(torchtrt_executorch_backend executorch_trt_backend)
 
 # The archive is linked by file below rather than by target, so the include path
-# does not come along with it. Carry it here: a runner that scopes CudaStreamGuard
-# or OptimizationProfileGuard needs the public header.
+# does not come along with it. Carry it here: a runner that scopes
+# OptimizationProfileGuard needs the public header. (The caller-stream guard now
+# comes from ExecuTorch, not from this header.)
 target_include_directories(torchtrt_executorch_backend
     INTERFACE
         "${CMAKE_CURRENT_LIST_DIR}/../../../include"
