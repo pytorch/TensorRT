@@ -343,7 +343,9 @@ class DispatchTestCase(TRTTestCase):
             fx_module = torch.fx.symbolic_trace(mod)
 
         if enable_passes:
-            fx_module = post_lowering(fx_module, settings)
+            # TRTTestCase.run_test executes the module as Python for the
+            # reference, so rebuild forward after graph rewrites.
+            fx_module = post_lowering(fx_module, settings, recompile=True)
 
         if propagate_shapes:
             # TODO: This is currently being used to test embedding_bag_aten due to https://github.com/pytorch/TensorRT/issues/2843

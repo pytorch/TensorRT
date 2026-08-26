@@ -6,6 +6,8 @@ from torch_tensorrt.dynamo.utils import COMPLEX_DTYPES
 # When True, clean_up_graph_after_modifications only marks the graph dirty and
 # skips DCE/lint/recompile. post_lowering enables this around the pass list so
 # multiple cheap FX repairs share one cleanup cycle (Naren: "one iteration").
+# The conversion flush keeps DCE/lint but skips recompile: TRTInterpreter walks
+# gm.graph.nodes and never calls gm.forward().
 _defer_graph_cleanup: bool = False
 _graph_cleanup_pending: bool = False
 
@@ -20,20 +22,31 @@ def set_defer_graph_cleanup(enabled: bool) -> None:
 
 def flush_deferred_graph_cleanup(
     gm: torch.fx.GraphModule,
+    *,
+    recompile: bool = True,
 ) -> torch.fx.GraphModule:
-    """Run a real cleanup if any deferred clean_up call happened."""
+    """Run a real cleanup if any deferred clean_up call happened.
+
+    ``recompile`` rebuilds ``gm.forward`` from the graph. Conversion does not
+    need that; keep it for callers that execute the module as Python.
+    """
     global _graph_cleanup_pending
     if _graph_cleanup_pending:
         _graph_cleanup_pending = False
-        return _run_graph_cleanup(gm)
+        return _run_graph_cleanup(gm, recompile=recompile)
     return gm
 
 
-def _run_graph_cleanup(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
-    """Runs dead-code elimination, linting, and recompilation for graph, in-place"""
+def _run_graph_cleanup(
+    gm: torch.fx.GraphModule,
+    *,
+    recompile: bool = True,
+) -> torch.fx.GraphModule:
+    """Runs dead-code elimination, linting, and optionally recompilation."""
     gm.graph.eliminate_dead_code()
     gm.graph.lint()
-    gm.recompile()
+    if recompile:
+        gm.recompile()
     return gm
 
 
@@ -44,6 +57,7 @@ def clean_up_graph_after_modifications(
 
     If deferred cleanup is enabled (see ``set_defer_graph_cleanup``), records that
     a cleanup is needed and returns immediately so callers can batch mutations.
+    Non-deferred calls still recompile because those callers may execute Python.
     """
     global _graph_cleanup_pending
     if _defer_graph_cleanup:

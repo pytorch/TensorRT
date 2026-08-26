@@ -253,7 +253,7 @@ def transform_gm_with_kv_cache(exported_program: torch.export.ExportedProgram, a
     exported_program = exported_program.run_decompositions(get_decompositions(False))
 
     gm = exported_program.module()
-    gm = post_lowering(gm, settings)
+    gm = post_lowering(gm, settings, recompile=True)
 
     return gm
 

@@ -136,20 +136,29 @@ def get_lowering_pass_config(lowering_pass: LoweringPassSignature) -> dict[str, 
 
 
 def post_lowering(
-    gm: torch.fx.GraphModule, settings: CompilationSettings = CompilationSettings()
+    gm: torch.fx.GraphModule,
+    settings: CompilationSettings = CompilationSettings(),
+    *,
+    recompile: bool = False,
 ) -> torch.fx.GraphModule:
-    """Applies the lowering passes to a graph module after torch.export/torch.compile and their decompositions, returns the modified GraphModule"""
+    """Applies the lowering passes to a graph module after torch.export/torch.compile and their decompositions, returns the modified GraphModule
+
+    By default the trailing cleanup skips ``gm.recompile()``. Conversion walks
+    ``gm.graph.nodes`` (TRTInterpreter) and does not call ``gm.forward()``.
+    Pass ``recompile=True`` when the returned module will be executed as Python
+    (tests, dry-run, Python fallback).
+    """
     logging.debug(
         f"Invoking DynamoPassManager and applying lowering passes: {ATEN_POST_LOWERING_PASSES}"
     )
     fake_mode = torch._export.utils._detect_fake_mode_from_gm(gm)
     fake_tensor_updater = FakeTensorUpdater(gm)
-    # Batch DCE/lint/recompile across passes: each pass may still call
+    # Batch DCE/lint across passes: each pass may still call
     # clean_up_graph_after_modifications, but only the final flush pays for it.
     set_defer_graph_cleanup(True)
     try:
         gm = ATEN_POST_LOWERING_PASSES(gm, settings)
-        gm = flush_deferred_graph_cleanup(gm)
+        gm = flush_deferred_graph_cleanup(gm, recompile=recompile)
     finally:
         set_defer_graph_cleanup(False)
     if fake_mode is not None:
