@@ -228,7 +228,7 @@ def fuse_distributed_ops(
     if modified_graph:
         gm = clean_up_graph_after_modifications(gm)
         logger.debug(
-            f"Graph after fusing wait_tensor and distributed op tensor:\n{gm.graph}"
+            "Graph after fusing wait_tensor and distributed op tensor:\n%s", gm.graph
         )
 
     return gm
