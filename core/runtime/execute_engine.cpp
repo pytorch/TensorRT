@@ -478,6 +478,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
           ctx->enqueueV3(recording_stream);
           compiled_engine->cudagraph.capture_end();
           compiled_engine->cudagraph.instantiate();
+          compiled_engine->record_cudagraph_capture();
           if (compiled_engine->profile_execution) {
             cudaError_t debug_dump_err = cudaGraphDebugDotPrint(
                 compiled_engine->cudagraph.raw_cuda_graph(),

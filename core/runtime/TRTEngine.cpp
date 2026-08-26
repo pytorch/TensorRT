@@ -491,9 +491,6 @@ bool TRTEngine::set_device_memory_budget(int64_t budget) {
     bind_nccl_comm();
   }
 #endif
-  // Indicates to reevaluate the runtime settings
-  runtime_states.context_changed = true;
-
   return result;
 }
 
@@ -939,10 +936,6 @@ bool TRTEngine::runtime_settings(RuntimeSettings new_settings) {
   // the next ``execute_engine`` must re-bind via ``bind_nccl_comm()``.
   nccl_initialized = false;
 #endif
-  // Existing recreate sites set runtime_states.context_changed for cudagraph
-  // re-record; do the same here so a settings flip inside an active CM forces
-  // the next enqueue to re-record any captured graph.
-  runtime_states.context_changed = true;
   return true;
 }
 
@@ -955,6 +948,11 @@ nvinfer1::IExecutionContext* TRTEngine::exec_ctx() {
 
 void TRTEngine::invalidate_exec_ctx() noexcept {
   exec_ctx_.reset();
+  // Manual CUDA graphs capture work emitted by the old IExecutionContext and
+  // may reference its workspace and other per-context state. Force the next
+  // execute_engine() call to discard that graph and capture against the
+  // replacement context.
+  runtime_states.context_changed = true;
 }
 
 bool TRTEngine::has_exec_ctx() const noexcept {

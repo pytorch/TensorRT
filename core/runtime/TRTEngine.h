@@ -433,8 +433,9 @@ struct TRTEngine : torch::CustomClassHolder {
   // factory throws if creation fails).
   nvinfer1::IExecutionContext* exec_ctx();
 
-  // Drop the live execution context without recreating. The next ``exec_ctx()``
-  // call rebuilds from the current ``runtime_cfg`` settings.
+  // Drop the live execution context without recreating and mark any manual
+  // CUDA graph captured from it stale. The next ``exec_ctx()`` call rebuilds
+  // from the current ``runtime_cfg`` settings.
   void invalidate_exec_ctx() noexcept;
 
   // True iff the execution context has been materialized. Probes WITHOUT
@@ -443,6 +444,18 @@ struct TRTEngine : torch::CustomClassHolder {
 
   [[nodiscard]] int64_t num_execution_contexts_created() const noexcept {
     return num_execution_contexts_created_;
+  }
+
+  // Test/introspection counter for verifying that context changes force the
+  // manual CUDA graph path to capture a replacement graph.
+  [[nodiscard]] int64_t num_cudagraph_captures() const noexcept {
+    return num_cudagraph_captures_;
+  }
+
+  // Internal execute_engine() hook; public because execution is implemented as
+  // a free function rather than a TRTEngine member.
+  void record_cudagraph_capture() noexcept {
+    ++num_cudagraph_captures_;
   }
 
  private:
@@ -456,6 +469,7 @@ struct TRTEngine : torch::CustomClassHolder {
   void recreate_execution_context();
 
   int64_t num_execution_contexts_created_ = 0;
+  int64_t num_cudagraph_captures_ = 0;
 };
 
 } // namespace runtime

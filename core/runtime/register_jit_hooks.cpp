@@ -89,6 +89,9 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
         .def(
             "num_execution_contexts_created",
             [](const c10::intrusive_ptr<TRTEngine>& self) -> int64_t { return self->num_execution_contexts_created(); })
+        .def(
+            "num_cudagraph_captures",
+            [](const c10::intrusive_ptr<TRTEngine>& self) -> int64_t { return self->num_cudagraph_captures(); })
         // Multiple optimization profiles. Names match the Python runtime
         // (_TRTEngine.py) so both runtimes are interchangeable behind
         // TorchTensorRTModule / the optimization_profile context manager.
