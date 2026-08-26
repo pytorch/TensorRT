@@ -296,7 +296,7 @@ def _pretraced_backend(
     original_gm = gm
 
     try:
-        logger.debug("Pre-AOT Autograd graph:\n" + str(gm.graph))
+        logger.debug("Pre-AOT Autograd graph:\n%s", gm.graph)
 
         fake_mode = detect_fake_mode(sample_inputs)
 
@@ -349,11 +349,11 @@ def _pretraced_backend(
                 input for input in sample_inputs if isinstance(input, torch.Tensor)
             ]
 
-            logger.debug("Post-AOT Autograd graph:\n" + str(gm.graph))
+            logger.debug("Post-AOT Autograd graph:\n%s", gm.graph)
 
             gm = post_lowering(gm, settings)
 
-            logger.debug("Lowered Input graph:\n " + str(gm.graph))
+            logger.debug("Lowered Input graph:\n%s", gm.graph)
 
             torchtrt_inputs = prepare_inputs(
                 torch_inputs, disable_memory_format_check=True

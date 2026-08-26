@@ -45,6 +45,6 @@ def repair_input_as_output(
 
     if modified_graph:
         gm = clean_up_graph_after_modifications(gm)
-        logger.debug(f"Graph after repair_input_as_output:\n{gm.graph}")
+        logger.debug("Graph after repair_input_as_output:\n%s", gm.graph)
 
     return gm

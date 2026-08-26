@@ -191,7 +191,7 @@ def constant_fold(
     # Delete the constant folder instance which holds GPU memory
     del cf
 
-    logger.debug(f"Graph after constant folding:\n{gm.graph}")
+    logger.debug("Graph after constant folding:\n%s", gm.graph)
     return gm
 
 

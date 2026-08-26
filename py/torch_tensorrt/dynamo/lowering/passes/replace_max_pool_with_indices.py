@@ -57,6 +57,6 @@ def replace_max_pool_with_indices(
 
     if modified_graph:
         gm = clean_up_graph_after_modifications(gm)
-        logger.debug(f"Graph after fusing maxpool operators with indices:\n{gm.graph}")
+        logger.debug("Graph after fusing maxpool operators with indices:\n%s", gm.graph)
 
     return gm

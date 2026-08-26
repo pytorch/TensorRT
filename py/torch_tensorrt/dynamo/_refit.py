@@ -268,12 +268,12 @@ def refit_module_weights(
     )
     new_gm = new_weight_module.module()
 
-    logger.debug("Input graph: " + str(new_gm.graph))
+    logger.debug("Input graph:\n%s", new_gm.graph)
     # Apply lowering on the graph module
 
     new_gm = post_lowering(new_gm, settings)
 
-    logger.debug("Lowered Input graph: " + str(new_gm.graph))
+    logger.debug("Lowered Input graph:\n%s", new_gm.graph)
 
     # Set torch-executed ops
     CONVERTERS.set_compilation_settings(settings)

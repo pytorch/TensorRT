@@ -41,6 +41,6 @@ def remove_input_alias_fixing_clones(
 
     if modified_graph:
         gm = clean_up_graph_after_modifications(gm)
-        logger.debug(f"Removed auxiliary clone nodes for placeholders:\n{gm.graph}")
+        logger.debug("Removed auxiliary clone nodes for placeholders:\n%s", gm.graph)
 
     return gm

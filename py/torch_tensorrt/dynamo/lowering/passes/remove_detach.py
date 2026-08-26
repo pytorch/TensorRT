@@ -20,6 +20,6 @@ def remove_detach(
             gm.graph.erase_node(node)
             count += 1
 
-    logger.debug(f"Removed {count} detach nodes:\n{gm.graph}")
+    logger.debug("Removed %d detach nodes:\n%s", count, gm.graph)
 
     return gm

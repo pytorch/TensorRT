@@ -31,7 +31,6 @@ def replace_complex_placeholder_to_tuple(
                 new_node_dtype = torch.float32
             else:
                 new_node_dtype = torch.float64
-            fake_mode = FakeTensorMode()
 
             real_tensor = torch.empty(new_node_shape, dtype=new_node_dtype)
             with FakeTensorMode() as fake_mode:
@@ -46,7 +45,7 @@ def replace_complex_placeholder_to_tuple(
     if modified_graph:
         gm = clean_up_graph_after_modifications(gm)
         logger.debug(
-            f"Graph after fusing wait_tensor and distributed op tensor:\n{gm.graph}"
+            "Graph after fusing wait_tensor and distributed op tensor:\n%s", gm.graph
         )
 
     return gm

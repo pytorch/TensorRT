@@ -20,7 +20,7 @@ def replace_fused_rms_norm(
             x_normalized, rsqrt = process_fused_rms_norm_node(node, gm)
             count += 1
 
-    logger.debug(f"Replaced {count} fused rms norm nodes:\n{gm.graph}")
+    logger.debug("Replaced %d fused rms norm nodes:\n%s", count, gm.graph)
 
     # Avoid a full DCE/lint/recompile when nothing changed — on large graphs
     # that cleanup alone is tens of ms.

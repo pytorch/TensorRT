@@ -65,5 +65,5 @@ def force_causal_efficient_attention(
     if changed:
         gm = clean_up_graph_after_modifications(gm)
 
-    logger.debug(f"After forcing causal efficient attention pass:\n{gm.graph}")
+    logger.debug("After forcing causal efficient attention pass:\n%s", gm.graph)
     return gm
