@@ -97,6 +97,30 @@ class PaddedConv2d(nn.Module):
         return self.conv(F.pad(x, (0, 1, 0, 1)))
 
 
+class Cdist(nn.Module):
+    """A GEMM the explicit GEMM guards never see, emitted inside the cdist converter.
+
+    The op has to be called directly: torch.cdist does not reach this converter on the
+    GEMM path, because ATen's cdist calls _euclidean_dist there, which lowers to
+    aten.matmul and is guarded already. Only _cdist_forward's own p == 2 branch emits a
+    matmul layer that no mm/bmm node stands for.
+    """
+
+    def __init__(self, p=2.0, compute_mode=None):
+        super().__init__()
+        self.p, self.compute_mode = p, compute_mode
+
+    def forward(self, x1, x2):
+        return torch.ops.aten._cdist_forward.default(x1, x2, self.p, self.compute_mode)
+
+
+def _cdist_inputs(rows1, rows2, dtype=torch.float32):
+    return (
+        torch.randn(4, rows1, 5, dtype=dtype).cuda(),
+        torch.randn(4, rows2, 5, dtype=dtype).cuda(),
+    )
+
+
 @unittest.skipIf(
     not ENABLED_FEATURES.tensorrt_rtx,
     "Turing capability guards only apply to TensorRT-RTX",
@@ -204,6 +228,59 @@ class TestTuringCapabilityGuards(TestCase):
         inputs = (torch.randn(1, 4, 8, 8, 8).cuda(),)
         compiled = self._compile(mod, inputs, target_compute_capabilities=[TURING])
         self.assertGreater(_trt_submodule_count(compiled), 0)
+
+    def test_declared_turing_target_falls_back_cdist_p2_compute_mode_1(self):
+        # compute_mode=1 is "always use the matrix multiply", whatever the row count.
+        mod = Cdist(compute_mode=1)
+        inputs = _cdist_inputs(6, 8)
+        compiled = self._compile(mod, inputs, target_compute_capabilities=[TURING])
+        self.assertEqual(_trt_submodule_count(compiled), 0)
+        self._assert_matches_eager(mod, compiled, inputs)
+
+    def test_declared_turing_target_falls_back_cdist_p2_default_compute_mode(self):
+        # An absent compute_mode means "use the matrix multiply if either operand has
+        # more than 25 rows". The validator has to normalise None to 0 as the converter does.
+        mod = Cdist()
+        inputs = _cdist_inputs(35, 45)
+        compiled = self._compile(mod, inputs, target_compute_capabilities=[TURING])
+        self.assertEqual(_trt_submodule_count(compiled), 0)
+        self._assert_matches_eager(mod, compiled, inputs)
+
+    def test_declared_turing_target_falls_back_fp16_cdist_p2(self):
+        # Unlike every other guard here, this one is not FP32-only: on a T4 the fused
+        # Matmul_MUL_SUB_SQRT_ pattern fails for FP16 operands too, under every
+        # enabled_precisions setting, even though a bare FP16 GEMM runs there fine.
+        mod = Cdist(compute_mode=1)
+        inputs = _cdist_inputs(6, 8, dtype=torch.half)
+        compiled = self._compile(mod, inputs, target_compute_capabilities=[TURING])
+        self.assertEqual(_trt_submodule_count(compiled), 0)
+        self._assert_matches_eager(mod, compiled, inputs)
+
+    def test_declared_turing_target_keeps_cdist_p2_compute_mode_2_on_trt(self):
+        # compute_mode=2 is "never use the matrix multiply", so there is no GEMM to reject.
+        mod = Cdist(compute_mode=2)
+        inputs = _cdist_inputs(35, 45)
+        compiled = self._compile(mod, inputs, target_compute_capabilities=[TURING])
+        self.assertGreater(_trt_submodule_count(compiled), 0)
+        self._assert_matches_eager(mod, compiled, inputs)
+
+    def test_declared_turing_target_keeps_cdist_p2_small_rows_on_trt(self):
+        # At or below 25 rows the default compute_mode emits no GEMM. Rejecting these
+        # anyway would be worse than useless: PyTorch's cdist_cuda kernel has no Half
+        # implementation, so for FP16 the fallback raises where TensorRT-RTX succeeds.
+        mod = Cdist(compute_mode=0)
+        inputs = _cdist_inputs(6, 8)
+        compiled = self._compile(mod, inputs, target_compute_capabilities=[TURING])
+        self.assertGreater(_trt_submodule_count(compiled), 0)
+        self._assert_matches_eager(mod, compiled, inputs)
+
+    def test_declared_turing_target_keeps_cdist_p1_on_trt(self):
+        # Only p == 2 has a matrix-multiply path at all.
+        mod = Cdist(p=1.0, compute_mode=0)
+        inputs = _cdist_inputs(35, 45)
+        compiled = self._compile(mod, inputs, target_compute_capabilities=[TURING])
+        self.assertGreater(_trt_submodule_count(compiled), 0)
+        self._assert_matches_eager(mod, compiled, inputs)
 
     @unittest.skipIf(
         _is_turing(), "on Turing the native path is already guarded; see the SM75 tests"
@@ -386,6 +463,19 @@ class TestTuringNativeFallback(TestCase):
         inputs = (torch.randn(1, 4, 8, 8, 8).cuda(),)
         compiled = self._compile(mod, inputs)
         self.assertEqual(_trt_submodule_count(compiled), 0)
+
+    def test_cdist_p2_falls_back(self):
+        # Unguarded this built an engine whose createExecutionContext() then returned
+        # nullptr: "cuDNN graph compilation failed: No valid engine configs for
+        # Matmul_MUL_SUB_SQRT_".
+        mod = Cdist(compute_mode=1)
+        inputs = _cdist_inputs(6, 8)
+        compiled = self._compile(mod, inputs)
+        self.assertEqual(_trt_submodule_count(compiled), 0)
+        with torch.no_grad():
+            ref = mod.eval().cuda()(*inputs)
+            out = compiled(*inputs)
+        self.assertEqual((ref - out).abs().max().item(), 0.0)
 
     def test_bfloat16_falls_back_without_crashing(self):
         # Unguarded, compiling bfloat16 for SM 7.5 segfaulted the process.
