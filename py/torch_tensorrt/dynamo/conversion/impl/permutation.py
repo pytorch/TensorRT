@@ -28,7 +28,11 @@ def permute(
             f"permute received input {input} that is not a TensorRT ITensor"
         )
 
-    permutation = get_positive_dim(permutation, len(input.shape))
+    # Use len(permutation) as the rank: a permutation vector always has exactly
+    # as many elements as the tensor's rank, and len(input.shape) can throw
+    # "Could not get tensor shape" for tensors whose shape isn't set at
+    # graph-construction time (e.g. bfloat16 SDPA output, issue #4496).
+    permutation = get_positive_dim(permutation, len(permutation))
 
     layer = ctx.net.add_shuffle(input)
     layer.second_transpose = tuple(permutation)
