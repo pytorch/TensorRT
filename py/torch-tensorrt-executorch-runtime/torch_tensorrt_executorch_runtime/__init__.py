@@ -4,12 +4,16 @@ from __future__ import annotations
 
 import ctypes
 import importlib
+import importlib.metadata
 import os
 import sys
 from types import ModuleType
 from typing import Any, Protocol, cast
 
-__version__ = "0.1.0"
+try:
+    __version__ = importlib.metadata.version("torch-tensorrt-executorch-runtime")
+except importlib.metadata.PackageNotFoundError:
+    __version__ = "unknown"
 
 BACKEND_NAME = "TensorRTBackend"
 _NATIVE_NAME = "executorch.extension.pybindings._portable_lib"

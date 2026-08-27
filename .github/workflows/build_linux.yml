@@ -279,7 +279,9 @@ jobs:
         run: echo "ARTIFACT_NAME=${ARTIFACT_NAME}_rtx" >> "${GITHUB_ENV}"
       - name: Prefix wheel artifact
         if: ${{ inputs.artifact-name-prefix }}
-        run: echo "ARTIFACT_NAME=${{ inputs.artifact-name-prefix }}-${ARTIFACT_NAME}" >> "${GITHUB_ENV}"
+        env:
+          ARTIFACT_PREFIX: ${{ inputs.artifact-name-prefix }}
+        run: echo "ARTIFACT_NAME=${ARTIFACT_PREFIX}-${ARTIFACT_NAME}" >> "${GITHUB_ENV}"
       - name: Combine Env Var and Build Env Files
         if: ${{ inputs.env-var-script != '' }}
         working-directory: ${{ inputs.repository }}

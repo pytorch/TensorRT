@@ -19,11 +19,14 @@ HERE = pathlib.Path(__file__).resolve().parent
 REPO_ROOT = HERE.parents[1]
 BAZEL_TARGET = "//py/torch-tensorrt-executorch-runtime/native:delegate_native"
 BUILD_NONCE = os.getenv("TORCH_TENSORRT_EXECUTORCH_BUILD_NONCE", uuid.uuid4().hex)
-TENSORRT_DISTRIBUTION = "tensorrt-cu13"
-RUNTIME_VERSION = "0.1.0"
+
+RUNTIME_VERSION = (HERE / "version.txt").read_text().strip()
+# Upper bounds are intentionally tight (one minor version) so that incompatible
+# ABI changes in torch, executorch, or TensorRT are caught at install time rather
+# than at runtime. Bump all four when moving to the next release.
 TORCH_REQUIREMENT = "torch>=2.15.0.dev,<2.16.0"
-TENSORRT_REQUIREMENT = f"{TENSORRT_DISTRIBUTION}>=11.2.1,<11.3"
-EXECUTORCH_REQUIREMENT = "executorch>=1.4.1,<1.5.0"
+TENSORRT_REQUIREMENT = "tensorrt-cu13>=11.2.1,<11.3"
+EXECUTORCH_REQUIREMENT = "executorch==1.4.1"
 TORCH_TENSORRT_REQUIREMENT = "torch-tensorrt>=2.15.0.dev,<2.16.0"
 
 
