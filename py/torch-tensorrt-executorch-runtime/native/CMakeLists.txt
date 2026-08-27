@@ -82,8 +82,9 @@ set(EXECUTORCH_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # rules_foreign_cc puts an explicit dynamic -lstdc++ in the Bazel toolchain's linker
-# flags. Retaining it makes the wheel depend on the build host's CXXABI version, so
-# remove it before anything that links is defined.
+# flags, ahead of the object files and wrapped in --as-needed, where it resolves
+# nothing. Remove it before anything that links is defined, and put a working one back
+# below.
 #
 # Two things have to be right, and each was got wrong before.
 #
@@ -95,7 +96,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 # WHY IT IS NOT HARMLESS WHERE IT SITS. It arrives wrapped in --as-needed, before the
 # object files, which with the default linker means it gets dropped. This build passes
 # -fuse-ld=gold, and gold keeps it anyway. Measured in the release image on a shared
-# object using std::string and exceptions, all with -static-libstdc++ -static-libgcc:
+# object using std::string and exceptions:
 #
 #   bfd,       -lstdc++ present   -> no libstdc++ NEEDED
 #   gold,      -lstdc++ present   -> libstdc++.so.6 NEEDED
@@ -128,46 +129,31 @@ foreach(_torch_tensorrt_linker_flags
     "[${${_torch_tensorrt_linker_flags}}]")
 endforeach()
 
-# Removing the dynamic -lstdc++ is only half of it: something still has to supply the
-# C++ runtime. The Bazel toolchain hands CMake the C driver, gcc, as CMAKE_CXX_COMPILER,
-# and gcc links no C++ runtime at all. -static-libstdc++ is silently a no-op for it,
-# which is exactly why the toolchain injected an explicit -lstdc++ in the first place.
+# Removing that fragment is only half of it: something still has to supply the C++
+# runtime. The Bazel toolchain hands CMake the C driver, gcc, as CMAKE_CXX_COMPILER,
+# and gcc links no C++ runtime at all, which is exactly why the toolchain injected an
+# explicit -lstdc++ in the first place.
 #
-# So put the static archive in its place, and put it where an archive can actually do
-# something. An archive only pulls the members that resolve symbols already undefined
-# when it is scanned, so ahead of the object files it contributes nothing. CMake appends
-# CMAKE_CXX_STANDARD_LIBRARIES after the objects, which is the position that works, and
-# is the same placement rules_foreign_cc documents for exactly this problem.
+# So put one back, after the object files. CMake appends CMAKE_CXX_STANDARD_LIBRARIES
+# there, which is the position that works, and is the same placement rules_foreign_cc
+# documents for exactly this problem.
 #
-# Measured in the release image with the build's own flags (gcc driver, -fuse-ld=gold,
-# -flto=auto, --gc-sections) on a shared object that stores a std::exception_ptr:
+# Measured on a shared object that stores a std::exception_ptr and formats through an
+# ostringstream:
 #
-#                                        UND _M_addref   libstdc++ NEEDED
-#   dynamic -lstdc++ before objects            2                1
-#   nothing at all                             2                0
-#   the static archive before objects          2                0
-#   the static archive after objects           0                0
+#                                                UND _M_addref   libstdc++ NEEDED
+#   the toolchain's --as-needed group, pre-objects      0                0
+#   nothing at all                                      0                0
+#   -lstdc++ after the objects                          0                1
 #
-# Only the last satisfies both halves of the check at the end of this file. Named with
-# -l: rather than whole-archived: forcing every member in is what previously collided
-# with libstdc++_nonshared.a, and nothing pulls that archive in now because the
-# libstdc++.so linker script that used to reference it is no longer on the link line.
-execute_process(
-  COMMAND "${CMAKE_CXX_COMPILER}" -print-file-name=libstdc++.a
-  OUTPUT_VARIABLE TORCH_TENSORRT_STATIC_LIBSTDCXX
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
-execute_process(
-  COMMAND "${CMAKE_CXX_COMPILER}" -print-libgcc-file-name
-  OUTPUT_VARIABLE TORCH_TENSORRT_STATIC_LIBGCC
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
-if(NOT EXISTS "${TORCH_TENSORRT_STATIC_LIBSTDCXX}" OR
-   NOT EXISTS "${TORCH_TENSORRT_STATIC_LIBGCC}")
-  message(FATAL_ERROR "A static C++ runtime is required to build the ExecuTorch runtime wheel")
-endif()
-# Named by the path the driver reports rather than as -l:libstdc++.a, so the archive
-# that gets linked is the one just checked for existence and not whichever copy a -L on
-# the link line happens to shadow it with.
-string(APPEND CMAKE_CXX_STANDARD_LIBRARIES " \"${TORCH_TENSORRT_STATIC_LIBSTDCXX}\"")
+# It has to be the dynamic library and not libstdc++.a. These artifacts share a C++ ABI
+# with libtorch_cpu.so, libc10.so, libtorch_python.so and libnvinfer.so.11, every one of
+# which already carries DT_NEEDED libstdc++.so.6 and needs no more than GLIBCXX_3.4.22.
+# A second static copy cannot be made safe in that company. Left visible it interposes
+# the real runtime for anything loaded alongside it, and hidden it gives this wheel
+# private __cxxabiv1 typeinfo and a private unwinder, so exceptions stop crossing the
+# boundary and dynamic_cast starts returning null.
+string(APPEND CMAKE_CXX_STANDARD_LIBRARIES " -lstdc++")
 # try_compile forwards CMAKE_EXE_LINKER_FLAGS but not CMAKE_CXX_STANDARD_LIBRARIES, so
 # without this a C++ probe loses the runtime the strip above removed and reports the
 # feature absent instead of failing.
@@ -236,29 +222,14 @@ target_link_libraries(portable_lib PRIVATE
   extension_threadpool
   CUDA::cudart TensorRT::nvinfer Threads::Threads)
 
-# The build and validation containers do not necessarily provide the same libstdc++,
-# so both Python extensions carry their own copy. What supplies it is the static archive
-# appended to CMAKE_CXX_STANDARD_LIBRARIES near the top of this file, not the driver
-# flags below: CMAKE_CXX_COMPILER here is gcc, the C driver, which links no C++ runtime
-# and treats -static-libstdc++ as a no-op.
+# What supplies the C++ runtime is the -lstdc++ appended to
+# CMAKE_CXX_STANDARD_LIBRARIES near the top of this file. LINKER_LANGUAGE CXX is what
+# selects CMAKE_CXX_COMPILER and those standard libraries for these targets, so it has
+# to be set on every one of them.
 #
-# The driver flags are still set, because they are what a C++ driver would need and the
-# toolchain is not ours to depend on. LINKER_LANGUAGE CXX is still set, because it is
-# what selects CMAKE_CXX_COMPILER and the CXX standard libraries for these targets.
-# Neither is sufficient on its own here.
-#
-# libstdc++.a is named, but not whole-archived. Forcing every member in is what
-# collided with libstdc++_nonshared.a before: on a Red Hat gcc-toolset, libstdc++.so is
-# a text linker script reading
-#
-#   INPUT ( /usr/lib64/libstdc++.so.6 -lstdc++_nonshared )
-#
-# so that archive used to arrive as an independent input and every forced member
-# collided. Nothing reaches it now, because that linker script is no longer on the link
-# line at all.
 # The CUDA backend brings two shared libraries of its own. They get the same treatment,
-# because one left on the host libstdc++ hands that dependency straight back to
-# _portable_lib.so through its own DT_NEEDED.
+# because libaoti_cuda_shims.so is the first DT_NEEDED of _portable_lib.so and so leads
+# the whole dlopen group in symbol search order.
 set(_torch_tensorrt_executorch_runtime_targets portable_lib data_loader)
 foreach(_torch_tensorrt_cuda_shared_target extension_cuda aoti_cuda_shims)
   get_target_property(_torch_tensorrt_cuda_shared_type
@@ -275,32 +246,8 @@ endforeach()
 
 foreach(_torch_tensorrt_executorch_runtime_target
         IN LISTS _torch_tensorrt_executorch_runtime_targets)
-  # Keep the C++ runtime self-contained. The compiler driver otherwise
-  # appends a dynamic -lstdc++ even when libstdc++.a is a direct link input,
-  # leaving CXXABI-versioned exception_ptr symbols for the host runtime.
   set_property(TARGET ${_torch_tensorrt_executorch_runtime_target}
     PROPERTY LINKER_LANGUAGE CXX)
-  # Do not add libstdc++.a here, and in particular do not whole-archive it. The
-  # driver flags below already select the static runtime, and on a Red Hat
-  # gcc-toolset the toolchain adds a second archive of its own: libstdc++.so is a
-  # text linker script, not an ELF object, and it reads
-  #
-  #   INPUT ( /usr/lib64/libstdc++.so.6 -lstdc++_nonshared )
-  #
-  # so libstdc++_nonshared.a arrives as an independent input carrying the
-  # newer-ABI symbols the base libstdc++.so.6 lacks. That archive is a strict
-  # subset of libstdc++.a: measured in the release image with
-  # `nm --defined-only -g`, counting T/W/B/D/R, 1003 definitions and none unique to
-  # it. Counting all global types gives 1141 instead; "none unique" holds either
-  # way, which is the part that matters. Whole-archiving libstdc++.a
-  # forces every member in whether referenced or not, so all 1003 collide and the
-  # link fails on whichever the linker reaches first.
-  target_link_libraries(${_torch_tensorrt_executorch_runtime_target} PRIVATE
-    "${TORCH_TENSORRT_STATIC_LIBGCC}")
-  target_link_options(${_torch_tensorrt_executorch_runtime_target} PRIVATE
-    -static-libstdc++
-    -static-libgcc)
-
 endforeach()
 
 # The runtime wheel intentionally does not bundle PyTorch, TensorRT, or CUDA.
@@ -337,9 +284,9 @@ install(TARGETS extension_cuda aoti_cuda_shims LIBRARY DESTINATION lib)
 add_custom_target(torch_tensorrt_executorch_portable_lib ALL
   DEPENDS ${_torch_tensorrt_executorch_runtime_targets})
 
-# Guard the two properties the removed whole-archive used to guarantee, on the real
-# artifacts: no dynamic dependency on the build host's libstdc++, and no undefined
-# exception_ptr::_M_addref. This wheel has no auditwheel step behind it.
+# Guard both halves of the C++ runtime contract on the real artifacts, because this
+# wheel has no auditwheel step behind it: nothing here may define libstdc++'s own
+# symbols, and anything referencing the runtime must declare it.
 #
 # ALL on the aggregate target above matters: a custom target without it is excluded
 # from the default build, and the default target is what the wheel build runs. The
@@ -348,22 +295,22 @@ add_custom_target(torch_tensorrt_executorch_portable_lib ALL
 # directory and those two come from ExecuTorch's subdirectory.
 #
 # The check lives in a script rather than an inline shell string so it can report what
-# it saw. A bare "has a dynamic libstdc++ dependency" does not say which input added
-# it, and the build logs do not print link lines, so the script prints both.
+# it saw. A bare "defines libstdc++ symbols" does not say which input added them, and
+# the build logs do not print link lines, so the script prints both.
 find_program(TORCH_TENSORRT_READELF NAMES readelf llvm-readelf)
 if(NOT TORCH_TENSORRT_READELF AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
   message(FATAL_ERROR
-    "readelf is required to verify the Python extensions link the C++ runtime "
-    "statically. Install binutils, or set TORCH_TENSORRT_READELF to a readelf.")
+    "readelf is required to verify the Python extensions share the C++ runtime. "
+    "Install binutils, or set TORCH_TENSORRT_READELF to a readelf.")
 endif()
 if(TORCH_TENSORRT_READELF)
   foreach(_torch_tensorrt_checked_target
           IN LISTS _torch_tensorrt_executorch_runtime_targets)
     add_custom_command(TARGET torch_tensorrt_executorch_portable_lib POST_BUILD
       COMMAND "${CMAKE_COMMAND}" -E echo
-        "checking $<TARGET_FILE_NAME:${_torch_tensorrt_checked_target}> links the C++ runtime statically"
+        "checking $<TARGET_FILE_NAME:${_torch_tensorrt_checked_target}> shares the C++ runtime"
       COMMAND sh
-        "${CMAKE_CURRENT_LIST_DIR}/check_static_cxx_runtime.sh"
+        "${CMAKE_CURRENT_LIST_DIR}/check_shared_cxx_runtime.sh"
         "${TORCH_TENSORRT_READELF}"
         "$<TARGET_FILE:${_torch_tensorrt_checked_target}>"
         "$<TARGET_PROPERTY:${_torch_tensorrt_checked_target},BINARY_DIR>/CMakeFiles/${_torch_tensorrt_checked_target}.dir/link.txt"

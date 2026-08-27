@@ -25,6 +25,8 @@ cc_binary(
     ],
     deps = [
         "//cpp:tensorrt_executorch_backend",
+        "//cpp:tensorrt_executorch_cuda_device_allocator",
+        "//cpp:tensorrt_executorch_device_copy_kernels",
         "@executorch//:executorch_core",
         "@executorch//:executorch_file_data_loader",
         "@executorch//:extension_cuda",
@@ -36,6 +38,8 @@ cc_binary(
     srcs = ["kv_cache_decode_check.cpp"],
     deps = [
         "//cpp:tensorrt_executorch_backend",
+        "//cpp:tensorrt_executorch_cuda_device_allocator",
+        "//cpp:tensorrt_executorch_device_copy_kernels",
         "@cuda//:cudart",
         "@executorch//:executorch_core",
         "@executorch//:executorch_file_data_loader",

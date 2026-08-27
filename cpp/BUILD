@@ -141,6 +141,56 @@ cc_library(
     ],
 )
 
+# Registration only, kept out of :tensorrt_executorch_backend so that linking
+# the backend into both a shared library and an executable cannot register the
+# allocator twice. Executables that run a TensorRT delegated program depend on
+# this directly.
+#
+# Not part of :executorch_backend_source_files. The CMake build of the reference
+# runner enables the CUDA/AOTI delegate, which already registers this allocator.
+cc_library(
+    name = "tensorrt_executorch_cuda_device_allocator",
+    srcs = [
+        "src/torch_tensorrt/executorch/RegisterCudaDeviceAllocator.cpp",
+    ],
+    alwayslink = True,
+    target_compatible_with = select({
+        ":linux_x86_64": [],
+        ":sbsa": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = select({
+        ":linux_x86_64": [
+            "@executorch//:executorch_cuda_allocator",
+            "@executorch//:executorch_headers",
+        ],
+        ":sbsa": [
+            "@executorch//:executorch_cuda_allocator",
+            "@executorch//:executorch_headers",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+# Registration only, for the same reason as the allocator above: the kernel
+# registry aborts when the same kernel is registered twice, so this cannot ride
+# along with the backend. Executables that run a TensorRT delegated program
+# depend on this directly.
+#
+# Not part of :executorch_backend_source_files. The CMake build of the reference
+# runner links executorch::kernels, which already registers these.
+cc_library(
+    name = "tensorrt_executorch_device_copy_kernels",
+    srcs = [
+        "src/torch_tensorrt/executorch/RegisterDeviceCopyKernels.cpp",
+    ],
+    alwayslink = True,
+    deps = [
+        "@executorch//:executorch_device_copy_kernels",
+        "@executorch//:executorch_headers",
+    ],
+)
+
 cc_library(
     name = "tensorrt_executorch_backend",
     srcs = [
