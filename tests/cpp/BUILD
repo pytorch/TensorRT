@@ -69,6 +69,8 @@ test_suite(
         "//tests/cpp/executorch:test_executorch_binding_names",
         "//tests/cpp/executorch:test_executorch_blob_header",
         "//tests/cpp/executorch:test_executorch_weight_streaming_budget",
+        "//tests/cpp/executorch:test_shared_scratch_backend",
+        "//tests/cpp/executorch:test_shared_scratch_pool",
     ],
 )
 

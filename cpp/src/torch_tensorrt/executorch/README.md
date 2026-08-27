@@ -85,14 +85,16 @@ the removed `CudaStreamGuard`:
   complete, order any cross-stream producers/consumers with their own events,
   and synchronize the stream before reading outputs on the host.
 - With no guard active, the backend falls back to `cudaStreamPerThread`.
-- With the `use_shared_activation_scratch` backend option enabled, one buffer per
-  device backs the activation scratch of every execution context created while it
-  was on, so an enqueue against that buffer must not overlap another one. The
-  backend orders consecutive enqueues itself, whether they run on one stream or
-  on two. What it cannot order is two `execute()` calls submitted concurrently on
-  one device: the caller must submit them one at a time, whether or not they
-  share a stream. Contexts created while the option was off keep their own
-  scratch and are unaffected.
+- With the `use_shared_activation_scratch` backend option enabled, one buffer
+  per device backs the activation scratch of every execution context created
+  while it was on, so an enqueue against that buffer must not overlap another
+  one. The backend orders consecutive enqueues itself, whether they run on one
+  stream or on two. What it cannot order is two `execute()` calls submitted
+  concurrently on one device: the caller must submit them one at a time, whether
+  or not they share a stream. Submitting them concurrently risks one of them
+  growing the pool and freeing the buffer the other's enqueue is still reading
+  and writing, not merely reordering them. Contexts created while the option was
+  off keep their own scratch and are unaffected.
 - The reference-runner smoke test runs inference inside a caller-stream guard on
   the discrete-GPU CI configuration, where all inputs and outputs are host-backed
   and therefore take the synchronized staging path. CI separately asserts that the
@@ -133,12 +135,19 @@ Check what `executorch::runtime::set_option` returns: `Error::NotFound` means no
 backend is registered under that name, which is what a binary that has not linked
 the backend archive gets.
 
-N per-engine copies collapse to one, so the reclaimed memory is `(N-1)` times the
-per-engine scratch. Set the option before loading the methods whose engines
-should use the pool, and read the `use_shared_activation_scratch` bullet of the
-caller-stream contract above first: the pool carries an ordering obligation the
-backend cannot discharge for you. The buffer is never released, so the device
-keeps the largest scratch it was ever asked for until the process exits.
+N per-engine copies collapse to one, so the reclaimed memory is the sum of the N
+requirements less the largest of them. Set the option before loading the methods
+whose engines should use the pool, and read the `use_shared_activation_scratch`
+bullet of the caller-stream contract above first: the pool carries an ordering
+obligation the backend cannot discharge for you. The buffer is never released, so
+the device keeps the largest scratch it was ever asked for until the process
+exits.
+
+How much any one engine asks for is fixed when it is built, not when it runs.
+The builder's `kRUNTIME_ACTIVATION_RESIZE_10_10` preview feature makes an engine
+report what the shapes just bound need; without it, whether an engine does that
+or reports its profile maximum depends on how TensorRT planned it. Either way the
+pool can settle well above the live data, and nothing the runtime does changes it.
 
 ## Standalone Backend Archive
 

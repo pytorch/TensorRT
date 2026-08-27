@@ -18,7 +18,6 @@
 #include <mutex>
 #include <string>
 #include <tuple>
-#include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -184,6 +183,13 @@ Error initialize_engine_io(EngineHandle& handle) {
   TORCHTRT_ET_CHECK_NOT_NULL(
       handle.exec_ctx, Error::InvalidProgram, "TensorRTBackend::init: failed to create TensorRT execution context");
 
+  if (handle.shared_scratch) {
+    // Read after the weight streaming budget is applied, which the caller does
+    // before this runs because TensorRT forbids moving the budget once a context
+    // exists -- and the budget is the one thing that moves this figure.
+    handle.engine_scratch_bytes = static_cast<size_t>(handle.engine->getDeviceMemorySizeV2());
+  }
+
   return Error::Ok;
 }
 
@@ -224,27 +230,29 @@ bool is_cuda_accessible_ptr(const void* ptr) {
 }
 
 // Process-wide per-device pool for TensorRT execution-context activation scratch.
-// One buffer sized to the largest engine's need serves every context on a device,
-// instead of each of N layer-engines pinning its own scratch, which makes device
-// memory scale with the layer count and OOMs multi-layer models.
+// One buffer sized to the largest engine's need serves every kUSER_MANAGED context
+// on a device, instead of each of N layer-engines pinning its own scratch, which
+// makes device memory scale with the layer count and OOMs multi-layer models.
 //
 // ORDERING: a context reads and writes its scratch for the whole enqueue, which
 // can still be in flight when execute() returns, so two enqueues must never hold
 // this buffer at the same time.
 //
 // What the pool's event handoff does NOT cover is concurrent execute() on one
-// device: scratch_pool_mu guards the two maps only, and is released before either
-// enqueue is submitted, so two threads can interleave their waits and records.
-// The requirement is therefore that delegate enqueues on a device are submitted
-// one at a time -- they need not share a stream, but they must not be submitted
-// concurrently. That is why the pool is opt-in.
+// device: a device's lock is released before the enqueue is submitted, so an
+// enqueue is live for a window before the event carries it, and a second thread
+// claiming inside that window is told to wait for the enqueue before it. Such a
+// claimant can grow the pool and free the buffer the first thread's enqueue is
+// still reading and writing. The requirement is therefore that the enqueues
+// drawing on a device's buffer are submitted one at a time, but they need not
+// share a stream. That is why the pool is opt-in. The pool's locking does not
+// couple two devices: each carries its own lock, and no CUDA call is made under
+// the lock that finds it.
 //
 // The buffers and the events are intentionally never freed. Nothing here runs a
 // CUDA call at process exit, which also keeps the pool clear of teardown-order
 // hazards against anything else holding device memory.
-std::mutex scratch_pool_mu;
-std::unordered_map<int, std::pair<void*, size_t>> scratch_pool;
-std::unordered_map<int, SharedScratchMarker> scratch_pool_markers;
+SharedScratchPool scratch_pool;
 
 // Sets out_ptr to a buffer of at least `need` bytes on `device_id` and out_size to
 // its capacity, with `stream` ordered after the enqueue that last used the buffer.
@@ -252,12 +260,13 @@ std::unordered_map<int, SharedScratchMarker> scratch_pool_markers;
 // enqueue.
 //
 // Must be called with `device_id` already current: cudaEventCreateWithFlags,
-// cudaMalloc, cudaFree and cudaDeviceSynchronize all act on the *current* device
-// and nothing in here sets it.
+// cudaMalloc and cudaFree all act on the *current* device and nothing in here
+// sets it.
 Error get_or_grow_shared_scratch(int device_id, size_t need, cudaStream_t stream, void*& out_ptr, size_t& out_size) {
-  std::lock_guard<std::mutex> lk(scratch_pool_mu);
+  SharedScratchDevice& dev = scratch_pool.get(device_id);
+  std::lock_guard<std::mutex> lk(dev.mu);
 
-  const SharedScratchHandoff handoff = shared_scratch_claim_event(scratch_pool_markers, device_id, []() -> cudaEvent_t {
+  const SharedScratchHandoff handoff = shared_scratch_claim_event(dev, []() -> cudaEvent_t {
     cudaEvent_t event = nullptr;
     if (cudaEventCreateWithFlags(&event, cudaEventDisableTiming) != cudaSuccess) {
       return nullptr;
@@ -282,11 +291,9 @@ Error get_or_grow_shared_scratch(int device_id, size_t need, cudaStream_t stream
     }
   }
 
-  const auto slot = scratch_pool.find(device_id);
-  const bool first_buffer = slot == scratch_pool.end() || slot->second.first == nullptr;
+  const bool first_buffer = dev.buffer == nullptr;
   void* const buffer = shared_scratch_get_or_grow(
-      scratch_pool,
-      device_id,
+      dev,
       need,
       out_size,
       [device_id, first_buffer](size_t bytes) -> void* {
@@ -302,9 +309,10 @@ Error get_or_grow_shared_scratch(int device_id, size_t need, cudaStream_t stream
             bytes);
         return p;
       },
-      [](void* old) {
-        // Sync before free so no in-flight enqueue points at the old buffer.
-        cudaDeviceSynchronize();
+      [](void* old, cudaEvent_t wait_for) {
+        if (wait_for != nullptr) {
+          cudaEventSynchronize(wait_for);
+        }
         cudaFree(old);
       });
   if (buffer == nullptr) {
@@ -323,9 +331,10 @@ Error get_or_grow_shared_scratch(int device_id, size_t need, cudaStream_t stream
 // Records the enqueue now in flight on `stream` against `device_id`'s shared
 // scratch, so the next call to get_or_grow_shared_scratch waits for it.
 Error mark_shared_scratch_in_flight(int device_id, cudaStream_t stream) {
-  std::lock_guard<std::mutex> lk(scratch_pool_mu);
+  SharedScratchDevice& dev = scratch_pool.get(device_id);
+  std::lock_guard<std::mutex> lk(dev.mu);
 
-  const cudaEvent_t event = shared_scratch_mark_in_flight(scratch_pool_markers, device_id);
+  const cudaEvent_t event = shared_scratch_mark_in_flight(dev);
   if (event == nullptr) {
     ET_LOG(Error, "TensorRTBackend::execute: shared activation scratch on device %d has no handoff event", device_id);
     return Error::Internal;
@@ -1045,28 +1054,41 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // ------------------------------------------------------------------
   // 4. Back activation scratch with the shared per-device pool
   // ------------------------------------------------------------------
-  // All input shapes are bound by now, so the exact scratch requirement for this
-  // call is known. The buffer is installed on every call, not once, because a
-  // larger engine may have grown the pool and moved it since the last one. A
-  // kSTATIC context owns its private scratch, so setDeviceMemoryV2 must not be
-  // called on one.
+  // The query requires every input shape to be bound, which they are by here.
+  // Whatever it answers is binding rather than advisory: setDeviceMemoryV2 refuses
+  // a smaller buffer, and an engine backed by less than it asked for writes past
+  // the end.
+  //
+  // The buffer is installed on every call, not once, because a larger engine may
+  // have grown the pool and moved it since the last one. A kSTATIC context owns
+  // its private scratch, so setDeviceMemoryV2 must not be called on one.
+  //
+  // A reported zero is ambiguous: TensorRT answers a failed query and an engine
+  // that genuinely needs no scratch the same way, and the engine's own
+  // requirement is what separates them. An engine that needs none is given no
+  // buffer, so it has nothing to claim and nothing for the next claimant to order
+  // against. A failed query carried on would instead leave the context enqueueing
+  // against whatever buffer it last held, because setDeviceMemoryV2(nullptr, 0)
+  // is rejected and returns nothing to test.
   bool scratch_from_pool = false;
   if (engine->shared_scratch) {
     const size_t need = ctx->updateDeviceMemorySizeForShapes();
-    void* pool = nullptr;
-    size_t pool_size = 0;
-    // Zero means this call needs no scratch: nothing to claim, and nothing to
-    // order against the previous user of the buffer. Zero is also what a failed
-    // query returns; on this context's first call that is caught, because
-    // enqueueV3 refuses an engine it has never been given scratch for.
     if (need > 0) {
+      void* pool = nullptr;
+      size_t pool_size = 0;
       const Error scratch_err = get_or_grow_shared_scratch(engine->device_id, need, stream, pool, pool_size);
       if (scratch_err != Error::Ok) {
         return scratch_err;
       }
       scratch_from_pool = true;
+      ctx->setDeviceMemoryV2(pool, static_cast<int64_t>(pool_size));
+    } else if (engine->engine_scratch_bytes > 0) {
+      ET_LOG(
+          Error,
+          "TensorRTBackend::execute: updateDeviceMemorySizeForShapes returned 0, but the engine needs %zu bytes of activation scratch",
+          engine->engine_scratch_bytes);
+      return Error::InvalidState;
     }
-    ctx->setDeviceMemoryV2(pool, static_cast<int64_t>(pool_size));
   }
 
   // ------------------------------------------------------------------
