@@ -70,6 +70,15 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
         .def("__str__", &TRTEngine::to_str)
         .def("__repr__", &TRTEngine::to_str)
         .def("__obj_flatten__", &TRTEngine::__obj_flatten__)
+        // Reporting "real" below puts the engine itself into torch's fake tensor
+        // dispatch cache key, and that cache compares keys with ==. Without this the
+        // second lookup raises "'__eq__' is not implemented", which breaks any
+        // re-export of a compiled module. Two handles to one engine are one engine.
+        .def(
+            "__eq__",
+            [](const c10::intrusive_ptr<TRTEngine>& self, const c10::intrusive_ptr<TRTEngine>& other) -> bool {
+              return self.get() == other.get();
+            })
         // Reporting "real" makes torch's tracing_with_real skip fakification and hand
         // the engine itself to the meta kernel, which reads only
         // get_serialized_metadata() -- nothing executes or mutates it. Otherwise each
