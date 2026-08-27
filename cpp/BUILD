@@ -172,6 +172,25 @@ cc_library(
     }),
 )
 
+# Registration only, for the same reason as the allocator above: the kernel
+# registry aborts when the same kernel is registered twice, so this cannot ride
+# along with the backend. Executables that run a TensorRT delegated program
+# depend on this directly.
+#
+# Not part of :executorch_backend_source_files. The CMake build of the reference
+# runner links executorch::kernels, which already registers these.
+cc_library(
+    name = "tensorrt_executorch_device_copy_kernels",
+    srcs = [
+        "src/torch_tensorrt/executorch/RegisterDeviceCopyKernels.cpp",
+    ],
+    alwayslink = True,
+    deps = [
+        "@executorch//:executorch_device_copy_kernels",
+        "@executorch//:executorch_headers",
+    ],
+)
+
 cc_library(
     name = "tensorrt_executorch_backend",
     srcs = [
