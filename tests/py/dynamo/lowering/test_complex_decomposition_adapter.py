@@ -3,9 +3,10 @@
 These tests exercise the TRT-specific glue around PyTorch's upstream complex
 decomposition -- they do NOT require a GPU or a TRT build:
 
-  * _normalize_complex_boundary_for_trt: folds the aten.complex / real / imag
-    seams that decompose_complex_in_graph leaves behind into the interleaved
-    [..., 2] real layout the rest of the TRT flow expects.
+  * _normalize_complex_boundary_for_trt: folds the aten.view_as_real /
+    aten.complex / real / imag seams that decompose_complex_in_graph leaves
+    behind into the interleaved [..., 2] real layout the rest of the TRT flow
+    expects.
   * the torch-version feature gate: when the upstream API is unavailable the
     adapter must fall back to the legacy complex_graph_detection pass.
 """
@@ -79,6 +80,118 @@ def test_normalize_packs_surviving_complex_to_interleaved():
     assert out.shape == (3, 2)
     assert torch.equal(out[..., 0], re)
     assert torch.equal(out[..., 1], im)
+
+
+def test_normalize_folds_view_as_real_of_view_as_complex():
+    """view_as_real(view_as_complex(x)) -> x, and both nodes are erased."""
+
+    class M(torch.nn.Module):
+        def forward(self, x):
+            z = torch.ops.aten.view_as_complex.default(x)
+            return torch.ops.aten.view_as_real.default(z)
+
+    from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
+        clean_up_graph_after_modifications,
+    )
+
+    x = torch.randn(3, 2)
+    gm = torch.fx.symbolic_trace(M())
+
+    gm = cda._normalize_complex_boundary_for_trt(gm)
+    # The view_as_complex node is left without users, and the adapter runs this
+    # right after the pass to collect nodes in exactly that state.
+    gm = clean_up_graph_after_modifications(gm)
+    targets = _targets(gm)
+
+    assert aten.view_as_real.default not in targets
+    assert aten.view_as_complex.default not in targets
+    assert torch.equal(gm(x), x)
+
+
+def test_normalize_folds_view_as_real_of_complex():
+    """view_as_real(complex(re,im)) -> the interleaved [..., 2] layout.
+
+    Without this, Pass C would rewrite the complex() node into that layout and
+    leave a view_as_real reading it, which is no longer a complex tensor.
+    """
+
+    class M(torch.nn.Module):
+        def forward(self, re, im):
+            z = torch.ops.aten.complex.default(re, im)
+            return torch.ops.aten.view_as_real.default(z)
+
+    re = torch.randn(3)
+    im = torch.randn(3)
+    gm = torch.fx.symbolic_trace(M())
+
+    gm = cda._normalize_complex_boundary_for_trt(gm)
+    targets = _targets(gm)
+
+    assert aten.view_as_real.default not in targets
+    assert aten.complex.default not in targets
+
+    out = gm(re, im)
+    assert out.shape == (3, 2)
+    assert torch.equal(out[..., 0], re)
+    assert torch.equal(out[..., 1], im)
+
+
+# ---------------------------------------------------------------------------
+# whole pass over a graph that is real at both ends and complex in the middle
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.skipif(
+    not cda.has_complex_decomposition(),
+    reason="decompose_complex_in_graph requires torch>=2.14.dev",
+)
+def test_interior_complex_region_leaves_nothing_trt_cannot_convert():
+    """A rotary-embedding shaped graph must come out with real ops only.
+
+    The complex region here sits in the middle: the graph takes a real tensor
+    and returns one, so upstream meets it at view_as_real rather than at
+    aten.complex, and its retrace also brings back ops the decomposition and
+    constant-folding stages had already dealt with. Any of those left behind
+    is not just an unconverted op: the partitioner cuts the graph around it and
+    the model comes back as several engines with PyTorch blocks in between.
+    """
+    from torch_tensorrt.dynamo._settings import CompilationSettings
+    from torch_tensorrt.dynamo.lowering import get_decompositions
+
+    class M(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.register_buffer(
+                "freqs",
+                torch.complex(torch.randn(1, 2, 1, 1), torch.randn(1, 2, 1, 1)),
+            )
+
+        def forward(self, x):
+            z = torch.view_as_complex(x.reshape(1, 2, 1, 1, 2))
+            return torch.view_as_real(z * self.freqs)
+
+    model = M().eval()
+    x = torch.randn(1, 2, 1, 2)
+    expected = model(x)
+
+    gm = (
+        torch.export.export(model, (x,))
+        .run_decompositions(get_decompositions())
+        .module()
+    )
+    out = cda.complex_decomposition_adapter(gm, CompilationSettings())
+
+    targets = set(_targets(out))
+    for target in (
+        aten.view_as_complex.default,
+        aten.view_as_real.default,
+        aten.complex.default,
+        aten.alias.default,
+        aten.stack.default,
+    ):
+        assert target not in targets, f"{target} survived the pass"
+
+    torch.testing.assert_close(out(x), expected)
 
 
 # ---------------------------------------------------------------------------
@@ -172,7 +285,11 @@ def test_io_metadata_reattached_to_returned_module(monkeypatch):
     )
     monkeypatch.setattr(cda, "has_complex_decomposition", lambda: True)
 
-    out = cda.complex_decomposition_adapter(gm, settings=object())
+    # Real settings, not a stub: the adapter reads the decomposition options off
+    # them to build the table it hands to the retrace.
+    from torch_tensorrt.dynamo._settings import CompilationSettings
+
+    out = cda.complex_decomposition_adapter(gm, settings=CompilationSettings())
 
     # Functional: we did NOT get the original module back...
     assert out is not gm
