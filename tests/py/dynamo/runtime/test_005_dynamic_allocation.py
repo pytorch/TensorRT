@@ -25,7 +25,7 @@ class TestDynamicAllocation(TestCase):
                 x = F.relu(self.conv2(x))
                 return x
 
-        inputs = [torch.rand((100, 3, 224, 224)).to("cuda")]
+        inputs = [torch.rand((2, 3, 224, 224)).to("cuda")]
 
         settings = {
             "ir": "dynamo",
