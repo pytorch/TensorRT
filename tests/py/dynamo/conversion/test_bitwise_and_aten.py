@@ -1,9 +1,11 @@
+import unittest
+
 import torch
 import torch.nn as nn
 import torch_tensorrt
 from parameterized import parameterized
 from torch.export import Dim
-from torch.testing._internal.common_utils import run_tests
+from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt import Input
 from torch_tensorrt.dynamo.utils import ATOL, RTOL
 
@@ -80,10 +82,12 @@ class TestBitwiseAndConverter(DispatchTestCase):
             use_example_tensors=False,
         )
 
+    # Only True is here; `x & False` is handled by TestBitwiseAndFalseScalar
+    # below, because the validator keeps it out of TensorRT.
     @parameterized.expand(
         [
             ("2d", (5, 3), True),
-            ("3d", (5, 3, 2), False),
+            ("3d", (5, 3, 2), True),
         ]
     )
     def test_bitwise_and_scalar(self, _, shape, scalar):
@@ -104,7 +108,7 @@ class TestBitwiseAndConverter(DispatchTestCase):
     @parameterized.expand(
         [
             ("2d", (5, 3), True),
-            ("3d", (5, 3, 2), False),
+            ("3d", (5, 3, 2), True),
         ]
     )
     def test_bitwise_and_scalar_tensor(self, _, shape, scalar):
@@ -163,6 +167,45 @@ class TestBitwiseAndConverter(DispatchTestCase):
                     equal_nan=True,
                     check_dtype=True,
                 )
+
+
+@unittest.skipIf(not torch.cuda.is_available(), "Skip because CUDA is not available")
+class TestBitwiseAndFalseScalar(TestCase):
+    """`x & False` must stay in PyTorch and still give the right answer.
+
+    DispatchTestCase never consults the capability validator, so these go
+    through the full compile pipeline and check that the partitioner built no
+    TensorRT engine at all.
+    """
+
+    @parameterized.expand(
+        [
+            ("scalar_2d", (5, 3), False),
+            ("scalar_tensor_3d", (5, 3, 2), True),
+        ]
+    )
+    def test_falls_back(self, _, shape, scalar_first):
+        class bitwise_and(nn.Module):
+            def forward(self, tensor):
+                if scalar_first:
+                    return torch.ops.aten.bitwise_and.Scalar_Tensor(False, tensor)
+                return torch.ops.aten.bitwise_and.Scalar(tensor, False)
+
+        mod = bitwise_and().eval().cuda()
+        inputs = [torch.randint(0, 2, shape, dtype=bool).cuda()]
+        trt_mod = torch_tensorrt.compile(
+            mod,
+            ir="dynamo",
+            inputs=inputs,
+            min_block_size=1,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
+        )
+        acc_count = sum(
+            1 for name, _ in trt_mod.named_children() if "_run_on_acc" in name
+        )
+        self.assertEqual(acc_count, 0)
+        torch.testing.assert_close(trt_mod(*inputs), mod(*inputs))
 
 
 if __name__ == "__main__":

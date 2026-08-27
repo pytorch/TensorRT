@@ -2507,16 +2507,26 @@ class TestLowering(TestCase):
             inputs,
             min_block_size=1,
             pass_through_build_failures=True,
+            # The reference below runs the matmul in full fp32, so TensorRT has to
+            # as well. TF32 is on by default and rounds the operands to 10 mantissa
+            # bits, which costs far more than DECIMALS_OF_AGREEMENT allows.
+            disable_tf32=True,
         )
         with torch.no_grad():
             trt_results = optimized_model(*inputs).detach().cpu()
             torch_results = fx_graph(*inputs).detach().cpu()
 
         max_diff = float(torch.max(torch.abs(trt_results - torch_results)))
+        # TensorRT-RTX ignores disable_tf32 and always runs the matmul in TF32, so
+        # the fp32 reference can differ by one TF32 rounding step. Only the standard
+        # runtime can meet DECIMALS_OF_AGREEMENT here.
+        decimals_of_agreement = (
+            1 if torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx else DECIMALS_OF_AGREEMENT
+        )
         self.assertAlmostEqual(
             max_diff,
             0,
-            DECIMALS_OF_AGREEMENT,
+            decimals_of_agreement,
             f"baddbmm TRT outputs don't match with the original model. (diff={max_diff})",
         )
 

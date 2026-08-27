@@ -2821,6 +2821,31 @@ def aten_ops_logical_xor(
     )
 
 
+# `x & False` is False whatever x is, and `x | True` is True whatever x is. For
+# those two, TensorRT 11.2 folds the layer down to a constant, and it gets that
+# wrong when the constant operand is smaller than the output and has to
+# broadcast: the build either aborts with an internal error or the engine
+# returns garbage. A Python scalar always reaches the network as a rank-0
+# constant, so it always has to broadcast, so these two combinations always hit
+# it. Nothing else does, including both XOR cases, since XOR has no value that
+# fixes its result.
+_ABSORBING_BITWISE_SCALAR = {
+    torch.ops.aten.bitwise_and.Scalar: False,
+    torch.ops.aten.bitwise_and.Scalar_Tensor: False,
+    torch.ops.aten.bitwise_or.Scalar: True,
+    torch.ops.aten.bitwise_or.Scalar_Tensor: True,
+}
+
+
+def _is_absorbing_bitwise_scalar(target: Target, scalar: Any) -> bool:
+    """Would TensorRT mis-evaluate this scalar bitwise op (see above)?"""
+    if target not in _ABSORBING_BITWISE_SCALAR:
+        return False
+    # A non-bool scalar is rejected by the dtype check further down anyway, and
+    # `1 == True` in Python, so check the type before comparing the value.
+    return isinstance(scalar, bool) and scalar == _ABSORBING_BITWISE_SCALAR[target]
+
+
 def bitwise_type_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
@@ -2870,6 +2895,8 @@ def bitwise_type_validator(
         lhs_meta = lhs_val.meta.get("tensor_meta")
         if lhs_meta is None:
             return False
+        if _is_absorbing_bitwise_scalar(node.target, rhs_val):
+            return False
         return lhs_meta.dtype in supported_type and isinstance(rhs_val, bool)
 
     elif node.target in scalar_tensor_targets:
@@ -2877,6 +2904,8 @@ def bitwise_type_validator(
         rhs_val = node.args[1]
         rhs_meta = rhs_val.meta.get("tensor_meta")
         if rhs_meta is None:
+            return False
+        if _is_absorbing_bitwise_scalar(node.target, lhs_val):
             return False
         return isinstance(lhs_val, bool) and rhs_meta.dtype in supported_type
 
