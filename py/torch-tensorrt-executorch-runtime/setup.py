@@ -25,19 +25,22 @@ RUNTIME_VERSION = (HERE / "version.txt").read_text().strip()
 # ABI changes in torch, executorch, or TensorRT are caught at install time rather
 # than at runtime. Bump all four when moving to the next release.
 TORCH_REQUIREMENT = "torch>=2.15.0.dev,<2.16.0"
-TENSORRT_REQUIREMENT = "tensorrt-cu13>=11.2.1,<11.3"
 EXECUTORCH_REQUIREMENT = "executorch==1.4.1"
 TORCH_TENSORRT_REQUIREMENT = "torch-tensorrt>=2.15.0.dev,<2.16.0"
 
 
-def require_cuda_13() -> None:
-    """Reject builds whose native dependencies do not use supported CUDA 13."""
+def get_tensorrt_requirement() -> str:
     cuda_version = torch.version.cuda
-    if cuda_version is None or not cuda_version.startswith("13."):
+    if cuda_version is None:
         raise RuntimeError(
-            "CUDA 13-enabled PyTorch is required to build this wheel "
-            f"(found CUDA {cuda_version or 'None'})"
+            "CUDA enabled PyTorch is required to build this wheel found None"
         )
+    if cuda_version.startswith("cu12"):
+        return "tensorrt-cu12>=11.2.1,<11.3"
+    elif cuda_version.startswith("cu13"):
+        return "tensorrt-cu13>=11.2.1,<11.3"
+    else:
+        raise RuntimeError(f"Unsupported CUDA version: {cuda_version}")
 
 
 class BazelExtension(Extension):
@@ -121,7 +124,6 @@ class BazelBuild(build_ext):
             shutil.copy2(source, destination)
 
 
-require_cuda_13()
 setup(
     name="torch-tensorrt-executorch-runtime",
     version=RUNTIME_VERSION,
@@ -137,7 +139,7 @@ setup(
         TORCH_REQUIREMENT,
         EXECUTORCH_REQUIREMENT,
         TORCH_TENSORRT_REQUIREMENT,
-        TENSORRT_REQUIREMENT,
+        get_tensorrt_requirement(),
     ],
     zip_safe=False,
 )
