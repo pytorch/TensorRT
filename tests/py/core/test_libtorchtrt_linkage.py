@@ -31,6 +31,15 @@ class TestLibTorchTensorRTLinkage(unittest.TestCase):
             if path.name.startswith("libnvinfer_plugin.so")
         ]
         cls.trt_lib_dirs = [path.parent for path in cls.trt_plugin_paths]
+        cls.cuda_runtime_paths = [
+            distribution.locate_file(path)
+            for distribution in importlib.metadata.distributions()
+            for path in distribution.files or []
+            if path.name.startswith("libcudart.so")
+        ]
+        cls.cuda_runtime_dirs = list(
+            dict.fromkeys(path.parent for path in cls.cuda_runtime_paths)
+        )
         cls.libtorchtrt = (
             Path(next(iter(torchtrt_spec.submodule_search_locations)))
             / "lib"
@@ -74,6 +83,7 @@ class TestLibTorchTensorRTLinkage(unittest.TestCase):
             [
                 str(self.torch_lib_dir),
                 *map(str, self.trt_lib_dirs),
+                *map(str, self.cuda_runtime_dirs),
                 *filter(None, env.get("LD_LIBRARY_PATH", "").split(os.pathsep)),
             ]
         )
@@ -108,6 +118,8 @@ assert "torch" not in sys.modules
                 f"TensorRT plugin paths: {self.trt_plugin_paths}",
                 f"Plugin paths exist: {[path.is_file() for path in self.trt_plugin_paths]}",
                 f"TensorRT library dirs: {self.trt_lib_dirs}",
+                f"CUDA runtime paths: {self.cuda_runtime_paths}",
+                f"CUDA runtime dirs: {self.cuda_runtime_dirs}",
                 f"Child LD_LIBRARY_PATH: {env['LD_LIBRARY_PATH']}",
             ]
         )
