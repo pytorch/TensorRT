@@ -73,6 +73,16 @@ class TestSliceConverterDynamicShape(DispatchTestCase):
                 2,
             ),
             (
+                "slice_dynamic_dim_finite_stop_past_opt",
+                (2, 16),
+                (2, 64),
+                (2, 128),
+                1,
+                0,
+                100,
+                1,
+            ),
+            (
                 "slice_dynamic_dim_start_stop_step_negatives",
                 (1, 10, 10),
                 (10, 10, 10),

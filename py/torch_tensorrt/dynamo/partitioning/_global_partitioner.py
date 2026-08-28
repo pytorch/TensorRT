@@ -1,6 +1,7 @@
 import logging
 from typing import Collection, Dict, List, Mapping, Optional, Sequence, Tuple
 
+import tensorrt as trt
 import torch
 from torch.fx.graph_module import GraphModule
 from torch.fx.node import Target
@@ -223,6 +224,27 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
         return cache[node]
 
     @staticmethod
+    def _exceeds_max_tensor_rank(node: torch.fx.Node) -> bool:
+        """Return whether a node would move a rank unsupported by TensorRT."""
+
+        def _value_exceeds_limit(value: object) -> bool:
+            if isinstance(value, torch.Tensor):
+                return value.ndim > trt.Dims.MAX_DIMS
+            if isinstance(value, (tuple, list)):
+                return any(_value_exceeds_limit(item) for item in value)
+            if isinstance(value, dict):
+                return any(_value_exceeds_limit(item) for item in value.values())
+            return False
+
+        def _node_exceeds_limit(candidate: torch.fx.Node) -> bool:
+            value = candidate.meta.get("val", candidate.meta.get("example_value"))
+            return _value_exceeds_limit(value)
+
+        return _node_exceeds_limit(node) or any(
+            _node_exceeds_limit(input_node) for input_node in node.all_input_nodes
+        )
+
+    @staticmethod
     def _requires_output_allocator(node: torch.fx.Node) -> bool:
         # True if the converter selected for this node needs a TRT output allocator,
         # i.e. the node has a data-dependent output shape (e.g. nonzero or boolean
@@ -252,6 +274,14 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
                 "non-target device region",
                 node_name,
             )
+            return False
+
+        if self._exceeds_max_tensor_rank(node):
+            # TensorRT network inputs and outputs are limited by trt.Dims.
+            if not node.is_impure():
+                self.unsupported_operators[node_name] = (
+                    self.unsupported_operators.get(node_name, 0) + 1
+                )
             return False
 
         if self._has_complex_dtype(node):
