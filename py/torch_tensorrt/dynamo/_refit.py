@@ -262,6 +262,7 @@ def refit_module_weights(
             settings.decompose_attention,
             settings.use_distributed_mode_trace,
             use_fp32_acc=settings.use_fp32_acc,
+            graph_module=new_weight_module.graph_module,
         )
     )
     new_gm = new_weight_module.module()

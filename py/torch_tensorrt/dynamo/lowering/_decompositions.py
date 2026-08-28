@@ -717,11 +717,35 @@ FP32_ACC_ATTENTION_DECOMPOSITIONS = {
 }
 
 
+def _has_symbolic_scatter_add_extent(
+    graph_module: Optional[torch.fx.GraphModule],
+) -> bool:
+    """Return whether scatter_add would require unrolling a symbolic extent."""
+    if graph_module is None:
+        return False
+
+    for node in graph_module.graph.nodes:
+        if node.target != torch.ops.aten.scatter_add.default or len(node.args) < 4:
+            continue
+        dim = node.args[1]
+        src_node = node.args[3]
+        if not isinstance(dim, int) or not isinstance(src_node, torch.fx.Node):
+            continue
+        src_val = src_node.meta.get("val", src_node.meta.get("example_value"))
+        if not isinstance(src_val, torch.Tensor) or not src_val.ndim:
+            continue
+        if isinstance(src_val.shape[get_positive_dim(dim, src_val.ndim)], torch.SymInt):
+            return True
+
+    return False
+
+
 def get_decompositions(
     enable_experimental_decompositions: bool = False,
     decompose_attention: bool = False,
     use_distributed_mode_trace: bool = False,
     use_fp32_acc: bool = False,
+    graph_module: Optional[torch.fx.GraphModule] = None,
 ) -> Dict[OpOverload, Callable[[Any], Any]]:
     trt_decomps = (
         dict(TORCH_TRT_DECOMPOSITIONS)
@@ -749,7 +773,7 @@ def get_decompositions(
             for decomp in _core_aten_decompositions
             if decomp not in discard_decompositions
         }
-        return {**CORE_ATEN_DECOMPOSITIONS_FILTERED, **trt_decomps}
+        decompositions = {**CORE_ATEN_DECOMPOSITIONS_FILTERED, **trt_decomps}
     else:
         # changes made here due to torch2.6 changes https://github.com/pytorch/pytorch/pull/135080
         decomp_table = {}
@@ -763,8 +787,16 @@ def get_decompositions(
             and decomp not in ATTENTION_DECOMPOSITION_OPS
         }
 
-        return {
+        decompositions = {
             **ENABLED_TORCH_DECOMPOSITIONS,
             **DECOMP_TABLE_FILTERED,
             **trt_decomps,
         }
+
+    if _has_symbolic_scatter_add_extent(graph_module):
+        # The custom decomposition uses a Python range over this extent.
+        # Keeping the op lets partitioning fall back to Torch without trying
+        # to specialize an unbacked or otherwise dynamic SymInt.
+        decompositions.pop(torch.ops.aten.scatter_add.default, None)
+
+    return decompositions
