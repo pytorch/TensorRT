@@ -41,6 +41,28 @@ def _sequence_dtype(
         return trt.DataType.INT64
 
 
+def _operand_as(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    value: Union[int, float, TRTTensor],
+    dtype: trt.DataType,
+    min_rank: int,
+) -> TRTTensor:
+    """
+    Materialize an arange operand as an ITensor of exactly `dtype`.
+
+    ``get_trt_tensor`` applies its ``dtype`` argument when it constructs a constant, and
+    returns a value that is already an ITensor unchanged. Casting afterwards lets the
+    resolved dtype hold for every operand, which is what LINSPACE asks of ``alpha`` and
+    ``beta``. ``cast_trt_tensor`` returns the tensor unchanged when the dtype already
+    matches.
+    """
+    operand = get_trt_tensor(ctx, value, name, dtype, min_rank=min_rank)
+    return cast_trt_tensor(ctx, operand, dtype, name + "_casted", target, source_ir)
+
+
 def arange(
     ctx: ConversionContext,
     target: Target,
@@ -62,8 +84,8 @@ def arange(
     # If any argument is a TRT tensor, use dynamic arange with a Fill layer
     if any(isinstance(x, TRTTensor) for x in (start, end, step)):
         value_dtype = _sequence_dtype(dtype, start, end, step)
-        start_rank_0 = get_trt_tensor(
-            ctx, start, name + "_start_rank_0", value_dtype, min_rank=0
+        start_rank_0 = _operand_as(
+            ctx, target, source_ir, name + "_start_rank_0", start, value_dtype, 0
         )
         # LINSPACE's start input requires rank 0; if the upstream ITensor came in
         # as rank-1 (e.g. a SymInt materialized by a sym_size op), reshape it.
@@ -75,11 +97,11 @@ def arange(
             )
             start_rank_0 = squeeze_layer.get_output(0)
 
-        start_rank_1 = get_trt_tensor(
-            ctx, start, name + "_start_rank_1", value_dtype, min_rank=1
+        start_rank_1 = _operand_as(
+            ctx, target, source_ir, name + "_start_rank_1", start, value_dtype, 1
         )
-        end = get_trt_tensor(ctx, end, name + "_end", value_dtype, min_rank=1)
-        step = get_trt_tensor(ctx, step, name + "_step", value_dtype, min_rank=1)
+        end = _operand_as(ctx, target, source_ir, name + "_end", end, value_dtype, 1)
+        step = _operand_as(ctx, target, source_ir, name + "_step", step, value_dtype, 1)
 
         # The number of elements is ceil((end - start) / step), computed as
         # -floor((start - end) / step) so that the whole expression stays in the
