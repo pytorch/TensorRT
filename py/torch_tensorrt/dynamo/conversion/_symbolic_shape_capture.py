@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 def extract_symbolic_shape_expressions(
     module: torch.fx.GraphModule,
     inputs: Optional[Sequence[Input]] = None,
+    truncate_double: bool = False,
 ) -> Optional[Dict[str, List[Dict[str, Any]]]]:
     """
     Extract symbolic shape expressions from an FX graph.
@@ -32,6 +33,8 @@ def extract_symbolic_shape_expressions(
             name. Used as the dtype source of truth for scalar inputs, which
             have no dtype of their own in FX metadata. Falls back to a
             best-effort default when not provided.
+        truncate_double: Record float64 tensor bindings as float32, matching
+            the precision TensorRT builds when double truncation is enabled
 
     Returns:
         Dict with 'inputs' and 'outputs' keys, each containing a list of dicts with shape_exprs and dtype,
@@ -79,7 +82,11 @@ def extract_symbolic_shape_expressions(
             input_info.append(
                 {
                     "shape_exprs": shape_exprs,
-                    "dtype": input_val.dtype,
+                    "dtype": (
+                        torch.float32
+                        if truncate_double and input_val.dtype == torch.float64
+                        else input_val.dtype
+                    ),
                     "name": input_node.name,
                 }
             )
@@ -134,7 +141,11 @@ def extract_symbolic_shape_expressions(
             output_info.append(
                 {
                     "shape_exprs": shape_exprs,
-                    "dtype": out_val.dtype,
+                    "dtype": (
+                        torch.float32
+                        if truncate_double and out_val.dtype == torch.float64
+                        else out_val.dtype
+                    ),
                 }
             )
         elif isinstance(out_val, (torch.SymInt, torch.SymFloat, int, float, bool)):

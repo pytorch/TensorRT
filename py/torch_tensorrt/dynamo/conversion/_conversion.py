@@ -221,7 +221,9 @@ def interpret_module_to_result(
     """
 
     symbolic_shape_expressions = extract_symbolic_shape_expressions(
-        module, inputs=inputs
+        module,
+        inputs=inputs,
+        truncate_double=settings.truncate_double,
     )
     if symbolic_shape_expressions is None:
         raise RuntimeError(
