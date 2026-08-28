@@ -134,7 +134,16 @@ from pathlib import Path
 repo_name = sys.argv[1]
 module_bazel = Path("MODULE.bazel").read_text()
 
-for match in re.finditer(r"http_archive\((?P<body>.*?)\n\)", module_bazel, re.DOTALL):
+# Match only real, top-level http_archive declarations.  MODULE.bazel also
+# contains commented-out examples of those declarations; an unanchored match
+# can start at one of those examples and consume a later block, leaving the
+# TensorRT declaration undiscoverable.
+archive_pattern = re.compile(
+    r"^[ \t]*http_archive\((?P<body>.*?)^[ \t]*\)",
+    re.MULTILINE | re.DOTALL,
+)
+
+for match in archive_pattern.finditer(module_bazel):
     body = match.group("body")
     name = re.search(r'name\s*=\s*"([^"]+)"', body)
     if name is None or name.group(1) != repo_name:
