@@ -484,6 +484,58 @@ class TestApplySymbolicShapeExpressions:
             with pytest.raises(RuntimeError):
                 _apply_symbolic_shape_expressions([fake_x, fake_z], shape_info)
 
+    @staticmethod
+    def _scalar_first_shape_info():
+        return {
+            "inputs": [
+                {
+                    "shape_exprs": [],
+                    "dtype": torch.int64,
+                    "name": "length",
+                    "is_scalar": True,
+                },
+                {
+                    "shape_exprs": [4],
+                    "dtype": torch.float32,
+                    "name": "x",
+                },
+            ],
+            "outputs": [
+                {
+                    "shape_exprs": [4],
+                    "dtype": torch.float32,
+                }
+            ],
+        }
+
+    def test_scalar_input_is_not_walked_as_a_tensor(self):
+        shape_env = ShapeEnv()
+        with FakeTensorMode(shape_env=shape_env):
+            scalar = shape_env.create_unbacked_symint()
+            tensor = torch.empty(4, device="cuda")
+            output = _apply_symbolic_shape_expressions(
+                [scalar, tensor], self._scalar_first_shape_info()
+            )[0]
+
+        assert output.shape == (4,)
+
+    def test_output_device_comes_from_first_tensor_input(self):
+        shape_env = ShapeEnv()
+        with FakeTensorMode(shape_env=shape_env):
+            scalar = shape_env.create_unbacked_symint()
+            tensor = torch.empty(4, device="cuda")
+            fake_output = _apply_symbolic_shape_expressions(
+                [scalar, tensor], self._scalar_first_shape_info()
+            )[0]
+
+        concrete_output = _apply_symbolic_shape_expressions(
+            [shape_env.create_unbacked_symint(), torch.empty(4)],
+            self._scalar_first_shape_info(),
+        )[0]
+
+        assert fake_output.device == tensor.device
+        assert concrete_output.device.type == "cpu"
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])

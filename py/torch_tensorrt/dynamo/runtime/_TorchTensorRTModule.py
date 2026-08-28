@@ -711,7 +711,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
     def set_use_output_allocator(self, enable: bool) -> None:
         self.get_engine().use_output_allocator_outputs = enable
 
-    def forward(self, *inputs: Any) -> torch.Tensor | Tuple[torch.Tensor, ...]:
+    def forward(self, *inputs: Any) -> Any:
         """Run the TensorRT engine on GPU tensors (non-tensor args are cast to CUDA tensors).
 
         Note: callers are responsible for ensuring the engine has been set up;
@@ -745,7 +745,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             else:
                 input_tensors.append(torch.tensor(i).cuda())
 
-        outputs: List[torch.Tensor] = torch.ops.tensorrt.execute_engine(
+        outputs: List[Any] = torch.ops.tensorrt.execute_engine(
             list(input_tensors), self.engine
         )
 
@@ -759,6 +759,11 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             n = user_output_count(self.output_binding_names, self.aliased_io)
             if n < len(outputs):
                 outputs = outputs[:n]
+
+        output_info = (self.symbolic_shape_expressions or {}).get("outputs", [])
+        for index, info in enumerate(output_info):
+            if index < len(outputs) and info.get("is_scalar"):
+                outputs[index] = outputs[index].item()
 
         if len(outputs) == 1:
             return outputs[0]
