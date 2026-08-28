@@ -1,6 +1,6 @@
 """Runtime settings + the TRTRuntimeConfig shim + the ``runtime_config`` CM.
 
-This module groups four closely related concepts together:
+This module groups three closely related concepts together:
 
 * :class:`RuntimeSettings` -- the user-facing, frozen dataclass of runtime-only
   knobs sampled at IExecutionContext creation (cuda_graph_strategy,
@@ -16,12 +16,11 @@ This module groups four closely related concepts together:
 * :func:`apply_runtime_settings` -- permanent apply to every TRT engine under a
   target, including engines loaded without a :class:`TorchTensorRTModule`.
 
-Three ways to use ``RuntimeSettings``:
+Two ways to use ``RuntimeSettings``:
 
 1. **Runtime context manager** -- toggle settings inside a ``with`` block.
-2. **Programmatic** -- assign ``module.runtime_settings = rs`` directly.
-3. **AOT artifact** -- call :func:`apply_runtime_settings` on a loaded
-   :class:`ExportedProgram` or ``GraphModule``.
+2. **Permanent apply** -- call :func:`apply_runtime_settings` on any compiled
+   module, :class:`ExportedProgram`, or AOT-loaded ``GraphModule``.
 
 ``RuntimeSettings`` is intentionally NOT part of ``CompilationSettings`` and is
 NOT serialized into the engine tuple. It's purely an in-memory initialization
