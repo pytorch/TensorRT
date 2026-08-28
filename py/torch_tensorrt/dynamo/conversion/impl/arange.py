@@ -38,7 +38,7 @@ def _sequence_dtype(
         if isinstance(x, float):
             return trt.DataType.FLOAT
 
-        return trt.DataType.INT64
+    return trt.DataType.INT64
 
 
 def arange(
@@ -65,6 +65,9 @@ def arange(
         start_rank_0 = get_trt_tensor(
             ctx, start, name + "_start_rank_0", value_dtype, min_rank=0
         )
+        start_rank_0 = cast_trt_tensor(
+            ctx, start_rank_0, value_dtype, name + "_start_rank_0_casted"
+        )
         # LINSPACE's start input requires rank 0; if the upstream ITensor came in
         # as rank-1 (e.g. a SymInt materialized by a sym_size op), reshape it.
         if len(start_rank_0.shape) > 0:
@@ -80,6 +83,11 @@ def arange(
         )
         end = get_trt_tensor(ctx, end, name + "_end", value_dtype, min_rank=1)
         step = get_trt_tensor(ctx, step, name + "_step", value_dtype, min_rank=1)
+        start_rank_1 = cast_trt_tensor(
+            ctx, start_rank_1, value_dtype, name + "_start_rank_1_casted"
+        )
+        end = cast_trt_tensor(ctx, end, value_dtype, name + "_end_casted")
+        step = cast_trt_tensor(ctx, step, value_dtype, name + "_step_casted")
 
         # The number of elements is ceil((end - start) / step), computed as
         # -floor((start - end) / step) so that the whole expression stays in the
