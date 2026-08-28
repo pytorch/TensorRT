@@ -3,6 +3,9 @@ from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
 from torch_tensorrt.dynamo.conversion import UnsupportedOperatorException
+from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
+    has_static_shapes_in_args,
+)
 
 from .harness import DispatchTestCase
 
@@ -191,6 +194,34 @@ class TestSplitConverterNoDim(DispatchTestCase):
                 TestModule(),
                 input,
             )
+
+    def test_dynamic_split_sections_decline_conversion(self):
+        columns = 8
+
+        class RuntimeSections(torch.nn.Module):
+            def forward(self, x, k):
+                first_size = k.item()
+                torch._check(first_size >= 1)
+                torch._check(first_size <= columns - 1)
+                return torch.split(x, [first_size, columns - first_size], dim=1)
+
+        class LiteralSections(torch.nn.Module):
+            def forward(self, x, k):
+                return torch.split(x, [3, columns - 3], dim=1)
+
+        def get_split_node(model, args):
+            exported = torch.export.export(model, args)
+            return next(
+                node
+                for node in exported.graph.nodes
+                if node.target == torch.ops.aten.split_with_sizes.default
+            )
+
+        args = (torch.rand(4, columns), torch.tensor([3]))
+        validator = has_static_shapes_in_args([1])
+
+        self.assertFalse(validator(get_split_node(RuntimeSections(), args), None))
+        self.assertTrue(validator(get_split_node(LiteralSections(), args), None))
 
 
 if __name__ == "__main__":
