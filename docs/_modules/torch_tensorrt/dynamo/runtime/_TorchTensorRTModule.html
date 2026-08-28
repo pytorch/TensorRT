@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../../_static/documentation_options.js?v=3ebb10e9"></script>
+    <script src="../../../../_static/documentation_options.js?v=21d71b0f"></script>
     <script src="../../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -841,6 +841,10 @@ document.write(`
     <span class="k">def</span><span class="w"> </span><span class="nf">_resolve_runtime_cache</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rs</span><span class="p">:</span> <span class="n">RuntimeSettings</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RuntimeSettings</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""Normalize ``rs.runtime_cache`` to ``None`` | ``RuntimeCache`` (never a path str).</span>
 
+<span class="sd">        This module is the only place a path string is resolved; engines reject</span>
+<span class="sd">        one (see ``TRTRuntimeConfig._apply_settings``), so the returned settings</span>
+<span class="sd">        must never carry a ``str``.</span>
+
 <span class="sd">        Manages the ``_implicit_cache_handle`` slot as a side effect: builds a</span>
 <span class="sd">        fresh wrapper for a new path, reuses the existing one for the same</span>
 <span class="sd">        path, releases it (with save-on-swap) for non-path inputs.</span>
@@ -856,7 +860,9 @@ document.write(`
         <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">rc</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">rc</span><span class="p">):</span>
             <span class="k">if</span> <span class="n">rc</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_implicit_cache_handle</span><span class="p">:</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">_set_managed_handle</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
-            <span class="k">return</span> <span class="n">rs</span>
+            <span class="c1"># An empty string means "no cache", but engines take only None or a</span>
+            <span class="c1"># RuntimeCache -- normalize so no str ever reaches one.</span>
+            <span class="k">return</span> <span class="n">rs</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">runtime_cache</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">rc</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="k">else</span> <span class="n">rs</span>
 
         <span class="c1"># Branch 2: same path + wrapper still usable -&gt; reuse. Keeps the CM</span>
         <span class="c1"># enter/exit cycle cheap (no teardown/rebuild loses in-memory kernels).</span>
@@ -1058,9 +1064,11 @@ document.write(`
             <span class="bp">self</span><span class="o">.</span><span class="n">settings</span> <span class="o">=</span> <span class="n">metadata</span><span class="p">[</span><span class="s2">"settings"</span><span class="p">]</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">symbolic_shape_expressions</span> <span class="o">=</span> <span class="n">metadata</span><span class="p">[</span><span class="s2">"inout_symexprs"</span><span class="p">]</span>
 
-            <span class="c1"># RuntimeSettings are NOT serialized; restore defaults. Caller can</span>
-            <span class="c1"># reapply via ``mod.runtime_settings = ...`` (per submodule) or a CM after load.</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_runtime_settings</span> <span class="o">=</span> <span class="n">RuntimeSettings</span><span class="p">()</span>
+            <span class="c1"># RuntimeSettings are NOT serialized; the reset leaves no runtime</span>
+            <span class="c1"># cache, matching the freshly-built engine below. A caller who wants</span>
+            <span class="c1"># one reapplies via ``mod.runtime_settings = ...`` (per submodule) or</span>
+            <span class="c1"># a CM after load.</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_runtime_settings</span> <span class="o">=</span> <span class="n">RuntimeSettings</span><span class="p">(</span><span class="n">runtime_cache</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
             <span class="c1"># Mirror the settings reset on the implicit cache handle so a</span>
             <span class="c1"># stale wrapper from prior use doesn't survive load_state_dict and</span>
             <span class="c1"># silently write the fresh engine's cache bytes to the old path.</span>
@@ -1184,7 +1192,7 @@ document.write(`
         <span class="k">return</span> <span class="n">state</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">__setstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"_runtime_settings"</span><span class="p">,</span> <span class="n">RuntimeSettings</span><span class="p">())</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"_runtime_settings"</span><span class="p">,</span> <span class="n">RuntimeSettings</span><span class="p">(</span><span class="n">runtime_cache</span><span class="o">=</span><span class="kc">None</span><span class="p">))</span>
         <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"_implicit_cache_handle"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
         <span class="n">set_state</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="nb">super</span><span class="p">(),</span> <span class="s2">"__setstate__"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">set_state</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
