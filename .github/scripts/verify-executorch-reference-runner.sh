@@ -186,7 +186,15 @@ download_tensorrt_root() {
   fi
   case "${tensorrt_archive}" in
     *.tar.zst)
-      tar --zstd -xf "${tensorrt_archive}" -C "${tensorrt_extract_dir}" || return 1
+      # Some CI images provide a tar implementation without GNU tar's
+      # --zstd option. Decompress explicitly so any tar that can read a
+      # regular tar stream can extract the SDK.
+      if ! command -v zstd >/dev/null 2>&1; then
+        echo "Cannot extract ${tensorrt_archive}: zstd is required for .tar.zst archives" >&2
+        return 1
+      fi
+      zstd --decompress --stdout "${tensorrt_archive}" |
+        tar -xf - -C "${tensorrt_extract_dir}" || return 1
       ;;
     *.tar.gz | *.tgz)
       tar -xzf "${tensorrt_archive}" -C "${tensorrt_extract_dir}" || return 1
