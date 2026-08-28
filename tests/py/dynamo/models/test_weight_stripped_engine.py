@@ -21,6 +21,21 @@ if importlib.util.find_spec("torchvision"):
     import torchvision.models as models
 
 
+def _turing_safe_gemm_dtype() -> torch.dtype:
+    """Model dtype for the resnet18 tests in this file.
+
+    On Turing ``gemm_capability_validator`` rejects resnet18's trailing ``fc``, which
+    breaks these tests two ways: the single-engine entry point has no partitioner to fall
+    back to and raises, while ``compile`` puts ``fc`` in a PyTorch block whose real bias
+    is then applied to the stripped engine's zeros, so the output is not the all-zeros
+    these tests assert. None of them is about FP32 -- they are about engine sizes,
+    stripping, refit and runtimes, all just as real in FP16 -- so follow the capability
+    rather than switching them off. Keyed off the same predicate the validator uses so
+    the two cannot drift.
+    """
+    return torch.float16 if trt_rtx_targets_turing() else torch.float32
+
+
 class TestWeightStrippedEngine(TestCase):
     @unittest.skipIf(
         not torch_trt.ENABLED_FEATURES.refit,
@@ -80,8 +95,12 @@ class TestWeightStrippedEngine(TestCase):
         "torchvision is not installed",
     )
     def test_compile_weight_stripped_engine(self):
-        pyt_model = models.resnet18(weights=None).eval().to("cuda")
-        example_inputs = (torch.randn((100, 3, 224, 224)).to("cuda"),)
+        # See _turing_safe_gemm_dtype: in FP32 on Turing the fc GEMM falls back to a
+        # PyTorch block whose real weights survive engine weight-stripping, so the
+        # all-zeros assertion below cannot hold.
+        dtype = _turing_safe_gemm_dtype()
+        pyt_model = models.resnet18(weights=None).eval().to("cuda").to(dtype)
+        example_inputs = (torch.randn((100, 3, 224, 224), dtype=dtype).to("cuda"),)
 
         settings = {
             "min_block_size": 1,
@@ -111,14 +130,10 @@ class TestWeightStrippedEngine(TestCase):
         "torchvision is not installed",
     )
     def test_weight_stripped_engine_sizes(self):
-        # TensorRT-RTX cannot serve an FP32 GEMM on Turing (SM 7.5), so the GEMM guard
-        # rejects resnet18's fc layer there. convert_exported_program_to_serialized_trt_engine
-        # emits one engine for the whole program and has no partitioner to fall back to,
-        # so the rejection raises rather than producing a PyTorch block. This test is
-        # about stripped-vs-included engine sizes, not about FP32, so follow the
-        # capability: the guard keys on operand dtype only, the network is strongly
-        # typed, and the size comparison below is just as meaningful in FP16.
-        dtype = torch.float16 if trt_rtx_targets_turing() else torch.float32
+        # See _turing_safe_gemm_dtype: on Turing the FP32 fc GEMM is rejected and this
+        # entry point has no partitioner to fall back to. The stripped-vs-included size
+        # comparison below is just as meaningful in FP16.
+        dtype = _turing_safe_gemm_dtype()
         pyt_model = models.resnet18(pretrained=True).eval().to("cuda").to(dtype)
         example_inputs = (torch.randn((2, 3, 224, 224), dtype=dtype).to("cuda"),)
         exp_program = torch.export.export(pyt_model, example_inputs)
@@ -164,15 +179,19 @@ class TestWeightStrippedEngine(TestCase):
         "torchvision is not installed",
     )
     def test_weight_stripped_engine_results(self):
-        pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
-        example_inputs = (torch.randn((2, 3, 224, 224)).to("cuda"),)
+        # See _turing_safe_gemm_dtype: in FP32 on Turing the fc GEMM falls back to a
+        # PyTorch block whose real weights survive engine weight-stripping, so the
+        # all-zeros assertion below cannot hold.
+        dtype = _turing_safe_gemm_dtype()
+        pyt_model = models.resnet18(pretrained=True).eval().to("cuda").to(dtype)
+        example_inputs = (torch.randn((2, 3, 224, 224), dtype=dtype).to("cuda"),)
         # Mark the dim0 of inputs as dynamic
         batch = torch.export.Dim("batch", min=1, max=200)
         exp_program = torch.export.export(
             pyt_model, args=example_inputs, dynamic_shapes={"x": {0: batch}}
         )
 
-        inputs = [torch.rand((2, 3, 224, 224)).to("cuda")]
+        inputs = [torch.rand((2, 3, 224, 224), dtype=dtype).to("cuda")]
 
         trt_gm = torch_trt.dynamo.compile(
             exp_program,
@@ -539,13 +558,17 @@ class TestWeightStrippedEngine(TestCase):
         "torchvision is not installed",
     )
     def test_two_TRTRuntime_in_refitting(self):
-        pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
-        example_inputs = (torch.randn((2, 3, 224, 224)).to("cuda"),)
+        # See _turing_safe_gemm_dtype: in FP32 on Turing the fc GEMM falls back to a
+        # PyTorch block whose real weights survive engine weight-stripping, so the
+        # all-zeros assertion below cannot hold.
+        dtype = _turing_safe_gemm_dtype()
+        pyt_model = models.resnet18(pretrained=True).eval().to("cuda").to(dtype)
+        example_inputs = (torch.randn((2, 3, 224, 224), dtype=dtype).to("cuda"),)
         batch = torch.export.Dim("batch", min=1, max=200)
         exp_program = torch.export.export(
             pyt_model, args=example_inputs, dynamic_shapes={"x": {0: batch}}
         )
-        inputs = [torch.rand((2, 3, 224, 224)).to("cuda")]
+        inputs = [torch.rand((2, 3, 224, 224), dtype=dtype).to("cuda")]
 
         pyt_results = pyt_model(*inputs)
 
@@ -629,15 +652,19 @@ class TestWeightStrippedEngine(TestCase):
         "Multiple refit requires TensorRT >= 10.14 with INCLUDE_REFIT serialization flag",
     )
     def test_refit_weight_stripped_engine_multiple_times(self):
-        pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
-        example_inputs = (torch.randn((100, 3, 224, 224)).to("cuda"),)
+        # See _turing_safe_gemm_dtype: in FP32 on Turing the fc GEMM falls back to a
+        # PyTorch block whose real weights survive engine weight-stripping, so the
+        # all-zeros assertion below cannot hold.
+        dtype = _turing_safe_gemm_dtype()
+        pyt_model = models.resnet18(pretrained=True).eval().to("cuda").to(dtype)
+        example_inputs = (torch.randn((100, 3, 224, 224), dtype=dtype).to("cuda"),)
         # Mark the dim0 of inputs as dynamic
         batch = torch.export.Dim("batch", min=1, max=200)
         exp_program = torch.export.export(
             pyt_model, args=example_inputs, dynamic_shapes={"x": {0: batch}}
         )
 
-        inputs = (torch.rand((128, 3, 224, 224)).to("cuda"),)
+        inputs = (torch.rand((128, 3, 224, 224), dtype=dtype).to("cuda"),)
 
         trt_gm = torch_trt.dynamo.compile(
             exp_program,
@@ -663,7 +690,7 @@ class TestWeightStrippedEngine(TestCase):
             msg="refitted engine results should not be all zeros",
         )
 
-        inputs2 = (torch.rand((64, 3, 224, 224)).to("cuda"),)
+        inputs2 = (torch.rand((64, 3, 224, 224), dtype=dtype).to("cuda"),)
         exp_program2 = torch.export.export(
             pyt_model, args=inputs2, dynamic_shapes={"x": {0: batch}}
         )

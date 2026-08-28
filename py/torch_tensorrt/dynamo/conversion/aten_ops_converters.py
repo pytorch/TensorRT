@@ -4563,46 +4563,33 @@ def aten_ops_linear(
     )
 
 
-# Operand dtypes TensorRT-RTX cannot serve as a fused attention op on Turing (SM 7.5).
-# Attention is converted as a single fused subgraph, so the matmuls it performs never
-# appear as nodes in the graph and ``gemm_capability_validator`` never sees them; the
-# dtypes that GEMM cannot serve have to be listed again here.
-_TURING_UNSUPPORTED_ATTENTION_DTYPES = (torch.float32,)
-
-
 def attention_capability_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
     """Reject fused attention TensorRT-RTX cannot serve when Turing (SM 7.5) is a target.
 
-    A fused attention op carries the same FP32 GEMMs that
-    ``gemm_capability_validator`` rejects, but it carries them *inside* the converter:
-    the graph holds one ``scaled_dot_product_attention`` node and no ``mm``/``bmm``, so
-    the GEMM guard never runs. On Turing the result is a cuDNN graph-compilation
-    failure, surfacing either as a null execution context (static shapes) or, worse, as
-    a silently wrong result (dynamic shapes).
-
-    Only the query/key/value dtypes matter. FP16 attention is unaffected by the FP32
-    GEMM restriction and keeps running on TensorRT.
-
-    Like every validator in this module, this relies on ``meta["val"]`` being populated
-    and fails open when it is not.
+    A fused attention op carries the same FP32 GEMMs ``gemm_capability_validator``
+    rejects, but inside the converter, so the graph holds one node and no ``mm``/``bmm``
+    for that guard to see. On Turing TRT-RTX this results in failure. Only the q/k/v
+    dtypes matter, so FP16 attention keeps running on TensorRT.
     """
     if not trt_rtx_targets_turing(settings):
         return True
 
-    for arg in node.args[:3]:
-        val = arg.meta.get("val") if hasattr(arg, "meta") else None
-        if val is not None and (
-            getattr(val, "dtype", None) in _TURING_UNSUPPORTED_ATTENTION_DTYPES
-        ):
-            _LOGGER.debug(
-                "%s attention '%s' is not supported on TensorRT-RTX for Turing "
-                "(SM 7.5). Falling back to PyTorch.",
-                val.dtype,
-                node.name,
-            )
-            return False
+    unsupported_dtypes = (torch.float32,)
+
+    def is_unsupported(operand: Argument) -> bool:
+        val = operand.meta.get("val") if hasattr(operand, "meta") else None
+        return bool(getattr(val, "dtype", None) in unsupported_dtypes)
+
+    qkv = node.args[:3]  # query, key, value
+    if any(map(is_unsupported, qkv)):
+        _LOGGER.debug(
+            "Attention '%s' is not supported on TensorRT-RTX for Turing (SM 7.5). "
+            "Falling back to PyTorch.",
+            node.name,
+        )
+        return False
 
     return True
 
