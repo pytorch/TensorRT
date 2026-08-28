@@ -51,10 +51,10 @@ def main(args: list[str]) -> None:
     for item in includes:
         # CUDA 12.6 release artifacts are available only for x86_64. This
         # excludes both Linux AArch64 and Windows Arm/AArch64 matrix entries.
-        if (
-            item["desired_cuda"] == "cu126"
-            and item["gpu_arch_type"] in {"cuda-aarch64", "cuda-arm64"}
-        ):
+        if item["desired_cuda"] == "cu126" and item["gpu_arch_type"] in {
+            "cuda-aarch64",
+            "cuda-arm64",
+        }:
             continue
         if (
             item["desired_cuda"] in cuda_versions
