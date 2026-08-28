@@ -35,12 +35,11 @@ def get_tensorrt_requirement() -> str:
         raise RuntimeError(
             "CUDA enabled PyTorch is required to build this wheel found None"
         )
-    if cuda_version.startswith("cu12"):
+    if cuda_version.startswith("12."):
         return "tensorrt-cu12>=11.2.1,<11.3"
-    elif cuda_version.startswith("cu13"):
+    if cuda_version.startswith("13."):
         return "tensorrt-cu13>=11.2.1,<11.3"
-    else:
-        raise RuntimeError(f"Unsupported CUDA version: {cuda_version}")
+    raise RuntimeError(f"Unsupported CUDA version: {cuda_version}")
 
 
 class BazelExtension(Extension):
