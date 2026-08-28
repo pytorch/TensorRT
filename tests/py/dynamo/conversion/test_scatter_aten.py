@@ -63,6 +63,12 @@ class TestScatterValueConverter(DispatchTestCase):
                 torch.tensor([[0, 1, 2, 0], [1, 2, 1, 1]]),
                 1,
             ),
+            (
+                "scatter_one_dim_float_scalar_value",
+                1,
+                torch.tensor([[0, 1, 2, 0]]),
+                2.5,
+            ),
         ]
     )
     def test_scatter_index_input(self, _, dim, index, value):
@@ -73,9 +79,10 @@ class TestScatterValueConverter(DispatchTestCase):
             def forward(self, input, index):
                 return torch.ops.aten.scatter.value(input, dim, index, value)
 
-        input = torch.zeros(3, 5, dtype=torch.int32)
+        dtype = torch.float32 if isinstance(value, float) else torch.int32
+        input = torch.zeros(3, 5, dtype=dtype)
         inputs = [input, index]
-        self.run_test(TestModule(), inputs, int32_reqd=True)
+        self.run_test(TestModule(), inputs, int32_reqd=(dtype == torch.int32))
 
 
 class TestScatterSrcConverter(DispatchTestCase):
