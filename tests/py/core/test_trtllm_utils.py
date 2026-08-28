@@ -13,6 +13,7 @@ class TestTensorRTLLMPlatformSupport(unittest.TestCase):
     @mock.patch.object(_utils.platform, "machine", return_value="x86_64")
     @mock.patch.object(_utils.platform, "release", return_value="generic")
     @mock.patch.object(_utils, "is_thor", return_value=False)
+    @mock.patch.object(_utils.trt, "__version__", "10.14.1")
     def test_cuda_12_is_supported(self, *unused_mocks):
         with mock.patch.object(torch.version, "cuda", "12.8"):
             self.assertTrue(_utils.is_platform_supported_for_trtllm())
@@ -21,9 +22,19 @@ class TestTensorRTLLMPlatformSupport(unittest.TestCase):
     @mock.patch.object(_utils.platform, "machine", return_value="x86_64")
     @mock.patch.object(_utils.platform, "release", return_value="generic")
     @mock.patch.object(_utils, "is_thor", return_value=False)
+    @mock.patch.object(_utils.trt, "__version__", "10.14.1")
     def test_cuda_13_is_supported(self, *unused_mocks):
         with mock.patch.object(torch.version, "cuda", "13.0"):
             self.assertTrue(_utils.is_platform_supported_for_trtllm())
+
+    @mock.patch.object(_utils.platform, "system", return_value="Linux")
+    @mock.patch.object(_utils.platform, "machine", return_value="x86_64")
+    @mock.patch.object(_utils.platform, "release", return_value="generic")
+    @mock.patch.object(_utils, "is_thor", return_value=False)
+    @mock.patch.object(_utils.trt, "__version__", "11.1.0")
+    def test_incompatible_tensorrt_version_is_not_supported(self, *unused_mocks):
+        with mock.patch.object(torch.version, "cuda", "13.0"):
+            self.assertFalse(_utils.is_platform_supported_for_trtllm())
 
     @mock.patch.object(_utils.platform, "system", return_value="Linux")
     @mock.patch.object(_utils.platform, "machine", return_value="x86_64")

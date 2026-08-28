@@ -16,6 +16,11 @@ logger = logging.getLogger(__name__)
 
 _WHL_CPYTHON_VERSION = "cp310"
 _TENSORRT_LLM_VERSION_ = "1.2.0"
+# TensorRT major.minor that the TRT-LLM release above is compatible with.
+# Checked in is_platform_supported_for_trtllm() before attempting to
+# download/load the plugin, since a mismatch otherwise surfaces as an opaque
+# "libnvinfer.so.<N>: cannot open shared object file" error at dlopen time.
+_TENSORRT_LLM_REQUIRED_TENSORRT_MAJOR_MINOR_ = "10.14"
 
 
 def sanitized_torch_version() -> Any:
@@ -117,6 +122,7 @@ def is_platform_supported_for_trtllm() -> bool:
         - Thor devices
         - PyTorch builds without CUDA support
         - CUDA 11 and older
+        - Installed TensorRT version incompatible with the pinned TRT-LLM release
     """
     system = platform.system().lower()
     machine = platform.machine().lower()
@@ -146,6 +152,15 @@ def is_platform_supported_for_trtllm() -> bool:
             logger.error(
                 "CUDA 11 and older versions are obsolete for TRT-LLM plugins. "
                 "Please install PyTorch with CUDA 12 or newer support."
+            )
+            return False
+
+        installed_trt_major_minor = ".".join(trt.__version__.split(".")[:2])
+        if installed_trt_major_minor != _TENSORRT_LLM_REQUIRED_TENSORRT_MAJOR_MINOR_:
+            logger.info(
+                f"TensorRT-LLM {_TENSORRT_LLM_VERSION_} requires TensorRT "
+                f"{_TENSORRT_LLM_REQUIRED_TENSORRT_MAJOR_MINOR_}.x, but TensorRT "
+                f"{trt.__version__} is installed. Skipping TensorRT-LLM plugin support."
             )
             return False
 
