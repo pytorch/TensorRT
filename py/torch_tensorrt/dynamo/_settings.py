@@ -82,6 +82,7 @@ class CompilationSettings:
         workspace_size (int): Workspace TRT is allowed to use for the module (0 is default)
         min_block_size (int): Minimum number of operators per TRT-Engine Block
         torch_executed_ops (Collection[Target]): Collection of operations to run in Torch, regardless of converter coverage
+        torch_executed_modules (Collection[str]): Collection of modules to run in Torch
         pass_through_build_failures (bool): Whether to fail on TRT engine build errors (True) or not (False)
         max_aux_streams (Optional[int]): Maximum number of allowed auxiliary TRT streams for each engine
         version_compatible (bool): Provide version forward-compatibility for engine plan files
@@ -147,6 +148,7 @@ class CompilationSettings:
     workspace_size: int = WORKSPACE_SIZE
     min_block_size: int = MIN_BLOCK_SIZE
     torch_executed_ops: Collection[Target] = field(default_factory=set)
+    torch_executed_modules: Collection[str] = field(default_factory=set)
     pass_through_build_failures: bool = PASS_THROUGH_BUILD_FAILURES
     max_aux_streams: Optional[int] = MAX_AUX_STREAMS
     version_compatible: bool = VERSION_COMPATIBLE
