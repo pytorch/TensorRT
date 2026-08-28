@@ -757,5 +757,246 @@ class TestImplicitWarmLoadPyRt(TestCase):
             self.assertTrue(found, "No TorchTensorRTModule with implicit handle found")
 
 
+@unittest.skipIf(
+    not ENABLED_FEATURES.tensorrt_rtx,
+    "Runtime cache is only available with TensorRT-RTX",
+)
+@unittest.skipIf(
+    ENABLED_FEATURES.torch_tensorrt_runtime,
+    "Module-less TRTEngine construction requires the Python TRTEngine path",
+)
+class TestEngineOwnsNoCache(TestCase):
+    """An engine never owns a runtime cache; the module does.
+
+    A module-less engine -- built from packed engine info, or loaded as a
+    graph constant from a saved ``ExportedProgram`` -- comes up with
+    ``runtime_cache=None`` and must run without one, rather than attaching a
+    handle nothing outlives.
+    """
+
+    def _bare_engine(self, compiled):
+        from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
+
+        mod = _find_python_trt_module(compiled)
+        self.assertIsNotNone(mod, "expected a TorchTensorRTModule after compile")
+        return TRTEngine(mod._pack_engine_info())
+
+    @staticmethod
+    def _first(out):
+        """``execute`` returns a bare Tensor for single-output engines."""
+        return out if isinstance(out, torch.Tensor) else out[0]
+
+    def test_bare_engine_defaults_to_no_cache(self):
+        model, inputs = _fresh_conv_model_and_inputs()
+        engine = self._bare_engine(_compile(model, inputs))
+        self.assertIsNone(engine.runtime_settings.runtime_cache)
+
+    def test_bare_engine_executes_without_a_cache(self):
+        model, inputs = _fresh_conv_model_and_inputs()
+        compiled = _compile(model, inputs)
+        ref = compiled(*inputs)
+        engine = self._bare_engine(compiled)
+        out = self._first(engine.execute(list(inputs)))
+        self.assertGreater(cosine_similarity(ref, out), COSINE_THRESHOLD)
+
+    def test_bare_engine_takes_an_explicit_cache(self):
+        """The opt-in an AOT deployment is expected to make."""
+        model, inputs = _fresh_conv_model_and_inputs()
+        compiled = _compile(model, inputs)
+        ref = compiled(*inputs)
+        engine = self._bare_engine(compiled)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "rc.bin")
+            handle = torchtrt.runtime.RuntimeCache(path=path)
+            engine.update_runtime_settings(RuntimeSettings(runtime_cache=handle))
+            out = self._first(engine.execute(list(inputs)))
+            self.assertGreater(cosine_similarity(ref, out), COSINE_THRESHOLD)
+            handle.save()
+            self.assertTrue(os.path.exists(path))
+            self.assertGreater(os.path.getsize(path), 0)
+
+    def test_failed_settings_do_not_leave_a_half_configured_config(self):
+        """A failed apply must raise every time, not just the first.
+
+        ``ensure_initialized`` early-returns when the live ``IRuntimeConfig``
+        exists, so a config left behind by a failed apply would make a retry
+        silently succeed against settings that were never fully applied.
+        """
+        model, inputs = _fresh_conv_model_and_inputs()
+        engine = self._bare_engine(_compile(model, inputs))
+        with tempfile.TemporaryDirectory() as tmp:
+            engine.update_runtime_settings(
+                RuntimeSettings(runtime_cache=os.path.join(tmp, "rc.bin"))
+            )
+            for attempt in range(2):
+                with self.assertRaisesRegex(
+                    TypeError,
+                    "must be None or a RuntimeCache",
+                    msg=f"attempt {attempt + 1} did not raise",
+                ):
+                    engine.execute(list(inputs))
+                self.assertIsNone(
+                    engine._trt_runtime_config._live,
+                    "a half-configured IRuntimeConfig survived the failure",
+                )
+
+    def test_path_string_on_an_engine_raises(self):
+        """Strings are the module's business; an engine rejects them."""
+        model, inputs = _fresh_conv_model_and_inputs()
+        engine = self._bare_engine(_compile(model, inputs))
+        with tempfile.TemporaryDirectory() as tmp:
+            engine.update_runtime_settings(
+                RuntimeSettings(runtime_cache=os.path.join(tmp, "rc.bin"))
+            )
+            with self.assertRaisesRegex(TypeError, "must be None or a RuntimeCache"):
+                engine.execute(list(inputs))
+
+
+@unittest.skipIf(
+    not ENABLED_FEATURES.tensorrt_rtx,
+    "Runtime cache is only available with TensorRT-RTX",
+)
+class TestModuleStillOwnsImplicitCache(TestCase):
+    """Guard against over-correction: the compile path must keep caching."""
+
+    def test_compiled_module_persists_its_implicit_cache(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "rc.bin")
+            model, inputs = _fresh_conv_model_and_inputs()
+            compiled = _compile(model, inputs)
+            _apply_runtime_settings(compiled, RuntimeSettings(runtime_cache=path))
+            compiled(*inputs)
+            del compiled
+            gc.collect()
+            self.assertTrue(os.path.exists(path), "implicit cache was not saved")
+            self.assertGreater(os.path.getsize(path), 0)
+
+    def test_empty_path_string_is_normalized_to_none(self):
+        """An empty string means "no cache" and must not reach the engine."""
+        from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
+            TorchTensorRTModule,
+        )
+
+        model, inputs = _fresh_conv_model_and_inputs()
+        compiled = _compile(model, inputs)
+        _apply_runtime_settings(compiled, RuntimeSettings(runtime_cache=""))
+
+        # Engine-flavor agnostic: the module's resolved settings are what gets
+        # dispatched, on both the Python and cpp runtimes.
+        mods = [
+            m for _, m in compiled.named_modules() if isinstance(m, TorchTensorRTModule)
+        ]
+        self.assertTrue(mods, "expected a TorchTensorRTModule after compile")
+        for m in mods:
+            self.assertIsNone(m.runtime_settings.runtime_cache)
+        compiled(*inputs)
+
+
+@unittest.skipIf(
+    not ENABLED_FEATURES.tensorrt_rtx,
+    "Runtime cache is only available with TensorRT-RTX",
+)
+class TestPostLoadOwnsNoCache(TestCase):
+    """The reset paths must leave no cache, matching the engine they rebuild.
+
+    ``set_extra_state`` / ``__setstate__`` restore ``RuntimeSettings`` defaults
+    after a load. If that reset kept the default path *string*, the module would
+    disagree with the engine it just built (which comes up ``None``), and a later
+    ``runtime_config(...)`` block -- a call that need not mention caching at all --
+    would resolve the string and leave an autosaving handle installed on exit.
+    """
+
+    def _round_tripped(self, tmp):
+        model, inputs = _fresh_conv_model_and_inputs()
+        compiled = _compile(model, inputs)
+        path = os.path.join(tmp, "mod.pt")
+        torch.save(compiled, path)
+        return torch.load(path, weights_only=False), inputs
+
+    def test_config_default_has_no_cache(self):
+        """A default-constructed config must not start from a path string."""
+        from torch_tensorrt.runtime._runtime_config import TRTRuntimeConfig
+
+        self.assertIsNone(TRTRuntimeConfig().settings.runtime_cache)
+
+    def test_torch_load_leaves_no_cache(self):
+        from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
+            TorchTensorRTModule,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            loaded, _ = self._round_tripped(tmp)
+            mods = [
+                m
+                for _, m in loaded.named_modules()
+                if isinstance(m, TorchTensorRTModule)
+            ]
+            self.assertTrue(mods, "expected a TorchTensorRTModule after load")
+            for m in mods:
+                self.assertIsNone(m.runtime_settings.runtime_cache)
+
+    def test_load_state_dict_leaves_no_cache(self):
+        from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
+            TorchTensorRTModule,
+        )
+
+        model, inputs = _fresh_conv_model_and_inputs()
+        compiled = _compile(model, inputs)
+        fresh, _ = _fresh_conv_model_and_inputs()
+        target = _compile(fresh, inputs)
+        target.load_state_dict(compiled.state_dict())
+
+        mods = [
+            m for _, m in target.named_modules() if isinstance(m, TorchTensorRTModule)
+        ]
+        self.assertTrue(mods, "expected a TorchTensorRTModule after load_state_dict")
+        for m in mods:
+            self.assertIsNone(m.runtime_settings.runtime_cache)
+
+    def test_unrelated_context_manager_does_not_install_a_cache(self):
+        """A cuda-graph-only CM must not switch caching on, on enter or on exit.
+
+        The CM snapshots the module's pre-resolution view; re-applying a path
+        string through the setter *creates* a handle rather than restoring one,
+        so a stale string here would survive ``__exit__`` pointed at the shared
+        default path with ``autosave_on_del=True``.
+        """
+        from torch_tensorrt.dynamo._defaults import RUNTIME_CACHE_PATH
+        from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
+            TorchTensorRTModule,
+        )
+        from torch_tensorrt.runtime import runtime_config
+
+        default_existed = os.path.exists(RUNTIME_CACHE_PATH)
+        with tempfile.TemporaryDirectory() as tmp:
+            loaded, inputs = self._round_tripped(tmp)
+            mods = [
+                m
+                for _, m in loaded.named_modules()
+                if isinstance(m, TorchTensorRTModule)
+            ]
+            self.assertTrue(mods, "expected a TorchTensorRTModule after load")
+
+            with runtime_config(loaded, cuda_graph_strategy="whole_graph_capture"):
+                for m in mods:
+                    self.assertIsNone(
+                        m._implicit_cache_handle, "CM installed a cache on enter"
+                    )
+                loaded(*inputs)
+
+            for m in mods:
+                self.assertIsNone(
+                    m._implicit_cache_handle, "CM left a cache installed on exit"
+                )
+                self.assertIsNone(m.runtime_settings.runtime_cache)
+
+        if not default_existed:
+            self.assertFalse(
+                os.path.exists(RUNTIME_CACHE_PATH),
+                "an unrelated CM wrote the shared default cache file",
+            )
+
+
 if __name__ == "__main__":
     run_tests()
