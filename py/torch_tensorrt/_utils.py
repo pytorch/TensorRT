@@ -15,11 +15,7 @@ import torch
 logger = logging.getLogger(__name__)
 
 _WHL_CPYTHON_VERSION = "cp310"
-# Auto-downloaded TensorRT-LLM wheels must match PyTorch's CUDA major version.
-_TENSORRT_LLM_VERSION_BY_CUDA_MAJOR = {
-    12: "0.17.0.post1",
-    13: "1.2.0",
-}
+_TENSORRT_LLM_VERSION_ = "1.2.0"
 
 
 def sanitized_torch_version() -> Any:
@@ -120,6 +116,7 @@ def is_platform_supported_for_trtllm() -> bool:
         - Jetson/Orin/Xavier (aarch64 architecture + 'tegra' in platform release)
         - Thor devices
         - PyTorch builds without CUDA support
+        - CUDA 11 and older
     """
     system = platform.system().lower()
     machine = platform.machine().lower()
@@ -131,9 +128,9 @@ def is_platform_supported_for_trtllm() -> bool:
         )
         return False
 
-    if machine == "aarch64" and "tegra" in release:
+    if machine == "aarch64" and "tegra" in release or is_thor():
         logger.info(
-            "TensorRT-LLM plugins for NCCL backend are not supported on Jetson/Orin/Xavier (Tegra) devices."
+            "TensorRT-LLM plugins for NCCL backend are not supported on Jetson/Orin/Xavier (Tegra) or Thor devices."
         )
         return False
 
@@ -144,9 +141,11 @@ def is_platform_supported_for_trtllm() -> bool:
             )
             return False
 
-        if is_thor():
-            logger.info(
-                "TensorRT-LLM plugins for NCCL backend are not supported on Thor devices."
+        cuda_major = int(torch.version.cuda.split(".", maxsplit=1)[0])
+        if cuda_major < 12:
+            logger.error(
+                "CUDA 11 and older versions are obsolete for TRT-LLM plugins. "
+                "Please install PyTorch with CUDA 12 or newer support."
             )
             return False
 
@@ -157,46 +156,16 @@ def is_platform_supported_for_trtllm() -> bool:
         return False
 
 
-def _get_trtllm_version_for_cuda(cuda_version: Optional[str]) -> Optional[str]:
-    if cuda_version is None:
-        logger.error(
-            "This pytorch build does not support CUDA, please reinstall pytorch with CUDA support"
-        )
-        return None
-
-    try:
-        cuda_major = int(cuda_version.split(".", maxsplit=1)[0])
-    except (AttributeError, ValueError):
-        logger.error(f"Failed to parse CUDA version: {cuda_version}")
-        return None
-
-    trtllm_version = _TENSORRT_LLM_VERSION_BY_CUDA_MAJOR.get(cuda_major)
-    if trtllm_version is None:
-        supported_cuda_versions = ", ".join(
-            str(version) for version in _TENSORRT_LLM_VERSION_BY_CUDA_MAJOR
-        )
-        logger.error(
-            f"TensorRT-LLM plugin auto-download is not configured for CUDA {cuda_version}. "
-            f"Supported CUDA major versions are {supported_cuda_versions}. To use a compatible "
-            "plugin supplied by another source, set TRTLLM_PLUGINS_PATH."
-        )
-        return None
-
-    return trtllm_version
-
-
 def _cache_root() -> Path:
     username = getpass.getuser()
     return Path(tempfile.gettempdir()) / f"torch_tensorrt_{username}"
 
 
-def _extracted_dir_trtllm(
-    trtllm_version: str, platform_system: str, platform_machine: str
-) -> Path:
+def _extracted_dir_trtllm(platform_system: str, platform_machine: str) -> Path:
     return (
         _cache_root()
         / "trtllm"
-        / f"{trtllm_version}_{platform_system}_{platform_machine}"
+        / f"{_TENSORRT_LLM_VERSION_}_{platform_system}_{platform_machine}"
     )
 
 
@@ -207,20 +176,14 @@ def download_and_get_plugin_lib_path() -> Optional[str]:
     Returns:
         Optional[str]: Path to shared library or None if operation fails.
     """
-    trtllm_version = _get_trtllm_version_for_cuda(torch.version.cuda)
-    if trtllm_version is None:
-        return None
-
     platform_system = platform.system().lower()
     platform_machine = platform.machine().lower()
     wheel_filename = (
-        f"tensorrt_llm-{trtllm_version}-{_WHL_CPYTHON_VERSION}-"
+        f"tensorrt_llm-{_TENSORRT_LLM_VERSION_}-{_WHL_CPYTHON_VERSION}-"
         f"{_WHL_CPYTHON_VERSION}-{platform_system}_{platform_machine}.whl"
     )
     wheel_path = _cache_root() / wheel_filename
-    extract_dir = _extracted_dir_trtllm(
-        trtllm_version, platform_system, platform_machine
-    )
+    extract_dir = _extracted_dir_trtllm(platform_system, platform_machine)
     # else will never be met though
     lib_filename = (
         "libnvinfer_plugin_tensorrt_llm.so"

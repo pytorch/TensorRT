@@ -13,6 +13,14 @@ class TestTensorRTLLMPlatformSupport(unittest.TestCase):
     @mock.patch.object(_utils.platform, "machine", return_value="x86_64")
     @mock.patch.object(_utils.platform, "release", return_value="generic")
     @mock.patch.object(_utils, "is_thor", return_value=False)
+    def test_cuda_12_is_supported(self, *unused_mocks):
+        with mock.patch.object(torch.version, "cuda", "12.8"):
+            self.assertTrue(_utils.is_platform_supported_for_trtllm())
+
+    @mock.patch.object(_utils.platform, "system", return_value="Linux")
+    @mock.patch.object(_utils.platform, "machine", return_value="x86_64")
+    @mock.patch.object(_utils.platform, "release", return_value="generic")
+    @mock.patch.object(_utils, "is_thor", return_value=False)
     def test_cuda_13_is_supported(self, *unused_mocks):
         with mock.patch.object(torch.version, "cuda", "13.0"):
             self.assertTrue(_utils.is_platform_supported_for_trtllm())
@@ -20,20 +28,22 @@ class TestTensorRTLLMPlatformSupport(unittest.TestCase):
     @mock.patch.object(_utils.platform, "system", return_value="Linux")
     @mock.patch.object(_utils.platform, "machine", return_value="x86_64")
     @mock.patch.object(_utils.platform, "release", return_value="generic")
-    @mock.patch.object(_utils, "is_thor")
+    @mock.patch.object(_utils, "is_thor", return_value=False)
     def test_cpu_only_pytorch_is_not_supported(self, mock_is_thor, *unused_mocks):
         with mock.patch.object(torch.version, "cuda", None):
             self.assertFalse(_utils.is_platform_supported_for_trtllm())
-        mock_is_thor.assert_not_called()
+        mock_is_thor.assert_called_once_with()
+
+    @mock.patch.object(_utils.platform, "system", return_value="Linux")
+    @mock.patch.object(_utils.platform, "machine", return_value="x86_64")
+    @mock.patch.object(_utils.platform, "release", return_value="generic")
+    @mock.patch.object(_utils, "is_thor", return_value=False)
+    def test_cuda_11_is_obsolete(self, *unused_mocks):
+        with mock.patch.object(torch.version, "cuda", "11.8"):
+            self.assertFalse(_utils.is_platform_supported_for_trtllm())
 
 
-class TestTensorRTLLMVersionSelection(unittest.TestCase):
-    def test_cuda_12_uses_existing_plugin_version(self):
-        self.assertEqual(_utils._get_trtllm_version_for_cuda("12.8"), "0.17.0.post1")
-
-    def test_cuda_13_uses_cuda_13_plugin_version(self):
-        self.assertEqual(_utils._get_trtllm_version_for_cuda("13.0"), "1.2.0")
-
+class TestTensorRTLLMVersion(unittest.TestCase):
     @mock.patch.object(_utils.platform, "system", return_value="Linux")
     @mock.patch.object(_utils.platform, "machine", return_value="x86_64")
     def test_cuda_13_auto_download_uses_cuda_13_artifact(self, *unused_mocks):
@@ -56,11 +66,6 @@ class TestTensorRTLLMVersionSelection(unittest.TestCase):
                     self.assertEqual(
                         _utils.download_and_get_plugin_lib_path(), str(plugin_path)
                     )
-
-    def test_unknown_cuda_version_requires_user_supplied_plugin(self):
-        with self.assertLogs(_utils.logger, level="ERROR") as captured_logs:
-            self.assertIsNone(_utils._get_trtllm_version_for_cuda("14.0"))
-        self.assertIn("set TRTLLM_PLUGINS_PATH", captured_logs.output[0])
 
 
 class TestTensorRTLLMLoading(unittest.TestCase):
