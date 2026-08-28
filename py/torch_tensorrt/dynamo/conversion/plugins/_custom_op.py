@@ -37,6 +37,12 @@ def custom_op(
         _aot_register: internal hook used by ``torch_tensorrt.kernels`` to register a
             cuda-python AOT impl between the plugin descriptor and the converter. Not
             part of the public API; pass ``None`` (the default) for ordinary use.
+
+    Note:
+        For a mutating custom op, the fake kernel must return each mutated tensor by
+        object identity. This is how the generated plugin discovers aliased outputs;
+        the real kernel must still return non-aliasing tensors as required by PyTorch.
+        Mutating custom ops that return ``None`` are not supported.
     """
     generate_plugin(op_name)
     if _aot_register is not None:

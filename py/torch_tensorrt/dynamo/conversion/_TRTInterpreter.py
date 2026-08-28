@@ -15,12 +15,14 @@ from typing import (
 )
 
 import numpy as np
+import tensorrt as trt
 import torch
 import torch.fx
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.fx.node import _get_qualified_name
 from torch.fx.passes.shape_prop import TensorMetadata
 from torch.utils._python_dispatch import _disable_current_modes
+
 from torch_tensorrt import ENABLED_FEATURES
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._Input import Input
@@ -51,8 +53,6 @@ from torch_tensorrt.dynamo.utils import (
     validate_optimization_profiles,
 )
 from torch_tensorrt.logging import TRT_LOGGER
-
-import tensorrt as trt
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -364,6 +364,19 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
         if self.compilation_settings.enable_weight_streaming:
             builder_config.set_flag(trt.BuilderFlag.WEIGHT_STREAMING)
+
+        if self.ctx.requires_aliased_plugin_io:
+            aliased_io_feature = getattr(
+                trt.PreviewFeature, "ALIASED_PLUGIN_IO_10_03", None
+            )
+            if aliased_io_feature is None:
+                raise RuntimeError(
+                    "An in-place QDP plugin declared aliased I/O, but this TensorRT"
+                    " version does not expose PreviewFeature.ALIASED_PLUGIN_IO_10_03."
+                    " TensorRT 10.3+ is required for aliased plugin I/O."
+                )
+            builder_config.set_preview_feature(aliased_io_feature, True)
+            _LOGGER.info("Enabling preview feature ALIASED_PLUGIN_IO_10_03")
 
         if is_tensorrt_version_supported("10.8"):
             TilingOptimizationLevel = {
@@ -706,6 +719,10 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         if converter_info.get("requires_native_multidevice", False):
             self.ctx.requires_native_multidevice = True
             _LOGGER.debug(f"{target} requires native multi-device support")
+
+        if converter_info.get("requires_aliased_plugin_io", False):
+            self.ctx.requires_aliased_plugin_io = True
+            _LOGGER.debug(f"{target} requires aliased plugin I/O")
 
         self.ctx.current_node = self._cur_node
         if calling_convention is CallingConvention.LEGACY:
