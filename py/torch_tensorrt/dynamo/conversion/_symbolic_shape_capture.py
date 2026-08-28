@@ -172,9 +172,6 @@ def extract_symbolic_shape_expressions(
             )
             return None
 
-    if not output_info:
-        return None
-
     return {
         "inputs": input_info,
         "outputs": output_info,

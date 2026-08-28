@@ -27,7 +27,6 @@ from typing import (
 import numpy as np
 import psutil
 import sympy
-import tensorrt as trt
 import torch
 from torch._subclasses.fake_tensor import FakeScriptObject, FakeTensor
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
@@ -42,6 +41,7 @@ from torch_tensorrt.dynamo._defaults import default_device
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
+import tensorrt as trt
 from packaging import version
 
 from .types import TRTDataType
@@ -956,7 +956,6 @@ def get_output_metadata(
     assert len(outputs) > 0
     outputs = outputs[0].args
     nodes = flatten_nodes(outputs)
-    assert len(nodes) > 0
     return [node.meta for node in nodes]
 
 

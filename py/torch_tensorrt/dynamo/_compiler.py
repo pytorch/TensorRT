@@ -1538,7 +1538,6 @@ def compile_module(
 
         # set the submodule metadata back to the parent trt_module_node
         metadata_list = get_output_metadata(submodule)
-        assert len(metadata_list) > 0
         metadata_keys = ["val", "tensor_meta"]
         for key in metadata_keys:
             if key not in submodule_node_dict[name].meta:
@@ -1665,6 +1664,8 @@ def compile_module(
             # than a tuple/list of Nodes.
             outputs = arg if isinstance(arg, (list, tuple)) else [arg]
             for output in outputs:
+                if not isinstance(output, torch.fx.Node):
+                    continue
                 target = output.target
                 if "_run_on_acc" not in str(target):
                     continue
