@@ -8,6 +8,7 @@ import torch_tensorrt as torchtrt
 from torch.fx.passes.splitter_base import Subgraph
 from torch.ops import aten
 from torch.testing._internal.common_utils import TestCase, run_tests
+from torch_tensorrt._utils import trt_rtx_targets_turing
 from torch_tensorrt.dynamo import partitioning
 from torch_tensorrt.dynamo.conversion import CompilationSettings
 from torch_tensorrt.dynamo.lowering import (
@@ -27,6 +28,19 @@ from torch_tensorrt.dynamo.partitioning._resource_partitioner import (
 
 # Fixed RSS value used across all tests to make memory-budget calculations deterministic.
 _FIXED_RSS_BYTES = 512 * 1024 * 1024  # 512 MB
+
+
+def _fp32_gemm_falls_back_to_pytorch() -> bool:
+    """Whether the trailing FP32 ``nn.Linear`` of these models lands in a PyTorch block.
+
+    TensorRT-RTX cannot serve an FP32 GEMM on Turing (SM 7.5), so
+    ``gemm_capability_validator`` rejects ``aten.linear.default`` there and capability
+    partitioning routes the Linear to the fallback, adding one non-accelerated block.
+    Keyed off the same predicate the validator uses so the expectation cannot drift
+    from the guard. These tests install no settings into the converter registry, so
+    the validator resolves the same live-device answer this no-argument call does.
+    """
+    return trt_rtx_targets_turing()
 
 
 class TestResourcePartitioning(TestCase):
@@ -183,6 +197,9 @@ class TestResourcePartitioning(TestCase):
             )
             == 4
         ), "The graph should have 4 accelerated subgraphs"
+        # The trailing FP32 Linear becomes an extra PyTorch block wherever TensorRT-RTX
+        # cannot serve an FP32 GEMM; the accelerated blocks above are unaffected.
+        expected_gpu_subgraphs = 3 if _fp32_gemm_falls_back_to_pytorch() else 2
         assert (
             len(
                 [
@@ -191,8 +208,8 @@ class TestResourcePartitioning(TestCase):
                     if "_run_on_gpu" in name
                 ]
             )
-            == 2
-        ), "The graph should have 2 non-accelerated subgraphs"
+            == expected_gpu_subgraphs
+        ), f"The graph should have {expected_gpu_subgraphs} non-accelerated subgraphs"
 
         torch._dynamo.reset()
 
@@ -202,6 +219,8 @@ class TestResourcePartitioning(TestCase):
         """
         After defining the atomic subgraphs, the resource partitioner will not be able to find valid partition in the subgraph.
         So there should only be 3 accelerated subgraphs and 2 non-accelerated subgraphs.
+        Where TensorRT-RTX cannot serve the trailing FP32 GEMM the non-accelerated count
+        is one higher, because the Linear falls back too.
         """
 
         @register_atomic_subgraph(init_args=(), is_core_aten=True)
@@ -231,6 +250,11 @@ class TestResourcePartitioning(TestCase):
                     groups,
                 )
                 return x
+
+        # Unregister through addCleanup rather than a trailing statement: an assertion
+        # that fails below would skip the latter, leaking ReLUConv into the next test
+        # and making it fail too.
+        self.addCleanup(ATOMIC_SUBGRAPHS.remove, (ReLUConv, (), True))
 
         class net(nn.Module):
             def __init__(self):
@@ -315,6 +339,9 @@ class TestResourcePartitioning(TestCase):
             )
             == 3
         ), "The graph should have 3 accelerated subgraphs"
+        # The trailing FP32 Linear becomes an extra PyTorch block wherever TensorRT-RTX
+        # cannot serve an FP32 GEMM; the accelerated blocks above are unaffected.
+        expected_gpu_subgraphs = 3 if _fp32_gemm_falls_back_to_pytorch() else 2
         assert (
             len(
                 [
@@ -323,10 +350,8 @@ class TestResourcePartitioning(TestCase):
                     if "_run_on_gpu" in name
                 ]
             )
-            == 2
-        ), "The graph should have 2 non-accelerated subgraphs"
-
-        ATOMIC_SUBGRAPHS.remove((ReLUConv, (), True))
+            == expected_gpu_subgraphs
+        ), f"The graph should have {expected_gpu_subgraphs} non-accelerated subgraphs"
 
         torch._dynamo.reset()
 
