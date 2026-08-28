@@ -138,40 +138,37 @@ def _has_dynamic_shapes(
         node, torch.fx.Node
     ), "Inputs to validator functions must be FX Nodes"
 
-    def _is_subnode_dynamic(subnode: torch.fx.Node) -> bool:
-        """Checks if a node itself has Dynamic properties"""
-        _has_symbolic_sizes_strides, is_shape_dynamic = False, False
-        if "val" in subnode.meta:
-            _has_symbolic_sizes_strides = getattr(
-                subnode.meta["val"], "_has_symbolic_sizes_strides", False
-            )
-            meta_val = subnode.meta["val"]
-            if isinstance(meta_val, (list, tuple)):
-                for val in meta_val:
-                    if val is None:
-                        continue
-                    if isinstance(val, (SymFloat, SymInt, SymBool)):
-                        is_shape_dynamic = True
-                        break
-                    if not hasattr(val, "size"):
-                        continue
-                    shape = val.size()
-                    if any(
-                        isinstance(dim, (SymFloat, SymInt, SymBool)) for dim in shape
-                    ):
-                        is_shape_dynamic = True
-                        break
-            elif isinstance(meta_val, (SymFloat, SymInt, SymBool)):
-                is_shape_dynamic = True
-            elif isinstance(meta_val, (int, float, bool)):
-                is_shape_dynamic = False
-            else:
-                shape = subnode.meta["val"].size()
-                is_shape_dynamic = any(
-                    isinstance(dim, (SymFloat, SymInt, SymBool)) for dim in shape
-                )
+    def _contains_dynamic_value(value: Any) -> bool:
+        """Recursively checks FX metadata for symbolic values or dimensions."""
+        if isinstance(value, (SymFloat, SymInt, SymBool)):
+            return True
+        if isinstance(value, dict):
+            return any(_contains_dynamic_value(item) for item in value.values())
+        if isinstance(value, (list, tuple)):
+            return any(_contains_dynamic_value(item) for item in value)
+        if value is None or isinstance(value, (int, float, bool)):
+            return False
+        if hasattr(value, "size"):
+            return any(_contains_dynamic_value(dim) for dim in value.size())
+        return False
 
-        return _has_symbolic_sizes_strides or is_shape_dynamic
+    def _is_subnode_dynamic(subnode: torch.fx.Node) -> bool:
+        """Checks if a node itself has Dynamic properties."""
+        meta_val = subnode.meta.get("val", subnode.meta.get("example_value"))
+        return bool(
+            getattr(meta_val, "_has_symbolic_sizes_strides", False)
+            or _contains_dynamic_value(meta_val)
+        )
+
+    def _is_argument_dynamic(argument: Argument) -> bool:
+        """Checks nodes nested inside FX container arguments."""
+        if isinstance(argument, torch.fx.Node):
+            return _is_subnode_dynamic(argument)
+        if isinstance(argument, dict):
+            return any(_is_argument_dynamic(item) for item in argument.values())
+        if isinstance(argument, (list, tuple)):
+            return any(_is_argument_dynamic(item) for item in argument)
+        return False
 
     # Check node value itself
     if arg_positions_to_check is None and _is_subnode_dynamic(node):
@@ -179,22 +176,18 @@ def _has_dynamic_shapes(
 
     # Check node arguments individually
     if arg_positions_to_check is None and any(
-        _is_subnode_dynamic(arg) for arg in node.args if isinstance(arg, torch.fx.Node)
+        _is_argument_dynamic(arg) for arg in node.args
     ):
         return True
     # Check specific arg positions if the caller has specified positions to check
     elif arg_positions_to_check is not None and any(
-        _is_subnode_dynamic(node.args[i])
-        for i in arg_positions_to_check
-        if isinstance(node.args[i], torch.fx.Node)
+        _is_argument_dynamic(node.args[i]) for i in arg_positions_to_check
     ):
         return True
 
     # Check node keyword arguments individually
     if arg_positions_to_check is None and any(
-        _is_subnode_dynamic(kwarg)
-        for kwarg in node.kwargs.values()
-        if isinstance(kwarg, torch.fx.Node)
+        _is_argument_dynamic(kwarg) for kwarg in node.kwargs.values()
     ):
         return True
 
