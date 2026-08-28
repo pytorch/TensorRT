@@ -2603,14 +2603,6 @@ def bitwise_type_validator(
             return False
         if not (tensor_meta.dtype in supported_type and isinstance(scalar_val, bool)):
             return False
-        # Myelin bug (fixed in TRT 11.3): absorbing-element boolean constants are
-        # miscompiled as identity (x AND False returns x; x OR True returns x).
-        # Fall back to PyTorch for these cases on affected TRT versions.
-        if not is_tensorrt_version_supported("11.3.0"):
-            is_and_op = node.target in {torch.ops.aten.bitwise_and.Scalar, torch.ops.aten.bitwise_and.Scalar_Tensor}
-            is_or_op = node.target in {torch.ops.aten.bitwise_or.Scalar, torch.ops.aten.bitwise_or.Scalar_Tensor}
-            if (is_and_op and scalar_val is False) or (is_or_op and scalar_val is True):
-                return False
         return True
 
     else:

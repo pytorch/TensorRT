@@ -1,5 +1,3 @@
-import unittest
-
 import torch
 import torch.nn as nn
 import torch_tensorrt
@@ -7,7 +5,6 @@ from parameterized import parameterized
 from torch.export import Dim
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
-from torch_tensorrt._utils import is_tensorrt_version_supported
 from torch_tensorrt.dynamo.utils import ATOL, RTOL
 
 from .harness import DispatchTestCase
@@ -90,11 +87,6 @@ class TestBitwiseAndConverter(DispatchTestCase):
         ]
     )
     def test_bitwise_and_scalar(self, _, shape, scalar):
-        if scalar is False and not is_tensorrt_version_supported("11.3.0"):
-            raise unittest.SkipTest(
-                "Myelin bug: x AND False miscompiled on TRT < 11.3 (NVBug 6605685)"
-            )
-
         class bitwise_and(nn.Module):
             def forward(self, tensor):
                 return torch.ops.aten.bitwise_and.Scalar(tensor, scalar)
@@ -116,11 +108,6 @@ class TestBitwiseAndConverter(DispatchTestCase):
         ]
     )
     def test_bitwise_and_scalar_tensor(self, _, shape, scalar):
-        if scalar is False and not is_tensorrt_version_supported("11.3.0"):
-            raise unittest.SkipTest(
-                "Myelin bug: x AND False miscompiled on TRT < 11.3 (NVBug 6605685)"
-            )
-
         class bitwise_and(nn.Module):
             def forward(self, tensor):
                 return torch.ops.aten.bitwise_and.Scalar_Tensor(scalar, tensor)
