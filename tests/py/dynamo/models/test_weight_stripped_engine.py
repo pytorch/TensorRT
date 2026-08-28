@@ -7,6 +7,7 @@ import unittest
 import torch
 import torch_tensorrt as torch_trt
 from torch.testing._internal.common_utils import TestCase
+from torch_tensorrt._utils import trt_rtx_targets_turing
 from torch_tensorrt.dynamo import convert_exported_program_to_serialized_trt_engine
 from torch_tensorrt.dynamo._defaults import TIMING_CACHE_PATH
 from torch_tensorrt.dynamo._refit import refit_module_weights
@@ -110,8 +111,16 @@ class TestWeightStrippedEngine(TestCase):
         "torchvision is not installed",
     )
     def test_weight_stripped_engine_sizes(self):
-        pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
-        example_inputs = (torch.randn((2, 3, 224, 224)).to("cuda"),)
+        # TensorRT-RTX cannot serve an FP32 GEMM on Turing (SM 7.5), so the GEMM guard
+        # rejects resnet18's fc layer there. convert_exported_program_to_serialized_trt_engine
+        # emits one engine for the whole program and has no partitioner to fall back to,
+        # so the rejection raises rather than producing a PyTorch block. This test is
+        # about stripped-vs-included engine sizes, not about FP32, so follow the
+        # capability: the guard keys on operand dtype only, the network is strongly
+        # typed, and the size comparison below is just as meaningful in FP16.
+        dtype = torch.float16 if trt_rtx_targets_turing() else torch.float32
+        pyt_model = models.resnet18(pretrained=True).eval().to("cuda").to(dtype)
+        example_inputs = (torch.randn((2, 3, 224, 224), dtype=dtype).to("cuda"),)
         exp_program = torch.export.export(pyt_model, example_inputs)
         weight_included_engine = convert_exported_program_to_serialized_trt_engine(
             exp_program,
