@@ -24,6 +24,13 @@ def remove_num_users_is_0_nodes(
             node != output_node
             and len(node.users) == 0
             and len(node.all_input_nodes) > 0
+            # Mutable operators can write graph inputs even when their result
+            # is unused. Keep these writes for auto-functionalized plugins.
+            and not (
+                node.op == "call_function"
+                and isinstance(node.target, torch._ops.OpOverload)
+                and node.target._schema.is_mutable
+            )
         ):
             gm.graph.erase_node(node)
 

@@ -4,7 +4,6 @@
 from typing import Callable, Optional
 
 from torch.fx.node import Node
-
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import ConverterPriority
 from torch_tensorrt.dynamo.conversion.plugins._generate_plugin import generate_plugin
@@ -41,6 +40,13 @@ def custom_op(
             precompiled-kernel AOT impl between the plugin descriptor and the
             converter. Not part of the public API; pass ``None`` (the default) for
             ordinary use.
+
+    Note:
+        For a mutating custom op, the fake kernel must return each mutated tensor by
+        object identity. This is how the generated plugin discovers aliased outputs;
+        the real kernel must still return non-aliasing tensors as required by PyTorch.
+        Ops returning ``None`` get synthetic aliased outputs for their mutations;
+        their fake kernel should return ``None`` as usual.
     """
     generate_plugin(op_name)
     if _aot_register is not None:
