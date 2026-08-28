@@ -6,6 +6,8 @@ import operator
 
 import pytest
 import torch
+from torch._subclasses.fake_tensor import FakeTensorMode
+from torch.fx.experimental.symbolic_shapes import ShapeEnv
 from torch.export.graph_signature import (
     ExportGraphSignature,
     InputKind,
@@ -17,6 +19,7 @@ from torch.export.graph_signature import (
 from torch_tensorrt.dynamo._exporter import (
     create_trt_exp_program,
     inline_torch_modules,
+    inline_trt_modules,
     lift,
 )
 
@@ -145,6 +148,96 @@ def test_inline_torch_modules_computed_intermediate_inputs():
     # out = (x*2) + (x+1); x=5 -> 10 + 6 = 16.
     out = parent(torch.tensor(5.0))
     assert torch.allclose(out, torch.tensor(16.0))
+
+
+class _FakeTRTModule(torch.nn.Module):
+    def __init__(self, shape_info):
+        super().__init__()
+        self.engine = object()
+        self.symbolic_shape_expressions = shape_info
+        self.target_device = torch.device("cuda")
+        self.aliased_io = {}
+
+    def forward(self, *args):
+        raise AssertionError("synthetic TRT module should be inlined, not executed")
+
+
+@pytest.mark.unit
+def test_inline_trt_modules_tensorizes_scalar_inputs_and_restores_outputs():
+    """The inlined execute_engine Tensor[] boundary contains tensors only.
+
+    Scalar partition inputs are materialized as zero-dimensional tensors before
+    execute_engine, and outputs recorded as scalars are converted back with item
+    before reaching their original consumers.
+    """
+    shape_info = {
+        "inputs": [
+            {
+                "shape_exprs": [],
+                "dtype": torch.int64,
+                "name": "length",
+                "is_scalar": True,
+            },
+            {
+                "shape_exprs": [4],
+                "dtype": torch.float32,
+                "name": "x",
+            },
+        ],
+        "outputs": [
+            {
+                "shape_exprs": [],
+                "dtype": torch.int64,
+                "is_scalar": True,
+            },
+            {
+                "shape_exprs": [4],
+                "dtype": torch.float32,
+            },
+        ],
+    }
+
+    shape_env = ShapeEnv()
+    fake_mode = FakeTensorMode(shape_env=shape_env)
+    with fake_mode:
+        scalar_val = shape_env.create_unbacked_symint()
+        tensor_val = torch.empty(4, device="cuda")
+
+    graph = torch.fx.Graph()
+    scalar = graph.placeholder("length")
+    scalar.meta["val"] = scalar_val
+    tensor = graph.placeholder("x")
+    tensor.meta["val"] = tensor_val
+
+    root = torch.nn.Module()
+    root.add_module("_run_on_acc_0", _FakeTRTModule(shape_info))
+    call = graph.call_module("_run_on_acc_0", (scalar, tensor))
+    call.meta["val"] = [scalar_val, tensor_val]
+    scalar_output = graph.call_function(operator.getitem, (call, 0))
+    scalar_output.meta["val"] = scalar_val
+    tensor_output = graph.call_function(operator.getitem, (call, 1))
+    tensor_output.meta["val"] = tensor_val
+    graph.output((scalar_output, tensor_output))
+    gm = torch.fx.GraphModule(root, graph)
+
+    inline_trt_modules(gm, expose_aliased_mutations=False)
+    gm.graph.lint()
+
+    execute = next(
+        node
+        for node in gm.graph.nodes
+        if node.target is torch.ops.tensorrt.execute_engine.default
+    )
+    engine_inputs = execute.args[0]
+    assert engine_inputs[0].target is torch.ops.aten.scalar_tensor.default
+    assert all(isinstance(node.meta.get("val"), torch.Tensor) for node in engine_inputs)
+    assert all(isinstance(value, torch.Tensor) for value in execute.meta["val"])
+
+    item_nodes = [
+        node for node in gm.graph.nodes if node.target is torch.ops.aten.item.default
+    ]
+    assert len(item_nodes) == 1
+    assert item_nodes[0].meta["val"] is scalar_val
 
 
 @pytest.mark.unit

@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 def _apply_symbolic_shape_expressions(
-    inputs: List[torch.Tensor], shape_info: Dict[str, List[Dict[str, Any]]]
+    inputs: List[Any], shape_info: Dict[str, List[Dict[str, Any]]]
 ) -> List[torch.Tensor]:
     """
     Apply symbolic shape expressions to create output fake tensors.
@@ -35,6 +35,13 @@ def _apply_symbolic_shape_expressions(
     input_info = shape_info.get("inputs", [])
     output_info = shape_info.get("outputs", [])
 
+    tensor_inputs = [value for value in inputs if isinstance(value, torch.Tensor)]
+    if not tensor_inputs:
+        raise RuntimeError(
+            "[torch.ops.tensorrt.execute_engine]: At least one tensor input is required to infer the engine output device"
+        )
+    output_device = tensor_inputs[0].device
+
     fake_mode = detect_fake_mode(inputs)
     if fake_mode is None:
         # No fake mode - shouldn't happen, but fall back to concrete shapes
@@ -45,7 +52,7 @@ def _apply_symbolic_shape_expressions(
                 for s in info["shape_exprs"]
             ]
             outputs.append(
-                torch.empty(shape, dtype=info["dtype"], device=inputs[0].device)
+                torch.empty(shape, dtype=info["dtype"], device=output_device)
             )
         return outputs
 
@@ -82,6 +89,8 @@ def _apply_symbolic_shape_expressions(
 
     # Align inputs: for each captured input, match it with the corresponding runtime input
     for inp_tensor, inp_info in zip(inputs, input_info):
+        if inp_info.get("is_scalar"):
+            continue
         for d, compile_expr in zip(inp_tensor.shape, inp_info["shape_exprs"]):
             if isinstance(compile_expr, int):
                 continue
@@ -254,7 +263,7 @@ def _apply_symbolic_shape_expressions(
                             ) from e
 
             outputs.append(
-                torch.empty(output_shape, dtype=info["dtype"], device=inputs[0].device)
+                torch.empty(output_shape, dtype=info["dtype"], device=output_device)
             )
     logger.debug(
         f"[torch.ops.tensorrt.execute_engine]: Meta kernel found the following output FakeTensors: {outputs}"
