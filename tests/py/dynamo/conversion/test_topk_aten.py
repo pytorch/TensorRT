@@ -34,5 +34,15 @@ class TestSortConverter(DispatchTestCase):
         )
 
 
+class TestTopk1DConverter(DispatchTestCase):
+    def test_topk_1d_values_and_indices_match_eager(self):
+        class Topk(nn.Module):
+            def forward(self, x):
+                return torch.ops.aten.topk.default(x, 3)
+
+        inputs = [torch.tensor([4.0, 1.0, 7.0, 2.0, 9.0, 3.0])]
+        self.run_test(Topk(), inputs, enable_passes=True)
+
+
 if __name__ == "__main__":
     run_tests()
