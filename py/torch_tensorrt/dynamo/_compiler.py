@@ -400,6 +400,7 @@ def cross_compile_for_windows(
             decompose_attention,
             use_distributed_mode_trace,
             use_fp32_acc=use_fp32_acc,
+            graph_module=exported_program.graph_module,
         )
     )
 
@@ -806,6 +807,7 @@ def compile(
             enable_experimental_decompositions,
             decompose_attention,
             use_distributed_mode_trace,
+            graph_module=exported_program.graph_module,
             use_fp32_acc=use_fp32_acc,
         )
     )
@@ -2113,6 +2115,7 @@ def convert_exported_program_to_serialized_trt_engine(
             decompose_attention,
             use_distributed_mode_trace,
             use_fp32_acc=use_fp32_acc,
+            graph_module=exported_program.graph_module,
         )
     )
 

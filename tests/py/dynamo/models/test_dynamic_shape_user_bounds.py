@@ -11,6 +11,7 @@ import torch
 import torch_tensorrt as torchtrt
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo._compiler import _build_user_symbol_bounds
+from torch_tensorrt.dynamo.partitioning.common import construct_dynamic_input
 from torch_tensorrt.dynamo.utils import extract_var_range_info
 
 assertions = unittest.TestCase()
@@ -558,6 +559,32 @@ def test_dim_dynamic_save_preserves_range_constraints(tmpdir):
     too_big = torch.randn(16, 8, device="cuda")
     with assertions.assertRaises(Exception):
         trt_module(too_big)
+
+
+@pytest.mark.unit
+def test_construct_dynamic_input_clamps_zero_minimum():
+    """Data-dependent extents can include zero, but TRT profiles cannot."""
+
+    class Nonzero(torch.nn.Module):
+        def forward(self, x):
+            return torch.nonzero(x)
+
+    exported = torch.export.export(
+        Nonzero(), (torch.tensor([True, False, True, False]),)
+    )
+    nonzero = next(
+        node
+        for node in exported.graph.nodes
+        if node.target == torch.ops.aten.nonzero.default
+    )
+    fake_value = nonzero.meta["val"]
+    assert isinstance(fake_value.shape[0], torch.SymInt)
+
+    input_spec = construct_dynamic_input(
+        fake_value.shape, fake_value.dtype, name="nonzero_output"
+    )
+    assert input_spec.shape["min_shape"] == (1, 1)
+    assert input_spec.shape["max_shape"] == (4, 1)
 
 
 if __name__ == "__main__":

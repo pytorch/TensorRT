@@ -1,9 +1,9 @@
 from typing import Optional, Union
 
+import numpy as np
 import tensorrt as trt
 import torch
 from tensorrt import ITensor as TRTTensor
-from torch._subclasses.fake_tensor import unset_fake_temporarily
 from torch.fx.node import Target
 from torch_tensorrt import _enums
 from torch_tensorrt.dynamo.conversion import impl
@@ -112,10 +112,19 @@ def arange(
 
     else:
         # All arguments are static, so evaluate the sequence eagerly and freeze it
-        # into the engine as a constant. Letting torch pick the dtype preserves
-        # PyTorch's promotion rules (float result if any argument is a float).
-        with unset_fake_temporarily():
-            values = torch.arange(start, end, step, dtype=dtype)
-        if values.dtype == torch.int64:
-            values = values.to(torch.int32)
+        # into the engine as a constant. NumPy avoids creating a FakeTensor when
+        # conversion runs inside torch.compile's active FakeTensorMode.
+        resolved_dtype = dtype
+        if resolved_dtype is None and any(
+            isinstance(value, float) for value in (start, end, step)
+        ):
+            resolved_dtype = torch.get_default_dtype()
+        np_dtype = (
+            _enums.dtype._from(resolved_dtype).to(np.dtype)
+            if resolved_dtype is not None
+            else None
+        )
+        values = np.arange(start, end, step, dtype=np_dtype)
+        if values.dtype == np.int64:
+            values = values.astype(np.int32)
         return get_trt_tensor(ctx, values, f"{name}_arange_const")
