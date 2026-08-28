@@ -39,6 +39,47 @@ to_test_models = {
     # "bert_base_uncased": {"model": cm.BertModule(), "path": "trace"},
 }
 
+# torchvision checkpoints that more than one test file in the same suite asks for
+# with pretrained=True: resnet18 in tests/py/ts/{api,models,integrations} and
+# mobilenet_v2 in tests/py/ts/api. Checkpoints that only one file uses cannot be
+# downloaded twice at once, so they are left to that file. IMAGENET1K_V1 is the
+# set of weights pretrained=True selects.
+PRETRAINED_WEIGHTS = (
+    "MobileNet_V2_Weights",
+    "ResNet18_Weights",
+)
+
+
+def download_pretrained_weights():
+    """Fetch the shared torchvision checkpoints before pytest forks its workers.
+
+    pytest runs one test file per xdist worker (--dist=loadfile), and several
+    files in the same suite ask torchvision for the same checkpoint, so two
+    workers can download one URL at the same time. torch.hub finishes a download
+    with shutil.move, and on Windows that is a plain copy whenever the
+    destination already exists, so the second worker rewrites the file while the
+    first one is reading it and torch.load fails on truncated pickle data.
+    Downloading here, in one process before the workers start, leaves them with
+    nothing to do but read.
+    """
+    if importlib.util.find_spec("torchvision") is None:
+        print("torchvision is not installed, skipping pretrained weight download")
+        return
+
+    import torchvision.models as tv_models
+
+    for name in PRETRAINED_WEIGHTS:
+        weights = getattr(tv_models, name).IMAGENET1K_V1
+        print("Downloading {}".format(weights))
+        try:
+            # check_hash is what torchvision itself passes, and it is the only
+            # thing that stops a bad download from being cached and reused.
+            weights.get_state_dict(progress=False, check_hash=True)
+        except Exception as e:
+            # Warming the cache is an optimization, so a failure here must not
+            # take the whole suite down. The tests still fetch what they need.
+            print("Could not pre-download {}: {}".format(name, e))
+
 
 def get(n, m, manifest):
     print("Downloading {}".format(n))
@@ -92,6 +133,8 @@ def download_models(version_matches, manifest):
 
 
 def main():
+
+    download_pretrained_weights()
 
     manifest = None
     version_matches = False
