@@ -13,8 +13,10 @@ disabled_cuda_versions: List[str] = []
 # jetpack 6.2 only officially supports python 3.10 and cu126
 jetpack_python_versions: List[str] = ["3.10"]
 jetpack_cuda_versions: List[str] = ["cu126"]
-rtx_cuda_versions: List[str] = ["cu130", "cu132"]
-trt_cuda_versions: List[str] = ["cu130", "cu132"]
+# CUDA 12.6 wheels are published for x86_64 only. Keep the Arm matrices on
+# CUDA 13, including Windows Arm/AArch64.
+x86_cuda_versions: List[str] = ["cu126", "cu130", "cu132"]
+arm_cuda_versions: List[str] = ["cu130", "cu132"]
 
 # For PRs we build/test a single representative config to keep cycle time short.
 # Full matrix runs on main / nightly / release branches.
@@ -74,12 +76,16 @@ def filter_matrix_item(
             return True
         return False
     else:
+        cuda_versions = (
+            arm_cuda_versions
+            if item["gpu_arch_type"] in {"cuda-aarch64", "cuda-arm64"}
+            else x86_cuda_versions
+        )
         if use_rtx:
-            if item["desired_cuda"] not in rtx_cuda_versions:
+            if item["desired_cuda"] not in cuda_versions:
                 return False
-        else:
-            if item["desired_cuda"] not in trt_cuda_versions:
-                return False
+        elif item["desired_cuda"] not in cuda_versions:
+            return False
         if item["gpu_arch_type"] == "cuda-aarch64":
             # pytorch image:pytorch/manylinuxaarch64-builder:cuda12.8 comes with glibc2.28
             # however, TensorRT requires glibc2.31 on aarch64 platform
