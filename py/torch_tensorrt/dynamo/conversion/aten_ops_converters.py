@@ -1721,6 +1721,27 @@ def to_copy_dtype_validator(
 
         Based on data type being casted to
         """
+        requested_device = to_copy_node.kwargs.get("device")
+        if requested_device is not None:
+            input_node = to_copy_node.args[0]
+            input_meta = (
+                input_node.meta.get("val") if isinstance(input_node, Node) else None
+            )
+            output_meta = to_copy_node.meta.get("val")
+            if (
+                not isinstance(input_meta, torch.Tensor)
+                or not isinstance(output_meta, torch.Tensor)
+                or input_meta.device != output_meta.device
+            ):
+                _LOGGER.debug(
+                    "_to_copy converter rejected node %s because TensorRT cannot "
+                    "represent a device transfer from %s to %s",
+                    to_copy_node,
+                    getattr(input_meta, "device", None),
+                    getattr(output_meta, "device", requested_device),
+                )
+                return False
+
         allowed_casts = {
             torch.float,
             torch.int32,

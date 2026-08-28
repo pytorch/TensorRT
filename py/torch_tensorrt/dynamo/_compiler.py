@@ -1438,7 +1438,11 @@ def compile_module(
                 str(name),
                 str(submodule.graph),
             )
-            submodule.to(to_torch_device(settings.device))
+            # Only undo the explicit compilation-time offload. Otherwise this
+            # would relocate parameters that the source graph intentionally
+            # kept on the host.
+            if settings.offload_module_to_cpu:
+                submodule.to(to_torch_device(settings.device))
             continue
 
         if name not in submodule_node_dict:
