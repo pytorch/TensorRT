@@ -17,10 +17,15 @@ of reusing the input SymInts. This is a known limitation.
 """
 
 import pytest
+import sympy
 import torch
 import torch_tensorrt
 from torch._subclasses.fake_tensor import FakeTensorMode
+from torch.fx.experimental.symbolic_shapes import ShapeEnv
 from torch.export import Dim
+from torch_tensorrt.dynamo.runtime.meta_ops.register_meta_ops import (
+    _apply_symbolic_shape_expressions,
+)
 
 
 class TestMetaKernelShapeInference:
@@ -292,6 +297,106 @@ class TestMetaKernelShapeInference:
 
         # Shapes should match
         assert exported_output.shape == trt_output.shape
+
+
+class TestApplySymbolicShapeExpressions:
+    """CPU-only tests for remapping serialized expressions into a fresh ShapeEnv."""
+
+    @staticmethod
+    def _shape_info(input_expr, output_expr):
+        return {
+            "inputs": [
+                {
+                    "shape_exprs": [input_expr],
+                    "dtype": torch.float32,
+                    "name": "x",
+                }
+            ],
+            "outputs": [
+                {
+                    "shape_exprs": [output_expr],
+                    "dtype": torch.float32,
+                }
+            ],
+        }
+
+    def test_output_symbol_does_not_alias_same_named_runtime_symbol(self):
+        compile_input = sympy.Symbol("s0", integer=True)
+        compile_output = sympy.Symbol("u0", integer=True)
+        shape_env = ShapeEnv()
+
+        with FakeTensorMode(shape_env=shape_env):
+            runtime_input = shape_env.create_unbacked_symint()
+            shape_env._constrain_range_for_size(runtime_input.node.expr)
+            fake_input = torch.empty(runtime_input)
+            output = _apply_symbolic_shape_expressions(
+                [fake_input], self._shape_info(compile_input, compile_output)
+            )[0]
+
+        assert output.shape[0].node.expr != runtime_input.node.expr
+
+    def test_output_only_symbol_uses_fake_mode_shape_env_and_is_size_like(self):
+        compile_output = sympy.Symbol("u0", integer=True)
+        shape_env = ShapeEnv()
+        shape_info = {
+            "inputs": [
+                {
+                    "shape_exprs": [16],
+                    "dtype": torch.float32,
+                    "name": "x",
+                }
+            ],
+            "outputs": [
+                {
+                    "shape_exprs": [compile_output],
+                    "dtype": torch.float32,
+                }
+            ],
+        }
+
+        with FakeTensorMode(shape_env=shape_env):
+            output = _apply_symbolic_shape_expressions([torch.empty(16)], shape_info)[0]
+            output_dim = output.shape[0]
+            query = 1 > output_dim + torch.sym_max(0, 1 - output_dim)
+
+        assert output_dim.node.shape_env is shape_env
+        assert output_dim.node.expr in shape_env.size_like
+        assert not bool(shape_env.evaluate_expr(query.node.expr, size_oblivious=True))
+
+    def test_derived_expression_uses_runtime_input_symbol(self):
+        compile_input = sympy.Symbol("s0", integer=True)
+        shape_env = ShapeEnv()
+
+        with FakeTensorMode(shape_env=shape_env):
+            runtime_input = shape_env.create_unbacked_symint()
+            shape_env._constrain_range_for_size(runtime_input.node.expr)
+            fake_input = torch.empty(runtime_input)
+            output = _apply_symbolic_shape_expressions(
+                [fake_input],
+                self._shape_info(compile_input, 2 * compile_input + 1),
+            )[0]
+
+        assert (
+            sympy.simplify(
+                output.shape[0].node.expr - (2 * runtime_input.node.expr + 1)
+            )
+            == 0
+        )
+
+    def test_composite_input_expression_is_solved_in_runtime_namespace(self):
+        compile_base = sympy.Symbol("s0", integer=True)
+        shape_env = ShapeEnv()
+
+        with FakeTensorMode(shape_env=shape_env):
+            runtime_base = shape_env.create_unbacked_symint()
+            shape_env._constrain_range_for_size(runtime_base.node.expr)
+            fake_input = torch.empty(2 * runtime_base)
+            output = _apply_symbolic_shape_expressions(
+                [fake_input],
+                self._shape_info(2 * compile_base, compile_base),
+            )[0]
+
+        assert output.shape[0].node.expr == runtime_base.node.expr
 
 
 if __name__ == "__main__":
