@@ -118,7 +118,17 @@ def construct_dynamic_input(
                 )
                 unwrapped_min_max_opt["min"] = 1
             else:
-                unwrapped_min_max_opt["min"] = min_max_opt["min"]
+                min_bound = int(min_max_opt["min"])
+                if min_bound < 1:
+                    logger.warning(
+                        "Dynamic input %s (shape: %s) has lower bound %d for dim %d. "
+                        "TensorRT profiles require dimensions >= 1; clamping it to 1.",
+                        name,
+                        input_shape,
+                        min_bound,
+                        d,
+                    )
+                unwrapped_min_max_opt["min"] = max(1, min_bound)
 
             if "max" not in min_max_opt or min_max_opt["max"] is None:
                 logger.warning(

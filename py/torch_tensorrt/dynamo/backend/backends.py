@@ -86,6 +86,7 @@ def aot_torch_tensorrt_aten_backend(
             settings.decompose_attention,
             settings.use_distributed_mode_trace,
             use_fp32_acc=settings.use_fp32_acc,
+            graph_module=gm,
         )
         # This is added since detach lowering leads to alias nodes
         # Error - View operation returned a tensor that is the same as the input base tensor
@@ -135,6 +136,7 @@ def aot_torch_tensorrt_aten_backend(
         aot_decomps = get_decompositions(
             settings.enable_experimental_decompositions,
             settings.decompose_attention,
+            graph_module=gm,
             use_fp32_acc=settings.use_fp32_acc,
         )
         # Remove detach decompositions to avoid alias node errors.
@@ -338,6 +340,7 @@ def _pretraced_backend(
                         settings.decompose_attention,
                         settings.use_distributed_mode_trace,
                         use_fp32_acc=settings.use_fp32_acc,
+                        graph_module=gm,
                     ),
                 )
 

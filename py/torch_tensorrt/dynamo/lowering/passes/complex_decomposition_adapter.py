@@ -100,7 +100,9 @@ def complex_decomposition_adapter(
         # anything, since it builds a new GraphModule rather than editing
         # the existing one in place).
         decomposed_gm = decompose_complex_in_graph(
-            gm, flat_args, decompositions=_trt_decomposition_table(settings)
+            gm,
+            flat_args,
+            decompositions=_trt_decomposition_table(settings, gm),
         )
     except Exception as e:
         # decompose_complex_in_graph is upstream, experimental PyTorch code
@@ -141,7 +143,7 @@ def complex_decomposition_adapter(
 
 
 def _trt_decomposition_table(
-    settings: CompilationSettings,
+    settings: CompilationSettings, graph_module: GraphModule
 ) -> dict[Any, Any]:
     """The op set the rest of the TRT flow expects to see.
 
@@ -160,6 +162,7 @@ def _trt_decomposition_table(
         settings.decompose_attention,
         settings.use_distributed_mode_trace,
         use_fp32_acc=settings.use_fp32_acc,
+        graph_module=graph_module,
     )
 
 
