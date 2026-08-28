@@ -348,7 +348,9 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         rs_resolved = self._resolve_runtime_cache(rs)
         # 2. Push to the engine if it exists; if not we stash for later.
         if self.engine is not None:
-            self._send_to_engine(rs_resolved)
+            from torch_tensorrt.runtime._runtime_config import _send_settings_to_engine
+
+            _send_settings_to_engine(self.engine, rs_resolved)
         # 3. Store the resolved form so reads agree with what the engine sees.
         self._runtime_settings = rs_resolved
 
@@ -423,12 +425,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         engine has no way to hold the same underlying ``IRuntimeCache``).
         """
         return not ENABLED_FEATURES.torch_tensorrt_runtime or w.is_cpp_runtime()
-
-    def _send_to_engine(self, rs: RuntimeSettings) -> None:
-        """Push ``rs`` to whichever engine flavor is attached."""
-        from torch_tensorrt.runtime._runtime_config import _send_settings_to_engine
-
-        _send_settings_to_engine(self.engine, rs)
 
     def setup_engine(self) -> None:
         """
