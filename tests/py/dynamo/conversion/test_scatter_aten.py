@@ -63,6 +63,12 @@ class TestScatterValueConverter(DispatchTestCase):
                 torch.tensor([[0, 1, 2, 0], [1, 2, 1, 1]]),
                 1,
             ),
+            (
+                "scatter_one_dim_float_scalar_value",
+                1,
+                torch.tensor([[0, 1, 2, 0]]),
+                2.5,
+            ),
         ]
     )
     def test_scatter_index_input(self, _, dim, index, value):
@@ -73,9 +79,10 @@ class TestScatterValueConverter(DispatchTestCase):
             def forward(self, input, index):
                 return torch.ops.aten.scatter.value(input, dim, index, value)
 
-        input = torch.zeros(3, 5, dtype=torch.int32)
+        dtype = torch.float32 if isinstance(value, float) else torch.int32
+        input = torch.zeros(3, 5, dtype=dtype)
         inputs = [input, index]
-        self.run_test(TestModule(), inputs, int32_reqd=True)
+        self.run_test(TestModule(), inputs, int32_reqd=(dtype == torch.int32))
 
 
 class TestScatterSrcConverter(DispatchTestCase):
@@ -314,6 +321,27 @@ class TestScatterSrcDynamicShapeConverter(DispatchTestCase):
                 ),
             ]
         self.run_test_with_dynamic_shape(TestModule(), input_specs)
+
+
+class TestScatterDtypeFixConverter(DispatchTestCase):
+    def test_scatter_value_bool_scalar_no_float64_promotion(self):
+        class TestModule(torch.nn.Module):
+            def forward(self, x):
+                index = torch.tensor([[0, 1], [1, 0]], dtype=torch.int64)
+                return torch.ops.aten.scatter.value(x, 1, index, True)
+
+        inputs = [torch.zeros(2, 4, dtype=torch.float32)]
+        self.run_test(TestModule(), inputs)
+
+    def test_scatter_src_dtype_mismatch_after_argmax(self):
+        class TestModule(torch.nn.Module):
+            def forward(self, x):
+                index = torch.tensor([[0, 1], [1, 0]], dtype=torch.int64)
+                src = torch.argmax(x, dim=1, keepdim=True).expand(2, 2)
+                return torch.ops.aten.scatter.src(x, 1, index, src)
+
+        inputs = [torch.arange(8, dtype=torch.int64).reshape(2, 4)]
+        self.run_test(TestModule(), inputs)
 
 
 if __name__ == "__main__":
