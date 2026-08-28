@@ -68,13 +68,13 @@ class RuntimeSettings:
             TRT-RTX-only; no-op on standard TensorRT.
         cuda_graph_strategy: ``"disabled" | "whole_graph_capture"``. TRT-RTX-only.
         runtime_cache: ``None``, a disk path string, or a
-            :class:`RuntimeCache`. ``None`` ⇒ no cache attached. A
-            string is honored at engine construction time and primes a
-            per-engine disk-backed cache (engine owns the implicit handle and
-            it saves on ``__del__``). A handle is the shared-cache form,
-            typically obtained from :func:`torch_tensorrt.runtime.runtime_cache`
-            -- multiple engines attaching the same handle share one
-            ``IRuntimeCache``.
+            :class:`RuntimeCache`. ``None`` ⇒ no cache attached. A string is
+            resolved by :class:`TorchTensorRTModule`, which builds the
+            engine-implicit :class:`RuntimeCache`, owns it, and saves it on
+            ``__del__``; engines themselves only ever receive ``None`` or a
+            handle. A handle is the shared-cache form, typically obtained from
+            :func:`torch_tensorrt.runtime.runtime_cache` -- multiple engines
+            attaching the same handle share one ``IRuntimeCache``.
 
     Equality compares all fields; for ``runtime_cache``, handle equality is
     by identity (same handle ⇒ same cache).
@@ -149,7 +149,9 @@ class TRTRuntimeConfig:
     """
 
     def __init__(self, settings: Optional[RuntimeSettings] = None) -> None:
-        self._settings: RuntimeSettings = settings or RuntimeSettings()
+        self._settings: RuntimeSettings = settings or RuntimeSettings(
+            runtime_cache=None
+        )
         # Live trt.IRuntimeConfig (RTX) or None (non-RTX / pre-init).
         self._live: Any = None
 
@@ -164,8 +166,8 @@ class TRTRuntimeConfig:
         On change, invalidates the live ``IRuntimeConfig`` and signals callers
         to recreate the ``IExecutionContext``. Disk persistence of any prior
         implicit cache handle is the module's responsibility (see
-        ``TorchTensorRTModule._materialize_implicit_handle``); this method is
-        a pure-execution swap.
+        ``TorchTensorRTModule._set_managed_handle``); this method is a
+        pure-execution swap.
         """
         if new == self._settings:
             return False
@@ -184,7 +186,13 @@ class TRTRuntimeConfig:
         if self._live is not None:
             return
         self._live = cuda_engine.create_runtime_config()
-        self._apply_settings()
+        try:
+            self._apply_settings()
+        except Exception:
+            # Reset the live config so a later ensure_initialized rebuilds it
+            # instead of short-circuiting on the guard above.
+            self._live = None
+            raise
 
     def reset(self) -> None:
         """Drop the live ``IRuntimeConfig``; the next ``ensure_initialized`` rebuilds."""
@@ -248,15 +256,18 @@ class TRTRuntimeConfig:
     def _apply_settings(self) -> None:
         """Apply ``self._settings`` to the live ``trt.IRuntimeConfig``.
 
-        Resolves ``runtime_cache``:
-        - ``None`` ⇒ no cache attached.
-        - ``RuntimeCache`` ⇒ caller owns lifecycle. ``ensure_cache``
-          materializes the inner ``IRuntimeCache`` on first use and drains
-          any pending warm bytes loaded into the handle's pending buffer at
-          construction time (by ``_TorchTensorRTModule._resolve_runtime_cache``
-          for engine-implicit handles, or by the ``runtime_cache`` CM for
-          shared ones). String paths are pre-wrapped into handles upstream;
-          raw strings are not accepted here.
+        Resolves ``runtime_cache``, which must be ``None`` or a
+        :class:`RuntimeCache` -- something that *owns* what it points at. A
+        ``RuntimeCache``'s ``ensure_cache`` materializes the inner
+        ``IRuntimeCache`` on first use and drains any pending warm bytes loaded
+        into the handle's pending buffer at construction time (by
+        ``_TorchTensorRTModule._resolve_runtime_cache`` for engine-implicit
+        handles, or by the ``runtime_cache`` CM for shared ones).
+
+        Path strings are resolved upstream by ``TorchTensorRTModule`` and are
+        rejected here: a string owns nothing, so honoring one would mean
+        building a handle this method does not outlive, handing its
+        ``IRuntimeCache`` to ``_live``, and letting it be collected on return.
         """
         # Deferred imports: trt is import-aliased to tensorrt_rtx on RTX builds,
         # and _runtime_cache imports this module's RuntimeSettings.
@@ -275,36 +286,15 @@ class TRTRuntimeConfig:
 
         rc = self._settings.runtime_cache
         if rc is None:
-            logger.debug("Runtime cache disabled (no RuntimeCache / path provided).")
+            logger.debug("Runtime cache disabled (no RuntimeCache provided).")
         elif isinstance(rc, RuntimeCache):
-            cache = rc.ensure_cache(self._live)
-            self._live.set_runtime_cache(cache)
-        elif isinstance(rc, str):
-            # ``TorchTensorRTModule._resolve_runtime_cache`` pre-wraps path
-            # strings on the compile / configure path, but engines created
-            # directly (e.g. the Python ``TRTEngine`` constructed from a
-            # cross-runtime ``.pt2`` load — see
-            # ``test_cross_runtime_serde::test_save_python_load_python``)
-            # get a default ``RuntimeSettings(runtime_cache=RUNTIME_CACHE_PATH)``
-            # that's never seen by the module's resolver. Wrap defensively
-            # here so the load path doesn't crash; this also keeps the
-            # documented contract that callers MAY pass a path string.
-            #
-            # ``RuntimeSettings`` is a frozen dataclass, so we can't store the
-            # wrapper back onto ``self._settings``; just use it locally. The
-            # wrapper is GC'd after this call, which is fine: ensure_cache has
-            # already materialized the underlying IRuntimeCache on ``_live``.
-            wrapped = RuntimeCache(path=rc, autosave_on_del=True)
-            try:
-                wrapped.load()
-            except Exception as e:
-                logger.warning(f"Failed to warm-load runtime cache from {rc!r}: {e}")
-            cache = wrapped.ensure_cache(self._live)
-            self._live.set_runtime_cache(cache)
+            self._live.set_runtime_cache(rc.ensure_cache(self._live))
         else:
             raise TypeError(
-                f"runtime_cache must be None, str, or RuntimeCache by the "
-                f"time it reaches TRTRuntimeConfig; got {type(rc).__name__}."
+                f"runtime_cache must be None or a RuntimeCache by the time it "
+                f"reaches TRTRuntimeConfig; got {type(rc).__name__}. Path "
+                f"strings are resolved by TorchTensorRTModule -- an engine "
+                f"used without one must be given a RuntimeCache explicitly."
             )
         logger.info("TensorRT-RTX runtime config configured")
 
