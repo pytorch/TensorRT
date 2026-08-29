@@ -12,7 +12,7 @@ from torch_tensorrt.dynamo.lowering._SubgraphBuilder import SubgraphBuilder
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     clean_up_graph_after_modifications,
 )
-from torch_tensorrt.dynamo.utils import COMPLEX_DTYPES
+from torch_tensorrt.dynamo.utils import COMPLEX_DTYPES, COMPLEX_TO_REAL_DTYPE
 
 logger = logging.getLogger(__name__)
 
@@ -1282,6 +1282,46 @@ class ComplexGraphRewriter:
             self.gm.graph.erase_node(node)
             return True
 
+    @_complex_unpacker(torch.ops.aten._to_copy.default)
+    def _rewrite_to_copy(self, node: Node) -> bool:
+        kwargs = dict(node.kwargs)
+        dtype = kwargs.get("dtype")
+        inp = node.args[0]
+        from_complex = self._is_complex_layout_node(inp)
+        to_complex = dtype is None or dtype in COMPLEX_DTYPES
+        if dtype is not None and to_complex:
+            kwargs["dtype"] = COMPLEX_TO_REAL_DTYPE[dtype]
+
+        with SubgraphBuilder(self.gm.graph, node) as b:
+            if to_complex and from_complex:
+                # remap dtype, [..., 2] layout unchanged
+                out = b(torch.ops.aten._to_copy.default, inp)
+                out.kwargs = kwargs
+                out.meta["is_complex_layout"] = True
+            elif to_complex:
+                # a real input needs a zero imaginary half, so 1 -> [1, 0]
+                re = b(torch.ops.aten._to_copy.default, inp)
+                re.kwargs = kwargs
+                im = b(torch.ops.aten.zeros_like.default, re)
+                out = self._inline_cat_re_im(b, re, im)
+            elif dtype == torch.bool:
+                # bool(a+bi) tests both halves for nonzero, not just a
+                re = b(torch.ops.aten.select.int, inp, -1, 0)
+                im = b(torch.ops.aten.select.int, inp, -1, 1)
+                re_bool = b(torch.ops.aten._to_copy.default, re)
+                re_bool.kwargs = kwargs
+                im_bool = b(torch.ops.aten._to_copy.default, im)
+                im_bool.kwargs = kwargs
+                out = b(torch.ops.aten.logical_or.default, re_bool, im_bool)
+            else:
+                # a real target discards the imaginary half
+                re = b(torch.ops.aten.select.int, inp, -1, 0)
+                out = b(torch.ops.aten._to_copy.default, re)
+                out.kwargs = kwargs
+            node.replace_all_uses_with(out)
+            self.gm.graph.erase_node(node)
+            return True
+
     # ------------------------------------------------------------------
     # Shape-manipulation handlers
     #
@@ -1297,6 +1337,7 @@ class ComplexGraphRewriter:
         torch.ops.aten.reshape.default,
         torch.ops.aten.view.default,
         torch.ops.aten._unsafe_view.default,
+        torch.ops.aten._reshape_copy.default,
     )
     def _rewrite_reshape_view(self, node: Node) -> bool:
         # Append 2 to the target shape so the trailing real/imag dim is
