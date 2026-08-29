@@ -80,6 +80,16 @@ def is_trtllm_for_nccl() -> bool:
         return False
 
 
+def has_native_collective_api() -> bool:
+    """Whether this TensorRT exposes the DistCollective API (TRT 10.16+)."""
+    try:
+        import tensorrt as trt
+
+        return hasattr(trt, "CollectiveOperation")
+    except Exception:
+        return False
+
+
 def has_nccl_collectives() -> bool:
     """Check if any NCCL collective backend is available (native TRT or TRT-LLM)."""
     try:
@@ -706,6 +716,133 @@ class TestSetDistributedGroup(unittest.TestCase):
 # ============================================================================
 # Section 3 — NCCL library utilities (no GPU)   [was Section 2]
 # ============================================================================
+
+
+class TestCollectiveGroupRanks(unittest.TestCase):
+    """_collective_group_ranks must preserve group-rank order — no GPU / no dist required."""
+
+    def _resolve_with(self, ranks, group_name="pg_under_test"):
+        """Run _collective_group_ranks with the process-group lookup stubbed to *ranks*."""
+        from torch_tensorrt.dynamo.conversion.impl import nccl_ops
+
+        import torch.distributed as dist
+        from torch.distributed import distributed_c10d
+
+        real_resolve = getattr(distributed_c10d, "_resolve_process_group", None)
+        real_get = dist.get_process_group_ranks
+        distributed_c10d._resolve_process_group = lambda name: _FakeGroup(name)
+        dist.get_process_group_ranks = lambda group: list(ranks)
+        try:
+            return nccl_ops._collective_group_ranks(group_name, world_size=8)
+        finally:
+            dist.get_process_group_ranks = real_get
+            if real_resolve is not None:
+                distributed_c10d._resolve_process_group = real_resolve
+
+    def test_group_rank_order_is_preserved(self) -> None:
+        """A non-ascending group must not be renumbered.
+
+        get_process_group_ranks() returns global ranks *ordered by group rank*, and that
+        mapping is what layout-sensitive collectives are defined against: all_gather
+        concatenates by group rank, reduce_scatter sends chunk i to group rank i,
+        all_to_all permutes by it, and a scatter/gather root names a position in it.
+        Sorting a group created as [5, 2] into [2, 5] swaps which rank receives which
+        slice, silently producing wrong results rather than an error.
+        """
+        self.assertEqual(list(self._resolve_with([5, 2])), [5, 2])
+        self.assertEqual(list(self._resolve_with([3, 1, 2, 0])), [3, 1, 2, 0])
+
+    def test_ascending_group_is_unchanged(self) -> None:
+        """The common ascending case is unaffected by preserving order."""
+        self.assertEqual(list(self._resolve_with([0, 1, 2, 3])), [0, 1, 2, 3])
+
+    def test_unresolvable_group_falls_back_to_world(self) -> None:
+        """An unresolvable group name falls back to the world group rather than raising."""
+        from torch_tensorrt.dynamo.conversion.impl import nccl_ops
+
+        result = nccl_ops._collective_group_ranks("no_such_group", world_size=4)
+        self.assertEqual(list(result), [0, 1, 2, 3])
+
+
+class TestNativeCollectiveNumRanks(unittest.TestCase):
+    """``num_ranks`` must equal the number of ranks in the collective's rank array.
+
+    TensorRT takes a collective's participants from the rank array passed to
+    ``add_dist_collective`` and their count from ``num_ranks``; the two describe the same
+    group and must agree. Leaving ``num_ranks`` at the world size while the array holds a
+    subgroup describes a group the collective does not have.
+
+    On hardware the mismatch is not loud: an all_reduce over a 4-rank group whose rank array
+    did not line up with the bound communicator returned zeros rather than raising.
+
+    This drives each converter against a stubbed network, so there is no GPU, no NCCL and no
+    process group -- the fake layer never reaches TensorRT.
+    """
+
+    class _RecordingLayer:
+        """Stands in for an ``IDistCollectiveLayer``, capturing what the converter sets."""
+
+        def __init__(self) -> None:
+            object.__setattr__(self, "num_ranks", None)
+
+        def get_output(self, index: int) -> object:
+            return object()
+
+    def _num_ranks_for(self, converter_name: str, group_size: int) -> object:
+        """Return the num_ranks a converter set, given a group of ``group_size`` ranks."""
+        import numpy as np
+        from unittest import mock
+
+        from torch_tensorrt import _features
+        from torch_tensorrt.dynamo.conversion.impl import nccl_ops
+
+        layer = self._RecordingLayer()
+        ctx = mock.MagicMock()
+        ctx.net.add_dist_collective.return_value = layer
+
+        converter = getattr(nccl_ops, converter_name)
+        # The converters are wrapped in @needs_native_collectives, which raises unless the
+        # feature is on. It reads the module global at call time, so replacing the namedtuple
+        # is enough -- this test is about the rank count, not about the runtime being built
+        # with NCCL.
+        enabled = _features.ENABLED_FEATURES._replace(native_trt_collectives=True)
+        with mock.patch.object(
+            _features, "ENABLED_FEATURES", enabled
+        ), mock.patch.object(nccl_ops, "set_layer_name"), mock.patch.object(
+            nccl_ops,
+            "_get_distributed_rank_and_world_size",
+            # world is deliberately larger than the group, so num_ranks=world_size
+            # is distinguishable from num_ranks=len(groups).
+            return_value=(0, group_size * 2),
+        ), mock.patch.object(
+            nccl_ops,
+            "_collective_group_ranks",
+            return_value=np.arange(group_size, dtype=np.int64),
+        ):
+            converter(ctx, "target", None, "collective", (mock.MagicMock(),))
+        return layer.num_ranks
+
+    @unittest.skipIf(
+        not has_native_collective_api(),
+        "TensorRT build has no CollectiveOperation (needs TRT 10.16+)",
+    )
+    def test_num_ranks_is_group_size_not_world_size(self) -> None:
+        group_size = 4
+        for converter_name in (
+            "nccl_all_gather_native",
+            "nccl_reduce_scatter_native",
+            "nccl_all_reduce_native",
+            "nccl_all_to_all_native",
+            "nccl_scatter_native",
+            "nccl_gather_native",
+        ):
+            with self.subTest(converter=converter_name):
+                self.assertEqual(
+                    self._num_ranks_for(converter_name, group_size),
+                    group_size,
+                    f"{converter_name} set num_ranks to the world size instead of the "
+                    "size of the collective's own group",
+                )
 
 
 class TestNcclUtils(unittest.TestCase):
@@ -1956,6 +2093,180 @@ def _multirank_distributed_mode_tp_model(
     _check_close(pt_out, trt_out, f"TP MLP distributed_context rank={rank}")
 
 
+def _multirank_compute_collective_single_engine(
+    rank: int, world_size: int, device: torch.device
+) -> None:
+    """Compile compute and a native all-reduce into a single TRT engine.
+
+    Pointwise and shuffle layers around the collective encourage Myelin to absorb it
+    into a ForeignNode. The whole module must still lower to one engine -- no graph
+    break, no second engine, no fallback to the PyTorch collective -- and produce the
+    same values as eager.
+
+    This also covers the converter setting ``num_ranks`` before the output is
+    requested: without it the build fails in Myelin shape inference rather than
+    producing a wrong answer, so a green result here means that ordering held.
+    """
+    import torch_tensorrt
+    from torch_tensorrt.distributed._distributed import distributed_context
+    from torch_tensorrt.distributed._nccl_utils import setup_nccl_for_torch_tensorrt
+
+    setup_nccl_for_torch_tensorrt()
+    group = dist.group.WORLD
+
+    hidden = 64
+    batch = 2
+    sequence = 8
+
+    class ComputeCollective(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.fc_in = nn.Linear(hidden, hidden)
+            self.fc_out = nn.Linear(hidden, hidden)
+            self.gain = nn.Parameter(torch.randn(hidden))
+            self.bias = nn.Parameter(torch.randn(hidden))
+
+        def forward(self, x: torch.Tensor, residual: torch.Tensor) -> torch.Tensor:
+            x = self.fc_in(x)
+            x = (x * self.gain + self.bias + residual).unsqueeze(0)
+            x = x.reshape(batch * sequence, hidden)
+            dist.all_reduce(x)
+            x = x.reshape(batch, sequence, hidden)
+            return self.fc_out(x * self.gain - self.bias + residual)
+
+    torch.manual_seed(42)
+    model = ComputeCollective().to(device=device, dtype=torch.bfloat16).eval()
+    torch.manual_seed(1234 + rank)
+    inp = torch.randn(batch, sequence, hidden, device=device, dtype=torch.bfloat16)
+    residual = torch.randn_like(inp)
+
+    with torch.no_grad():
+        eager_out = model(inp, residual)
+        exported = torch.export.export(model, (inp, residual), strict=False)
+        with distributed_context(group):
+            trt_model = torch_tensorrt.dynamo.compile(
+                exported,
+                inputs=[inp, residual],
+                min_block_size=1,
+                use_distributed_mode_trace=True,
+                use_python_runtime=False,
+            )
+
+            # Compilation must not hide the collective in a PyTorch fallback.
+            trt_engines = [
+                name for name, _ in trt_model.named_modules() if "_run_on_acc" in name
+            ]
+            assert (
+                len(trt_engines) == 1
+            ), f"expected one TRT engine, found {trt_engines}"
+            graph = str(trt_model.graph) if hasattr(trt_model, "graph") else ""
+            for token in ("all_reduce", "_c10d_functional", "wait_tensor"):
+                assert token not in graph, f"collective escaped TRT engine: {graph}"
+
+            trt_out = trt_model(inp, residual)
+
+    torch.testing.assert_close(trt_out, eager_out, atol=2e-2, rtol=2e-2)
+    print(
+        f"[Rank {rank}] PASS compute+collective single-engine regression",
+        flush=True,
+    )
+
+
+def _multirank_two_dimensional_mesh_routing(
+    rank: int, world_size: int, device: torch.device
+) -> None:
+    """Each collective must reduce over its own subgroup, not the world group.
+
+    Topology is the one TensorRT MR !49040 was validated on: four ranks arranged as a
+    2-D mesh, with context parallelism over one axis and tensor parallelism over the
+    other.
+
+        CP groups: [0, 2] and [1, 3]
+        TP groups: [0, 1] and [2, 3]
+
+    This is what distinguishes correct subgroup routing from the old world-group
+    behaviour, and it is the only test that can: with rank r contributing r + 1, a
+    TP all-reduce owes {1+2=3, 3+4=7} and a CP all-reduce owes {1+3=4, 2+4=6}, while a
+    collective wrongly routed to the world group would return 10 everywhere. The
+    existing subgroup test cannot catch this -- it builds its group from *all* ranks,
+    so subgroup and world are numerically indistinguishable.
+    """
+    if world_size != 4:
+        print(
+            f"[SKIP] _multirank_two_dimensional_mesh_routing requires world_size == 4, "
+            f"got {world_size}"
+        )
+        return
+    import torch_tensorrt
+    from torch_tensorrt.distributed._distributed import distributed_context
+    from torch_tensorrt.distributed._nccl_utils import setup_nccl_for_torch_tensorrt
+
+    setup_nccl_for_torch_tensorrt()
+
+    # Every rank must create every group, in the same order, for the handles to match.
+    cp_groups = [dist.new_group(ranks=[0, 2]), dist.new_group(ranks=[1, 3])]
+    tp_groups = [dist.new_group(ranks=[0, 1]), dist.new_group(ranks=[2, 3])]
+    cp_group = cp_groups[rank % 2]
+    tp_group = tp_groups[rank // 2]
+    # PyTorch creates the ncclComm_t lazily; bind_nccl_comm() reads a null pointer until
+    # at least one collective has run on the group. A real collective is used rather than
+    # dist.barrier(), which for NCCL infers the device when device_ids is omitted and can
+    # pick the wrong one on a multi-GPU rank, hanging the group.
+    seed = torch.zeros(1, device=device)
+    for group in cp_groups + tp_groups:
+        if rank in dist.get_process_group_ranks(group):
+            dist.all_reduce(seed, group=group)
+
+    class AllReduceOnGroup(nn.Module):
+        def __init__(self, group_name: str) -> None:
+            super().__init__()
+            self.group_name = group_name
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            out = torch.ops._c10d_functional.all_reduce.default(
+                x, "sum", self.group_name
+            )
+            return torch.ops._c10d_functional.wait_tensor.default(out)
+
+    inp = torch.full((1, 8), float(rank + 1), device=device)
+    world_total = float(sum(r + 1 for r in range(world_size)))
+
+    for axis, group in (("TP", tp_group), ("CP", cp_group)):
+        members = dist.get_process_group_ranks(group)
+        expected_value = float(sum(r + 1 for r in members))
+        model = AllReduceOnGroup(group.group_name).to(device).eval()
+
+        with distributed_context(group):
+            trt_model = torch.compile(
+                model,
+                backend="torch_tensorrt",
+                dynamic=False,
+                options={"min_block_size": 1, "use_distributed_mode_trace": True},
+            )
+            with torch.no_grad():
+                out = trt_model(inp)
+
+        expected = torch.full((1, 8), expected_value, device=device)
+        if not torch.allclose(out, expected):
+            got = out[0, 0].item()
+            # Name the specific regression when the value matches the world sum: that is
+            # what a collective routed to the world group instead of `members` returns.
+            hint = (
+                f" -- that is the world sum, so the collective was routed to the world "
+                f"group instead of {members}"
+                if abs(got - world_total) < 1e-6
+                else ""
+            )
+            raise AssertionError(
+                f"rank {rank}: {axis} all-reduce over {members} returned {got}, "
+                f"expected {expected_value}{hint}"
+            )
+
+    print(
+        f"[rank {rank}] 2-D mesh routing OK (CP and TP each reduced over their own group)"
+    )
+
+
 def _multirank_distributed_mode_subgroup(
     rank: int, world_size: int, device: torch.device
 ) -> None:
@@ -2322,16 +2633,12 @@ def _multirank_comm_survives_invalidation(
 # ============================================================================
 
 
-class TestMultirankNccl(MultiProcessTestCase):
-    """Multi-rank NCCL tests as pytest-compatible MultiProcessTestCase.
+class MultirankNcclBase(MultiProcessTestCase):
+    """Shared harness for the multi-rank tests. Subclasses set ``world_size``.
 
-    Each test spawns 2 worker processes via torch.multiprocessing.  Requires
-    exactly 2 CUDA GPUs.  Run with:
-
-        pytest distributed/test_native_nccl.py::TestMultirankNccl -v
+    Deliberately not named ``Test*`` so neither pytest nor unittest collects it on its
+    own -- it holds no tests, only the process spawn and the process-group setup.
     """
-
-    world_size = 2
 
     def setUp(self) -> None:
         super().setUp()
@@ -2360,6 +2667,15 @@ class TestMultirankNccl(MultiProcessTestCase):
         torch.cuda.set_device(local)
         dist.barrier()  # seeds ncclComm_t before any TRT bind_nccl_comm() call
         return torch.device(f"cuda:{local}")
+
+
+class TestMultirankNccl(MultirankNcclBase):
+    """Multi-rank NCCL tests on 2 GPUs.
+
+    pytest distributed/test_native_nccl.py::TestMultirankNccl -v
+    """
+
+    world_size = 2
 
     @requires_nccl()
     @skip_if_lt_x_gpu(2)
@@ -2419,6 +2735,14 @@ class TestMultirankNccl(MultiProcessTestCase):
     @unittest.skipIf(not has_nccl_collectives(), "No NCCL collective support available")
     @requires_nccl()
     @skip_if_lt_x_gpu(2)
+    def test_compute_collective_single_engine(self) -> None:
+        """Compute and a native collective compile and run in one TRT engine."""
+        device = self._init_dist()
+        _multirank_compute_collective_single_engine(self.rank, self.world_size, device)
+
+    @unittest.skipIf(not has_nccl_collectives(), "No NCCL collective support available")
+    @requires_nccl()
+    @skip_if_lt_x_gpu(2)
     def test_distributed_mode_subgroup(self) -> None:
         """C++ runtime with a non-default TP subgroup routes NCCL correctly."""
         device = self._init_dist()
@@ -2469,6 +2793,31 @@ class TestMultirankNccl(MultiProcessTestCase):
         )
 
 
+class TestMultirankNccl4GPU(MultirankNcclBase):
+    """The 2-D mesh test, which needs four ranks -- one axis for CP, one for TP.
+
+    It lives in its own class because ``world_size`` is fixed per class and
+    ``TestMultirankNccl`` runs at 2. At 2 ranks the CP and TP groups collapse onto the
+    same pair, so the test could not tell correct subgroup routing from the old
+    world-group behaviour, and would report success without checking anything.
+
+        pytest distributed/test_native_nccl.py::TestMultirankNccl4GPU -v
+    """
+
+    world_size = 4
+
+    @unittest.skipIf(not has_nccl_collectives(), "No NCCL collective support available")
+    @requires_nccl()
+    @skip_if_lt_x_gpu(4)
+    def test_two_dimensional_mesh_routing(self) -> None:
+        """CP and TP collectives each route to their own subgroup, not the world group."""
+        self.assertEqual(
+            self.world_size, 4, "the 2-D mesh test is meaningless below 4 ranks"
+        )
+        device = self._init_dist()
+        _multirank_two_dimensional_mesh_routing(self.rank, self.world_size, device)
+
+
 # ============================================================================
 # Section 9 — torchrun / mpirun entry point (legacy multi-rank runner)
 # ============================================================================
@@ -2491,7 +2840,9 @@ def run_multirank_tests() -> None:
             _multirank_gather_correctness(i, r, ws, dev) for i in range(ws)
         ],
         _multirank_distributed_mode_tp_model,
+        _multirank_compute_collective_single_engine,
         _multirank_distributed_mode_subgroup,
+        _multirank_two_dimensional_mesh_routing,
         _multirank_cpp_runtime_bind_nccl,
         _multirank_distributed_mode_context_switch,
         _multirank_pg_migration,
