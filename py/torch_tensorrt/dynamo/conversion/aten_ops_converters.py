@@ -1564,6 +1564,7 @@ def aten_ops_cumsum(
         name,
         args[0],
         args[1],
+        kwargs.get("dtype"),
     )
 
 
