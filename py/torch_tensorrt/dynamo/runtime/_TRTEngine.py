@@ -292,11 +292,18 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         # engines compiled with native multi-device collective layers.
         self._nccl_comm: Optional[Any] = None
 
-        # Owns RuntimeSettings + the live trt.IRuntimeConfig + the
-        # engine-implicit RuntimeCache. Hides all RTX feature gates.
-        # ``RuntimeSettings`` default; callers wanting non-defaults assign via
-        # the module's ``runtime_settings`` setter after compile.
-        self._trt_runtime_config: TRTRuntimeConfig = TRTRuntimeConfig(RuntimeSettings())
+        # Owns RuntimeSettings + the live trt.IRuntimeConfig. Hides all RTX
+        # feature gates.
+        #
+        # ``runtime_cache=None``: an engine never owns a runtime cache. The
+        # module owns the implicit one and pushes it down via
+        # ``setup_engine``; an engine with no module (a packed-engine-info
+        # build, or a constant in an AOT-loaded ExportedProgram) runs without
+        # one until a caller attaches a ``RuntimeCache`` explicitly. Mirrors
+        # the cpp default (``RuntimeSettings::runtime_cache = nullptr``).
+        self._trt_runtime_config: TRTRuntimeConfig = TRTRuntimeConfig(
+            RuntimeSettings(runtime_cache=None)
+        )
         # Multiple optimization profiles. Manual selection by default:
         # ``_active_profile_index`` is the profile currently loaded in the TRT
         # context (default 0, reused across calls). ``_auto_select_profiles``
@@ -409,10 +416,11 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         # NCCL communicators cannot be pickled; rebind lazily on the next
         # forward pass via setup_nccl_comm().
         self._nccl_comm = None
-        # RuntimeSettings are NOT serialized -- restore defaults. Callers
-        # who want runtime-mode overrides must reapply them post-load via
-        # ``mod.runtime_settings = ...`` (per ``TorchTensorRTModule``) or a runtime CM.
-        self._trt_runtime_config = TRTRuntimeConfig(RuntimeSettings())
+        # RuntimeSettings are NOT serialized -- restore defaults, runtime cache
+        # included (see ``__init__``). Callers who want runtime-mode overrides
+        # must reapply them post-load via ``mod.runtime_settings = ...`` (per
+        # ``TorchTensorRTModule``) or a runtime CM.
+        self._trt_runtime_config = TRTRuntimeConfig(RuntimeSettings(runtime_cache=None))
 
         self._active_profile_index = 0
         self._auto_select_profiles = False
