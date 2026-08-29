@@ -3,7 +3,7 @@ from parameterized import param, parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
 
-from .harness import DispatchTestCase
+from .harness import DispatchTestCase, skip_if_trt_rtx_turing
 
 
 class TestConvolutionConverter(DispatchTestCase):
@@ -233,6 +233,8 @@ class TestConvolutionConverter(DispatchTestCase):
         groups=1,
         bias=True,
     ):
+        skip_if_trt_rtx_turing(self, "3D convolution")
+
         class TestModule(torch.nn.Module):
             def __init__(self):
                 super().__init__()
@@ -255,6 +257,8 @@ class TestConvolutionConverter(DispatchTestCase):
     # AssertionError: Channel dim can't be dynamic for convolution.
 
     def test_conv3d_with_dynamic_shape(self):
+        skip_if_trt_rtx_turing(self, "3D convolution")
+
         class TestModule(torch.nn.Module):
             def __init__(self):
                 super().__init__()
