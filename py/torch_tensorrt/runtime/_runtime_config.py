@@ -37,6 +37,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Dict,
+    Iterable,
     Optional,
     Sequence,
     Set,
@@ -373,7 +374,7 @@ class _RuntimeConfigContextManager:
     def __enter__(self) -> Union["torch.nn.Module", Tuple["torch.nn.Module", ...]]:
         # Drain the traversal before mutating; raise on unsupported engines
         # before any settings are changed.
-        engines = list(_iter_trt_engines(list(self._targets)))
+        engines = list(_iter_trt_engines(self._targets))
 
         module_less = [(owner, eng) for owner, eng in engines if owner is None]
         if module_less:
@@ -524,32 +525,29 @@ def _iter_trt_engines(
                             seen.add(id(obj))
                             yield (None, obj)
 
-    if isinstance(target_or_targets, torch.export.ExportedProgram):
-        yield from _visit_ep(target_or_targets)
-    elif isinstance(target_or_targets, torch.nn.Module):
-        yield from _visit_module(target_or_targets)
-    elif hasattr(target_or_targets, "__iter__") and not isinstance(
-        target_or_targets, (str, bytes)
-    ):
+    def _visit_one(t: Any) -> Any:
+        if isinstance(t, torch.export.ExportedProgram):
+            yield from _visit_ep(t)
+        elif isinstance(t, torch.nn.Module):
+            yield from _visit_module(t)
+        else:
+            raise TypeError(
+                f"_iter_trt_engines(): each target must be an nn.Module or "
+                f"ExportedProgram; got {type(t).__name__}. "
+                "For a torch_tensorrt.load() result, pass the ExportedProgram "
+                "directly or call .module() on it."
+            )
+
+    if isinstance(target_or_targets, (torch.nn.Module, torch.export.ExportedProgram)):
+        yield from _visit_one(target_or_targets)
+    elif isinstance(target_or_targets, Iterable):
         for t in target_or_targets:
-            if isinstance(t, torch.export.ExportedProgram):
-                yield from _visit_ep(t)
-            elif isinstance(t, torch.nn.Module):
-                yield from _visit_module(t)
-            else:
-                raise TypeError(
-                    f"_iter_trt_engines(): each target must be an nn.Module or "
-                    f"ExportedProgram; got {type(t).__name__}. "
-                    "For a torch_tensorrt.load() result, pass the ExportedProgram "
-                    "directly or call .module() on it."
-                )
+            yield from _visit_one(t)
     else:
         raise TypeError(
             f"_iter_trt_engines(): target must be an nn.Module, an "
             f"ExportedProgram, or a sequence of those; got "
-            f"{type(target_or_targets).__name__}. "
-            "For a torch_tensorrt.load() result, pass the ExportedProgram "
-            "directly or call .module() on it."
+            f"{type(target_or_targets).__name__}."
         )
 
 
