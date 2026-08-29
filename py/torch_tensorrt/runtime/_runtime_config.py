@@ -376,11 +376,10 @@ class _RuntimeConfigContextManager:
         # before any settings are changed.
         engines = list(_iter_trt_engines(self._targets))
 
-        module_less = [(owner, eng) for owner, eng in engines if owner is None]
-        if module_less:
+        if any(owner is None for owner, _ in engines):
             raise TypeError(
-                f"runtime_config() encountered {len(module_less)} module-less "
-                "TRT engine(s) that it cannot snapshot and restore on exit. "
+                "runtime_config() encountered module-less TRT engine(s) that it "
+                "cannot snapshot and restore on exit. "
                 "Use apply_runtime_settings() for engines loaded without a "
                 "TorchTensorRTModule (e.g. via torch_tensorrt.load())."
             )
