@@ -35,49 +35,19 @@ The three ways to apply settings
 ``apply_runtime_settings(...)`` — permanent apply
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Use for any permanent assignment — whether the engine is wrapped in a
-:class:`TorchTensorRTModule` (in-process compiled result) or bare (AOT-loaded
-artifact with no module wrapper):
+Use for any permanent assignment on in-process compiled models:
 
 .. code-block:: python
 
     import torch_tensorrt
     from torch_tensorrt.runtime import RuntimeSettings, apply_runtime_settings
 
-    # In-process compiled model — one or more TRT subgraphs, all updated:
     mod = torch_tensorrt.compile(model, inputs=inputs)
     apply_runtime_settings(mod, RuntimeSettings(runtime_cache="/var/cache/jit.bin"))
 
-    # AOT-loaded artifact — no TorchTensorRTModule, same call:
-    ep = torch_tensorrt.load("model.ep")
-    gm = ep.module()
-    from torch_tensorrt.runtime import RuntimeCache
-    cache = RuntimeCache(path="/var/cache/jit.bin")
-    cache.load()  # warm from disk — caller's responsibility on the module-less path
-    apply_runtime_settings(gm, RuntimeSettings(runtime_cache=cache))
-    out = gm(x)
-    cache.save()
-
-:func:`apply_runtime_settings` returns the number of engines updated and raises
-:exc:`RuntimeError` if no TRT engines are found. For module-less engines,
-``settings.runtime_cache`` must be ``None`` or a :class:`RuntimeCache` you own
-(a path string raises :exc:`TypeError` — there is no module to build and save
-the handle). See :func:`~torch_tensorrt.runtime.apply_runtime_settings` for
-the full ownership rules.
-
-:func:`apply_runtime_settings` also accepts a
-:class:`~torch.export.ExportedProgram` directly (the
-:func:`torch_tensorrt.load` return value), which is equivalent to passing
-``ep.module()``:
-
-.. code-block:: python
-
-    apply_runtime_settings(ep, RuntimeSettings(runtime_cache=cache))
-
-.. note::
-
-   Runtime settings are never serialized.  They do not survive
-   :func:`torch_tensorrt.save`; re-apply after each :func:`torch_tensorrt.load`.
+:func:`apply_runtime_settings` walks all TRT subgraphs under ``mod`` and
+applies ``settings`` to each one. It returns the number of engines updated and
+raises :exc:`RuntimeError` if no TRT engines are found.
 
 ``runtime_config(...)`` context manager — scoped override
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -333,6 +303,45 @@ Or with explicit save/load:
     apply_runtime_settings(mod, RuntimeSettings(runtime_cache=handle))
     out = mod(x)
     handle.save()
+
+AOT-loaded artifacts (``ExportedProgram`` / ``GraphModule``)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Engines loaded with :func:`torch_tensorrt.load` have no
+:class:`TorchTensorRTModule`, so the context managers cannot restore settings
+on exit and will raise. Use :func:`apply_runtime_settings` with a caller-owned
+:class:`RuntimeCache` instead:
+
+.. code-block:: python
+
+    import torch_tensorrt
+    from torch_tensorrt.runtime import RuntimeCache, RuntimeSettings, apply_runtime_settings
+
+    ep = torch_tensorrt.load("model.ep")
+    gm = ep.module()
+
+    cache = RuntimeCache(path="/var/cache/jit.bin")
+    cache.load()  # caller's responsibility — no module to auto-warm the cache
+
+    apply_runtime_settings(gm, RuntimeSettings(runtime_cache=cache))
+    out = gm(x)
+    cache.save()
+
+``settings.runtime_cache`` must be ``None`` or a :class:`RuntimeCache` you own
+for module-less engines — a path string raises :exc:`TypeError` because there
+is no module to build and save the handle.
+
+:func:`apply_runtime_settings` also accepts the :class:`~torch.export.ExportedProgram`
+directly, which is equivalent to passing ``ep.module()``:
+
+.. code-block:: python
+
+    apply_runtime_settings(ep, RuntimeSettings(runtime_cache=cache))
+
+.. note::
+
+   Runtime settings are never serialized.  They do not survive
+   :func:`torch_tensorrt.save`; re-apply after each :func:`torch_tensorrt.load`.
 
 ----
 
