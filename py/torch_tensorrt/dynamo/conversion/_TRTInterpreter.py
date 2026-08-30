@@ -15,6 +15,7 @@ from typing import (
 )
 
 import numpy as np
+import tensorrt as trt
 import torch
 import torch.fx
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
@@ -52,8 +53,6 @@ from torch_tensorrt.dynamo.utils import (
 )
 from torch_tensorrt.logging import TRT_LOGGER
 
-import tensorrt as trt
-
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 TRT_INTERPRETER_CALL_PRE_OBSERVER: Observer[Callable[[torch.fx.GraphModule], None]] = (
@@ -84,6 +83,73 @@ class TRTInterpreterResult(NamedTuple):
     # — see ``user_output_count`` in the runtime module — and hides the
     # side-effect outputs from the caller's return tuple.
     aliased_io: dict[str, tuple[str, str]] = {}
+
+
+def _named_compute_capability(major: int, minor: int) -> "trt.ComputeCapability":
+    """Map a compute capability to the TensorRT-RTX enum member naming it.
+
+    The return annotation is quoted: ``ComputeCapability`` exists only in the
+    TensorRT-RTX bindings, and an unquoted annotation is evaluated at import time on
+    every backend.
+
+    Raises when TensorRT-RTX does not name the architecture: an explicit request for an
+    unsupported target is a user error and should stay loud.
+    """
+    name = f"SM{major}{minor}"
+    if (compute_capability := getattr(trt.ComputeCapability, name, None)) is None:
+        supported = [m for m in dir(trt.ComputeCapability) if m.startswith("SM")]
+        raise ValueError(
+            f"TensorRT-RTX has no compute capability {name} for requested "
+            f"target ({major}, {minor}). Supported: {supported}"
+        )
+    return compute_capability
+
+
+def _set_declared_compute_capabilities(
+    builder_config: trt.IBuilderConfig,
+    declared: Sequence[Tuple[int, int]],
+) -> None:
+    """Declare the architectures the artifact is built for, by name."""
+    builder_config.num_compute_capabilities = len(declared)
+    for idx, (major, minor) in enumerate(declared):
+        if not builder_config.set_compute_capability(
+            _named_compute_capability(major, minor), idx
+        ):
+            raise RuntimeError(
+                f"Failed to set TensorRT-RTX compute capability SM{major}{minor}"
+            )
+    _LOGGER.info(f"Targeting TensorRT-RTX compute capabilities {declared}")
+
+
+def _set_current_compute_capability(builder_config: trt.IBuilderConfig) -> None:
+    """Declare the current device, for a build that named no targets.
+
+    ComputeCapability.CURRENT rather than an SM<major><minor> lookup: TensorRT-RTX names
+    only a subset of architectures, and the implicit path must not start failing on
+    hosts that build fine today.
+    """
+    builder_config.num_compute_capabilities = 1
+    if not builder_config.set_compute_capability(trt.ComputeCapability.CURRENT, 0):
+        raise RuntimeError(
+            "Failed to set the TensorRT-RTX compute capability of the current device"
+        )
+    _LOGGER.info("Targeting the TensorRT-RTX compute capability of the current device")
+
+
+def set_rtx_compute_capabilities(
+    builder_config: trt.IBuilderConfig,
+    declared: Optional[Sequence[Tuple[int, int]]],
+) -> None:
+    """Tell the TensorRT-RTX builder which architectures to build for.
+
+    An undeclared target is resolved rather than skipped: the builder default leaves
+    num_compute_capabilities at 0, and a refittable graph then fails with "Compatible
+    cubin or ptx module for device target '75' not found".
+    """
+    if declared:
+        _set_declared_compute_capabilities(builder_config, declared)
+    else:
+        _set_current_compute_capability(builder_config)
 
 
 @cls_supports_debugger
@@ -384,6 +450,11 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 builder_config.l2_limit_for_tiling = (
                     self.compilation_settings.l2_limit_for_tiling
                 )
+
+        if ENABLED_FEATURES.tensorrt_rtx:
+            set_rtx_compute_capabilities(
+                builder_config, self.compilation_settings.target_compute_capabilities
+            )
 
         return builder_config
 
