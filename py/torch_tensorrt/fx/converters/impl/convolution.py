@@ -9,7 +9,6 @@ from torch.fx.node import Target
 from torch_tensorrt.fx.converters.converter_utils import (
     SourceIR,
     extend_attr_to_tuple,
-    get_dyn_range,
     mark_as_int8_layer,
     set_layer_name,
     has_dynamic_shape,
@@ -127,7 +126,7 @@ def convNd(
     # Handle quantization cases
     if scale is not None and zero_point is not None:
         # Assume the dtype of activation is torch.quint8
-        mark_as_int8_layer(conv_layer, get_dyn_range(scale, zero_point, torch.quint8))
+        mark_as_int8_layer(conv_layer)
 
     result = conv_layer.get_output(0)
 
