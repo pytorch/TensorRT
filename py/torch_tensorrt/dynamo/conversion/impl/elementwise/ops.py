@@ -466,20 +466,40 @@ def add(
     )
 
 
+def _is_boolean_operand(
+    value: Union[TRTTensor, torch.Tensor, int, float, bool],
+) -> bool:
+    if isinstance(value, TRTTensor):
+        return bool(value.dtype == trt.DataType.BOOL)
+    if isinstance(value, torch.Tensor):
+        return bool(value.dtype == torch.bool)
+    return isinstance(value, bool)
+
+
 def mul(
     ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    lhs_val: Union[TRTTensor, int, float],
-    rhs_val: Union[TRTTensor, int, float],
+    lhs_val: Union[TRTTensor, torch.Tensor, int, float, bool],
+    rhs_val: Union[TRTTensor, torch.Tensor, int, float, bool],
 ) -> TRTTensor:
+    op_type = trt.ElementWiseOperation.PROD
+    if (
+        (isinstance(lhs_val, TRTTensor) or isinstance(rhs_val, TRTTensor))
+        and _is_boolean_operand(lhs_val)
+        and _is_boolean_operand(rhs_val)
+    ):
+        # PyTorch defines bool multiplication as logical AND, while TensorRT
+        # rejects PROD with bool inputs.
+        op_type = trt.ElementWiseOperation.AND
+
     return convert_binary_elementwise(
         ctx,
         target,
         source_ir,
         name,
-        trt.ElementWiseOperation.PROD,
+        op_type,
         lhs_val,
         rhs_val,
     )
