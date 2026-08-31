@@ -24,12 +24,14 @@ You can also generate a sample `.pte` from the Torch-TensorRT source tree:
 ```bash
 python examples/torchtrt_executorch_example/export_static_shape.py --model_path=model.pte
 
-# Two-profile Gemma-3 engine for the multi-profile runner below. Defaults to a
-# mini Gemma-3 that needs no download and exports in about a minute, most of it
-# spent serializing the engine into the .pte. Add --weights google/gemma-3-1b-it
-# for the real 1B model -- but that .pte is about 2 GB and serialization scales
-# with engine size, so budget hours rather than minutes for it. The export
-# script documents the measured rate.
+# Two-profile Gemma-3 engine for the multi-profile runner below. Needs
+# transformers (pip install "transformers>=5.4.0") for the Gemma-3 definition;
+# the executorch extra does not pull it in. Defaults to a mini Gemma-3 that
+# needs no download and exports in about a minute, most of it spent serializing
+# the engine into the .pte. Add --weights google/gemma-3-1b-it for the real 1B
+# model -- but that .pte is about 2 GB and serialization scales with engine
+# size, so budget hours rather than minutes for it. The export script documents
+# the measured rate.
 python examples/torchtrt_executorch_example/export_multi_profile.py --model_path=model_gemma3_multi_profile.pte
 ```
 
@@ -281,7 +283,11 @@ cmake --build build-executorch-reference-runner --target example_executorch_mult
 
 After the correctness walkthrough it times decode on each profile, the same
 comparison `examples/dynamo/multi_optimization_profiles.py` makes through the
-Python runtime:
+Python runtime. Everything below is the ExecuTorch delegate, so the numbers are
+not comparable with that example's or with the two-engine table in the
+[tutorial](../../docsrc/tutorials/runtime_opt/multi_optimization_profiles.rst):
+different runtime, and there a separately compiled single-profile engine
+provides the baseline rather than a second profile of this one.
 
 ```
 Per-call latency (ms), batch=1
@@ -303,9 +309,10 @@ it can run on.
 
 `multi_profile_benchmark.cpp` times the same prefill/decode loop twice against
 one engine: once with every call pinned to the prefill profile (it accepts
-`seq == 1` too, so decode runs on prefill-tuned kernels, which is what a
-single-profile engine gives you), and once with each phase pinned to its own
-profile.
+`seq == 1` too, so decode runs on prefill-tuned kernels), and once with each
+phase pinned to its own profile. Both sides are the same engine, so what this
+isolates is the choice of profile, not the cost of a separately compiled
+single-profile build.
 
 ```bash
 cmake --build build-executorch-reference-runner --target example_executorch_multi_profile_benchmark -j

@@ -24,9 +24,13 @@ select the active profile per call (by index, or ``"auto"``).
 This example compiles `google/gemma-3-1b-it
 <https://huggingface.co/google/gemma-3-1b-it>`_ **once** into a two-profile
 engine and then runs the same engine two ways: every call on the prefill profile
-(which accepts ``seq == 1`` as well, so it is what a conventional single-profile
-engine gives you) versus each phase on its own profile. One engine, one set of
-weights; the only difference is which profile is active when the call runs.
+(which accepts ``seq == 1`` as well) versus each phase on its own profile. One
+engine, one set of weights; the only difference is which profile is active when
+the call runs. What that isolates is what the *active profile* is worth, holding
+the engine fixed. It is not a stand-in for a separately compiled single-profile
+engine: that is a different build, and on the same A40 it makes decode look
+1.14x faster rather than the 1.30x measured here. The two-engine pairing is in
+the :ref:`tutorial <multi_optimization_profiles_tutorial>`.
 
 .. note::
 
@@ -150,11 +154,10 @@ multi_profile_inputs = [
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^
 #
 # ``export_llm`` traces the model over a dynamic ``seq`` range, and one compile
-# turns that into one engine holding both profiles. No separate single-profile
-# build is needed for the baseline: the prefill profile already accepts
-# ``seq == 1``, so running every call on it reproduces what a single-profile
-# engine does, without a second compile or a second set of weights to keep
-# honest.
+# turns that into one engine holding both profiles. There is no second compile:
+# the prefill profile already accepts ``seq == 1``, so pinning every call to it
+# is the comparison point, and both sides of the measurement below then share one
+# engine and one set of weights.
 from utils import export_llm  # noqa: E402
 
 example_ids, _ = make_inputs(PREFILL_SEQ)
@@ -263,11 +266,13 @@ print(
 #   ``profiles=[{min_shape, opt_shape, max_shape}, ...]``
 #   (one per dynamic model input -- here ``input_ids`` and ``position_ids``).
 # - One export + one engine; each profile gets its own TensorRT kernel tuning.
-# - A profile whose range covers the other regime doubles as the baseline:
-#   pinning every call to the prefill profile shows what a single-profile engine
-#   would do, with no second compile and no second set of weights.
-# - Select at runtime by **index** (``optimization_profile(m, i)``) or let
-#   ``"auto"`` pick the first profile that fits the input shapes.
+# - A profile whose range covers the other regime is the comparison point:
+#   pinning every call to the prefill profile isolates what the active profile is
+#   worth on one engine. A separately compiled single-profile engine is a
+#   different build and lands elsewhere -- see the tutorial for that pairing.
+# - Select at runtime by **index** (``optimization_profile(m, i)``) or with
+#   ``"auto"``, which keeps the active profile while it still fits and rescans
+#   from index 0 only once it does not.
 # - Dedicating a static ``seq == 1`` profile to decode lets TensorRT tune that
 #   latency-critical path independently of the prefill length.
 

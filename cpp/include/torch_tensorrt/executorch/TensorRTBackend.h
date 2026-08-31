@@ -26,6 +26,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <type_traits>
 
 namespace torch_tensorrt {
 namespace executorch_backend {
@@ -51,7 +52,8 @@ class TRTLogger : public nvinfer1::ILogger {
 /**
  * @brief The delegate ExecuTorch calls to run a TensorRT engine.
  *
- * Registered under the backend id `TensorRT`; a `.pte` produced by
+ * Registered under the backend id `TensorRTBackend`, the name the partitioner
+ * writes into the `.pte`; a `.pte` produced by
  * torch_tensorrt.save(output_format="executorch") dispatches to it.
  */
 class TensorRTBackend final : public ::executorch::runtime::BackendInterface {
@@ -144,11 +146,14 @@ class TensorRTBackend final : public ::executorch::runtime::BackendInterface {
  * asked for:
  *
  * @code
- * OptimizationProfileGuard(kPrefillProfile);         // no-op, guard already dead
+ * OptimizationProfileGuard{kPrefillProfile};         // no-op, guard already dead
  * OptimizationProfileGuard::automatic();             // no-op, guard already dead
  * OptimizationProfileGuard guard(kPrefillProfile);   // correct
  * auto guard = OptimizationProfileGuard::automatic(); // correct
  * @endcode
+ *
+ * (The braces on the first line are load-bearing: written with parentheses it
+ * is a declaration of a variable named `kPrefillProfile`, not a temporary.)
  *
  * Both mistakes are compiler warnings rather than a silently mistuned
  * execution: the pinning constructor and automatic() are each [[nodiscard]]
@@ -168,6 +173,24 @@ class [[nodiscard]] OptimizationProfileGuard {
    * @param profile_index Position in the export-time profile list.
    */
   [[nodiscard]] explicit OptimizationProfileGuard(int32_t profile_index);
+
+  /**
+   * @brief Pin using any other integer spelling of an index, converted to
+   * int32_t.
+   *
+   * An index arrives as int64_t from TRTEngine::set_active_profile, as size_t
+   * from a container, and as int from a literal. Without this overload the
+   * deleted bool constructor would make every one of those spellings ambiguous
+   * rather than converting, since narrowing to int32_t and converting to bool
+   * rank equally.
+   *
+   * @param profile_index Position in the export-time profile list.
+   */
+  template <
+      typename T,
+      typename = std::enable_if_t<std::is_integral_v<T> && !std::is_same_v<std::remove_cv_t<T>, bool>>>
+  [[nodiscard]] explicit OptimizationProfileGuard(T profile_index)
+      : OptimizationProfileGuard(static_cast<int32_t>(profile_index)) {}
 
   /// @brief Rejected so that OptimizationProfileGuard(true) cannot become index 1.
   OptimizationProfileGuard(bool) = delete;
