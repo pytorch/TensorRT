@@ -47,9 +47,11 @@ seconds per megabyte of engine, so its ~2 GB engine is a couple of hours.
 
 Prerequisites
 -------------
-Install Torch-TensorRT with the ExecuTorch extra before running this example::
+Install Torch-TensorRT with the ExecuTorch extra before running this example.
+The Gemma-3 definition comes from ``transformers``, which that extra does not
+pull in::
 
-    pip install -e ".[executorch]"
+    pip install -e ".[executorch]" "transformers>=5.4.0"
 
 See https://pytorch.org/executorch/stable/getting-started-setup.html for details.
 """
@@ -188,11 +190,18 @@ def build_model() -> torch.nn.Module:
 
 try:
     model = build_model()
-except Exception as e:  # no GPU, or gated/unauthenticated --weights
-    print(f"Skipping example: could not build the model ({type(e).__name__}: {e}).")
-    print("A CUDA GPU is required. With --weights, accept the model license and")
-    print("authenticate (hf auth login / HF_TOKEN), or use an ungated mirror.")
-    sys.exit(0)
+except Exception as e:
+    print(f"Could not build the model ({type(e).__name__}: {e}).")
+    # No GPU is the one case that is not a broken setup: the header says one is
+    # required, so treat it as a skip. Everything else -- transformers missing
+    # from the environment, a gated repo, out of memory -- writes no .pte and
+    # must not be reported as a run that succeeded.
+    if not torch.cuda.is_available():
+        print("Skipping example: a CUDA GPU is required.")
+        sys.exit(0)
+    print("With --weights, accept the model license and authenticate")
+    print("(hf auth login / HF_TOKEN), or use an ungated mirror.")
+    sys.exit(1)
 
 
 # %%
