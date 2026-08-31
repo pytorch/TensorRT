@@ -1227,7 +1227,8 @@ def _index_copy_kv_eligible(
     if len(node.args) < 4:
         return False
     if input_node is None:
-        input_node = node.args[0]  # type: ignore[assignment]
+        cache_arg = node.args[0]
+        input_node = cache_arg if isinstance(cache_arg, Node) else None
     dim, _index_node, src_node = node.args[1:4]
 
     if not isinstance(input_node, Node) or input_node.op != "placeholder":
@@ -1312,8 +1313,47 @@ def aten_ops_index_copy_fallback(
     )
 
 
+def slice_scatter_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    """Reject a write whose bounds need the size of the dim it writes -- a negative
+    index, or the open end torch.export writes for ``x[..., start:]`` -- when that dim
+    is dynamic. The converter cannot resolve those (see ``resolve_slice_scatter_write``)
+    and raises, so they run in PyTorch until it gains dynamic bounds.
+
+    Missing metadata is passed, not rejected: the KV-cache classifier in
+    ``lowering/_buffer_lifting.py`` reads the same metadata, and vetoing a write it
+    classified as engine-aliased fails ``assert_predicted_kv_aliased``.
+    """
+    input_meta = getattr(node.args[0], "meta", {})
+    input_val = input_meta.get("val", input_meta.get("tensor_meta"))
+    if input_val is None:
+        _LOGGER.debug(
+            f"slice_scatter node {node.name} has no shape metadata; leaving its bounds "
+            "for the converter to resolve against the TensorRT shape."
+        )
+        return True
+
+    _start, _end, _step, status = impl.slice_scatter.resolve_slice_scatter_write(
+        tuple(input_val.shape),
+        args_bounds_check(node.args, 2, 0),
+        args_bounds_check(node.args, 3),
+        args_bounds_check(node.args, 4),
+        args_bounds_check(node.args, 5),
+    )
+    if status is impl.slice_scatter.KVWriteStatus.DYNAMIC_DIM_SIZE:
+        _LOGGER.debug(
+            f"slice_scatter node {node.name} needs the size of a dynamic dim to "
+            "resolve its bounds; falling back to PyTorch operation."
+        )
+        return False
+    return True
+
+
 @dynamo_tensorrt_converter(
-    torch.ops.aten.slice_scatter.default, supports_dynamic_shapes=True
+    torch.ops.aten.slice_scatter.default,
+    capability_validator=slice_scatter_validator,
+    supports_dynamic_shapes=True,
 )
 @enforce_tensor_types({0: (TRTTensor,), 1: (TRTTensor,)})
 def aten_ops_slice_scatter(

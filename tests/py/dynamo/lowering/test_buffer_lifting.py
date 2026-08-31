@@ -25,6 +25,7 @@ These tests verify:
 """
 
 import inspect
+import sys
 import unittest
 from unittest import mock
 
@@ -559,7 +560,7 @@ class TestSliceScatterDerivationIsShared(TestCase):
 
     ``_kv_write_will_alias`` reuses the converter's eligibility predicate, but a
     predicate is only as good as what it is handed: computing ``start`` /
-    ``update_len`` differently on the two sides mis-predicts just as effectively
+    ``update_len`` differently on the two sides mispredicts just as effectively
     as a different predicate would. ``resolve_slice_scatter_write`` is the single
     derivation both sides call, and these pin the corners where an independent
     derivation would part company with the converter.
@@ -587,23 +588,31 @@ class TestSliceScatterDerivationIsShared(TestCase):
         # Same slice written implicitly (no start/end args).
         self.assertFalse(self._classify((2, 4, 16, 8), (2, 4, 16, 8), 2))
 
-    def test_open_ended_slice_is_not_kv(self):
-        """``cache[:, :, 3:, :]`` lowers with ``end == INT64_MAX``. The converter
-        takes its write length from ``end - start``, which fails the ``start +
-        update_len <= s_max`` bound, so the predictor has to read the length the
-        same way rather than from the source's extent along the dim."""
-        self.assertFalse(
-            self._classify((2, 4, 16, 8), (2, 4, 13, 8), 2, 3, 9223372036854775807)
-        )
+    def test_open_ended_slice_is_clamped_to_the_dim(self):
+        """``cache[:, :, 3:, :]`` lowers with ``end == INT64_MAX``, which the shared
+        derivation clamps to the dim as aten does, leaving the 13 slots from 3 to s_max
+        -- a KV-eligible write. Both sides have to clamp: the predictor takes the write
+        length from ``end - start``, so an unclamped end fails the ``start + update_len
+        <= s_max`` bound and files copy-back for a write the converter goes on to alias,
+        which is what ``assert_predicted_kv_aliased`` raises on."""
+        for open_end in (sys.maxsize, 9223372036854775807):
+            self.assertTrue(
+                self._classify((2, 4, 16, 8), (2, 4, 13, 8), 2, 3, open_end)
+            )
 
     def test_negative_start_is_normalised(self):
-        """A negative ``start`` counts from the end for the converter, so the
-        predictor must normalise it before applying the ``start + update_len <=
-        s_max`` bound rather than passing the raw negative through."""
-        # -4 normalises to 12; 12 + 4 == s_max, so this is eligible.
+        """A negative ``start`` counts from the end for the converter, so the predictor
+        has to normalise it the same way -- ``resolve_slice_scatter_write`` is what pins
+        the resulting 12 -- before applying the ``start + update_len <= s_max`` bound.
+
+        Both of these now pass that bound, and no slice can fail it: ``end`` is clamped
+        to the dim, so ``start + update_len == end <= s_max`` holds by construction. The
+        bound still guards ``index_copy``, whose write position comes from an index
+        tensor rather than a slice."""
+        # -4 normalises to 12; the write is the 4 slots from 12 to s_max.
         self.assertTrue(self._classify((2, 4, 16, 8), (2, 4, 4, 8), 2, -4, 16))
-        # -4 normalises to 12 but the write runs past s_max, so it is not.
-        self.assertFalse(self._classify((2, 4, 16, 8), (2, 4, 8, 8), 2, -4, 20))
+        # An end past the dim is clamped back to it, leaving the same 4-slot write.
+        self.assertTrue(self._classify((2, 4, 16, 8), (2, 4, 4, 8), 2, -4, 20))
 
     def test_non_int_start_is_not_kv(self):
         """A non-constant bound makes the converter raise rather than emit a KV
@@ -654,6 +663,11 @@ class TestSliceScatterDerivationIsShared(TestCase):
             resolve_slice_scatter_write(shape, 2, -4, None, None),
             (12, 16, 1, KVWriteStatus.OK),
         )
+        # An end past the dim is clamped to it, as aten does.
+        self.assertEqual(
+            resolve_slice_scatter_write(shape, 2, -4, 20, 1),
+            (12, 16, 1, KVWriteStatus.OK),
+        )
         self.assertEqual(
             resolve_slice_scatter_write(shape, 2, None, None, None),
             (0, 16, 1, KVWriteStatus.FULL_OVERWRITE),
@@ -679,6 +693,36 @@ class TestSliceScatterDerivationIsShared(TestCase):
             resolve_slice_scatter_write(shape, 9, 0, 4, 1),
             (None, None, None, KVWriteStatus.BAD_DIM),
         )
+
+    def test_a_dynamic_dim_leaves_relative_bounds_unresolved(self):
+        """A bound needing the size of a dynamic dim is reported rather than resolved
+        against a stand-in: reading TensorRT's -1 as a size is how ``cache[:, :, 3:]``
+        used to resolve to ``arange(3, -2)``, an empty write. Both shapes that dim
+        arrives in are checked -- -1 from TensorRT, a non-int for the fx graph's
+        ``SymInt`` -- since the two callers have to read them the same way."""
+        from torch_tensorrt.dynamo.conversion.impl.slice_scatter import (
+            KVWriteStatus,
+            resolve_slice_scatter_write,
+        )
+
+        unresolved = (None, None, None, KVWriteStatus.DYNAMIC_DIM_SIZE)
+        for dynamic_size in (-1, "sym"):
+            shape = (2, 4, dynamic_size, 8)
+            for start, end in (
+                (3, sys.maxsize),
+                (3, 9223372036854775807),
+                (3, None),
+                (None, None),
+                (-4, None),
+                (-4, 12),
+            ):
+                self.assertEqual(
+                    resolve_slice_scatter_write(shape, 2, start, end, 1), unresolved
+                )
+            self.assertEqual(
+                resolve_slice_scatter_write(shape, 2, 1, 5, 1),
+                (1, 5, 1, KVWriteStatus.OK),
+            )
 
 
 class TestCacheMustReachTheConverterAsANetworkInput(TestCase):
@@ -1274,7 +1318,7 @@ class TestCompileSeam(TestCase):
 
     def test_compile_runs_the_predicted_kv_cross_check(self):
         """``compile()`` must actually call ``assert_predicted_kv_aliased`` with the
-        predictions lift made; without that call a mis-classified write silently
+        predictions lift made; without that call a misclassified write silently
         loses its write-back."""
         from torch_tensorrt.dynamo import _compiler as C
 

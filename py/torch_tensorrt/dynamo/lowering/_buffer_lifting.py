@@ -150,14 +150,16 @@ def _kv_write_will_alias(
     direct network input, so this reuses the converters' own eligibility
     predicates -- and, for ``slice_scatter``, the converter's own derivation of
     the arguments those predicates take (:func:`resolve_slice_scatter_write`), since
-    a divergence there mis-predicts just as effectively as a divergence in the
+    a divergence there mispredicts just as effectively as a divergence in the
     predicate. Returning ``False`` routes the write to copy-back, which is right
     whatever the converter goes on to do with it: it lowers most ineligible writes
     to a non-aliasing scatter, returns the source outright for a full overwrite, and
     raises for the rest (a ``slice_scatter`` with dynamic bounds or a bad ``dim``, an
     ``index_copy`` its fallback cannot express). The first two both have a write-back
     to preserve -- for a full overwrite the source *is* the buffer's new contents --
-    and the ones that raise never get as far as needing one.
+    and the ones that raise never get as far as needing one. One more never reaches a
+    converter: a ``slice_scatter`` whose bounds need the size of a dynamic dim, which
+    its validator runs in PyTorch, and which needs the copy-back like any other.
     Imports are local to avoid a lowering<->conversion import cycle.
     """
     if not (isinstance(value_node, torch.fx.Node) and value_node.op == "call_function"):
@@ -201,8 +203,9 @@ def _kv_write_will_alias(
         # Returning False routes the write to copy-back -- the copy_ is erased
         # either way, and the new value is re-attached as a graph output instead. A
         # full overwrite needs that: it returns the source, emits no KV layer, and
-        # its write still has to be recorded. The other two statuses raise out of the
-        # converter, so the compile aborts and the output is never reached.
+        # its write still has to be recorded. Two of the rest raise out of the
+        # converter, so the compile aborts and the output is never reached; the
+        # dynamic-dim one is validated away to PyTorch and keeps its copy-back.
         dim = args[2] if len(args) > 2 else 0
         start, end, _step, status = resolve_slice_scatter_write(
             tuple(cache_shape),
@@ -484,7 +487,7 @@ def lift_mutated_buffers(
     copyback: List[Tuple[torch.fx.Node, str, str]] = []
     # Input-binding names of writes predicted to alias (KV). compile() asserts each
     # actually appears in the engine's aliased_io, and that no copy-back binding
-    # does, turning either mis-prediction into a loud error instead of a silently
+    # does, turning either misprediction into a loud error instead of a silently
     # dropped write-back or a module that raises on every call. The binding name
     # (buf_*) is the stable key: it survives the buffer renaming inline does later,
     # and it is exactly what aliased_io records on the input side.
