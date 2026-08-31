@@ -297,6 +297,31 @@ TEST(ExecuTorchOptimizationProfileSelection, ProfileWithFewerBoundsThanInputsDoe
   EXPECT_EQ(selected, 1);
 }
 
+// The last two guards, exercised directly because select_profile cannot reach
+// them: it range-checks a pinned index before profile_fits sees it, and it never
+// builds a bounds row itself. profile_fits is installed all the same, so both
+// are reachable by a caller we do not control -- and deleting either one leaves
+// every select_profile test above still passing.
+TEST(ExecuTorchOptimizationProfileSelection, ProfileFitsRejectsAnIndexOutsideTheTable) {
+  const ProfileTable table = decode_and_prefill();
+
+  EXPECT_FALSE(profile_fits(table, -1, decode_input()));
+  EXPECT_FALSE(profile_fits(table, table.size(), decode_input()));
+}
+
+TEST(ExecuTorchOptimizationProfileSelection, ProfileWhoseBoundsCarryAnExtraExtentDoesNotFit) {
+  ProfileTable table;
+  table.bounds = {
+      {bounds({1, 1, 4}, {1, 2048, 4})}, // profile 0: both bounds rank 3
+      {bounds({1, 1}, {1, 2048, 4})}, // profile 1: max alone rank 3
+  };
+
+  // The extra extent is nonzero on purpose. At zero the range comparison would
+  // reject a rank-2 input on its own and the rank check could go missing unseen.
+  EXPECT_FALSE(profile_fits(table, 0, prefill_input()));
+  EXPECT_FALSE(profile_fits(table, 1, prefill_input()));
+}
+
 } // namespace
 } // namespace executorch_backend
 } // namespace torch_tensorrt
