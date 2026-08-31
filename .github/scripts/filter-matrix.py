@@ -21,7 +21,7 @@ arm_cuda_versions: List[str] = ["cu130", "cu132"]
 # For PRs we build/test a single representative config to keep cycle time short.
 # Full matrix runs on main / nightly / release branches.
 PR_PYTHON_VERSION: str = "3.12"
-PR_CUDA_VERSION: str = "cu130"
+PR_CUDA_VERSION: str = "cu132"
 
 jetpack_container_image: str = "nvcr.io/nvidia/l4t-jetpack:r36.4.0"
 sbsa_container_image: str = "quay.io/pypa/manylinux_2_39_aarch64"
@@ -30,8 +30,9 @@ sbsa_container_image: str = "quay.io/pypa/manylinux_2_39_aarch64"
 def pick_pr_representative(includes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Return a single-item list for PR builds to keep cycle time short.
 
-    Prefers PR_PYTHON_VERSION + PR_CUDA_VERSION; falls back to the first
-    available item so the matrix is never empty.
+    Prefers PR_PYTHON_VERSION + PR_CUDA_VERSION, then any row with the
+    preferred CUDA version. Falls back to the first available item so the
+    matrix is never empty.
     """
     preferred = [
         item
@@ -39,7 +40,13 @@ def pick_pr_representative(includes: List[Dict[str, Any]]) -> List[Dict[str, Any
         if item.get("python_version") == PR_PYTHON_VERSION
         and item.get("desired_cuda") == PR_CUDA_VERSION
     ]
-    return preferred[:1] or includes[:1]
+    if preferred:
+        return preferred[:1]
+
+    preferred_cuda = [
+        item for item in includes if item.get("desired_cuda") == PR_CUDA_VERSION
+    ]
+    return preferred_cuda[:1] or includes[:1]
 
 
 def validate_matrix(matrix_dict: Dict[str, Any]) -> None:
