@@ -96,7 +96,10 @@ enum class ProfileSelection {
  * @return true when the ranks match and every extent is in range.
  */
 inline bool dims_fit(const nvinfer1::Dims& dims, const InputProfileBounds& bounds) {
-  if (dims.nbDims != bounds.min.nbDims) {
+  // Both bounds, not just min: the loop below reads max.d up to dims.nbDims, and
+  // a max of a different rank leaves those extents holding whatever the Dims was
+  // built with rather than a bound this profile ever declared.
+  if (dims.nbDims != bounds.min.nbDims || dims.nbDims != bounds.max.nbDims) {
     return false;
   }
   for (int d = 0; d < dims.nbDims; ++d) {
