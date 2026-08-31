@@ -227,6 +227,7 @@ target_link_libraries(portable_lib PRIVATE
 # selects CMAKE_CXX_COMPILER and those standard libraries for these targets, so it has
 # to be set on every one of them.
 #
+
 # The CUDA backend brings two shared libraries of its own. They get the same treatment,
 # because libaoti_cuda_shims.so is the first DT_NEEDED of _portable_lib.so and so leads
 # the whole dlopen group in symbol search order.
@@ -248,6 +249,33 @@ foreach(_torch_tensorrt_executorch_runtime_target
         IN LISTS _torch_tensorrt_executorch_runtime_targets)
   set_property(TARGET ${_torch_tensorrt_executorch_runtime_target}
     PROPERTY LINKER_LANGUAGE CXX)
+endforeach()
+
+# ExecuTorch links CUDA::curand into aoti_cuda_shims, but nothing in it calls a curand
+# host function: the only curand use in the pinned source is the device-side API from
+# curand_kernel.h inside rand.cu, which nvcc compiles into the fatbinary. Measured on the
+# shipped artifact: DT_NEEDED carries libcurand.so.10 while the dynamic symbol table
+# imports no curand symbol at all.
+#
+# The over-link is not harmless: the wheel declares a dependency it never calls, and
+# nothing guarantees an installer provides it, so importing the runtime can fail on a
+# missing shared object before any delegate runs. Which installers happen to supply
+# libcurand.so.10 is not stable and has already changed more than once, so the reason to
+# drop the link is that nothing uses it, not that a particular resolver omits it.
+#
+# Dropped here rather than patched into ExecuTorch. This becomes a no-op only once the
+# pin includes upstream's own removal, which landed on their main line AFTER the pinned
+# release. The 1.4 series still links cuRAND, so a patch bump within 1.4 does not make
+# this redundant: check that the pinned tree has no CUDA::curand in
+# backends/cuda/CMakeLists.txt before deleting this block.
+foreach(_torch_tensorrt_curand_property LINK_LIBRARIES INTERFACE_LINK_LIBRARIES)
+  get_target_property(_torch_tensorrt_curand_value
+    aoti_cuda_shims ${_torch_tensorrt_curand_property})
+  if(_torch_tensorrt_curand_value AND CUDA::curand IN_LIST _torch_tensorrt_curand_value)
+    list(REMOVE_ITEM _torch_tensorrt_curand_value CUDA::curand)
+    set_property(TARGET aoti_cuda_shims
+      PROPERTY ${_torch_tensorrt_curand_property} "${_torch_tensorrt_curand_value}")
+  endif()
 endforeach()
 
 # The runtime wheel intentionally does not bundle PyTorch, TensorRT, or CUDA.
