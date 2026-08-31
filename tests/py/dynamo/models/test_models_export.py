@@ -332,12 +332,13 @@ def test_base_fp4_static_shapes(ir):
                 reuse_cached_engines=False,
             )
             outputs_trt = trt_model(input_tensor)
-            abs_diff = torch.abs(expected_output - outputs_trt)
-            print(f"max/mean abs_diff: {abs_diff.max().item()=} {abs_diff.mean()=}")
-            # NVFP4 calibration/quantization roundoff is right at the edge of the
-            # previous 0.3 tolerance and flakes across GPUs (seen failing on
-            # GB200CX8 at 0.336 while passing on GB200NVL); give it headroom.
-            assert torch.allclose(expected_output, outputs_trt, rtol=0.35, atol=0.35)
+            # NVFP4 outlier elements flake past any elementwise tolerance; use
+            # cosine_similarity like the rest of this file's model tests.
+            cos_sim = cosine_similarity(expected_output, outputs_trt)
+            assertions.assertTrue(
+                cos_sim > COSINE_THRESHOLD,
+                msg=f"NVFP4 TRT output doesn't match the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+            )
 
 
 @unittest.skipIf(
