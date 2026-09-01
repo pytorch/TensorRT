@@ -69,7 +69,7 @@ jobs:
         # --pre would apply to every other requirement in the same command too.
         python -m pip install pyyaml \
           --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" \
-          "executorch==1.5.0.dev20260829"
+          "executorch==1.5.0.dev20260901"
         # Run the check directly so its exit status is the step's exit status.
         # Wrapping it in `gdb --batch` reports gdb's own status, which is 0
         # whatever the program does, so a SIGSEGV here was passing.

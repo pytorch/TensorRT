@@ -233,7 +233,10 @@ def test_runtime_wheel_uses_public_torch_version():
 @pytest.mark.unit
 def test_runtime_wheel_pins_cuda_13_native_dependencies():
     setup_source = _RUNTIME_SETUP_PY.read_text(encoding="utf-8")
-    assert 'TENSORRT_DISTRIBUTION = "tensorrt-cu13"' in setup_source
+    # Resolved from the build's own CUDA rather than hardcoded, so a CUDA 12.6 row declares
+    # tensorrt-cu12 instead of pulling the CUDA 13 distribution.
+    assert "TENSORRT_DISTRIBUTION = tensorrt_distribution()" in setup_source
+    assert '"tensorrt-cu12"' in setup_source and '"tensorrt-cu13"' in setup_source
     assert 'CUDA_RUNTIME_DISTRIBUTION = "nvidia-cuda-runtime"' in setup_source
     assert "torch=={public_version(torch.__version__)}" in setup_source
     assert "{TENSORRT_DISTRIBUTION}=={tensorrt_version}" in setup_source

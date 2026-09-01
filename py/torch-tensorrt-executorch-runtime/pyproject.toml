@@ -6,6 +6,6 @@ requires = [
     # environment.
     # Builds must use --no-build-isolation; see README.md.
     "torch",
-    "executorch==1.5.0.dev20260829",
+    "executorch==1.5.0.dev20260901",
 ]
 build-backend = "setuptools.build_meta"

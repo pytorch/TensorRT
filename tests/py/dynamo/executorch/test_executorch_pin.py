@@ -97,6 +97,10 @@ NO_NIGHTLY_MARKER = "pin-check: no-nightly"
 _EXPECTED_REQUIREMENT_SITES = {
     ".github/workflows/executorch-build-linux.yml": 2,
     ".github/workflows/executorch-test-linux.yml": 1,
+    # The release lane builds the runtime wheel too, so it installs ExecuTorch and therefore pins it.
+    # It arrived with the CUDA 12.6 rows and named a stale release off the default index, which is
+    # exactly what these checks exist to catch.
+    ".github/workflows/release-linux-x86_64.yml": 1,
     "MODULE.bazel": 1,
     "docker/MODULE.bazel.docker": 1,
     "docker/MODULE.bazel.ngc": 1,
@@ -254,8 +258,15 @@ def _without_trailing_comment(path: str, text: str) -> str:
     if path in _ANNOTATED_COMMIT_SITES:
         return text
     for marker in ("#", "//"):
-        if marker in text:
-            text = text.split(marker, 1)[0]
+        # A URL scheme contains "//" and is not a comment. Splitting on it truncated any line
+        # carrying an index URL, which hid a real pin from the search and reported the site as
+        # missing rather than as wrong.
+        for candidate in re.finditer(re.escape(marker), text):
+            start = candidate.start()
+            if marker == "//" and text[max(0, start - 1) : start] == ":":
+                continue
+            text = text[:start]
+            break
     return text
 
 
@@ -311,6 +322,36 @@ def _resolve_shell_assignment(text: str, variable: str, before: int) -> str | No
             break
         resolved = match.group(1)
     return resolved
+
+
+def test_every_install_that_names_a_channel_can_resolve_its_variable() -> None:
+    """An install URL built from a shell variable must have that variable in scope.
+
+    The release lane's install reaches the nightly channel through CU_VERSION, which the reusable
+    build workflow sets as job-level env from the matrix row. If that ever stops being exported the
+    URL collapses to a directory that does not exist, pip falls back to the default index, and the
+    install silently resolves the wrong ExecuTorch instead of failing.
+    """
+    build_linux = (REPO_ROOT / ".github/workflows/build_linux.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "CU_VERSION: ${{ matrix.desired_cuda }}" in build_linux, (
+        "build_linux.yml no longer exports CU_VERSION from the matrix row, so every install URL "
+        "built from it resolves to an empty channel"
+    )
+
+    for path in (
+        ".github/workflows/release-linux-x86_64.yml",
+        ".github/workflows/executorch-build-linux.yml",
+    ):
+        text = (REPO_ROOT / path).read_text(encoding="utf-8")
+        for line in text.splitlines():
+            if "download.pytorch.org/whl/nightly/${CU_VERSION}" not in line:
+                continue
+            assert "executorch" in text, (
+                f"{path} builds a nightly channel URL but installs no ExecuTorch, so the URL is "
+                "either dead code or the install lost its pin"
+            )
 
 
 def test_every_requirement_matches_the_pin() -> None:
@@ -622,9 +663,14 @@ def test_the_executorch_install_message_names_the_torch_channel() -> None:
     assert channel() == "cu132"
     message = command()
     assert "download.pytorch.org/whl/nightly/cu132" in message, message
-    # Raised from inside an installed torch_tensorrt, so pip treats the requirement as satisfied
-    # and exits 0 without the extra unless --upgrade forces a re-resolve. --pre selects the dev pin.
-    assert "--upgrade" in message and "--pre" in message, message
+    # --pre selects the dev pin. NOT --upgrade: on a named requirement it upgrades the package
+    # itself, replacing a user's released torch_tensorrt with a nightly when all they asked for was
+    # the extra, and it is not needed to add a missing extra in the first place. Asserting its
+    # absence, because the docstring here previously claimed the opposite and a measurement
+    # disproved it: with the package installed and the extra missing, plain
+    # `pip install "demo[executorch]"` does install the extra's dependencies.
+    assert "--pre" in message, message
+    assert "--upgrade" not in message, message
 
     channel_130, command_130 = _load_utils_channel_helpers("13.0")
     assert channel_130() == "cu130"

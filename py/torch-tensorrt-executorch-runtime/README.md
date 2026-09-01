@@ -41,7 +41,7 @@ export TensorRT_ROOT=/path/to/TensorRT
 
 python -m pip install pyyaml \
   --extra-index-url https://download.pytorch.org/whl/nightly/cu130 \
-  "executorch==1.5.0.dev20260829"
+  "executorch==1.5.0.dev20260901"
 python -m pip wheel --no-build-isolation --no-deps \
   --wheel-dir dist py/torch-tensorrt-executorch-runtime
 ```
@@ -49,7 +49,7 @@ python -m pip wheel --no-build-isolation --no-deps \
 The native build obtains the ExecuTorch source through Bazel; no separate
 source checkout or `EXECUTORCH_SOURCE_DIR` setting is required. The source
 commit pinned in `MODULE.bazel` is the revision recorded by the
-`executorch==1.5.0.dev20260829` wheel.
+`executorch==1.5.0.dev20260901` wheel.
 
 The static ExecuTorch and delegate archives are intermediate build inputs;
 users receive the final native Python module and do not compile anything.
