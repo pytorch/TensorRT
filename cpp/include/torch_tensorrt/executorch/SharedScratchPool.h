@@ -49,11 +49,13 @@ struct SharedScratchHandoff {
 // One device's shared scratch buffer and the marker ordering its handoff, behind
 // the lock that covers both.
 //
-// A claimant holds `mu` from the wait on the previous enqueue through the choice
-// of buffer, so it cannot be handed a buffer another claimant is midway through
-// replacing, and cannot record its own enqueue against a marker that has since
-// moved on. `mu` covers one device, so a growth holds no lock a claim on another
-// device has to acquire.
+// A claimant holds `mu` from the wait on the previous enqueue through its own
+// enqueue and the record of that enqueue on the marker. Holding it that far is
+// what makes the marker a complete account of who is using the buffer. Anything
+// less leaves an enqueue live in a window the marker does not cover, and a
+// claimant entering that window is handed the same buffer with nothing ordering
+// the two. `mu` covers one device, so a growth holds no lock a claim on
+// another device has to acquire.
 struct SharedScratchDevice {
   std::mutex mu;
   void* buffer = nullptr;
@@ -118,6 +120,29 @@ inline cudaEvent_t shared_scratch_mark_in_flight(SharedScratchDevice& dev) {
   return dev.marker.event;
 }
 
+// A buffer a growth replaced, handed back for the caller to dispose of.
+//
+// A non-null `wait_for` is the marker's event, on which an enqueue that may still
+// be reading and writing `buffer` has been recorded; the caller must wait for
+// that event on the host before it frees, and must do so while it still holds
+// `dev.mu`. Once the lock is dropped the next claimant records its own enqueue on
+// the same event, and a wait made then would block on work that never touched
+// this buffer. A null `wait_for` means nothing was ever recorded against it.
+//
+// One event covers every enqueue the buffer ever served, but only because each of
+// them claims the handoff before enqueueing -- which orders its stream after the
+// event -- and records on the event afterwards, so the latest recording completes
+// only once all the earlier ones have. An enqueue that reaches the buffer without
+// doing both is covered by no wait here.
+//
+// The free itself belongs outside `dev.mu`: on CUDA it is a device-wide
+// synchronization, so performing it under the lock makes an unrelated claim on
+// this device wait for every stream on it.
+struct RetiredScratch {
+  void* buffer = nullptr;
+  cudaEvent_t wait_for = nullptr;
+};
+
 // Bookkeeping for a device's scratch buffer, which grows monotonically to the
 // largest requested size. Call with `dev.mu` held.
 //
@@ -125,22 +150,17 @@ inline cudaEvent_t shared_scratch_mark_in_flight(SharedScratchDevice& dev) {
 // Allocating before releasing is what makes that true, and it costs peak
 // residency: while the buffer grows, the old and the new one are both resident.
 //
-// `release(old, wait_for)` frees `old`. A non-null `wait_for` is the marker's
-// event, on which an enqueue that may still be reading and writing `old` has been
-// recorded; the release must wait for that event on the host before freeing. One
-// event covers every enqueue the buffer ever served, but only because each of
-// them claims the handoff before enqueueing -- which orders its stream after the
-// event -- and records on the event afterwards, so the latest recording completes
-// only once all the earlier ones have. An enqueue that reaches the buffer without
-// doing both is covered by no wait here. A null `wait_for` means nothing was ever
-// recorded against this buffer, so there is nothing to wait for.
-template <typename Alloc, typename Release>
+// A growth reports the buffer it displaced through `out_retired`; see
+// RetiredScratch for what the caller owes it. Nothing is freed here, so a caller
+// that ignores `out_retired` leaks rather than frees a buffer an enqueue may
+// still be using.
+template <typename Alloc>
 void* shared_scratch_get_or_grow(
     SharedScratchDevice& dev,
     std::size_t need,
     std::size_t& out_size,
     Alloc alloc,
-    Release release) {
+    RetiredScratch& out_retired) {
   if (dev.buffer != nullptr && dev.capacity >= need) {
     out_size = dev.capacity;
     return dev.buffer;
@@ -150,7 +170,8 @@ void* shared_scratch_get_or_grow(
     return nullptr;
   }
   if (dev.buffer != nullptr) {
-    release(dev.buffer, dev.marker.pending ? dev.marker.event : nullptr);
+    out_retired.buffer = dev.buffer;
+    out_retired.wait_for = dev.marker.pending ? dev.marker.event : nullptr;
   }
   dev.buffer = p;
   dev.capacity = need;

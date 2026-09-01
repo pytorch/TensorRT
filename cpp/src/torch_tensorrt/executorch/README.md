@@ -87,14 +87,15 @@ the removed `CudaStreamGuard`:
 - With no guard active, the backend falls back to `cudaStreamPerThread`.
 - With the `use_shared_activation_scratch` backend option enabled, one buffer
   per device backs the activation scratch of every execution context created
-  while it was on, so an enqueue against that buffer must not overlap another
-  one. The backend orders consecutive enqueues itself, whether they run on one
-  stream or on two. What it cannot order is two `execute()` calls submitted
-  concurrently on one device: the caller must submit them one at a time, whether
-  or not they share a stream. Submitting them concurrently risks one of them
-  growing the pool and freeing the buffer the other's enqueue is still reading
-  and writing, not merely reordering them. Contexts created while the option was
-  off keep their own scratch and are unaffected.
+  while it was on, so no two enqueues against it may overlap. The backend
+  enforces this itself: it holds a per-device lock from the claim on the buffer
+  through the enqueue and the completion event recorded on it, so two
+  `execute()` calls on one device are serialized at submission and the second's
+  stream waits on the first's enqueue. They may run on one stream or on two, and
+  they may be submitted concurrently from two threads — but they will not run
+  concurrently on the device, so the pool costs the parallelism between them.
+  Contexts created while the option was off keep their own scratch and are
+  unaffected.
 - The reference-runner smoke test runs inference inside a caller-stream guard on
   the discrete-GPU CI configuration, where all inputs and outputs are host-backed
   and therefore take the synchronized staging path. CI separately asserts that the
@@ -138,10 +139,21 @@ the backend archive gets.
 N per-engine copies collapse to one, so the reclaimed memory is the sum of the N
 requirements less the largest of them. Set the option before loading the methods
 whose engines should use the pool, and read the `use_shared_activation_scratch`
-bullet of the caller-stream contract above first: the pool carries an ordering
-obligation the backend cannot discharge for you. The buffer is never released, so
-the device keeps the largest scratch it was ever asked for until the process
-exits.
+bullet of the caller-stream contract above: engines sharing a buffer do not run
+concurrently on the device. The pool never returns memory to the
+device, so the largest scratch it was ever asked for stays allocated until the
+process exits.
+
+The buffer grows when an engine asks for more than every engine before it did,
+and a growth is not free. It frees the buffer it replaces, and `cudaFree` waits
+for everything queued on the device, not only for the enqueues that used that
+buffer, so it can stall for far longer than the event wait that precedes it. The
+backend keeps that stall out from under the per-device lock, so it does not hold
+up another engine on the device, but it does fall after the growing call's own
+enqueue, so that one `execute()` waits for its own engine work too. A growth
+happens only on an engine's first run and only for an engine larger than every
+engine before it, so loading the largest engine first reduces the pool to a
+single allocation.
 
 How much any one engine asks for is fixed when it is built, not when it runs.
 The builder's `kRUNTIME_ACTIVATION_RESIZE_10_10` preview feature makes an engine

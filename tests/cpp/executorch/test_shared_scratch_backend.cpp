@@ -7,9 +7,11 @@
 
 // Exercises the shared activation-scratch pool through the delegate that uses
 // it: the runtime option that turns it on, the per-engine capture of that
-// option, and the single-threaded pooled execute() path -- the kUSER_MANAGED
-// context, the updateDeviceMemorySizeForShapes/setDeviceMemoryV2 pair, and the
-// enqueue handoff between two caller streams.
+// option, and the pooled execute() path -- the kUSER_MANAGED context, the
+// updateDeviceMemorySizeForShapes/setDeviceMemoryV2 pair, the enqueue handoff
+// between two caller streams, the growth a larger engine forces on a pool a
+// smaller one already allocated, and two threads submitting against one pooled
+// buffer at once.
 //
 // The TensorRT engine is built here rather than loaded from a .pte so the target
 // carries no exported artifact, at the cost of a few seconds of builder time.
@@ -76,6 +78,12 @@ constexpr int kRows = 2048;
 constexpr int kCols = 2048;
 constexpr std::size_t kElems = static_cast<std::size_t>(kRows) * static_cast<std::size_t>(kCols);
 constexpr std::size_t kBytes = kElems * sizeof(float);
+
+// A second scratch-needing engine, four times the elements of the one above, so
+// loading it after that one drives the pool's growth path. Every other engine in
+// this file asks for the same size, which is why nothing else reaches it.
+constexpr int kBigRows = 4096;
+constexpr int kBigCols = 4096;
 
 // Engines loaded together in the memory test. Four is enough for the private
 // case to cost 4x the scratch and the pooled case 1x.
@@ -174,7 +182,7 @@ bool add_scratch_free_net(nvinfer1::INetworkDefinition& network, nvinfer1::ITens
   return true;
 }
 
-std::vector<std::uint8_t> build_engine_blob(bool needs_scratch) {
+std::vector<std::uint8_t> build_engine_blob(bool needs_scratch, int rows = kRows, int cols = kCols) {
   static BuilderLogger logger;
 
   TRTUniquePtr<nvinfer1::IBuilder> builder(nvinfer1::createInferBuilder(logger));
@@ -186,7 +194,7 @@ std::vector<std::uint8_t> build_engine_blob(bool needs_scratch) {
     return {};
   }
 
-  nvinfer1::ITensor* input = network->addInput("input_0", nvinfer1::DataType::kFLOAT, nvinfer1::Dims3{1, kRows, kCols});
+  nvinfer1::ITensor* input = network->addInput("input_0", nvinfer1::DataType::kFLOAT, nvinfer1::Dims3{1, rows, cols});
   if (input == nullptr) {
     return {};
   }
@@ -200,7 +208,7 @@ std::vector<std::uint8_t> build_engine_blob(bool needs_scratch) {
     return {};
   }
   nvinfer1::IOptimizationProfile* profile = builder->createOptimizationProfile();
-  const nvinfer1::Dims3 shape{1, kRows, kCols};
+  const nvinfer1::Dims3 shape{1, rows, cols};
   profile->setDimensions("input_0", nvinfer1::OptProfileSelector::kMIN, shape);
   profile->setDimensions("input_0", nvinfer1::OptProfileSelector::kOPT, shape);
   profile->setDimensions("input_0", nvinfer1::OptProfileSelector::kMAX, shape);
@@ -231,7 +239,7 @@ std::vector<std::uint8_t> build_engine_blob(bool needs_scratch) {
 
 // The activation scratch one context of the shared engine needs, read the way
 // execute() reads it. Zero if the engine could not be measured.
-std::size_t measure_engine_scratch(const std::vector<std::uint8_t>& blob) {
+std::size_t measure_engine_scratch(const std::vector<std::uint8_t>& blob, int rows = kRows, int cols = kCols) {
   static BuilderLogger logger;
   TensorRTBlobHeader header;
   if (!TensorRTBlobHeader::parse(blob.data(), blob.size(), header)) {
@@ -252,7 +260,7 @@ std::size_t measure_engine_scratch(const std::vector<std::uint8_t>& blob) {
   if (ctx == nullptr) {
     return 0;
   }
-  if (!ctx->setInputShape("input_0", nvinfer1::Dims3{1, kRows, kCols})) {
+  if (!ctx->setInputShape("input_0", nvinfer1::Dims3{1, rows, cols})) {
     return 0;
   }
   return ctx->updateDeviceMemorySizeForShapes();
@@ -306,16 +314,19 @@ class LoadedEngine {
   }
 
   // Loads the blob through the backend, capturing whatever the shared-scratch
-  // option is set to at this moment.
-  Error load(const std::vector<std::uint8_t>& blob, std::uint32_t seed) {
-    std::vector<float> host_in(kElems);
-    for (std::size_t i = 0; i < kElems; ++i) {
+  // option is set to at this moment. `rows`/`cols` must be the shape the blob was
+  // built for.
+  Error load(const std::vector<std::uint8_t>& blob, std::uint32_t seed, int rows = kRows, int cols = kCols) {
+    rows_ = static_cast<SizesType>(rows);
+    cols_ = static_cast<SizesType>(cols);
+    std::vector<float> host_in(elems());
+    for (std::size_t i = 0; i < elems(); ++i) {
       host_in[i] = pattern(i, seed);
     }
-    if (cudaMalloc(&device_in_, kBytes) != cudaSuccess || cudaMalloc(&device_out_, kBytes) != cudaSuccess) {
+    if (cudaMalloc(&device_in_, bytes()) != cudaSuccess || cudaMalloc(&device_out_, bytes()) != cudaSuccess) {
       return Error::MemoryAllocationFailed;
     }
-    if (cudaMemcpy(device_in_, host_in.data(), kBytes, cudaMemcpyHostToDevice) != cudaSuccess) {
+    if (cudaMemcpy(device_in_, host_in.data(), bytes(), cudaMemcpyHostToDevice) != cudaSuccess) {
       return Error::Internal;
     }
 
@@ -332,8 +343,8 @@ class LoadedEngine {
   }
 
   bool fill_output(float value) {
-    const std::vector<float> host(kElems, value);
-    return cudaMemcpy(device_out_, host.data(), kBytes, cudaMemcpyHostToDevice) == cudaSuccess;
+    const std::vector<float> host(elems(), value);
+    return cudaMemcpy(device_out_, host.data(), bytes(), cudaMemcpyHostToDevice) == cudaSuccess;
   }
 
   // Runs one inference on `stream`. Returns without waiting for the enqueue,
@@ -341,8 +352,8 @@ class LoadedEngine {
   Error run(cudaStream_t stream) {
     // Separate arrays: execute() resizes the output tensor to the shape TensorRT
     // inferred, which writes through whichever array that tensor was given.
-    SizesType in_sizes[3] = {1, kRows, kCols};
-    SizesType out_sizes[3] = {1, kRows, kCols};
+    SizesType in_sizes[3] = {1, rows_, cols_};
+    SizesType out_sizes[3] = {1, rows_, cols_};
     ::executorch::aten::TensorImpl in_impl(ScalarType::Float, 3, in_sizes, device_in_);
     ::executorch::aten::TensorImpl out_impl(ScalarType::Float, 3, out_sizes, device_out_);
     ::executorch::aten::Tensor in_tensor(&in_impl);
@@ -357,8 +368,8 @@ class LoadedEngine {
   }
 
   std::vector<float> read_output() const {
-    std::vector<float> host_out(kElems);
-    if (cudaMemcpy(host_out.data(), device_out_, kBytes, cudaMemcpyDeviceToHost) != cudaSuccess) {
+    std::vector<float> host_out(elems());
+    if (cudaMemcpy(host_out.data(), device_out_, bytes(), cudaMemcpyDeviceToHost) != cudaSuccess) {
       host_out.clear();
     }
     return host_out;
@@ -366,6 +377,14 @@ class LoadedEngine {
 
   const EngineHandle* handle() const {
     return static_cast<const EngineHandle*>(handle_);
+  }
+
+  std::size_t elems() const {
+    return static_cast<std::size_t>(rows_) * static_cast<std::size_t>(cols_);
+  }
+
+  std::size_t bytes() const {
+    return elems() * sizeof(float);
   }
 
  private:
@@ -379,6 +398,8 @@ class LoadedEngine {
   DelegateHandle* handle_ = nullptr;
   void* device_in_ = nullptr;
   void* device_out_ = nullptr;
+  SizesType rows_ = kRows;
+  SizesType cols_ = kCols;
 };
 
 std::size_t device_bytes_in_use() {
@@ -415,10 +436,12 @@ class SharedScratchBackendTest : public ::testing::Test {
     }
     blob_ = build_engine_blob(true);
     scratch_free_blob_ = build_engine_blob(false);
-    if (blob_.empty() || scratch_free_blob_.empty()) {
+    big_blob_ = build_engine_blob(true, kBigRows, kBigCols);
+    if (blob_.empty() || scratch_free_blob_.empty() || big_blob_.empty()) {
       return;
     }
     scratch_bytes_ = measure_engine_scratch(blob_);
+    big_scratch_bytes_ = measure_engine_scratch(big_blob_, kBigRows, kBigCols);
     engine_bytes_ = engine_scratch_requirement(blob_);
     scratch_free_engine_bytes_ = engine_scratch_requirement(scratch_free_blob_);
   }
@@ -430,6 +453,7 @@ class SharedScratchBackendTest : public ::testing::Test {
     }
     ASSERT_FALSE(blob_.empty()) << "TensorRT could not build the fixture engine";
     ASSERT_FALSE(scratch_free_blob_.empty()) << "TensorRT could not build the scratch-free fixture engine";
+    ASSERT_FALSE(big_blob_.empty()) << "TensorRT could not build the larger fixture engine";
     ASSERT_EQ(set_shared_scratch(backend_, false), Error::Ok);
   }
 
@@ -445,17 +469,25 @@ class SharedScratchBackendTest : public ::testing::Test {
     return scratch_free_blob_;
   }
 
+  const std::vector<std::uint8_t>& big_blob() const {
+    return big_blob_;
+  }
+
   TensorRTBackend backend_;
   static std::vector<std::uint8_t> blob_;
   static std::vector<std::uint8_t> scratch_free_blob_;
+  static std::vector<std::uint8_t> big_blob_;
   static std::size_t scratch_bytes_;
+  static std::size_t big_scratch_bytes_;
   static std::int64_t engine_bytes_;
   static std::int64_t scratch_free_engine_bytes_;
 };
 
 std::vector<std::uint8_t> SharedScratchBackendTest::blob_;
 std::vector<std::uint8_t> SharedScratchBackendTest::scratch_free_blob_;
+std::vector<std::uint8_t> SharedScratchBackendTest::big_blob_;
 std::size_t SharedScratchBackendTest::scratch_bytes_ = 0;
+std::size_t SharedScratchBackendTest::big_scratch_bytes_ = 0;
 std::int64_t SharedScratchBackendTest::engine_bytes_ = -1;
 std::int64_t SharedScratchBackendTest::scratch_free_engine_bytes_ = -1;
 
@@ -638,6 +670,99 @@ TEST_F(SharedScratchBackendTest, PooledEnginesShareOneActivationScratchAllocatio
   EXPECT_GE(private_cost, pooled_cost + expected_saving)
       << kEngineCount << " engines cost " << private_cost << " bytes with private scratch and " << pooled_cost
       << " pooled, against " << scratch_bytes_ << " bytes of scratch each";
+}
+
+// ---------------------------------------------------------------------------
+// Growing the pool
+// ---------------------------------------------------------------------------
+
+// Runs a four-times-larger engine after a smaller one to reach the growth path,
+// which nothing else in this file does.
+//
+// The bounds cover the second allocation and the free of the buffer it replaces,
+// not the host wait before that free: cudaFree synchronizes device-wide anyway,
+// so deleting the wait leaves this test green. The wait stays as the explicit
+// guarantee rather than a reliance on cudaFree's implicit one.
+//
+// The lower bound also fails if an earlier test left the pool already large
+// enough, which is how this test could otherwise pass vacuously.
+TEST_F(SharedScratchBackendTest, ALargerEngineGrowsThePoolAndFreesTheBufferItReplaces) {
+  ASSERT_GE(big_scratch_bytes_, scratch_bytes_ + kMinMeasurableScratch)
+      << "the two fixture engines ask for " << scratch_bytes_ << " and " << big_scratch_bytes_
+      << " bytes of activation scratch, too close for the growth to be measurable";
+
+  cudaStream_t stream = nullptr;
+  ASSERT_EQ(cudaStreamCreate(&stream), cudaSuccess);
+
+  // Private-scratch references for both engines, and the run that pays the larger
+  // engine's one-time TensorRT and CUDA module costs so they land outside the
+  // measurement below.
+  std::vector<float> small_expected;
+  std::vector<float> big_expected;
+  {
+    LoadedEngine small_priv;
+    LoadedEngine big_priv;
+    ASSERT_EQ(small_priv.load(blob(), 15), Error::Ok);
+    ASSERT_EQ(big_priv.load(big_blob(), 16, kBigRows, kBigCols), Error::Ok);
+    ASSERT_FALSE(small_priv.handle()->shared_scratch);
+    ASSERT_FALSE(big_priv.handle()->shared_scratch);
+    ASSERT_EQ(small_priv.run(stream), Error::Ok);
+    ASSERT_EQ(big_priv.run(stream), Error::Ok);
+    ASSERT_EQ(cudaStreamSynchronize(stream), cudaSuccess);
+    small_expected = small_priv.read_output();
+    big_expected = big_priv.read_output();
+  }
+
+  ASSERT_EQ(set_shared_scratch(backend_, true), Error::Ok);
+  LoadedEngine small;
+  ASSERT_EQ(small.load(blob(), 15), Error::Ok);
+  ASSERT_TRUE(small.handle()->shared_scratch);
+  ASSERT_EQ(small.run(stream), Error::Ok);
+  ASSERT_EQ(cudaStreamSynchronize(stream), cudaSuccess);
+
+  // Loaded before the measurement starts: its weights and its I/O are not part of
+  // what the growth costs.
+  LoadedEngine big;
+  ASSERT_EQ(big.load(big_blob(), 16, kBigRows, kBigCols), Error::Ok);
+  ASSERT_TRUE(big.handle()->shared_scratch);
+
+  const std::size_t before = device_bytes_in_use();
+  ASSERT_EQ(big.run(stream), Error::Ok);
+  ASSERT_EQ(cudaStreamSynchronize(stream), cudaSuccess);
+  const std::size_t after = device_bytes_in_use();
+  ASSERT_GE(after, before) << "device-wide memory in use fell across the growth, so something outside this test is "
+                              "releasing memory on this device";
+  const std::size_t growth_cost = after - before;
+  const std::size_t difference = big_scratch_bytes_ - scratch_bytes_;
+
+  // The pool must still serve the smaller engine after the growth moved the
+  // buffer: its context holds the address it was given on its previous call, and
+  // that address has been freed.
+  ASSERT_TRUE(small.fill_output(kSentinel));
+  ASSERT_EQ(small.run(stream), Error::Ok);
+  ASSERT_EQ(cudaStreamSynchronize(stream), cudaSuccess);
+  const std::vector<float> small_actual = small.read_output();
+  const std::vector<float> big_actual = big.read_output();
+
+  ASSERT_EQ(cudaStreamDestroy(stream), cudaSuccess);
+
+  EXPECT_GE(growth_cost, difference / 2) << "the larger engine cost " << growth_cost << " bytes against a "
+                                         << difference
+                                         << "-byte difference in requirement, so the pool did not grow for it";
+  EXPECT_LE(growth_cost, difference + scratch_bytes_ / 2)
+      << "the larger engine cost " << growth_cost << " bytes, about the whole " << big_scratch_bytes_
+      << "-byte buffer rather than the " << difference << "-byte difference, so the buffer it replaced was not freed";
+
+  ASSERT_EQ(big_expected.size(), big_actual.size());
+  ASSERT_FALSE(big_expected.empty());
+  EXPECT_EQ(std::memcmp(big_expected.data(), big_actual.data(), big_expected.size() * sizeof(float)), 0)
+      << "the engine that grew the pool did not produce what it produces with its own scratch";
+
+  ASSERT_EQ(small_expected.size(), kElems);
+  ASSERT_EQ(small_actual.size(), kElems);
+  EXPECT_NE(small_expected[0], kSentinel) << "the reference output is the sentinel, so a skipped enqueue would pass";
+  EXPECT_EQ(std::memcmp(small_expected.data(), small_actual.data(), kBytes), 0)
+      << "the smaller engine stopped producing its own output once the growth moved the shared buffer";
 }
 
 // ---------------------------------------------------------------------------
@@ -844,6 +969,114 @@ TEST_F(SharedScratchBackendTest, ASecondPooledEnqueueWaitsForTheFirstOnAnotherSt
 
   ASSERT_EQ(cudaStreamDestroy(first_stream), cudaSuccess);
   ASSERT_EQ(cudaStreamDestroy(second_stream), cudaSuccess);
+}
+
+// ---------------------------------------------------------------------------
+// The pooled path under two concurrent callers
+// ---------------------------------------------------------------------------
+
+// The window a dropped lock would leave open is a few microseconds wide, so one
+// pair of runs would find it only by luck. At this count a build that leaves the
+// window open loses most of the runs, and the test costs about two seconds.
+constexpr int kConcurrentRunsPerThread = 60;
+
+// Two pooled engines on one device, submitted from two threads on two streams,
+// with nothing but the backend ordering them. Both are backed by the same buffer,
+// so a claim that ends before the enqueue is recorded hands a second caller the
+// same scratch with nothing ordering the two -- silently wrong output, no CUDA
+// error, no TensorRT error. Each thread compares byte-for-byte against what its own
+// engine produces with private scratch.
+TEST_F(SharedScratchBackendTest, TwoThreadsRunningPooledEnginesOnOneDeviceKeepTheirOwnOutputs) {
+  cudaStream_t reference_stream = nullptr;
+  ASSERT_EQ(cudaStreamCreate(&reference_stream), cudaSuccess);
+
+  std::vector<float> first_expected;
+  std::vector<float> second_expected;
+  {
+    LoadedEngine first_priv;
+    LoadedEngine second_priv;
+    ASSERT_EQ(first_priv.load(blob(), 17), Error::Ok);
+    ASSERT_EQ(second_priv.load(blob(), 18), Error::Ok);
+    ASSERT_FALSE(first_priv.handle()->shared_scratch);
+    ASSERT_FALSE(second_priv.handle()->shared_scratch);
+    ASSERT_EQ(first_priv.run(reference_stream), Error::Ok);
+    ASSERT_EQ(second_priv.run(reference_stream), Error::Ok);
+    ASSERT_EQ(cudaStreamSynchronize(reference_stream), cudaSuccess);
+    first_expected = first_priv.read_output();
+    second_expected = second_priv.read_output();
+  }
+  ASSERT_EQ(cudaStreamDestroy(reference_stream), cudaSuccess);
+
+  ASSERT_EQ(first_expected.size(), kElems);
+  ASSERT_EQ(second_expected.size(), kElems);
+  // Two engines producing the same bytes would let each thread pass on the other
+  // one's output, which is the outcome this test exists to catch.
+  ASSERT_NE(std::memcmp(first_expected.data(), second_expected.data(), kBytes), 0)
+      << "the two engines were given different inputs but produced the same output";
+  ASSERT_NE(first_expected[0], kSentinel) << "the reference output is the sentinel, so a skipped enqueue would pass";
+  ASSERT_NE(second_expected[0], kSentinel) << "the reference output is the sentinel, so a skipped enqueue would pass";
+
+  ASSERT_EQ(set_shared_scratch(backend_, true), Error::Ok);
+  LoadedEngine first;
+  LoadedEngine second;
+  ASSERT_EQ(first.load(blob(), 17), Error::Ok);
+  ASSERT_EQ(second.load(blob(), 18), Error::Ok);
+  ASSERT_TRUE(first.handle()->shared_scratch);
+  ASSERT_TRUE(second.handle()->shared_scratch);
+
+  cudaStream_t first_stream = nullptr;
+  cudaStream_t second_stream = nullptr;
+  ASSERT_EQ(cudaStreamCreateWithFlags(&first_stream, cudaStreamNonBlocking), cudaSuccess);
+  ASSERT_EQ(cudaStreamCreateWithFlags(&second_stream, cudaStreamNonBlocking), cudaSuccess);
+
+  // The host copies that bracket each run synchronize the whole device, so two
+  // threads left to themselves take turns rather than overlap. Against a build
+  // that leaves the window open, taking turns caught it in 2 of the 120 runs
+  // below; releasing both threads together caught nearly all of them. Neither
+  // thread can strand the other here -- both run the same fixed
+  // number of iterations and neither leaves the loop early.
+  std::atomic<int> arrived{0};
+  auto submit_together = [&arrived](int iteration) {
+    arrived.fetch_add(1);
+    while (arrived.load() < 2 * (iteration + 1)) {
+      std::this_thread::yield();
+    }
+  };
+
+  std::atomic<int> wrong_outputs{0};
+  std::atomic<int> failures{0};
+  auto run_repeatedly = [&](LoadedEngine& engine, const std::vector<float>& expected, cudaStream_t stream) {
+    for (int i = 0; i < kConcurrentRunsPerThread; ++i) {
+      // Rewritten every iteration, so a run whose enqueue never reached the engine
+      // leaves the sentinel behind rather than the previous iteration's output.
+      if (!engine.fill_output(kSentinel)) {
+        failures.fetch_add(1);
+      }
+      submit_together(i);
+      if (engine.run(stream) != Error::Ok || cudaStreamSynchronize(stream) != cudaSuccess) {
+        failures.fetch_add(1);
+        continue;
+      }
+      const std::vector<float> actual = engine.read_output();
+      if (actual.size() != expected.size() || std::memcmp(actual.data(), expected.data(), kBytes) != 0) {
+        wrong_outputs.fetch_add(1);
+      }
+    }
+  };
+
+  std::thread first_thread([&] { run_repeatedly(first, first_expected, first_stream); });
+  std::thread second_thread([&] { run_repeatedly(second, second_expected, second_stream); });
+  first_thread.join();
+  second_thread.join();
+
+  ASSERT_EQ(cudaStreamDestroy(first_stream), cudaSuccess);
+  ASSERT_EQ(cudaStreamDestroy(second_stream), cudaSuccess);
+
+  EXPECT_EQ(failures.load(), 0) << "a run failed outright, so fewer than " << (2 * kConcurrentRunsPerThread)
+                                << " runs reached the comparison below";
+  EXPECT_EQ(wrong_outputs.load(), 0) << wrong_outputs.load() << " of " << (2 * kConcurrentRunsPerThread)
+                                     << " concurrent pooled runs did not produce what the same engine produces with "
+                                        "its own scratch";
 }
 
 } // namespace

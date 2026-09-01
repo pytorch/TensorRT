@@ -26,11 +26,12 @@ namespace executorch_backend {
 namespace {
 
 // Fake device allocator: hands out distinct non-null pointers and records every
-// allocation size and every release, so tests can assert the pool's grow/reuse
-// policy and what each release was told to wait for, without a CUDA device.
+// allocation size and every buffer a growth retired, so tests can assert the
+// pool's grow/reuse policy and what each retirement has to wait for, without a
+// CUDA device.
 struct FakeAllocator {
   std::vector<std::size_t> alloc_sizes;
-  std::vector<std::pair<void*, cudaEvent_t>> released;
+  std::vector<std::pair<void*, cudaEvent_t>> retirements;
   std::uintptr_t next = 0x1000;
   bool fail_next = false;
 
@@ -45,8 +46,8 @@ struct FakeAllocator {
     return p;
   }
 
-  void release(void* p, cudaEvent_t wait_for) {
-    released.emplace_back(p, wait_for);
+  void retire(void* p, cudaEvent_t wait_for) {
+    retirements.emplace_back(p, wait_for);
   }
 
   int alloc_count() const {
@@ -74,13 +75,16 @@ struct FakeEventFactory {
   }
 };
 
+// Stands in for the backend: passes the allocator through and records whatever
+// the call retired, the way execute() hands a retired buffer to its claim.
 void* call(SharedScratchDevice& dev, FakeAllocator& a, std::size_t need, std::size_t& out_size) {
-  return shared_scratch_get_or_grow(
-      dev,
-      need,
-      out_size,
-      [&a](std::size_t bytes) { return a.alloc(bytes); },
-      [&a](void* p, cudaEvent_t wait_for) { a.release(p, wait_for); });
+  RetiredScratch retired;
+  void* const p = shared_scratch_get_or_grow(
+      dev, need, out_size, [&a](std::size_t bytes) { return a.alloc(bytes); }, retired);
+  if (retired.buffer != nullptr) {
+    a.retire(retired.buffer, retired.wait_for);
+  }
+  return p;
 }
 
 TEST(SharedScratchPool, FirstRequestAllocatesExactSize) {
@@ -94,7 +98,7 @@ TEST(SharedScratchPool, FirstRequestAllocatesExactSize) {
   EXPECT_EQ(out, 1024u);
   ASSERT_EQ(a.alloc_count(), 1);
   EXPECT_EQ(a.alloc_sizes[0], 1024u);
-  EXPECT_TRUE(a.released.empty());
+  EXPECT_TRUE(a.retirements.empty());
 }
 
 TEST(SharedScratchPool, ReusesWhenExistingBufferIsLargeEnough) {
@@ -116,10 +120,10 @@ TEST(SharedScratchPool, ReusesWhenExistingBufferIsLargeEnough) {
   // Reuse reports the buffer's capacity, not the smaller amount asked for.
   EXPECT_EQ(out2, 4096u);
   EXPECT_EQ(a.alloc_count(), 1);
-  EXPECT_TRUE(a.released.empty());
+  EXPECT_TRUE(a.retirements.empty());
 }
 
-TEST(SharedScratchPool, GrowsMonotonicallyToMaxAndReleasesOldBuffer) {
+TEST(SharedScratchPool, GrowsMonotonicallyToMaxAndRetiresOldBuffer) {
   SharedScratchDevice dev;
   FakeAllocator a;
   std::size_t out = 0;
@@ -131,8 +135,8 @@ TEST(SharedScratchPool, GrowsMonotonicallyToMaxAndReleasesOldBuffer) {
   EXPECT_EQ(out, 8192u);
   ASSERT_EQ(a.alloc_count(), 2);
   EXPECT_EQ(a.alloc_sizes[1], 8192u);
-  ASSERT_EQ(a.released.size(), 1u);
-  EXPECT_EQ(a.released[0].first, small);
+  ASSERT_EQ(a.retirements.size(), 1u);
+  EXPECT_EQ(a.retirements[0].first, small);
 
   // A subsequent smaller request reuses the grown buffer -- pool never shrinks.
   void* reuse = call(dev, a, 512, out);
@@ -141,7 +145,7 @@ TEST(SharedScratchPool, GrowsMonotonicallyToMaxAndReleasesOldBuffer) {
   EXPECT_EQ(a.alloc_count(), 2);
 }
 
-TEST(SharedScratchPool, GrowWaitsOnTheRecordedEnqueueBeforeReleasing) {
+TEST(SharedScratchPool, GrowRetiresTheOldBufferWithTheEventToWaitOn) {
   SharedScratchDevice dev;
   FakeAllocator a;
   FakeEventFactory events;
@@ -150,18 +154,19 @@ TEST(SharedScratchPool, GrowWaitsOnTheRecordedEnqueueBeforeReleasing) {
   void* small = call(dev, a, 1024, out);
   ASSERT_NE(small, nullptr);
 
-  // An enqueue against `small` has been submitted and recorded, so the release
-  // has something specific to outlive.
+  // An enqueue against `small` has been submitted and recorded, so its
+  // retirement has something specific to outlive.
   const SharedScratchHandoff handoff = shared_scratch_claim_event(dev, std::ref(events));
   ASSERT_EQ(shared_scratch_mark_in_flight(dev), handoff.event);
 
   ASSERT_NE(call(dev, a, 8192, out), nullptr);
 
-  ASSERT_EQ(a.released.size(), 1u);
-  EXPECT_EQ(a.released[0].first, small);
-  // The release is handed the event that enqueue was recorded on, so it waits for
-  // that enqueue rather than for everything queued on the device.
-  EXPECT_EQ(a.released[0].second, handoff.event);
+  ASSERT_EQ(a.retirements.size(), 1u);
+  EXPECT_EQ(a.retirements[0].first, small);
+  // The retirement carries the event that enqueue was recorded on, so the caller
+  // has one specific enqueue to wait for, rather than needing a device-wide
+  // synchronize to be correct.
+  EXPECT_EQ(a.retirements[0].second, handoff.event);
 }
 
 TEST(SharedScratchPool, GrowHasNothingToWaitForWhenNoEnqueueWasRecorded) {
@@ -178,9 +183,9 @@ TEST(SharedScratchPool, GrowHasNothingToWaitForWhenNoEnqueueWasRecorded) {
 
   ASSERT_NE(call(dev, a, 8192, out), nullptr);
 
-  ASSERT_EQ(a.released.size(), 1u);
-  EXPECT_EQ(a.released[0].first, small);
-  EXPECT_EQ(a.released[0].second, nullptr);
+  ASSERT_EQ(a.retirements.size(), 1u);
+  EXPECT_EQ(a.retirements[0].first, small);
+  EXPECT_EQ(a.retirements[0].second, nullptr);
 }
 
 TEST(SharedScratchPool, AllocationFailureLeavesExistingBufferUntouched) {
@@ -197,7 +202,7 @@ TEST(SharedScratchPool, AllocationFailureLeavesExistingBufferUntouched) {
   std::size_t out2 = 0;
   void* failed = call(dev, a, 8192, out2);
   EXPECT_EQ(failed, nullptr);
-  EXPECT_TRUE(a.released.empty());
+  EXPECT_TRUE(a.retirements.empty());
 
   // The device still holds the original buffer and serves it on the next request.
   void* again = call(dev, a, 1024, out);
@@ -327,15 +332,15 @@ TEST(SharedScratchPoolRegistry, KeepsAnIndependentBufferPerDevice) {
 
   EXPECT_NE(dev0, dev1);
   EXPECT_EQ(a.alloc_count(), 2);
-  EXPECT_TRUE(a.released.empty());
+  EXPECT_TRUE(a.retirements.empty());
 
   // Growing device 1 must not touch device 0's buffer.
   void* dev1_big = call(pool.get(1), a, 9000, out);
   void* dev0_again = call(pool.get(0), a, 2048, out);
   EXPECT_NE(dev1_big, dev1);
   EXPECT_EQ(dev0_again, dev0);
-  ASSERT_EQ(a.released.size(), 1u);
-  EXPECT_EQ(a.released[0].first, dev1);
+  ASSERT_EQ(a.retirements.size(), 1u);
+  EXPECT_EQ(a.retirements[0].first, dev1);
 }
 
 TEST(SharedScratchPoolRegistry, HandsOutOneStableEntryPerDevice) {
@@ -373,6 +378,7 @@ TEST(SharedScratchPoolRegistry, AGrowthOnOneDeviceDoesNotBlockAClaimOnAnother) {
   std::thread grower([&] {
     std::lock_guard<std::mutex> lk(dev0.mu);
     std::size_t out = 0;
+    RetiredScratch retired;
     shared_scratch_get_or_grow(
         dev0,
         4096,
@@ -382,7 +388,7 @@ TEST(SharedScratchPoolRegistry, AGrowthOnOneDeviceDoesNotBlockAClaimOnAnother) {
           leave.wait();
           return zero.alloc(bytes);
         },
-        [&](void* p, cudaEvent_t wait_for) { zero.release(p, wait_for); });
+        retired);
   });
   // The cap matters as much as the wait: a growth that takes the reuse path never
   // reaches its allocation, so nothing fires this promise and an uncapped wait
@@ -404,12 +410,9 @@ TEST(SharedScratchPoolRegistry, AGrowthOnOneDeviceDoesNotBlockAClaimOnAnother) {
     SharedScratchDevice& dev1 = pool.get(1);
     std::lock_guard<std::mutex> lk(dev1.mu);
     std::size_t out = 0;
+    RetiredScratch retired;
     return shared_scratch_get_or_grow(
-        dev1,
-        2048,
-        out,
-        [&](std::size_t bytes) { return one.alloc(bytes); },
-        [&](void* p, cudaEvent_t wait_for) { one.release(p, wait_for); });
+        dev1, 2048, out, [&](std::size_t bytes) { return one.alloc(bytes); }, retired);
   });
   const bool served = claim.wait_for(std::chrono::seconds(10)) == std::future_status::ready;
 

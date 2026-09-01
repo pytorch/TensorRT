@@ -110,11 +110,12 @@ class TensorRTBackend final : public ::executorch::runtime::BackendInterface {
   // past return, order any other stream against this one, and synchronize the stream
   // before reading device-resident outputs. The selected stream must be on the engine's
   // device, and calls on one handle must not overlap each other or its destruction.
-  // The shared activation scratch pool (kSharedActivationScratchKey) widens that
-  // across handles: one buffer per device backs every context created while the
-  // option was on, so calls on two such handles on one device must not overlap
-  // either. A handle whose context was created while the option was off keeps its
-  // own scratch and is outside that rule.
+  // With the shared activation scratch pool (kSharedActivationScratchKey) one
+  // buffer per device backs every context created while the option was on. Calls
+  // on two such handles on one device may overlap: a per-device lock held across
+  // the enqueue serializes them, so they do not run concurrently on the device. A
+  // handle whose context was created while the option was off keeps its own
+  // scratch and is not subject to this.
   // Note that other CUDA delegates sharing the same guard may instead synchronize before
   // returning, so do not assume results are ready on return from this one.
   ::executorch::runtime::Error execute(

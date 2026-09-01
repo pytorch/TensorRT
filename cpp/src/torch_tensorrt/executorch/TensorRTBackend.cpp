@@ -236,35 +236,114 @@ bool is_cuda_accessible_ptr(const void* ptr) {
 //
 // ORDERING: a context reads and writes its scratch for the whole enqueue, which
 // can still be in flight when execute() returns, so two enqueues must never hold
-// this buffer at the same time.
+// this buffer at the same time. A device's lock is what enforces that -- see
+// SharedScratchClaim -- and it is held from the claim through the enqueue and the
+// record of it, so two execute() calls on one device are serialized at
+// submission. The lock does not couple two
+// devices: each carries its own, and no CUDA call is made under the one lock the
+// registry itself holds.
 //
-// What the pool's event handoff does NOT cover is concurrent execute() on one
-// device: a device's lock is released before the enqueue is submitted, so an
-// enqueue is live for a window before the event carries it, and a second thread
-// claiming inside that window is told to wait for the enqueue before it. Such a
-// claimant can grow the pool and free the buffer the first thread's enqueue is
-// still reading and writing. The requirement is therefore that the enqueues
-// drawing on a device's buffer are submitted one at a time, but they need not
-// share a stream. That is why the pool is opt-in. The pool's locking does not
-// couple two devices: each carries its own lock, and no CUDA call is made under
-// the lock that finds it.
-//
-// The buffers and the events are intentionally never freed. Nothing here runs a
-// CUDA call at process exit, which also keeps the pool clear of teardown-order
-// hazards against anything else holding device memory.
+// The buffers and the events are intentionally never freed at teardown. Nothing
+// here runs a CUDA call at process exit, which keeps the pool clear of
+// teardown-order hazards against anything else holding device memory.
 SharedScratchPool scratch_pool;
+
+// A caller's hold on one device's shared scratch: the device lock, plus the
+// buffer a growth displaced, freed once that lock is dropped.
+//
+// The lock spans the enqueue, not just the choice of buffer. A claimant that
+// released it as soon as it had a buffer would leave its enqueue live for a
+// window the marker's event does not yet cover, and a second claimant entering
+// that window is handed the same buffer and told to wait for the enqueue before
+// it -- so nothing orders the two and both write the same scratch. The failure
+// is silent: wrong output, no CUDA error, no TensorRT error.
+//
+// This lock nests inside the per-handle EngineHandle::mu, which already spans
+// the enqueue, and is never taken in the other order.
+class SharedScratchClaim {
+ public:
+  SharedScratchClaim() = default;
+  SharedScratchClaim(const SharedScratchClaim&) = delete;
+  SharedScratchClaim& operator=(const SharedScratchClaim&) = delete;
+  ~SharedScratchClaim() {
+    release();
+  }
+
+  SharedScratchDevice& hold(int device_id) {
+    dev_ = &scratch_pool.get(device_id);
+    device_id_ = device_id;
+    lock_ = std::unique_lock<std::mutex>(dev_->mu);
+    return *dev_;
+  }
+
+  // Null until hold() runs and null again after release(): non-null exactly while
+  // this claim holds the device's lock.
+  SharedScratchDevice* device() const {
+    return dev_;
+  }
+
+  int device_id() const {
+    return device_id_;
+  }
+
+  // Takes ownership of a buffer a growth displaced, to be freed by release().
+  void retire(void* buffer) {
+    retired_ = buffer;
+  }
+
+  // Drops the lock, and the device pointer with it so device() cannot hand out a
+  // pointer this claim no longer holds the lock for. Then frees whatever a growth
+  // displaced -- after the unlock, because cudaFree waits for every stream on the
+  // device, which under the lock would stall the next claim on work unrelated to
+  // the pool. Outside it the stall is this caller's alone and falls after its own
+  // enqueue, so a growth makes that one execute() wait for its own engine work.
+  //
+  // Frees on the current device, which must still be the buffer's.
+  void release() {
+    if (lock_.owns_lock()) {
+      lock_.unlock();
+    }
+    dev_ = nullptr;
+    if (retired_ != nullptr) {
+      // cudaFree synchronizes, so an earlier asynchronous fault on this device
+      // often surfaces here. Report and clear it, or it resurfaces under the
+      // name of the next CUDA call in execute().
+      const cudaError_t err = cudaFree(retired_);
+      if (err != cudaSuccess) {
+        ET_LOG(
+            Error,
+            "TensorRTBackend::execute: freeing the shared activation scratch buffer that a pool growth replaced on device %d failed: %s",
+            device_id_,
+            cudaGetErrorString(err));
+        cudaGetLastError(); // clear sticky error; the free is cleanup, so execute() continues
+      }
+      retired_ = nullptr;
+    }
+  }
+
+ private:
+  SharedScratchDevice* dev_ = nullptr;
+  int device_id_ = -1;
+  std::unique_lock<std::mutex> lock_;
+  void* retired_ = nullptr;
+};
 
 // Sets out_ptr to a buffer of at least `need` bytes on `device_id` and out_size to
 // its capacity, with `stream` ordered after the enqueue that last used the buffer.
-// The caller must call mark_shared_scratch_in_flight once it has submitted its own
-// enqueue.
+// Returns with `claim` holding the device's lock: the caller must submit its
+// enqueue, call mark_shared_scratch_in_flight, and only then release the claim.
 //
 // Must be called with `device_id` already current: cudaEventCreateWithFlags,
 // cudaMalloc and cudaFree all act on the *current* device and nothing in here
 // sets it.
-Error get_or_grow_shared_scratch(int device_id, size_t need, cudaStream_t stream, void*& out_ptr, size_t& out_size) {
-  SharedScratchDevice& dev = scratch_pool.get(device_id);
-  std::lock_guard<std::mutex> lk(dev.mu);
+Error get_or_grow_shared_scratch(
+    SharedScratchClaim& claim,
+    int device_id,
+    size_t need,
+    cudaStream_t stream,
+    void*& out_ptr,
+    size_t& out_size) {
+  SharedScratchDevice& dev = claim.hold(device_id);
 
   const SharedScratchHandoff handoff = shared_scratch_claim_event(dev, []() -> cudaEvent_t {
     cudaEvent_t event = nullptr;
@@ -292,6 +371,7 @@ Error get_or_grow_shared_scratch(int device_id, size_t need, cudaStream_t stream
   }
 
   const bool first_buffer = dev.buffer == nullptr;
+  RetiredScratch retired;
   void* const buffer = shared_scratch_get_or_grow(
       dev,
       need,
@@ -309,12 +389,7 @@ Error get_or_grow_shared_scratch(int device_id, size_t need, cudaStream_t stream
             bytes);
         return p;
       },
-      [](void* old, cudaEvent_t wait_for) {
-        if (wait_for != nullptr) {
-          cudaEventSynchronize(wait_for);
-        }
-        cudaFree(old);
-      });
+      retired);
   if (buffer == nullptr) {
     ET_LOG(
         Error,
@@ -324,19 +399,46 @@ Error get_or_grow_shared_scratch(int device_id, size_t need, cudaStream_t stream
     return Error::MemoryAllocationFailed;
   }
 
+  if (retired.buffer != nullptr) {
+    // The wait runs here and the free runs at release(), because this caller
+    // records its own enqueue on the same event before it drops the lock: a wait
+    // deferred to sit beside the free would block on that enqueue too.
+    const cudaError_t err = retired.wait_for != nullptr ? cudaEventSynchronize(retired.wait_for) : cudaSuccess;
+    if (err == cudaSuccess) {
+      claim.retire(retired.buffer);
+    } else {
+      // This wait is the only thing keeping the free off a buffer an enqueue may
+      // still be reading, so a failed wait leaks it instead. Bounded: at most one
+      // buffer per growth, and growth is rare -- see SharedScratchClaim::release.
+      ET_LOG(
+          Error,
+          "TensorRTBackend::execute: waiting for the enqueue on the replaced shared activation scratch on device %d failed (%s); leaking that buffer rather than freeing it under a live enqueue",
+          device_id,
+          cudaGetErrorString(err));
+      cudaGetLastError(); // clear sticky error; execute() continues regardless
+    }
+  }
+
   out_ptr = buffer;
   return Error::Ok;
 }
 
-// Records the enqueue now in flight on `stream` against `device_id`'s shared
-// scratch, so the next call to get_or_grow_shared_scratch waits for it.
-Error mark_shared_scratch_in_flight(int device_id, cudaStream_t stream) {
-  SharedScratchDevice& dev = scratch_pool.get(device_id);
-  std::lock_guard<std::mutex> lk(dev.mu);
+// Records the enqueue now in flight on `stream` against the claimed device's
+// shared scratch, so the next call to get_or_grow_shared_scratch waits for it.
+// Call with `claim` still holding the device's lock.
+Error mark_shared_scratch_in_flight(SharedScratchClaim& claim, cudaStream_t stream) {
+  SharedScratchDevice* const dev = claim.device();
+  if (dev == nullptr) {
+    ET_LOG(Error, "TensorRTBackend::execute: no shared activation scratch claim to record an enqueue against");
+    return Error::Internal;
+  }
 
-  const cudaEvent_t event = shared_scratch_mark_in_flight(dev);
+  const cudaEvent_t event = shared_scratch_mark_in_flight(*dev);
   if (event == nullptr) {
-    ET_LOG(Error, "TensorRTBackend::execute: shared activation scratch on device %d has no handoff event", device_id);
+    ET_LOG(
+        Error,
+        "TensorRTBackend::execute: shared activation scratch on device %d has no handoff event",
+        claim.device_id());
     return Error::Internal;
   }
   const cudaError_t err = cudaEventRecord(event, stream);
@@ -1070,13 +1172,20 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // against. A failed query carried on would instead leave the context enqueueing
   // against whatever buffer it last held, because setDeviceMemoryV2(nullptr, 0)
   // is rejected and returns nothing to test.
+  //
+  // The claim holds the device's pool lock from here through the record of the
+  // enqueue below; see SharedScratchClaim for why it spans that far. Every return
+  // in between drops it through the destructor, which runs ahead of the device
+  // restore above, so its free lands on the right device.
+  SharedScratchClaim scratch_claim;
   bool scratch_from_pool = false;
   if (engine->shared_scratch) {
     const size_t need = ctx->updateDeviceMemorySizeForShapes();
     if (need > 0) {
       void* pool = nullptr;
       size_t pool_size = 0;
-      const Error scratch_err = get_or_grow_shared_scratch(engine->device_id, need, stream, pool, pool_size);
+      const Error scratch_err =
+          get_or_grow_shared_scratch(scratch_claim, engine->device_id, need, stream, pool, pool_size);
       if (scratch_err != Error::Ok) {
         return scratch_err;
       }
@@ -1106,7 +1215,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
 
   // Pairs with get_or_grow_shared_scratch: the next claimant waits on this event.
   if (scratch_from_pool) {
-    const Error mark_err = mark_shared_scratch_in_flight(engine->device_id, stream);
+    const Error mark_err = mark_shared_scratch_in_flight(scratch_claim, stream);
     if (mark_err != Error::Ok) {
       // Nothing will wait for this enqueue, so wait for it here instead of
       // leaving the next user of the buffer to overwrite live scratch.
@@ -1115,6 +1224,11 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       return mark_err;
     }
   }
+  // The enqueue is now on the marker's event, so the device's pool is safe to
+  // hand to the next claimant. Released here rather than at the end of the
+  // function so the rest of execute() -- the aliased reflects, the D2H copies and
+  // their synchronizations -- does not hold up another engine on this device.
+  scratch_claim.release();
 
   // Caller-owned KV: reflect each engine in-place update into its delegate output
   // EValue (D2D on the same stream, after the engine work).
