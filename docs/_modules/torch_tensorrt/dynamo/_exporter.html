@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=1b7ebc1b"></script>
+    <script src="../../../_static/documentation_options.js?v=cfaed3aa"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -653,8 +653,25 @@ document.write(`
     <span class="c1"># At first the user_inputs are only present in the graph_signature.input_specs and hence non_user_input_idx=0</span>
     <span class="c1"># The input_specs should be of the form [params, buffers, constant_tensors, custom_obj, user_inputs]</span>
     <span class="n">non_user_input_idx</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="c1"># Inlining the partitions left in PyTorch copies each one's own get_attr back</span>
+    <span class="c1"># into the graph, so one constant can arrive as several get_attr nodes sharing a</span>
+    <span class="c1"># target. fx uniquifies a placeholder's name but not its target, and placeholder</span>
+    <span class="c1"># codegen emits the target, so lifting that target twice yields a forward() with</span>
+    <span class="c1"># a duplicated argument that fails to compile.</span>
+    <span class="n">lifted_placeholders</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">Node</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"get_attr"</span><span class="p">:</span>
+            <span class="n">existing</span> <span class="o">=</span> <span class="n">lifted_placeholders</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">target</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">existing</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="c1"># This read may itself be a graph output, and the rename below only</span>
+                <span class="c1"># runs for the first read, so point the output at the placeholder</span>
+                <span class="c1"># being reused before the node goes away.</span>
+                <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="n">output_names</span><span class="p">:</span>
+                    <span class="n">output_names</span><span class="p">[</span><span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">existing</span><span class="o">.</span><span class="n">name</span>
+                <span class="n">node</span><span class="o">.</span><span class="n">replace_all_uses_with</span><span class="p">(</span><span class="n">existing</span><span class="p">)</span>
+                <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">erase_node</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
+                <span class="k">continue</span>
+
             <span class="n">lift_val</span> <span class="o">=</span> <span class="kc">None</span>
             <span class="n">input_kind</span> <span class="o">=</span> <span class="kc">None</span>
 
@@ -699,14 +716,26 @@ document.write(`
                         <span class="n">lift_val</span><span class="p">,</span> <span class="n">static_shapes</span><span class="o">=</span><span class="kc">True</span>
                     <span class="p">)</span>
 
+                <span class="c1"># Two attributes whose names differ only by a dot sanitize to one</span>
+                <span class="c1"># argument name, so take the node's own name, which fx has already</span>
+                <span class="c1"># made unique against everything else in the graph.</span>
+                <span class="n">const_placeholder_node</span><span class="o">.</span><span class="n">target</span> <span class="o">=</span> <span class="n">const_placeholder_node</span><span class="o">.</span><span class="n">name</span>
+
                 <span class="n">node</span><span class="o">.</span><span class="n">replace_all_uses_with</span><span class="p">(</span><span class="n">const_placeholder_node</span><span class="p">)</span>
+                <span class="n">lifted_placeholders</span><span class="p">[</span><span class="n">node</span><span class="o">.</span><span class="n">target</span><span class="p">]</span> <span class="o">=</span> <span class="n">const_placeholder_node</span>
                 <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">erase_node</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
 
                 <span class="c1"># Verify if the const_placeholder being added is one of the output nodes</span>
                 <span class="c1"># This happens if there is just a single static arange op in the graph</span>
                 <span class="c1"># https://github.com/pytorch/TensorRT/issues/3189</span>
-                <span class="k">if</span> <span class="n">const_placeholder_name</span> <span class="ow">in</span> <span class="n">output_names</span><span class="p">:</span>
-                    <span class="n">output_names</span><span class="p">[</span><span class="n">const_placeholder_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">const_placeholder_node</span><span class="o">.</span><span class="n">name</span>
+                <span class="c1"># Keyed on the get_attr node's own name, which is what the output spec</span>
+                <span class="c1"># holds. The sanitised target only matches it when fx did not have to</span>
+                <span class="c1"># rename the node, so an attribute like W or myBuf or 0.weight left the</span>
+                <span class="c1"># spec pointing at a node that was just erased. The dedup branch above</span>
+                <span class="c1"># keys on node.name for the same reason, and so does upstream's own</span>
+                <span class="c1"># lifting pass.</span>
+                <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="n">output_names</span><span class="p">:</span>
+                    <span class="n">output_names</span><span class="p">[</span><span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">const_placeholder_node</span><span class="o">.</span><span class="n">name</span>
 
                 <span class="c1"># Add these parameters/buffers/constants to the existing graph signature</span>
                 <span class="c1"># before user inputs. These specs are looked up in the state_dict during ExportedProgram creation.</span>
