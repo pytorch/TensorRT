@@ -76,7 +76,7 @@ def _apply_symbolic_shape_expressions(
     # statically shaped even when a data-dependent engine output is symbolic.
     shape_env = getattr(fake_mode, "shape_env", None)
     compile_input_symbols = set()
-    compile_to_runtime = {}
+    compile_to_runtime: Dict[sympy.Expr, sympy.Expr] = {}
     runtime_expr_to_symint = {}
     composite_input_equations = []
 
@@ -97,9 +97,22 @@ def _apply_symbolic_shape_expressions(
                 runtime_expr = sympy.Integer(d)
 
             if compile_expr.is_Symbol:
+                if (
+                    compile_expr in compile_to_runtime
+                    and sympy.simplify(compile_to_runtime[compile_expr] - runtime_expr)
+                    != 0
+                ):
+                    raise RuntimeError(
+                        "[torch.ops.tensorrt.execute_engine]: Runtime input shapes "
+                        f"disagree on compile-time symbol {compile_expr}: already "
+                        f"mapped to {compile_to_runtime[compile_expr]} from an earlier "
+                        f"input, but this input maps it to {runtime_expr}"
+                    )
                 compile_to_runtime[compile_expr] = runtime_expr
             else:
-                composite_input_equations.append(sympy.Eq(compile_expr, runtime_expr))
+                # Store the difference: sympy.Eq can auto-collapse to a bare
+                # Boolean with no .lhs/.rhs (e.g. Eq(2*d, 7) -> False).
+                composite_input_equations.append(compile_expr - runtime_expr)
 
             logger.debug(
                 f"[torch.ops.tensorrt.execute_engine]: Meta kernel captured input shape mapping from {compile_expr} to {runtime_expr}"
@@ -120,7 +133,32 @@ def _apply_symbolic_shape_expressions(
             dict=True,
         )
         if len(solutions) == 1:
-            compile_to_runtime.update(solutions[0])
+            # Underdetermined systems still return one dict, but a value can
+            # contain other unresolved compile-time symbols, e.g. solve(s0+s1-10,
+            # (s0,s1)) -> {s0: 10-s1}. Only accept fully resolved values.
+            for symbol, value in solutions[0].items():
+                if not (value.free_symbols & compile_input_symbols):
+                    compile_to_runtime[symbol] = value
+
+    # Validate every composite equation, even if unresolved_input_symbols was
+    # empty above (a symbol already mapped elsewhere doesn't mean this
+    # relationship was actually satisfied by these runtime inputs).
+    for diff in composite_input_equations:
+        residual = sympy.simplify(diff.xreplace(compile_to_runtime))
+        if residual == 0:
+            continue
+        if residual.is_number:
+            raise RuntimeError(
+                "[torch.ops.tensorrt.execute_engine]: Runtime input shapes violate "
+                f"a relationship captured at compile time: {diff} == 0 does not hold "
+                f"for these inputs (residual {residual} != 0)"
+            )
+        # Still symbolic: can't prove it holds, so fail closed.
+        raise RuntimeError(
+            "[torch.ops.tensorrt.execute_engine]: Could not verify the compile-time "
+            f"input relationship {diff} == 0 against these runtime shapes "
+            f"(unresolved residual: {residual})"
+        )
 
     # Symbols which occur only in engine outputs represent quantities created
     # by the engine, such as the row count of nonzero. Allocate fresh runtime
