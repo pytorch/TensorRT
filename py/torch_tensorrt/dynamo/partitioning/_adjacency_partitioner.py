@@ -138,6 +138,7 @@ class TRTPartitioner(_SplitterBase):  # type: ignore
         require_full_compilation: bool = REQUIRE_FULL_COMPILATION,
         return_tuple: bool = False,
         skip_fusion: bool = False,
+        assume_full_support: bool = False,
     ):
         """
         Preprocesses graph before splitting:
@@ -157,20 +158,30 @@ class TRTPartitioner(_SplitterBase):  # type: ignore
             skip_fusion=skip_fusion,
         )
         self.operator_support = operator_support
+        self.assume_full_support = assume_full_support
 
-        # Get all accelerated nodes based on operator support conditions
-        self.acc_nodes = FxNetAccNodesFinder(
-            self.module, self.operator_support, self.settings.allow_non_tensor
-        )()
-
-        if self.settings.skip_fusion:
-            self.fusions = {}
+        if self.assume_full_support:
+            # The caller already walked the graph and verified converter support.
+            # Avoid repeating support discovery and dependency construction.
+            self.acc_nodes = {
+                node for node in self.module.graph.nodes if node.op in CALLABLE_NODE_OPS
+            }
+            self.fusions: Dict[torch.fx.Node, NodeSet] = {}
+            self.deps: Dict[torch.fx.Node, NodeSet] = {}
         else:
-            self.fusions = FxNetAccFusionsFinder(module, set(self.acc_nodes))()
+            # Get all accelerated nodes based on operator support conditions
+            self.acc_nodes = FxNetAccNodesFinder(
+                self.module, self.operator_support, self.settings.allow_non_tensor
+            )()
 
-        # Modify deps to add more deps for fused nodes
-        self.deps = self.find_deps()
-        self.update_deps_for_fusions()
+            if self.settings.skip_fusion:
+                self.fusions = {}
+            else:
+                self.fusions = FxNetAccFusionsFinder(module, set(self.acc_nodes))()
+
+            # Modify deps to add more deps for fused nodes
+            self.deps = self.find_deps()
+            self.update_deps_for_fusions()
 
         self.non_acc_submodule_name = "_run_on_gpu_"
         self._node_submodule_map: Dict[str, str] = {}
@@ -223,6 +234,40 @@ class TRTPartitioner(_SplitterBase):  # type: ignore
 
         Returns a GraphModule with submodules for each segment
         """
+        unsupported = getattr(self.operator_support, "unsupported_operators", None)
+        # The explicit assumption comes from the compiler's earlier support walk.
+        # Otherwise, an empty dict means AccNodesFinder found no unsupported ops.
+        fully_supported = self.assume_full_support or (
+            isinstance(unsupported, dict) and len(unsupported) == 0
+        )
+
+        # Fast path: user demanded a single TRT engine and every op is convertible.
+        # Skip adjacency splitting; emit one ACC block and tag/split as usual so the
+        # rest of compile still sees `_run_on_acc_*`.
+        if self.require_full_compilation and fully_supported:
+            if self.settings.min_acc_module_size != MIN_BLOCK_SIZE:
+                logger.warning(
+                    "Detected both require_full_compilation and min_block_size compilation "
+                    "arguments were specified. Disregarding min_block_size argument for "
+                    "fully supported model."
+                )
+            nodes = [
+                node for node in self.module.graph.nodes if node.op in CALLABLE_NODE_OPS
+            ]
+            if not nodes:
+                raise AssertionError(
+                    "require_full_compilation=True was specified, but no accelerated "
+                    "operators were found in the graph"
+                )
+            logger.info(
+                "require_full_compilation + full operator support: "
+                "wrapping graph as a single TRT submodule (skipping adjacency split)"
+            )
+            subgraphs = [Subgraph(is_acc=True, nodes=nodes)]
+            self.num_trt_accelerated_subgraphs = 1
+            self.tag(subgraphs)
+            return self.split(remove_tag=True)
+
         # Delegate nodes based on operator coverage
         subgraphs = self.put_nodes_into_subgraphs()
 
@@ -280,6 +325,7 @@ def partition(
     torch_executed_ops: Collection[Target] = set(),
     require_full_compilation: bool = REQUIRE_FULL_COMPILATION,
     skip_fusion: bool = False,
+    assume_full_support: bool = False,
 ) -> Tuple[torch.fx.GraphModule, OpSupportTester]:
     """Partition an FX GraphModule with aten ops into TRT engines
     Partitioning is based on converter operator support
@@ -290,6 +336,8 @@ def partition(
         torch_executed_ops: Collection of operations to run in Torch, regardless of converter coverage
         require_full_compilation: Require that all computational operators be run in TRT
         skip_fusion: Skip fusions found by FxNetAccFusionsFinder
+        assume_full_support: Skip repeated support/dependency discovery because
+            the caller already verified that every computational op is supported
     Returns:
         torch.fx.GraphModule, OpSupportTester
     """
@@ -306,6 +354,7 @@ def partition(
         min_block_size=min_block_size,
         require_full_compilation=require_full_compilation,
         skip_fusion=skip_fusion,
+        assume_full_support=assume_full_support,
     )
 
     partitioned_graph = partitioner.partition_graph()
