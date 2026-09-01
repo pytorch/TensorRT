@@ -44,6 +44,7 @@ from torch_tensorrt.dynamo.lowering import (
     pre_export_lowering,
 )
 from torch_tensorrt.dynamo.lowering._buffer_lifting import (
+    erase_export_guards,
     inline_lifted_buffers_into_gm,
     lift_mutated_buffers,
 )
@@ -1226,6 +1227,37 @@ def compile_module(
         # TODO: For future, explore when nodes don't have metadata and if fake_tensor_prop can resolve this.
         logger.warning(
             "Some nodes do not have metadata (shape and dtype information). This could lead to problems sometimes if the graph has PyTorch and TensorRT segments."
+        )
+
+    # Every computational op is TRT-legal: skip AccNodesFinder / tag / split and
+    # convert the lowered graph as a single engine. Mixed graphs still partition.
+    if (
+        settings.require_full_compilation
+        and num_supported_ops == total_ops
+        and not settings.enable_resource_partitioning
+    ):
+        logger.info(
+            "require_full_compilation + full operator support: "
+            "skipping partitioner, converting whole graph"
+        )
+        if settings.dryrun:
+            return gm
+        gm = erase_export_guards(gm)
+        # Do not delete `_frozen_param*` here. Stock compile_module only drops
+        # them on the parent after split; convert still needs them on the
+        # graph being interpreted. Use placeholder meta for engine I/O — a
+        # flattened copy of compile() sample args can wrap kwargs dicts and
+        # non-tensor flags (Flux `return_dict`) that are not TRT bindings.
+        convert_inputs = partitioning.construct_submodule_inputs(
+            gm,
+            user_symbol_bounds=user_symbol_bounds,
+        )
+        return convert_module(
+            gm,
+            convert_inputs,
+            settings=settings,
+            name="_run_on_acc_0",
+            engine_cache=engine_cache,
         )
 
     # Store the original input spec for later use

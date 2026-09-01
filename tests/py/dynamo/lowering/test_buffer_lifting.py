@@ -30,6 +30,7 @@ import torch
 from torch.export import export
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo.lowering._buffer_lifting import (
+    erase_export_guards,
     inline_lifted_buffers_into_gm,
     lift_mutated_buffers,
 )
@@ -282,6 +283,28 @@ class TestInlineLiftedBuffers(TestCase):
         if isinstance(out, tuple):
             out = out[0]
         self.assertEqual(out.item(), 33.0)
+
+
+class TestEraseExportGuards(TestCase):
+    def test_erase_guards_fn_from_exported_module(self):
+        class Add(torch.nn.Module):
+            def forward(self, x):
+                return x + x
+
+        gm = export(Add(), (torch.ones(2, 2),)).module()
+        had_guard = any(
+            n.op == "call_module" and n.target == "_guards_fn" for n in gm.graph.nodes
+        )
+        if not had_guard:
+            self.skipTest("this PyTorch export did not emit _guards_fn")
+        gm = erase_export_guards(gm)
+        self.assertFalse(
+            any(
+                n.op == "call_module" and n.target == "_guards_fn"
+                for n in gm.graph.nodes
+            )
+        )
+        self.assertNotIn("_guards_fn", dict(gm.named_children()))
 
 
 if __name__ == "__main__":

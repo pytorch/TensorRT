@@ -35,6 +35,29 @@ import torch
 logger = logging.getLogger(__name__)
 
 
+def erase_export_guards(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
+    """Remove ``torch.export`` ``_guards_fn`` call_module nodes.
+
+    The partitioner does not delete these nodes: AccNodesFinder marks them
+    unsupported, ``split()`` parks them on ``_run_on_gpu_*``, and
+    ``compile_module`` skips convert for non-``_run_on_acc`` children. Direct
+    ``convert_module(gm)`` would otherwise try to compile ``GuardsFn``.
+    """
+    for node in list(gm.graph.nodes):
+        if (
+            node.op == "call_module"
+            and isinstance(node.target, str)
+            and node.target == "_guards_fn"
+        ):
+            name = node.target
+            gm.graph.erase_node(node)
+            if name in dict(gm.named_children()):
+                gm.delete_submodule(name)
+            break
+    gm.graph.lint()
+    return gm
+
+
 def lift_mutated_buffers(
     gm: torch.fx.GraphModule,
 ) -> Tuple[torch.fx.GraphModule, List[Tuple[str, str, torch.Tensor]]]:
@@ -158,14 +181,7 @@ def lift_mutated_buffers(
     # forward signature reflects the placeholder set as written.
     # First remove the call to ``_guards_fn`` (generated for the original
     # arity; would fail after lifting).
-    for node in list(gm.graph.nodes):
-        if (
-            node.op == "call_module"
-            and isinstance(node.target, str)
-            and node.target == "_guards_fn"
-        ):
-            gm.graph.erase_node(node)
-            break
+    gm = erase_export_guards(gm)
 
     # Reset codegen to the plain CodeGen so the forward args = placeholders.
     gm.graph.set_codegen(torch.fx.graph.CodeGen())
