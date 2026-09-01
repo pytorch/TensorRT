@@ -21,8 +21,8 @@ import sympy
 import torch
 import torch_tensorrt
 from torch._subclasses.fake_tensor import FakeTensorMode
-from torch.fx.experimental.symbolic_shapes import ShapeEnv
 from torch.export import Dim
+from torch.fx.experimental.symbolic_shapes import ShapeEnv
 from torch_tensorrt.dynamo.runtime.meta_ops.register_meta_ops import (
     _apply_symbolic_shape_expressions,
 )
@@ -397,6 +397,92 @@ class TestApplySymbolicShapeExpressions:
             )[0]
 
         assert output.shape[0].node.expr == runtime_base.node.expr
+
+    def test_rejects_underdetermined_composite_mapping(self):
+        """One input dim s0+s1=10 cannot pin down s0 alone, so the output
+        (which is just s0) cannot be inferred. sympy.solve still returns one
+        solution ({s0: 10-s1}), so this must be rejected explicitly rather
+        than accepted because len(solutions) == 1."""
+        compile_s0 = sympy.Symbol("s0", integer=True)
+        compile_s1 = sympy.Symbol("s1", integer=True)
+
+        shape_info = self._shape_info(
+            input_expr=compile_s0 + compile_s1,
+            output_expr=compile_s0,
+        )
+
+        shape_env = ShapeEnv()
+        with FakeTensorMode(shape_env=shape_env):
+            fake_input = torch.empty(10)
+
+            with pytest.raises(
+                RuntimeError,
+                match="Could not verify the compile-time input relationship",
+            ):
+                _apply_symbolic_shape_expressions(
+                    [fake_input],
+                    shape_info,
+                )
+
+    @staticmethod
+    def _two_input_shape_info(x_expr, y_expr, output_expr):
+        return {
+            "inputs": [
+                {"shape_exprs": [x_expr], "dtype": torch.float32, "name": "x"},
+                {"shape_exprs": [y_expr], "dtype": torch.float32, "name": "y"},
+            ],
+            "outputs": [
+                {"shape_exprs": [output_expr], "dtype": torch.float32},
+            ],
+        }
+
+    def test_rejects_inconsistent_composite_input_relationship(self):
+        """s0 is mapped directly from x, so composite_input_equations from y's
+        `2*s0` is never solved (nothing is left unresolved) -- it still has to
+        be checked against the runtime shapes, or an inconsistent pairing like
+        x=4, y=7 (requires y=8) is silently accepted."""
+        compile_base = sympy.Symbol("s0", integer=True)
+        shape_info = self._two_input_shape_info(
+            compile_base, 2 * compile_base, compile_base
+        )
+
+        shape_env = ShapeEnv()
+        with FakeTensorMode(shape_env=shape_env):
+            fake_x = torch.empty(4)
+            fake_y = torch.empty(7)
+            with pytest.raises(RuntimeError):
+                _apply_symbolic_shape_expressions([fake_x, fake_y], shape_info)
+
+    def test_accepts_consistent_composite_input_relationship(self):
+        compile_base = sympy.Symbol("s0", integer=True)
+        shape_info = self._two_input_shape_info(
+            compile_base, 2 * compile_base, compile_base
+        )
+
+        shape_env = ShapeEnv()
+        with FakeTensorMode(shape_env=shape_env):
+            runtime_base = shape_env.create_unbacked_symint()
+            shape_env._constrain_range_for_size(runtime_base.node.expr)
+            fake_x = torch.empty(runtime_base)
+            fake_y = torch.empty(2 * runtime_base)
+            output = _apply_symbolic_shape_expressions([fake_x, fake_y], shape_info)[0]
+
+        assert output.shape[0].node.expr == runtime_base.node.expr
+
+    def test_rejects_inconsistent_repeated_direct_mapping(self):
+        """The same compile-time symbol s0 as a bare dimension on two inputs
+        must resolve to the same runtime value; x=4, z=5 disagree."""
+        compile_base = sympy.Symbol("s0", integer=True)
+        shape_info = self._two_input_shape_info(
+            compile_base, compile_base, compile_base
+        )
+
+        shape_env = ShapeEnv()
+        with FakeTensorMode(shape_env=shape_env):
+            fake_x = torch.empty(4)
+            fake_z = torch.empty(5)
+            with pytest.raises(RuntimeError):
+                _apply_symbolic_shape_expressions([fake_x, fake_z], shape_info)
 
 
 if __name__ == "__main__":
