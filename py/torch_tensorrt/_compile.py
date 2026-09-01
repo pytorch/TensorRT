@@ -1396,11 +1396,6 @@ def _write_external_tensor_data(executorch_program: Any, file_path: str) -> None
 
 def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None:
     """Save an engine-bearing ExportedProgram as an ExecuTorch program."""
-    if not ENABLED_FEATURES.torch_tensorrt_runtime:
-        raise RuntimeError(
-            "output_format='executorch' requires the Torch-TensorRT runtime "
-            "(torch_tensorrt_runtime). Reinstall torch_tensorrt with the runtime extension."
-        )
     try:
         from torch_tensorrt.executorch import export
     except ImportError:
