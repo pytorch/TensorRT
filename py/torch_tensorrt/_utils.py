@@ -52,12 +52,17 @@ def executorch_install_command() -> str:
 
     Shared by every runtime error message that tells a user how to install ExecuTorch, so the
     channel is derived once from the running torch and the three messages cannot drift from each
-    other or from the pin. ``--upgrade`` because the message is raised from inside an already
-    installed ``torch_tensorrt``: without it pip treats the requirement as satisfied and exits 0
-    without adding the ``executorch`` extra.
+    other or from the pin.
+
+    No ``--upgrade``: on a named requirement it upgrades the package itself, so a user on a
+    released ``torch_tensorrt`` would have that build replaced by a nightly, and ``torch`` pulled
+    along with it, when all they asked for was the extra. It is not needed either. Measured with
+    pip 25.0.1 against probe wheels shaped like this case: with the package already installed and
+    the extra missing, ``pip install "demo[executorch]"`` installs the extra's dependencies and
+    leaves the package alone.
     """
     return (
-        'pip install --pre --upgrade "torch_tensorrt[executorch]" '
+        'pip install --pre "torch_tensorrt[executorch]" '
         f"--extra-index-url https://download.pytorch.org/whl/nightly/{executorch_install_channel()}"
     )
 
