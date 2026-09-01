@@ -59,7 +59,7 @@ class TestAutomaticPlugin(DispatchTestCase):
             torch.randn(weight_shape, device="cuda", dtype=data_type),
         ]
 
-        self.run_test(rmsnorm(), inputs, precision=dtype.f16)
+        self.run_test(rmsnorm(), inputs)
 
 
 if __name__ == "__main__":
