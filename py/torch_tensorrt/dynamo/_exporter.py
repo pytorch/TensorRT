@@ -174,8 +174,25 @@ def lift(
     # At first the user_inputs are only present in the graph_signature.input_specs and hence non_user_input_idx=0
     # The input_specs should be of the form [params, buffers, constant_tensors, custom_obj, user_inputs]
     non_user_input_idx = 0
+    # Inlining the partitions left in PyTorch copies each one's own get_attr back
+    # into the graph, so one constant can arrive as several get_attr nodes sharing a
+    # target. fx uniquifies a placeholder's name but not its target, and placeholder
+    # codegen emits the target, so lifting that target twice yields a forward() with
+    # a duplicated argument that fails to compile.
+    lifted_placeholders: Dict[str, torch.fx.Node] = {}
     for node in gm.graph.nodes:
         if node.op == "get_attr":
+            existing = lifted_placeholders.get(node.target)
+            if existing is not None:
+                # This read may itself be a graph output, and the rename below only
+                # runs for the first read, so point the output at the placeholder
+                # being reused before the node goes away.
+                if node.name in output_names:
+                    output_names[node.name] = existing.name
+                node.replace_all_uses_with(existing)
+                gm.graph.erase_node(node)
+                continue
+
             lift_val = None
             input_kind = None
 
@@ -220,14 +237,26 @@ def lift(
                         lift_val, static_shapes=True
                     )
 
+                # Two attributes whose names differ only by a dot sanitize to one
+                # argument name, so take the node's own name, which fx has already
+                # made unique against everything else in the graph.
+                const_placeholder_node.target = const_placeholder_node.name
+
                 node.replace_all_uses_with(const_placeholder_node)
+                lifted_placeholders[node.target] = const_placeholder_node
                 gm.graph.erase_node(node)
 
                 # Verify if the const_placeholder being added is one of the output nodes
                 # This happens if there is just a single static arange op in the graph
                 # https://github.com/pytorch/TensorRT/issues/3189
-                if const_placeholder_name in output_names:
-                    output_names[const_placeholder_name] = const_placeholder_node.name
+                # Keyed on the get_attr node's own name, which is what the output spec
+                # holds. The sanitised target only matches it when fx did not have to
+                # rename the node, so an attribute like W or myBuf or 0.weight left the
+                # spec pointing at a node that was just erased. The dedup branch above
+                # keys on node.name for the same reason, and so does upstream's own
+                # lifting pass.
+                if node.name in output_names:
+                    output_names[node.name] = const_placeholder_node.name
 
                 # Add these parameters/buffers/constants to the existing graph signature
                 # before user inputs. These specs are looked up in the state_dict during ExportedProgram creation.
