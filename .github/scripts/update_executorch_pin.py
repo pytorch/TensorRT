@@ -153,6 +153,7 @@ def _upper_bound(version: str) -> str:
 _PIN_SITES = (
     ".github/workflows/executorch-build-linux.yml",
     ".github/workflows/executorch-test-linux.yml",
+    ".github/workflows/release-linux-x86_64.yml",
     "MODULE.bazel",
     "docker/MODULE.bazel.docker",
     "docker/MODULE.bazel.ngc",
