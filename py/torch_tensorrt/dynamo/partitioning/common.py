@@ -283,9 +283,11 @@ def construct_submodule_inputs(
                             )
                         )
                     elif isinstance(input_meta, torch.SymFloat):
+                        # Rank-0 to match the 0-D scalar_tensor inline_trt_modules
+                        # materializes for this input at the engine boundary.
                         torchtrt_inputs.append(
                             get_input(
-                                [1],
+                                [],
                                 torch.float32,
                                 name=input.name,
                                 is_shape_tensor=False,  # Only SymInt inputs are treated as shape tensors
