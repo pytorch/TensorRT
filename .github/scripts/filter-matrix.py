@@ -21,7 +21,7 @@ arm_cuda_versions: List[str] = ["cu130", "cu132"]
 # For PRs we build/test a single representative config to keep cycle time short.
 # Full matrix runs on main / nightly / release branches.
 PR_PYTHON_VERSION: str = "3.12"
-PR_CUDA_VERSION: str = "cu132"
+PR_CUDA_VERSION: str = "cu126"
 
 jetpack_container_image: str = "nvcr.io/nvidia/l4t-jetpack:r36.4.0"
 sbsa_container_image: str = "quay.io/pypa/manylinux_2_39_aarch64"
