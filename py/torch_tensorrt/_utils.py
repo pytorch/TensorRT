@@ -15,7 +15,12 @@ import torch
 logger = logging.getLogger(__name__)
 
 _WHL_CPYTHON_VERSION = "cp310"
-_TENSORRT_LLM_VERSION_ = "0.17.0.post1"
+_TENSORRT_LLM_VERSION_ = "1.2.0"
+# TensorRT major.minor that the TRT-LLM release above is compatible with.
+# Checked in is_platform_supported_for_trtllm() before attempting to
+# download/load the plugin, since a mismatch otherwise surfaces as an opaque
+# "libnvinfer.so.<N>: cannot open shared object file" error at dlopen time.
+_TENSORRT_LLM_REQUIRED_TENSORRT_MAJOR_MINOR_ = "10.14"
 
 
 def sanitized_torch_version() -> Any:
@@ -115,7 +120,9 @@ def is_platform_supported_for_trtllm() -> bool:
         - Windows platforms
         - Jetson/Orin/Xavier (aarch64 architecture + 'tegra' in platform release)
         - Thor devices
-        - CUDA 13 not supported
+        - PyTorch builds without CUDA support
+        - CUDA 11 and older
+        - Installed TensorRT version incompatible with the pinned TRT-LLM release
     """
     system = platform.system().lower()
     machine = platform.machine().lower()
@@ -134,17 +141,26 @@ def is_platform_supported_for_trtllm() -> bool:
         return False
 
     try:
-        cuda_version = torch.version.cuda  # e.g., "12.4" or "13.0"
-        if cuda_version is None:
+        if torch.version.cuda is None:
             logger.error(
                 "This pytorch build does not support CUDA, please reinstall pytorch with CUDA support"
             )
             return False
 
-        major, minor = map(int, cuda_version.split("."))
-        if major != 12:
+        cuda_major = int(torch.version.cuda.split(".", maxsplit=1)[0])
+        if cuda_major < 12:
             logger.error(
-                "CUDA 13 is not currently supported for TRT-LLM plugins. Please install pytorch with CUDA 12.x support"
+                "CUDA 11 and older versions are obsolete for TRT-LLM plugins. "
+                "Please install PyTorch with CUDA 12 or newer support."
+            )
+            return False
+
+        installed_trt_major_minor = ".".join(trt.__version__.split(".")[:2])
+        if installed_trt_major_minor != _TENSORRT_LLM_REQUIRED_TENSORRT_MAJOR_MINOR_:
+            logger.info(
+                f"TensorRT-LLM {_TENSORRT_LLM_VERSION_} requires TensorRT "
+                f"{_TENSORRT_LLM_REQUIRED_TENSORRT_MAJOR_MINOR_}.x, but TensorRT "
+                f"{trt.__version__} is installed. Skipping TensorRT-LLM plugin support."
             )
             return False
 
@@ -153,8 +169,6 @@ def is_platform_supported_for_trtllm() -> bool:
     except Exception as e:
         logger.info(f"Failed to detect CUDA version: {e}")
         return False
-
-    return True
 
 
 def _cache_root() -> Path:
@@ -174,9 +188,6 @@ def download_and_get_plugin_lib_path() -> Optional[str]:
     """
     Returns the path to the TensorRT‑LLM shared library, downloading and extracting if necessary.
 
-    Args:
-        platform (str): Platform identifier (e.g., 'linux_x86_64')
-
     Returns:
         Optional[str]: Path to shared library or None if operation fails.
     """
@@ -194,7 +205,7 @@ def download_and_get_plugin_lib_path() -> Optional[str]:
         if "linux" in platform_system
         else "libnvinfer_plugin_tensorrt_llm.dll"
     )
-    # eg: /tmp/torch_tensorrt_<username>/trtllm/0.17.0.post1_linux_x86_64/tensorrt_llm/libs/libnvinfer_plugin_tensorrt_llm.so
+    # eg: /tmp/torch_tensorrt_<username>/trtllm/<version>_linux_x86_64/tensorrt_llm/libs/libnvinfer_plugin_tensorrt_llm.so
     plugin_lib_path = extract_dir / "tensorrt_llm" / "libs" / lib_filename
 
     if plugin_lib_path.exists():
@@ -351,8 +362,10 @@ def check_native_trt_collectives(
 def load_tensorrt_llm_for_nccl() -> bool:
     """
     Attempts to load the TensorRT-LLM plugin and initialize it.
-    Either the env variable TRTLLM_PLUGINS_PATH can specify the path
-    Or the user can specify USE_TRTLLM_PLUGINS as either of (1, true, yes, on) to download the TRT-LLM distribution and load it
+
+    TRTLLM_PLUGINS_PATH can specify a user-provided plugin. Alternatively,
+    USE_TRTLLM_PLUGINS can be set to one of (1, true, yes, on) to download
+    the compatible TensorRT-LLM distribution and load its plugin.
 
     Returns:
         bool: True if the plugin was successfully loaded and initialized, False otherwise.
@@ -373,10 +386,13 @@ def load_tensorrt_llm_for_nccl() -> bool:
         )
         if not use_trtllm_plugin:
             logger.info(
-                "Neither TRTLLM_PLUGIN_PATH is set nor is it directed to download the shared library. Please set either of the two to use TRT-LLM libraries in torchTRT"
+                "Neither TRTLLM_PLUGINS_PATH nor USE_TRTLLM_PLUGINS is set. "
+                "Please set one of them to use TensorRT-LLM libraries in Torch-TensorRT."
             )
             return False
 
         plugin_lib_path = download_and_get_plugin_lib_path()
-        return load_and_initialize_trtllm_plugin(plugin_lib_path)  # type: ignore[arg-type]
+        if plugin_lib_path is None:
+            return False
+        return load_and_initialize_trtllm_plugin(plugin_lib_path)
     return False
