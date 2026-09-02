@@ -42,6 +42,23 @@ unzip fmt.zip
 cp -r fmt-12.0.0/include/fmt/ $TORCH_INSTALL_PATH/include/
 ls -lart $TORCH_INSTALL_PATH/include/fmt/
 
+# TensorRT archives have different CUDA compatibility ceilings. CI provides
+# CU_VERSION in the PyTorch wheel format (for example, cu132).
+case "${CU_VERSION}" in
+    cu12*)
+        export TENSORRT_CUDA_VERSION_UPPER_BOUND="12.9"
+        export TENSORRT_RTX_CUDA_VERSION_UPPER_BOUND="12.9"
+        ;;
+    cu13*)
+        export TENSORRT_CUDA_VERSION_UPPER_BOUND="13.3"
+        export TENSORRT_RTX_CUDA_VERSION_UPPER_BOUND="13.4"
+        ;;
+    *)
+        echo "ERROR: Unsupported CUDA version '${CU_VERSION}' for TensorRT archive selection."
+        exit 1
+        ;;
+esac
+
 cat toolchains/ci_workspaces/MODULE.bazel.tmpl | envsubst > MODULE.bazel
 
 if [[ ${TENSORRT_VERSION} != "" ]]; then
