@@ -10,6 +10,7 @@ from torch_tensorrt.dynamo.lowering.passes.mark_constant_fold_exclusions import 
     mark_constant_fold_exclusions,
 )
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
+    iter_cond_subgraphs,
     trace_intermediate_node_outputs,
 )
 
@@ -171,6 +172,9 @@ def post_lowering(
     if fake_mode is not None:
         fake_tensor_updater.incremental_update(fake_mode)
 
+    for sub in iter_cond_subgraphs(gm):
+        post_lowering(sub, settings)
+
     return gm
 
 
@@ -192,6 +196,8 @@ def pre_export_lowering(
         )
     gm = ep.graph_module
     gm = ATEN_PRE_LOWERING_PASSES(gm, settings)
+    for sub in iter_cond_subgraphs(gm):
+        ATEN_PRE_LOWERING_PASSES(sub, settings)
     return ep
 
 
