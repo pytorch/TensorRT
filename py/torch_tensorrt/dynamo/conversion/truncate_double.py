@@ -66,38 +66,28 @@ def _metadata_to_dtype(
     return updated
 
 
+def _find_module_node(gm: torch.fx.GraphModule, submodule_name: str) -> torch.fx.Node:
+    for node in gm.graph.nodes:
+        if node.op == "call_module" and str(node.target) == submodule_name:
+            return node
+
+    raise AssertionError(
+        f"Sought module node {submodule_name}, could not find in graph:\n{gm.graph}"
+    )
+
+
 def _repair_64bit_input(
     gm: torch.fx.GraphModule,
     position: int,
     submodule_name: str,
-    submodule_output_metadata: Optional[Sequence[Dict[str, Any]]],
-    is_collection_output: bool,
-    dtype: torch.dtype,
 ) -> None:
-    """Fix a single double input and any double outputs at a TRT boundary.
-
-    The output dtypes come from the partition's FX metadata. Compilation must not
-    execute the partition merely to discover information already recorded there.
-    """
-    assert dtype == torch.float64, f"dtype argument must be torch.float64, got {dtype}"
-
+    """Downcast a single double input at a TRT boundary to float32."""
     logger.info(
         f"Downcasting a 64-bit input at position {position} of submodule {submodule_name}"
     )
 
-    dtype_64bit = dtype
     dtype_32bit = torch.float32
-
-    module_node = None
-    for node in gm.graph.nodes:
-        if node.op == "call_module" and str(node.target) == submodule_name:
-            module_node = node
-            break
-
-    if module_node is None:
-        raise AssertionError(
-            f"Sought module node {submodule_name}, could not find in graph:\n{gm.graph}"
-        )
+    module_node = _find_module_node(gm, submodule_name)
 
     node_64bit = module_node.all_input_nodes[position]
     with gm.graph.inserting_before(module_node):
@@ -110,8 +100,31 @@ def _repair_64bit_input(
 
     module_node.replace_input_with(node_64bit, node_32bit)
 
+    gm.graph.eliminate_dead_code()
+    gm.graph.lint()
+    gm.recompile()
+
+
+def _repair_64bit_outputs(
+    gm: torch.fx.GraphModule,
+    submodule_name: str,
+    submodule_output_metadata: Sequence[Dict[str, Any]],
+    is_collection_output: bool,
+) -> None:
+    """Correct output metadata and insert restoring casts for double outputs.
+
+    A partition can have a float64 output even when every runtime input is
+    float32 -- e.g. a float32 input added to a float64 weight/constant -- so
+    this must run independently of whether any input needed repair. The
+    output dtypes come from the partition's FX metadata; compilation must not
+    execute the partition merely to discover information already recorded
+    there.
+    """
+    dtype_64bit = torch.float64
+    dtype_32bit = torch.float32
+
     output_positions_64bit: Set[int] = set()
-    original_output_metadata = list(submodule_output_metadata or ())
+    original_output_metadata = list(submodule_output_metadata)
     truncated_output_metadata = []
     for output_position, metadata in enumerate(original_output_metadata):
         if _metadata_dtype(metadata) == dtype_64bit:
@@ -120,59 +133,56 @@ def _repair_64bit_input(
         else:
             truncated_output_metadata.append(metadata.copy())
 
+    if not output_positions_64bit:
+        return
+
+    module_node = _find_module_node(gm, submodule_name)
+
     # The call_module node describes the actual engine boundary. Preserve its
     # container convention while correcting tensor dtypes to what TRT emits.
-    if truncated_output_metadata:
-        for key in ("val", "tensor_meta"):
-            values = [
-                metadata[key]
-                for metadata in truncated_output_metadata
-                if key in metadata
-            ]
-            if not values:
-                continue
-            current = module_node.meta.get(key)
-            if isinstance(current, tuple):
-                module_node.meta[key] = tuple(values)
-            elif isinstance(current, list) or len(values) > 1:
-                module_node.meta[key] = values
-            else:
-                module_node.meta[key] = values[0]
+    for key in ("val", "tensor_meta"):
+        values = [
+            metadata[key] for metadata in truncated_output_metadata if key in metadata
+        ]
+        if not values:
+            continue
+        current = module_node.meta.get(key)
+        if isinstance(current, tuple):
+            module_node.meta[key] = tuple(values)
+        elif isinstance(current, list) or len(values) > 1:
+            module_node.meta[key] = values
+        else:
+            module_node.meta[key] = values[0]
 
-    if output_positions_64bit:
-        if not is_collection_output:
-            with gm.graph.inserting_after(module_node):
+    if not is_collection_output:
+        with gm.graph.inserting_after(module_node):
+            cast_node_64bit = gm.graph.call_function(
+                torch.ops.aten._to_copy.default,
+                args=(module_node,),
+                kwargs={"dtype": dtype_64bit},
+            )
+            cast_node_64bit.meta = original_output_metadata[0].copy()
+
+        module_node.replace_all_uses_with(
+            cast_node_64bit, delete_user_cb=lambda user: user != cast_node_64bit
+        )
+    else:
+        get_nodes = _extract_downstream_get_nodes(module_node, output_positions_64bit)
+        for get_node in get_nodes:
+            output_position = get_node.args[1]
+            get_node.meta = truncated_output_metadata[output_position].copy()
+            with gm.graph.inserting_after(get_node):
                 cast_node_64bit = gm.graph.call_function(
                     torch.ops.aten._to_copy.default,
-                    args=(module_node,),
+                    args=(get_node,),
                     kwargs={"dtype": dtype_64bit},
                 )
-                cast_node_64bit.meta = original_output_metadata[0].copy()
+                cast_node_64bit.meta = original_output_metadata[output_position].copy()
 
-            module_node.replace_all_uses_with(
-                cast_node_64bit, delete_user_cb=lambda user: user != cast_node_64bit
+            get_node.replace_all_uses_with(
+                cast_node_64bit,
+                delete_user_cb=lambda user: user != cast_node_64bit,
             )
-        else:
-            get_nodes = _extract_downstream_get_nodes(
-                module_node, output_positions_64bit
-            )
-            for get_node in get_nodes:
-                output_position = get_node.args[1]
-                get_node.meta = truncated_output_metadata[output_position].copy()
-                with gm.graph.inserting_after(get_node):
-                    cast_node_64bit = gm.graph.call_function(
-                        torch.ops.aten._to_copy.default,
-                        args=(get_node,),
-                        kwargs={"dtype": dtype_64bit},
-                    )
-                    cast_node_64bit.meta = original_output_metadata[
-                        output_position
-                    ].copy()
-
-                get_node.replace_all_uses_with(
-                    cast_node_64bit,
-                    delete_user_cb=lambda user: user != cast_node_64bit,
-                )
 
     gm.graph.eliminate_dead_code()
     gm.graph.lint()
@@ -186,12 +196,12 @@ def repair_double_inputs(
     device: torch.device,
     submodule_name: Optional[str] = None,
 ) -> Sequence[Input]:
-    """Fixes all Long/Double type inputs to a TRT-accelerated subgraph
+    """Repair float64 inputs and outputs at a TensorRT partition boundary.
 
     In-Place modifies the provided graph
 
-    Inserts a cast to the 32-bit equivalent type for TRT, then if necessary,
-    inserts an upcast back to the 64-bit type for subsequent Torch operations
+    Casts float64 runtime inputs to float32 for TensorRT and independently
+    restores float64 source outputs after the engine.
 
     Args:
         parent_graph: FX GraphModule enclosing the TRT subgraph
@@ -199,11 +209,11 @@ def repair_double_inputs(
         submodule_inputs: Input tensor(s) of TRT-accelerated subgraph (used for dtypes/structure)
         submodule_name: Optionally specify the name of the submodule target in the parent graph
     Returns:
-        New submodule inputs, updated accordingly with long/double truncation
+        New submodule inputs, updated for float64 truncation
     """
     submodule_torch_inputs = get_torch_inputs(submodule_inputs, device)
     num_submodule_inputs = len(submodule_inputs)
-    repaired_outputs_once = False
+    name = submodule_name if submodule_name is not None else submodule._get_name()
     output_node = next(node for node in submodule.graph.nodes if node.op == "output")
     is_collection_output = isinstance(output_node.args[0], (tuple, list))
     submodule_output_metadata = get_output_metadata(submodule)
@@ -213,16 +223,7 @@ def repair_double_inputs(
         param = submodule_torch_inputs[position]
 
         if isinstance(param, torch.Tensor) and param.dtype == torch.float64:
-            _repair_64bit_input(
-                parent_graph,
-                position,
-                submodule_name if submodule_name is not None else submodule._get_name(),
-                None if repaired_outputs_once else submodule_output_metadata,
-                is_collection_output,
-                param.dtype,
-            )
-
-            repaired_outputs_once = True
+            _repair_64bit_input(parent_graph, position, name)
 
             # Repair submodule inputs in accordance with inserted casts
             dtype_32bit = torch.float32
@@ -240,5 +241,11 @@ def repair_double_inputs(
                 submodule_inputs[idx].dtype = dtype._from(
                     submodule_torch_inputs[idx].dtype
                 )
+
+    # A partition can have a float64 output (e.g. from a float64 weight) even
+    # when no runtime input was float64, so this runs unconditionally.
+    _repair_64bit_outputs(
+        parent_graph, name, submodule_output_metadata, is_collection_output
+    )
 
     return submodule_inputs
