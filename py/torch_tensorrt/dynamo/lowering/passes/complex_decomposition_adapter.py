@@ -155,14 +155,19 @@ def _trt_decomposition_table(
     would have handled them, and the partitioner then cuts the graph around
     them. Handing the retrace the same table keeps the two in step.
     """
-    from torch_tensorrt.dynamo.lowering import get_decompositions
+    from torch_tensorrt.dynamo.lowering import (
+        filter_decomposition_table,
+        get_decompositions,
+    )
 
-    return get_decompositions(
-        settings.enable_experimental_decompositions,
-        settings.decompose_attention,
-        settings.use_distributed_mode_trace,
-        use_fp32_acc=settings.use_fp32_acc,
-        graph_module=graph_module,
+    return filter_decomposition_table(
+        get_decompositions(
+            settings.enable_experimental_decompositions,
+            settings.decompose_attention,
+            settings.use_distributed_mode_trace,
+            use_fp32_acc=settings.use_fp32_acc,
+        ),
+        graph_module,
     )
 
 
