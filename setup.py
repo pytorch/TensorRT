@@ -1014,13 +1014,10 @@ def get_x86_64_requirements(base_requirements):
                 "tensorrt_rtx>=1.6.1.120,<1.7.0.0",
             ]
         else:
-            requirements = requirements + [
-                "tensorrt>=11.1.0,<11.2.0",
-            ]
             cuda_version = torch.version.cuda
             if cuda_version.startswith("12"):
-                # In cu12* envs, keep the CUDA-specific TensorRT wheels explicit so the default CUDA 13
-                # TensorRT dependency path is not pulled in as well.
+                # Do not depend on the generic ``tensorrt`` metapackage here:
+                # it selects CUDA 13 packages even for a cu12 Torch wheel.
                 tensorrt_prefix = "tensorrt-cu12"
                 requirements = requirements + [
                     f"{tensorrt_prefix}>=11.1.0,<11.2.0",
