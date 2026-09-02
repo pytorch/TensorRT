@@ -21,7 +21,6 @@ HERE = pathlib.Path(__file__).resolve().parent
 REPO_ROOT = HERE.parents[1]
 BAZEL_TARGET = "//py/torch-tensorrt-executorch-runtime/native:delegate_native"
 BUILD_NONCE = os.getenv("TORCH_TENSORRT_EXECUTORCH_BUILD_NONCE", uuid.uuid4().hex)
-CUDA_RUNTIME_DISTRIBUTION = "nvidia-cuda-runtime"
 
 
 def torchtrt_version() -> str:
@@ -50,14 +49,39 @@ def installed_version(distribution: str) -> str:
 
 
 def tensorrt_distribution() -> str:
-    """Return the TensorRT distribution matching the PyTorch CUDA build."""
+    """Return the TensorRT distribution matching the PyTorch CUDA build.
+
+    Matched on the major. test-infra's matrix carries cu128 alongside cu126, and the filter
+    drops it rather than the build rejecting it, but a 12.x that is not exactly 12.6 used to
+    reach the "Unsupported CUDA version" path here even though tensorrt-cu12 is what it needs.
+    """
     cuda_version = torch.version.cuda
     if cuda_version is None:
         raise RuntimeError("CUDA-enabled PyTorch is required to build this wheel")
-    if cuda_version.startswith("12.6"):
+    if cuda_version.startswith("12."):
         return "tensorrt-cu12"
     if cuda_version.startswith("13."):
         return "tensorrt-cu13"
+    raise RuntimeError(f"Unsupported CUDA version: {cuda_version}")
+
+
+def cuda_runtime_distribution() -> str:
+    """Return the CUDA runtime distribution matching the PyTorch CUDA build.
+
+    NVIDIA splits this one by major: the CUDA 12 wheels are published as
+    ``nvidia-cuda-runtime-cu12``, while the unsuffixed ``nvidia-cuda-runtime``
+    is the CUDA 13 line. Naming the unsuffixed one unconditionally made every
+    CUDA 12 row fail with "No package metadata was found for
+    nvidia-cuda-runtime", because what torch installed there was the suffixed
+    distribution.
+    """
+    cuda_version = torch.version.cuda
+    if cuda_version is None:
+        raise RuntimeError("CUDA-enabled PyTorch is required to build this wheel")
+    if cuda_version.startswith("12."):
+        return "nvidia-cuda-runtime-cu12"
+    if cuda_version.startswith("13."):
+        return "nvidia-cuda-runtime"
     raise RuntimeError(f"Unsupported CUDA version: {cuda_version}")
 
 
@@ -141,6 +165,7 @@ class BazelBuild(build_ext):
 
 
 TENSORRT_DISTRIBUTION = tensorrt_distribution()
+CUDA_RUNTIME_DISTRIBUTION = cuda_runtime_distribution()
 executorch_version = installed_version("executorch")
 tensorrt_version = installed_version(TENSORRT_DISTRIBUTION)
 cuda_runtime_version = installed_version(CUDA_RUNTIME_DISTRIBUTION)

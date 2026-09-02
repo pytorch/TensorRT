@@ -35,42 +35,73 @@ def load_delegate_module():
     return module
 
 
-class FakeMethod:
-    def execute(self, inputs):
+class FakeModule:
+    """Stands in for what the Module API returns.
+
+    method_names is a call and running a method is one step, unlike the program loader's
+    load_method(...).execute(...). The runtime moved to this API because only it backs
+    device-tagged memory-planned arenas with real device memory.
+    """
+
+    def __init__(self, data):
+        self.data = data
+
+    def method_names(self):
+        return {"forward"}
+
+    def run_method(self, name, inputs):
+        if name != "forward":
+            raise RuntimeError(f"unknown method {name!r}")
         return [inputs[0] + 1]
 
 
-class FakeProgram:
-    method_names = {"forward"}
-
-    def load_method(self, name):
-        return FakeMethod() if name == "forward" else None
-
-
 class FakeRuntime:
-    def load_program(self, data):
-        self.data = data
-        return FakeProgram()
+    def __init__(self):
+        self.data = None
+
+    def __call__(self):
+        return self
+
+
+def _install_fakes(monkeypatch):
+    """Stub the delegate and the Module loader the runtime imports.
+
+    The runtime calls get_runtime() to check the backend is registered and activate() to get the
+    native module it installed, then takes the loader off that module. Faking activate() keeps the
+    canonical portable_lib name out of sys.modules, which is what activate() itself treats as a
+    sign the stock runtime was imported first.
+    """
+    loaded = {}
+
+    def fake_load_from_buffer(data):
+        loaded["data"] = data
+        return FakeModule(data)
+
+    native = types.ModuleType("fake_portable_lib")
+    native._load_for_executorch_from_buffer = fake_load_from_buffer
+
+    delegate = types.ModuleType("torch_tensorrt_executorch_runtime")
+    delegate.get_runtime = lambda: None
+    delegate.activate = lambda: native
+    monkeypatch.setitem(sys.modules, delegate.__name__, delegate)
+    return loaded
 
 
 def test_load_and_forward(monkeypatch, tmp_path):
-    delegate = types.ModuleType("torch_tensorrt_executorch_runtime")
-    fake_runtime = FakeRuntime()
-    delegate.get_runtime = lambda: fake_runtime
-    monkeypatch.setitem(sys.modules, delegate.__name__, delegate)
+    loaded = _install_fakes(monkeypatch)
     model = tmp_path / "model.pte"
     model.write_bytes(b"pte")
 
     program = load_runtime_module().load(model)
 
     assert program.forward(2) == [3]
-    assert program._data is fake_runtime.data
+    # The bytes reach the loader without a copy, and the wrapper keeps them alive because
+    # ExecuTorch references that memory rather than owning it.
+    assert program._data is loaded["data"]
 
 
 def test_unknown_method(monkeypatch, tmp_path):
-    delegate = types.ModuleType("torch_tensorrt_executorch_runtime")
-    delegate.get_runtime = FakeRuntime
-    monkeypatch.setitem(sys.modules, delegate.__name__, delegate)
+    _install_fakes(monkeypatch)
     model = tmp_path / "model.pte"
     model.write_bytes(b"pte")
 
