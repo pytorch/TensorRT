@@ -234,14 +234,22 @@ def write_pins(new_version: str, new_commit: str) -> bool:
         + re.escape(old_range_tail)
         + r"|"
         + re.escape(old_version)
-        + r")(?![0-9A-Za-z.+_-])"
+        # A local label belongs to the version, so consume it rather than letting it block
+        # the match. The guard accepts "executorch==<pin>+cu130" as a pin, so a rewriter
+        # blind to it would leave such a site stale and then fail the generated pull request.
+        + r")(?P<label>\+[0-9A-Za-z.]+)?(?![0-9A-Za-z.+_-])"
     )
 
     def _sub_version(match: re.Match[str]) -> str:
         lead = match.group("lead")
-        if match.group(0).endswith(f",<{old_upper}"):
-            return f"{lead}{new_version},<{new_upper}"
-        return f"{lead}{new_version}"
+        # A local label names the CUDA train, not the version, so it survives the bump.
+        label = match.group("label") or ""
+        matched = match.group(0)
+        if label:
+            matched = matched[: -len(label)]
+        if matched.endswith(f",<{old_upper}"):
+            return f"{lead}{new_version},<{new_upper}{label}"
+        return f"{lead}{new_version}{label}"
 
     changed = False
     for path in _pin_site_paths():
