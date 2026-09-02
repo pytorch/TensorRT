@@ -109,3 +109,41 @@ def test_fallback_data_dependent_ops_routes_output_allocator_op_to_torch():
     )
     targets = {n.target for n in gm.graph.nodes if n.op == "call_function"}
     assert torch.ops.aten.nonzero.default in targets
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA required")
+def test_zero_length_nonzero_boundary_remains_in_torch():
+    """A legal empty nonzero result must not enter a TRT profile with min=1."""
+
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            indices = torch.nonzero(x)
+            return torch.sin(indices.to(torch.float32))
+
+    model = Model().eval().cuda()
+    compile_input = torch.tensor([0, 3, 0, 5, 7], dtype=torch.int32, device="cuda")
+    exported = torch.export.export(model, (compile_input,))
+    compiled = torch_tensorrt.dynamo.compile(
+        exported,
+        arg_inputs=[compile_input],
+        min_block_size=1,
+        fallback_data_dependent_ops=True,
+    )
+
+    sin_fallback_name = next(
+        name
+        for name, submodule in compiled.named_children()
+        if isinstance(submodule, torch.fx.GraphModule)
+        and any(
+            node.target == torch.ops.aten.sin.default for node in submodule.graph.nodes
+        )
+    )
+    assert "_run_on_gpu" in sin_fallback_name
+    assert "_run_on_acc" not in sin_fallback_name
+
+    runtime_input = torch.zeros_like(compile_input)
+    expected = model(runtime_input)
+    actual = compiled(runtime_input)
+
+    assert actual.shape == (0, 1)
+    torch.testing.assert_close(actual, expected)

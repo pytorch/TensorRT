@@ -1432,7 +1432,8 @@ def compile_module(
         if attr.startswith("_frozen_param"):
             delattr(gm, attr)
 
-    for name, _ in partitioned_module.named_children():
+    renamed_fallback_submodule = False
+    for name, _ in list(partitioned_module.named_children()):
         submodule = getattr(partitioned_module, name)
         # filter on the GraphModule
         if not isinstance(submodule, torch.fx.graph_module.GraphModule):
@@ -1485,12 +1486,54 @@ def compile_module(
         # Get the submodule inputs for min, opt, max shapes of the graph inputs.
         # With multi-profile compile, propagate the profiles (by index) to each
         # submodule input by symbolic substitution.
-        submodule_inputs = partitioning.construct_submodule_inputs(
-            submodule,
-            profile_source_bounds=profile_source_bounds,
-            num_profiles=num_profiles,
-            user_symbol_bounds=user_symbol_bounds,
-        )
+        try:
+            submodule_inputs = partitioning.construct_submodule_inputs(
+                submodule,
+                profile_source_bounds=profile_source_bounds,
+                num_profiles=num_profiles,
+                user_symbol_bounds=user_symbol_bounds,
+            )
+        except partitioning.ZeroLengthInputError as exc:
+            if settings.require_full_compilation:
+                raise ValueError(
+                    "A TensorRT submodule input may contain a zero-length "
+                    "dimension, which is incompatible with "
+                    "require_full_compilation=True."
+                ) from exc
+            logger.warning(
+                "Leaving submodule %s in PyTorch because one of its inputs may "
+                "contain a zero-length dimension: %s",
+                name,
+                exc,
+            )
+            dryrun_tracker.to_run_in_torch.extend(parse_non_trt_nodes(submodule))
+            if settings.offload_module_to_cpu:
+                submodule.to(to_torch_device(settings.device))
+
+            # The partitioner named this as an accelerator submodule before its
+            # input profile was constructed. Keep the returned graph truthful by
+            # relabeling the late fallback as a PyTorch/GPU submodule.
+            fallback_base_name = name.replace("_run_on_acc", "_run_on_gpu", 1)
+            fallback_name = fallback_base_name
+            existing_node_names = {
+                node.name
+                for node in partitioned_module.graph.nodes
+                if node is not submodule_node_dict[name]
+            }
+            suffix = 1
+            while (
+                hasattr(partitioned_module, fallback_name)
+                or fallback_name in existing_node_names
+            ):
+                fallback_name = f"{fallback_base_name}_{suffix}"
+                suffix += 1
+
+            delattr(partitioned_module, name)
+            partitioned_module.add_submodule(fallback_name, submodule)
+            submodule_node_dict[name].target = fallback_name
+            submodule_node_dict[name].name = fallback_name
+            renamed_fallback_submodule = True
+            continue
 
         assert submodule_inputs is not None
 
@@ -1573,6 +1616,10 @@ def compile_module(
         if settings.lazy_engine_init and not settings.enable_cross_compile_for_windows:
             trt_module = getattr(partitioned_module, name)
             trt_module.setup_engine()
+
+    if renamed_fallback_submodule:
+        partitioned_module.graph.lint()
+        partitioned_module.recompile()
 
     # Post-partition complex I/O boundary pass — runs in both normal and dryrun mode
     # so the wrapper graph reflects the exact graph that will be executed/built.

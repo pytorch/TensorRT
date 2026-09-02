@@ -22,6 +22,10 @@ logger = logging.getLogger(__name__)
 ProfileSourceBounds = List[Dict[str, Dict[str, int]]]
 
 
+class ZeroLengthInputError(ValueError):
+    """Raised when a TensorRT engine input may contain a zero-length dimension."""
+
+
 def _build_submodule_profiles(
     input_shape: torch.Size,
     union_min: Sequence[int],
@@ -102,6 +106,9 @@ def construct_dynamic_input(
             :func:`extract_var_range_info` to fill unbounded exporter uppers.
     Returns:
         A dynamic shaped torch_tensorrt.Input which has the properties of the symbolic shaped input.
+    Raises:
+        ZeroLengthInputError: If a dimension's legal lower bound is below one
+            and therefore cannot be represented by a TensorRT input profile.
     """
     min_shape = []
     opt_shape = []
@@ -120,15 +127,12 @@ def construct_dynamic_input(
             else:
                 min_bound = int(min_max_opt["min"])
                 if min_bound < 1:
-                    logger.warning(
-                        "Dynamic input %s (shape: %s) has lower bound %d for dim %d. "
-                        "TensorRT profiles require dimensions >= 1; clamping it to 1.",
-                        name,
-                        input_shape,
-                        min_bound,
-                        d,
+                    raise ZeroLengthInputError(
+                        f"Dynamic input {name} (shape: {input_shape}) has lower "
+                        f"bound {min_bound} for dim {d}. TensorRT profiles require "
+                        "dimensions >= 1, so this input must remain in PyTorch."
                     )
-                unwrapped_min_max_opt["min"] = max(1, min_bound)
+                unwrapped_min_max_opt["min"] = min_bound
 
             if "max" not in min_max_opt or min_max_opt["max"] is None:
                 logger.warning(

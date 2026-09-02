@@ -12,7 +12,10 @@ import torch
 import torch_tensorrt as torchtrt
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo._compiler import _build_user_symbol_bounds
-from torch_tensorrt.dynamo.partitioning.common import construct_dynamic_input
+from torch_tensorrt.dynamo.partitioning.common import (
+    ZeroLengthInputError,
+    construct_dynamic_input,
+)
 from torch_tensorrt.dynamo.utils import extract_var_range_info
 
 assertions = unittest.TestCase()
@@ -624,8 +627,8 @@ def test_largest_size_symbol_bound_is_treated_as_unbounded():
 
 
 @pytest.mark.unit
-def test_construct_dynamic_input_clamps_zero_minimum():
-    """Data-dependent extents can include zero, but TRT profiles cannot."""
+def test_construct_dynamic_input_rejects_zero_minimum():
+    """Do not narrow a legal zero-length extent to make a TRT profile."""
 
     class Nonzero(torch.nn.Module):
         def forward(self, x):
@@ -642,11 +645,10 @@ def test_construct_dynamic_input_clamps_zero_minimum():
     fake_value = nonzero.meta["val"]
     assert isinstance(fake_value.shape[0], torch.SymInt)
 
-    input_spec = construct_dynamic_input(
-        fake_value.shape, fake_value.dtype, name="nonzero_output"
-    )
-    assert input_spec.shape["min_shape"] == (1, 1)
-    assert input_spec.shape["max_shape"] == (4, 1)
+    with pytest.raises(ZeroLengthInputError, match="must remain in PyTorch"):
+        construct_dynamic_input(
+            fake_value.shape, fake_value.dtype, name="nonzero_output"
+        )
 
 
 if __name__ == "__main__":
