@@ -129,5 +129,9 @@ jobs:
         python -m pip install pyyaml "executorch>=1.4.1,<1.5"
         python examples/torchtrt_executorch_example/export_static_shape.py \
           --model_path="${RUNNER_TEMP}/torchtrt-reference-runner.pte"
-        .github/scripts/verify-executorch-reference-runner.sh \
-          "${RUNNER_TEMP}/torchtrt-reference-runner.pte"
+        # ExecuTorch's CUDA AOTI shims use __dp4a, which cannot be compiled
+        # for the CI-wide sm_50 and sm_60 targets. Limit only this CMake
+        # reference-runner build to architectures that support the intrinsic.
+        TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6;9.0" \
+          .github/scripts/verify-executorch-reference-runner.sh \
+            "${RUNNER_TEMP}/torchtrt-reference-runner.pte"
