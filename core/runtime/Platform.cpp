@@ -13,6 +13,10 @@ const std::unordered_map<std::string, Platform::PlatformEnum>& get_name_to_platf
       {"linux_x86_64", Platform::PlatformEnum::kLINUX_X86_64},
       {"windows_x86_64", Platform::PlatformEnum::kWIN_X86_64},
       {"windows_arm64", Platform::PlatformEnum::kWIN_ARM64},
+      // Python-only artifacts produced before canonical platform metadata used
+      // the Platform enum spelling. Keep them loadable by accepting those tags.
+      {"win_x86_64", Platform::PlatformEnum::kWIN_X86_64},
+      {"win_arm64", Platform::PlatformEnum::kWIN_ARM64},
       {"unknown", Platform::PlatformEnum::kUNKNOWN},
   };
   return name_to_platform_map;
