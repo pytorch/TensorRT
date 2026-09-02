@@ -1375,14 +1375,14 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
                         if self._profile_execution:
                             self.cudagraph.enable_debug_mode()
                         with torch.cuda.graph(self.cudagraph, stream=engine_stream):
-                            self.context.execute_async_v3(engine_stream.cuda_stream)
+                            self._execute_async_v3(engine_stream)
                         if self._profile_execution:
                             self.cudagraph.debug_dump(
                                 f"{DEBUG_LOGGING_DIR}/{self.name}_cudagraph.dot"
                             )
                     self.cudagraph.replay()  # type: ignore[union-attr]
                 else:
-                    self.context.execute_async_v3(engine_stream.cuda_stream)
+                    self._execute_async_v3(engine_stream)
 
             if caller_on_default:
                 caller_stream.wait_stream(engine_stream)
@@ -1459,7 +1459,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             if caller_on_default:
                 engine_stream.wait_stream(caller_stream)
             with torch.cuda.stream(engine_stream):
-                self.context.execute_async_v3(engine_stream.cuda_stream)
+                self._execute_async_v3(engine_stream)
             if caller_on_default:
                 caller_stream.wait_stream(engine_stream)
 
@@ -1478,6 +1478,15 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         if len(outputs) == 1:
             return outputs[0]
         return tuple(outputs)
+
+    def _execute_async_v3(self, stream: torch.cuda.Stream) -> None:
+        # TensorRT reports enqueue failure via a False return (and its logger),
+        # not an exception. Swallowing that leaves output tensors uninitialized.
+        if not self.context.execute_async_v3(stream.cuda_stream):
+            raise RuntimeError(
+                "IExecutionContext.execute_async_v3 failed. The TensorRT engine "
+                "did not execute; output tensors are invalid."
+            )
 
     def execute(
         self, inputs: Sequence[torch.Tensor]
