@@ -135,6 +135,12 @@ def slice_op(  # TODO: This should be slice not whatever is in base
         dim_size = get_shape(
             ctx, target, source_ir, name + "_stop_dim_size", input, dim
         )
+        if isinstance(start, int) and start > 0:
+            # A runtime axis can be shorter than a positive literal start.
+            # Normalize it just like Python so the slice extent cannot go negative.
+            start_slice[dim] = impl.elementwise.min(
+                ctx, target, source_ir, name + "_start_clamped", start, dim_size
+            )
         stop_slice[dim] = impl.elementwise.min(
             ctx, target, source_ir, name + "_stop_clamped", stop, dim_size
         )
