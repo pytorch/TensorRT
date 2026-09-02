@@ -43,6 +43,19 @@ class TestArangeConverter(DispatchTestCase):
             use_dynamo_tracer=True,
         )
 
+    def test_arange_static_non_numpy_type(self):
+        class Arange(nn.Module):
+            def forward(self, x):
+                return torch.ops.aten.arange.start_step(
+                    0, 5, 1, dtype=torch.bfloat16, device=x.device
+                )
+
+        self.run_test(
+            Arange(),
+            [torch.randn(1, 1)],
+            use_dynamo_tracer=True,
+        )
+
     def test_arange_dynamic_int32(self):
         class Arange(nn.Module):
             def forward(self, end_tensor):

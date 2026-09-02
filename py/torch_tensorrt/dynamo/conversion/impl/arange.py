@@ -119,12 +119,19 @@ def arange(
             isinstance(value, float) for value in (start, end, step)
         ):
             resolved_dtype = torch.get_default_dtype()
-        np_dtype = (
-            _enums.dtype._from(resolved_dtype).to(np.dtype)
-            if resolved_dtype is not None
-            else None
-        )
+        constant_dtype = None
+        if resolved_dtype is not None:
+            try:
+                np_dtype = _enums.dtype._from(resolved_dtype).to(np.dtype)
+            except TypeError:
+                # Some TensorRT dtypes, such as BF16, have no NumPy
+                # representation. Build the sequence in NumPy's inferred dtype
+                # and let constant creation cast it to the requested dtype.
+                np_dtype = None
+                constant_dtype = resolved_dtype
+        else:
+            np_dtype = None
         values = np.arange(start, end, step, dtype=np_dtype)
         if values.dtype == np.int64:
             values = values.astype(np.int32)
-        return get_trt_tensor(ctx, values, f"{name}_arange_const")
+        return get_trt_tensor(ctx, values, f"{name}_arange_const", dtype=constant_dtype)
