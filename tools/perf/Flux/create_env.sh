@@ -20,7 +20,7 @@ pip install tensorrt==10.14.1.48 --force-reinstall
 pip3 install --pre  torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu130
 
 
-pip install sentencepiece=="0.2.0" transformers=="4.48.2" accelerate=="1.3.0" diffusers=="0.32.2" protobuf=="5.29.3"
+pip install sentencepiece=="0.2.0" transformers>="5.15.1" accelerate=="1.3.0" diffusers=="0.38.0" protobuf=="5.29.3"
 
 pip install notebook
 pip install gradio safetensors peft pyinstrument

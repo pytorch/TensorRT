@@ -98,7 +98,7 @@ test = [
 
 test-ext = [
     "timm>=1.0.3",
-    "transformers>=5.4.0",
+    "transformers>=5.15.1",
     "torchvision>=0.30.0.dev,<0.31.0",
     "flashinfer-python; sys_platform == 'linux' and python_version >= '3.11' and python_version < '3.13'",
 ]
@@ -178,7 +178,7 @@ conflicts = [
     ],
 ]
 constraint-dependencies = [
-    "transformers>=5.4.0",
+    "transformers>=5.15.1",
 ]
 
 [tool.uv.sources]

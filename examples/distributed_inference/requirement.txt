@@ -1,4 +1,4 @@
 accelerate
-transformers
-diffusers
+transformers>=5.15.1
+diffusers>=0.38.0
 tensorrt-llm

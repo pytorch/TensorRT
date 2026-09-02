@@ -8,7 +8,7 @@ This demo showcases the Flux image generation model accelerated using Torch-Tens
 1. Install the required dependencies:
 
 ```bash
-pip install gradio==5.29.0 nvidia-modelopt==0.27.1 diffusers==0.33.1 accelerate==1.3.0
+pip install gradio==5.29.0 nvidia-modelopt==0.27.1 diffusers==0.38.0 accelerate==1.3.0
 ```
 
 ## Usage
