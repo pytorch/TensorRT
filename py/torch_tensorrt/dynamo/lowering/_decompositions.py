@@ -485,18 +485,21 @@ def scaled_dot_product_attention_decomposition(
     L, S = query.size(-2), key.size(-2)
     device = query.device
 
-    if is_causal or attn_mask is not None:
-        attn_bias = torch.zeros((L, S), dtype=query.dtype, device=device)
-
     if is_causal:
         assert attn_mask is None, "attn_mask must be None when is_causal=True"
+        attn_bias = torch.zeros((L, S), dtype=query.dtype, device=device)
         temp_mask = torch.ones((L, S), dtype=torch.bool, device=device).tril(diagonal=0)
         attn_bias = attn_bias.masked_fill(temp_mask.logical_not(), float("-inf"))
 
     if attn_mask is not None:
         if attn_mask.dtype == torch.bool:
-            attn_bias = attn_bias.masked_fill(attn_mask.logical_not(), float("-inf"))
+            # Preserve masked_fill semantics while using scalar choices so TensorRT
+            # can recognize the compact additive-attention-mask pattern.
+            zero = torch.full((), 0.0, dtype=query.dtype, device=device)
+            negative = torch.full((), float("-inf"), dtype=query.dtype, device=device)
+            attn_bias = torch.where(attn_mask.logical_not(), negative, zero)
         else:
+            attn_bias = torch.zeros((L, S), dtype=query.dtype, device=device)
             attn_bias = attn_mask + attn_bias
 
     if enable_gqa:
