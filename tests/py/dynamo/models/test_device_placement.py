@@ -87,3 +87,31 @@ def test_device_changing_to_copy_stays_outside_engine():
     with FakeTensorMode(shape_env=ShapeEnv()):
         fake_output = inlined(torch.empty(16, device="cuda"))
     assert fake_output.device.type == "cpu"
+
+
+class HostComputeAfterCopy(nn.Module):
+    def forward(self, x):
+        host = (x * 2.0).to("cpu")
+        return host + 1.0
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("use_fast_partitioner", [True, False])
+def test_cpu_compute_after_device_copy_stays_outside_engine(use_fast_partitioner):
+    model = HostComputeAfterCopy().eval().cuda()
+    x = torch.randn(16, device="cuda")
+    expected = model(x)
+
+    exported = torch.export.export(model, (x,))
+    compiled = torch_tensorrt.dynamo.compile(
+        exported,
+        inputs=(x,),
+        min_block_size=1,
+        pass_through_build_failures=True,
+        use_fast_partitioner=use_fast_partitioner,
+    )
+
+    assert any("_run_on_acc" in name for name, _ in compiled.named_children())
+    actual = compiled(x)
+    assert actual.device.type == "cpu"
+    torch.testing.assert_close(actual, expected)
