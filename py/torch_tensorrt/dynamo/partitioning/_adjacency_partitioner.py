@@ -25,6 +25,7 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
 from torch_tensorrt.dynamo.partitioning._global_partitioner import (
     TorchTensorRTOperatorSupport,
 )
+from torch_tensorrt.dynamo.utils import to_torch_device
 
 logger = logging.getLogger(__name__)
 
@@ -39,11 +40,32 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
         self.supported_operators: Dict[str, int] = {}
         self.unsupported_operators: Dict[str, int] = {}
         self.torch_executed_ops = torch_executed_ops
+        self._non_target_device_cache: Dict[torch.fx.Node, bool] = {}
 
     def is_node_supported(
         self, submodules: Dict[str, torch.nn.Module], node: torch.fx.Node
     ) -> bool:
         node_name = ConverterRegistry.qualified_name_or_str(node.target)
+
+        settings = CONVERTERS.compilation_settings
+        if (
+            settings is not None
+            and TorchTensorRTOperatorSupport._is_explicit_non_target_region(
+                node,
+                to_torch_device(settings.device),
+                self._non_target_device_cache,
+            )
+        ):
+            if not node.is_impure():
+                self.unsupported_operators[node_name] = (
+                    self.unsupported_operators.get(node_name, 0) + 1
+                )
+            logger.debug(
+                "Operator %s is not supported because it belongs to an explicit "
+                "non-target device region",
+                node_name,
+            )
+            return False
 
         if TorchTensorRTOperatorSupport._has_complex_dtype(node):
             # Complex-dtype tensors are not supported by TensorRT; force PyTorch fallback
@@ -53,7 +75,6 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
                 )
             return False
 
-        settings = CONVERTERS.compilation_settings
         if (
             settings is not None
             and settings.fallback_data_dependent_ops
