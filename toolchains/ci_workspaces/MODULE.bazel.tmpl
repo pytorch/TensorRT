@@ -108,7 +108,7 @@ http_archive(
     strip_prefix = "TensorRT-11.2.1.2",
     type = "tar.zst",
     urls = [
-        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/11.2.1/tars/TensorRT-Enterprise-11.2.1.2-Linux-x86_64-cuda-13.3-Release-external.tar.zst",
+        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/11.2.1/tars/TensorRT-Enterprise-11.2.1.2-Linux-x86_64-cuda-${TENSORRT_CUDA_VERSION_UPPER_BOUND}-Release-external.tar.zst",
     ],
 )
 
@@ -118,7 +118,7 @@ http_archive(
     strip_prefix = "TensorRT-RTX-1.6.1.120",
     type = "tar.zst",
     urls = [
-        "https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.6/TensorRT-RTX-1.6.1.120-Linux-x86_64-cuda-13.4-Release-external.tar.zst",
+        "https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.6/TensorRT-RTX-1.6.1.120-Linux-x86_64-cuda-${TENSORRT_RTX_CUDA_VERSION_UPPER_BOUND}-Release-external.tar.zst",
     ],
 )
 
@@ -156,7 +156,7 @@ http_archive(
     build_file = "@//third_party/tensorrt/archive:BUILD",
     strip_prefix = "TensorRT-11.2.1.2",
     urls = [
-        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/11.2.1/zip/TensorRT-Enterprise-11.2.1.2-Windows-amd64-cuda-13.3-Release-external.zip",
+        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/11.2.1/zip/TensorRT-Enterprise-11.2.1.2-Windows-amd64-cuda-${TENSORRT_CUDA_VERSION_UPPER_BOUND}-Release-external.zip",
     ],
 )
 
@@ -165,7 +165,7 @@ http_archive(
     build_file = "@//third_party/tensorrt_rtx/archive:BUILD",
     strip_prefix = "TensorRT-RTX-1.6.1.120",
     urls = [
-        "https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.6/TensorRT-RTX-1.6.1.120-Windows-amd64-cuda-13.4-Release-external.zip",
+        "https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.6/TensorRT-RTX-1.6.1.120-Windows-amd64-cuda-${TENSORRT_RTX_CUDA_VERSION_UPPER_BOUND}-Release-external.zip",
     ],
 )
 

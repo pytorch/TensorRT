@@ -21,7 +21,6 @@ HERE = pathlib.Path(__file__).resolve().parent
 REPO_ROOT = HERE.parents[1]
 BAZEL_TARGET = "//py/torch-tensorrt-executorch-runtime/native:delegate_native"
 BUILD_NONCE = os.getenv("TORCH_TENSORRT_EXECUTORCH_BUILD_NONCE", uuid.uuid4().hex)
-TENSORRT_DISTRIBUTION = "tensorrt-cu13"
 CUDA_RUNTIME_DISTRIBUTION = "nvidia-cuda-runtime"
 
 
@@ -50,14 +49,16 @@ def installed_version(distribution: str) -> str:
         ) from error
 
 
-def require_cuda_13() -> None:
-    """Reject builds whose native dependencies do not use supported CUDA 13."""
+def tensorrt_distribution() -> str:
+    """Return the TensorRT distribution matching the PyTorch CUDA build."""
     cuda_version = torch.version.cuda
-    if cuda_version is None or not cuda_version.startswith("13."):
-        raise RuntimeError(
-            "CUDA 13-enabled PyTorch is required to build this wheel "
-            f"(found CUDA {cuda_version or 'None'})"
-        )
+    if cuda_version is None:
+        raise RuntimeError("CUDA-enabled PyTorch is required to build this wheel")
+    if cuda_version.startswith("12.6"):
+        return "tensorrt-cu12"
+    if cuda_version.startswith("13."):
+        return "tensorrt-cu13"
+    raise RuntimeError(f"Unsupported CUDA version: {cuda_version}")
 
 
 class BazelExtension(Extension):
@@ -139,7 +140,7 @@ class BazelBuild(build_ext):
             shutil.copy2(source, output.parent / dependency)
 
 
-require_cuda_13()
+TENSORRT_DISTRIBUTION = tensorrt_distribution()
 executorch_version = installed_version("executorch")
 tensorrt_version = installed_version(TENSORRT_DISTRIBUTION)
 cuda_runtime_version = installed_version(CUDA_RUNTIME_DISTRIBUTION)
