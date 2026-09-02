@@ -3,21 +3,35 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Collection, Sequence, Union, cast
-
-if TYPE_CHECKING:
-    from torch_tensorrt_executorch_runtime import _Runtime
+from typing import Any, Collection, Sequence, Union, cast
 
 
-def _get_runtime() -> _Runtime:
+def _load_module(data: bytes) -> Any:
+    """Load a program through ExecuTorch's Module API.
+
+    A TensorRT delegated program is exported with device-tagged memory-planned
+    arenas, and ExecuTorch backs those with real device memory only through
+    this API. Its program loader plans every arena on the host, so the device
+    copy the exporter inserts around the delegate would hand ``cudaMemcpy`` a
+    host destination and fail with ``invalid argument``.
+    """
     try:
-        from torch_tensorrt_executorch_runtime import get_runtime
+        from torch_tensorrt_executorch_runtime import activate, get_runtime
     except ImportError as error:
         raise ImportError(
             "ExecuTorch Python inference requires the prebuilt delegate. "
             'Install it with: pip install "torch-tensorrt[executorch]"'
         ) from error
-    return get_runtime()
+
+    # get_runtime verifies TensorRTBackend is registered; activate returns the native module it
+    # installed as the process portable runtime, which is what loads the program.
+    get_runtime()
+    native = activate()
+    # Taken off the native module rather than imported through
+    # executorch.extension.pybindings.portable_lib. That wrapper's presence in sys.modules is how
+    # activate() detects that ExecuTorch's stock runtime was imported first, so importing it here
+    # would make a later activate() in the same process refuse.
+    return native._load_for_executorch_from_buffer(data)
 
 
 class Program:
@@ -30,14 +44,14 @@ class Program:
     ExecuTorch C++ runner.
     """
 
-    def __init__(self, program: Any, data: bytes) -> None:
+    def __init__(self, module: Any, data: bytes) -> None:
         # ExecuTorch's BufferDataLoader references this memory without copying it.
         self._data = data
-        self._program = program
+        self._module = module
 
     @property
     def method_names(self) -> Collection[str]:
-        return cast(Collection[str], self._program.method_names)
+        return cast(Collection[str], self._module.method_names())
 
     def run(self, inputs: Sequence[Any], method: str = "forward") -> Sequence[Any]:
         """Run a method using CPU inputs and return CPU outputs.
@@ -56,10 +70,7 @@ class Program:
             raise ValueError(
                 f"Unknown method {method!r}; available methods: {sorted(self.method_names)}"
             )
-        loaded = self._program.load_method(method)
-        if loaded is None:
-            raise RuntimeError(f"ExecuTorch failed to load method {method!r}")
-        return cast(Sequence[Any], loaded.execute(inputs))
+        return cast(Sequence[Any], self._module.run_method(method, inputs))
 
     def forward(self, *inputs: Any) -> Sequence[Any]:
         return self.run(inputs, "forward")
@@ -75,7 +86,7 @@ def load(path: Union[str, Path]) -> Program:
     if not model_path.is_file():
         raise FileNotFoundError(f"ExecuTorch model not found: {model_path}")
     data = model_path.read_bytes()
-    return Program(_get_runtime().load_program(data), data)
+    return Program(_load_module(data), data)
 
 
 __all__ = ["Program", "load"]

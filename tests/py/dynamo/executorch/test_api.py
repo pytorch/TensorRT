@@ -1,5 +1,7 @@
 import ast
 import importlib
+import importlib.util
+import subprocess
 import sys
 import types
 from pathlib import Path
@@ -10,6 +12,198 @@ from torch._library.fake_class_registry import FakeScriptObject
 from torch._subclasses.fake_tensor import FakeTensor
 from torch.export.graph_signature import InputKind
 from torch_tensorrt.dynamo._exporter import _resolve_lifted_custom_obj, lift
+
+
+@pytest.mark.unit
+def test_the_python_loader_uses_the_api_that_backs_device_arenas():
+    """Loading must go through the Module API, not the program loader.
+
+    A delegated program is exported with device-tagged memory-planned arenas. Only the Module API
+    allocates device memory for those; the program loader behind ``executorch.runtime`` plans every
+    arena on the host, so the device copy the exporter inserts is handed a host destination and
+    ``cudaMemcpy`` fails with ``invalid argument``. Asserting the call rather than trusting a
+    comment, since the two APIs differ by one function name and swapping back would be silent until
+    someone ran a delegated model on a GPU.
+    """
+    source = _RUNTIME_PY.read_text(encoding="utf-8")
+    assert "_load_for_executorch_from_buffer" in source, (
+        "the runtime no longer loads through the Module API, so device-planned arenas would be "
+        "planned on the host and every delegate boundary copy would fail"
+    )
+    assert (
+        "load_program" not in source
+    ), "the runtime still references the program loader, which does not back device-tagged arenas"
+
+
+@pytest.mark.unit
+def test_every_lane_that_builds_the_cuda_shims_filters_the_arch_list():
+    """Both ExecuTorch lanes compile the shims, so both need the architecture floor.
+
+    The build lane builds the wheel and the reference runner; the test lane builds the runner
+    again, whose CMakeLists forces EXECUTORCH_BUILD_CUDA=ON. Both source the channel's build
+    environment, so filtering in only one of them moves the cu126 failure from that job into the
+    other rather than removing it. Checked by parsing, because the ordering matters: the filter has
+    to run before whatever compiles.
+    """
+    import yaml
+
+    for name in ("executorch-build-linux.yml", "executorch-test-linux.yml"):
+        workflow = yaml.safe_load(
+            (_REPO_ROOT / ".github/workflows" / name).read_text(encoding="utf-8")
+        )
+        scripts = [
+            (job.get("with") or {}).get("script", "")
+            for job in workflow.get("jobs", {}).values()
+        ]
+        script = next(
+            (s for s in scripts if "verify-executorch-reference-runner" in s), None
+        )
+        assert script is not None, f"{name} no longer builds the reference runner"
+
+        lines = script.splitlines()
+        filtered = [
+            i for i, line in enumerate(lines) if "filter-executorch-cuda-arches" in line
+        ]
+        assert filtered, (
+            f"{name} builds the CUDA shims without narrowing TORCH_CUDA_ARCH_LIST, so a channel "
+            "asking for an architecture without __dp4a fails to compile"
+        )
+        for marker in ("verify-executorch-reference-runner", "pip wheel"):
+            compiled = [i for i, line in enumerate(lines) if marker in line]
+            if compiled:
+                assert filtered[0] < compiled[0], (
+                    f"{name} filters the architecture list after {marker!r}, so the value in "
+                    "effect while compiling is the unfiltered one"
+                )
+
+
+@pytest.mark.unit
+def test_the_cuda_arch_filter_drops_only_what_executorch_cannot_compile():
+    """The delegate build must not be asked for an architecture without ``__dp4a``.
+
+    ExecuTorch's CUDA shims call that intrinsic, which nvcc does not declare before
+    sm_61, so a list carrying 5.0 or 6.0 fails to compile at all. The cu126 build
+    environment asks for exactly that while the CUDA 13 ones start higher, which is why
+    only cu126 broke. The filter narrows the request rather than pinning a list, so this
+    checks both that the unbuildable entries go and that everything else survives.
+    """
+    script = _REPO_ROOT / ".github/scripts/filter-executorch-cuda-arches.py"
+
+    def run(requested):
+        return subprocess.run(
+            [sys.executable, str(script), requested],
+            capture_output=True,
+            text=True,
+        )
+
+    # The list the cu126 environment actually exports.
+    result = run("5.0;6.0;7.0;7.5;8.0;8.6;9.0")
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "7.0;7.5;8.0;8.6;9.0"
+
+    # A CUDA 13 list is already buildable and must come back untouched, including
+    # architectures newer than anything named in the filter.
+    unchanged = "7.5;8.0;8.6;9.0;10.0;12.0"
+    assert run(unchanged).stdout.strip() == unchanged
+
+    # A "+PTX" suffix sorts by its number and keeps its suffix.
+    assert run("5.0;6.0;8.6+PTX").stdout.strip() == "8.6+PTX"
+
+    # PyTorch also accepts named architectures and expands each before building its gencode
+    # flags, so a name has to be expanded here too. Pascal is 6.0;6.1+PTX, and passing the name
+    # through untouched would carry 6.0 into the build, which is the target this filter exists to
+    # drop. The longer keys go first, or "Maxwell+Tegra" leaves a "+Tegra" tail behind.
+    assert run("Pascal").stdout.strip() == "6.1+PTX"
+    assert run("Ampere").stdout.strip() == "8.0;8.6+PTX"
+    assert run("Pascal;7.5").stdout.strip() == "6.1+PTX;7.5"
+    for name in ("Maxwell", "Maxwell+Tegra", "Kepler"):
+        rejected = run(name)
+        assert rejected.returncode != 0, f"{name} has no member at or above sm_61"
+        assert "sm_61" in rejected.stderr
+
+    # Space separated is the other spelling torch accepts, and it normalises spaces the same way
+    # (torch/utils/cpp_extension.py does _arch_list.replace(" ", ";")). Filtering only on
+    # semicolons let a space separated list through untouched, which is silent rather than loud.
+    assert run("5.0 6.0 7.5 8.6").stdout.strip() == "7.5;8.6"
+    assert run("5.0, 6.0, 7.5").stdout.strip() == "7.5"
+
+    # Nothing buildable must fail loudly. Printing an empty list would leave nvcc to
+    # pick its own default and ship a wheel for architectures nobody asked for.
+    empty = run("5.0;6.0")
+    assert empty.returncode != 0
+    assert "sm_61" in empty.stderr
+
+    # An unset list is not this script's problem to invent.
+    assert run("").returncode == 0
+
+
+def _is_importable_module(name: str) -> bool:
+    """Whether ``name`` is a module, so reaching through it needs its own import.
+
+    find_spec raises rather than returning None for a dotted name whose parent is a module but
+    whose child is an ordinary attribute: ``sys.modules`` gives ModuleNotFoundError, "__path__
+    attribute not found on 'sys'". Treating that as "not a module" is the point, since an attribute
+    is reachable without a second import.
+    """
+    try:
+        return importlib.util.find_spec(name) is not None
+    except (AttributeError, ImportError, ValueError):
+        return False
+
+
+@pytest.mark.unit
+def test_the_runtime_package_imports_every_submodule_it_reaches_through():
+    """Every dotted module the runtime package uses must be imported, not assumed.
+
+    ``import importlib`` does not bind ``importlib.util``: the attribute exists only once something
+    else in the process has imported that submodule. The package used ``importlib.util.find_spec``
+    on the strength of a bare ``import importlib``, which worked whenever torch was imported first,
+    since torch pulls the submodule in, and raised AttributeError when the runtime wheel was
+    imported on its own. Compiling the module here is not enough to catch it, because the attribute
+    is only read at call time, so match the source against what it imports.
+    """
+    source = _RUNTIME_INIT_PY.read_text(encoding="utf-8")
+    tree = ast.parse(source)
+
+    imported: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.asname is None:
+                    parts = alias.name.split(".")
+                    for index in range(len(parts)):
+                        imported.add(".".join(parts[: index + 1]))
+                else:
+                    imported.add(alias.asname)
+        elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
+            for alias in node.names:
+                imported.add(f"{node.module}.{alias.name}")
+                imported.add(alias.asname or alias.name)
+
+    used: set[str] = set()
+    for node in ast.walk(tree):
+        # Only two-level attribute reads, so importlib.util.find_spec yields importlib.util rather
+        # than the function. A deeper chain would report a name that is never importable.
+        if (
+            isinstance(node, ast.Attribute)
+            and isinstance(node.value, ast.Attribute)
+            and isinstance(node.value.value, ast.Name)
+        ):
+            used.add(f"{node.value.value.id}.{node.value.attr}")
+
+    # Only names that are importable modules matter. sys.modules is an attribute of an imported
+    # module, not a submodule, so it is reachable without a second import and is not a finding.
+    missing = sorted(
+        name
+        for name in used
+        if name.split(".")[0] in imported
+        and name not in imported
+        and _is_importable_module(name)
+    )
+    assert not missing, (
+        "the runtime package reaches through a submodule it never imports, so the attribute exists "
+        f"only when another import happens to have loaded it first: {missing}. Import it explicitly."
+    )
 
 
 @pytest.mark.unit
@@ -107,6 +301,14 @@ def test_public_api_symbols_present():
 _REPO_ROOT = Path(__file__).resolve().parents[4]
 _SETUP_PY = _REPO_ROOT / "setup.py"
 _RUNTIME_SETUP_PY = _REPO_ROOT / "py/torch-tensorrt-executorch-runtime/setup.py"
+_RUNTIME_PY = (
+    _REPO_ROOT
+    / "py/torch-tensorrt-executorch-runtime/torch_tensorrt_executorch_runtime/runtime.py"
+)
+_RUNTIME_INIT_PY = (
+    _REPO_ROOT
+    / "py/torch-tensorrt-executorch-runtime/torch_tensorrt_executorch_runtime/__init__.py"
+)
 
 
 @pytest.mark.unit
@@ -204,14 +406,72 @@ def test_runtime_wheel_uses_public_torch_version():
 
 
 @pytest.mark.unit
-def test_runtime_wheel_pins_cuda_13_native_dependencies():
+def test_runtime_wheel_pins_its_native_dependencies_per_cuda_major():
+    """Both native dependencies are resolved from the CUDA the build actually uses.
+
+    Hardcoding the CUDA 13 spellings was right while only CUDA 13 shipped and wrong once 12.6 came
+    back. NVIDIA splits the runtime by major: CUDA 12 publishes nvidia-cuda-runtime-cu12 while the
+    unsuffixed name is the CUDA 13 line, so naming the unsuffixed one unconditionally failed every
+    CUDA 12 row with "No package metadata was found for nvidia-cuda-runtime". TensorRT splits the
+    same way.
+    """
     setup_source = _RUNTIME_SETUP_PY.read_text(encoding="utf-8")
-    assert 'TENSORRT_DISTRIBUTION = "tensorrt-cu13"' in setup_source
-    assert 'CUDA_RUNTIME_DISTRIBUTION = "nvidia-cuda-runtime"' in setup_source
+    assert "TENSORRT_DISTRIBUTION = tensorrt_distribution()" in setup_source, (
+        "the TensorRT distribution is no longer resolved from the build's CUDA version, so a CUDA "
+        "12.6 row would declare the CUDA 13 distribution"
+    )
+    assert "CUDA_RUNTIME_DISTRIBUTION = cuda_runtime_distribution()" in setup_source, (
+        "the CUDA runtime distribution is no longer resolved from the build's CUDA version, so a "
+        "CUDA 12 row would look for a distribution torch did not install"
+    )
+
+    # Execute both resolvers rather than grepping for the names. Checking that each spelling
+    # appears somewhere in the file still passes when the two mappings are swapped, which would
+    # send every CUDA 12 row after CUDA 13 packages and vice versa.
+    tree = ast.parse(setup_source)
+    wanted = ("tensorrt_distribution", "cuda_runtime_distribution")
+    functions = [
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name in wanted
+    ]
+    assert {node.name for node in functions} == set(wanted), (
+        f"expected both resolvers to be module-level functions, found "
+        f"{sorted(node.name for node in functions)}"
+    )
+    fake_torch = types.SimpleNamespace(version=types.SimpleNamespace(cuda=None))
+    namespace: dict = {"torch": fake_torch}
+    exec(
+        compile(ast.Module(body=functions, type_ignores=[]), "<setup.py>", "exec"),
+        namespace,
+    )
+
+    for cuda_version, tensorrt, cuda_runtime in (
+        ("12.6", "tensorrt-cu12", "nvidia-cuda-runtime-cu12"),
+        ("12.9", "tensorrt-cu12", "nvidia-cuda-runtime-cu12"),
+        ("13.0", "tensorrt-cu13", "nvidia-cuda-runtime"),
+        ("13.2", "tensorrt-cu13", "nvidia-cuda-runtime"),
+    ):
+        fake_torch.version.cuda = cuda_version
+        assert namespace["tensorrt_distribution"]() == tensorrt, (
+            f"CUDA {cuda_version} resolves the wrong TensorRT distribution, so that row installs "
+            "the other CUDA major's native libraries"
+        )
+        assert namespace["cuda_runtime_distribution"]() == cuda_runtime, (
+            f"CUDA {cuda_version} resolves the wrong CUDA runtime distribution, so that row looks "
+            "for metadata torch did not install"
+        )
+
+    # A CUDA-less torch and an unsupported major are refused rather than guessed at.
+    for cuda_version in (None, "11.8"):
+        fake_torch.version.cuda = cuda_version
+        for name in wanted:
+            with pytest.raises(RuntimeError):
+                namespace[name]()
+
     assert "torch=={public_version(torch.__version__)}" in setup_source
     assert "{TENSORRT_DISTRIBUTION}=={tensorrt_version}" in setup_source
     assert "{CUDA_RUNTIME_DISTRIBUTION}=={cuda_runtime_version}" in setup_source
-    assert "nvidia-cuda-runtime-cu12" not in setup_source
 
 
 @pytest.mark.unit
