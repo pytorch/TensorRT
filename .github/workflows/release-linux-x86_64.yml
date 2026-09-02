@@ -143,6 +143,8 @@ jobs:
       artifact-name-prefix: torch-tensorrt-executorch-runtime
       trigger-event: ${{ github.event_name }}
       is-release-wheel: true
+      # Functional coverage is performed by executorch-test-linux.yml, which
+      # installs this wheel with its matching core wheel and runs model exports.
       run-smoke-test: false
 
 concurrency:

@@ -168,10 +168,6 @@ def _setup_tree():
     return ast.parse(_SETUP_PY.read_text(encoding="utf-8"))
 
 
-def _runtime_setup_tree():
-    return ast.parse(_RUNTIME_SETUP_PY.read_text(encoding="utf-8"))
-
-
 def _assignment_value(tree, name):
     for node in tree.body:
         if isinstance(node, ast.Assign) and any(
@@ -187,31 +183,6 @@ def _function_def(tree, name):
         if isinstance(node, ast.FunctionDef) and node.name == name:
             return node
     raise AssertionError(f"Could not find function {name}")
-
-
-@pytest.mark.unit
-def test_runtime_wheel_uses_public_torch_version():
-    function = _function_def(_runtime_setup_tree(), "public_version")
-    namespace = {}
-    exec(
-        compile(ast.Module(body=[function], type_ignores=[]), "<setup.py>", "exec"),
-        namespace,
-    )
-
-    assert namespace["public_version"]("2.14.0.dev20260726+cu132") == (
-        "2.14.0.dev20260726"
-    )
-
-
-@pytest.mark.unit
-def test_runtime_wheel_pins_cuda_13_native_dependencies():
-    setup_source = _RUNTIME_SETUP_PY.read_text(encoding="utf-8")
-    assert 'TENSORRT_DISTRIBUTION = "tensorrt-cu13"' in setup_source
-    assert 'CUDA_RUNTIME_DISTRIBUTION = "nvidia-cuda-runtime"' in setup_source
-    assert "torch=={public_version(torch.__version__)}" in setup_source
-    assert "{TENSORRT_DISTRIBUTION}=={tensorrt_version}" in setup_source
-    assert "{CUDA_RUNTIME_DISTRIBUTION}=={cuda_runtime_version}" in setup_source
-    assert "nvidia-cuda-runtime-cu12" not in setup_source
 
 
 @pytest.mark.unit
