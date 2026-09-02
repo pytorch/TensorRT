@@ -236,6 +236,27 @@ class TestSliceConverterDynamicShape(DispatchTestCase):
             input_specs,
         )
 
+    def test_slice_finite_stop_clamps_to_runtime_extent(self):
+        class TestModule(torch.nn.Module):
+            def forward(self, input):
+                return torch.ops.aten.slice.Tensor(input, 1, 0, 48, 1)
+
+        runtime_input = torch.randn(2, 16)
+        input_specs = [
+            Input(
+                min_shape=(2, 16),
+                opt_shape=(2, 64),
+                max_shape=(2, 128),
+                dtype=torch.float32,
+                torch_tensor=runtime_input,
+            ),
+        ]
+        self.run_test_with_dynamic_shape(
+            TestModule(),
+            input_specs,
+            use_example_tensors=False,
+        )
+
     def test_slice_dynamic_computed_negative_start(self):
         # Regression test for https://github.com/pytorch/TensorRT/issues/4186.
         # Unlike the cases above (a literal negative int start, known at
