@@ -330,7 +330,10 @@ def test_runtime_extension_has_dependency_wheel_rpaths():
     assert "$ORIGIN/../torch/lib" in cmake
     assert "$ORIGIN/../tensorrt_libs" in cmake
     assert "$ORIGIN/../nvidia/cuda_runtime/lib" in cmake
+    assert "$ORIGIN/../nvidia/cu12/lib" in cmake
     assert "$ORIGIN/../nvidia/cu13/lib" in cmake
+    assert "CUDAToolkit_VERSION_MAJOR EQUAL 12" in cmake
+    assert "CUDAToolkit_VERSION_MAJOR EQUAL 13" in cmake
     assert "-Wl,-Bsymbolic" not in cmake
     assert "set(EXECUTORCH_BUILD_KERNELS_OPTIMIZED ON" in cmake
     assert "set(EXECUTORCH_BUILD_XNNPACK ON" in cmake
