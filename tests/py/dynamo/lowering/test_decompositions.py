@@ -9,7 +9,10 @@ from torch.testing._internal.common_cuda import (
 )
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo._settings import CompilationSettings
-from torch_tensorrt.dynamo.lowering import get_decompositions
+from torch_tensorrt.dynamo.lowering import (
+    filter_decomposition_table,
+    get_decompositions,
+)
 from torch_tensorrt.dynamo.lowering.passes._aten_lowering_pass import post_lowering
 from torch_tensorrt.dynamo.utils import ATOL, RTOL
 
@@ -1236,7 +1239,7 @@ class TestLowering(TestCase):
             f"The optimized model results shape and torch model results shape should be equal in empty_stride",
         )
 
-    def test_scatter_add_symbolic_extent_skips_unrolled_decomposition(self):
+    def test_scatter_add_symbolic_extent_filters_unrolled_decomposition(self):
         class ScatterAdd(torch.nn.Module):
             def forward(self, base, index, src):
                 return torch.ops.aten.scatter_add.default(base, 0, index, src)
@@ -1256,10 +1259,12 @@ class TestLowering(TestCase):
                 "src": {0: src_rows},
             },
         )
-        dynamic_decompositions = get_decompositions(
-            graph_module=dynamic_export.graph_module
+        base_decompositions = get_decompositions()
+        dynamic_decompositions = filter_decomposition_table(
+            base_decompositions, dynamic_export.graph_module
         )
         self.assertNotIn(torch.ops.aten.scatter_add.default, dynamic_decompositions)
+        self.assertIn(torch.ops.aten.scatter_add.default, base_decompositions)
 
         dynamic_lowered = dynamic_export.run_decompositions(dynamic_decompositions)
         self.assertTrue(
@@ -1278,14 +1283,14 @@ class TestLowering(TestCase):
         dynamic_src = dynamic_scatter.args[3]
         self.assertIsInstance(dynamic_src, torch.fx.Node)
         dynamic_src.meta["example_value"] = dynamic_src.meta.pop("val")
-        dynamo_decompositions = get_decompositions(
-            graph_module=dynamic_export.graph_module
+        dynamo_decompositions = filter_decomposition_table(
+            get_decompositions(), dynamic_export.graph_module
         )
         self.assertNotIn(torch.ops.aten.scatter_add.default, dynamo_decompositions)
 
         static_export = torch.export.export(model, (base, index, src))
-        static_decompositions = get_decompositions(
-            graph_module=static_export.graph_module
+        static_decompositions = filter_decomposition_table(
+            get_decompositions(), static_export.graph_module
         )
         self.assertIn(torch.ops.aten.scatter_add.default, static_decompositions)
 
