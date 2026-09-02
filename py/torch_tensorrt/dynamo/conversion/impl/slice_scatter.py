@@ -183,11 +183,41 @@ def emit_kv_cache_update_layer(
     direct network input or the layer can't be created.
 
     Validators upstream are expected to have already verified shape /
-    dtype / dim invariants; this function trusts its inputs.
+    dtype / dim invariants against the FX metadata; the one thing checked here
+    instead is what the *network* ended up knowing, which can be less.
     """
     cache_input_name = input_binding_name(ctx, cache)
     if cache_input_name is None:
         logger.debug("KV cache update: skipped — input is not a direct network input")
+        return None
+
+    # The layer requires the update to match the cache on batch, heads and head
+    # size, sequence being the only extent free to differ (validate() in
+    # kVCacheUpdateLayer.cpp). A -1 fails that too: the builder wants these
+    # statically. Worth re-checking here rather than trusting the validator,
+    # because an extent static in the FX metadata can still reach the network as
+    # -1 -- a reshape converted from a runtime shape tensor erases every extent
+    # TensorRT cannot infer, static head counts included. Missing it costs the
+    # whole build, with an error naming this layer and nothing about where the
+    # shape went. Returning None instead is not free: on a functional graph it
+    # costs a scatter, but on a lifted buffer the write was already predicted to
+    # alias, so `assert_predicted_kv_aliased` turns this into a hard error --
+    # a clear one, naming the buffer, which is the point.
+    cache_dims, src_dims = tuple(cache.shape), tuple(src.shape)
+    if (
+        len(cache_dims) != 4
+        or len(src_dims) != 4
+        # cache_dims[2] is maxSequenceLength, the extent the whole static-cache
+        # design rests on; the comparisons below never look at it.
+        or cache_dims[2] < 0
+        or any(src_dims[i] < 0 or src_dims[i] != cache_dims[i] for i in (0, 1, 3))
+    ):
+        logger.debug(
+            "KV cache update: skipped — update %s cannot write into cache %s; "
+            "batch/heads/head_dim must agree and be static",
+            src_dims,
+            cache_dims,
+        )
         return None
 
     layer = ctx.net.add_kv_cache_update(

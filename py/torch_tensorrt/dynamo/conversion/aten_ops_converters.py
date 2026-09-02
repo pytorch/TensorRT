@@ -1190,6 +1190,99 @@ def aten_ops_gather(
     )
 
 
+def _materialised_ascending_run(node: Argument) -> Optional[bool]:
+    """Whether a constant index holds an ascending run; None if not a constant.
+
+    ``constant_fold`` runs inside ``post_lowering`` and replaces a
+    static-length ``arange`` with a frozen parameter, so the graph pattern
+    :func:`_index_positions_ascend_from_first` matches is visible on only one
+    side of lowering -- while this validator is consulted on both, by
+    ``lowering/_buffer_lifting.py`` before and by the partitioner after. Two
+    different answers there means a write whose ``copy_`` was dropped as
+    engine-aliased does not get aliased, which ``assert_predicted_kv_aliased``
+    turns into a hard error. Reading the values settles the folded form, and
+    proves more than the pattern match does.
+    """
+    if not (isinstance(node, Node) and node.op == "get_attr"):
+        return None
+    const = getattr(node.graph.owning_module, str(node.target), None)
+    if not isinstance(const, torch.Tensor) or const.dim() != 1 or const.numel() == 0:
+        return False
+    const = const.detach().cpu()
+    first = int(const[0])
+    return bool(
+        torch.equal(
+            const, torch.arange(first, first + const.numel(), dtype=const.dtype)
+        )
+    )
+
+
+def _is_uniform_shift(node: Argument) -> bool:
+    """Whether adding ``node`` moves a range without restriding it -- one value
+    for the whole range, i.e. a Python scalar or a 0-d tensor."""
+    if isinstance(node, Node):
+        val = node.meta.get("val")
+        return val is not None and getattr(val, "ndim", None) == 0
+    return isinstance(node, (int, float))
+
+
+def _index_positions_ascend_from_first(index_node: Argument) -> bool:
+    """Whether ``index`` provably holds ``start, start + 1, ... start + n - 1``.
+
+    ``IKVCacheUpdateLayer`` in ``LINEAR`` mode writes a contiguous block --
+    ``out[writeIndices[i] + s] = update[i, :, s, :]`` -- so it can express a
+    multi-position ``index_copy`` only when the positions ascend by one from the
+    first, and the converter can then pass that first position as
+    ``writeIndices``. A one-position write satisfies this whatever the index
+    holds, so this is only consulted beyond that, where it has to be read off
+    the graph: a materialised constant run, or an ``arange`` optionally shifted
+    by a scalar, which is the form a cache position takes (HF builds it as
+    ``arange(query_len) + cumulative_length``).
+    """
+    if not isinstance(index_node, Node):
+        return False
+
+    materialised = _materialised_ascending_run(index_node)
+    if materialised is not None:
+        return materialised
+
+    range_node: Argument = index_node
+    if index_node.target is torch.ops.aten.add.Tensor:
+        # Addition commutes and either operand may hold the range, so pick the
+        # range by shape rather than by position. alpha scales the second
+        # operand, which restrides the range whenever that is the side the range
+        # landed on -- cheaper to require alpha == 1 than to reason about which.
+        if index_node.kwargs.get("alpha", 1) != 1:
+            return False
+        lhs, rhs = index_node.args[0], index_node.args[1]
+        range_node, offset_node = (lhs, rhs) if _is_uniform_shift(rhs) else (rhs, lhs)
+        if not _is_uniform_shift(offset_node):
+            return False
+
+    if not isinstance(range_node, Node):
+        return False
+
+    materialised = _materialised_ascending_run(range_node)
+    if materialised is not None:
+        return materialised
+
+    if range_node.target not in (
+        torch.ops.aten.arange.default,
+        torch.ops.aten.arange.start,
+        torch.ops.aten.arange.start_step,
+    ):
+        return False
+    # Only start_step takes a step at all, and it defaults to one. A traced or
+    # symbolic step is not provably one, and comparing a SymInt against 1 would
+    # plant a guard, so require a plain int.
+    step = (
+        range_node.args[2]
+        if len(range_node.args) > 2
+        else range_node.kwargs.get("step", 1)
+    )
+    return isinstance(step, int) and step == 1
+
+
 def _index_copy_kv_eligible(
     node: Node,
     settings: Optional[CompilationSettings] = None,
@@ -1205,8 +1298,14 @@ def _index_copy_kv_eligible(
       aliasing).
     * Input has rank 4 and fully static shape ``[b, d, s_max, h]``.
     * ``dim`` argument is exactly ``2``.
-    * Source tensor has rank 4 with ``shape[2] == 1`` (single-position
-      write; matches HF's per-step ``StaticCache.update`` call).
+    * Source tensor has rank 4. Its write length -- ``shape[2]`` -- may be more
+      than one position, and may be dynamic (a prefill profile writes the whole
+      prompt, a decode profile one token, and one engine serving both has the
+      axis symbolic here, before profiles exist). Past one position the write
+      has to be contiguous for the layer to express it, so the index must be
+      recognisably ascending; see
+      :func:`_index_positions_ascend_from_first`.
+    * Index has rank 1, which is what ``writeIndices`` is sliced from.
     * Batch is 1 (avoids writeIndices broadcasting; trivially extensible
       to larger batches when needed).
 
@@ -1227,8 +1326,9 @@ def _index_copy_kv_eligible(
     if len(node.args) < 4:
         return False
     if input_node is None:
-        input_node = node.args[0]  # type: ignore[assignment]
-    dim, _index_node, src_node = node.args[1:4]
+        arg0 = node.args[0]
+        input_node = arg0 if isinstance(arg0, Node) else None
+    dim, index_node, src_node = node.args[1:4]
 
     if not isinstance(input_node, Node) or input_node.op != "placeholder":
         return False
@@ -1256,8 +1356,22 @@ def _index_copy_kv_eligible(
     if src_val is None:
         return False
     src_shape = tuple(src_val.shape)
-    if len(src_shape) != 4 or not isinstance(src_shape[2], int) or src_shape[2] != 1:
+    if len(src_shape) != 4:
         return False
+
+    # ``index_copy_kv`` slices element 0 of the index for writeIndices, which the
+    # layer wants rank 1. aten accepts a 0-d index here too, and that reaches
+    # add_kv_cache_update as a bare nbDims assertion naming nothing.
+    index_val = index_node.meta.get("val") if isinstance(index_node, Node) else None
+    if index_val is not None and getattr(index_val, "ndim", None) != 1:
+        return False
+
+    # A symbolic write length is not one position, so it needs the contiguity
+    # check as well -- hence isinstance before the comparison, which also keeps
+    # a SymInt from turning `== 1` into a guard that specialises the axis.
+    if not (isinstance(src_shape[2], int) and src_shape[2] == 1):
+        if not _index_positions_ascend_from_first(index_node):
+            return False
 
     return True
 
@@ -1266,7 +1380,10 @@ def _index_copy_kv_eligible(
     torch.ops.aten.index_copy.default,
     capability_validator=_index_copy_kv_eligible,
     priority=ConverterPriority.HIGH,
-    supports_dynamic_shapes=False,
+    # The cache the validator insists on is static; what may be dynamic is the
+    # number of positions written, which the layer takes as the extent of its
+    # update tensor.
+    supports_dynamic_shapes=True,
 )
 @enforce_tensor_types({0: (TRTTensor,), 2: (TRTTensor,), 3: (TRTTensor,)})
 def aten_ops_index_copy_kv(
@@ -2838,7 +2955,7 @@ _ABSORBING_BITWISE_SCALAR = {
 
 
 def _is_absorbing_bitwise_scalar(target: Target, scalar: Any) -> bool:
-    """Would TensorRT mis-evaluate this scalar bitwise op (see above)?"""
+    """Would TensorRT misevaluate this scalar bitwise op (see above)?"""
     if target not in _ABSORBING_BITWISE_SCALAR:
         return False
     # A non-bool scalar is rejected by the dtype check further down anyway, and
