@@ -20,9 +20,10 @@ import pytest
 import sympy
 import torch
 import torch_tensorrt
+from torch._dynamo.source import LocalSource
 from torch._subclasses.fake_tensor import FakeTensorMode
 from torch.export import Dim
-from torch.fx.experimental.symbolic_shapes import ShapeEnv
+from torch.fx.experimental.symbolic_shapes import DimDynamic, ShapeEnv
 from torch_tensorrt.dynamo.runtime.meta_ops.register_meta_ops import (
     _apply_symbolic_shape_expressions,
 )
@@ -483,6 +484,80 @@ class TestApplySymbolicShapeExpressions:
             fake_z = torch.empty(5)
             with pytest.raises(RuntimeError):
                 _apply_symbolic_shape_expressions([fake_x, fake_z], shape_info)
+
+    def test_guards_distinct_runtime_symbols_for_repeated_direct_mapping(self):
+        """A re-export can allocate distinct backed symbols for dimensions
+        that the engine metadata records as equal. Preserve that relationship
+        as a ShapeEnv guard rather than rejecting the fake execution."""
+        compile_base = sympy.Symbol("s0", integer=True)
+        shape_info = self._two_input_shape_info(
+            compile_base, compile_base, compile_base
+        )
+
+        shape_env = ShapeEnv()
+        runtime_x_expr = shape_env.create_symbol(
+            4, LocalSource("x"), dynamic_dim=DimDynamic.DYNAMIC
+        )
+        runtime_y_expr = shape_env.create_symbol(
+            4, LocalSource("y"), dynamic_dim=DimDynamic.DYNAMIC
+        )
+        runtime_x = shape_env.create_symintnode(runtime_x_expr, hint=4)
+        runtime_y = shape_env.create_symintnode(runtime_y_expr, hint=4)
+
+        with FakeTensorMode(shape_env=shape_env):
+            fake_x = torch.empty(runtime_x)
+            fake_y = torch.empty(runtime_y)
+            _apply_symbolic_shape_expressions([fake_x, fake_y], shape_info)
+
+        assert runtime_x_expr != runtime_y_expr
+        assert shape_env.simplify(runtime_x_expr - runtime_y_expr) == 0
+
+    def test_guards_distinct_runtime_symbols_for_composite_mapping(self):
+        """The same guard mechanism preserves derived engine-input
+        relationships such as y.shape[0] == 2 * x.shape[0]."""
+        compile_base = sympy.Symbol("s0", integer=True)
+        shape_info = self._two_input_shape_info(
+            compile_base, 2 * compile_base, compile_base
+        )
+
+        shape_env = ShapeEnv()
+        runtime_x_expr = shape_env.create_symbol(
+            4, LocalSource("x"), dynamic_dim=DimDynamic.DYNAMIC
+        )
+        runtime_y_expr = shape_env.create_symbol(
+            8, LocalSource("y"), dynamic_dim=DimDynamic.DYNAMIC
+        )
+        runtime_x = shape_env.create_symintnode(runtime_x_expr, hint=4)
+        runtime_y = shape_env.create_symintnode(runtime_y_expr, hint=8)
+
+        with FakeTensorMode(shape_env=shape_env):
+            fake_x = torch.empty(runtime_x)
+            fake_y = torch.empty(runtime_y)
+            _apply_symbolic_shape_expressions([fake_x, fake_y], shape_info)
+
+        assert shape_env.simplify(2 * runtime_x_expr - runtime_y_expr) == 0
+
+    def test_defers_repeated_direct_mapping_for_unbacked_symbols(self):
+        """Distinct data-dependent symbols have no hints, so their required
+        equality must be recorded as a deferred runtime assertion."""
+        compile_base = sympy.Symbol("s0", integer=True)
+        shape_info = self._two_input_shape_info(
+            compile_base, compile_base, compile_base
+        )
+
+        shape_env = ShapeEnv()
+        with FakeTensorMode(shape_env=shape_env):
+            runtime_x = shape_env.create_unbacked_symint()
+            runtime_y = shape_env.create_unbacked_symint()
+            shape_env._constrain_range_for_size(runtime_x.node.expr)
+            shape_env._constrain_range_for_size(runtime_y.node.expr)
+            fake_x = torch.empty(runtime_x)
+            fake_y = torch.empty(runtime_y)
+            deferred_asserts_before = shape_env.num_deferred_runtime_asserts
+
+            _apply_symbolic_shape_expressions([fake_x, fake_y], shape_info)
+
+        assert shape_env.num_deferred_runtime_asserts == deferred_asserts_before + 1
 
 
 if __name__ == "__main__":

@@ -97,17 +97,31 @@ def _apply_symbolic_shape_expressions(
                 runtime_expr = sympy.Integer(d)
 
             if compile_expr.is_Symbol:
-                if (
-                    compile_expr in compile_to_runtime
-                    and sympy.simplify(compile_to_runtime[compile_expr] - runtime_expr)
-                    != 0
-                ):
-                    raise RuntimeError(
+                if compile_expr in compile_to_runtime:
+                    residual = compile_to_runtime[compile_expr] - runtime_expr
+                    # Two runtime SymInts can be tied to the same compile-time
+                    # symbol yet be distinct symbol objects here -- e.g. a
+                    # shared torch.export.Dim gets reallocated as separate,
+                    # SymInts on retrace/re-export. Preserve the compile-time
+                    # equality by installing it as a guard in the active
+                    # ShapeEnv instead of requiring the symbols to have
+                    # already been merged.
+                    error_message = (
                         "[torch.ops.tensorrt.execute_engine]: Runtime input shapes "
                         f"disagree on compile-time symbol {compile_expr}: already "
                         f"mapped to {compile_to_runtime[compile_expr]} from an earlier "
                         f"input, but this input maps it to {runtime_expr}"
                     )
+                    if shape_env is not None:
+                        residual = shape_env.simplify(residual)
+                    residual = sympy.simplify(residual)
+                    if residual != 0 and (
+                        shape_env is None
+                        or not shape_env.guard_or_defer_runtime_assert(
+                            sympy.Eq(residual, 0), error_message
+                        )
+                    ):
+                        raise RuntimeError(error_message)
                 compile_to_runtime[compile_expr] = runtime_expr
             else:
                 # Store the difference: sympy.Eq can auto-collapse to a bare
@@ -145,14 +159,28 @@ def _apply_symbolic_shape_expressions(
     # relationship was actually satisfied by these runtime inputs).
     for diff in composite_input_equations:
         residual = sympy.simplify(diff.xreplace(compile_to_runtime))
+        unresolved_symbols = residual.free_symbols & compile_input_symbols
+        if unresolved_symbols:
+            raise RuntimeError(
+                "[torch.ops.tensorrt.execute_engine]: Could not verify the compile-time "
+                f"input relationship {diff} == 0 against these runtime shapes "
+                f"(unresolved residual: {residual})"
+            )
+        if shape_env is not None:
+            residual = sympy.simplify(shape_env.simplify(residual))
         if residual == 0:
             continue
+        error_message = (
+            "[torch.ops.tensorrt.execute_engine]: Runtime input shapes violate "
+            f"a relationship captured at compile time: {diff} == 0 does not hold "
+            f"for these inputs (residual {residual} != 0)"
+        )
+        if shape_env is not None and shape_env.guard_or_defer_runtime_assert(
+            sympy.Eq(residual, 0), error_message
+        ):
+            continue
         if residual.is_number:
-            raise RuntimeError(
-                "[torch.ops.tensorrt.execute_engine]: Runtime input shapes violate "
-                f"a relationship captured at compile time: {diff} == 0 does not hold "
-                f"for these inputs (residual {residual} != 0)"
-            )
+            raise RuntimeError(error_message)
         # Still symbolic: can't prove it holds, so fail closed.
         raise RuntimeError(
             "[torch.ops.tensorrt.execute_engine]: Could not verify the compile-time "
