@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
+from typing import Any, Collection, Dict, List, Optional, Sequence, Set, Tuple
 
 import sympy
 import torch
@@ -79,6 +79,33 @@ def _build_submodule_profiles(
             }
         )
     return profiles
+
+
+def node_in_torch_executed_module(
+    node: torch.fx.Node, torch_executed_modules: Collection[str]
+) -> bool:
+    """
+    Determine whether a node traces through a module that should run in Torch.
+    A node matches if any level of its nn_module_stack is one of the torch_executed_modules,
+    matched on fully-qualified class name (e.g. "torchvision.models.resnet.BasicBlock"), which
+    torch.export stores as the second element of each nn_module_stack value.
+    Args:
+        node: FX node to check
+        torch_executed_modules: Collection of fully-qualified module class names to run in Torch
+    Returns:
+        True if the node lies within a torch_executed_module, False otherwise
+    """
+    if not torch_executed_modules:
+        return False
+    stack = node.meta.get("nn_module_stack") or {}
+    for _, module_type in stack.values():
+        if module_type in torch_executed_modules:
+            logger.debug(
+                f"Excluding node {node.name} from TRT because its module type "
+                f"{module_type} is in torch_executed_modules."
+            )
+            return True
+    return False
 
 
 def construct_dynamic_input(
