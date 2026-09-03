@@ -188,6 +188,7 @@ jobs:
         if: inputs.cross-compile
         shell: powershell
         env:
+          # TODO: Replace this prerelease CTK 13.4 installer with the official CTK 13.4 release when available.
           CUDA_INSTALLER_URL: https://packages.nvidia.com/prerelease/cuda/13.4.0/local_installers/cuda_13.4.0_windows_x86_64.exe
           CUDA_ROOT: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.4
         run: |

@@ -1,5 +1,5 @@
 param(
-    [string] $PyTorchArtifact = "https://pypi.nvidia.com/nvtorch_oot_nightly/torch/torch-2.14.0.dev20260728%2Bcu134-cp313-cp313-win_arm64.whl",
+    [string] $PyTorchArtifact = "https://pypi.nvidia.com/nvtorch_oot/torch/torch-2.14.0%2Bcu134-cp313-cp313-win_arm64.whl",
     [string] $PythonArtifact = "https://api.nuget.org/v3-flatcontainer/pythonarm64/3.13.0/pythonarm64.3.13.0.nupkg",
     [Parameter(Mandatory = $true)] [string] $TargetRoot,
     [Parameter(Mandatory = $true)] [string] $CudaRoot,
@@ -8,7 +8,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$PyTorchArtifactSha256 = "23862a93476cb038ffd26f7141cd476717d97b69b50074f2ab14036eb6093200"
+$PyTorchArtifactSha256 = "4f781babc0e0e0722cc48d0b15107a28e6003fc2b6544f1578b6eb6f5177dcb5"
 $PythonArtifactSha256 = "f44428dc94e6f9c72cd69ad6436280784e6f9eed46a149641fee71866d3081f3"
 
 $ArtifactTempRoot = $env:RUNNER_TEMP
@@ -71,6 +71,7 @@ if (-not (Test-Path -LiteralPath $cudaVersionFile -PathType Leaf)) {
     throw "CUDA version file is missing: $cudaVersionFile"
 }
 $cudaVersion = (Get-Content -LiteralPath $cudaVersionFile -Raw | ConvertFrom-Json).cuda.version
+# TODO: Replace the prerelease CTK 13.4 requirement with the official CTK 13.4 release when available.
 if ($cudaVersion -notlike '13.4*') {
     throw "Windows ARM64 builds require CUDA 13.4 Preview; got '$cudaVersion'"
 }
