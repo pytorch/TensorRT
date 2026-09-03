@@ -562,6 +562,7 @@ def export(
         stage_exported_program,
         validate_engine_program,
     )
+    from torch_tensorrt.executorch._zero_copy import order_rewired_mutations_last
     from torch_tensorrt.executorch.backend import (
         ZERO_COPY_KV_COMPILE_SPEC_KEY,
         _serialize_elided_output_names,
@@ -727,7 +728,7 @@ def export(
         edge_programs = rewritten["forward"]
         partitioner_pipeline = method_partitioners["forward"]
 
-    return to_edge_transform_and_lower(
+    edge_manager = to_edge_transform_and_lower(
         edge_programs,
         transform_passes=transform_passes,
         partitioner=partitioner_pipeline,
@@ -737,3 +738,9 @@ def export(
         ),
         generate_etrecord=generate_etrecord,
     )
+    for name in zero_copy_methods:
+        # Here rather than beside the rewiring: to_edge_transform_and_lower runs
+        # run_decompositions, which rebuilds the output specs in its own order, so
+        # a permutation applied before lowering never reaches to_executorch().
+        order_rewired_mutations_last(edge_manager.exported_program(name))
+    return edge_manager

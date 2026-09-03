@@ -195,6 +195,108 @@ def _aliased_buffer_mutations(
     return mutations
 
 
+def order_rewired_mutations_last(exported_program: Any) -> int:
+    """Move an Edge program's rewired mutations behind its un-rewired ones.
+
+    ExecuTorch's ``insert_write_back_for_buffers_pass`` renames the mutation
+    output specs by walking them with one counter, indexing a list of the
+    ``copy_`` nodes it created followed by every output it copied nothing for, in
+    graph order. That pairs every spec with its own value exactly when every
+    mutation the pass skips comes after every one it copies: a skip with a
+    copy-producing mutation behind it shifts that mutation onto another buffer's
+    value. A rewired mutation is one the pass creates no copy for -- its value
+    already *is* the buffer placeholder -- so ordering every rewired mutation
+    behind every un-rewired one meets that condition while the rewired ones are
+    the only skips, and keeping each group's relative order lines the copies up
+    with the prefix one for one and the rewired values with the tail. A method
+    holding only rewired mutations, or only un-rewired ones, is already in that
+    order and is left alone.
+
+    The write-back also skips a mutation whose value is a chain of in-place ops
+    rooted at the buffer. That one is not rewired, so this pass leaves it in the
+    prefix, where it crosses the specs only if a copy-producing mutation follows
+    it there. Edge programs are functional, so this pass sees none;
+    ``to_executorch()`` runs ``reinplace_pass`` before the write-back when
+    ``run_reinplace_pass`` or ``reinplace_extra_ops`` is set, which can create
+    one, and :func:`zero_copy_backend_config` preserves both fields rather than
+    overriding them. When one turns up with a copy-producing mutation behind it,
+    the upstream off-by-one is back, reached by a route this pass cannot see and
+    after it has already run.
+
+    This runs on the Edge program rather than beside the rewiring, because
+    ``to_edge_transform_and_lower`` calls ``run_decompositions``, which rebuilds
+    the output specs in its own order and drops any permutation applied before
+    it. The Edge program is the last one ``export()`` holds, and
+    ``to_executorch()`` reaches the write-back pass without re-deriving the order
+    again.
+
+    Both mutation kinds are moved as one block because that counter walks both.
+    The permutation stays inside the mutation block -- a spec is only ever
+    exchanged with another mutation spec -- so no ``USER_OUTPUT`` changes
+    position; moving one would renumber the program's real outputs. Spec and
+    graph-output arg move together, or the program stops verifying.
+
+    A mutation counts as rewired when its value is a placeholder carrying the
+    mark :func:`rewire_aliased_mutations_to_buffers` left, which is the same
+    property the un-staging pass keys off later.
+
+    Returns the number of mutations in the block it rewrote, or 0 when the method
+    held only one kind and there was no reordering to be done. A block that holds
+    both kinds is rewritten, and its length reported, even when the permutation
+    turns out to be the identity.
+    """
+    from torch.export.graph_signature import (
+        ExportGraphSignature,
+        OutputKind,
+        OutputSpec,
+    )
+
+    graph_module = exported_program.graph_module
+    signature = exported_program.graph_signature
+    output_node = graph_module.graph.output_node()
+    output_args = list(output_node.args[0])
+    output_specs: List[OutputSpec] = list(signature.output_specs)
+
+    mutation_kinds = (OutputKind.BUFFER_MUTATION, OutputKind.USER_INPUT_MUTATION)
+    slots = [
+        index
+        for index, spec in enumerate(output_specs[: len(output_args)])
+        if spec.kind in mutation_kinds
+    ]
+
+    def is_rewired(index: int) -> bool:
+        value = output_args[index]
+        return (
+            isinstance(value, Node)
+            and value.op == "placeholder"
+            and bool(value.meta.get("_torch_tensorrt_aliased_buffer"))
+        )
+
+    rewired = [index for index in slots if is_rewired(index)]
+    if not rewired or len(rewired) == len(slots):
+        return 0
+
+    # Stable, so both groups keep their relative order; False sorts before True.
+    sources = sorted(slots, key=lambda index: index in set(rewired))
+    specs = [output_specs[index] for index in sources]
+    args = [output_args[index] for index in sources]
+    for slot, spec, arg in zip(slots, specs, args):
+        output_specs[slot] = spec
+        output_args[slot] = arg
+
+    output_node.args = (tuple(output_args),)
+    graph_module.recompile()
+    exported_program._graph_signature = ExportGraphSignature(
+        input_specs=list(signature.input_specs), output_specs=output_specs
+    )
+    _LOGGER.debug(
+        "ordered %d rewired mutation(s) behind %d un-rewired one(s)",
+        len(rewired),
+        len(slots) - len(rewired),
+    )
+    return len(slots)
+
+
 def rewire_aliased_mutations_to_buffers(exported_program: Any) -> List[str]:
     """Declare that an aliased buffer *is* its own mutation result.
 
@@ -211,6 +313,10 @@ def rewire_aliased_mutations_to_buffers(exported_program: Any) -> List[str]:
     placeholder it rewires is marked for
     :func:`unstage_aliased_buffers_pass`, which cannot re-derive the aliasing
     once lowering has turned the engine into an opaque blob.
+
+    The order the mutations end up in matters as well, but not here: see
+    :func:`order_rewired_mutations_last`, which runs on the Edge program because
+    lowering rebuilds the output specs.
 
     On its own this is not correct: ExecuTorch still stages the buffer, so the
     engine's in-place write would land in per-call scratch and, with the

@@ -1210,6 +1210,147 @@ def _assert_marked_buffers_reach_the_engine_unstaged(graph_module):
         )
 
 
+def _mutation_program(kinds):
+    """A stub Edge program whose outputs are ``kinds``, positionally.
+
+    ``"rewired"`` gives a mutation whose value is a marked buffer placeholder,
+    ``"copyback"`` one whose value is computed, ``"user"`` a plain user output.
+    That is what ``order_rewired_mutations_last`` works from: the graph's output
+    node, and a signature whose output specs line up with it positionally.
+    """
+    from torch.export.graph_signature import (
+        ExportGraphSignature,
+        OutputKind,
+        OutputSpec,
+        TensorArgument,
+    )
+
+    graph = torch.fx.Graph()
+    x = graph.placeholder("x")
+    specs = []
+    args = []
+    for index, kind in enumerate(kinds):
+        if kind == "rewired":
+            node = graph.placeholder(f"b_rewired_{index}")
+            node.meta["_torch_tensorrt_aliased_buffer"] = True
+        else:
+            node = graph.call_function(torch.ops.aten.add.Tensor, (x, index))
+        args.append(node)
+        specs.append(
+            OutputSpec(
+                (
+                    OutputKind.USER_OUTPUT
+                    if kind == "user"
+                    else OutputKind.BUFFER_MUTATION
+                ),
+                TensorArgument(name=node.name),
+                None if kind == "user" else f"buf_{index}",
+            )
+        )
+    graph.output(tuple(args))
+    graph_module = torch.fx.GraphModule(torch.nn.Module(), graph)
+    signature = ExportGraphSignature(input_specs=[], output_specs=specs)
+    return SimpleNamespace(
+        graph_module=graph_module,
+        graph_signature=signature,
+        _graph_signature=signature,
+    )
+
+
+def _ordered_outputs(program):
+    """The reordered outputs, as ``(target, arg name, spec arg name)`` triples.
+
+    Read from ``_graph_signature``, which is what the function rebinds. A
+    ``SimpleNamespace`` has no property tying ``graph_signature`` to it, so the
+    stub's ``graph_signature`` still holds the pre-call order and reading it
+    would make a correct permutation look crossed.
+    """
+    args = list(program.graph_module.graph.output_node().args[0])
+    specs = program._graph_signature.output_specs
+    return [(spec.target, arg.name, spec.arg.name) for spec, arg in zip(specs, args)]
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "kinds,moved",
+    [
+        (["rewired", "rewired", "user"], 0),
+        (["copyback", "copyback", "user"], 0),
+        (["copyback", "rewired", "user"], 2),
+    ],
+    ids=["all-rewired", "all-copyback", "already-ordered"],
+)
+def test_order_rewired_mutations_last_leaves_a_settled_block_alone(kinds, moved):
+    """Three blocks the write-back already pairs correctly, none of which may be
+    disturbed. In the first two every mutation is skipped, or every one gets a
+    copy, and the function short-circuits without touching the program -- which
+    is what the 0 reports. The third is mixed and already in the right order, so
+    it is rewritten to the order it was in."""
+    program = _mutation_program(kinds)
+    before = _ordered_outputs(program)
+
+    assert Z.order_rewired_mutations_last(program) == moved
+    assert _ordered_outputs(program) == before
+
+
+@pytest.mark.unit
+def test_order_rewired_mutations_last_moves_the_rewired_mutation_behind():
+    """The permutation itself, and the properties the docstring bounds it with:
+    the user output does not move, and each spec travels with the graph output
+    arg it describes."""
+    program = _mutation_program(["rewired", "copyback", "user"])
+    rewired, copyback, user = program.graph_module.graph.output_node().args[0]
+
+    assert Z.order_rewired_mutations_last(program) == 2
+
+    assert _ordered_outputs(program) == [
+        # The copy-producing mutation is now the prefix the write-back's copy
+        # list lines up with; buf_0's spec keeps buf_0 as its target and moves to
+        # the tail with the placeholder that carries its value.
+        ("buf_1", copyback.name, copyback.name),
+        ("buf_0", rewired.name, rewired.name),
+        (None, user.name, user.name),
+    ]
+
+
+def _assert_finalized_mutation_pairing(program):
+    """Each finalized BUFFER_MUTATION still names the value that updates its buffer.
+
+    ExecuTorch's write-back pass renames the mutation specs by walking them with
+    one counter, indexing a list of the ``copy_`` nodes it created followed by
+    every output it copied nothing for, so a mutation it skips -- which is what a
+    rewired one is -- shifts each copy-producing mutation behind it onto another
+    buffer's value. ``order_rewired_mutations_last`` moves the skips last so the
+    two sequences line up; without it the ``k_cache`` mutation here comes out
+    naming the ``copy_`` that writes ``conv_state``.
+
+    A rewired mutation must name its own buffer placeholder (nothing is copied
+    into it -- the engine wrote it), and the copy-back mutation must name
+    something that is not a placeholder at all: the ``copy_`` the pass inserted.
+    """
+    exported = program.exported_program()
+    signature = exported.graph_signature
+    placeholders = {
+        node.name
+        for node in exported.graph_module.graph.nodes
+        if node.op == "placeholder"
+    }
+    placeholder_of = {fqn: name for name, fqn in signature.inputs_to_buffers.items()}
+    named_by = {fqn: name for name, fqn in signature.buffers_to_mutate.items()}
+    assert set(named_by) == {"k_cache", "v_cache", "conv_state"}
+    for name in ("k_cache", "v_cache"):
+        assert named_by[name] == placeholder_of[name], (
+            f"the finalized mutation of '{name}' names '{named_by[name]}', not its "
+            f"own placeholder '{placeholder_of[name]}' -- the write-back pass "
+            "shifted the mutation specs onto the wrong buffers"
+        )
+    assert named_by["conv_state"] not in placeholders, (
+        "the finalized mutation of 'conv_state' names a placeholder, so it was "
+        "handed a rewired mutation's value instead of the copy that carries its "
+        "new contents"
+    )
+
+
 @pytest.mark.skipif(
     not torch.cuda.is_available(), reason="requires CUDA + TensorRT for a real engine"
 )
@@ -1286,6 +1427,7 @@ def test_zero_copy_kv_keeps_a_copyback_buffer_in_the_same_method(retrace):
     _assert_marked_buffers_reach_the_engine_unstaged(
         program.exported_program().graph_module
     )
+    _assert_finalized_mutation_pairing(program)
 
 
 class _SplitRolesDecodeStep(_MixedDecodeStep):
@@ -1431,6 +1573,7 @@ def test_zero_copy_kv_with_the_copyback_on_a_second_delegate(retrace):
     _assert_marked_buffers_reach_the_engine_unstaged(
         program.exported_program().graph_module
     )
+    _assert_finalized_mutation_pairing(program)
 
 
 @pytest.mark.skipif(
