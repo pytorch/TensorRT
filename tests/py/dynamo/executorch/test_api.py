@@ -135,6 +135,33 @@ def test_runtime_extension_has_dependency_wheel_rpaths():
 
 
 @pytest.mark.unit
+def test_the_install_script_puts_a_cuda_runtime_on_the_library_path_for_both_majors():
+    """Every CUDA row gets a CUDA runtime directory, not just the CUDA 13 ones.
+
+    The two majors ship different layouts: nvidia-cuda-runtime-cu12 installs
+    nvidia/cuda_runtime/lib/libcudart.so.12 while the CUDA 13 line installs
+    nvidia/cu13/lib/libcudart.so.13. Naming only the cu13 path left every CUDA 12 row with no
+    CUDA runtime on the search path, and the ExecuTorch reference runner died at startup with
+    "libcudart.so.12: cannot open shared object file" while the package was installed all along.
+    The runtime wheel's own RPATH already lists both directories; this keeps the CI install
+    script consistent with it.
+    """
+    script = (_REPO_ROOT / ".github/scripts/install-torch-tensorrt.sh").read_text(
+        encoding="utf-8"
+    )
+    for directory in ("nvidia/cuda_runtime/lib", "nvidia/cu13/lib"):
+        assert directory in script, (
+            f"{directory} is not on LD_LIBRARY_PATH, so a row of that CUDA major cannot resolve "
+            "libcudart at run time"
+        )
+    # Matched on the major, so a future cu128 or cu134 row is covered without another edit.
+    for pattern in ("cu12*)", "cu13*)"):
+        assert (
+            pattern in script
+        ), f"{pattern} is gone, so a CUDA row of that major would fall through to no directory"
+
+
+@pytest.mark.unit
 def test_runtime_extension_does_not_require_an_embeddable_python():
     """Development.Embed must stay optional, or the release build cannot configure.
 

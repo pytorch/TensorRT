@@ -1428,6 +1428,29 @@ class Platform(Enum):
         # Make it compatible with C++ runtime
         return self.name.lower()
 
+    def _to_serialized_platform(self) -> str:
+        """Return the runtime-independent platform token used in engine metadata.
+
+        This must not depend on the C++ Torch-TensorRT runtime being loaded:
+        Python-only artifacts need to use the same tokens the C++ runtime
+        serializes and accepts.
+        """
+        return {
+            Platform.LINUX_X86_64: "linux_x86_64",
+            Platform.LINUX_AARCH64: "linux_aarch64",
+            Platform.WIN_X86_64: "windows_x86_64",
+            Platform.WIN_ARM64: "windows_arm64",
+            Platform.UNKNOWN: "unknown",
+        }[self]
+
+    @classmethod
+    def _normalize_serialized_platform(cls, value: str) -> str:
+        """Normalize platform tokens emitted by older Python-only artifacts."""
+        return {
+            "win_x86_64": "windows_x86_64",
+            "win_arm64": "windows_arm64",
+        }.get(value, value)
+
     @needs_torch_tensorrt_runtime  # type: ignore
     def _to_serialized_rt_platform(self) -> str:
         if self == Platform.LINUX_X86_64:

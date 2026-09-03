@@ -184,6 +184,8 @@ jobs:
       - uses: ./test-infra/.github/actions/setup-windows
         with:
           cuda-version: ${{ env.CU_VERSION }}
+      # TODO: When CUDA 13.4 is officially released, replace the prerelease installer URL below
+      # with the official CUDA Toolkit distribution URL.
       - name: Install CUDA 13.4 toolkit with ARM64 target libraries
         if: inputs.cross-compile
         shell: powershell

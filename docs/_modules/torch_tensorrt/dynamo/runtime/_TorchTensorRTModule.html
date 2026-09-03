@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../../_static/documentation_options.js?v=d3a85f45"></script>
+    <script src="../../../../_static/documentation_options.js?v=d4c44997"></script>
     <script src="../../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -753,9 +753,7 @@ document.write(`
         <span class="n">engine_info</span><span class="p">[</span><span class="n">HW_COMPATIBLE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">hardware_compatible</span><span class="p">))</span>
         <span class="n">engine_info</span><span class="p">[</span><span class="n">SERIALIZED_METADATA_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">encode_metadata</span><span class="p">(</span><span class="n">metadata</span><span class="p">)</span>
         <span class="n">engine_info</span><span class="p">[</span><span class="n">TARGET_PLATFORM_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">target_platform</span><span class="o">.</span><span class="n">_to_serialized_rt_platform</span><span class="p">()</span>
-            <span class="k">if</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torch_tensorrt_runtime</span>
-            <span class="k">else</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">target_platform</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">target_platform</span><span class="o">.</span><span class="n">_to_serialized_platform</span><span class="p">()</span>
         <span class="p">)</span>
         <span class="n">engine_info</span><span class="p">[</span><span class="n">REQUIRES_OUTPUT_ALLOCATOR_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span>
             <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">requires_output_allocator</span><span class="p">)</span>
