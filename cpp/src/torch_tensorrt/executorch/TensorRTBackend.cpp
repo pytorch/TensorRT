@@ -440,6 +440,9 @@ Result<DelegateHandle*> TensorRTBackend::init(
   // Map each aliased output binding to the index of the input it aliases so
   // execute() can bind it to that input's device pointer (in-place).
   // Non-aliased models have an empty header.aliased_io -> all -1, unchanged path.
+  // The parser has already refused a blob claiming one output twice, so the count
+  // built below is one per distinct output binding, which is what execute()
+  // subtracts on.
   handle->output_aliased_input_idx.assign(handle->num_outputs, -1);
   handle->input_is_alias_target.assign(handle->num_inputs, false);
   for (const auto& ab : header.aliased_io) {
@@ -573,6 +576,22 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // cannot instead mean "the aliased outputs were never declared".
   const size_t num_delegate_inputs = num_inputs;
   const size_t num_aliased_outputs = engine->num_aliased_outputs;
+  // The blob parser refuses a second aliased_io entry for an output already
+  // claimed, and init refuses an entry whose output is not one of the recorded
+  // output bindings, so this holds for any header that reached here. It is
+  // checked anyway because both subtractions below are unsigned: on a header
+  // built some other way they wrap and the length check then accepts any
+  // argument count. That wrap is all this catches. A duplicate entry inflates
+  // the count while staying within num_outputs, passes both checks, and still
+  // indexes one past the end of args; the parser's refusal is what stops that.
+  if (num_aliased_outputs > num_outputs) {
+    ET_LOG(
+        Error,
+        "TensorRTBackend::execute: %zu aliased output(s) recorded for %zu output binding(s)",
+        num_aliased_outputs,
+        num_outputs);
+    return Error::InvalidProgram;
+  }
   const bool aliased_outputs_elided =
       num_aliased_outputs > 0 && args.size() == num_delegate_inputs + num_outputs - num_aliased_outputs;
   const size_t num_delegate_outputs = num_outputs - (aliased_outputs_elided ? num_aliased_outputs : 0);
