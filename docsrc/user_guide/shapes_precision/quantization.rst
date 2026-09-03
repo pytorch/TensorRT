@@ -6,7 +6,8 @@ Quantization (INT8 / FP8 / FP4)
 Torch-TensorRT supports post-training quantization (PTQ) with **INT8**, **FP8**, and
 **FP4** precisions via NVIDIA's
 `ModelOpt <https://github.com/NVIDIA/TensorRT-Model-Optimizer>`_ library, and
-**FP8 weight-only**, **static FP8**, and **INT4 weight-only** quantization via
+**FP8 weight-only**, **static FP8**, **INT4 weight-only**, and **NVFP4
+weight-only** quantization via
 `TorchAO <https://github.com/pytorch/ao>`_. Quantizers insert
 quantize/dequantize (QDQ) nodes into the model graph; Torch-TensorRT then
 converts those nodes into TRT quantization layers and sets the appropriate builder flags.
@@ -28,7 +29,8 @@ Hardware requirements:
 * **INT8**: Any NVIDIA GPU with TensorRT support.
 * **FP8**: NVIDIA Hopper (H100) or newer.
 * **INT4 (TorchAO WOQ)**: TensorRT with INT4 constants (TRT ≥ 10.8); storage + DQ, not low-bit MMA.
-* **FP4 (NVFP4)**: NVIDIA Blackwell (B100/B200) or newer; requires TensorRT ≥ 10.8.
+* **NVFP4 (TorchAO WOQ)**: TensorRT with FP4 constants (TRT ≥ 10.8); packed FP4 storage + DQ, not native FP4 MMA.
+* **FP4 (ModelOpt NVFP4)**: NVIDIA Blackwell (B100/B200) or newer; requires TensorRT ≥ 10.8.
 
 ----
 
@@ -247,6 +249,48 @@ See :ref:`quantize_linear_int4_woq` for a toy Linear model,
 
 ----
 
+TorchAO NVFP4 Weight-Only Quantization
+--------------------------------------
+
+TorchAO NVFP4 quantizes Linear weights to packed FP4 E2M1 (two values per
+byte) with FP8 E4M3 block scales (block size 16) and an FP32 per-tensor
+global scale. Activations stay BF16. This is **weight-only storage**:
+TensorRT keeps an FP4 constant and dequantizes into a high-precision GEMM.
+It is not native FP4 Tensor Core MMA, and it is a different graph from
+ModelOpt ``NVFP4_DEFAULT_CFG`` (``dynamic_block_quantize_op``).
+
+Last two weight dims must be divisible by 16. Parent ``NVFP4Tensor`` Linear
+does not emit a DQ op TensorRT can map. Promote weights to
+``NVFP4TensorNonDecomposed`` so export emits
+``torch.ops.torchao_trt.dequantize_nvfp4``. The converter unswizzles TorchAO
+block scales, then builds an FP4 constant, an FP8 block-scale constant, and
+two-level ``IDequantizeLayer``.
+
+Torch-TensorRT marks ``dequantize_nvfp4`` impure in constant folding so the
+packed FP4 weight is not folded into a dense BF16 constant. Compile with
+``immutable_weights=True``.
+
+.. code-block:: python
+
+    quantize_linear_nvfp4(model)
+    model = pre_process_model_for_export(model)
+
+    exp_program = torch.export.export(model, (example_input,), strict=True)
+
+    trt_model = torch_tensorrt.dynamo.compile(
+        exp_program,
+        inputs=[example_input],
+        min_block_size=1,
+        use_explicit_typing=True,
+        require_full_compilation=True,
+        immutable_weights=True,
+    )
+
+See :ref:`quantize_linear_nvfp4_woq` for a toy Linear model and
+:ref:`torch_export_flux_nvfp4_woq` for FLUX.1-dev.
+
+----
+
 TorchAO Static FP8 Quantization
 --------------------------------
 
@@ -293,8 +337,12 @@ For TorchAO static FP8 graphs,
 map to ``IQuantizeLayer`` / ``IDequantizeLayer`` so both activations and weights
 participate in FP8 GEMM fusion.
 
-For FP4, ``torch.ops.tensorrt.dynamic_block_quantize_op.default`` nodes are converted
-via the dynamic block quantize converter, which uses TRT's
+For TorchAO NVFP4 weight-only graphs, ``torch.ops.torchao_trt.dequantize_nvfp4.default``
+is mapped to two-level ``IDequantizeLayer`` (FP8 block scales restored with the
+global scale, then packed FP4 dequantized into the GEMM input type).
+
+For ModelOpt FP4, ``torch.ops.tensorrt.dynamic_block_quantize_op.default`` nodes
+are converted via the dynamic block quantize converter, which uses TRT's
 ``add_dynamic_quantize`` API (TRT ≥ 10.8).
 
 The ``constant_folding`` lowering pass explicitly marks quantization ops as *impure* to
@@ -337,7 +385,10 @@ Supported Precision / Hardware Matrix
    * - INT4 (TorchAO WOQ)
      - Any TRT-capable GPU with INT4 support
      - TRT ≥ 10.8
-   * - FP4 (NVFP4)
+   * - NVFP4 (TorchAO WOQ)
+     - GPU with TRT FP4 constants
+     - TRT ≥ 10.8
+   * - FP4 (ModelOpt NVFP4)
      - NVIDIA Blackwell (B100+)
      - TRT ≥ 10.8
 
@@ -380,3 +431,9 @@ Troubleshooting
     TorchAO's default INT4 config is asymmetric. Use
     ``quantize_linear_int4_symmetric`` (or ``convert_hub_int4_to_symmetric_trt``
     for Hub checkpoints) as in :ref:`quantize_linear_int4_woq`.
+
+**TorchAO NVFP4 weights folded to BF16, or engine has no FP4E2M1 constant**
+    The graph must keep ``torchao_trt.dequantize_nvfp4``. Promote weights with
+    ``pre_process_model_for_export`` as in :ref:`quantize_linear_nvfp4_woq`.
+    Last two Linear dims must be divisible by 16. This path is weight-only DQ
+    + BF16 GEMM, not ModelOpt ``dynamic_block_quantize_op``.
