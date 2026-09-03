@@ -38,20 +38,47 @@ else()
   set(_TensorRT_NVINFER_PLUGIN_NAMES nvinfer_plugin)
 endif()
 
+# Debian-style installations, including DRIVE OS, place development files in
+# architecture-qualified directories such as include/aarch64-linux-gnu and
+# lib/aarch64-linux-gnu. Preserve the flat TensorRT tarball layout while also
+# searching the active compiler's multiarch tuple.
+set(_TensorRT_INCLUDE_PATH_SUFFIXES include)
+set(_TensorRT_LIBRARY_PATH_SUFFIXES lib lib64)
+if(CMAKE_LIBRARY_ARCHITECTURE)
+  list(APPEND _TensorRT_INCLUDE_PATH_SUFFIXES
+    "include/${CMAKE_LIBRARY_ARCHITECTURE}"
+  )
+  list(APPEND _TensorRT_LIBRARY_PATH_SUFFIXES
+    "lib/${CMAKE_LIBRARY_ARCHITECTURE}"
+  )
+endif()
+
 # Include dir
 foreach(search ${_TensorRT_SEARCHES})
-  find_path(TensorRT_INCLUDE_DIR NAMES NvInfer.h ${${search}} PATH_SUFFIXES include)
+  find_path(TensorRT_INCLUDE_DIR
+    NAMES NvInfer.h
+    ${${search}}
+    PATH_SUFFIXES ${_TensorRT_INCLUDE_PATH_SUFFIXES}
+  )
 endforeach()
 
 if(NOT TensorRT_LIBRARY)
   foreach(search ${_TensorRT_SEARCHES})
-    find_library(TensorRT_LIBRARY NAMES ${_TensorRT_NVINFER_NAMES} ${${search}} PATH_SUFFIXES lib)
+    find_library(TensorRT_LIBRARY
+      NAMES ${_TensorRT_NVINFER_NAMES}
+      ${${search}}
+      PATH_SUFFIXES ${_TensorRT_LIBRARY_PATH_SUFFIXES}
+    )
   endforeach()
 endif()
 
 if(NOT TensorRT_nvinfer_plugin_LIBRARY)
   foreach(search ${_TensorRT_SEARCHES})
-    find_library(TensorRT_nvinfer_plugin_LIBRARY NAMES ${_TensorRT_NVINFER_PLUGIN_NAMES} ${${search}} PATH_SUFFIXES lib)
+    find_library(TensorRT_nvinfer_plugin_LIBRARY
+      NAMES ${_TensorRT_NVINFER_PLUGIN_NAMES}
+      ${${search}}
+      PATH_SUFFIXES ${_TensorRT_LIBRARY_PATH_SUFFIXES}
+    )
   endforeach()
 endif()
 
