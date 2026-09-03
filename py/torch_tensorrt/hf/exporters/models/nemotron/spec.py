@@ -5,139 +5,21 @@ from typing import Any
 
 import torch
 import torch.nn as nn
+from torch_tensorrt.hf.exporters.models.common.helpers import (
+    kv_kwargs,
+    split_flat_to_kwargs,
+)
+from torch_tensorrt.hf.exporters.models.nemotron.helpers import (
+    _decoder,
+    allocate_plugin_states,
+)
+from torch_tensorrt.hf.exporters.models.nemotron.patches import NemotronPatch
 from torch_tensorrt.hf.exporters.ops import call_engine
 from torch_tensorrt.hf.exporters.spec import (
     ComponentBundle,
     EdgeSpec,
     register_edge_spec,
 )
-from torch_tensorrt.hf.exporters.specs._language import kv_kwargs, split_flat_to_kwargs
-
-
-def _decoder(model: nn.Module) -> nn.Module:
-    return getattr(model, "backbone", None) or model.model
-
-
-def _kind(mixer: nn.Module) -> str:
-    name = type(mixer).__name__
-    if "Mamba" in name:
-        return "mamba"
-    if "Attention" in name:
-        return "attention"
-    if "MoE" in name or "Moe" in name:
-        return "moe"
-    return "mlp"
-
-
-class NemotronPatch(nn.Module):  # type: ignore[misc]
-    """Hybrid decoder: plugin attention / mamba / moe, native MLP."""
-
-    def __init__(self, model: nn.Module):
-        super().__init__()
-        decoder = _decoder(model)
-        self.layers = decoder.layers
-        self.norm = decoder.norm_f
-        self.lm_head = model.lm_head
-        self.kinds = [_kind(block.mixer) for block in self.layers]
-        self.num_attn = self.kinds.count("attention")
-        self.num_mamba = self.kinds.count("mamba")
-
-    def forward(
-        self,
-        inputs_embeds: torch.Tensor,
-        rope_rotary_cos_sin: torch.Tensor,
-        context_lengths: torch.Tensor,
-        kvcache_start_index: torch.Tensor,
-        last_token_ids: torch.Tensor,
-        *states: torch.Tensor,
-    ) -> tuple[torch.Tensor, ...]:
-        from torch_tensorrt.hf.exporters.patches.language import (
-            gather_last_token_hidden,
-        )
-
-        na, nm = self.num_attn, self.num_mamba
-        kvs = list(states[:na])
-        convs = list(states[na : na + nm])
-        ssms = list(states[na + nm : na + 2 * nm])
-        kv_i = conv_i = 0
-        hidden = inputs_embeds
-        present_kv, present_conv, present_ssm = [], [], []
-        for block, kind in zip(self.layers, self.kinds):
-            residual = hidden
-            hidden = block.norm(hidden)
-            mixer = block.mixer
-            if kind == "attention":
-                hidden, kv = mixer(
-                    hidden_states=hidden,
-                    rope_rotary_cos_sin=rope_rotary_cos_sin,
-                    past_key_value=kvs[kv_i],
-                    ctx_len=context_lengths,
-                    kvcache_start_index=kvcache_start_index,
-                )
-                present_kv.append(kv)
-                kv_i += 1
-            elif kind == "mamba":
-                hidden, conv_out, ssm_out = mixer(
-                    hidden, convs[conv_i], ssms[conv_i], context_lengths
-                )
-                present_conv.append(conv_out)
-                present_ssm.append(ssm_out)
-                conv_i += 1
-            else:
-                hidden = mixer(hidden)
-            hidden = residual + hidden
-        hidden = self.norm(hidden)
-        last = gather_last_token_hidden(hidden, last_token_ids)
-        logits = self.lm_head(last).float()
-        return (logits, *present_kv, *present_conv, *present_ssm)
-
-
-def allocate_plugin_states(
-    model: nn.Module,
-    config: Any,
-    batch: int,
-    max_seq_len: int,
-    device: torch.device,
-    dtype: torch.dtype,
-) -> tuple[list[torch.Tensor], list[torch.Tensor], list[torch.Tensor]]:
-    kinds = [_kind(block.mixer) for block in _decoder(model).layers]
-    head_dim = int(
-        getattr(config, "head_dim", 0)
-        or config.hidden_size // config.num_attention_heads
-    )
-    conv_dim = int(config.mamba_num_heads) * int(config.mamba_head_dim) + 2 * int(
-        config.n_groups
-    ) * int(config.ssm_state_size)
-    conv_kernel = int(getattr(config, "conv_kernel", 4))
-    kvs, convs, ssms = [], [], []
-    for kind in kinds:
-        if kind == "attention":
-            kvs.append(
-                torch.zeros(
-                    batch,
-                    2,
-                    int(config.num_key_value_heads),
-                    max_seq_len,
-                    head_dim,
-                    device=device,
-                    dtype=dtype,
-                )
-            )
-        elif kind == "mamba":
-            convs.append(
-                torch.zeros(batch, conv_dim, conv_kernel, device=device, dtype=dtype)
-            )
-            ssms.append(
-                torch.zeros(
-                    batch,
-                    int(config.mamba_num_heads),
-                    int(config.mamba_head_dim),
-                    int(config.ssm_state_size),
-                    device=device,
-                    dtype=dtype,
-                )
-            )
-    return kvs, convs, ssms
 
 
 @register_edge_spec("nemotron_h", "nemotron")

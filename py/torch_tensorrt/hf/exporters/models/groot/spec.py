@@ -5,28 +5,32 @@ from typing import Any
 
 import torch
 import torch.nn as nn
+from torch_tensorrt.hf.exporters.models.common.helpers import (
+    causal_lm_flat,
+    kv_kwargs,
+    split_flat_to_kwargs,
+)
+from torch_tensorrt.hf.exporters.models.common.patches import (
+    CausalLMPatch,
+    GridVisionPatch,
+    StaticActionVelocityStepPatch,
+    language_decoder,
+)
+from torch_tensorrt.hf.exporters.models.groot.helpers import (
+    _groot,
+    make_embodiment_id,
+)
+from torch_tensorrt.hf.exporters.models.groot.patches import (
+    ContextProjectionPatch,
+    GrootDiTStepEncoderPatch,
+    TRTDynamicCategorySpecificMLPPatch,
+)
 from torch_tensorrt.hf.exporters.ops import call_engine, scatter_image_tokens
 from torch_tensorrt.hf.exporters.spec import (
     ComponentBundle,
     EdgeSpec,
     register_edge_spec,
 )
-from torch_tensorrt.hf.exporters.specs._language import (
-    causal_lm_flat,
-    kv_kwargs,
-    split_flat_to_kwargs,
-)
-
-
-def _groot(model: nn.Module) -> nn.Module:
-    if hasattr(model, "_groot_model"):
-        return model._groot_model
-    backbone = getattr(model, "backbone", None)
-    if backbone is not None and hasattr(backbone, "eagle_model"):
-        return model
-    raise RuntimeError(
-        "GR00T spec expected GrootPolicy or a module with backbone.eagle_model"
-    )
 
 
 @register_edge_spec("groot", "gr00t")
@@ -46,7 +50,6 @@ class GrootSpec(EdgeSpec):  # type: ignore[misc]
             load_test_data,
             pack_state,
         )
-        from torch_tensorrt.hf.exporters.helpers.groot import make_embodiment_id
 
         policy = model
         device = raw.get(
@@ -107,18 +110,6 @@ class GrootSpec(EdgeSpec):  # type: ignore[misc]
     def wrap(
         self, name: str, model: nn.Module, sample: Mapping[str, Any], config: Any
     ) -> nn.Module:
-        from torch_tensorrt.hf.exporters.patches.diffusion import (
-            GrootDiTStepEncoderPatch,
-            StaticActionVelocityStepPatch,
-            TRTDynamicCategorySpecificMLPPatch,
-        )
-        from torch_tensorrt.hf.exporters.patches.language import (
-            CausalLMPatch,
-            ContextProjectionPatch,
-            language_decoder,
-        )
-        from torch_tensorrt.hf.exporters.patches.vision import GridVisionPatch
-
         found = _groot(model)
         eagle = found.backbone.eagle_model
         device = sample["pixel_values"].device

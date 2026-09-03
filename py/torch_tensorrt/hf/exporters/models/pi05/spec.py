@@ -5,34 +5,31 @@ from typing import Any
 
 import torch
 import torch.nn as nn
+from torch_tensorrt.hf.exporters.models.common.helpers import (
+    causal_lm_flat,
+    kv_kwargs,
+    split_flat_to_kwargs,
+)
+from torch_tensorrt.hf.exporters.models.common.patches import (
+    CausalLMPatch,
+    GridVisionPatch,
+    StaticActionVelocityStepPatch,
+    language_decoder,
+)
+from torch_tensorrt.hf.exporters.models.pi05.helpers import (
+    _core,
+    _nchw_to_hwc,
+    build_pi05_prefix_embs,
+    make_pi05_suffix_position_and_mask,
+    pi05_compact_index,
+)
+from torch_tensorrt.hf.exporters.models.pi05.patches import PI05PrefixKVStepEncoderPatch
 from torch_tensorrt.hf.exporters.ops import call_engine, fuse_prefix
 from torch_tensorrt.hf.exporters.spec import (
     ComponentBundle,
     EdgeSpec,
     register_edge_spec,
 )
-from torch_tensorrt.hf.exporters.specs._language import (
-    causal_lm_flat,
-    kv_kwargs,
-    split_flat_to_kwargs,
-)
-
-
-def _core(model: nn.Module) -> nn.Module:
-    if hasattr(model, "paligemma_with_expert"):
-        return model
-    inner = getattr(model, "model", None)
-    if isinstance(inner, nn.Module) and hasattr(inner, "paligemma_with_expert"):
-        return inner
-    raise RuntimeError("PI05 spec expected a policy or paligemma_with_expert module")
-
-
-def _nchw_to_hwc(pixel_values: torch.Tensor) -> torch.Tensor:
-    if pixel_values.ndim != 4:
-        return pixel_values
-    if pixel_values.shape[1] in (1, 3, 4) and pixel_values.shape[-1] not in (1, 3, 4):
-        return pixel_values.permute(0, 2, 3, 1).contiguous()
-    return pixel_values
 
 
 @register_edge_spec("pi05")
@@ -93,16 +90,6 @@ class Pi05Spec(EdgeSpec):  # type: ignore[misc]
     def wrap(
         self, name: str, model: nn.Module, sample: Mapping[str, Any], config: Any
     ) -> nn.Module:
-        from torch_tensorrt.hf.exporters.patches.diffusion import (
-            PI05PrefixKVStepEncoderPatch,
-            StaticActionVelocityStepPatch,
-        )
-        from torch_tensorrt.hf.exporters.patches.language import (
-            CausalLMPatch,
-            language_decoder,
-        )
-        from torch_tensorrt.hf.exporters.patches.vision import GridVisionPatch
-
         core = _core(model)
         paligemma = core.paligemma_with_expert.paligemma.model
         if name == "vision":
@@ -140,11 +127,6 @@ class Pi05Spec(EdgeSpec):  # type: ignore[misc]
         config: Any,
         module: nn.Module,
     ) -> ComponentBundle:
-        from torch_tensorrt.hf.exporters.helpers.pi05 import (
-            build_pi05_prefix_embs,
-            make_pi05_suffix_position_and_mask,
-            pi05_compact_index,
-        )
         from torch_tensorrt.hf.exporters.plugin.attention import (
             ContextAttentionMaskType,
         )
