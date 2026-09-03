@@ -44,10 +44,20 @@ python -m pip uninstall -y torch torchvision
 python -m pip install --force-reinstall --pre ${TORCHVISION} --index-url ${INDEX_URL} --extra-index-url https://pypi.org/simple
 python -m pip install --force-reinstall --pre ${TORCH} --index-url ${INDEX_URL} --extra-index-url https://pypi.org/simple
 
-# If CUDA 13 (cu13), prepend venv's NVIDIA CUDA 13 libs to LD_LIBRARY_PATH
-if [[ "${CU_VERSION}" == cu13* ]]; then
-    SITE_PACKAGES="$(python -c 'import sysconfig; print(sysconfig.get_path("platlib"))')"
-    export LD_LIBRARY_PATH="${SITE_PACKAGES}/nvidia/cu13/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+# Prepend the venv's NVIDIA CUDA runtime libs to LD_LIBRARY_PATH. The two majors ship
+# different layouts: nvidia-cuda-runtime-cu12 installs nvidia/cuda_runtime/lib/libcudart.so.12
+# while the CUDA 13 line installs nvidia/cu13/lib/libcudart.so.13. Naming only the cu13 path
+# left every CUDA 12 row without a CUDA runtime on the search path, so a binary linked against
+# libcudart died at startup with "libcudart.so.12: cannot open shared object file" even though
+# the package was installed.
+SITE_PACKAGES="$(python -c 'import sysconfig; print(sysconfig.get_path("platlib"))')"
+case "${CU_VERSION}" in
+cu13*) CUDA_RUNTIME_LIB_DIR="${SITE_PACKAGES}/nvidia/cu13/lib" ;;
+cu12*) CUDA_RUNTIME_LIB_DIR="${SITE_PACKAGES}/nvidia/cuda_runtime/lib" ;;
+*) CUDA_RUNTIME_LIB_DIR="" ;;
+esac
+if [[ -n "${CUDA_RUNTIME_LIB_DIR}" ]]; then
+    export LD_LIBRARY_PATH="${CUDA_RUNTIME_LIB_DIR}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
 fi
 
 # Install Torch-TensorRT
