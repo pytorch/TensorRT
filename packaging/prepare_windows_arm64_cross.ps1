@@ -1,5 +1,5 @@
 param(
-    [string] $PyTorchArtifact = "https://pypi.nvidia.com/nvtorch_oot/torch/torch-2.14.0%2Bcu134-cp313-cp313-win_arm64.whl",
+    [string] $PyTorchArtifact = "https://pypi.nvidia.com/nvtorch_oot_nightly/torch/torch-2.15.0.dev20260902%2Bcu134-cp313-cp313-win_arm64.whl",
     [string] $PythonArtifact = "https://api.nuget.org/v3-flatcontainer/pythonarm64/3.13.0/pythonarm64.3.13.0.nupkg",
     [Parameter(Mandatory = $true)] [string] $TargetRoot,
     [Parameter(Mandatory = $true)] [string] $CudaRoot,

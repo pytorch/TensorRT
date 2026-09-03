@@ -199,10 +199,10 @@ new_local_repository(
 http_archive(
     name = "libtorch_win_arm64",
     build_file = "third_party/libtorch/BUILD",
-    sha256 = "4f781babc0e0e0722cc48d0b15107a28e6003fc2b6544f1578b6eb6f5177dcb5",
+    sha256 = "e72f2b05d062651d0ba1d44e189979f70c2faf7e879e925849f3c5716ab4319e",
     strip_prefix = "torch",
     type = "zip",
-    urls = ["https://pypi.nvidia.com/nvtorch_oot/torch/torch-2.14.0%2Bcu134-cp313-cp313-win_arm64.whl"],
+    urls = ["https://pypi.nvidia.com/nvtorch_oot_nightly/torch/torch-2.15.0.dev20260902%2Bcu134-cp313-cp313-win_arm64.whl"],
 )
 
 new_local_repository(
