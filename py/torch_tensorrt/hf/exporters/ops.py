@@ -83,6 +83,9 @@ def fuse_prefix(
     hidden = lang_embeds.shape[-1]
     batch = lang_embeds.shape[0]
     vis = vision_tokens
+    # Vision engines may emit [B, S, H] (HF image features) or flattened [N, H].
+    if vis.ndim == 3:
+        vis = vis.reshape(-1, vis.shape[-1])
     if vis.ndim == 2:
         vis = vis.reshape(batch, -1, hidden)
     embs = torch.cat([vis, lang_embeds], dim=1)
