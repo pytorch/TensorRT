@@ -476,12 +476,11 @@ illegal memory access.
 
 The runtime does not impose a shared stream across delegates, so it is the
 **runner's responsibility** to run all delegates on one CUDA stream. Create a
-single stream and, for the duration of execution, direct every backend to use it
-(each backend exposes a caller-stream hook: scope both
-``torch_tensorrt::executorch_backend::CudaStreamGuard`` and
-``executorch::extension::cuda::CallerStreamGuard`` over that stream, since
-installing one of them leaves the other backend on its own). All GPU work is then
-enqueued in order and every cross-boundary dependency is satisfied, while
+single stream and scope ``executorch::extension::cuda::CallerStreamGuard`` over it
+for the duration of execution. That one guard reaches every CUDA-capable
+delegate: they resolve a single shared ``libextension_cuda``, so the TensorRT
+backend and the CUDA backend read the same caller-stream storage. All GPU work is
+then enqueued in order and every cross-boundary dependency is satisfied, while
 execution stays asynchronous.
 
 If the runner reads a delegate's outputs between calls (for example, an
