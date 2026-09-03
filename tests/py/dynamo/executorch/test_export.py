@@ -228,11 +228,28 @@ def _use_cpu_default_device(monkeypatch):
     )
 
 
+class FakeEdgeProgramManager:
+    """Stands in for what ``to_edge_transform_and_lower`` returns.
+
+    ``export()`` reaches back into it after lowering, to order the mutations of
+    each method zero-copy rewired, so the stub has to answer
+    ``exported_program(name)``. ``ordered`` records what the ordering pass was
+    handed, which is the only way to see that reach-back from here.
+    """
+
+    def __init__(self):
+        self.ordered = []
+
+    def exported_program(self, method_name="forward"):
+        return f"edge:{method_name}"
+
+
 def _patch_lowering(monkeypatch, engine_counts=None):
     import executorch.exir
     import torch_tensorrt._features as features
     import torch_tensorrt.executorch as executorch_api
     import torch_tensorrt.executorch._export_utils as export_utils
+    import torch_tensorrt.executorch._zero_copy as zero_copy
 
     monkeypatch.setattr(
         features,
@@ -241,8 +258,14 @@ def _patch_lowering(monkeypatch, engine_counts=None):
     )
     export_module = importlib.import_module("torch_tensorrt.executorch._export")
     engine_counts = engine_counts or {}
-    lower = MagicMock(return_value=object())
+    edge_manager = FakeEdgeProgramManager()
+    lower = MagicMock(return_value=edge_manager)
     monkeypatch.setattr(executorch.exir, "to_edge_transform_and_lower", lower)
+    monkeypatch.setattr(
+        zero_copy,
+        "order_rewired_mutations_last",
+        lambda program: edge_manager.ordered.append(program),
+    )
     monkeypatch.setattr(executorch_api, "TensorRTPartitioner", FakeTensorRTPartitioner)
     monkeypatch.setattr(executorch_api, "get_edge_compile_config", lambda: "default")
     monkeypatch.setattr(export_module, "ExportedProgram", FakeExportedProgram)
@@ -555,6 +578,10 @@ def test_export_zero_copy_kv_rewires_every_method(monkeypatch):
 
     assert declared == [prefill, decode]
     assert rewired == [prefill, decode]
+    # Rewiring a mutation makes the write-back pass skip its copy, which shifts
+    # the mutation specs after it; the ordering pass has to run on each rewired
+    # method's Edge program, since lowering rebuilds the order it fixes.
+    assert sorted(lower.return_value.ordered) == ["edge:decode", "edge:prefill"]
     # The backend rejects a delegate missing its aliased outputs unless it is
     # told the omission was deliberate, and this spec is the only channel.
     from torch_tensorrt.executorch.backend import (
