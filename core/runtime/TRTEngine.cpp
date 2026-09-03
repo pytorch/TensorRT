@@ -20,9 +20,8 @@
 #include "torch/csrc/distributed/c10d/NCCLUtils.hpp"
 #include "torch/csrc/distributed/c10d/ProcessGroup.hpp"
 #include "torch/csrc/distributed/c10d/ProcessGroupNCCL.hpp"
-#if __has_include("torch/csrc/distributed/c10d/nccl2/ProcessGroupNCCL.hpp")
+#ifdef TORCHTRT_HAS_PROCESS_GROUP_NCCL2
 #include "torch/csrc/distributed/c10d/nccl2/ProcessGroupNCCL.hpp"
-#define TORCHTRT_HAS_PROCESS_GROUP_NCCL2 1
 #endif
 #endif
 
