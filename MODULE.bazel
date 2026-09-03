@@ -71,16 +71,12 @@ new_local_repository(
     path = "/usr/local/lib/python3.12/site-packages/torch_tensorrt/",
 )
 
-# CUDA should be installed on the system locally
-# for linux x86_64 and aarch64
-# Jobs that render MODULE.bazel from toolchains/ci_workspaces/MODULE.bazel.tmpl substitute
-# ${CUDA_HOME} here. Jobs that use this file directly need a container that actually provides
-# the path below as soon as anything they run resolves a target that depends on @cuda.
-new_local_repository(
-    name = "cuda",
-    build_file = "@//third_party/cuda:BUILD",
-    path = "/usr/local/cuda-13.2/",
-)
+# CUDA should be installed on the system locally for linux x86_64 and aarch64.
+# CUDA_HOME can select a non-default toolkit, including the conventional merged
+# toolkit view constructed from DRIVE OS and container development files.
+local_cuda = use_repo_rule("//toolchains:local_cuda.bzl", "local_cuda")
+
+local_cuda(name = "cuda")
 
 # for Jetson
 # These versions can be selected using the flag `--//toolchains/dep_collection:compute_libs="jetpack"`
@@ -225,11 +221,17 @@ http_archive(
     ],
 )
 
-http_archive(
+local_or_archive_tensorrt = use_repo_rule(
+    "//toolchains:local_or_archive_tensorrt.bzl",
+    "local_or_archive_tensorrt",
+)
+
+local_or_archive_tensorrt(
     name = "tensorrt_sbsa",
-    build_file = "@//third_party/tensorrt/archive:BUILD",
+    archive_build_file = "@//third_party/tensorrt/archive:BUILD",
+    archive_type = "tar.zst",
+    local_build_file = "@//third_party/tensorrt/local:BUILD",
     strip_prefix = "TensorRT-11.2.1.2",
-    type = "tar.zst",
     urls = [
         "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/11.2.1/tars/TensorRT-Enterprise-11.2.1.2-Linux-aarch64-cuda-13.3-Release-external.tar.zst",
     ],

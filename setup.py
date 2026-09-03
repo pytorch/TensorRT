@@ -94,6 +94,8 @@ dir_path = os.path.join(str(get_root_dir()), "py")
 MACHINE_ARCH = platform.machine().lower()
 NATIVE_WINDOWS_ARM64 = IS_WINDOWS and MACHINE_ARCH in ("arm64", "aarch64")
 IS_AARCH64 = not IS_WINDOWS and MACHINE_ARCH == "aarch64"
+TARGET_PLATFORM = os.environ.get("TORCHTRT_TARGET_PLATFORM", "").strip().lower()
+IS_DRIVEOS = TARGET_PLATFORM == "driveos"
 WINDOWS_ON_ARM = "--windows-on-arm" in sys.argv
 if WINDOWS_ON_ARM:
     # setuptools does not know this project-specific option, so consume it
@@ -102,10 +104,12 @@ if WINDOWS_ON_ARM:
     sys.argv.remove("--windows-on-arm")
 FORCED_WINDOWS_ARM64 = (
     WINDOWS_ON_ARM
-    or os.environ.get("TORCHTRT_TARGET_PLATFORM", "").lower() == "windows-arm64"
+    or TARGET_PLATFORM == "windows-arm64"
 )
 if FORCED_WINDOWS_ARM64 and not IS_WINDOWS:
     raise RuntimeError("Windows ARM64 builds are supported only on Windows")
+if IS_DRIVEOS and not IS_AARCH64:
+    raise RuntimeError("DRIVE OS builds are supported only on Linux aarch64")
 TARGET_WINDOWS_ARM64 = NATIVE_WINDOWS_ARM64 or FORCED_WINDOWS_ARM64
 # An ARM64 Python process builds natively. An x64 Python process must opt in to
 # the ARM64 target via --windows-on-arm or TORCHTRT_TARGET_PLATFORM.
@@ -159,6 +163,9 @@ if (py_only_env_var := os.environ.get("PYTHON_ONLY")) is not None:
 if (use_rtx_env_var := os.environ.get("USE_TRT_RTX")) is not None:
     if use_rtx_env_var == "1" or use_rtx_env_var.lower() == "true":
         USE_TRT_RTX = True
+
+if IS_DRIVEOS and USE_TRT_RTX:
+    raise RuntimeError("DRIVE OS builds require standard TensorRT, not TensorRT RTX")
 
 # Distribution name: keep import package as `torch_tensorrt`, but vary project
 # name so wheels for RTX vs standard TensorRT are distinct.
@@ -286,6 +293,8 @@ def build_libtorchtrt_cxx11_abi(
             cmd.append(
                 "--extra_toolchains=@local_config_cc//:cc-toolchain-arm64_windows"
             )
+    elif IS_DRIVEOS:
+        cmd.append("--config=driveos")
     else:
         cmd.append("--config=linux")
 
@@ -301,7 +310,9 @@ def build_libtorchtrt_cxx11_abi(
         cmd.append("--config=jetpack")
         print("Jetpack build")
 
-    if IS_SBSA:
+    if IS_DRIVEOS:
+        print("DRIVE OS build")
+    elif IS_SBSA:
         print("SBSA build")
 
     if CI_BUILD:
@@ -1009,6 +1020,20 @@ def get_sbsa_requirements(base_requirements):
         ]
 
 
+DRIVEOS_TENSORRT_REQUIREMENT = "tensorrt>=10.16.1,<10.17.0"
+
+
+def get_driveos_requirements(base_requirements):
+    """Dependencies for a native DRIVE OS build using the platform TensorRT."""
+    requirements = base_requirements + ["numpy"]
+    if IS_DLFW_CI:
+        return requirements
+    return requirements + [
+        "torch>=2.15.0.dev,<2.16.0",
+        DRIVEOS_TENSORRT_REQUIREMENT,
+    ]
+
+
 def get_x86_64_requirements(base_requirements):
     requirements = base_requirements + ["numpy"]
 
@@ -1058,7 +1083,9 @@ def get_requirements():
         "psutil",
     ]
 
-    if IS_JETPACK:
+    if IS_DRIVEOS:
+        requirements = get_driveos_requirements(base_requirements)
+    elif IS_JETPACK:
         requirements = get_jetpack_requirements(base_requirements)
     elif IS_SBSA:
         requirements = get_sbsa_requirements(base_requirements)
