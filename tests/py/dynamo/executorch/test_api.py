@@ -280,6 +280,7 @@ def test_packaging_declares_executorch_extra():
 def test_executorch_is_not_base_install_requirement():
     tree = _setup_tree()
     for function_name in (
+        "get_driveos_requirements",
         "get_jetpack_requirements",
         "get_sbsa_requirements",
         "get_x86_64_requirements",
@@ -290,6 +291,38 @@ def test_executorch_is_not_base_install_requirement():
             isinstance(node, ast.Name) and node.id == "EXECUTORCH_REQUIREMENT"
             for node in ast.walk(function)
         )
+
+
+@pytest.mark.unit
+def test_driveos_packaging_requires_tensorrt_10_16():
+    tree = _setup_tree()
+    requirement = _assignment_value(tree, "DRIVEOS_TENSORRT_REQUIREMENT")
+    assert isinstance(requirement, ast.Constant)
+    assert requirement.value == "tensorrt>=10.16.1,<10.17.0"
+
+    function = _function_def(tree, "get_driveos_requirements")
+    namespace = {
+        "DRIVEOS_TENSORRT_REQUIREMENT": requirement.value,
+        "IS_DLFW_CI": False,
+    }
+    exec(
+        compile(ast.Module(body=[function], type_ignores=[]), "<setup.py>", "exec"),
+        namespace,
+    )
+
+    requirements = namespace["get_driveos_requirements"](["base"])
+    assert requirements == [
+        "base",
+        "numpy",
+        "torch>=2.15.0.dev,<2.16.0",
+        "tensorrt>=10.16.1,<10.17.0",
+    ]
+
+
+@pytest.mark.unit
+def test_driveos_packaging_selects_driveos_bazel_config():
+    source = ast.unparse(_function_def(_setup_tree(), "build_libtorchtrt_cxx11_abi"))
+    assert 'cmd.append("--config=driveos")' in source
 
 
 @pytest.mark.unit
