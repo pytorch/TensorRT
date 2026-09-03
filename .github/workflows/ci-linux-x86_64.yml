@@ -72,15 +72,11 @@ jobs:
     with:
       lane: ${{ needs.decide.outputs.lane }}
       use-rtx: false
-      # Temporarily disabled while validating the ExecuTorch runtime build.
-      run-tests: false
       raw-matrix: ${{ needs.generate-matrix.outputs.matrix }}
 
   rtx:
     needs: [decide, generate-matrix]
-    # Temporarily disabled while validating the ExecuTorch runtime build.
-    # if: needs.decide.outputs.lane != 'skip' && needs.decide.outputs.backend != 'standard'
-    if: ${{ false }}
+    if: needs.decide.outputs.lane != 'skip' && needs.decide.outputs.backend != 'standard'
     uses: ./.github/workflows/_test-linux.yml
     with:
       lane: ${{ needs.decide.outputs.lane }}
@@ -92,9 +88,7 @@ jobs:
   # so the wheel builds cheaply and each push smoke-tests the no-C++-runtime path.
   python-only:
     needs: [decide, generate-matrix]
-    # Temporarily disabled while validating the ExecuTorch runtime build.
-    # if: needs.decide.outputs.lane != 'skip' && needs.decide.outputs.backend != 'rtx'
-    if: ${{ false }}
+    if: needs.decide.outputs.lane != 'skip' && needs.decide.outputs.backend != 'rtx'
     uses: ./.github/workflows/_test-linux.yml
     with:
       lane: python-only
@@ -106,9 +100,7 @@ jobs:
   # Runs on any non-skip lane, but only when an RTX backend is selected.
   python-only-rtx:
     needs: [decide, generate-matrix]
-    # Temporarily disabled while validating the ExecuTorch runtime build.
-    # if: needs.decide.outputs.lane != 'skip' && needs.decide.outputs.backend != 'standard'
-    if: ${{ false }}
+    if: needs.decide.outputs.lane != 'skip' && needs.decide.outputs.backend != 'standard'
     uses: ./.github/workflows/_test-linux.yml
     with:
       lane: python-only
@@ -180,9 +172,7 @@ jobs:
   # Consolidated, agent-friendly report over this run's suites (informational).
   report:
     needs: [standard, rtx, python-only, python-only-rtx, executorch-runtime-build, executorch-runtime-test]
-    # Temporarily disabled while validating the ExecuTorch runtime build.
-    # if: always()
-    if: ${{ false }}
+    if: always()
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
