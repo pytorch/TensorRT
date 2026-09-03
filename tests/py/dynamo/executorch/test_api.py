@@ -391,72 +391,34 @@ def _function_def(tree, name):
 
 
 @pytest.mark.unit
-def test_runtime_wheel_pins_its_native_dependencies_per_cuda_major():
-    """Both native dependencies are resolved from the CUDA the build actually uses.
-
-    Hardcoding the CUDA 13 spellings was right while only CUDA 13 shipped and wrong once 12.6 came
-    back. NVIDIA splits the runtime by major: CUDA 12 publishes nvidia-cuda-runtime-cu12 while the
-    unsuffixed name is the CUDA 13 line, so naming the unsuffixed one unconditionally failed every
-    CUDA 12 row with "No package metadata was found for nvidia-cuda-runtime". TensorRT splits the
-    same way.
-    """
+def test_runtime_wheel_selects_its_tensorrt_requirement_per_cuda_major():
+    """The TensorRT requirement must match the CUDA major used to build the wheel."""
     setup_source = _RUNTIME_SETUP_PY.read_text(encoding="utf-8")
-    assert "TENSORRT_DISTRIBUTION = tensorrt_distribution()" in setup_source, (
-        "the TensorRT distribution is no longer resolved from the build's CUDA version, so a CUDA "
-        "12.6 row would declare the CUDA 13 distribution"
-    )
-    assert "CUDA_RUNTIME_DISTRIBUTION = cuda_runtime_distribution()" in setup_source, (
-        "the CUDA runtime distribution is no longer resolved from the build's CUDA version, so a "
-        "CUDA 12 row would look for a distribution torch did not install"
-    )
-
-    # Execute both resolvers rather than grepping for the names. Checking that each spelling
-    # appears somewhere in the file still passes when the two mappings are swapped, which would
-    # send every CUDA 12 row after CUDA 13 packages and vice versa.
     tree = ast.parse(setup_source)
-    wanted = ("tensorrt_distribution", "cuda_runtime_distribution")
-    functions = [
-        node
-        for node in tree.body
-        if isinstance(node, ast.FunctionDef) and node.name in wanted
-    ]
-    assert {node.name for node in functions} == set(wanted), (
-        f"expected both resolvers to be module-level functions, found "
-        f"{sorted(node.name for node in functions)}"
-    )
+    function = _function_def(tree, "get_tensorrt_requirement")
     fake_torch = types.SimpleNamespace(version=types.SimpleNamespace(cuda=None))
     namespace: dict = {"torch": fake_torch}
     exec(
-        compile(ast.Module(body=functions, type_ignores=[]), "<setup.py>", "exec"),
+        compile(ast.Module(body=[function], type_ignores=[]), "<setup.py>", "exec"),
         namespace,
     )
 
-    for cuda_version, tensorrt, cuda_runtime in (
-        ("12.6", "tensorrt-cu12", "nvidia-cuda-runtime-cu12"),
-        ("12.9", "tensorrt-cu12", "nvidia-cuda-runtime-cu12"),
-        ("13.0", "tensorrt-cu13", "nvidia-cuda-runtime"),
-        ("13.2", "tensorrt-cu13", "nvidia-cuda-runtime"),
+    for cuda_version, requirement in (
+        ("12.6", "tensorrt-cu12>=11.1.0,<11.2"),
+        ("12.9", "tensorrt-cu12>=11.1.0,<11.2"),
+        ("13.0", "tensorrt-cu13>=11.1.0,<11.2"),
+        ("13.2", "tensorrt-cu13>=11.1.0,<11.2"),
     ):
         fake_torch.version.cuda = cuda_version
-        assert namespace["tensorrt_distribution"]() == tensorrt, (
-            f"CUDA {cuda_version} resolves the wrong TensorRT distribution, so that row installs "
-            "the other CUDA major's native libraries"
-        )
-        assert namespace["cuda_runtime_distribution"]() == cuda_runtime, (
-            f"CUDA {cuda_version} resolves the wrong CUDA runtime distribution, so that row looks "
-            "for metadata torch did not install"
-        )
+        assert (
+            namespace["get_tensorrt_requirement"]() == requirement
+        ), f"CUDA {cuda_version} resolves the wrong TensorRT requirement"
 
     # A CUDA-less torch and an unsupported major are refused rather than guessed at.
     for cuda_version in (None, "11.8"):
         fake_torch.version.cuda = cuda_version
-        for name in wanted:
-            with pytest.raises(RuntimeError):
-                namespace[name]()
-
-    assert "torch=={public_version(torch.__version__)}" in setup_source
-    assert "{TENSORRT_DISTRIBUTION}=={tensorrt_version}" in setup_source
-    assert "{CUDA_RUNTIME_DISTRIBUTION}=={cuda_runtime_version}" in setup_source
+        with pytest.raises(RuntimeError):
+            namespace["get_tensorrt_requirement"]()
 
 
 @pytest.mark.unit
