@@ -43,6 +43,8 @@ PY
 python -m pip uninstall -y torch torchvision
 python -m pip install --force-reinstall --pre ${TORCHVISION} --index-url ${INDEX_URL} --extra-index-url https://pypi.org/simple
 python -m pip install --force-reinstall --pre ${TORCH} --index-url ${INDEX_URL} --extra-index-url https://pypi.org/simple
+# dynamo-torchao full/nightly suite
+python -m pip install torchao
 
 # Prepend the venv's NVIDIA CUDA runtime libs to LD_LIBRARY_PATH. The two majors ship
 # different layouts: nvidia-cuda-runtime-cu12 installs nvidia/cuda_runtime/lib/libcudart.so.12
