@@ -1,4 +1,5 @@
 import importlib
+import platform
 import unittest
 
 import pytest
@@ -20,6 +21,10 @@ if importlib.util.find_spec("transformers"):
 @unittest.skipIf(
     not importlib.util.find_spec("transformers"),
     "transformers is required to run this test",
+)
+@unittest.skipIf(
+    platform.system().lower().startswith("windows"),
+    "dynamic head dimension HF GQA test is not supported on Windows",
 )
 def test_dynamic_head_dim_with_hf_model(dtype, decompose_attention):
     if (
