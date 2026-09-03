@@ -20,8 +20,8 @@ result back. The persistence check is the same, and it is the check that matters
 here: zero-copy removes the copy that was making the update stick, so if the
 engine's in-place write is not reaching the caller's buffer the run fails. What
 it cannot see is a ``--zero_copy`` export that degenerated into an ordinary
-staged ``.pte`` -- the two are indistinguishable to it -- so ``_check_zero_copy``
-refuses to write one.
+staged ``.pte`` -- the two are indistinguishable to it -- so
+``check_zero_copy_kv`` refuses to write one.
 
 Prerequisites
 -------------
@@ -32,7 +32,6 @@ Install Torch-TensorRT with the ExecuTorch extra before running this example::
 
 import argparse
 import os
-from typing import Any
 
 import torch
 import torch_tensorrt
@@ -92,45 +91,6 @@ class KVDecodeStep(torch.nn.Module):
         return self.lm(self.o(out))
 
 
-def _check_zero_copy(program: Any) -> None:
-    """Refuse to write a ``--zero_copy`` .pte that is really an ordinary staged one.
-
-    Neither half of zero-copy fails when it finds nothing to do:
-    ``zero_copy_kv=True`` logs a warning and carries on when no aliased buffer
-    mutation turns up, and the finalization pass, handed a program with nothing
-    marked, un-stages nothing and returns without a word. The ``.pte`` that comes
-    out still runs, and ``kv_cache_decode_check`` cannot tell it from the staged
-    model exported beside it -- so without this the lane would stay green while
-    covering none of the feature.
-    """
-    from executorch.exir.delegate import executorch_call_delegate
-
-    graph_module = program.exported_program().graph_module
-    marked = [
-        node
-        for node in graph_module.graph.nodes
-        if node.op == "placeholder" and node.meta.get("_torch_tensorrt_aliased_buffer")
-    ]
-    if not marked:
-        raise RuntimeError(
-            "zero_copy_kv=True rewired no aliased buffer, so this .pte stages its "
-            "KV cache like any other."
-        )
-    delegate_args = {
-        arg
-        for node in graph_module.graph.nodes
-        if node.op == "call_function" and node.target is executorch_call_delegate
-        for arg in node.args[1:]
-    }
-    staged = [node.name for node in marked if node not in delegate_args]
-    if staged:
-        raise RuntimeError(
-            f"buffer(s) {staged} still reach the delegate through a staging copy, "
-            "so the engine writes scratch that is thrown away and the cache never "
-            "updates."
-        )
-
-
 def _save_zero_copy(trt_gm: torch.fx.GraphModule, inputs: tuple, path: str) -> None:
     """Save a .pte whose engine updates the KV cache in place.
 
@@ -143,7 +103,11 @@ def _save_zero_copy(trt_gm: torch.fx.GraphModule, inputs: tuple, path: str) -> N
     that reaches ``to_executorch()`` by any other route has to install the config
     itself.
     """
-    from torch_tensorrt.executorch import export, zero_copy_backend_config
+    from torch_tensorrt.executorch import (
+        check_zero_copy_kv,
+        export,
+        zero_copy_backend_config,
+    )
 
     # retrace=True here, retrace=False for the plain save() below, so the two
     # exporters are both covered. Which way round matters: the legacy exporter
@@ -154,7 +118,7 @@ def _save_zero_copy(trt_gm: torch.fx.GraphModule, inputs: tuple, path: str) -> N
     # cache is told from an ordinary copy-back buffer.
     edge = export(trt_gm, arg_inputs=inputs, retrace=True, zero_copy_kv=True)
     program = edge.to_executorch(zero_copy_backend_config())
-    _check_zero_copy(program)
+    check_zero_copy_kv(program)
     with open(path, "wb") as output:
         program.write_to_file(output)
     if program._tensor_data:

@@ -392,12 +392,18 @@ one silently would break a runner built before this feature.
 .. warning::
 
     **Both calls are required.** Exporting with ``zero_copy_kv=True`` and then
-    finalizing without ``zero_copy_backend_config`` does not raise: the engine
-    writes a per-call staging copy that is discarded, and the cache never
-    updates. For a KV cache that is wrong output, not a crash. Nothing
-    downstream can detect the omission, so pairing the two is on the caller --
-    unless ``torch_tensorrt.save`` is the one writing the ``.pte``, which owns
-    both ends and leaves nothing to pair.
+    finalizing without ``zero_copy_backend_config`` does not raise on its own:
+    the engine writes a per-call staging copy that is discarded, and the cache
+    never updates. For a KV cache that is wrong output, not a crash. Pass the
+    finalized program to ``torch_tensorrt.executorch.check_zero_copy_kv``, which
+    reads the graph back and refuses one whose caches are still staged, before
+    writing the ``.pte``::
+
+        program = edge.to_executorch(zero_copy_backend_config(backend_config))
+        torch_tensorrt.executorch.check_zero_copy_kv(program)
+
+    ``torch_tensorrt.save`` owns both ends and runs that check itself, so there
+    is nothing to pair on that path.
 
 ``torch_tensorrt.save`` finalizes the program itself, so a single
 ``zero_copy_kv=True`` covers both steps:

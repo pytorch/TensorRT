@@ -698,6 +698,100 @@ def test_zero_copy_backend_config_keeps_the_callers_config():
     assert delegate.args[1] is k_buffer
 
 
+def _finalized_program(forward=None, **methods):
+    """The shape ``check_zero_copy_kv`` reads: to_executorch()'s return value.
+
+    One positional graph module makes a single-method ``forward`` program; the
+    keywords name a method each. ``exported_program`` defaults to ``forward``
+    and raises ``KeyError`` on a method the program does not have, like
+    ``ExecutorchProgramManager``'s -- which is what a program with no ``forward``
+    does to a caller that never asked for one.
+    """
+    if forward is not None:
+        methods = {"forward": forward, **methods}
+    return SimpleNamespace(
+        methods=set(methods),
+        exported_program=lambda method_name="forward": SimpleNamespace(
+            graph_module=methods[method_name]
+        ),
+    )
+
+
+def _unstaged_graph():
+    """A graph whose marked buffer already reaches its delegate directly."""
+    graph_module, k_buffer, _, _ = _staged_delegate_graph()
+    k_buffer.meta["_torch_tensorrt_aliased_buffer"] = True
+    Z._unstage_aliased_buffers(graph_module)
+    return graph_module
+
+
+@pytest.mark.unit
+def test_check_zero_copy_kv_accepts_an_unstaged_buffer():
+    graph_module, k_buffer, _, delegate = _staged_delegate_graph()
+    k_buffer.meta["_torch_tensorrt_aliased_buffer"] = True
+    Z._unstage_aliased_buffers(graph_module)
+
+    Z.check_zero_copy_kv(_finalized_program(graph_module))
+
+
+@pytest.mark.unit
+def test_check_zero_copy_kv_rejects_a_still_staged_buffer():
+    """The shape a program finalized without zero_copy_backend_config has: the
+    buffer is marked, so export dropped its copy-back, but it still reaches the
+    delegate through a staging copy the engine's write is thrown away with."""
+    graph_module, k_buffer, _, _ = _staged_delegate_graph()
+    k_buffer.meta["_torch_tensorrt_aliased_buffer"] = True
+
+    with pytest.raises(RuntimeError, match="do not reach a delegate directly"):
+        Z.check_zero_copy_kv(_finalized_program(graph_module))
+
+
+@pytest.mark.unit
+def test_check_zero_copy_kv_rejects_a_program_with_nothing_marked():
+    """zero_copy_kv=True on a model with no engine-aliased buffer only warns, so
+    the .pte that comes out is an ordinary staged one. Refuse it rather than let
+    a caller who asked for zero-copy ship a program that never got it."""
+    graph_module, _, _, _ = _staged_delegate_graph()
+
+    with pytest.raises(RuntimeError, match="marked for in-place update"):
+        Z.check_zero_copy_kv(_finalized_program(graph_module))
+
+
+@pytest.mark.unit
+def test_check_zero_copy_kv_accepts_a_program_with_no_forward_method():
+    """The shape the user guide's zero-copy example exports: prefill and decode,
+    no ``forward``. Reading the default method would raise KeyError naming a
+    method the caller never asked for. A method that rewired nothing of its own
+    is not an error either, so only ``decode`` here carries a marked buffer."""
+    unmarked, _, _, _ = _staged_delegate_graph()
+
+    Z.check_zero_copy_kv(_finalized_program(prefill=unmarked, decode=_unstaged_graph()))
+
+
+@pytest.mark.unit
+def test_check_zero_copy_kv_catches_a_method_other_than_forward():
+    """The silent case: ``forward`` got zero-copy and ``decode`` degenerated to
+    staged. Stopping at ``forward`` would write a .pte whose decode cache never
+    updates, so the failure has to name the method that lost it."""
+    staged, k_buffer, _, _ = _staged_delegate_graph()
+    k_buffer.meta["_torch_tensorrt_aliased_buffer"] = True
+
+    with pytest.raises(RuntimeError, match="in method 'decode'"):
+        Z.check_zero_copy_kv(_finalized_program(_unstaged_graph(), decode=staged))
+
+
+@pytest.mark.unit
+def test_check_zero_copy_kv_rejects_a_multi_method_program_with_nothing_marked():
+    """Nothing marked anywhere is about the program, not about one method: a
+    method with no aliased buffer mutation is an error only when no other method
+    has one, and the failure lists every method it looked in."""
+    first, _, _, _ = _staged_delegate_graph()
+    second, _, _, _ = _staged_delegate_graph()
+
+    with pytest.raises(RuntimeError, match=r"\(decode, prefill\)"):
+        Z.check_zero_copy_kv(_finalized_program(prefill=first, decode=second))
+
+
 @pytest.mark.unit
 def test_zero_copy_backend_config_defaults_to_executorch_defaults():
     """Called with no config it starts from ExecuTorch's defaults, and the one
@@ -1178,7 +1272,7 @@ def _lowered_module(graph_module, delegate):
     return getattr(graph_module, delegate.args[0].target)
 
 
-def _assert_marked_buffers_reach_the_engine_unstaged(graph_module):
+def _assert_marked_buffers_reach_the_engine_unstaged(program):
     """Every marked buffer is a direct argument of a TensorRT delegate.
 
     Finalizing a zero-copy program without raising is a weak signal, because both
@@ -1187,7 +1281,16 @@ def _assert_marked_buffers_reach_the_engine_unstaged(graph_module):
     argument pointing at the staging copy still satisfies them. Only the graph says
     whether the rewiring happened, and getting it wrong is silent -- the engine
     writes per-call scratch that is discarded and the cache never updates.
+
+    The library's own check runs first, on the whole program. It is weaker than
+    what follows -- it accepts a marked buffer reaching any backend's delegate --
+    but it is the only place the container API it reads, ``methods`` and
+    ``exported_program(name)``, meets a real ``ExecutorchProgramManager``: every
+    other test of it builds the program itself, so an upstream rename would
+    leave those green and break ``save(zero_copy_kv=True)`` for every caller.
     """
+    torch_tensorrt.executorch.check_zero_copy_kv(program)
+    graph_module = program.exported_program().graph_module
     marked = [
         node
         for node in graph_module.graph.nodes
@@ -1424,9 +1527,7 @@ def test_zero_copy_kv_keeps_a_copyback_buffer_in_the_same_method(retrace):
     program = edge.to_executorch(
         config=torch_tensorrt.executorch.zero_copy_backend_config()
     )
-    _assert_marked_buffers_reach_the_engine_unstaged(
-        program.exported_program().graph_module
-    )
+    _assert_marked_buffers_reach_the_engine_unstaged(program)
     _assert_finalized_mutation_pairing(program)
 
 
@@ -1570,9 +1671,7 @@ def test_zero_copy_kv_with_the_copyback_on_a_second_delegate(retrace):
     program = edge.to_executorch(
         config=torch_tensorrt.executorch.zero_copy_backend_config()
     )
-    _assert_marked_buffers_reach_the_engine_unstaged(
-        program.exported_program().graph_module
-    )
+    _assert_marked_buffers_reach_the_engine_unstaged(program)
     _assert_finalized_mutation_pairing(program)
 
 
@@ -1682,9 +1781,7 @@ def test_zero_copy_kv_beside_an_executorch_cuda_delegate():
     program = edge.to_executorch(
         config=torch_tensorrt.executorch.zero_copy_backend_config()
     )
-    _assert_marked_buffers_reach_the_engine_unstaged(
-        program.exported_program().graph_module
-    )
+    _assert_marked_buffers_reach_the_engine_unstaged(program)
 
 
 # --------------------------------------------------------------------------
@@ -1714,9 +1811,10 @@ def _install_save_stubs(monkeypatch, *, wrap_config=True):
     """Stub the executorch lowering that save() drives and record how it is called.
 
     Returns a namespace capturing the kwargs export() received, the arguments
-    zero_copy_backend_config() was wrapped with, and the config finally handed to
-    to_executorch(). When ``wrap_config`` is False the real
-    zero_copy_backend_config runs, so the recorded config is the genuine one.
+    zero_copy_backend_config() was wrapped with, the config finally handed to
+    to_executorch(), and the programs check_zero_copy_kv() was given. When
+    ``wrap_config`` is False the real zero_copy_backend_config runs, so the
+    recorded config is the genuine one.
     """
     import torch_tensorrt._compile as compile_module
     import torch_tensorrt.executorch as executorch_api
@@ -1728,16 +1826,29 @@ def _install_save_stubs(monkeypatch, *, wrap_config=True):
     )
 
     calls = SimpleNamespace(
-        export_kwargs=None, wrap_args=[], to_executorch_config="unset"
+        export_kwargs=None,
+        wrap_args=[],
+        to_executorch_config="unset",
+        program=None,
+        checked=[],
     )
 
     def _to_executorch(config=None):
         calls.to_executorch_config = config
-        return SimpleNamespace(
+        calls.program = SimpleNamespace(
             _tensor_data=None, write_to_file=lambda f: f.write(b"stub-pte")
         )
+        return calls.program
 
     edge = SimpleNamespace(to_executorch=_to_executorch)
+
+    # The stub program has no graph, so the real check cannot read it; what these
+    # tests pin is that save() runs it, on the finalized program, before writing.
+    monkeypatch.setattr(
+        executorch_api,
+        "check_zero_copy_kv",
+        lambda program: calls.checked.append(program),
+    )
 
     def _export(exp_program, **kwargs):
         calls.export_kwargs = kwargs
@@ -1785,6 +1896,7 @@ def test_save_zero_copy_kv_true_threads_flag_and_installs_config(monkeypatch, tm
     # The user's config is wrapped once (preserving their fields), not double-wrapped.
     assert calls.wrap_args == [user_cfg]
     assert calls.to_executorch_config is calls.wrapped_sentinel
+    assert calls.checked == [calls.program]
 
 
 @pytest.mark.unit
@@ -1843,3 +1955,4 @@ def test_save_defaults_leave_kv_staged(monkeypatch, tmp_path):
     assert calls.export_kwargs["zero_copy_kv"] is False
     assert calls.wrap_args == []
     assert calls.to_executorch_config is user_cfg
+    assert calls.checked == []

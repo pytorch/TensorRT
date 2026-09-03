@@ -29,7 +29,9 @@ Applying only the first would leave the engine writing a discarded staging copy
 with nothing to copy back -- the buffer would simply never update. So neither
 pass is public on its own: the rewiring is reached only through
 ``export(..., zero_copy_kv=True)``, and the un-staging only through
-:func:`zero_copy_backend_config`, which is this module's one exported name.
+:func:`zero_copy_backend_config`. That, plus :func:`check_zero_copy_kv` -- which
+reads a finalized program back and refuses one where the pairing did not happen
+-- is what this module exports.
 """
 
 import logging
@@ -676,6 +678,85 @@ def unstage_aliased_buffers_pass(inner_pass: Optional[Any] = None) -> Any:
     return _UnstageThenToOutVar()
 
 
+def check_zero_copy_kv(program: Any) -> None:
+    """Raise unless a finalized program really updates its KV buffers in place.
+
+    ``program`` is what ``to_executorch()`` returns. Both halves of zero-copy do
+    nothing quietly when they find nothing to do: ``zero_copy_kv=True`` warns and
+    carries on when the model holds no aliased buffer mutation, and
+    :func:`unstage_aliased_buffers_pass`, handed a program with nothing marked,
+    un-stages nothing and returns. Either way the ``.pte`` that comes out runs
+    and stages its cache like any other, which for a KV cache is wrong output
+    rather than a crash.
+
+    Two shapes are refused: a marked buffer that is not a direct argument of any
+    delegate -- it still reaches one through an ``_h2d_copy`` staging, or reaches
+    none -- and a program with no marked buffer in any method. The first is what
+    finalizing without :func:`zero_copy_backend_config` leaves behind; when that
+    config *is* installed, ``_unstage_aliased_buffers`` has already raised on the
+    same condition.
+
+    Every method is read, not only ``forward``. ``export()`` rewires each method
+    on its own, so a check that stopped at ``forward`` would pass a program whose
+    decode had degenerated to staged -- and on the prefill/decode pair the user
+    guide's zero-copy example exports it would not get that far, since a
+    multi-method program need not have a ``forward`` at all. The second refusal is
+    about the program rather than about one method, matching the warning
+    ``export()`` emits: a method with no aliased buffer mutation of its own is
+    not an error, so a model that rewires only its decode step is accepted.
+
+    This reads the graph, so it says what the program does rather than what the
+    passes recorded. It says nothing about whether the engine's write is correct,
+    only that the buffer it writes is the caller's.
+    """
+    from executorch.exir.delegate import executorch_call_delegate
+
+    method_names = sorted(program.methods)
+    staged_by_method: Dict[str, List[str]] = {}
+    marked_anywhere = False
+    for method_name in method_names:
+        graph_module = program.exported_program(method_name).graph_module
+        marked = [
+            node
+            for node in graph_module.graph.nodes
+            if node.op == "placeholder"
+            and node.meta.get("_torch_tensorrt_aliased_buffer")
+        ]
+        if not marked:
+            continue
+        marked_anywhere = True
+        delegate_args = {
+            arg
+            for node in graph_module.graph.nodes
+            if node.op == "call_function" and node.target is executorch_call_delegate
+            for arg in node.args[1:]
+        }
+        staged = [node.name for node in marked if node not in delegate_args]
+        if staged:
+            staged_by_method[method_name] = staged
+    if not marked_anywhere:
+        raise RuntimeError(
+            "TensorRT zero-copy KV: no buffer in this program is marked for "
+            f"in-place update, in any of its methods ({', '.join(method_names)}), "
+            "so it stages its caches like any other .pte. Either it was not "
+            "exported with zero_copy_kv=True, or it was and no aliased buffer "
+            "mutation was found -- export logs a warning for that case."
+        )
+    if staged_by_method:
+        detail = ", ".join(
+            f"'{name}' in method '{method}'"
+            for method, names in staged_by_method.items()
+            for name in names
+        )
+        raise RuntimeError(
+            f"TensorRT zero-copy KV: buffer(s) {detail} are marked for in-place "
+            "update but do not reach a delegate directly, so the engine writes a "
+            "staging copy that is discarded and the cache never updates. Export "
+            "removed their copy-back, so nothing else would restore it. Finalize "
+            "with torch_tensorrt.executorch.zero_copy_backend_config()."
+        )
+
+
 def zero_copy_backend_config(
     config: Optional["ExecutorchBackendConfig"] = None,
 ) -> "ExecutorchBackendConfig":
@@ -697,10 +778,12 @@ def zero_copy_backend_config(
 
     .. warning::
         Finalizing a ``zero_copy_kv=True`` program *without* this config does
-        not raise. The engine writes a per-call staging copy that is then
-        discarded and the buffer never updates, which for a KV cache is wrong
-        output rather than a crash. Nothing downstream can detect the omission,
-        so pairing the two is the caller's responsibility.
+        not raise on its own. The engine writes a per-call staging copy that is
+        then discarded and the buffer never updates, which for a KV cache is
+        wrong output rather than a crash. Hand the finalized program to
+        :func:`check_zero_copy_kv` before writing the ``.pte`` and that mistake
+        becomes an error; ``torch_tensorrt.save(..., zero_copy_kv=True)`` runs
+        the check for you.
 
         The opposite mistake does raise. ``save(..., zero_copy_kv=True)``
         installs this pass itself, so handing it the result of this function as

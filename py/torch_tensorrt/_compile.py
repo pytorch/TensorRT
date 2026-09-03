@@ -1419,7 +1419,11 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
             "(torch_tensorrt_runtime). Reinstall torch_tensorrt with the runtime extension."
         )
     try:
-        from torch_tensorrt.executorch import export, zero_copy_backend_config
+        from torch_tensorrt.executorch import (
+            check_zero_copy_kv,
+            export,
+            zero_copy_backend_config,
+        )
     except ImportError:
         raise ImportError(
             "ExecuTorch is not installed. Install with: pip install "
@@ -1466,6 +1470,13 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
     if zero_copy_kv:
         backend_config = zero_copy_backend_config(backend_config)
     executorch_program = edge_program.to_executorch(config=backend_config)
+    if zero_copy_kv:
+        # save() holds the finalized program here, which is the only place the
+        # graph shows whether the caches actually reach the engine un-staged.
+        # Both halves of zero-copy no-op quietly when they find nothing to do, so
+        # without this a save() that asked for zero-copy could still write an
+        # ordinary staged .pte.
+        check_zero_copy_kv(executorch_program)
     with open(file_path, "wb") as f:
         executorch_program.write_to_file(f)
     _write_external_tensor_data(executorch_program, file_path)
