@@ -177,10 +177,10 @@ http_archive(
 http_archive(
     name = "libtorch_win_arm64",
     build_file = "@//third_party/libtorch:BUILD",
-    sha256 = "23862a93476cb038ffd26f7141cd476717d97b69b50074f2ab14036eb6093200",
+    sha256 = "4f781babc0e0e0722cc48d0b15107a28e6003fc2b6544f1578b6eb6f5177dcb5",
     strip_prefix = "torch",
     type = "zip",
-    urls = ["https://pypi.nvidia.com/nvtorch_oot_nightly/torch/torch-2.14.0.dev20260728%2Bcu134-cp313-cp313-win_arm64.whl"],
+    urls = ["https://pypi.nvidia.com/nvtorch_oot/torch/torch-2.14.0%2Bcu134-cp313-cp313-win_arm64.whl"],
 )
 
 http_archive(
