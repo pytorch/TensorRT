@@ -580,12 +580,19 @@ if [[ ${#kv_model_paths[@]} -gt 0 ]]; then
   kv_index=0
   for kv_model_path in "${kv_model_paths[@]}"; do
     # kv_cache_decode_check exits non-zero when a decode step does not observe the
-    # KV the previous step wrote; the grep additionally pins the assertion itself,
+    # KV the previous step wrote; the greps additionally pin the assertion itself,
     # so weakening the check inside the binary cannot quietly turn this into a
-    # no-op.
+    # no-op. Both caller-stream modes are pinned by name: the backend skips its
+    # end-of-execute synchronization only when a caller stream is set, so dropping
+    # the "own" run would leave the branch zero-copy KV relies on uncovered while
+    # the lane stayed green.
     kv_check_log="${verify_root}/kv_cache_decode_check_${kv_index}.log"
     "${kv_check_path}" --model_path="${kv_model_path}" 2>&1 | tee "${kv_check_log}"
-    grep -q "PASS: decode at pos=1 observed the KV written at pos=0" "${kv_check_log}"
+    for kv_stream_mode in none own; do
+      grep -q \
+        "PASS: decode at pos=1 observed the KV written at pos=0 across execute() calls (caller stream: ${kv_stream_mode})" \
+        "${kv_check_log}"
+    done
     kv_index=$((kv_index + 1))
   done
 fi

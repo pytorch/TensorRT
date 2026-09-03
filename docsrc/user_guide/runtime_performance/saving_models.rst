@@ -420,10 +420,12 @@ It installs ``zero_copy_backend_config`` for you, so do not hand it one as
 ``backend_config`` as well: the pass would be installed twice and finalization
 raises. The two entry points are alternatives, not a pair.
 
-Two further responsibilities are the caller's, and both fail quietly:
+Two further responsibilities are the caller's, and neither raises:
 
 * **One CUDA stream for every delegate**, if the ``.pte`` is coalesced -- and the
-  synchronization it calls for, which zero-copy makes load-bearing. See
+  synchronization it calls for, which zero-copy makes load-bearing. Getting this
+  wrong is a race, not a deterministic error: it is intermittent and can surface
+  as wrong results *or* as an illegal memory access. See
   :ref:`Running a coalesced .pte <executorch_single_stream>`.
 
 * **Sharing one cache between methods.** Zero-copy is per method: it makes each
