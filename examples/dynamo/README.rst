@@ -25,6 +25,9 @@ Model Zoo
 * :ref:`_torch_export_llama2`: Compiling a Llama2 model using AOT workflow (`ir=dynamo`)
 * :ref:`_torch_export_sam2`: Compiling SAM2 model using AOT workflow (`ir=dynamo`)
 * :ref:`_torch_export_flux_dev`: Compiling FLUX.1-dev model using AOT workflow (`ir=dynamo`)
+* :ref:`quantize_linear_fp8_woq`: TorchAO FP8 weight-only quantization of a Linear layer (``examples/dynamo/torchao``)
+* :ref:`quantize_linear_fp8_static`: TorchAO static FP8 (act + weight) quantization of a Linear layer (``examples/dynamo/torchao``)
+* :ref:`torch_export_flux_fp8_woq`: Compiling FLUX.1-dev with TorchAO FP8 weight-only quantization (``examples/dynamo/torchao``)
 * :ref:`debugger_example`: Debugging Torch-TensorRT Compilation
 * :ref:`torch_export_3d_rope`: Compiling a 3D RoPE video-transformer block with complex numerics support
 * :ref:`engine_converter_binding_names`: Naming input / output bindings when emitting a raw serialized TRT engine

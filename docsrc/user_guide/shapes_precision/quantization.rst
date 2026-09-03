@@ -5,8 +5,10 @@ Quantization (INT8 / FP8 / FP4)
 
 Torch-TensorRT supports post-training quantization (PTQ) with **INT8**, **FP8**, and
 **FP4** precisions via NVIDIA's
-`ModelOpt <https://github.com/NVIDIA/TensorRT-Model-Optimizer>`_ library. ModelOpt
-inserts quantize/dequantize (QDQ) nodes into the model graph; Torch-TensorRT then
+`ModelOpt <https://github.com/NVIDIA/TensorRT-Model-Optimizer>`_ library, and
+**FP8 weight-only** and **static FP8** quantization via
+`TorchAO <https://github.com/pytorch/ao>`_. Quantizers insert
+quantize/dequantize (QDQ) nodes into the model graph; Torch-TensorRT then
 converts those nodes into TRT quantization layers and sets the appropriate builder flags.
 
 ----
@@ -14,11 +16,12 @@ converts those nodes into TRT quantization layers and sets the appropriate build
 Prerequisites
 -------------
 
-Install ModelOpt (requires ``nvidia-modelopt``):
+Install ModelOpt (requires ``nvidia-modelopt``) and/or TorchAO:
 
 .. code-block:: bash
 
     pip install nvidia-modelopt
+    pip install torchao
 
 Hardware requirements:
 
@@ -152,6 +155,73 @@ Quantization also works with ``torch.compile``:
 
 ----
 
+TorchAO FP8 Weight-Only Quantization
+------------------------------------
+
+TorchAO ``Float8WeightOnlyConfig`` quantizes Linear weights to FP8 (e4m3) while
+leaving activations in BF16/FP16. Unlike ModelOpt PTQ, no calibration dataset is
+required.
+
+Default TorchAO ``Float8Tensor.dequantize`` decomposes into primitive ops. The
+examples promote weights to a ``Float8TensorNonDecomposed`` subclass so export
+emits ``torch.ops.torchao.dequantize_affine``, which Torch-TensorRT converts to
+``IDequantizeLayer``.
+
+.. code-block:: python
+
+    from torchao.quantization import Float8WeightOnlyConfig, quantize_
+
+    quantize_(model, Float8WeightOnlyConfig())
+    model = pre_process_model_for_export(model)  # emit dequantize_affine
+
+    with exclude_dq_from_constant_folding():
+        exp_program = torch.export.export(model, (example_input,), strict=True)
+
+    trt_model = torch_tensorrt.dynamo.compile(
+        exp_program,
+        inputs=[example_input],
+        min_block_size=1,
+        use_explicit_typing=True,
+        require_full_compilation=True,
+    )
+
+The intended engine keeps an FP8 weight constant plus a DQ prologue into GEMM.
+On **Blackwell**, Myelin can fuse that prologue into the matmul. On other GPUs
+DQ + GEMM may run as two kernels — that is still correct as long as the FP8
+weight is not constant-folded into a dense high-precision weight.
+
+See :ref:`quantize_linear_fp8_woq` for a toy Linear model and
+:ref:`torch_export_flux_fp8_woq` for FLUX.1-dev.
+
+----
+
+TorchAO Static FP8 Quantization
+--------------------------------
+
+Static FP8 quantizes **activations and weights**. Activation scales are chosen
+offline with min/max observers (per-tensor activations, per-channel weights),
+then Linear layers are rewritten so export emits
+``quantize_affine_float8_non_decomposed`` and
+``dequantize_affine_float8_non_decomposed``. Torch-TensorRT maps those ops to
+``IQuantizeLayer`` / ``IDequantizeLayer``. After fusion, GEMMs can run in FP8.
+
+.. code-block:: python
+
+    quantize_static_fp8(model, (example_input,), calibration_steps=10)
+    exp_program = torch.export.export(model, (example_input,), strict=True)
+    trt_model = torch_tensorrt.dynamo.compile(
+        exp_program,
+        inputs=[example_input],
+        enabled_precisions={torch.float8_e4m3fn},
+        min_block_size=1,
+        require_full_compilation=True,
+    )
+
+This needs a calibration loop (unlike weight-only). See
+:ref:`quantize_linear_fp8_static`.
+
+----
+
 How QDQ Nodes Are Converted
 -----------------------------
 
@@ -160,6 +230,15 @@ graph (inserted by ModelOpt), the
 ``aten_ops_quantize_op`` converter maps them to TRT ``IQuantizeLayer`` /
 ``IDequantizeLayer`` pairs. The TRT builder then fuses these with adjacent compute layers
 (e.g. Conv, Linear) to produce INT8 or FP8 kernel variants.
+
+For TorchAO weight-only graphs, ``torch.ops.torchao.dequantize_affine.default`` is
+mapped to ``IDequantizeLayer`` (weight constant stays FP8/INT, activations stay
+high precision).
+
+For TorchAO static FP8 graphs,
+``quantize_affine_float8_non_decomposed`` / ``dequantize_affine_float8_non_decomposed``
+map to ``IQuantizeLayer`` / ``IDequantizeLayer`` so both activations and weights
+participate in FP8 GEMM fusion.
 
 For FP4, ``torch.ops.tensorrt.dynamic_block_quantize_op.default`` nodes are converted
 via the dynamic block quantize converter, which uses TRT's
@@ -228,3 +307,9 @@ Troubleshooting
 **FP4 "requires TRT ≥ 10.8" error**
     Upgrade TensorRT. FP4 uses ``add_dynamic_quantize`` which is only available in
     TRT 10.8 and newer.
+
+**TorchAO FP8 weights folded to BF16/FP16**
+    Export or Torch-TensorRT constant folding removed ``dequantize_affine``.
+    Promote weights with ``pre_process_model_for_export`` and wrap export in
+    ``exclude_dq_from_constant_folding`` as in :ref:`quantize_linear_fp8_woq`.
+    Install ``torchao`` so the converter and constant-folding exclusion register.
