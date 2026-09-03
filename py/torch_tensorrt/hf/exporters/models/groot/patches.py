@@ -1,179 +1,134 @@
+"""GR00T setattr replacements. Installed for the whole export via ``GrootSpec.apply_patches``."""
+
 from __future__ import annotations
 
+from typing import Any, Callable
+
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch_tensorrt.hf.exporters.models.common.patches import ActionStepEncoderPatch
+from torch_tensorrt.hf.exporters.models.common.patches import causal_lm_plugin_forward
+from torch_tensorrt.hf.exporters.plugin.attn_patches import (
+    _patch_language_attention,
+    _patch_vision_attention,
+    register_patch,
+)
+
+GROOT = "groot"
+
+register_patch(
+    GROOT,
+    "transformers.models.internvl.modeling_internvl.InternVLVisionAttention.forward",
+    "transformers.models.siglip.modeling_siglip.SiglipAttention.forward",
+    "transformers.models.siglip.modeling_siglip.SiglipSdpaAttention.forward",
+    "transformers.models.siglip.modeling_siglip.SiglipFlashAttention2.forward",
+)(_patch_vision_attention)
+
+register_patch(
+    GROOT,
+    "transformers.models.llama.modeling_llama.LlamaAttention.forward",
+    "transformers.models.qwen2.modeling_qwen2.Qwen2Attention.forward",
+    "transformers.models.qwen3.modeling_qwen3.Qwen3Attention.forward",
+)(_patch_language_attention)
 
 
-class TRTFixedCategorySpecificLinearPatch(nn.Module):
-    """Freeze one GR00T embodiment-specific Linear into a normal Linear.
+@register_patch(
+    GROOT,
+    "lerobot.policies.groot.eagle2_hg_model.modeling_eagle2_5_vl.Eagle25VLForConditionalGeneration.forward",
+)
+def _patch_eagle_image_features(original: Callable) -> Callable:
+    """Vision-only compile calls ``eagle(pixel_values)``; otherwise the full VLM forward."""
 
-    GR00T stores one weight matrix per robot embodiment and selects it with
-    embodiment_id at runtime. For TensorRT deployment we compile one robot at a
-    time, so this wrapper picks that robot's weights once in __init__ and the
-    forward path becomes a plain static F.linear.
-    """
+    def forward(self, pixel_values, input_ids=None, **kwargs: Any):
+        if input_ids is None:
+            return self.extract_feature(pixel_values)
+        return original(self, pixel_values, input_ids, **kwargs)
 
-    def __init__(self, layer: nn.Module, embodiment_id: torch.Tensor):
-        super().__init__()
-
-        cat_id = int(embodiment_id.flatten()[0].item())
-
-        # Original: [num_embodiments, input_dim, output_dim]
-        # using cat_id selects the weight matrix for one embodiment/robot -> [input_dim, output_dim]
-        # nn.functional.linear expects -> weight: [output_dim, input_dim] so we transpose
-        weight = layer.W[cat_id].transpose(0, 1).contiguous()
-        bias = layer.b[cat_id].contiguous()
-
-        # detach() breaks any autograd link to the original multi-embodiment
-        # parameter; clone() gives this fixed wrapper independent storage for
-        # the selected slice. This copy happens once during wrapper creation,
-        # not in forward, and lets TensorRT see normal immutable weights.
-        self.weight = nn.Parameter(weight.detach().clone(), requires_grad=False)
-        self.bias = nn.Parameter(bias.detach().clone(), requires_grad=False)
-        self.out_features = int(bias.shape[0])
-
-    def forward(self, x):
-        # x: [B, T, input_dim]
-        # out: [B, T, output_dim]
-        batch_size = x.shape[0]
-        seq_len = x.shape[1]
-        x = x.reshape(batch_size * seq_len, x.shape[-1])
-        x = F.linear(x, self.weight, self.bias)
-        return x.reshape(batch_size, seq_len, self.out_features)
+    return forward
 
 
-class TRTDynamicCategorySpecificLinearPatch(nn.Module):
-    """TensorRT-friendly dynamic version of GR00T CategorySpecificLinear.
+@register_patch(
+    GROOT,
+    "transformers.models.llama.modeling_llama.LlamaForCausalLM.forward",
+    "transformers.models.qwen2.modeling_qwen2.Qwen2ForCausalLM.forward",
+    "transformers.models.qwen3.modeling_qwen3.Qwen3ForCausalLM.forward",
+    "transformers.models.llama.modeling_llama.LlamaModel.forward",
+    "transformers.models.qwen2.modeling_qwen2.Qwen2Model.forward",
+    "transformers.models.qwen3.modeling_qwen3.Qwen3Model.forward",
+)
+def _patch_groot_language_model(original: Callable) -> Callable:
+    """Edge prefill when rope is present; otherwise HF causal-LM forward."""
 
-    Unlike the fixed wrapper, this keeps the full embodiment weight bank and
-    uses runtime embodiment_id values to gather W/b for each batch item. The
-    math stays equivalent to GR00T category-specific linear:
-    x [B,T,in] @ W[embodiment] [B,in,out] + b[embodiment].
-    """
+    def forward(
+        self,
+        inputs_embeds=None,
+        rope_rotary_cos_sin=None,
+        context_lengths=None,
+        kvcache_start_index=None,
+        last_token_ids=None,
+        ds_stack=None,
+        *past_key_values,
+        **kwargs: Any,
+    ):
+        if rope_rotary_cos_sin is None:
+            return original(self, inputs_embeds=inputs_embeds, **kwargs)
+        decoder = self if hasattr(self, "layers") else self.model
+        return causal_lm_plugin_forward(
+            decoder,
+            inputs_embeds,
+            rope_rotary_cos_sin,
+            context_lengths,
+            kvcache_start_index,
+            last_token_ids,
+            ds_stack,
+            *past_key_values,
+            lm_head=getattr(self, "lm_head", None),
+        )
 
-    def __init__(self, layer: nn.Module):
-        super().__init__()
-
-        # Keep the full embodiment weight bank.
-        # W: [num_embodiments, input_dim, output_dim]
-        # b: [num_embodiments, output_dim]
-        self.W = layer.W
-        self.b = layer.b
-
-    def forward(self, x, cat_ids):
-        # x:       [B, T, input_dim]
-        # cat_ids: [B]
-
-        cat_ids = cat_ids.to(dtype=torch.long)
-
-        # selected_w: [B, input_dim, output_dim]
-        # selected_b: [B, output_dim]
-        selected_w = torch.index_select(self.W, dim=0, index=cat_ids).to(dtype=x.dtype)
-        selected_b = torch.index_select(self.b, dim=0, index=cat_ids).to(dtype=x.dtype)
-
-        # out: [B, T, output_dim]
-        out = torch.bmm(x, selected_w)
-
-        # bias: [B, 1, output_dim], broadcast over T
-        return out + selected_b.unsqueeze(1)
-
-
-class TRTDynamicCategorySpecificMLPPatch(nn.Module):
-    """Dynamic two-layer category-specific MLP used by GR00T.
-
-    GR00T state encoders and action decoders are CategorySpecificMLP modules:
-    each contains layer1/layer2 CategorySpecificLinear layers. This wrapper
-    preserves runtime embodiment selection for both layers.
-    """
-
-    def __init__(self, mlp: nn.Module):
-        super().__init__()
-        self.layer1 = TRTDynamicCategorySpecificLinearPatch(mlp.layer1)
-        self.layer2 = TRTDynamicCategorySpecificLinearPatch(mlp.layer2)
-
-    def forward(self, x, embodiment_id):
-        hidden = F.relu(self.layer1(x, embodiment_id))
-        return self.layer2(hidden, embodiment_id)
+    return forward
 
 
-class TRTGrootActionEncoderPatch(nn.Module):
-    def __init__(self, action_encoder: nn.Module, embodiment_id: torch.Tensor):
-        super().__init__()
-        self.W1 = TRTFixedCategorySpecificLinearPatch(action_encoder.W1, embodiment_id)
-        self.W2 = TRTFixedCategorySpecificLinearPatch(action_encoder.W2, embodiment_id)
-        self.W3 = TRTFixedCategorySpecificLinearPatch(action_encoder.W3, embodiment_id)
-        self.pos_encoding = action_encoder.pos_encoding
+@register_patch(
+    GROOT,
+    "lerobot.policies.groot.groot_n1.GR00TN15.forward",
+)
+def _patch_groot_context_projection(original: Callable) -> Callable:
+    """One linear + VLLN + VL attention when a single hidden tensor is present."""
 
-    def forward(self, actions, timesteps, embodiment_id):
-        batch_size, action_horizon, _ = actions.shape
+    def forward(self, hidden_states, *args, **kwargs: Any):
+        if args:
+            return original(self, hidden_states, *args, **kwargs)
+        context_embs = self.backbone.eagle_linear(hidden_states)
+        vlln = self.action_head.vlln
+        weight = getattr(vlln, "weight", None)
+        if weight is not None:
+            context_embs = context_embs.to(dtype=weight.dtype)
+        context_embs = vlln(context_embs)
+        return self.action_head.vl_self_attention(context_embs)
 
-        if timesteps.dim() == 1 and timesteps.shape[0] == batch_size:
-            timesteps = timesteps.unsqueeze(1).expand(-1, action_horizon)
-        else:
-            raise ValueError("Expected `timesteps` to have shape (B,).")
-
-        action_emb = self.W1(actions)
-        timestep_emb = self.pos_encoding(timesteps).to(dtype=action_emb.dtype)
-        hidden = torch.cat([action_emb, timestep_emb], dim=-1)
-        hidden = F.silu(self.W2(hidden))
-        return self.W3(hidden)
+    return forward
 
 
-class TRTDynamicGrootActionEncoderPatch(nn.Module):
-    """Dynamic GR00T noisy-action encoder.
+@register_patch(
+    GROOT,
+    "lerobot.policies.groot.action_head.flow_matching_action_head.FlowmatchingActionHead.forward",
+)
+def _patch_groot_action_step_forward(original: Callable) -> Callable:
+    """One DiT velocity step when Edge action I/O is present; otherwise training."""
 
-    The original action encoder uses three embodiment-specific linear layers
-    around the action embedding, timestep positional embedding, and SiLU block.
-    This wrapper keeps embodiment_id dynamic while spelling the category-specific
-    pieces as index_select + bmm so Torch-TRT can lower them reliably.
-    """
-
-    def __init__(self, action_encoder: nn.Module):
-        super().__init__()
-        self.W1 = TRTDynamicCategorySpecificLinearPatch(action_encoder.W1)
-        self.W2 = TRTDynamicCategorySpecificLinearPatch(action_encoder.W2)
-        self.W3 = TRTDynamicCategorySpecificLinearPatch(action_encoder.W3)
-        self.pos_encoding = action_encoder.pos_encoding
-
-    def forward(self, actions, timesteps, embodiment_id):
-        batch_size, action_horizon, _ = actions.shape
-
-        timesteps = timesteps.unsqueeze(1).expand(-1, action_horizon)
-
-        action_emb = self.W1(actions, embodiment_id)
-        timestep_emb = self.pos_encoding(timesteps).to(dtype=action_emb.dtype)
-
-        hidden = torch.cat([action_emb, timestep_emb], dim=-1)
-        hidden = F.silu(self.W2(hidden, embodiment_id))
-        return self.W3(hidden, embodiment_id)
-
-
-class GrootDiTStepEncoderPatch(ActionStepEncoderPatch):
-    def __init__(self, action_head, embodiment_id: torch.Tensor | None = None):
-        super().__init__()
-        if embodiment_id is None:
-            self.state_encoder = action_head.state_encoder
-            self.action_encoder = action_head.action_encoder
-        else:
-            # Keep embodiment_id as a runtime input while replacing GR00T's
-            # category-specific modules with Torch-TRT-friendly dynamic wrappers.
-            self.state_encoder = TRTDynamicCategorySpecificMLPPatch(
-                action_head.state_encoder
-            )
-            self.action_encoder = TRTDynamicGrootActionEncoderPatch(
-                action_head.action_encoder
-            )
-        self.future_tokens = action_head.future_tokens
-        self.position_embedding = getattr(action_head, "position_embedding", None)
-        self.add_pos_embed = action_head.config.add_pos_embed
-
-    def forward(self, actions, timestep, vl_embs, state, embodiment_id):
+    def forward(
+        self,
+        actions,
+        timestep=None,
+        context_embs=None,
+        state=None,
+        embodiment_id=None,
+        *args,
+        **kwargs: Any,
+    ):
+        if context_embs is None:
+            return original(self, actions, timestep, *args, **kwargs)
         state_features = self.state_encoder(state, embodiment_id)
         action_features = self.action_encoder(actions, timestep, embodiment_id)
-
-        if self.add_pos_embed:
+        if self.config.add_pos_embed:
             pos_ids = torch.arange(
                 action_features.shape[1],
                 dtype=torch.long,
@@ -182,47 +137,41 @@ class GrootDiTStepEncoderPatch(ActionStepEncoderPatch):
             action_features = action_features + self.position_embedding(
                 pos_ids
             ).unsqueeze(0)
-
         future_tokens = self.future_tokens.weight.unsqueeze(0).expand(
-            vl_embs.shape[0],
+            context_embs.shape[0],
             -1,
             -1,
         )
-
-        sa_embs = torch.cat(
-            (state_features, future_tokens, action_features),
-            dim=1,
+        sa_embs = torch.cat((state_features, future_tokens, action_features), dim=1)
+        expert_out = self.model(
+            hidden_states=sa_embs,
+            encoder_hidden_states=context_embs,
+            timestep=timestep,
         )
+        hidden = (
+            expert_out.last_hidden_state
+            if hasattr(expert_out, "last_hidden_state")
+            else expert_out
+        )
+        if isinstance(hidden, (tuple, list)):
+            hidden = hidden[0]
+        action_hidden = hidden[:, -int(self.config.action_horizon) :]
+        return self.action_decoder(action_hidden, embodiment_id)
 
-        expert_args = ()
-        expert_kwargs = {
-            "hidden_states": sa_embs,
-            "encoder_hidden_states": vl_embs,
-            "timestep": timestep,
-        }
-
-        decoder_args = (embodiment_id,)
-        decoder_kwargs = {}
-
-        return expert_args, expert_kwargs, decoder_args, decoder_kwargs
+    return forward
 
 
-class ContextProjectionPatch(nn.Module):
-    """eagle_linear -> vlln -> vl_self_attention (matches eager context path)."""
+@register_patch(
+    GROOT,
+    "lerobot.policies.groot.action_head.flow_matching_action_head.CategorySpecificLinear.forward",
+)
+def _patch_category_specific_linear(_original: Callable) -> Callable:
+    """``index_select`` + ``bmm`` is the TensorRT-friendly form of ``W[cat_ids]``."""
 
-    def __init__(self, eagle_linear, vlln, vl_self_attention):
-        super().__init__()
-        self.eagle_linear = eagle_linear
-        self.vlln = vlln
-        self.vl_self_attention = vl_self_attention
+    def forward(self, x: torch.Tensor, cat_ids: torch.Tensor) -> torch.Tensor:
+        cat_ids = cat_ids.to(dtype=torch.long)
+        selected_w = torch.index_select(self.W, dim=0, index=cat_ids).to(dtype=x.dtype)
+        selected_b = torch.index_select(self.b, dim=0, index=cat_ids).to(dtype=x.dtype)
+        return torch.bmm(x, selected_w) + selected_b.unsqueeze(1)
 
-    def forward(self, hidden_states: torch.Tensor):
-        context_embs = self.eagle_linear(hidden_states)
-
-        vlln_weight = getattr(self.vlln, "weight", None)
-        if vlln_weight is not None:
-            context_embs = context_embs.to(dtype=vlln_weight.dtype)
-
-        context_embs = self.vlln(context_embs)
-        context_embs = self.vl_self_attention(context_embs)
-        return context_embs
+    return forward
