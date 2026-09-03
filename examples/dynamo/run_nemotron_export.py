@@ -8,19 +8,10 @@ pads to max_seq_len. apply_mamba_stub() must run before from_pretrained.
 from __future__ import annotations
 
 import argparse
-import sys
 from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]  # TensorRT/
 _TRT_PY = _REPO_ROOT / "py"
-_TEST = Path("/home/micwilliams/workspace/Test")
-_NEMOTRON = _TEST / "nemotron"
-
-for p in (_NEMOTRON, _TEST):
-    s = str(p)
-    while s in sys.path:
-        sys.path.remove(s)
-    sys.path.insert(0, s)
 
 import torch  # noqa: E402
 import torch_tensorrt  # noqa: E402
@@ -29,11 +20,11 @@ _src_pkg = str(_TRT_PY / "torch_tensorrt")
 if _src_pkg not in list(torch_tensorrt.__path__):
     torch_tensorrt.__path__.append(_src_pkg)
 
-from mamba_stub import apply as apply_mamba_stub
 from torch_tensorrt.hf.exporters import EdgeConfig, EdgeExporter
+from torch_tensorrt.hf.exporters.mamba_stub import apply as apply_mamba_stub
+from torch_tensorrt.hf.exporters.plugin.plugin_utils import load_plugins_for_trt
+from torch_tensorrt.hf.exporters.utils import configure_thor_pytorch
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from trt.plugin.plugin_utils import load_plugins_for_trt
-from trt.utils import configure_thor_pytorch
 
 
 def load_nemotron(checkpoint: str, device: torch.device, dtype: torch.dtype):
@@ -91,7 +82,6 @@ def main() -> None:
     program = exporter.export(model, sample_inputs, config=config)
 
     print("engines:", exporter.engines)
-    print("saved:", exporter.save_engines())
     print("runtime keys:", sorted(exporter.sample))
 
     with torch.no_grad():
