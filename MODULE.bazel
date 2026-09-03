@@ -97,7 +97,9 @@ new_local_repository(
     path = "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.2/",
 )
 
-# supposedly cuda 13.4 on windows x86 preview has everything required for cross compile for windows on arm
+# TODO: When CUDA 13.4 is officially released, switch this Windows ARM64 cross-build
+# sysroot from the preview toolkit to the official CUDA Toolkit distribution.
+# Supposedly cuda 13.4 on windows x86 preview has everything required for cross compile for windows on arm
 new_local_repository(
     name = "cuda_win_arm64",
     build_file = "@//third_party/cuda:BUILD",

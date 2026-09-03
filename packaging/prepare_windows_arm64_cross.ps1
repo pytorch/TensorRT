@@ -8,7 +8,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$PyTorchArtifactSha256 = "23862a93476cb038ffd26f7141cd476717d97b69b50074f2ab14036eb6093200"
+$PyTorchArtifactSha256 = "e72f2b05d062651d0ba1d44e189979f70c2faf7e879e925849f3c5716ab4319e"
 $PythonArtifactSha256 = "f44428dc94e6f9c72cd69ad6436280784e6f9eed46a149641fee71866d3081f3"
 
 $ArtifactTempRoot = $env:RUNNER_TEMP
@@ -71,6 +71,8 @@ if (-not (Test-Path -LiteralPath $cudaVersionFile -PathType Leaf)) {
     throw "CUDA version file is missing: $cudaVersionFile"
 }
 $cudaVersion = (Get-Content -LiteralPath $cudaVersionFile -Raw | ConvertFrom-Json).cuda.version
+# TODO: When CUDA 13.4 is officially released, update this preview-specific message
+# and the CI installer URL to use the official CUDA Toolkit distribution.
 if ($cudaVersion -notlike '13.4*') {
     throw "Windows ARM64 builds require CUDA 13.4 Preview; got '$cudaVersion'"
 }
