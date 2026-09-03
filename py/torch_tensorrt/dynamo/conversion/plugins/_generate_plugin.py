@@ -75,6 +75,34 @@ _TORCH_SCHEMA_TYPE_TO_PLUGIN_ATTR_TYPE = {
 }
 
 
+def _torch_dtype_to_trt(dtype: torch.dtype) -> Any:
+    """Translate a fake/meta tensor dtype to TensorRT's ``DataType`` enum."""
+    import tensorrt as trt
+
+    from torch_tensorrt._enums import dtype as torchtrt_dtype
+
+    try:
+        return torchtrt_dtype._from(dtype).to(trt.DataType)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"QDP plugin output uses unsupported torch dtype {dtype}."
+        ) from exc
+
+
+def _trt_dtype_to_torch(dtype: Any) -> torch.dtype:
+    """Translate a QDP input descriptor dtype for fake/meta propagation."""
+    from torch_tensorrt._enums import dtype as torchtrt_dtype
+
+    try:
+        torch_dtype = torchtrt_dtype._from(dtype).to(torch.dtype)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"QDP plugin input uses unsupported TensorRT dtype {dtype}."
+        ) from exc
+    assert isinstance(torch_dtype, torch.dtype)
+    return torch_dtype
+
+
 def _identifier_from_plugin_name(plugin_name: str) -> str:
     """Return a valid Python identifier fragment for generated plugin functions."""
     return re.sub(r"\W|^(?=\d)", "_", plugin_name)
@@ -227,8 +255,13 @@ def _generate_plugin(plugin_name: str) -> None:
 
         with FakeTensorMode(shape_env=shape_env) as fake_mode:
             fake_args = []
-            for syms_arg in syms_args:
-                fake_arg = torch.randn(syms_arg)
+            for tensor_arg, syms_arg in zip(tensor_args, syms_args):
+                # Meta functions commonly derive output dtype with
+                # ``empty_like``. Model the QDP descriptor's actual dtype
+                # instead of implicitly treating every input as float32.
+                fake_arg = torch.empty(
+                    syms_arg, dtype=_trt_dtype_to_torch(tensor_arg.dtype)
+                )
                 fake_args.append(fake_arg)
 
             output = torch_op(*fake_args, *non_tensor_args, **torch_kwargs)
@@ -272,8 +305,11 @@ def _generate_plugin(plugin_name: str) -> None:
                 shape_calc_fns[i] = lambdify(tuple(clean_args), out_expr, "math")
 
             # ``TensorDesc.like()`` keeps the input rank, which is wrong for
-            # shape-changing ops such as reductions. Use the meta output rank.
+            # shape-changing ops such as reductions. Use the meta output rank
+            # and dtype; inheriting input 0's dtype would make TensorRT bind an
+            # incorrectly sized output buffer for mixed-dtype kernels.
             out_desc = tensor_args[0].like()
+            out_desc.dtype = _torch_dtype_to_trt(fake_out.dtype)
             new_shape_expr = trtp.ShapeExprs(fake_out.ndim)
             for i in range(fake_out.ndim):
                 new_shape_expr[i] = shape_calc_fns[i](*input_shape_expr)

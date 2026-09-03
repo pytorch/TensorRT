@@ -24,7 +24,7 @@ def custom_op(
     Generate the Plugin and corresponding Plugin Converter using external kernels and TensorRT Quick Deployable Plugin APIs.
 
     Args:
-        plugin_name: the plugin name that is used to generate the plugin automatically.
+        op_name: the qualified operator name used to generate the plugin automatically.
             There should be existing kernels and pytorch custom operation for this plugin name.
         capability_validator:  A lambda that can take a ``torch.fx.Node`` and determine if the
             converter can properly handle this Node. If the validator returns ``False``, the subgraph
@@ -35,8 +35,9 @@ def custom_op(
         use_aot_if_available: forwarded to ``generate_plugin_converter``; when ``True``
             (the default), the converter prefers the AOT impl if the op has one registered.
         _aot_register: internal hook used by ``torch_tensorrt.kernels`` to register a
-            cuda-python AOT impl between the plugin descriptor and the converter. Not
-            part of the public API; pass ``None`` (the default) for ordinary use.
+            precompiled-kernel AOT impl between the plugin descriptor and the
+            converter. Not part of the public API; pass ``None`` (the default) for
+            ordinary use.
     """
     generate_plugin(op_name)
     if _aot_register is not None:

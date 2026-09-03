@@ -1,5 +1,5 @@
 cupy==13.1.0
-triton==2.3.0
+triton>=3.5.0
 diffusers==0.30.3
 transformers>=5.4.0
 matplotlib
