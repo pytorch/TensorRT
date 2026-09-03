@@ -30,8 +30,8 @@ def _groot(model: nn.Module) -> nn.Module:
 
 
 @register_edge_spec("groot", "gr00t")
-class GrootSpec(EdgeSpec):
-    components = ("vision", "language", "action_context", "action")
+class GrootSpec(EdgeSpec):  # type: ignore[misc]
+    components = ("vision", "language", "context_projection", "action")
 
     def prepare_sample_inputs(
         self, model: nn.Module, raw: Mapping[str, Any], config: Any
@@ -41,8 +41,12 @@ class GrootSpec(EdgeSpec):
 
         from lerobot.policies.factory import make_pre_post_processors
         from lerobot.policies.groot.processor_groot import GrootEagleEncodeStep
-        from trt.data import create_pil_messages, load_test_data, pack_state
-        from trt.executor.models.groot.helpers import make_embodiment_id
+        from torch_tensorrt.hf.exporters.data import (
+            create_pil_messages,
+            load_test_data,
+            pack_state,
+        )
+        from torch_tensorrt.hf.exporters.helpers.groot import make_embodiment_id
 
         policy = model
         device = raw.get(
@@ -103,17 +107,17 @@ class GrootSpec(EdgeSpec):
     def wrap(
         self, name: str, model: nn.Module, sample: Mapping[str, Any], config: Any
     ) -> nn.Module:
-        from trt.modules.export.diffusion import (
-            GrootDiTStepEncoderExportModule,
-            StaticActionVelocityStepExportModule,
-            TRTDynamicCategorySpecificMLPExportModule,
+        from torch_tensorrt.hf.exporters.patches.diffusion import (
+            GrootDiTStepEncoderPatch,
+            StaticActionVelocityStepPatch,
+            TRTDynamicCategorySpecificMLPPatch,
         )
-        from trt.modules.export.language import (
-            CausalLMExportModule,
-            ContextProjectionExportModule,
+        from torch_tensorrt.hf.exporters.patches.language import (
+            CausalLMPatch,
+            ContextProjectionPatch,
             language_decoder,
         )
-        from trt.modules.export.vision import GridVisionExportModule
+        from torch_tensorrt.hf.exporters.patches.vision import GridVisionPatch
 
         found = _groot(model)
         eagle = found.backbone.eagle_model
@@ -123,7 +127,7 @@ class GrootSpec(EdgeSpec):
         # The e2e path casts the whole wrapper; without that, sa_embs is
         # float32 against bf16 attn.to_q weights.
         if name == "vision":
-            module = GridVisionExportModule(
+            module = GridVisionPatch(
                 vision_model=eagle.vision_model,
                 projector=eagle.mlp1,
                 sample_pixel_values=sample["pixel_values"],
@@ -134,22 +138,22 @@ class GrootSpec(EdgeSpec):
             )
         elif name == "language":
             language = eagle.language_model
-            module = CausalLMExportModule(
+            module = CausalLMPatch(
                 language_decoder(language), language.lm_head, select_layer=-1
             )
-        elif name == "action_context":
-            module = ContextProjectionExportModule(
+        elif name == "context_projection":
+            module = ContextProjectionPatch(  # type: ignore[no-untyped-call]
                 found.backbone.eagle_linear,
                 found.action_head.vlln,
                 found.action_head.vl_self_attention,
             )
         elif name == "action":
-            module = StaticActionVelocityStepExportModule(
-                step_encoder=GrootDiTStepEncoderExportModule(
+            module = StaticActionVelocityStepPatch(
+                step_encoder=GrootDiTStepEncoderPatch(
                     found.action_head, sample.get("embodiment_id")
                 ),
                 action_expert=found.action_head.model,
-                velocity_decoder=TRTDynamicCategorySpecificMLPExportModule(
+                velocity_decoder=TRTDynamicCategorySpecificMLPPatch(
                     found.action_head.action_decoder
                 ),
                 output_tokens=int(found.action_head.config.action_horizon),
@@ -168,8 +172,10 @@ class GrootSpec(EdgeSpec):
         config: Any,
         module: nn.Module,
     ) -> ComponentBundle:
-        from trt.plugin.attention import ContextAttentionMaskType
-        from trt.plugin.plugin_utils import (
+        from torch_tensorrt.hf.exporters.plugin.attention import (
+            ContextAttentionMaskType,
+        )
+        from torch_tensorrt.hf.exporters.plugin.plugin_utils import (
             patch_language_attention,
             patch_vision_attention,
         )
@@ -254,7 +260,7 @@ class GrootSpec(EdgeSpec):
                 engine_file="language.engine",
             )
 
-        if name == "action_context":
+        if name == "context_projection":
             hidden = upstream["lm_hidden"].to(dtype=dtype)
             return ComponentBundle(
                 trace_args=(hidden,),
@@ -314,7 +320,7 @@ class GrootSpec(EdgeSpec):
             return {"visual_embeds": vis}
         if name == "language":
             return {"lm_hidden": outputs[1]}
-        if name == "action_context":
+        if name == "context_projection":
             ctx = outputs[0] if isinstance(outputs, tuple) else outputs
             return {"context_embs": ctx}
         return {}
@@ -335,7 +341,7 @@ class GrootSpec(EdgeSpec):
             sample["ds_stack"],
             *kv_kwargs(sample),
         )
-        ctx = call_engine(engines["action_context"], "action_context", lm[1])[0]
+        ctx = call_engine(engines["context_projection"], "context_projection", lm[1])[0]
         return call_engine(
             engines["action"],
             "action",

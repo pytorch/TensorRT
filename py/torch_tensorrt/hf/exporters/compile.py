@@ -6,9 +6,9 @@ from typing import Any
 
 import torch
 import torch.nn as nn
+import torch_tensorrt
 from torch_tensorrt.hf.exporters.ops import _as_tuple, record_engine
 from torch_tensorrt.hf.exporters.spec import ComponentBundle
-from trt.plugin.plugin_utils import restore_attention
 
 DEFAULT_TRT_SETTINGS: dict[str, Any] = {
     "min_block_size": 1,
@@ -79,7 +79,6 @@ def compile_component(
             }.items()
             if k in _TRT_COMPILE_KEYS
         }
-        import torch_tensorrt
 
         compiled = torch_tensorrt.dynamo.compile(
             exported,
@@ -107,8 +106,12 @@ def compile_component(
         _write_sidecar(out_dir, bundle, name, outputs, engine_file=engine_file)
         return engine_path, outputs
     finally:
-        if not dryrun:
-            restore_attention(patched)
+        if not dryrun and patched is not None:
+            from torch_tensorrt.hf.exporters.plugin.plugin_utils import (
+                restore_attention,
+            )
+
+            restore_attention(patched)  # type: ignore[no-untyped-call]
 
 
 def _write_sidecar(

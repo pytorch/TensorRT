@@ -36,7 +36,7 @@ def _nchw_to_hwc(pixel_values: torch.Tensor) -> torch.Tensor:
 
 
 @register_edge_spec("pi05")
-class Pi05Spec(EdgeSpec):
+class Pi05Spec(EdgeSpec):  # type: ignore[misc]
     components = ("vision", "language", "action")
 
     def prepare_sample_inputs(
@@ -50,7 +50,10 @@ class Pi05Spec(EdgeSpec):
             OBS_LANGUAGE_ATTENTION_MASK,
             OBS_LANGUAGE_TOKENS,
         )
-        from trt.data import frame_from_test_data, load_test_data
+        from torch_tensorrt.hf.exporters.data import (
+            frame_from_test_data,
+            load_test_data,
+        )
 
         policy = model if hasattr(model, "_preprocess_images") else None
         if policy is None:
@@ -90,19 +93,22 @@ class Pi05Spec(EdgeSpec):
     def wrap(
         self, name: str, model: nn.Module, sample: Mapping[str, Any], config: Any
     ) -> nn.Module:
-        from trt.modules.export.diffusion import (
-            PI05PrefixKVStepEncoderExportModule,
-            StaticActionVelocityStepExportModule,
+        from torch_tensorrt.hf.exporters.patches.diffusion import (
+            PI05PrefixKVStepEncoderPatch,
+            StaticActionVelocityStepPatch,
         )
-        from trt.modules.export.language import CausalLMExportModule, language_decoder
-        from trt.modules.export.vision import GridVisionExportModule
+        from torch_tensorrt.hf.exporters.patches.language import (
+            CausalLMPatch,
+            language_decoder,
+        )
+        from torch_tensorrt.hf.exporters.patches.vision import GridVisionPatch
 
         core = _core(model)
         paligemma = core.paligemma_with_expert.paligemma.model
         if name == "vision":
             px = sample["pixel_values"]
             sample_px = px.float() if px.dtype != torch.float32 else px
-            return GridVisionExportModule(
+            return GridVisionPatch(
                 vision_model=paligemma.vision_tower.float(),
                 projector=paligemma.multi_modal_projector,
                 sample_pixel_values=sample_px,
@@ -114,10 +120,10 @@ class Pi05Spec(EdgeSpec):
         if name == "language":
             language = paligemma.language_model
             lm_head = core.paligemma_with_expert.paligemma.lm_head
-            return CausalLMExportModule(language_decoder(language), lm_head).eval()
+            return CausalLMPatch(language_decoder(language), lm_head).eval()
         if name == "action":
-            return StaticActionVelocityStepExportModule(
-                step_encoder=PI05PrefixKVStepEncoderExportModule(core),
+            return StaticActionVelocityStepPatch(
+                step_encoder=PI05PrefixKVStepEncoderPatch(core),  # type: ignore[no-untyped-call]
                 action_expert=core.paligemma_with_expert.gemma_expert.model,
                 velocity_decoder=core.action_out_proj,
                 output_tokens=int(core.config.chunk_size),
@@ -134,13 +140,15 @@ class Pi05Spec(EdgeSpec):
         config: Any,
         module: nn.Module,
     ) -> ComponentBundle:
-        from trt.executor.models.pi05.helpers import (
+        from torch_tensorrt.hf.exporters.helpers.pi05 import (
             build_pi05_prefix_embs,
             make_pi05_suffix_position_and_mask,
             pi05_compact_index,
         )
-        from trt.plugin.attention import ContextAttentionMaskType
-        from trt.plugin.plugin_utils import (
+        from torch_tensorrt.hf.exporters.plugin.attention import (
+            ContextAttentionMaskType,
+        )
+        from torch_tensorrt.hf.exporters.plugin.plugin_utils import (
             patch_language_attention,
             patch_vision_attention,
         )
@@ -253,7 +261,7 @@ class Pi05Spec(EdgeSpec):
             sample["step_timestep"] = step_timestep
             prefix_k = upstream["prefix_k"].to(device=device, dtype=dtype)
             prefix_v = upstream["prefix_v"].to(device=device, dtype=dtype)
-            pos, mask = make_pi05_suffix_position_and_mask(
+            pos, mask = make_pi05_suffix_position_and_mask(  # type: ignore[no-untyped-call]
                 core_mod, sample["prefix_pad_mask"], step_actions, device
             )
             sample["suffix_position_ids"] = pos
