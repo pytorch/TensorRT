@@ -70,7 +70,7 @@ using ::executorch::runtime::FreeableBuffer;
 using ::executorch::runtime::MemoryAllocator;
 using ::executorch::runtime::Span;
 
-// Spelled out rather than taken from SharedScratchPool.h: a test that reads the
+// Spelled out rather than taken from TensorRTBackend.h: a test that reads the
 // key through the production constant cannot pin the key's value.
 constexpr char kOptionKey[] = "use_shared_activation_scratch";
 

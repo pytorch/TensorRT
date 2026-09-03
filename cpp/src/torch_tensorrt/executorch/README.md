@@ -122,7 +122,7 @@ for as long as the context lives, so a model lowered to N single-layer engines
 pays N copies and can run out of device memory on the layer count alone. The
 `use_shared_activation_scratch` backend option — a boolean, off by default —
 instead backs every context on a device from one buffer, grown to the largest
-engine's requirement:
+requirement any call on that device has asked for:
 
 ```cpp
 #include <executorch/runtime/backend/interface.h>
@@ -140,26 +140,32 @@ N per-engine copies collapse to one, so the reclaimed memory is the sum of the N
 requirements less the largest of them. Set the option before loading the methods
 whose engines should use the pool, and read the `use_shared_activation_scratch`
 bullet of the caller-stream contract above: engines sharing a buffer do not run
-concurrently on the device. The pool never returns memory to the
-device, so the largest scratch it was ever asked for stays allocated until the
-process exits.
+concurrently on the device. The pool never shrinks, so the largest scratch it was
+ever asked for stays allocated until the process exits.
 
-The buffer grows when an engine asks for more than every engine before it did,
-and a growth is not free. It frees the buffer it replaces, and `cudaFree` waits
-for everything queued on the device, not only for the enqueues that used that
-buffer, so it can stall for far longer than the event wait that precedes it. The
-backend keeps that stall out from under the per-device lock, so it does not hold
-up another engine on the device, but it does fall after the growing call's own
-enqueue, so that one `execute()` waits for its own engine work too. A growth
-happens only on an engine's first run and only for an engine larger than every
-engine before it, so loading the largest engine first reduces the pool to a
-single allocation.
+The buffer grows when a call asks for more than every call before it did, and a
+growth is not free. It frees the buffer it replaces, and `cudaFree` waits for
+everything queued on the device, not only for the enqueues that used that buffer,
+so it can stall for far longer than the event wait that precedes it. The backend
+keeps that stall out from under the per-device lock, so it does not hold up
+another engine on the device, but it does fall after the growing call's own
+enqueue, so that one `execute()` waits for its own engine work too.
 
-How much any one engine asks for is fixed when it is built, not when it runs.
-The builder's `kRUNTIME_ACTIVATION_RESIZE_10_10` preview feature makes an engine
-report what the shapes just bound need; without it, whether an engine does that
-or reports its profile maximum depends on how TensorRT planned it. Either way the
-pool can settle well above the live data, and nothing the runtime does changes it.
+What an engine answers when asked how much it needs is decided when it is built,
+not when it runs. The builder's `kRUNTIME_ACTIVATION_RESIZE_10_10` preview feature
+makes an engine report what the shapes just bound need; without it, whether an
+engine does that or reports its profile maximum depends on how TensorRT planned
+it. Either way the pool can settle well above the live data, and nothing the
+runtime does changes it.
+
+How often the pool grows follows from that. The backend asks afresh on every
+`execute()`, after the input shapes are bound, so an engine whose answer does not
+vary with the bound shapes grows the pool at most once, on its first run — for a
+program built only from such engines, running the largest one first leaves the
+pool with a single allocation. An engine whose answer does vary can grow it on any
+call whose shapes need more than every call before them, so with one of those in
+the program no run order bounds the number of allocations. One engine over a
+`[1..4, 512, 512]` profile is either, depending on how it was built.
 
 ## Standalone Backend Archive
 

@@ -21,15 +21,6 @@
 namespace torch_tensorrt {
 namespace executorch_backend {
 
-// Runtime backend option that backs execution-context activation scratch with a
-// shared per-device pool instead of giving every context its own. Boolean,
-// default false. Delivered as
-//   executorch::runtime::set_option("TensorRTBackend", options.view())
-// A context's allocation strategy is fixed when the context is created, so a
-// later call governs only the engines loaded after it, and a pooled context and
-// a private-scratch one coexist in one process.
-inline constexpr char kSharedActivationScratchKey[] = "use_shared_activation_scratch";
-
 // Per-device handoff marker for the shared scratch buffer: the pool-owned CUDA
 // event that the last enqueue against the buffer was recorded on.
 struct SharedScratchMarker {

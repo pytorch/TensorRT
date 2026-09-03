@@ -230,9 +230,10 @@ bool is_cuda_accessible_ptr(const void* ptr) {
 }
 
 // Process-wide per-device pool for TensorRT execution-context activation scratch.
-// One buffer sized to the largest engine's need serves every kUSER_MANAGED context
-// on a device, instead of each of N layer-engines pinning its own scratch, which
-// makes device memory scale with the layer count and OOMs multi-layer models.
+// One buffer, grown to the largest requirement any call on that device has asked
+// for, serves every kUSER_MANAGED context on a device, instead of each of N
+// layer-engines pinning its own scratch, which makes device memory scale with the
+// layer count and OOMs multi-layer models.
 //
 // ORDERING: a context reads and writes its scratch for the whole enqueue, which
 // can still be in flight when execute() returns, so two enqueues must never hold
@@ -408,8 +409,11 @@ Error get_or_grow_shared_scratch(
       claim.retire(retired.buffer);
     } else {
       // This wait is the only thing keeping the free off a buffer an enqueue may
-      // still be reading, so a failed wait leaks it instead. Bounded: at most one
-      // buffer per growth, and growth is rare -- see SharedScratchClaim::release.
+      // still be reading, so a failed wait leaks it instead -- one buffer for each
+      // growth whose wait fails. How many growths a run sees is not bounded by the
+      // engine count: the requirement is re-queried every execute() below, so an
+      // engine that answers with what the bound shapes need can grow the pool on
+      // any call.
       ET_LOG(
           Error,
           "TensorRTBackend::execute: waiting for the enqueue on the replaced shared activation scratch on device %d failed (%s); leaking that buffer rather than freeing it under a live enqueue",
@@ -1161,9 +1165,10 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // a smaller buffer, and an engine backed by less than it asked for writes past
   // the end.
   //
-  // The buffer is installed on every call, not once, because a larger engine may
-  // have grown the pool and moved it since the last one. A kSTATIC context owns
-  // its private scratch, so setDeviceMemoryV2 must not be called on one.
+  // The buffer is installed on every call, not once, because any call needing more
+  // than the pool holds -- this engine on other shapes, or another one -- grows it
+  // and moves it. A kSTATIC context owns its private scratch, so setDeviceMemoryV2
+  // must not be called on one.
   //
   // A reported zero is ambiguous: TensorRT answers a failed query and an engine
   // that genuinely needs no scratch the same way, and the engine's own
