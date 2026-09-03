@@ -454,8 +454,7 @@ follow_imports = "skip"
 [[tool.mypy.overrides]]
 module = [
     "torch_tensorrt.hf.exporters.plugin.*",
-    "torch_tensorrt.hf.exporters.patches.*",
-    "torch_tensorrt.hf.exporters.helpers.*",
+    "torch_tensorrt.hf.exporters.models.*",
     "torch_tensorrt.hf.exporters.data",
     "torch_tensorrt.hf.exporters.rope",
     "torch_tensorrt.hf.exporters.prefix_cache",
