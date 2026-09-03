@@ -54,6 +54,10 @@ on:
         description: "The target to build and publish (for repos that build multiple packages)"
         default: ""
         type: string
+      artifact-name-prefix:
+        description: "Optional prefix added to the GitHub wheel artifact name"
+        default: ""
+        type: string
       trigger-event:
         description: "Trigger Event in caller that determines whether or not to upload"
         default: ""
@@ -273,6 +277,11 @@ jobs:
       - name: Mark TensorRT-RTX artifact
         if: ${{ inputs.use-rtx }}
         run: echo "ARTIFACT_NAME=${ARTIFACT_NAME}_rtx" >> "${GITHUB_ENV}"
+      - name: Prefix wheel artifact
+        if: ${{ inputs.artifact-name-prefix }}
+        env:
+          ARTIFACT_PREFIX: ${{ inputs.artifact-name-prefix }}
+        run: echo "ARTIFACT_NAME=${ARTIFACT_PREFIX}-${ARTIFACT_NAME}" >> "${GITHUB_ENV}"
       - name: Combine Env Var and Build Env Files
         if: ${{ inputs.env-var-script != '' }}
         working-directory: ${{ inputs.repository }}

@@ -272,9 +272,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         engine_info[HW_COMPATIBLE_IDX] = str(int(self.hardware_compatible))
         engine_info[SERIALIZED_METADATA_IDX] = self.encode_metadata(metadata)
         engine_info[TARGET_PLATFORM_IDX] = (
-            self.target_platform._to_serialized_rt_platform()
-            if ENABLED_FEATURES.torch_tensorrt_runtime
-            else str(self.target_platform)
+            self.target_platform._to_serialized_platform()
         )
         engine_info[REQUIRES_OUTPUT_ALLOCATOR_IDX] = str(
             int(self.requires_output_allocator)
