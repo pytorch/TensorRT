@@ -347,6 +347,8 @@ def load_plugins_for_trt():
     _register_vit_attention_plugin_op()
     register_mamba_plugin_ops()
     register_moe_plugin_ops()
+    from . import attn_patches as _attn_patches  # noqa: F401,E402
+
     load_plugin()
 
     from . import plugin_converter as _plugin_converter  # noqa: F401,E402

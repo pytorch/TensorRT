@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping, MutableMapping
+from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -29,27 +30,40 @@ def registered_specs() -> dict[str, type[EdgeSpec]]:
 class ComponentBundle:
     """Everything :func:`compile_component` needs to build one engine."""
 
+    module: nn.Module
     trace_args: tuple[Any, ...]
     save_args: tuple[Any, ...]
     input_names: list[str]
     output_names: list[str]
-    input_specs: Any = None
     extra_config: dict[str, Any] = field(default_factory=dict)
     trt_settings: dict[str, Any] = field(default_factory=dict)
     patch_fn: Callable[[nn.Module], Any] | None = None
+    context_attention_mask_type: int | None = None
     execute_args: tuple[Any, ...] | None = None
     model_type: str = "edge"
     engine_file: str = "engine.engine"
 
 
 class EdgeSpec(ABC):
-    """Per-family wrap / flatten / runtime wiring.
+    """Per-family flatten / runtime wiring.
 
     ``EdgeExporter.export`` never branches on PI05 vs Nemotron. It only loops
     ``spec.components``.
     """
 
     components: tuple[str, ...] = ()
+
+    def apply_patches(
+        self, model: nn.Module | None = None
+    ) -> AbstractContextManager[None]:
+        """Install this family's setattr replacements for the whole ``export()``.
+
+        Default is a no-op. Families register factories on their own backend
+        and return ``apply_patches(backend)``. ``model`` is the export root;
+        Nemotron uses it to wrap hybrid mixers.
+        """
+        del model
+        return nullcontext()
 
     @abstractmethod
     def prepare_sample_inputs(
@@ -58,17 +72,7 @@ class EdgeSpec(ABC):
         raw: Mapping[str, Any],
         config: Any,
     ) -> MutableMapping[str, Any]:
-        """Caller payload → stem dict used by wrap/prepare/run."""
-
-    @abstractmethod
-    def wrap(
-        self,
-        name: str,
-        model: nn.Module,
-        sample: Mapping[str, Any],
-        config: Any,
-    ) -> nn.Module:
-        """Replace a submodule with an export wrapper (not an HF forward patch)."""
+        """Caller payload → stem dict used by prepare/run."""
 
     @abstractmethod
     def prepare(
@@ -78,9 +82,8 @@ class EdgeSpec(ABC):
         sample: MutableMapping[str, Any],
         upstream: Mapping[str, Any],
         config: Any,
-        module: nn.Module,
     ) -> ComponentBundle:
-        """Build the trace/save tuple for ``module``."""
+        """Select the original submodule and build its trace/save tuple."""
 
     def capture_upstream(
         self,

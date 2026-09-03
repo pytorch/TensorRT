@@ -11,9 +11,12 @@ from torch_tensorrt.hf.exporters.models.common.helpers import (
 )
 from torch_tensorrt.hf.exporters.models.nemotron.helpers import (
     _decoder,
+    _kind,
     allocate_plugin_states,
 )
-from torch_tensorrt.hf.exporters.models.nemotron.patches import NemotronPatch
+from torch_tensorrt.hf.exporters.models.nemotron.patches import (
+    apply_nemotron_patches,
+)
 from torch_tensorrt.hf.exporters.ops import call_engine
 from torch_tensorrt.hf.exporters.spec import (
     ComponentBundle,
@@ -25,6 +28,9 @@ from torch_tensorrt.hf.exporters.spec import (
 @register_edge_spec("nemotron_h", "nemotron")
 class NemotronSpec(EdgeSpec):  # type: ignore[misc]
     components = ("language",)
+
+    def apply_patches(self, model=None):
+        return apply_nemotron_patches(model)
 
     def prepare_sample_inputs(
         self, model: nn.Module, raw: Mapping[str, Any], config: Any
@@ -58,20 +64,6 @@ class NemotronSpec(EdgeSpec):  # type: ignore[misc]
             "bsz": embeddings.shape[0],
         }
 
-    def wrap(
-        self, name: str, model: nn.Module, sample: Mapping[str, Any], config: Any
-    ) -> nn.Module:
-        from torch_tensorrt.hf.exporters.plugin.moe import PluginNemotronMoE
-        from torch_tensorrt.hf.exporters.plugin.plugin_utils import (
-            patch_nemotron_mixers,
-        )
-
-        patch_nemotron_mixers(model, model.config)  # type: ignore[no-untyped-call]
-        for block in _decoder(model).layers:
-            if isinstance(block.mixer, PluginNemotronMoE):
-                block.mixer.prepare_for_export()
-        return NemotronPatch(model).eval()
-
     def prepare(
         self,
         name: str,
@@ -79,10 +71,10 @@ class NemotronSpec(EdgeSpec):  # type: ignore[misc]
         sample: MutableMapping[str, Any],
         upstream: Mapping[str, Any],
         config: Any,
-        module: nn.Module,
     ) -> ComponentBundle:
         from torch_tensorrt.hf.exporters.rope import make_rope_rotary_cos_sin
 
+        del name, upstream
         embeds = sample["inputs_embeds"]
         device, dtype = embeds.device, embeds.dtype
         bsz, seq_len, _ = embeds.shape
@@ -101,7 +93,8 @@ class NemotronSpec(EdgeSpec):  # type: ignore[misc]
             model, model.config, bsz, int(config.max_seq_len), device, dtype
         )
         flat = (embeds, rope, ctx_len, kv_start, last_token_ids, *kvs, *convs, *ssms)
-        na, nm = module.num_attn, module.num_mamba
+        kinds = [_kind(block.mixer) for block in _decoder(model).layers]
+        na, nm = kinds.count("attention"), kinds.count("mamba")
         names = [
             "inputs_embeds",
             "rope_rotary_cos_sin",
@@ -114,6 +107,7 @@ class NemotronSpec(EdgeSpec):  # type: ignore[misc]
         ]
         sample.update(split_flat_to_kwargs(flat, names))
         return ComponentBundle(
+            module=model.eval(),
             trace_args=flat,
             save_args=flat,
             input_names=names,
