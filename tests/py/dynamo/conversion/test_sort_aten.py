@@ -21,6 +21,10 @@ class TestSortConverter(DispatchTestCase):
             ((1, 5, 2, 1), -1, True),
             ((1, 2, 5, 3), -2, False),
             ((6, 2, 1, 3), -4, True),
+            # ITopKLayer requires rank >= 2; converter broadcasts rank-1
+            ((64,), 0, False),
+            ((64,), 0, True),
+            ((16,), -1, True),
         ]
     )
     def test_sort(self, input_shape, dim, descending):
