@@ -33,6 +33,7 @@ from .remove_num_users_is_0_nodes import remove_num_users_is_0_nodes
 from .repair_input_as_output import repair_input_as_output
 from .replace_fused_rms_norm import replace_fused_rms_norm
 from .replace_max_pool_with_indices import replace_max_pool_with_indices
+from .reset_folded_constructors import reset_folded_constructors
 from .rule_based_autocast import rule_based_autocast
 
 pre_lowering_pass_list = [
@@ -61,6 +62,7 @@ post_lowering_pass_list = [
     mark_constant_fold_exclusions,
     constant_fold,
     repair_input_as_output,
+    reset_folded_constructors,
     fuse_prims_broadcast,
     replace_max_pool_with_indices,
     fuse_pad_into_convolution,
