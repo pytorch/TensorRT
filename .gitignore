@@ -1,6 +1,7 @@
 bazel
 /node_modules/
 /package.json
+/package-lock.json
 bazel-bazel-test
 bazel-bin
 bazel-genfiles
