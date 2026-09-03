@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke EdgeExporter on GR00T (4 engines: vision, language, action_context, action).
+"""Smoke EdgeExporter on GR00T (4 engines: vision, language, context_projection, action).
 
 Pass the LeRobot GrootPolicy, not policy._groot_model — prepare_sample_inputs
 needs GrootEagleEncodeStep / embodiment_id from the policy wrapper.
@@ -8,17 +8,10 @@ needs GrootEagleEncodeStep / embodiment_id from the policy wrapper.
 from __future__ import annotations
 
 import argparse
-import sys
 from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]  # TensorRT/
 _TRT_PY = _REPO_ROOT / "py"
-_TEST = Path("/home/micwilliams/workspace/Test")
-
-_test = str(_TEST)
-while _test in sys.path:
-    sys.path.remove(_test)
-sys.path.insert(0, _test)
 
 import torch  # noqa: E402
 import torch_tensorrt  # noqa: E402
@@ -32,8 +25,8 @@ from lerobot.policies.groot import GrootPolicy
 from lerobot.policies.groot.configuration_groot import GrootConfig
 from lerobot.utils.constants import ACTION, OBS_STATE
 from torch_tensorrt.hf.exporters import EdgeConfig, EdgeExporter
-from trt.plugin.plugin_utils import load_plugins_for_trt
-from trt.utils import configure_thor_pytorch, force_hf_attention
+from torch_tensorrt.hf.exporters.plugin.plugin_utils import load_plugins_for_trt
+from torch_tensorrt.hf.exporters.utils import configure_thor_pytorch, force_hf_attention
 
 
 def load_groot(device: torch.device) -> GrootPolicy:
@@ -95,7 +88,6 @@ def main() -> None:
     program = exporter.export(policy, sample_inputs, config=config)
 
     print("engines:", exporter.engines)
-    print("saved:", exporter.save_engines())
     print("runtime keys:", sorted(exporter.sample))
 
     with torch.no_grad():

@@ -29,7 +29,7 @@ def _kind(mixer: nn.Module) -> str:
     return "mlp"
 
 
-class NemotronExportModule(nn.Module):  # type: ignore[misc]
+class NemotronPatch(nn.Module):  # type: ignore[misc]
     """Hybrid decoder: plugin attention / mamba / moe, native MLP."""
 
     def __init__(self, model: nn.Module):
@@ -51,7 +51,9 @@ class NemotronExportModule(nn.Module):  # type: ignore[misc]
         last_token_ids: torch.Tensor,
         *states: torch.Tensor,
     ) -> tuple[torch.Tensor, ...]:
-        from trt.modules.export.language import gather_last_token_hidden
+        from torch_tensorrt.hf.exporters.patches.language import (
+            gather_last_token_hidden,
+        )
 
         na, nm = self.num_attn, self.num_mamba
         kvs = list(states[:na])
@@ -139,7 +141,7 @@ def allocate_plugin_states(
 
 
 @register_edge_spec("nemotron_h", "nemotron")
-class NemotronSpec(EdgeSpec):
+class NemotronSpec(EdgeSpec):  # type: ignore[misc]
     components = ("language",)
 
     def prepare_sample_inputs(
@@ -177,14 +179,16 @@ class NemotronSpec(EdgeSpec):
     def wrap(
         self, name: str, model: nn.Module, sample: Mapping[str, Any], config: Any
     ) -> nn.Module:
-        from trt.plugin.moe import PluginNemotronMoE
-        from trt.plugin.plugin_utils import patch_nemotron_mixers
+        from torch_tensorrt.hf.exporters.plugin.moe import PluginNemotronMoE
+        from torch_tensorrt.hf.exporters.plugin.plugin_utils import (
+            patch_nemotron_mixers,
+        )
 
-        patch_nemotron_mixers(model, model.config)
+        patch_nemotron_mixers(model, model.config)  # type: ignore[no-untyped-call]
         for block in _decoder(model).layers:
             if isinstance(block.mixer, PluginNemotronMoE):
                 block.mixer.prepare_for_export()
-        return NemotronExportModule(model).eval()
+        return NemotronPatch(model).eval()
 
     def prepare(
         self,
@@ -195,7 +199,7 @@ class NemotronSpec(EdgeSpec):
         config: Any,
         module: nn.Module,
     ) -> ComponentBundle:
-        from trt.rope import make_rope_rotary_cos_sin
+        from torch_tensorrt.hf.exporters.rope import make_rope_rotary_cos_sin
 
         embeds = sample["inputs_embeds"]
         device, dtype = embeds.device, embeds.dtype

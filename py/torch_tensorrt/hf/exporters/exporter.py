@@ -140,22 +140,3 @@ class EdgeExporter(DynamoExporter):  # type: ignore[misc]
                     config.prefer_deferred_runtime_asserts_over_guards
                 ),
             )
-
-    def save_engines(self, out_dir: str | Path | None = None) -> dict[str, Path]:
-        if not self.engines:
-            raise RuntimeError("save_engines() requires export() first")
-        if out_dir is None:
-            return {name: Path(path) for name, path in self.engines.items()}
-        import shutil
-
-        dest = Path(out_dir)
-        dest.mkdir(parents=True, exist_ok=True)
-        written: dict[str, Path] = {}
-        for name, path in self.engines.items():
-            target = dest / name
-            if Path(path).resolve() != target.resolve():
-                if target.exists():
-                    shutil.rmtree(target)
-                shutil.copytree(path, target)
-            written[name] = target
-        return written

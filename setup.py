@@ -618,6 +618,9 @@ dynamo_packages = [
     "torch_tensorrt.executorch",
     "torch_tensorrt.hf",
     "torch_tensorrt.hf.exporters",
+    "torch_tensorrt.hf.exporters.helpers",
+    "torch_tensorrt.hf.exporters.patches",
+    "torch_tensorrt.hf.exporters.plugin",
     "torch_tensorrt.hf.exporters.specs",
     "torch_tensorrt.runtime",
 ]
@@ -660,6 +663,9 @@ dynamo_package_dir = {
     "torch_tensorrt.executorch": "py/torch_tensorrt/executorch",
     "torch_tensorrt.hf": "py/torch_tensorrt/hf",
     "torch_tensorrt.hf.exporters": "py/torch_tensorrt/hf/exporters",
+    "torch_tensorrt.hf.exporters.helpers": "py/torch_tensorrt/hf/exporters/helpers",
+    "torch_tensorrt.hf.exporters.patches": "py/torch_tensorrt/hf/exporters/patches",
+    "torch_tensorrt.hf.exporters.plugin": "py/torch_tensorrt/hf/exporters/plugin",
     "torch_tensorrt.hf.exporters.specs": "py/torch_tensorrt/hf/exporters/specs",
     "torch_tensorrt.runtime": "py/torch_tensorrt/runtime",
 }

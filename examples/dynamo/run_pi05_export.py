@@ -2,18 +2,10 @@
 from __future__ import annotations
 
 import argparse
-import sys
 from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]  # TensorRT/
 _TRT_PY = _REPO_ROOT / "py"
-_TEST = Path("/home/micwilliams/workspace/Test")
-
-# ``trt.*`` lives in the Test tree. Always move it to the front.
-_test = str(_TEST)
-while _test in sys.path:
-    sys.path.remove(_test)
-sys.path.insert(0, _test)
 
 import torch  # noqa: E402
 import torch_tensorrt  # noqa: E402
@@ -26,8 +18,8 @@ from lerobot.configs import FeatureType, PolicyFeature
 from lerobot.policies.pi05 import PI05Policy
 from lerobot.utils.constants import ACTION, OBS_IMAGES, OBS_STATE
 from torch_tensorrt.hf.exporters import EdgeConfig, EdgeExporter
-from trt.plugin.plugin_utils import load_plugins_for_trt
-from trt.utils import configure_thor_pytorch, force_hf_attention
+from torch_tensorrt.hf.exporters.plugin.plugin_utils import load_plugins_for_trt
+from torch_tensorrt.hf.exporters.utils import configure_thor_pytorch, force_hf_attention
 
 
 def load_pi05(device: torch.device) -> PI05Policy:
@@ -97,7 +89,6 @@ def main() -> None:
     program = exporter.export(policy, sample_inputs, config=config)
 
     print("engines:", exporter.engines)
-    print("saved:", exporter.save_engines())
 
     # Runtime kwargs are tensors only (pixel_values, lang_embeds, rope, KVs, …).
     runtime_kwargs = exporter.sample

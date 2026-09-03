@@ -25,7 +25,7 @@ def causal_lm_flat(
     num_kv = int(cfg.num_key_value_heads)
     head_dim = int(getattr(cfg, "head_dim", cfg.hidden_size // cfg.num_attention_heads))
     try:
-        from trt.rope import make_rope_rotary_cos_sin
+        from torch_tensorrt.hf.exporters.rope import make_rope_rotary_cos_sin
 
         rope = make_rope_rotary_cos_sin(
             cfg, int(max_seq_len), device, language_model=language
