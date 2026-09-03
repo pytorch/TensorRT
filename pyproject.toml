@@ -458,7 +458,6 @@ module = [
     "torch_tensorrt.hf.exporters.data",
     "torch_tensorrt.hf.exporters.rope",
     "torch_tensorrt.hf.exporters.prefix_cache",
-    "torch_tensorrt.hf.exporters.mamba_stub",
 ]
 ignore_errors = true
 
