@@ -109,12 +109,32 @@ auto results = trt_mod.forward({input_tensor});
 | ------------------- | ------------------------------------------------ |
 | Linux AMD64 / GPU   | **Supported**                                    |
 | Linux SBSA / GPU    | **Supported**                                    |
+| NVIDIA DRIVE OS / GPU | **Source Compilation (DRIVE OS 7.2.4 / TensorRT 10.16)** |
 | Windows / GPU       | **Supported (Dynamo only)**                      |
 | Linux Jetson / GPU | **Source Compilation Supported on JetPack-4.4+**  |
 | Linux Jetson / DLA | **Source Compilation Supported on JetPack-4.4+**  |
 | Linux ppc64le / GPU | Not supported                                    |
 
 > Note: Refer [NVIDIA L4T PyTorch NGC container](https://ngc.nvidia.com/catalog/containers/nvidia:l4t-pytorch) for PyTorch libraries on JetPack.
+
+### Building on DRIVE OS
+
+DRIVE OS builds use the platform TensorRT 10.16 installation and a conventional
+CUDA 13.2 toolkit root. Select the DRIVE dependency metadata and native Bazel
+configuration with `TORCHTRT_TARGET_PLATFORM=driveos`:
+
+```bash
+CUDA_HOME=/path/to/cuda-13.2-build \
+TORCHTRT_TENSORRT_ROOT=/usr \
+TORCHTRT_TARGET_PLATFORM=driveos \
+python -m pip install --pre --editable '.[executorch]' \
+  --index-url https://download.pytorch.org/whl/nightly/cu132 \
+  --extra-index-url https://pypi.org/simple
+```
+
+The resulting package requires PyTorch 2.15 nightly and TensorRT 10.16. It does
+not change the default Linux SBSA build, which continues to target the TensorRT
+version recorded in `dev_dep_versions.yml`.
 
 ### Dependencies
 
