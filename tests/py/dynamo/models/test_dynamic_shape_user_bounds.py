@@ -562,8 +562,8 @@ def test_dim_dynamic_save_preserves_range_constraints(tmpdir):
 
 
 @pytest.mark.unit
-def test_construct_dynamic_input_clamps_zero_minimum():
-    """Data-dependent extents can include zero, but TRT profiles cannot."""
+def test_construct_dynamic_input_preserves_zero_minimum():
+    """Data-dependent extents retain their legal zero profile minimum."""
 
     class Nonzero(torch.nn.Module):
         def forward(self, x):
@@ -583,7 +583,8 @@ def test_construct_dynamic_input_clamps_zero_minimum():
     input_spec = construct_dynamic_input(
         fake_value.shape, fake_value.dtype, name="nonzero_output"
     )
-    assert input_spec.shape["min_shape"] == (1, 1)
+    assert input_spec.shape["min_shape"] == (0, 1)
+    assert input_spec.shape["opt_shape"] == (2, 1)
     assert input_spec.shape["max_shape"] == (4, 1)
 
 
