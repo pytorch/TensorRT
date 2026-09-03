@@ -345,7 +345,7 @@ def rewire_aliased_mutations_to_buffers(exported_program: Any) -> List[str]:
         _LOGGER.debug("no aliased buffer mutations to rewire")
         return []
 
-    elided_by_engine: Dict[Node, List[Node]] = {}
+    engines_with_elided_outputs: Set[Node] = set()
     output_names_by_engine: Dict[Node, List[str]] = {}
     elided_output_names: List[str] = []
     output_node = graph_module.graph.output_node()
@@ -362,7 +362,7 @@ def rewire_aliased_mutations_to_buffers(exported_program: Any) -> List[str]:
             TensorArgument(name=mutation.placeholder.name),
             output_specs[spec_index].target,
         )
-        elided_by_engine.setdefault(mutation.engine, []).append(mutation.aliased_output)
+        engines_with_elided_outputs.add(mutation.engine)
         names = output_names_by_engine.get(mutation.engine)
         if names is None:
             names = _engine_output_binding_names(exported_program, mutation.engine)
@@ -372,21 +372,24 @@ def rewire_aliased_mutations_to_buffers(exported_program: Any) -> List[str]:
             elided_output_names.append(names[output_index])
 
     output_node.args = (tuple(output_args),)
-    # Dropping every output of an engine would leave a delegate with no outputs.
+    # Leaving an engine with no output would leave its delegate with no outputs.
     # Nothing downstream reports that shape: the runtime infers elision from a
     # single argument count, which a zero-output delegate satisfies, and a
     # delegate nothing reads is a pure node that a later graph-wide dead-code
-    # elimination can erase, taking the computation with it. Stop here instead.
-    # The eliminate_dead_code() below does not erase this engine node: unlike
-    # the delegate, an execute_engine node is impure to FX and survives with no
-    # users.
-    for engine, elided in elided_by_engine.items():
-        if all(user in elided and not user.users for user in engine.users):
+    # elimination can erase, taking the computation with it. This raise, and not
+    # the eliminate_dead_code() below, is what stops that. That DCE leaves the
+    # engine node itself in place -- PyTorch defaults an operator taking a
+    # ScriptObject argument to an ORDERED effect (torch._library.effects), and
+    # execute_engine takes the engine as one, so FX reads it as impure where the
+    # delegate is not -- but it does erase the engine's own dead users, so a
+    # user with no users of its own is not an output the engine still has.
+    for engine in engines_with_elided_outputs:
+        if not any(user.users for user in engine.users):
             raise RuntimeError(
-                "TensorRT zero-copy KV: every output of engine node "
-                f"'{engine.name}' is an aliased buffer written in place, so "
-                "eliding them would leave the delegate with no outputs at all. "
-                "This shape is not supported; export this method without "
+                "TensorRT zero-copy KV: eliding the aliased buffers engine node "
+                f"'{engine.name}' writes in place leaves it with no output any "
+                "node reads, so the delegate would have no outputs at all. This "
+                "shape is not supported; export this method without "
                 "zero_copy_kv."
             )
     graph_module.graph.eliminate_dead_code()

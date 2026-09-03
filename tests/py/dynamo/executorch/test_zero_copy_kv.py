@@ -316,6 +316,50 @@ def test_rewire_rejects_an_engine_whose_every_output_is_aliased(monkeypatch):
         Z.rewire_aliased_mutations_to_buffers(program)
 
 
+@pytest.mark.unit
+def test_rewire_rejects_an_engine_whose_only_other_output_is_dead(monkeypatch):
+    """A surviving-but-unread output does not keep the engine's delegate alive.
+
+    The engine has two outputs: an aliased buffer this elides, and a second one
+    nothing reads. Counting the second as an output would let the check pass,
+    and the eliminate_dead_code() that follows would then erase it too, leaving
+    exactly the zero-output delegate the check exists to refuse.
+    """
+    graph = torch.fx.Graph()
+    k_buffer = graph.placeholder("b_k_0")
+    engine = graph.placeholder("engine")
+    engine_call = graph.call_function(
+        torch.ops.tensorrt.execute_engine.default, ([k_buffer], engine)
+    )
+    k_out = graph.call_function(operator.getitem, (engine_call, 0))
+    graph.call_function(operator.getitem, (engine_call, 1))
+    graph.output((k_out,))
+    graph_module = torch.fx.GraphModule(torch.nn.Module(), graph)
+    signature = SimpleNamespace(
+        inputs_to_buffers={"b_k_0": "k_0"},
+        input_specs=[],
+        output_specs=[
+            OutputSpec(
+                OutputKind.BUFFER_MUTATION, TensorArgument(name=k_out.name), "k_0"
+            )
+        ],
+    )
+    program = SimpleNamespace(
+        graph_module=graph_module,
+        graph_signature=signature,
+        _graph_signature=signature,
+    )
+    _patch_engine_metadata(
+        monkeypatch,
+        aliased_io={"out_k": ("k_in", "kv_cache_update")},
+        input_names=["k_in"],
+        output_names=["out_k", "out_dead"],
+    )
+
+    with pytest.raises(RuntimeError, match="no outputs at all"):
+        Z.rewire_aliased_mutations_to_buffers(program)
+
+
 def _staged_delegate_graph(
     *, backend_id="TensorRTBackend", device=DeviceType.CUDA, compile_specs=None
 ):
