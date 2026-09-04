@@ -11,6 +11,10 @@ on:
     types: [submitted]
   push:
     branches: [main, nightly, 'release/**']
+    # Keep CI in lockstep with the release artifact workflows. A tag push is
+    # resolved by _decide.yml as the full lane.
+    tags:
+      - v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+
   workflow_dispatch:
     inputs:
       lane:
