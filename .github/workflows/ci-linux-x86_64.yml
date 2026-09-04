@@ -113,8 +113,10 @@ jobs:
       name-prefix: "Python-only RTX "
       raw-matrix: ${{ needs.generate-matrix.outputs.matrix }}
 
-  # ExecuTorch runtime is bundled with the standard wheel artifact. Wait for
-  # that build/test channel to finish before exercising the companion wheel.
+  # ExecuTorch runtime is bundled with the standard wheel artifact. The build
+  # uploads that artifact before the standard suite completes, so still run
+  # this independent coverage if a standard test fails. A cancelled standard
+  # channel may not have uploaded anything, so skip that case.
   #
   # A standard channel that was CANCELLED is different from one that failed a test:
   # it uploaded no wheel, so this job has nothing to download and dies with
@@ -131,7 +133,7 @@ jobs:
       needs.generate-matrix.result == 'success' &&
       needs.decide.outputs.lane != 'skip' &&
       needs.decide.outputs.backend != 'rtx' &&
-      needs.standard.result == 'success'
+      needs.standard.result != 'cancelled'
     uses: ./.github/workflows/executorch-test-linux.yml
     with:
       repository: pytorch/tensorrt

@@ -469,9 +469,16 @@ jobs:
         run: |
           set -euxo pipefail
           source "${BUILD_ENV_FILE}"
-          WHEEL_PATH="$(find "${{ inputs.repository }}/dist" -maxdepth 1 -type f -name "${PACKAGE_NAME}-*.whl" -print -quit)"
+          # PACKAGE_NAME is the import package used below. The RTX
+          # distribution intentionally has a different wheel stem while still
+          # importing as torch_tensorrt.
+          WHEEL_DISTRIBUTION="${PACKAGE_NAME}"
+          if [[ "${USE_TRT_RTX}" == "true" ]]; then
+            WHEEL_DISTRIBUTION="${PACKAGE_NAME}_rtx"
+          fi
+          WHEEL_PATH="$(find "${{ inputs.repository }}/dist" -maxdepth 1 -type f -name "${WHEEL_DISTRIBUTION}-*.whl" -print -quit)"
           if [[ -z "${WHEEL_PATH}" ]]; then
-            echo "No wheel for ${PACKAGE_NAME} was built" >&2
+            echo "No wheel for distribution ${WHEEL_DISTRIBUTION} was built" >&2
             exit 1
           fi
           WHEEL_NAME="$(basename "${WHEEL_PATH}")"

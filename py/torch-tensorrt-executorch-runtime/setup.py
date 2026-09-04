@@ -88,6 +88,15 @@ class BazelBuild(build_ext):
             f"--action_env=PYTHON_BIN_PATH={sys.executable}",
             f"--action_env=TORCH_TENSORRT_EXECUTORCH_BUILD_NONCE={BUILD_NONCE}",
         ]
+        # Bazel actions run with a restricted environment.  In particular,
+        # rules_foreign_cc's CMake invocation does not inherit this process's
+        # TORCH_CUDA_ARCH_LIST unless it is made an action environment value.
+        # Without it, ExecuTorch's CMake falls back to its common architecture
+        # list (including compute_50), which CUDA 13 rejects.
+        cuda_arch_list = os.getenv("TORCH_CUDA_ARCH_LIST")
+        if cuda_arch_list:
+            print(f"Forwarding TORCH_CUDA_ARCH_LIST to Bazel actions: {cuda_arch_list}")
+            command.append(f"--action_env=TORCH_CUDA_ARCH_LIST={cuda_arch_list}")
         dist_dir_arch = (
             "aarch64-linux-gnu"
             if platform.machine() in {"aarch64", "arm64"}
