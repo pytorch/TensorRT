@@ -20,7 +20,24 @@ REPO_ROOT = HERE.parents[1]
 BAZEL_TARGET = "//py/torch-tensorrt-executorch-runtime/native:delegate_native"
 BUILD_NONCE = os.getenv("TORCH_TENSORRT_EXECUTORCH_BUILD_NONCE", uuid.uuid4().hex)
 
-RUNTIME_VERSION = (HERE / "version.txt").read_text().strip()
+
+def get_runtime_version() -> str:
+    """Match the primary wheel's local-version convention with this wheel's base."""
+    if version := os.getenv("TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION"):
+        return version
+
+    base_version = (HERE / "version.txt").read_text().strip()
+    try:
+        revision = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"], cwd=REPO_ROOT, text=True
+        ).strip()
+    except (OSError, subprocess.CalledProcessError):
+        print("WARNING: Could not get git revision short hash, using default one")
+        revision = "0000000"
+    return f"{base_version}.dev0+{revision}"
+
+
+RUNTIME_VERSION = get_runtime_version()
 
 TORCH_REQUIREMENT = "torch>=2.14.0,<2.15.0"
 EXECUTORCH_REQUIREMENT = "executorch==1.4.1"

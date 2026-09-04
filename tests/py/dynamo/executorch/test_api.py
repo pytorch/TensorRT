@@ -39,26 +39,27 @@ def test_the_python_loader_uses_the_api_that_backs_device_arenas():
 def test_every_lane_that_builds_the_cuda_shims_filters_the_arch_list():
     """Both ExecuTorch lanes compile the shims, so both need the architecture floor.
 
-    The build lane builds the wheel and the reference runner; the test lane builds the runner
-    again, whose CMakeLists forces EXECUTORCH_BUILD_CUDA=ON. Both source the channel's build
-    environment, so filtering in only one of them moves the cu126 failure from that job into the
-    other rather than removing it. Checked by parsing, because the ordering matters: the filter has
-    to run before whatever compiles.
+    The reusable Linux build workflow builds the runtime wheel, while the test lane builds the
+    reference runner, whose CMakeLists forces EXECUTORCH_BUILD_CUDA=ON. Both source the channel's
+    build environment, so filtering in only one of them moves the cu126 failure from that job into
+    the other rather than removing it. Checked by parsing, because the ordering matters: the
+    filter has to run before whatever compiles.
     """
     import yaml
 
-    for name in ("executorch-build-linux.yml", "executorch-test-linux.yml"):
+    for name, compile_marker in (
+        ("build_linux.yml", "python -m pip wheel"),
+        ("executorch-test-linux.yml", "verify-executorch-reference-runner"),
+    ):
         workflow = yaml.safe_load(
             (_REPO_ROOT / ".github/workflows" / name).read_text(encoding="utf-8")
         )
-        scripts = [
-            (job.get("with") or {}).get("script", "")
-            for job in workflow.get("jobs", {}).values()
-        ]
-        script = next(
-            (s for s in scripts if "verify-executorch-reference-runner" in s), None
-        )
-        assert script is not None, f"{name} no longer builds the reference runner"
+        scripts = []
+        for job in workflow.get("jobs", {}).values():
+            scripts.append((job.get("with") or {}).get("script", ""))
+            scripts.extend(step.get("run", "") for step in job.get("steps", []))
+        script = next((s for s in scripts if compile_marker in s), None)
+        assert script is not None, f"{name} no longer contains {compile_marker!r}"
 
         lines = script.splitlines()
         filtered = [
@@ -68,13 +69,11 @@ def test_every_lane_that_builds_the_cuda_shims_filters_the_arch_list():
             f"{name} builds the CUDA shims without narrowing TORCH_CUDA_ARCH_LIST, so a channel "
             "asking for an architecture without __dp4a fails to compile"
         )
-        for marker in ("verify-executorch-reference-runner", "pip wheel"):
-            compiled = [i for i, line in enumerate(lines) if marker in line]
-            if compiled:
-                assert filtered[0] < compiled[0], (
-                    f"{name} filters the architecture list after {marker!r}, so the value in "
-                    "effect while compiling is the unfiltered one"
-                )
+        compiled = [i for i, line in enumerate(lines) if compile_marker in line]
+        assert filtered[0] < compiled[0], (
+            f"{name} filters the architecture list after {compile_marker!r}, so the value in "
+            "effect while compiling is the unfiltered one"
+        )
 
 
 @pytest.mark.unit

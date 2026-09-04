@@ -410,6 +410,21 @@ jobs:
           TORCH_CUDA_ARCH_LIST="$(${CONDA_RUN} python .github/scripts/filter-executorch-cuda-arches.py "${TORCH_CUDA_ARCH_LIST:-}")"
           export TORCH_CUDA_ARCH_LIST
           echo "TORCH_CUDA_ARCH_LIST=${TORCH_CUDA_ARCH_LIST}"
+          # Give the companion wheel the same channel/date and CUDA local-version
+          # suffix as torch-tensorrt, while retaining its independent base version.
+          main_version="$(sed 's/a0$//' version.txt)"
+          runtime_version="$(<py/torch-tensorrt-executorch-runtime/version.txt)"
+          if [[ "${BUILD_VERSION}" != "${main_version}"* ]]; then
+            echo "Unexpected torch-tensorrt build version: ${BUILD_VERSION}" >&2
+            exit 1
+          fi
+          if [[ ${{ inputs.is-release-wheel }} == true ]]; then
+            BUILD_VERSION="${BUILD_VERSION%+*}"
+          elif [[ "${BUILD_VERSION}" != *"+${CU_VERSION}" ]]; then
+            BUILD_VERSION="${BUILD_VERSION}+${CU_VERSION}"
+          fi
+          export TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION="${runtime_version}${BUILD_VERSION#"${main_version}"}"
+          echo "TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION=${TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION}"
           ${CONDA_RUN} python -m pip wheel --no-build-isolation --no-deps --wheel-dir dist \
             py/torch-tensorrt-executorch-runtime
       - name: Repair Manylinux_2_28 Wheel
