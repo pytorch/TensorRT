@@ -67,6 +67,14 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
             )
             return False
 
+        if TorchTensorRTOperatorSupport._exceeds_max_tensor_rank(node):
+            # Keep unrepresentable tensors entirely in the Torch partition.
+            if not node.is_impure():
+                self.unsupported_operators[node_name] = (
+                    self.unsupported_operators.get(node_name, 0) + 1
+                )
+            return False
+
         if TorchTensorRTOperatorSupport._has_complex_dtype(node):
             # Complex-dtype tensors are not supported by TensorRT; force PyTorch fallback
             if not node.is_impure():

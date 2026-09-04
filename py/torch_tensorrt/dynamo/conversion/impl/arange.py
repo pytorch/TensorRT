@@ -1,9 +1,9 @@
 from typing import Optional, Union
 
+import numpy as np
 import tensorrt as trt
 import torch
 from tensorrt import ITensor as TRTTensor
-from torch._subclasses.fake_tensor import unset_fake_temporarily
 from torch.fx.node import Target
 from torch_tensorrt import _enums
 from torch_tensorrt.dynamo.conversion import impl
@@ -38,7 +38,7 @@ def _sequence_dtype(
         if isinstance(x, float):
             return trt.DataType.FLOAT
 
-        return trt.DataType.INT64
+    return trt.DataType.INT64
 
 
 def arange(
@@ -65,6 +65,9 @@ def arange(
         start_rank_0 = get_trt_tensor(
             ctx, start, name + "_start_rank_0", value_dtype, min_rank=0
         )
+        start_rank_0 = cast_trt_tensor(
+            ctx, start_rank_0, value_dtype, name + "_start_rank_0_casted"
+        )
         # LINSPACE's start input requires rank 0; if the upstream ITensor came in
         # as rank-1 (e.g. a SymInt materialized by a sym_size op), reshape it.
         if len(start_rank_0.shape) > 0:
@@ -80,6 +83,11 @@ def arange(
         )
         end = get_trt_tensor(ctx, end, name + "_end", value_dtype, min_rank=1)
         step = get_trt_tensor(ctx, step, name + "_step", value_dtype, min_rank=1)
+        start_rank_1 = cast_trt_tensor(
+            ctx, start_rank_1, value_dtype, name + "_start_rank_1_casted"
+        )
+        end = cast_trt_tensor(ctx, end, value_dtype, name + "_end_casted")
+        step = cast_trt_tensor(ctx, step, value_dtype, name + "_step_casted")
 
         # The number of elements is ceil((end - start) / step), computed as
         # -floor((start - end) / step) so that the whole expression stays in the
@@ -112,10 +120,26 @@ def arange(
 
     else:
         # All arguments are static, so evaluate the sequence eagerly and freeze it
-        # into the engine as a constant. Letting torch pick the dtype preserves
-        # PyTorch's promotion rules (float result if any argument is a float).
-        with unset_fake_temporarily():
-            values = torch.arange(start, end, step, dtype=dtype)
-        if values.dtype == torch.int64:
-            values = values.to(torch.int32)
-        return get_trt_tensor(ctx, values, f"{name}_arange_const")
+        # into the engine as a constant. NumPy avoids creating a FakeTensor when
+        # conversion runs inside torch.compile's active FakeTensorMode.
+        resolved_dtype = dtype
+        if resolved_dtype is None and any(
+            isinstance(value, float) for value in (start, end, step)
+        ):
+            resolved_dtype = torch.get_default_dtype()
+        constant_dtype = None
+        if resolved_dtype is not None:
+            try:
+                np_dtype = _enums.dtype._from(resolved_dtype).to(np.dtype)
+            except TypeError:
+                # Some TensorRT dtypes, such as BF16, have no NumPy
+                # representation. Build the sequence in NumPy's inferred dtype
+                # and let constant creation cast it to the requested dtype.
+                np_dtype = None
+                constant_dtype = resolved_dtype
+        else:
+            np_dtype = None
+        values = np.arange(start, end, step, dtype=np_dtype)
+        if values.dtype == np.int64:
+            values = values.astype(np.int32)
+        return get_trt_tensor(ctx, values, f"{name}_arange_const", dtype=constant_dtype)

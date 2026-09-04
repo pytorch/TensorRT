@@ -1,5 +1,3 @@
-import unittest
-
 import torch
 import torch.nn as nn
 import torch_tensorrt
@@ -40,6 +38,19 @@ class TestArangeConverter(DispatchTestCase):
         self.run_test(
             Arange(),
             inputs,
+            use_dynamo_tracer=True,
+        )
+
+    def test_arange_static_non_numpy_type(self):
+        class Arange(nn.Module):
+            def forward(self, x):
+                return torch.ops.aten.arange.start_step(
+                    0, 5, 1, dtype=torch.bfloat16, device=x.device
+                )
+
+        self.run_test(
+            Arange(),
+            [torch.randn(1, 1)],
             use_dynamo_tracer=True,
         )
 
@@ -92,6 +103,39 @@ class TestArangeConverter(DispatchTestCase):
             pyt_inputs=[pyt_input],
             use_dynamo_tracer=False,
         )
+
+    def test_arange_data_dependent_start(self):
+        class Arange(torch.nn.Module):
+            def forward(self, x, mask):
+                end = mask.nonzero().size(0)
+                start = end // 2
+                indices = torch.arange(start, end, 1, device=x.device)
+                return x.index_select(0, indices)
+
+        previous_capture_setting = torch._dynamo.config.capture_dynamic_output_shape_ops
+        try:
+            torch._dynamo.config.capture_dynamic_output_shape_ops = True
+            torch._dynamo.reset()
+
+            model = Arange().eval().cuda()
+            x = torch.randn((16, 8), device="cuda")
+            mask = torch.arange(16, device="cuda") % 2 == 0
+            expected = model(x, mask)
+
+            compiled = torch.compile(
+                model,
+                backend="tensorrt",
+                options={
+                    "pass_through_build_failures": True,
+                    "min_block_size": 1,
+                },
+            )
+            torch.testing.assert_close(compiled(x, mask), expected)
+        finally:
+            torch._dynamo.config.capture_dynamic_output_shape_ops = (
+                previous_capture_setting
+            )
+            torch._dynamo.reset()
 
 
 if __name__ == "__main__":

@@ -118,7 +118,8 @@ def construct_dynamic_input(
                 )
                 unwrapped_min_max_opt["min"] = 1
             else:
-                unwrapped_min_max_opt["min"] = min_max_opt["min"]
+                min_bound = int(min_max_opt["min"])
+                unwrapped_min_max_opt["min"] = min_bound
 
             if "max" not in min_max_opt or min_max_opt["max"] is None:
                 logger.warning(
@@ -131,10 +132,14 @@ def construct_dynamic_input(
             # if opt not exist, set it to the mean of min and max
             if "opt" not in min_max_opt or min_max_opt["opt"] is None:
                 logger.info(
-                    f"Dynamic input {name} (shape: {input_shape}) has no opt target i.e. which shape to specialize for, for dim {d}, attempting to use a sane default (opt: min({min_max_opt['min']}) + max({min_max_opt['max']}) / 2). If you want to specialized further, use torch_tensorrt.compile"
+                    f"Dynamic input {name} (shape: {input_shape}) has no opt target "
+                    f"for dim {d}; using the midpoint of min "
+                    f"({unwrapped_min_max_opt['min']}) and max "
+                    f"({unwrapped_min_max_opt['max']})."
                 )
-                unwrapped_min_max_opt["opt"] = int(
-                    unwrapped_min_max_opt["min"] + unwrapped_min_max_opt["max"] / 2
+                unwrapped_min_max_opt["opt"] = (
+                    unwrapped_min_max_opt["min"]
+                    + (unwrapped_min_max_opt["max"] - unwrapped_min_max_opt["min"]) // 2
                 )
             else:
                 unwrapped_min_max_opt["opt"] = min_max_opt["opt"]

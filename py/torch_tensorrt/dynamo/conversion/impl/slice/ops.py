@@ -109,7 +109,7 @@ def slice_op(  # TODO: This should be slice not whatever is in base
     # Assign the initial stop tensor
     stop_slice = []
     if isinstance(stop, int) and dynamic_input_dim_equal:
-        stop_slice = input.shape
+        stop_slice = list(input.shape)
         stop_slice[dim] = stop
     else:
         # required for cases where stop is ITensor and dim != dynamic dim of input
@@ -125,6 +125,25 @@ def slice_op(  # TODO: This should be slice not whatever is in base
                 stop_slice.append(stop)
             else:
                 stop_slice.append(input.shape[i])
+
+    finite_stop_on_dynamic_dim = (
+        input.shape[dim] == DYNAMIC_DIM
+        and isinstance(stop, int)
+        and 0 <= stop < sys.maxsize
+    )
+    if finite_stop_on_dynamic_dim:
+        dim_size = get_shape(
+            ctx, target, source_ir, name + "_stop_dim_size", input, dim
+        )
+        if isinstance(start, int) and start > 0:
+            # A runtime axis can be shorter than a positive literal start.
+            # Normalize it just like Python so the slice extent cannot go negative.
+            start_slice[dim] = impl.elementwise.min(
+                ctx, target, source_ir, name + "_start_clamped", start, dim_size
+            )
+        stop_slice[dim] = impl.elementwise.min(
+            ctx, target, source_ir, name + "_stop_clamped", stop, dim_size
+        )
 
     stride_slice = [1] * len(input.shape)
     stride_slice[dim] = step
@@ -143,6 +162,7 @@ def slice_op(  # TODO: This should be slice not whatever is in base
             or stop < 0
             or stop_dynamic_None
             or stop == sys.maxsize
+            or finite_stop_on_dynamic_dim
         ):
             # special assignments for dynamic cases
             if isinstance(start, int) and start < 0:
