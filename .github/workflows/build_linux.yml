@@ -121,6 +121,11 @@ on:
         required: false
         type: boolean
         default: true
+      build-executorch-runtime:
+        description: "Build the companion torch-tensorrt-executorch-runtime wheel into dist/"
+        required: false
+        type: boolean
+        default: false
       pip-install-torch-extra-args:
         # NOTE: Why does this exist?
         # Well setuptools / python packaging doesn't actually allow you to specify dependencies
@@ -387,6 +392,30 @@ jobs:
               ${CONDA_RUN} python setup.py bdist_wheel ${param}
             fi
           fi
+      # Keep the ExecuTorch runtime in the standard wheel artifact.  This makes
+      # its packaging, manylinux repair, GitHub artifact, and PyTorch-index
+      # upload follow the exact same path as torch-tensorrt itself.
+      - name: Build the ExecuTorch runtime wheel
+        if: ${{ inputs.build-executorch-runtime }}
+        working-directory: ${{ inputs.repository }}
+        shell: bash -l {0}
+        run: |
+          set -euxo pipefail
+          source "${BUILD_ENV_FILE}"
+          # The runtime links against the just-built standard wheel. Install it
+          # without resolving dependencies so it cannot replace the matrix's
+          # pinned torch/TensorRT packages.
+          ${CONDA_RUN} python -m pip install --no-deps dist/torch_tensorrt*.whl
+          ${CONDA_RUN} python -m pip install pyyaml "executorch==1.4.1"
+          export TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION="$(
+            ${CONDA_RUN} python -c 'import importlib.metadata; print(importlib.metadata.version("torch-tensorrt"))'
+          )"
+          echo "TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION=${TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION}"
+          TORCH_CUDA_ARCH_LIST="$(${CONDA_RUN} python .github/scripts/filter-executorch-cuda-arches.py "${TORCH_CUDA_ARCH_LIST:-}")"
+          export TORCH_CUDA_ARCH_LIST
+          echo "TORCH_CUDA_ARCH_LIST=${TORCH_CUDA_ARCH_LIST}"
+          ${CONDA_RUN} python -m pip wheel --no-build-isolation --no-deps --wheel-dir dist \
+            py/torch-tensorrt-executorch-runtime
       - name: Repair Manylinux_2_28 Wheel
         shell: bash -l {0}
         env:
@@ -411,6 +440,29 @@ jobs:
         with:
           repository: ${{ inputs.repository  }}
           script: ${{ inputs.post-script }}
+      - name: Inventory packaged wheels
+        # Keep this immediately before the smoke test/upload boundary.  When a
+        # matrix row fails downstream, its log shows exactly which repaired
+        # wheels (and package versions) were placed in the GitHub artifact.
+        if: ${{ inputs.is-release-tarball == false }}
+        shell: bash -l {0}
+        working-directory: ${{ inputs.repository }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          wheels=(dist/*.whl)
+          if [[ ${#wheels[@]} -eq 0 ]]; then
+            echo "No wheels were produced in dist/" >&2
+            exit 1
+          fi
+          echo "Packaged wheels to upload:"
+          for wheel in "${wheels[@]}"; do
+            echo "  $(basename "${wheel}") ($(stat -c%s "${wheel}") bytes)"
+            metadata_path="$(unzip -Z1 "${wheel}" '*.dist-info/METADATA' | head -n1)"
+            if [[ -n "${metadata_path}" ]]; then
+              unzip -p "${wheel}" "${metadata_path}" | grep -E '^(Name|Version):' || true
+            fi
+          done
       - name: Smoke Test
         # Release tarball builds do not produce a wheel.
         if: ${{ inputs.run-smoke-test && inputs.is-release-tarball == false }}
@@ -421,8 +473,13 @@ jobs:
         run: |
           set -euxo pipefail
           source "${BUILD_ENV_FILE}"
-          WHEEL_NAME=$(ls "${{ inputs.repository }}/dist/")
-          echo "$WHEEL_NAME"
+          WHEEL_PATH="$(find "${{ inputs.repository }}/dist" -maxdepth 1 -type f -name "${PACKAGE_NAME}-*.whl" -print -quit)"
+          if [[ -z "${WHEEL_PATH}" ]]; then
+            echo "No wheel for ${PACKAGE_NAME} was built" >&2
+            exit 1
+          fi
+          WHEEL_NAME="$(basename "${WHEEL_PATH}")"
+          echo "${WHEEL_NAME}"
           if [[ ${{ inputs.architecture }} == "aarch64" ]]; then
             echo "Skipping smoke test for aarch64, since it is not an actual gpu runner"
           else

@@ -20,7 +20,14 @@ REPO_ROOT = HERE.parents[1]
 BAZEL_TARGET = "//py/torch-tensorrt-executorch-runtime/native:delegate_native"
 BUILD_NONCE = os.getenv("TORCH_TENSORRT_EXECUTORCH_BUILD_NONCE", uuid.uuid4().hex)
 
-RUNTIME_VERSION = (HERE / "version.txt").read_text().strip()
+# CI ships this as a companion of one specific torch-tensorrt wheel.  Give it
+# that wheel's version so nightly/index uploads are immutable per build and
+# pip selects the compatible companion naturally.  The checked-in value keeps
+# standalone development builds deterministic.
+RUNTIME_VERSION = os.getenv(
+    "TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION",
+    (HERE / "version.txt").read_text().strip(),
+)
 
 TORCH_REQUIREMENT = "torch>=2.14.0,<2.15.0"
 EXECUTORCH_REQUIREMENT = "executorch==1.4.1"
