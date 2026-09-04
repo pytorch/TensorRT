@@ -142,7 +142,11 @@ jobs:
         bash -c '
           set -euo pipefail
           python -m pip install pyyaml "executorch==1.4.1"
-          bash .github/scripts/build-executorch-runtime-wheel.sh
+          TORCH_CUDA_ARCH_LIST="$(python .github/scripts/filter-executorch-cuda-arches.py "${TORCH_CUDA_ARCH_LIST:-}")"
+          export TORCH_CUDA_ARCH_LIST
+          echo "TORCH_CUDA_ARCH_LIST=${TORCH_CUDA_ARCH_LIST}"
+          python -m pip wheel --no-build-isolation --no-deps --wheel-dir dist \
+            py/torch-tensorrt-executorch-runtime
         '
       artifact-name-prefix: torch-tensorrt-executorch-runtime
       trigger-event: ${{ github.event_name }}
