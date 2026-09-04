@@ -125,7 +125,7 @@ configuration with `TORCHTRT_TARGET_PLATFORM=driveos`:
 
 ```bash
 CUDA_HOME=/path/to/cuda-13.2-build \
-TORCHTRT_TENSORRT_ROOT=/usr \
+TORCHTRT_TENSORRT_ROOT=/path/to/tensorrt-10.16-sdk-root \
 TORCHTRT_TARGET_PLATFORM=driveos \
 python -m pip install --pre --editable '.[executorch]' \
   --index-url https://download.pytorch.org/whl/nightly/cu132 \

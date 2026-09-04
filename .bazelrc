@@ -44,6 +44,7 @@ build:jetpack --//toolchains/dep_collection:compute_libs=jetpack
 build:driveos --config=linux
 build:driveos --platforms=//toolchains:aarch64_linux
 build:driveos --repo_env=CUDA_HOME
+build:driveos --repo_env=CUDA_PATH
 build:driveos --repo_env=TORCHTRT_TENSORRT_ROOT
 
 build:rtx --//toolchains/dep_collection:compute_libs=rtx
