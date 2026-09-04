@@ -133,6 +133,7 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
+      architecture: aarch64
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
 
   gate:
