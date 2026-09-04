@@ -138,8 +138,12 @@ jobs:
       pre-script: packaging/pre_build_script.sh
       package-name: torch_tensorrt_executorch_runtime
       build-platform: python-build-package
-      build-command: >-
-        bash -c 'python -m pip install pyyaml "executorch==1.4.1" && python -m pip wheel --no-build-isolation --no-deps --wheel-dir dist py/torch-tensorrt-executorch-runtime'
+      build-command: |
+        bash -c '
+          set -euo pipefail
+          python -m pip install pyyaml "executorch==1.4.1"
+          bash .github/scripts/build-executorch-runtime-wheel.sh
+        '
       artifact-name-prefix: torch-tensorrt-executorch-runtime
       trigger-event: ${{ github.event_name }}
       is-release-wheel: true
