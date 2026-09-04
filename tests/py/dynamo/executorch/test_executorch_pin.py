@@ -101,6 +101,7 @@ _EXPECTED_REQUIREMENT_SITES = {
     # It arrived with the CUDA 12.6 rows and named a stale release off the default index, which is
     # exactly what these checks exist to catch.
     ".github/workflows/release-linux-x86_64.yml": 1,
+    ".github/workflows/release-linux-aarch64.yml": 1,
     "MODULE.bazel": 1,
     "docker/MODULE.bazel.docker": 1,
     "docker/MODULE.bazel.ngc": 1,
@@ -342,6 +343,7 @@ def test_every_install_that_names_a_channel_can_resolve_its_variable() -> None:
 
     for path in (
         ".github/workflows/release-linux-x86_64.yml",
+        ".github/workflows/release-linux-aarch64.yml",
         ".github/workflows/executorch-build-linux.yml",
     ):
         text = (REPO_ROOT / path).read_text(encoding="utf-8")
