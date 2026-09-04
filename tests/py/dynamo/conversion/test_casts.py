@@ -1,13 +1,11 @@
 # type: ignore
 
-import unittest
-
 import torch
 import torch.nn as nn
-import torch_tensorrt
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt import dtype
-from torch_tensorrt.dynamo.conversion import UnsupportedOperatorException
+from torch_tensorrt.dynamo.conversion.aten_ops_converters import (
+    to_copy_dtype_validator,
+)
 
 from .harness import DispatchTestCase
 
@@ -108,6 +106,31 @@ class TestToCopyConverter(DispatchTestCase):
             inputs,
             precision=torch.float,
         )
+
+    def test_to_copy_validator_rejects_device_transfer(self):
+        class DeviceAndDtypeCopy(nn.Module):
+            def __init__(self, device):
+                super().__init__()
+                self.device = device
+
+            def forward(self, x):
+                y = x + 1
+                return torch.ops.aten._to_copy.default(
+                    y, device=self.device, dtype=torch.int32
+                )
+
+        def to_copy_node(device):
+            x = torch.randn(4, device="cuda")
+            exported = torch.export.export(DeviceAndDtypeCopy(device), (x,))
+            return next(
+                node
+                for node in exported.graph.nodes
+                if node.target is torch.ops.aten._to_copy.default
+            )
+
+        validator = to_copy_dtype_validator(placeholder_only=False)
+        self.assertFalse(validator(to_copy_node("cpu")))
+        self.assertTrue(validator(to_copy_node("cuda")))
 
 
 if __name__ == "__main__":
