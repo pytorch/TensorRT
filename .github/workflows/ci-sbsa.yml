@@ -13,6 +13,10 @@ on:
     types: [submitted]
   push:
     branches: [main, nightly, 'release/**']
+    # Keep CI in lockstep with the release artifact workflows. A tag push is
+    # resolved by _decide.yml as the full lane.
+    tags:
+      - v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+
   workflow_dispatch:
     inputs:
       lane:
@@ -114,8 +118,30 @@ jobs:
       name-prefix: "RTX Python-only SBSA "
       raw-matrix: ${{ needs.generate-matrix.outputs.matrix }}
 
+  # ExecuTorch runtime is supported by the standard TensorRT wheel only. Wait
+  # for that channel to upload its wheel artifact, but still build the runtime
+  # if the standard channel fails after uploading it. SBSA has no GPU test
+  # runners, so this workflow builds the runtime but does not run its test job.
+  executorch-runtime-build:
+    needs: [decide, generate-matrix, build]
+    if: >-
+      !cancelled() &&
+      needs.decide.result == 'success' &&
+      needs.generate-matrix.result == 'success' &&
+      needs.build.result != 'cancelled' &&
+      (needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly') &&
+      needs.decide.outputs.backend != 'rtx'
+    uses: ./.github/workflows/executorch-build-linux.yml
+    with:
+      repository: pytorch/tensorrt
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      architecture: aarch64
+      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+
   gate:
-    needs: [decide, build, python-only, build-rtx, python-only-rtx]
+    needs: [decide, build, python-only, build-rtx, python-only-rtx, executorch-runtime-build]
     if: always()
     runs-on: ubuntu-latest
     steps:

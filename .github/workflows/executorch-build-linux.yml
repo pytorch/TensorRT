@@ -23,6 +23,10 @@ on:
         description: "Test infra reference to use"
         default: ""
         type: string
+      architecture:
+        description: "Target architecture for the TensorRT wheel artifact"
+        default: x86_64
+        type: string
 
 jobs:
   filter-matrix:
@@ -53,6 +57,7 @@ jobs:
       ref: ${{ inputs.ref }}
       test-infra-repository: ${{ inputs.test-infra-repository }}
       test-infra-ref: ${{ inputs.test-infra-ref }}
+      architecture: ${{ inputs.architecture }}
       build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: packaging/pre_build_script.sh
       fail-on-empty: false
@@ -80,8 +85,6 @@ jobs:
         bazel --version
 
         python -m pip install pyyaml "executorch==1.4.1"
-        export TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION="$(python -c 'import importlib.metadata; print(importlib.metadata.version("torch-tensorrt"))')"
-
         # The downloaded wheel has to carry the C++ runtime. A wheel built with
         # PYTHON_ONLY=1 has no libtorchtrt.so, which leaves
         # ENABLED_FEATURES.torch_tensorrt_runtime False, and the export near the
