@@ -3,7 +3,16 @@
 def _local_cuda_impl(ctx):
     cuda_home = ctx.os.environ.get("CUDA_HOME", "").strip()
     if not cuda_home:
-        cuda_home = ctx.attr.default_path
+        cuda_home = ctx.os.environ.get("CUDA_PATH", "").strip()
+    if not cuda_home:
+        nvcc = ctx.which("nvcc")
+        if nvcc:
+            cuda_home = str(nvcc.dirname.dirname)
+    if not cuda_home:
+        fail(
+            "Could not locate a CUDA toolkit. Set CUDA_HOME or CUDA_PATH to a " +
+            "conventional toolkit root, or put nvcc on PATH.",
+        )
 
     cuda_path = ctx.path(cuda_home)
     required_files = [
@@ -17,7 +26,7 @@ def _local_cuda_impl(ctx):
     ]
     if missing:
         fail(
-            "CUDA_HOME='{}' is not a conventional CUDA toolkit root; missing {}. ".format(
+            "CUDA toolkit root '{}' is not conventional; missing {}. ".format(
                 cuda_home,
                 ", ".join(missing),
             ) +
@@ -34,9 +43,6 @@ def _local_cuda_impl(ctx):
 
 local_cuda = repository_rule(
     implementation = _local_cuda_impl,
-    attrs = {
-        "default_path": attr.string(default = "/usr/local/cuda-13.2"),
-    },
     configure = True,
-    environ = ["CUDA_HOME"],
+    environ = ["CUDA_HOME", "CUDA_PATH", "PATH"],
 )
