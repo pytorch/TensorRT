@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import copy
 import inspect
 import logging
@@ -41,6 +42,7 @@ class EdgeExporter(DynamoExporter):  # type: ignore[misc]
         self.engines: dict[str, str] = {}
         self.runtime: EdgeRuntimeModule | None = None
         self.sample: dict[str, Any] = {}
+        self._dryrun_patches: contextlib.ExitStack | None = None
 
     def export(
         self,
@@ -53,11 +55,15 @@ class EdgeExporter(DynamoExporter):  # type: ignore[misc]
         elif not isinstance(config, EdgeConfig):
             raise TypeError(f"Expected EdgeConfig or dict, got {type(config)}")
 
+        # Family spec owns flatten / stitch. The exporter only loops
+        # over component names (vision, language, action, ...).
         spec = get_edge_spec(model, config.model_type)
         names = config.components or spec.components
         if not names:
             raise ValueError(f"{type(spec).__name__} has empty components")
 
+        # Caller payload (policy batch, tokenizer ids, ...) -> shared sample
+        # dict used by prepare and the stitched runtime.
         sample = spec.prepare_sample_inputs(model, sample_inputs, config)
 
         engine_dir = Path(config.engine_dir or "edge_engines")
@@ -66,19 +72,31 @@ class EdgeExporter(DynamoExporter):  # type: ignore[misc]
         engines: dict[str, str] = {}
         upstream: dict[str, Any] = {}
 
-        for name in names:
-            module = spec.wrap(name, model, sample, config)
-            bundle = spec.prepare(name, model, sample, upstream, config, module)
-            engines[name], outs = compile_component(
-                module,
-                bundle,
-                name=name,
-                engine_dir=engine_dir,
-                dryrun=config.dryrun,
-                trt_settings=config.trt_settings,
-            )
-            upstream.update(spec.capture_upstream(name, outs, sample, bundle))
+        def _compile_components() -> None:
+            for name in names:
+                bundle = spec.prepare(name, model, sample, upstream, config)
+                engines[name], outs = compile_component(
+                    bundle,
+                    name=name,
+                    engine_dir=engine_dir,
+                    dryrun=config.dryrun,
+                    trt_settings=config.trt_settings,
+                )
+                upstream.update(spec.capture_upstream(name, outs, sample, bundle))
 
+        # Family setattr. Dryrun leaves them installed so execute_engine still
+        # hits the patched original module after export() returns.
+        if config.dryrun:
+            if self._dryrun_patches is not None:
+                self._dryrun_patches.close()
+            self._dryrun_patches = contextlib.ExitStack()
+            self._dryrun_patches.enter_context(spec.apply_patches(model))
+            _compile_components()
+        else:
+            with spec.apply_patches(model):
+                _compile_components()
+
+        # One module whose forward is spec.run() over execute_engine calls.
         runtime = EdgeRuntimeModule(spec, engines)
         runtime_kwargs = _clone_export_kwargs(spec.runtime_kwargs(sample))
 
@@ -88,6 +106,7 @@ class EdgeExporter(DynamoExporter):  # type: ignore[misc]
 
         if config.skip_runtime_export:
             return runtime
+        # torch.export the stitched graph so the product is one ExportedProgram.
         return self._export_runtime(runtime, runtime_kwargs, config)
 
     def _export_runtime(
