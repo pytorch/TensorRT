@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=b261e5e5"></script>
+    <script src="../../../_static/documentation_options.js?v=c658da0c"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -516,6 +516,7 @@ document.write(`
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.debug._DebuggerConfig</span><span class="w"> </span><span class="kn">import</span> <span class="n">DebuggerConfig</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.debug._supports_debugger</span><span class="w"> </span><span class="kn">import</span> <span class="n">fn_supports_debugger</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.lowering</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">filter_decomposition_table</span><span class="p">,</span>
     <span class="n">get_decompositions</span><span class="p">,</span>
     <span class="n">post_lowering</span><span class="p">,</span>
     <span class="n">pre_export_lowering</span><span class="p">,</span>
@@ -871,11 +872,14 @@ document.write(`
     <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"Compilation Settings: </span><span class="si">%s</span><span class="se">\n</span><span class="s2">"</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
     <span class="n">exported_program</span> <span class="o">=</span> <span class="n">pre_export_lowering</span><span class="p">(</span><span class="n">exported_program</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
     <span class="n">exported_program</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">run_decompositions</span><span class="p">(</span>
-        <span class="n">get_decompositions</span><span class="p">(</span>
-            <span class="n">enable_experimental_decompositions</span><span class="p">,</span>
-            <span class="n">decompose_attention</span><span class="p">,</span>
-            <span class="n">use_distributed_mode_trace</span><span class="p">,</span>
-            <span class="n">use_fp32_acc</span><span class="o">=</span><span class="n">use_fp32_acc</span><span class="p">,</span>
+        <span class="n">filter_decomposition_table</span><span class="p">(</span>
+            <span class="n">get_decompositions</span><span class="p">(</span>
+                <span class="n">enable_experimental_decompositions</span><span class="p">,</span>
+                <span class="n">decompose_attention</span><span class="p">,</span>
+                <span class="n">use_distributed_mode_trace</span><span class="p">,</span>
+                <span class="n">use_fp32_acc</span><span class="o">=</span><span class="n">use_fp32_acc</span><span class="p">,</span>
+            <span class="p">),</span>
+            <span class="n">exported_program</span><span class="o">.</span><span class="n">graph_module</span><span class="p">,</span>
         <span class="p">)</span>
     <span class="p">)</span>
 
@@ -1280,11 +1284,14 @@ document.write(`
     <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"Compilation Settings: </span><span class="si">%s</span><span class="se">\n</span><span class="s2">"</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
     <span class="n">exported_program</span> <span class="o">=</span> <span class="n">pre_export_lowering</span><span class="p">(</span><span class="n">exported_program</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
     <span class="n">exported_program</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">run_decompositions</span><span class="p">(</span>
-        <span class="n">get_decompositions</span><span class="p">(</span>
-            <span class="n">enable_experimental_decompositions</span><span class="p">,</span>
-            <span class="n">decompose_attention</span><span class="p">,</span>
-            <span class="n">use_distributed_mode_trace</span><span class="p">,</span>
-            <span class="n">use_fp32_acc</span><span class="o">=</span><span class="n">use_fp32_acc</span><span class="p">,</span>
+        <span class="n">filter_decomposition_table</span><span class="p">(</span>
+            <span class="n">get_decompositions</span><span class="p">(</span>
+                <span class="n">enable_experimental_decompositions</span><span class="p">,</span>
+                <span class="n">decompose_attention</span><span class="p">,</span>
+                <span class="n">use_distributed_mode_trace</span><span class="p">,</span>
+                <span class="n">use_fp32_acc</span><span class="o">=</span><span class="n">use_fp32_acc</span><span class="p">,</span>
+            <span class="p">),</span>
+            <span class="n">exported_program</span><span class="o">.</span><span class="n">graph_module</span><span class="p">,</span>
         <span class="p">)</span>
     <span class="p">)</span>
 
@@ -1917,7 +1924,11 @@ document.write(`
                 <span class="nb">str</span><span class="p">(</span><span class="n">name</span><span class="p">),</span>
                 <span class="nb">str</span><span class="p">(</span><span class="n">submodule</span><span class="o">.</span><span class="n">graph</span><span class="p">),</span>
             <span class="p">)</span>
-            <span class="n">submodule</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">to_torch_device</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">device</span><span class="p">))</span>
+            <span class="c1"># Only undo the explicit compilation-time offload. Otherwise this</span>
+            <span class="c1"># would relocate parameters that the source graph intentionally</span>
+            <span class="c1"># kept on the host.</span>
+            <span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">offload_module_to_cpu</span><span class="p">:</span>
+                <span class="n">submodule</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">to_torch_device</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">device</span><span class="p">))</span>
             <span class="k">continue</span>
 
         <span class="k">if</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">submodule_node_dict</span><span class="p">:</span>
@@ -2585,11 +2596,14 @@ document.write(`
     <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"Compilation Settings: </span><span class="si">%s</span><span class="se">\n</span><span class="s2">"</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
     <span class="n">exported_program</span> <span class="o">=</span> <span class="n">pre_export_lowering</span><span class="p">(</span><span class="n">exported_program</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
     <span class="n">exported_program</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">run_decompositions</span><span class="p">(</span>
-        <span class="n">get_decompositions</span><span class="p">(</span>
-            <span class="n">enable_experimental_decompositions</span><span class="p">,</span>
-            <span class="n">decompose_attention</span><span class="p">,</span>
-            <span class="n">use_distributed_mode_trace</span><span class="p">,</span>
-            <span class="n">use_fp32_acc</span><span class="o">=</span><span class="n">use_fp32_acc</span><span class="p">,</span>
+        <span class="n">filter_decomposition_table</span><span class="p">(</span>
+            <span class="n">get_decompositions</span><span class="p">(</span>
+                <span class="n">enable_experimental_decompositions</span><span class="p">,</span>
+                <span class="n">decompose_attention</span><span class="p">,</span>
+                <span class="n">use_distributed_mode_trace</span><span class="p">,</span>
+                <span class="n">use_fp32_acc</span><span class="o">=</span><span class="n">use_fp32_acc</span><span class="p">,</span>
+            <span class="p">),</span>
+            <span class="n">exported_program</span><span class="o">.</span><span class="n">graph_module</span><span class="p">,</span>
         <span class="p">)</span>
     <span class="p">)</span>
 

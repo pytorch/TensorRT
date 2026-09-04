@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=b261e5e5"></script>
+    <script src="../../_static/documentation_options.js?v=c658da0c"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -675,16 +675,6 @@ document.write(`
                     <span class="s2">"max_shape"</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">"max_shape"</span><span class="p">]),</span>
                 <span class="p">}</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">shape_mode</span> <span class="o">=</span> <span class="n">Input</span><span class="o">.</span><span class="n">_ShapeMode</span><span class="o">.</span><span class="n">DYNAMIC</span>
-
-                <span class="c1"># Warn if min_shape has any 0 dimension (empty tensor) - TensorRT doesn't support this</span>
-                <span class="c1"># @apbose: Is this warning necessary?</span>
-                <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">dim</span> <span class="o">==</span> <span class="mi">0</span> <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s2">"min_shape"</span><span class="p">]):</span>
-                    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-                        <span class="sa">f</span><span class="s2">"min_shape contains a 0 dimension: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="s1">'min_shape'</span><span class="p">]</span><span class="si">}</span><span class="s2">. "</span>
-                        <span class="s2">"TensorRT does not support dynamic shapes with min dimension of 0 (empty tensors). "</span>
-                        <span class="s2">"TensorRT will internally clamp min dimensions to 1, which may cause runtime errors "</span>
-                        <span class="s2">"if you try to run inference with empty tensor inputs."</span>
-                    <span class="p">)</span>
 
                 <span class="c1"># Namedtuple shape API: field names encode per-axis dimension names.</span>
                 <span class="c1"># Convert to shared_dims so _tracer.py needs no changes — axes with the</span>
