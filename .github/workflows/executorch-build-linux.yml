@@ -79,13 +79,6 @@ jobs:
         export PATH="${RUNNER_TEMP}/bin:${PATH}"
         bazel --version
 
-        # Building the ExecuTorch runtime wheel compiles aoti_cuda_shims.  Some
-        # channels request pre-sm_61 architectures, but those shims use __dp4a,
-        # which nvcc does not declare for them.
-        TORCH_CUDA_ARCH_LIST="$(python .github/scripts/filter-executorch-cuda-arches.py "${TORCH_CUDA_ARCH_LIST:-}")"
-        export TORCH_CUDA_ARCH_LIST
-        echo "TORCH_CUDA_ARCH_LIST=${TORCH_CUDA_ARCH_LIST}"
-
         python -m pip install pyyaml "executorch==1.4.1"
         export TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION="$(python -c 'import importlib.metadata; print(importlib.metadata.version("torch-tensorrt"))')"
 
@@ -103,9 +96,16 @@ jobs:
         # setup.py already forwards BAZEL_ARGS, so raise the limit rather than
         # debugging blind.
         export BAZEL_ARGS="--experimental_ui_max_stdouterr_bytes=33554432"
+        # ExecuTorch's CUDA shims call __dp4a, which nvcc does not declare before
+        # sm_61, and the cu126 build environment asks for 5.0;6.0;... while the CUDA
+        # 13 ones start higher. Building the pinned ExecuTorch for those two
+        # architectures cannot work, so narrow the list to what it can compile.
+        TORCH_CUDA_ARCH_LIST="$(python .github/scripts/filter-executorch-cuda-arches.py "${TORCH_CUDA_ARCH_LIST:-}")"
+        export TORCH_CUDA_ARCH_LIST
+        echo "TORCH_CUDA_ARCH_LIST=${TORCH_CUDA_ARCH_LIST}"
+
         # Build the no-compile-for-users Python runtime wheel.
-        python -m pip wheel --no-build-isolation --no-deps --wheel-dir dist \
-          py/torch-tensorrt-executorch-runtime
+        python -m pip wheel --no-build-isolation --no-deps --wheel-dir dist py/torch-tensorrt-executorch-runtime
         # this is to build the libtorchtrt.tar.gz
         bazel build //:libtorchtrt --compilation_mode opt --config=linux
         # Run the ExecuTorch backend C++ unit tests, which are otherwise only
