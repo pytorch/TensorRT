@@ -79,8 +79,10 @@ struct EngineHandle {
   // from the shared per-device pool (kSharedActivationScratchKey).
   bool shared_scratch = false;
   // The activation scratch the engine itself reports needing, read at init when
-  // shared_scratch is set. execute() needs it to tell a failed per-call query,
-  // which TensorRT also reports as zero, from an engine that genuinely needs none.
+  // shared_scratch is set. It bounds every shape the engine accepts, so execute()
+  // substitutes it whenever the per-call query answers zero -- which TensorRT does
+  // for a failed query, for an engine that genuinely needs none, and for shapes
+  // that need none.
   size_t engine_scratch_bytes = 0;
   std::mutex mu;
   // Makes the skip-sync fast path safe to reuse: TensorRT forbids reconfiguring or

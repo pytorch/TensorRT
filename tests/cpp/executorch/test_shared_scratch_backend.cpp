@@ -10,8 +10,8 @@
 // option, and the pooled execute() path -- the kUSER_MANAGED context, the
 // updateDeviceMemorySizeForShapes/setDeviceMemoryV2 pair, the enqueue handoff
 // between two caller streams, the growth a larger engine forces on a pool a
-// smaller one already allocated, and two threads submitting against one pooled
-// buffer at once.
+// smaller one already allocated, the two cases that make the per-shape query
+// answer zero, and two threads submitting against one pooled buffer at once.
 //
 // The TensorRT engine is built here rather than loaded from a .pte so the target
 // carries no exported artifact, at the cost of a few seconds of builder time.
@@ -84,6 +84,17 @@ constexpr std::size_t kBytes = kElems * sizeof(float);
 // this file asks for the same size, which is why nothing else reaches it.
 constexpr int kBigRows = 4096;
 constexpr int kBigCols = 4096;
+
+// A dynamic-batch engine whose profile admits an empty batch. Binding one is a
+// valid call that needs no activation scratch, from an engine that needs some,
+// which is one of the three things a zero from updateDeviceMemorySizeForShapes
+// can mean. The dimensions are small because no test compares this engine's
+// memory against a figure; only whether each answer it gives is zero matters.
+constexpr int kDynRows = 64;
+constexpr int kDynCols = 64;
+constexpr int kDynMaxBatch = 128;
+// Inside the same profile and not empty, so one engine covers both answers.
+constexpr int kDynBatch = 4;
 
 // Engines loaded together in the memory test. Four is enough for the private
 // case to cost 4x the scratch and the pooled case 1x.
@@ -182,6 +193,26 @@ bool add_scratch_free_net(nvinfer1::INetworkDefinition& network, nvinfer1::ITens
   return true;
 }
 
+// Wraps a serialized engine in the delegate's blob wire format.
+std::vector<std::uint8_t> wrap_engine_plan(const nvinfer1::IHostMemory& plan) {
+  const std::string metadata =
+      R"({"io_bindings":[{"name":"input_0","is_input":true},{"name":"output_0","is_input":false}],)"
+      R"("hardware_compatible":false,"device_id":0})";
+  const auto metadata_offset = static_cast<std::uint32_t>(kHeaderSize);
+  const auto metadata_size = static_cast<std::uint32_t>(metadata.size());
+  const auto engine_offset = static_cast<std::uint32_t>(align_up(metadata_offset + metadata_size, kEngineAlignment));
+
+  std::vector<std::uint8_t> blob(static_cast<std::size_t>(engine_offset) + plan.size(), 0);
+  std::memcpy(blob.data(), kMagic, sizeof(kMagic));
+  write_field(blob, kMetadataOffsetField, metadata_offset);
+  write_field(blob, kMetadataSizeField, metadata_size);
+  write_field(blob, kEngineOffsetField, engine_offset);
+  write_field(blob, kEngineSizeField, static_cast<std::uint64_t>(plan.size()));
+  std::memcpy(blob.data() + metadata_offset, metadata.data(), metadata.size());
+  std::memcpy(blob.data() + engine_offset, plan.data(), plan.size());
+  return blob;
+}
+
 std::vector<std::uint8_t> build_engine_blob(bool needs_scratch, int rows = kRows, int cols = kCols) {
   static BuilderLogger logger;
 
@@ -218,28 +249,56 @@ std::vector<std::uint8_t> build_engine_blob(bool needs_scratch, int rows = kRows
   if (plan == nullptr) {
     return {};
   }
-
-  const std::string metadata =
-      R"({"io_bindings":[{"name":"input_0","is_input":true},{"name":"output_0","is_input":false}],)"
-      R"("hardware_compatible":false,"device_id":0})";
-  const auto metadata_offset = static_cast<std::uint32_t>(kHeaderSize);
-  const auto metadata_size = static_cast<std::uint32_t>(metadata.size());
-  const auto engine_offset = static_cast<std::uint32_t>(align_up(metadata_offset + metadata_size, kEngineAlignment));
-
-  std::vector<std::uint8_t> blob(static_cast<std::size_t>(engine_offset) + plan->size(), 0);
-  std::memcpy(blob.data(), kMagic, sizeof(kMagic));
-  write_field(blob, kMetadataOffsetField, metadata_offset);
-  write_field(blob, kMetadataSizeField, metadata_size);
-  write_field(blob, kEngineOffsetField, engine_offset);
-  write_field(blob, kEngineSizeField, static_cast<std::uint64_t>(plan->size()));
-  std::memcpy(blob.data() + metadata_offset, metadata.data(), metadata.size());
-  std::memcpy(blob.data() + engine_offset, plan->data(), plan->size());
-  return blob;
+  return wrap_engine_plan(*plan);
 }
 
-// The activation scratch one context of the shared engine needs, read the way
-// execute() reads it. Zero if the engine could not be measured.
-std::size_t measure_engine_scratch(const std::vector<std::uint8_t>& blob, int rows = kRows, int cols = kCols) {
+// The scratch-needing network again, over a leading dimension the caller chooses
+// per call, with an empty batch as the profile minimum.
+std::vector<std::uint8_t> build_dynamic_batch_engine_blob() {
+  static BuilderLogger logger;
+
+  TRTUniquePtr<nvinfer1::IBuilder> builder(nvinfer1::createInferBuilder(logger));
+  if (builder == nullptr) {
+    return {};
+  }
+  TRTUniquePtr<nvinfer1::INetworkDefinition> network(builder->createNetworkV2(0));
+  if (network == nullptr) {
+    return {};
+  }
+
+  nvinfer1::ITensor* input =
+      network->addInput("input_0", nvinfer1::DataType::kFLOAT, nvinfer1::Dims3{-1, kDynRows, kDynCols});
+  if (input == nullptr || !add_scratch_needing_net(*network, *input)) {
+    return {};
+  }
+
+  TRTUniquePtr<nvinfer1::IBuilderConfig> config(builder->createBuilderConfig());
+  if (config == nullptr) {
+    return {};
+  }
+  nvinfer1::IOptimizationProfile* profile = builder->createOptimizationProfile();
+  profile->setDimensions("input_0", nvinfer1::OptProfileSelector::kMIN, nvinfer1::Dims3{0, kDynRows, kDynCols});
+  profile->setDimensions("input_0", nvinfer1::OptProfileSelector::kOPT, nvinfer1::Dims3{kDynBatch, kDynRows, kDynCols});
+  profile->setDimensions(
+      "input_0", nvinfer1::OptProfileSelector::kMAX, nvinfer1::Dims3{kDynMaxBatch, kDynRows, kDynCols});
+  config->addOptimizationProfile(profile);
+
+  TRTUniquePtr<nvinfer1::IHostMemory> plan(builder->buildSerializedNetwork(*network, *config));
+  if (plan == nullptr) {
+    return {};
+  }
+  return wrap_engine_plan(*plan);
+}
+
+// The activation scratch one context of the shared engine needs for the given
+// shape, read the way execute() reads it. Zero if the engine could not be
+// measured, which is also what an empty batch answers, so a caller reading a zero
+// as meaningful has to rule the failure out by some other measurement.
+std::size_t measure_engine_scratch(
+    const std::vector<std::uint8_t>& blob,
+    int rows = kRows,
+    int cols = kCols,
+    int batch = 1) {
   static BuilderLogger logger;
   TensorRTBlobHeader header;
   if (!TensorRTBlobHeader::parse(blob.data(), blob.size(), header)) {
@@ -260,7 +319,7 @@ std::size_t measure_engine_scratch(const std::vector<std::uint8_t>& blob, int ro
   if (ctx == nullptr) {
     return 0;
   }
-  if (!ctx->setInputShape("input_0", nvinfer1::Dims3{1, rows, cols})) {
+  if (!ctx->setInputShape("input_0", nvinfer1::Dims3{batch, rows, cols})) {
     return 0;
   }
   return ctx->updateDeviceMemorySizeForShapes();
@@ -314,20 +373,29 @@ class LoadedEngine {
   }
 
   // Loads the blob through the backend, capturing whatever the shared-scratch
-  // option is set to at this moment. `rows`/`cols` must be the shape the blob was
-  // built for.
-  Error load(const std::vector<std::uint8_t>& blob, std::uint32_t seed, int rows = kRows, int cols = kCols) {
+  // option is set to at this moment. `batch`/`rows`/`cols` must be a shape the
+  // blob's profile admits; `batch` may be 0, which allocates nothing and leaves
+  // both device pointers null, a state an empty ExecuTorch tensor can arrive in.
+  Error load(
+      const std::vector<std::uint8_t>& blob,
+      std::uint32_t seed,
+      int rows = kRows,
+      int cols = kCols,
+      int batch = 1) {
+    batch_ = static_cast<SizesType>(batch);
     rows_ = static_cast<SizesType>(rows);
     cols_ = static_cast<SizesType>(cols);
     std::vector<float> host_in(elems());
     for (std::size_t i = 0; i < elems(); ++i) {
       host_in[i] = pattern(i, seed);
     }
-    if (cudaMalloc(&device_in_, bytes()) != cudaSuccess || cudaMalloc(&device_out_, bytes()) != cudaSuccess) {
-      return Error::MemoryAllocationFailed;
-    }
-    if (cudaMemcpy(device_in_, host_in.data(), bytes(), cudaMemcpyHostToDevice) != cudaSuccess) {
-      return Error::Internal;
+    if (bytes() > 0) {
+      if (cudaMalloc(&device_in_, bytes()) != cudaSuccess || cudaMalloc(&device_out_, bytes()) != cudaSuccess) {
+        return Error::MemoryAllocationFailed;
+      }
+      if (cudaMemcpy(device_in_, host_in.data(), bytes(), cudaMemcpyHostToDevice) != cudaSuccess) {
+        return Error::Internal;
+      }
     }
 
     arena_storage_.resize(kArenaBytes);
@@ -343,6 +411,9 @@ class LoadedEngine {
   }
 
   bool fill_output(float value) {
+    if (bytes() == 0) {
+      return true;
+    }
     const std::vector<float> host(elems(), value);
     return cudaMemcpy(device_out_, host.data(), bytes(), cudaMemcpyHostToDevice) == cudaSuccess;
   }
@@ -352,8 +423,8 @@ class LoadedEngine {
   Error run(cudaStream_t stream) {
     // Separate arrays: execute() resizes the output tensor to the shape TensorRT
     // inferred, which writes through whichever array that tensor was given.
-    SizesType in_sizes[3] = {1, rows_, cols_};
-    SizesType out_sizes[3] = {1, rows_, cols_};
+    SizesType in_sizes[3] = {batch_, rows_, cols_};
+    SizesType out_sizes[3] = {batch_, rows_, cols_};
     ::executorch::aten::TensorImpl in_impl(ScalarType::Float, 3, in_sizes, device_in_);
     ::executorch::aten::TensorImpl out_impl(ScalarType::Float, 3, out_sizes, device_out_);
     ::executorch::aten::Tensor in_tensor(&in_impl);
@@ -369,7 +440,7 @@ class LoadedEngine {
 
   std::vector<float> read_output() const {
     std::vector<float> host_out(elems());
-    if (cudaMemcpy(host_out.data(), device_out_, bytes(), cudaMemcpyDeviceToHost) != cudaSuccess) {
+    if (bytes() > 0 && cudaMemcpy(host_out.data(), device_out_, bytes(), cudaMemcpyDeviceToHost) != cudaSuccess) {
       host_out.clear();
     }
     return host_out;
@@ -380,7 +451,7 @@ class LoadedEngine {
   }
 
   std::size_t elems() const {
-    return static_cast<std::size_t>(rows_) * static_cast<std::size_t>(cols_);
+    return static_cast<std::size_t>(batch_) * static_cast<std::size_t>(rows_) * static_cast<std::size_t>(cols_);
   }
 
   std::size_t bytes() const {
@@ -398,6 +469,7 @@ class LoadedEngine {
   DelegateHandle* handle_ = nullptr;
   void* device_in_ = nullptr;
   void* device_out_ = nullptr;
+  SizesType batch_ = 1;
   SizesType rows_ = kRows;
   SizesType cols_ = kCols;
 };
@@ -437,13 +509,17 @@ class SharedScratchBackendTest : public ::testing::Test {
     blob_ = build_engine_blob(true);
     scratch_free_blob_ = build_engine_blob(false);
     big_blob_ = build_engine_blob(true, kBigRows, kBigCols);
-    if (blob_.empty() || scratch_free_blob_.empty() || big_blob_.empty()) {
+    dynamic_blob_ = build_dynamic_batch_engine_blob();
+    if (blob_.empty() || scratch_free_blob_.empty() || big_blob_.empty() || dynamic_blob_.empty()) {
       return;
     }
     scratch_bytes_ = measure_engine_scratch(blob_);
     big_scratch_bytes_ = measure_engine_scratch(big_blob_, kBigRows, kBigCols);
+    empty_batch_scratch_bytes_ = measure_engine_scratch(dynamic_blob_, kDynRows, kDynCols, 0);
+    dynamic_batch_scratch_bytes_ = measure_engine_scratch(dynamic_blob_, kDynRows, kDynCols, kDynBatch);
     engine_bytes_ = engine_scratch_requirement(blob_);
     scratch_free_engine_bytes_ = engine_scratch_requirement(scratch_free_blob_);
+    dynamic_engine_bytes_ = engine_scratch_requirement(dynamic_blob_);
   }
 
   void SetUp() override {
@@ -454,6 +530,7 @@ class SharedScratchBackendTest : public ::testing::Test {
     ASSERT_FALSE(blob_.empty()) << "TensorRT could not build the fixture engine";
     ASSERT_FALSE(scratch_free_blob_.empty()) << "TensorRT could not build the scratch-free fixture engine";
     ASSERT_FALSE(big_blob_.empty()) << "TensorRT could not build the larger fixture engine";
+    ASSERT_FALSE(dynamic_blob_.empty()) << "TensorRT could not build the dynamic-batch fixture engine";
     ASSERT_EQ(set_shared_scratch(backend_, false), Error::Ok);
   }
 
@@ -473,23 +550,35 @@ class SharedScratchBackendTest : public ::testing::Test {
     return big_blob_;
   }
 
+  const std::vector<std::uint8_t>& dynamic_blob() const {
+    return dynamic_blob_;
+  }
+
   TensorRTBackend backend_;
   static std::vector<std::uint8_t> blob_;
   static std::vector<std::uint8_t> scratch_free_blob_;
   static std::vector<std::uint8_t> big_blob_;
+  static std::vector<std::uint8_t> dynamic_blob_;
   static std::size_t scratch_bytes_;
   static std::size_t big_scratch_bytes_;
+  static std::size_t empty_batch_scratch_bytes_;
+  static std::size_t dynamic_batch_scratch_bytes_;
   static std::int64_t engine_bytes_;
   static std::int64_t scratch_free_engine_bytes_;
+  static std::int64_t dynamic_engine_bytes_;
 };
 
 std::vector<std::uint8_t> SharedScratchBackendTest::blob_;
 std::vector<std::uint8_t> SharedScratchBackendTest::scratch_free_blob_;
 std::vector<std::uint8_t> SharedScratchBackendTest::big_blob_;
+std::vector<std::uint8_t> SharedScratchBackendTest::dynamic_blob_;
 std::size_t SharedScratchBackendTest::scratch_bytes_ = 0;
 std::size_t SharedScratchBackendTest::big_scratch_bytes_ = 0;
+std::size_t SharedScratchBackendTest::empty_batch_scratch_bytes_ = 0;
+std::size_t SharedScratchBackendTest::dynamic_batch_scratch_bytes_ = 0;
 std::int64_t SharedScratchBackendTest::engine_bytes_ = -1;
 std::int64_t SharedScratchBackendTest::scratch_free_engine_bytes_ = -1;
+std::int64_t SharedScratchBackendTest::dynamic_engine_bytes_ = -1;
 
 // ---------------------------------------------------------------------------
 // set_option
@@ -769,16 +858,18 @@ TEST_F(SharedScratchBackendTest, ALargerEngineGrowsThePoolAndFreesTheBufferItRep
 // An engine that needs no activation scratch
 // ---------------------------------------------------------------------------
 
-// updateDeviceMemorySizeForShapes() answers a failed query and an engine that
-// needs nothing identically, so execute() separates them on the engine's own
-// requirement. Everything below rests on that requirement telling the two
-// fixture networks apart, which is why it is asserted on its own first.
+// A zero from updateDeviceMemorySizeForShapes() does not say which of its causes
+// it is, so execute() substitutes the engine's own requirement and installs a
+// buffer unless that is zero too. Everything below rests on that requirement
+// telling the two fixture networks apart, which is why it is asserted on its own
+// first.
 TEST_F(SharedScratchBackendTest, TheEngineLevelRequirementSeparatesTheTwoFixtureEngines) {
   EXPECT_EQ(scratch_free_engine_bytes_, 0)
       << "the pointwise chain reports " << scratch_free_engine_bytes_
       << " bytes of activation scratch, so it no longer covers the scratch-free case";
-  EXPECT_GT(engine_bytes_, 0) << "the two-softmax network reports no activation scratch, so it no longer covers the "
-                                 "case a failed query has to be told apart from";
+  EXPECT_GT(engine_bytes_, 0) << "the two-softmax network reports no activation scratch of its own, so it no longer "
+                                 "covers the case where the engine's own requirement stands in for a zero from the "
+                                 "per-shape query";
 }
 
 TEST_F(SharedScratchBackendTest, EachEngineRecordsItsOwnActivationScratchRequirement) {
@@ -829,6 +920,73 @@ TEST_F(SharedScratchBackendTest, AnEngineNeedingNoActivationScratchRunsWithThePo
   }
   EXPECT_TRUE(varies) << "the reference output is constant, so the comparison proves nothing";
   EXPECT_EQ(std::memcmp(expected.data(), actual.data(), kBytes), 0);
+}
+
+// ---------------------------------------------------------------------------
+// An empty input to an engine that does need activation scratch
+// ---------------------------------------------------------------------------
+
+// An empty batch inside the profile is a valid call, and the per-shape query
+// answers it with the same zero it gives for a failed query, from an engine whose
+// own requirement is not zero. The three assertions at the top are what make this
+// the empty-input case rather than either of the others: an engine that needs
+// nothing would fail the second, and a measurement that could not read the engine
+// at all would fail the third.
+TEST_F(SharedScratchBackendTest, AnEmptyInputRunsWithThePoolEnabled) {
+  ASSERT_EQ(empty_batch_scratch_bytes_, 0u)
+      << "an empty batch reports " << empty_batch_scratch_bytes_
+      << " bytes of activation scratch, so this test no longer covers a call whose per-shape query answers zero";
+  ASSERT_GT(dynamic_engine_bytes_, 0)
+      << "the dynamic fixture engine reports no activation scratch of its own, so the zero above is the "
+         "scratch-free case rather than the empty-input one";
+  ASSERT_GT(dynamic_batch_scratch_bytes_, 0u) << "the same engine reports no activation scratch at batch " << kDynBatch
+                                              << " either, so the zero above says nothing about the batch being empty";
+
+  cudaStream_t stream = nullptr;
+  ASSERT_EQ(cudaStreamCreate(&stream), cudaSuccess);
+
+  // The non-empty reference is taken with private scratch, so the pooled run
+  // below has something to be compared against that the pool did not produce.
+  LoadedEngine priv;
+  ASSERT_EQ(priv.load(dynamic_blob(), 19, kDynRows, kDynCols, kDynBatch), Error::Ok);
+  ASSERT_FALSE(priv.handle()->shared_scratch);
+  ASSERT_TRUE(priv.fill_output(kSentinel));
+  ASSERT_EQ(priv.run(stream), Error::Ok);
+  ASSERT_EQ(cudaStreamSynchronize(stream), cudaSuccess);
+  const std::vector<float> expected = priv.read_output();
+
+  ASSERT_EQ(set_shared_scratch(backend_, true), Error::Ok);
+  LoadedEngine empty;
+  ASSERT_EQ(empty.load(dynamic_blob(), 19, kDynRows, kDynCols, 0), Error::Ok);
+  ASSERT_TRUE(empty.handle()->shared_scratch);
+  EXPECT_EQ(empty.run(stream), Error::Ok) << "the pool rejected an empty input to an engine that needs scratch";
+  EXPECT_EQ(cudaStreamSynchronize(stream), cudaSuccess);
+
+  // The same engine on a shape that does need scratch, after the empty call, so a
+  // fallback that installed an unusable buffer is not left untested.
+  LoadedEngine pooled;
+  ASSERT_EQ(pooled.load(dynamic_blob(), 19, kDynRows, kDynCols, kDynBatch), Error::Ok);
+  ASSERT_TRUE(pooled.handle()->shared_scratch);
+  ASSERT_TRUE(pooled.fill_output(kSentinel));
+  EXPECT_EQ(pooled.run(stream), Error::Ok);
+  ASSERT_EQ(cudaStreamSynchronize(stream), cudaSuccess);
+  const std::vector<float> actual = pooled.read_output();
+
+  ASSERT_EQ(cudaStreamDestroy(stream), cudaSuccess);
+
+  const std::size_t dyn_elems =
+      static_cast<std::size_t>(kDynBatch) * static_cast<std::size_t>(kDynRows) * static_cast<std::size_t>(kDynCols);
+  ASSERT_EQ(expected.size(), dyn_elems);
+  ASSERT_EQ(actual.size(), dyn_elems);
+  // Without these two the comparison would be satisfied by an execute() that
+  // wrote nothing, and by a network whose output does not depend on its input.
+  EXPECT_NE(expected[0], kSentinel) << "the reference output is the sentinel, so a skipped enqueue would pass";
+  bool varies = false;
+  for (std::size_t i = 1; i < dyn_elems && !varies; ++i) {
+    varies = expected[i] != expected[0];
+  }
+  EXPECT_TRUE(varies) << "the reference output is constant, so the comparison proves nothing";
+  EXPECT_EQ(std::memcmp(expected.data(), actual.data(), dyn_elems * sizeof(float)), 0);
 }
 
 // ---------------------------------------------------------------------------

@@ -334,9 +334,8 @@ class SharedScratchClaim {
 // Returns with `claim` holding the device's lock: the caller must submit its
 // enqueue, call mark_shared_scratch_in_flight, and only then release the claim.
 //
-// Must be called with `device_id` already current: cudaEventCreateWithFlags,
-// cudaMalloc and cudaFree all act on the *current* device and nothing in here
-// sets it.
+// Must be called with `device_id` already current: cudaEventCreateWithFlags and
+// cudaMalloc both act on the *current* device and nothing in here sets it.
 Error get_or_grow_shared_scratch(
     SharedScratchClaim& claim,
     int device_id,
@@ -348,7 +347,11 @@ Error get_or_grow_shared_scratch(
 
   const SharedScratchHandoff handoff = shared_scratch_claim_event(dev, []() -> cudaEvent_t {
     cudaEvent_t event = nullptr;
-    if (cudaEventCreateWithFlags(&event, cudaEventDisableTiming) != cudaSuccess) {
+    // Blocking-sync so the host yields instead of busy-spinning. The one host wait
+    // on this event -- the one below, before a displaced buffer is freed -- runs
+    // with the device's lock held, so it already holds off every other pooled
+    // engine on the device; spinning would burn a core for that whole time as well.
+    if (cudaEventCreateWithFlags(&event, cudaEventDisableTiming | cudaEventBlockingSync) != cudaSuccess) {
       return nullptr;
     }
     return event;
@@ -1170,13 +1173,14 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // and moves it. A kSTATIC context owns its private scratch, so setDeviceMemoryV2
   // must not be called on one.
   //
-  // A reported zero is ambiguous: TensorRT answers a failed query and an engine
-  // that genuinely needs no scratch the same way, and the engine's own
-  // requirement is what separates them. An engine that needs none is given no
-  // buffer, so it has nothing to claim and nothing for the next claimant to order
-  // against. A failed query carried on would instead leave the context enqueueing
-  // against whatever buffer it last held, because setDeviceMemoryV2(nullptr, 0)
-  // is rejected and returns nothing to test.
+  // A reported zero has more than one cause, and nothing here tells them apart: a
+  // failed query, an engine that needs no scratch under any shape, and a call
+  // whose bound shapes need none -- an empty input inside a profile that admits
+  // one. The engine's own requirement stands in for all three. Zero there means
+  // no shape needs scratch, so no buffer is installed and the context has nothing
+  // to claim; anything else is an upper bound over every shape the engine
+  // accepts, which is a valid buffer for a call whose own requirement could not
+  // be read and an over-sized one for a call that needs less.
   //
   // The claim holds the device's pool lock from here through the record of the
   // enqueue below; see SharedScratchClaim for why it spans that far. Every return
@@ -1185,7 +1189,14 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   SharedScratchClaim scratch_claim;
   bool scratch_from_pool = false;
   if (engine->shared_scratch) {
-    const size_t need = ctx->updateDeviceMemorySizeForShapes();
+    size_t need = ctx->updateDeviceMemorySizeForShapes();
+    if (need == 0 && engine->engine_scratch_bytes > 0) {
+      ET_LOG(
+          Debug,
+          "TensorRTBackend::execute: updateDeviceMemorySizeForShapes returned 0; using the engine-wide activation scratch requirement of %zu bytes instead",
+          engine->engine_scratch_bytes);
+      need = engine->engine_scratch_bytes;
+    }
     if (need > 0) {
       void* pool = nullptr;
       size_t pool_size = 0;
@@ -1196,12 +1207,6 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       }
       scratch_from_pool = true;
       ctx->setDeviceMemoryV2(pool, static_cast<int64_t>(pool_size));
-    } else if (engine->engine_scratch_bytes > 0) {
-      ET_LOG(
-          Error,
-          "TensorRTBackend::execute: updateDeviceMemorySizeForShapes returned 0, but the engine needs %zu bytes of activation scratch",
-          engine->engine_scratch_bytes);
-      return Error::InvalidState;
     }
   }
 

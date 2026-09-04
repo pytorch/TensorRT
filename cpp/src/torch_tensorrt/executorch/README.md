@@ -92,7 +92,7 @@ the removed `CudaStreamGuard`:
   through the enqueue and the completion event recorded on it, so two
   `execute()` calls on one device are serialized at submission and the second's
   stream waits on the first's enqueue. They may run on one stream or on two, and
-  they may be submitted concurrently from two threads — but they will not run
+  they may be submitted concurrently from two threads, but they will not run
   concurrently on the device, so the pool costs the parallelism between them.
   Contexts created while the option was off keep their own scratch and are
   unaffected.
@@ -120,7 +120,7 @@ the removed `CudaStreamGuard`:
 A TensorRT execution context allocates its own activation scratch and holds it
 for as long as the context lives, so a model lowered to N single-layer engines
 pays N copies and can run out of device memory on the layer count alone. The
-`use_shared_activation_scratch` backend option — a boolean, off by default —
+`use_shared_activation_scratch` backend option (a boolean, off by default)
 instead backs every context on a device from one buffer, grown to the largest
 requirement any call on that device has asked for:
 
@@ -129,12 +129,17 @@ requirement any call on that device has asked for:
 
 executorch::runtime::BackendOptions<1> options;
 options.set_option("use_shared_activation_scratch", true);
-executorch::runtime::set_option("TensorRTBackend", options.view());
+const executorch::runtime::Error err =
+    executorch::runtime::set_option("TensorRTBackend", options.view());
+if (err != executorch::runtime::Error::Ok) {
+  return err; // nothing was set: every context still allocates its own scratch
+}
 ```
 
-Check what `executorch::runtime::set_option` returns: `Error::NotFound` means no
-backend is registered under that name, which is what a binary that has not linked
-the backend archive gets.
+`Error::NotFound` means no backend is registered under that name, which is what a
+binary that has not linked the backend archive gets. Nothing forces the check: the
+free `executorch::runtime::set_option` is not `ET_NODISCARD`, so dropping its
+return compiles.
 
 N per-engine copies collapse to one, so the reclaimed memory is the sum of the N
 requirements less the largest of them. Set the option before loading the methods
@@ -160,7 +165,7 @@ runtime does changes it.
 
 How often the pool grows follows from that. The backend asks afresh on every
 `execute()`, after the input shapes are bound, so an engine whose answer does not
-vary with the bound shapes grows the pool at most once, on its first run — for a
+vary with the bound shapes grows the pool at most once, on its first run. For a
 program built only from such engines, running the largest one first leaves the
 pool with a single allocation. An engine whose answer does vary can grow it on any
 call whose shapes need more than every call before them, so with one of those in
