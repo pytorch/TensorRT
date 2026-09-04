@@ -139,7 +139,7 @@ jobs:
       package-name: torch_tensorrt_executorch_runtime
       build-platform: python-build-package
       build-command: >-
-        bash -c 'python -m pip install pyyaml --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" "executorch==1.5.0.dev20260902" && python -m pip wheel --no-build-isolation --no-deps --wheel-dir dist py/torch-tensorrt-executorch-runtime'
+        bash -c 'python -m pip install pyyaml --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" "executorch==1.5.0.dev20260904" && python -m pip wheel --no-build-isolation --no-deps --wheel-dir dist py/torch-tensorrt-executorch-runtime'
       artifact-name-prefix: torch-tensorrt-executorch-runtime
       trigger-event: ${{ github.event_name }}
       is-release-wheel: true
