@@ -154,6 +154,7 @@ _PIN_SITES = (
     ".github/workflows/executorch-build-linux.yml",
     ".github/workflows/executorch-test-linux.yml",
     ".github/workflows/release-linux-x86_64.yml",
+    ".github/workflows/release-linux-aarch64.yml",
     "MODULE.bazel",
     "docker/MODULE.bazel.docker",
     "docker/MODULE.bazel.ngc",
