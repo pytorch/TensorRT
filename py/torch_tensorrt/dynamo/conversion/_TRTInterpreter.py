@@ -751,6 +751,48 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         layer.name = f"Cast output {output_name} from {output.dtype} to {output_dtype}"
         return layer.get_output(0)
 
+    def _scalar_output_positions(self) -> Set[int]:
+        """Positions in the FX output node whose value is a scalar, not a tensor.
+
+        These are exactly the positions ``extract_symbolic_shape_expressions``
+        records with ``is_scalar``, so the two stay in step.
+        """
+        if self._cur_node is None:
+            return set()
+
+        fx_outputs = self._cur_node.args[0]
+        if not isinstance(fx_outputs, (tuple, list)):
+            fx_outputs = (fx_outputs,)
+
+        positions = set()
+        for i, fx_output in enumerate(fx_outputs):
+            val = (
+                fx_output.meta.get("val")
+                if isinstance(fx_output, torch.fx.Node)
+                else fx_output
+            )
+            if isinstance(val, (torch.SymInt, torch.SymFloat, int, float, bool)):
+                positions.add(i)
+        return positions
+
+    def _reshape_output_to_scalar(
+        self, output: trt.ITensor, output_name: str
+    ) -> trt.ITensor:
+        if len(output.shape) == 0:
+            return output
+
+        if tuple(output.shape) != (1,):
+            _LOGGER.warning(
+                f"Output {output_name} is a scalar in the graph but the network "
+                f"produced shape {tuple(output.shape)}, leaving its rank alone."
+            )
+            return output
+
+        layer = self.ctx.net.add_shuffle(output)
+        layer.reshape_dims = ()
+        layer.name = f"Reshape output {output_name} to a scalar"
+        return layer.get_output(0)
+
     def output(self, target: str, args: Any, kwargs: Any) -> List[Any]:
         assert len(args) == 1
         if isinstance(args[0], tuple):
@@ -798,6 +840,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             raise RuntimeError(
                 f"Specified output dtypes ({len(self.output_dtypes)}) differ from number of outputs ({len(outputs)})"
             )
+
+        scalar_output_positions = self._scalar_output_positions()
 
         marked_outputs_ids = []
         for i, output in enumerate(outputs):
@@ -854,6 +898,15 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                     output_dtype.to(trt.DataType, use_default=True),
                     name,
                 )
+
+            # TensorRT has no scalar type, so a converter emits a graph scalar as
+            # a rank-1 tensor of length 1. The engine's shape metadata is read off
+            # the FX graph, where the value is rank 0, so reshape the output back
+            # to rank 0 or the meta kernel and the engine report different ranks
+            # for the same binding. Skipped for aliased outputs for the same
+            # reason as the cast above.
+            if alias_info is None and i in scalar_output_positions:
+                output = self._reshape_output_to_scalar(output, name)
 
             output.name = name
             outputs = outputs[:i] + (output,) + outputs[i + 1 :]
