@@ -55,7 +55,6 @@ jobs:
       test-infra-ref: ${{ inputs.test-infra-ref }}
       build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: packaging/pre_build_script.sh
-      additional-artifact: torch-tensorrt-executorch-runtime
       script: |
         set -euo pipefail
         mkdir -p "${RUNNER_TEMP}/bin"
@@ -65,6 +64,19 @@ jobs:
         export PATH="${RUNNER_TEMP}/bin:${PATH}"
 
         python -m pip install pyyaml "executorch==1.4.1"
+        # The standard wheel build packages the matching runtime wheel in its
+        # artifact alongside torch_tensorrt*.whl; install it after the shared
+        # core-wheel installer has selected the matrix-matched core wheel.
+        shopt -s nullglob
+        runtime_wheels=(/opt/torch-tensorrt-builds/torch_tensorrt_executorch_runtime*.whl)
+        echo "Downloaded wheel artifact contents:"
+        find /opt/torch-tensorrt-builds -maxdepth 1 -type f -name '*.whl' -printf '  %f (%s bytes)\n' | sort
+        if [[ ${#runtime_wheels[@]} -ne 1 ]]; then
+          echo "::error::Expected exactly one ExecuTorch runtime wheel in the standard artifact; found ${#runtime_wheels[@]}" >&2
+          exit 1
+        fi
+        echo "Installing ExecuTorch runtime wheel: ${runtime_wheels[0]}"
+        python -m pip install --no-deps "${runtime_wheels[0]}"
         # Run the check directly so its exit status is the step's exit status.
         # Wrapping it in `gdb --batch` reports gdb's own status, which is 0
         # whatever the program does, so a SIGSEGV here was passing.
@@ -88,6 +100,25 @@ jobs:
         trt_tier_executorch
 
         bazel build //:libtorchtrt --compilation_mode opt --config=linux
+        # Execute the delegate C++ unit tests as well as building the Python
+        # examples below. Bazel's cc_import provides unversioned CUDA/TensorRT
+        # libraries, while the loader resolves versioned sonames, so expose the
+        # directories containing those sonames to the test process.
+        bazel_external="$(bazel info output_base)/external"
+        for _soname in libnvinfer.so libcudart.so; do
+          _dir="$(
+            find -L "${bazel_external}" -path "*/lib*/${_soname}.*" -printf '%h\n' 2>/dev/null |
+              sort -u | head -n1
+          )"
+          if [[ -z "${_dir}" ]]; then
+            echo "Could not locate a versioned ${_soname} under ${bazel_external}" >&2
+            exit 1
+          fi
+          export LD_LIBRARY_PATH="${_dir}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+        done
+        bazel test //tests/cpp/executorch:executorch_backend_tests \
+          --compilation_mode opt --config=linux --test_output=errors \
+          --test_env=LD_LIBRARY_PATH
         executorch_cmake_location="$(bazel query @executorch//:executorch/CMakeLists.txt --output=location)"
         export EXECUTORCH_SOURCE_DIR="$(dirname "${executorch_cmake_location%%:*}")"
         export EXECUTORCH_ROOT="${EXECUTORCH_SOURCE_DIR}"

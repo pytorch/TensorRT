@@ -126,35 +126,7 @@ jobs:
       trigger-event: ${{ github.event_name }}
       is-release-wheel: true
       architecture: "aarch64"
-
-  release-executorch-runtime-wheel-artifacts:
-    name: Release aarch64 torch-tensorrt-executorch-runtime wheel artifacts
-    needs: [generate-release-wheel-matrix]
-    uses: ./.github/workflows/build_linux.yml
-    with:
-      repository: pytorch/tensorrt
-      ref: ""
-      test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
-      build-matrix: ${{ needs.generate-release-wheel-matrix.outputs.matrix }}
-      pre-script: packaging/pre_build_script.sh
-      package-name: torch_tensorrt_executorch_runtime
-      build-platform: python-build-package
-      build-command: |
-        bash -c '
-          set -euo pipefail
-          python -m pip install pyyaml "executorch==1.4.1"
-          TORCH_CUDA_ARCH_LIST="$(python .github/scripts/filter-executorch-cuda-arches.py "${TORCH_CUDA_ARCH_LIST:-}")"
-          export TORCH_CUDA_ARCH_LIST
-          echo "TORCH_CUDA_ARCH_LIST=${TORCH_CUDA_ARCH_LIST}"
-          python -m pip wheel --no-build-isolation --no-deps --wheel-dir dist \
-            py/torch-tensorrt-executorch-runtime
-        '
-      artifact-name-prefix: torch-tensorrt-executorch-runtime
-      trigger-event: ${{ github.event_name }}
-      is-release-wheel: true
-      run-smoke-test: false
-      architecture: "aarch64"
+      build-executorch-runtime: true
 
 concurrency:
   group: ${{ github.workflow }}-aarch64-release-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}

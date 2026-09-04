@@ -20,7 +20,24 @@ REPO_ROOT = HERE.parents[1]
 BAZEL_TARGET = "//py/torch-tensorrt-executorch-runtime/native:delegate_native"
 BUILD_NONCE = os.getenv("TORCH_TENSORRT_EXECUTORCH_BUILD_NONCE", uuid.uuid4().hex)
 
-RUNTIME_VERSION = (HERE / "version.txt").read_text().strip()
+
+def get_runtime_version() -> str:
+    """Match the primary wheel's local-version convention with this wheel's base."""
+    if version := os.getenv("TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION"):
+        return version
+
+    base_version = (HERE / "version.txt").read_text().strip()
+    try:
+        revision = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"], cwd=REPO_ROOT, text=True
+        ).strip()
+    except (OSError, subprocess.CalledProcessError):
+        print("WARNING: Could not get git revision short hash, using default one")
+        revision = "0000000"
+    return f"{base_version}.dev0+{revision}"
+
+
+RUNTIME_VERSION = get_runtime_version()
 
 TORCH_REQUIREMENT = "torch>=2.15.0.dev0,<2.16.0"
 EXECUTORCH_REQUIREMENT = "executorch==1.4.1"
@@ -68,6 +85,15 @@ class BazelBuild(build_ext):
             f"--action_env=PYTHON_BIN_PATH={sys.executable}",
             f"--action_env=TORCH_TENSORRT_EXECUTORCH_BUILD_NONCE={BUILD_NONCE}",
         ]
+        # Bazel actions run with a restricted environment.  In particular,
+        # rules_foreign_cc's CMake invocation does not inherit this process's
+        # TORCH_CUDA_ARCH_LIST unless it is made an action environment value.
+        # Without it, ExecuTorch's CMake falls back to its common architecture
+        # list (including compute_50), which CUDA 13 rejects.
+        cuda_arch_list = os.getenv("TORCH_CUDA_ARCH_LIST")
+        if cuda_arch_list:
+            print(f"Forwarding TORCH_CUDA_ARCH_LIST to Bazel actions: {cuda_arch_list}")
+            command.append(f"--action_env=TORCH_CUDA_ARCH_LIST={cuda_arch_list}")
         dist_dir_arch = (
             "aarch64-linux-gnu"
             if platform.machine() in {"aarch64", "arm64"}
