@@ -407,10 +407,6 @@ jobs:
           # pinned torch/TensorRT packages.
           ${CONDA_RUN} python -m pip install --no-deps dist/torch_tensorrt*.whl
           ${CONDA_RUN} python -m pip install pyyaml "executorch==1.4.1"
-          export TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION="$(
-            ${CONDA_RUN} python -c 'import importlib.metadata; print(importlib.metadata.version("torch-tensorrt"))'
-          )"
-          echo "TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION=${TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION}"
           TORCH_CUDA_ARCH_LIST="$(${CONDA_RUN} python .github/scripts/filter-executorch-cuda-arches.py "${TORCH_CUDA_ARCH_LIST:-}")"
           export TORCH_CUDA_ARCH_LIST
           echo "TORCH_CUDA_ARCH_LIST=${TORCH_CUDA_ARCH_LIST}"
