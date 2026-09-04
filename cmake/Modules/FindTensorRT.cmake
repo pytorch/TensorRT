@@ -19,15 +19,19 @@
 #
 set(_TensorRT_SEARCHES)
 
+if(NOT TensorRT_ROOT AND DEFINED ENV{TORCHTRT_TENSORRT_ROOT})
+  set(TensorRT_ROOT "$ENV{TORCHTRT_TENSORRT_ROOT}")
+endif()
+
 if(TensorRT_ROOT)
-  set(_TensorRT_SEARCH_ROOT PATHS ${TensorRT_ROOT} NO_DEFAULT_PATH)
+  set(_TensorRT_SEARCH_ROOT PATHS "${TensorRT_ROOT}" NO_DEFAULT_PATH)
   list(APPEND _TensorRT_SEARCHES _TensorRT_SEARCH_ROOT)
 endif()
 
-# appends some common paths
-set(_TensorRT_SEARCH_NORMAL
-  PATHS "/usr"
-)
+# An empty option set makes find_path/find_library use CMake's standard system
+# prefixes. Callers can add non-system installations through TensorRT_ROOT or
+# the shared TORCHTRT_TENSORRT_ROOT environment variable above.
+set(_TensorRT_SEARCH_NORMAL)
 list(APPEND _TensorRT_SEARCHES _TensorRT_SEARCH_NORMAL)
 
 if(WIN32)
