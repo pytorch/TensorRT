@@ -107,6 +107,8 @@ def test_public_api_symbols_present():
 _REPO_ROOT = Path(__file__).resolve().parents[4]
 _SETUP_PY = _REPO_ROOT / "setup.py"
 _RUNTIME_SETUP_PY = _REPO_ROOT / "py/torch-tensorrt-executorch-runtime/setup.py"
+_TENSORRT_CMAKE_FINDER = _REPO_ROOT / "cmake/Modules/FindTensorRT.cmake"
+_LOCAL_CUDA_RULE = _REPO_ROOT / "toolchains/local_cuda.bzl"
 
 
 @pytest.mark.unit
@@ -323,6 +325,20 @@ def test_driveos_packaging_requires_tensorrt_10_16():
 def test_driveos_packaging_selects_driveos_bazel_config():
     source = ast.unparse(_function_def(_setup_tree(), "build_libtorchtrt_cxx11_abi"))
     assert 'cmd.append("--config=driveos")' in source
+
+
+@pytest.mark.unit
+def test_driveos_sdk_discovery_has_no_absolute_path_dependency():
+    cuda_rule = _LOCAL_CUDA_RULE.read_text()
+    assert 'ctx.os.environ.get("CUDA_HOME"' in cuda_rule
+    assert 'ctx.os.environ.get("CUDA_PATH"' in cuda_rule
+    assert 'ctx.which("nvcc")' in cuda_rule
+    assert "/usr/local/cuda" not in cuda_rule
+
+    tensorrt_finder = _TENSORRT_CMAKE_FINDER.read_text()
+    assert "ENV{TORCHTRT_TENSORRT_ROOT}" in tensorrt_finder
+    assert "${CMAKE_LIBRARY_ARCHITECTURE}" in tensorrt_finder
+    assert 'PATHS "/usr"' not in tensorrt_finder
 
 
 @pytest.mark.unit
