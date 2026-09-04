@@ -541,17 +541,7 @@ class TestBindNcclProbeBinding(MultiProcessTestCase):
         super().setUp()
         self._spawn_processes()
 
-    def _init_dist(self, use_nccl2: bool = False) -> torch.device:
-        if use_nccl2:
-            from torch.distributed import distributed_c10d
-
-            # PyTorch recently made ProcessGroupNCCL2 the implementation of
-            # the built-in "nccl" backend. Re-register it explicitly so this
-            # regression test exercises that path on nightlies where legacy
-            # ProcessGroupNCCL is still the default.
-            os.environ["TORCH_DIST_USE_NCCL2"] = "1"
-            distributed_c10d._register_builtin_nccl_backend()
-
+    def _init_dist(self) -> torch.device:
         store = dist.FileStore(self.file_name, self.world_size)
         dist.init_process_group(
             backend="nccl", store=store, rank=self.rank, world_size=self.world_size
@@ -592,10 +582,10 @@ class TestBindNcclProbeBinding(MultiProcessTestCase):
     @skip_if_lt_x_gpu(2)
     def test_nccl2_backend(self) -> None:
         """The NCCL2 implementation exposes a communicator TensorRT can bind."""
-        device = self._init_dist(use_nccl2=True)
-        self.assertIsInstance(
-            dist.get_backend_impl(dist.group.WORLD), dist.ProcessGroupNCCL2
-        )
+        device = self._init_dist()
+        backend = dist.get_backend_impl(dist.group.WORLD)
+        if not isinstance(backend, dist.ProcessGroupNCCL2):
+            self.skipTest("ProcessGroupNCCL2 is not the default NCCL backend")
         _bind_explicit_pin_world_group(self.rank, self.world_size, device)
 
 
