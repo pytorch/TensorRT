@@ -53,8 +53,8 @@ local_torch = use_repo_rule("//toolchains:local_torch.bzl", "local_torch")
 new_git_repository(
     name = "executorch",
     build_file = "@//third_party/executorch:BUILD",
-    # executorch==1.5.0.dev20260902
-    commit = "5afeaa8130f68f2afa800e0743d4a73aec79bf15",
+    # executorch==1.5.0.dev20260904
+    commit = "9379a885af0544c2ae87bb19b341c1c2b58d80c9",
     patch_cmds = [
         "find . -mindepth 2 \\( -name BUILD -o -name BUILD.bazel \\) -delete",
         "mkdir executorch && find . -mindepth 1 -maxdepth 1 ! -name executorch ! -name BUILD ! -name BUILD.bazel ! -name REPO.bazel -exec cp -a {} executorch/ \\;",
