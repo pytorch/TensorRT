@@ -17,6 +17,7 @@ from .conftest import (
     SIN_COS_SRC,
     register_once,
     skip_no_cuda,
+    skip_no_nvrtc,
     skip_no_qdp,
 )
 
@@ -125,14 +126,15 @@ def _register_relu_flat():
 
 @skip_no_cuda
 @skip_no_qdp
+@skip_no_nvrtc
 class TestFlat:
     def test_eager_any_rank(self):
-        register_once(_register_relu_flat)
+        register_once("ttk_kp::relu_flat", _register_relu_flat)
         x = torch.randn(2, 3, 5, 7, device="cuda")
         assert torch.allclose(torch.ops.ttk_kp.relu_flat(x), torch.relu(x), atol=1e-5)
 
     def test_trt_compile(self):
-        register_once(_register_relu_flat)
+        register_once("ttk_kp::relu_flat", _register_relu_flat)
 
         class M(torch.nn.Module):
             def forward(self, x):
@@ -165,14 +167,15 @@ def _register_relu_nd():
 
 @skip_no_cuda
 @skip_no_qdp
+@skip_no_nvrtc
 class TestND:
     def test_eager_2d(self):
-        register_once(_register_relu_nd)
+        register_once("ttk_kp::relu_nd", _register_relu_nd)
         x = torch.randn(33, 47, device="cuda")
         assert torch.allclose(torch.ops.ttk_kp.relu_nd(x), torch.relu(x), atol=1e-5)
 
     def test_trt_compile(self):
-        register_once(_register_relu_nd)
+        register_once("ttk_kp::relu_nd", _register_relu_nd)
 
         class M(torch.nn.Module):
             def forward(self, x):
@@ -232,9 +235,10 @@ def _register_row_sum(op_name: str = "ttk_kp::row_sum", *, keepdim: bool = False
 
 @skip_no_cuda
 @skip_no_qdp
+@skip_no_nvrtc
 class TestReduction:
     def test_eager_any_rank(self):
-        register_once(_register_row_sum)
+        register_once("ttk_kp::row_sum", _register_row_sum)
         for shape in [(4, 128), (2, 3, 64)]:
             x = torch.randn(*shape, device="cuda")
             assert torch.allclose(
@@ -242,7 +246,7 @@ class TestReduction:
             )
 
     def test_trt_compile(self):
-        register_once(_register_row_sum)
+        register_once("ttk_kp::row_sum", _register_row_sum)
 
         class M(torch.nn.Module):
             def forward(self, x):
@@ -260,7 +264,8 @@ class TestReduction:
 
     def test_keepdim_shape(self):
         register_once(
-            lambda: _register_row_sum("ttk_kp::row_sum_keepdim", keepdim=True)
+            "ttk_kp::row_sum_keepdim",
+            lambda: _register_row_sum("ttk_kp::row_sum_keepdim", keepdim=True),
         )
         x = torch.randn(4, 64, device="cuda")
         out = torch.ops.ttk_kp.row_sum_keepdim(x)
@@ -273,6 +278,7 @@ class TestReduction:
 
 @skip_no_cuda
 @skip_no_qdp
+@skip_no_nvrtc
 def test_multi_input_add():
     ttk.cuda_kernel_op(
         "ttk_kp::add",
@@ -307,19 +313,20 @@ def _register_scale():
 
 @skip_no_cuda
 @skip_no_qdp
+@skip_no_nvrtc
 class TestScalarInput:
     def test_schema_has_float(self):
-        register_once(_register_scale)
+        register_once("ttk_kp::scale", _register_scale)
         schemas = torch._C._jit_get_schemas_for_operator("ttk_kp::scale")
         assert any("float alpha" in str(s) for s in schemas)
 
     def test_eager_run(self):
-        register_once(_register_scale)
+        register_once("ttk_kp::scale", _register_scale)
         x = torch.randn(256, device="cuda")
         assert torch.allclose(torch.ops.ttk_kp.scale(x, 2.5), 2.5 * x, atol=1e-5)
 
     def test_trt_compile(self):
-        register_once(_register_scale)
+        register_once("ttk_kp::scale", _register_scale)
 
         class M(torch.nn.Module):
             def forward(self, x):
@@ -338,6 +345,7 @@ class TestScalarInput:
 
 @skip_no_cuda
 @skip_no_qdp
+@skip_no_nvrtc
 def test_custom_geometry_aot_path_only():
     """Custom geometry routes to user's aot_fn; eager must refuse."""
     import tensorrt.plugin as trtp
@@ -414,15 +422,16 @@ def _register_sin_cos(op_name: str = "ttk_kp::sin_cos") -> None:
 
 @skip_no_cuda
 @skip_no_qdp
+@skip_no_nvrtc
 class TestMultiOutput:
     def test_schema_returns_tuple(self):
-        register_once(_register_sin_cos)
+        register_once("ttk_kp::sin_cos", _register_sin_cos)
         schemas = torch._C._jit_get_schemas_for_operator("ttk_kp::sin_cos")
         # Two-tensor return is rendered as ``(Tensor, Tensor)`` in the schema.
         assert any("(Tensor, Tensor)" in str(s) for s in schemas)
 
     def test_eager_unpacks_to_two_tensors(self):
-        register_once(_register_sin_cos)
+        register_once("ttk_kp::sin_cos", _register_sin_cos)
         x = torch.randn(7, 31, device="cuda", dtype=torch.float32)
         s, c = torch.ops.ttk_kp.sin_cos(x)
         assert torch.allclose(s, torch.sin(x), atol=1e-3, rtol=1e-3)
@@ -431,7 +440,7 @@ class TestMultiOutput:
         assert s.data_ptr() != c.data_ptr()
 
     def test_trt_compile(self):
-        register_once(_register_sin_cos)
+        register_once("ttk_kp::sin_cos", _register_sin_cos)
 
         class M(torch.nn.Module):
             def forward(self, x):

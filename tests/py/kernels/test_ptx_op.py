@@ -9,21 +9,24 @@ from .conftest import (
     SIGMOID_SRC,
     make_eager_sigmoid,
     make_sigmoid_aot,
+    register_once,
     skip_no_cuda,
+    skip_no_nvrtc,
     skip_no_qdp,
 )
 
 # ---- No-GPU: API plumbing ----
 
 
+@skip_no_qdp
 def test_ptx_op_forwards_precompiled_ptx(monkeypatch):
-    """ptx_op must pass ``ptx`` through as ``precompiled_ptx=`` to the registrar."""
+    """ptx_op must pass PTX through to the common precompiled registrar."""
     from torch_tensorrt.kernels import _register
 
     captured = {}
     monkeypatch.setattr(
         _register,
-        "register_cuda_python_plugin",
+        "register_precompiled_qdp_plugin",
         lambda *a, **k: captured.update(k),
     )
 
@@ -41,19 +44,19 @@ def test_ptx_op_forwards_precompiled_ptx(monkeypatch):
     )
 
     assert captured["op_name"] == "ttk_test::ptx_forward"
-    assert captured["precompiled_ptx"] == b"// fake PTX bytes"
+    assert captured["ptx"] == b"// fake PTX bytes"
     assert captured["supports_dynamic_shapes"] is True
-    assert captured["register_torch_op"] is True
 
 
-def test_ptx_op_kernel_name_lands_on_spec(monkeypatch):
-    """The ``kernel_name`` argument must reach the CudaPythonSpec."""
+@skip_no_qdp
+def test_ptx_op_forwards_kernel_name(monkeypatch):
+    """The entry-point name must reach the common precompiled registrar."""
     from torch_tensorrt.kernels import _register
 
     captured = {}
     monkeypatch.setattr(
         _register,
-        "register_cuda_python_plugin",
+        "register_precompiled_qdp_plugin",
         lambda *a, **k: captured.update(k),
     )
 
@@ -69,8 +72,7 @@ def test_ptx_op_kernel_name_lands_on_spec(monkeypatch):
         aot_fn=lambda *a: None,
     )
 
-    assert captured["spec"].kernel_name == "my_entrypoint"
-    assert captured["spec"].kernel_source == ""  # ptx_op leaves source empty
+    assert captured["kernel_name"] == "my_entrypoint"
 
 
 # ---- GPU: integration — compile PTX once, register via ptx_op, exercise eager + TRT ----
@@ -105,12 +107,13 @@ def _register_sigmoid_via_ptx(op_name: str) -> None:
 
 @skip_no_cuda
 @skip_no_qdp
+@skip_no_nvrtc
 class TestPtxOpIntegration:
     def test_register_and_eager(self):
-        try:
-            _register_sigmoid_via_ptx("ttk_test::sigmoid_ptx_eager")
-        except Exception:
-            pass
+        register_once(
+            "ttk_test::sigmoid_ptx_eager",
+            lambda: _register_sigmoid_via_ptx("ttk_test::sigmoid_ptx_eager"),
+        )
         x = torch.randn(1024, device="cuda")
         assert torch.allclose(
             torch.ops.ttk_test.sigmoid_ptx_eager(x),
@@ -120,10 +123,10 @@ class TestPtxOpIntegration:
         )
 
     def test_trt_compile_dynamic_shapes(self):
-        try:
-            _register_sigmoid_via_ptx("ttk_test::sigmoid_ptx_dyn")
-        except Exception:
-            pass
+        register_once(
+            "ttk_test::sigmoid_ptx_dyn",
+            lambda: _register_sigmoid_via_ptx("ttk_test::sigmoid_ptx_dyn"),
+        )
 
         class M(torch.nn.Module):
             def forward(self, x):

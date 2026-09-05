@@ -9,6 +9,7 @@ import torch
 from torch._library.fake_class_registry import FakeScriptObject
 from torch._subclasses.fake_tensor import FakeTensor
 from torch.export.graph_signature import InputKind
+
 from torch_tensorrt.dynamo._exporter import _resolve_lifted_custom_obj, lift
 
 
@@ -231,9 +232,50 @@ def test_runtime_wheel_uses_public_torch_version():
 
 
 @pytest.mark.unit
-def test_runtime_wheel_pins_cuda_13_native_dependencies():
+@pytest.mark.parametrize(
+    ("cuda_version", "expected_distribution"),
+    [("12.6", "tensorrt-cu12"), ("13.0", "tensorrt-cu13")],
+)
+def test_runtime_wheel_selects_native_dependencies(cuda_version, expected_distribution):
+    function = _function_def(_runtime_setup_tree(), "tensorrt_distribution")
+    namespace = {
+        "torch": types.SimpleNamespace(version=types.SimpleNamespace(cuda=cuda_version))
+    }
+    exec(
+        compile(ast.Module(body=[function], type_ignores=[]), "<setup.py>", "exec"),
+        namespace,
+    )
+
+    assert namespace["tensorrt_distribution"]() == expected_distribution
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("cuda_version", [None, "11.8", "12.8"])
+def test_runtime_wheel_rejects_unsupported_cuda_backends(cuda_version):
+    function = _function_def(_runtime_setup_tree(), "tensorrt_distribution")
+    namespace = {
+        "torch": types.SimpleNamespace(version=types.SimpleNamespace(cuda=cuda_version))
+    }
+    exec(
+        compile(ast.Module(body=[function], type_ignores=[]), "<setup.py>", "exec"),
+        namespace,
+    )
+
+    with pytest.raises(RuntimeError, match="CUDA-enabled|Unsupported CUDA"):
+        namespace["tensorrt_distribution"]()
+
+
+@pytest.mark.unit
+def test_runtime_wheel_dependency_expressions_track_selected_backend():
+    tree = _runtime_setup_tree()
+    assignment = _assignment_value(tree, "TENSORRT_DISTRIBUTION")
+    assert isinstance(assignment, ast.Call)
+    assert isinstance(assignment.func, ast.Name)
+    assert assignment.func.id == "tensorrt_distribution"
+    assert assignment.args == []
+    assert assignment.keywords == []
+
     setup_source = _RUNTIME_SETUP_PY.read_text(encoding="utf-8")
-    assert 'TENSORRT_DISTRIBUTION = "tensorrt-cu13"' in setup_source
     assert 'CUDA_RUNTIME_DISTRIBUTION = "nvidia-cuda-runtime"' in setup_source
     assert "torch=={public_version(torch.__version__)}" in setup_source
     assert "{TENSORRT_DISTRIBUTION}=={tensorrt_version}" in setup_source
@@ -552,6 +594,7 @@ def _patch_executorch_lowering(monkeypatch, captured):
     compile_config -- land in `captured`; and records backend_config from
     to_executorch(). Fills `captured`; returns nothing."""
     import executorch.exir as exir
+
     import torch_tensorrt._compile as tc
     import torch_tensorrt.executorch as tte
 
@@ -599,8 +642,9 @@ def _patch_executorch_lowering(monkeypatch, captured):
 @pytest.mark.unit
 def test_save_executorch_forwards_lowering_kwargs(monkeypatch, tmp_path):
     pytest.importorskip("executorch.exir")
-    import torch_tensorrt._compile as tc
     from executorch.exir import EdgeCompileConfig
+
+    import torch_tensorrt._compile as tc
 
     captured = {}
     _patch_executorch_lowering(monkeypatch, captured)
@@ -711,8 +755,9 @@ def _assert_lowering_kwargs_forwarded(kw, methods, passes, cfg):
 @pytest.mark.unit
 def test_public_save_forwards_lowering_kwargs_exported_program(monkeypatch, tmp_path):
     pytest.importorskip("executorch.exir")
-    import torch_tensorrt
     from executorch.exir import EdgeCompileConfig
+
+    import torch_tensorrt
 
     calls = _stub_save_as_executorch(monkeypatch)
     methods = {"get_max_seq_len": 128}
@@ -744,8 +789,9 @@ def test_public_save_forwards_lowering_kwargs_graphmodule_retrace(
     monkeypatch, tmp_path
 ):
     pytest.importorskip("executorch.exir")
-    import torch_tensorrt
     from executorch.exir import EdgeCompileConfig
+
+    import torch_tensorrt
 
     calls = _stub_save_as_executorch(monkeypatch)
     methods = {"get_max_seq_len": 128}
@@ -778,9 +824,10 @@ def test_public_save_forwards_lowering_kwargs_graphmodule_no_retrace(
     monkeypatch, tmp_path
 ):
     pytest.importorskip("executorch.exir")
+    from executorch.exir import EdgeCompileConfig
+
     import torch_tensorrt
     import torch_tensorrt.dynamo._exporter as _exporter
-    from executorch.exir import EdgeCompileConfig
 
     calls = _stub_save_as_executorch(monkeypatch)
     # retrace=False routes through the dynamo exporter (TRT-specific graph surgery);
@@ -824,8 +871,9 @@ def test_save_executorch_real_etrecord_is_inspector_consumable(tmp_path):
     devtools can parse back into an Inspector-consumable ETRecord."""
     pytest.importorskip("executorch.exir")
     pytest.importorskip("executorch.devtools")
-    import torch_tensorrt
     from executorch.devtools.etrecord import parse_etrecord
+
+    import torch_tensorrt
     from torch_tensorrt._features import ENABLED_FEATURES
 
     if not ENABLED_FEATURES.torch_tensorrt_runtime:
