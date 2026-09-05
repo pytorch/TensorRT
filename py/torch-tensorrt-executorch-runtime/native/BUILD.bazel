@@ -20,39 +20,26 @@ filegroup(
         "//core/runtime:include_files",
         "//cpp:executorch_api_headers",
         "//cpp:executorch_backend_source_files",
-        "@executorch//:executorch_sources",
     ],
 )
 
-# ExecuTorch exposes its Python portable runtime through CMake. Keep that
-# upstream build behind Bazel so both Torch-TensorRT wheels have one build
-# entry point and share Bazel's dependency/toolchain selection.
+# The delegate compiles and links against the installed ExecuTorch wheel, which ships the
+# headers and the prebuilt runtime. ExecuTorch is not built from source here, so this target
+# takes no ExecuTorch source input; CMAKE_PREFIX_PATH points find_package at the wheel.
 cmake(
     name = "delegate_native",
+    build_args = ["--verbose"],
     cache_entries = {
         "CMAKE_BUILD_TYPE": "Release",
-        "EXECUTORCH_CMAKE_FILE": "$(execpath @executorch//:executorch/CMakeLists.txt)",
+        "CMAKE_PREFIX_PATH": "$${EXECUTORCH_CMAKE_PREFIX_PATH:-}",
         "PYTHON_EXECUTABLE": "$${PYTHON_BIN_PATH}",
-        "TORCH_HEADER_MARKER": "$(execpath @libtorch//:include/torch/headeronly/util/TypeTraits.h)",
         "TORCH_TENSORRT_SOURCE_DIR": "$$EXT_BUILD_ROOT$$",
     },
-    data = [
-        "@executorch//:executorch/CMakeLists.txt",
-        "@libtorch//:include/torch/headeronly/util/TypeTraits.h",
-    ],
     lib_source = ":delegate_sources",
     out_include_dir = "",
-    out_shared_libs = [
-        # The extensions carry a DT_NEEDED on both of these and ExecuTorch's own wheel
-        # ships neither, so this one has to.
-        "libaoti_cuda_shims.so",
-        "libextension_cuda.so",
-        "_portable_lib.so",
-        "data_loader.so",
-    ],
+    out_shared_libs = ["libexecutorch_backend_tensorrt.so"],
     deps = [
         "@cuda//:cudart",
-        "@libtorch//:torch",
     ] + select({
         ":aarch64_linux": ["@tensorrt_sbsa//:nvinfer"],
         "//conditions:default": ["@tensorrt//:nvinfer"],

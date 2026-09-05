@@ -64,13 +64,30 @@ jobs:
         chmod +x "${RUNNER_TEMP}/bin/bazel"
         export PATH="${RUNNER_TEMP}/bin:${PATH}"
 
-        python -m pip install pyyaml "executorch==1.4.1"
-        # Run the check directly so its exit status is the step's exit status.
-        # Wrapping it in `gdb --batch` reports gdb's own status, which is 0
-        # whatever the program does, so a SIGSEGV here was passing.
-        # On failure, re-run under gdb for the backtrace, then fail the step.
+        # ExecuTorch's CUDA wheels live only on the PyTorch nightly index, so the channel is
+        # needed. No --pre: a specifier naming a prerelease admits prereleases by itself, and
+        # --pre would apply to every other requirement in the same command too.
+        python -m pip install pyyaml \
+          --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" \
+          "executorch==1.5.0.dev20260904"
+        # XnnpackBackend and CudaBackend are asserted because a delegated program can fall
+        # back to them. They now come from ExecuTorch's own runtime rather than from a runtime
+        # this wheel rebuilt, so this also checks the slim delegate registers alongside the
+        # stock backends instead of displacing them.
+        #
+        # faulthandler stays because registration runs C++ static initializers, where a
+        # failure arrives as a fatal signal with no Python traceback. The check runs directly
+        # so its exit status is the step's: `gdb --batch` exits 0 whatever the program does,
+        # which used to let a SIGSEGV here pass. gdb is used only for a backtrace after a
+        # failure, and the original status is what fails the step.
         ulimit -c unlimited || true
-        runtime_check='import torch; print(torch.__version__, torch.version.cuda); from torch_tensorrt_executorch_runtime import BACKEND_NAME, get_runtime; print(1); runtime = get_runtime(); print(2); assert runtime.backend_registry.is_available(BACKEND_NAME); assert runtime.backend_registry.is_available("XnnpackBackend"); assert runtime.backend_registry.is_available("CudaBackend")'
+        # sys.exit, not assert: under PYTHONOPTIMIZE or python -O every assert is compiled out and
+        # this check would pass over a runtime with no backends registered at all.
+        #
+        # Importing the delegate package is the whole registration step; it exposes no runtime API,
+        # so the registry is queried through ExecuTorch's own Runtime. Importing it for its side
+        # effect only is exactly what a user does, so this also proves the side effect works.
+        runtime_check='import sys, torch; print(torch.__version__, torch.version.cuda); import torch_tensorrt_executorch_runtime; from torch_tensorrt_executorch_runtime import BACKEND_NAME; from executorch.runtime import Runtime; registry = Runtime.get().backend_registry; missing = [n for n in (BACKEND_NAME, "XnnpackBackend", "CudaBackend") if not registry.is_available(n)]; sys.exit("FATAL: backends not registered: " + ", ".join(missing)) if missing else None'
         check_status=0
         PYTHONFAULTHANDLER=1 python -u -X faulthandler -c "${runtime_check}" ||
           check_status=$?
@@ -97,9 +114,17 @@ jobs:
           --model_path="${RUNNER_TEMP}/torchtrt-kv-cache-decode.pte"
         python examples/torchtrt_executorch_example/export_coalesced.py \
           --model_path="${RUNNER_TEMP}/torchtrt-coalesced.pte"
+        python examples/torchtrt_executorch_example/export_device_resident.py \
+          --model_path="${RUNNER_TEMP}/torchtrt-device-resident.pte"
         .github/scripts/verify-executorch-reference-runner.sh \
           "${RUNNER_TEMP}/torchtrt-python.pte" \
           "${RUNNER_TEMP}/torchtrt-kv-cache-decode.pte" \
           "${RUNNER_TEMP}/torchtrt-coalesced.pte"
         python examples/executorch_reference_runner/load_model.py \
           --model_path="${RUNNER_TEMP}/torchtrt-python.pte" --num_runs=1
+        # The device-resident program is deliberately NOT handed to the C++
+        # reference runner above: that runner feeds host tensors, which this
+        # program's boundary contract forbids. Its Python runner passes CUDA
+        # tensors and asserts the output never left the device.
+        python examples/executorch_reference_runner/load_model_device_resident.py \
+          --model_path="${RUNNER_TEMP}/torchtrt-device-resident.pte" --num_runs=2

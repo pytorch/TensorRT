@@ -27,12 +27,15 @@ def _executorch_requirement() -> str:
     # Read the pin the way the drift test does, so this file is not a second
     # place to edit when it moves. Regex rather than yaml: the runner declares
     # no runtime dependencies of its own and importing it should not add one.
+    #
+    # Exact, not a range: the nightly channel gains a member every day, so a
+    # range would install whatever is newest while the delegate is compiled
+    # from the pinned commit. Pairing them is the point.
     text = (REPO_ROOT / "dev_dep_versions.yml").read_text()
     version = dict(re.findall(r'^(__\w+__): "([^"]+)"', text, re.MULTILINE))[
         "__executorch_version__"
     ]
-    major, minor = version.split(".")[:2]
-    return f"executorch>={version},<{major}.{int(minor) + 1}"
+    return f"executorch=={version}"
 
 
 # Known transient cudagraph/TRT-driver flake signatures. Expand ONLY with
@@ -131,10 +134,25 @@ def _setup_commands(step: str) -> list[tuple[list[str], Path]]:
     if step == "hub":
         return [(launcher + ["hub.py"], REPO_ROOT / "tests/modules")]
     if step == "executorch":
+        # ExecuTorch's CUDA wheels are published only on the PyTorch nightly index, so the
+        # channel is needed here. Derived from CU_VERSION rather than fixed, because the
+        # executorch suite is nightly-only and the nightly matrix runs cu132 rows as well as
+        # cu130 ones; a fixed channel would install a CUDA 13.0 runtime into a 13.2 job. The
+        # cu130 default is for a local run with no CU_VERSION set, and matches the torch index
+        # pyproject.toml resolves against by default.
+        cuda = os.environ.get("CU_VERSION", "cu130")
         return [
             (
                 launcher
-                + ["-m", "pip", "install", "pyyaml", _executorch_requirement()],
+                + [
+                    "-m",
+                    "pip",
+                    "install",
+                    "pyyaml",
+                    "--extra-index-url",
+                    f"https://download.pytorch.org/whl/nightly/{cuda}",
+                    _executorch_requirement(),
+                ],
                 REPO_ROOT,
             )
         ]
@@ -202,7 +220,20 @@ def run_suite(
             print(f"==> setup[{step}]: {shlex.join(argv)}", flush=True)
             rc = subprocess.run(argv, cwd=scwd, env=env).returncode
             if rc != 0:
-                print(f"::warning::setup step {step!r} exited {rc}", flush=True)
+                # Fail rather than warn and continue, for every setup step and not just the
+                # executorch one: a suite whose dependencies did not install cannot test what it
+                # was asked to test, whichever step failed. Most of the executorch suite gates on
+                # pytest.importorskip, so a failed install skips those files, leaves the rest
+                # passing, and reports success with a populated junit xml -- the run looks green
+                # precisely when the thing it exists to test is absent. This matters more now
+                # that the ExecuTorch pin names a nightly build, which is pruned from the
+                # channel eventually; when that happens this has to be loud.
+                print(
+                    f"::error::setup step {step!r} exited {rc}, so the suite cannot test what "
+                    "it was asked to test",
+                    flush=True,
+                )
+                return rc
 
     print(f"==> {suite.name} [{variant}]: {shlex.join(pytest_cmd)}", flush=True)
     rc = subprocess.run(pytest_cmd, cwd=cwd, env=env).returncode

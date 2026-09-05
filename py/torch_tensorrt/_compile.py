@@ -26,6 +26,7 @@ import torch
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES, needs_cross_compile
 from torch_tensorrt._Input import Input
+from torch_tensorrt._utils import executorch_install_command
 from torch_tensorrt.dynamo.runtime._CudaGraphsTorchTensorRTModule import (
     CudaGraphsTorchTensorRTModule,
 )
@@ -87,13 +88,6 @@ __all__ = [
 def _has_executorch_exir() -> bool:
     try:
         return importlib.util.find_spec("executorch.exir") is not None
-    except ModuleNotFoundError:
-        return False
-
-
-def _has_executorch_runtime() -> bool:
-    try:
-        return importlib.util.find_spec("torch_tensorrt_executorch_runtime") is not None
     except ModuleNotFoundError:
         return False
 
@@ -601,21 +595,14 @@ def load_cross_compiled_exported_program(file_path: str = "") -> Any:
 def load(
     file_path: str = "",
     extra_files: Optional[dict[str, Any]] = None,
-    *,
-    format: Optional[str] = None,
     **kwargs: Any,
 ) -> Any:
     """
-    Load a TorchScript, ExportedProgram, or ExecuTorch program.
-
-    By default, detects TorchScript and ExportedProgram files. Set
-    ``format="executorch"`` explicitly for an ExecuTorch ``.pte`` file.
+    Load either a TorchScript module or ExportedProgram file
 
     Arguments:
         file_path (str): Path to file on the disk
         extra_files (dict[str, Any]): Extra files to load with the model
-        format (Optional[str]): Set to ``"executorch"`` to load a ``.pte`` file
-            using the separately installed ExecuTorch runtime package.
 
     Example:
     # Load with extra files.
@@ -624,22 +611,29 @@ def load(
         print(extra_files["foo.txt"])
 
     Raises:
-        ImportError: If ExecuTorch format is requested without the runtime package
-        ValueError: If the format is unsupported or the file is not a TorchScript or ExportedProgram file
-    """
-    if format == "executorch":
-        if not _has_executorch_runtime():
-            raise ImportError(
-                "Loading an ExecuTorch program requires the prebuilt "
-                "Torch-TensorRT ExecuTorch delegate. Install it with: "
-                "pip install torch-tensorrt-executorch-runtime"
-            )
-        from torch_tensorrt_executorch_runtime.runtime import load as load_executorch
+        ValueError: If the file is not a TorchScript module or ExportedProgram file
 
-        return load_executorch(file_path)
-    if format is not None:
-        raise ValueError(
-            f"Unsupported format {format!r}; expected None or 'executorch'"
+    Note:
+        An ExecuTorch ``.pte`` program is loaded and run through ExecuTorch itself, which owns that
+        runtime API. Install ``torch_tensorrt_executorch_runtime`` so the TensorRT delegate is
+        registered, then use ``executorch.runtime``::
+
+            import torch_tensorrt_executorch_runtime  # noqa: F401
+            from executorch.runtime import Runtime
+
+            program = Runtime.get().load_program("model.pte")
+            outputs = program.load_method("forward").execute((tensor,))
+    """
+
+    # A caller carrying the old format="executorch" argument gets told where that moved, rather than
+    # having the keyword silently dropped. None is let through: it was the documented default, so a
+    # wrapper that forwards an optional format it received keeps working.
+    if kwargs.pop("format", None) is not None:
+        raise TypeError(
+            "load() no longer accepts a 'format' argument. An ExecuTorch .pte program is loaded "
+            "through ExecuTorch, which owns that runtime API: import "
+            "torch_tensorrt_executorch_runtime to register the TensorRT delegate, then use "
+            "executorch.runtime.Runtime.get().load_program(path)."
         )
 
     # Ensure Python TRT engine ops are registered so torch.export.load can
@@ -856,9 +850,9 @@ def save(
         )
     if output_format == "executorch" and not _has_executorch_exir():
         raise ImportError(
-            "Saving in ExecuTorch format requires the executorch package "
-            "with executorch.exir. Install with: pip install "
-            "\"torch_tensorrt[executorch]\" to use output_format='executorch'."
+            "Saving in ExecuTorch format requires the executorch package with "
+            "executorch.exir, published for Linux only, to use "
+            "output_format='executorch'. Install with: " + executorch_install_command()
         )
     if output_format == "executorch":
         # Every executorch option is popped above, so a leftover kwarg is a typo. Fail
@@ -867,8 +861,9 @@ def save(
             raise TypeError(
                 "save() received unexpected keyword argument(s) for "
                 f"output_format='executorch': {sorted(kwargs)}. Supported executorch "
-                "options are 'partitioners', 'compile_specs', 'backend_config', and "
-                "'weight_streaming_budget_per_engine'."
+                "options are 'partitioners', 'compile_specs', 'backend_config', "
+                "'constant_methods', 'transform_passes', 'compile_config', "
+                "'generate_etrecord', and 'weight_streaming_budget_per_engine'."
             )
         # Validate the budget before the input and model-shape checks below, so a wrong
         # type is not reported as an unrelated failure.
@@ -1405,8 +1400,8 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
         from torch_tensorrt.executorch import export
     except ImportError:
         raise ImportError(
-            "ExecuTorch is not installed. Install with: pip install "
-            "\"torch_tensorrt[executorch]\" to use output_format='executorch'."
+            "ExecuTorch is not installed, and is published for Linux only, to use "
+            "output_format='executorch'. Install with: " + executorch_install_command()
         )
     import torch_tensorrt.dynamo.runtime.meta_ops.register_meta_ops  # noqa: F401
 

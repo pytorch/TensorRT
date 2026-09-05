@@ -12,7 +12,8 @@ Prerequisites
 -------------
 Install Torch-TensorRT with the ExecuTorch extra before running this example::
 
-    pip install -e ".[executorch]"
+    pip install -e ".[executorch]" \
+        --extra-index-url https://download.pytorch.org/whl/nightly/cu130
 
 See https://pytorch.org/executorch/stable/getting-started-setup.html for details.
 """

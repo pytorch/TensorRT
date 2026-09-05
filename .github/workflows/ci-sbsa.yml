@@ -114,7 +114,30 @@ jobs:
       name-prefix: "RTX Python-only SBSA "
       raw-matrix: ${{ needs.generate-matrix.outputs.matrix }}
 
+  executorch-runtime-build:
+    # Ordered after `build`, not just after the matrix: this job downloads the torch-tensorrt wheel
+    # that `build` uploads, and starting earlier fails with "Artifact not found for name:
+    # pytorch_tensorrt__...". The x86_64 caller waits on its own wheel job for the same reason.
+    needs: [decide, generate-matrix, build]
+    # Same lane gating as the standard SBSA channels, plus the rtx exclusion the x86_64 caller
+    # applies: the delegate links stock TensorRT, not TensorRT-RTX.
+    if: >-
+      !cancelled() &&
+      needs.build.result == 'success' &&
+      (needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly') &&
+      needs.decide.outputs.backend != 'rtx'
+    uses: ./.github/workflows/executorch-build-linux.yml
+    with:
+      repository: pytorch/tensorrt
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      architecture: aarch64
   gate:
+    # Deliberately not depending on executorch-runtime-build. The gate fails the whole workflow on
+    # any failure among its needs, so putting the delegate here would let it block every unrelated
+    # pull request that touches SBSA. It reports on its own check instead.
     needs: [decide, build, python-only, build-rtx, python-only-rtx]
     if: always()
     runs-on: ubuntu-latest
