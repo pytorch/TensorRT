@@ -26,6 +26,7 @@ Additional resources:
    :caption: Getting Started
 
    getting_started/installation
+   getting_started/executorch_runtime
 
 .. toctree::
    :hidden:
