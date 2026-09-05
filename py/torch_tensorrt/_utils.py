@@ -31,6 +31,42 @@ def sanitized_torch_version() -> Any:
     )
 
 
+def executorch_install_channel() -> str:
+    """The PyTorch nightly channel that carries the ExecuTorch build matching this torch.
+
+    ExecuTorch publishes a distinct wheel per CUDA channel (``+cu130`` and ``+cu132`` are separate
+    builds), so an install instruction has to name the channel that matches the user's torch, or a
+    CUDA 13.2 user installs a CUDA 13.0 ExecuTorch. Derived from ``torch.version.cuda`` rather than
+    hardcoded for that reason. Falls back to the literal placeholder ``cuXYZ`` when torch reports no
+    CUDA build, so the message stays honest instead of naming a channel the user cannot use.
+    """
+    cuda_version = torch.version.cuda
+    if not cuda_version:
+        return "cuXYZ"
+    major, _, minor = cuda_version.partition(".")
+    return f"cu{major}{minor or '0'}"
+
+
+def executorch_install_command() -> str:
+    """The exact ``pip install`` line for the ExecuTorch authoring stack, channel included.
+
+    Shared by every runtime error message that tells a user how to install ExecuTorch, so the
+    channel is derived once from the running torch and the three messages cannot drift from each
+    other or from the pin.
+
+    No ``--upgrade``: on a named requirement it upgrades the package itself, so a user on a
+    released ``torch_tensorrt`` would have that build replaced by a nightly, and ``torch`` pulled
+    along with it, when all they asked for was the extra. It is not needed either. Measured with
+    pip 25.0.1 against probe wheels shaped like this case: with the package already installed and
+    the extra missing, ``pip install "demo[executorch]"`` installs the extra's dependencies and
+    leaves the package alone.
+    """
+    return (
+        'pip install --pre "torch_tensorrt[executorch]" '
+        f"--extra-index-url https://download.pytorch.org/whl/nightly/{executorch_install_channel()}"
+    )
+
+
 def check_cross_compile_trt_win_lib() -> bool:
     # cross compile feature is only available on linux
     # build engine on linux and run on windows

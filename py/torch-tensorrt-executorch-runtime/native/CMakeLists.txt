@@ -294,6 +294,18 @@ set_target_properties(portable_lib PROPERTIES
   INSTALL_RPATH "${_torch_tensorrt_executorch_runtime_rpath}"
   OUTPUT_NAME "_portable_lib"
   SUFFIX ".so")
+# The pinned ExecuTorch builds this extension as _C, setting both OUTPUT_NAME and
+# EXECUTORCH_PYTHON_MODULE_NAME=_C, and that define is what PYBIND11_MODULE pastes into the module
+# init symbol. Forcing OUTPUT_NAME back to _portable_lib above would ship _portable_lib.so still
+# exporting PyInit__C, and activate() imports the extension by module name, so that import would
+# raise. Set the define to match the file name. The inherited _C value is dropped first so a single
+# -D reaches the compiler instead of two that disagree and warn about a redefinition.
+get_target_property(_portable_lib_defs portable_lib COMPILE_DEFINITIONS)
+if(_portable_lib_defs)
+  list(REMOVE_ITEM _portable_lib_defs "EXECUTORCH_PYTHON_MODULE_NAME=_C")
+  set_target_properties(portable_lib PROPERTIES COMPILE_DEFINITIONS "${_portable_lib_defs}")
+endif()
+target_compile_definitions(portable_lib PRIVATE EXECUTORCH_PYTHON_MODULE_NAME=_portable_lib)
 # data_loader gets $ORIGIN too, so finding those libraries does not depend on which
 # module Python imports first.
 set_target_properties(data_loader PROPERTIES

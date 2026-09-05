@@ -22,10 +22,12 @@ def _has_executorch_exir() -> bool:
 if not _has_executorch_exir():
 
     def __getattr__(name: str) -> NoReturn:
+        from torch_tensorrt._utils import executorch_install_command
+
         raise ImportError(
             f"Cannot access torch_tensorrt.executorch.{name}: "
-            "ExecuTorch with executorch.exir is required. "
-            'Install with: pip install "torch_tensorrt[executorch]"'
+            "ExecuTorch with executorch.exir is required, and is published for "
+            "Linux only. Install with: " + executorch_install_command()
         )
 
     __all__ = [

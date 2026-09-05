@@ -79,7 +79,13 @@ jobs:
         export PATH="${RUNNER_TEMP}/bin:${PATH}"
         bazel --version
 
-        python -m pip install pyyaml "executorch==1.4.1"
+        # ExecuTorch's CUDA wheels are published only on the PyTorch nightly index, so the
+        # channel is needed. No --pre: a specifier naming a prerelease admits prereleases by
+        # itself, and --pre would apply to every other requirement in the same command too.
+        # CU_VERSION selects the row's own channel, which is what keeps the runtime the
+        # delegate links to the same CUDA build as the rest of the job.
+        EXECUTORCH_INDEX_URL="https://download.pytorch.org/whl/nightly/${CU_VERSION}"
+        python -m pip install pyyaml --extra-index-url "${EXECUTORCH_INDEX_URL}" "executorch==1.5.0.dev20260904"
         export TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION="$(python -c 'import importlib.metadata; print(importlib.metadata.version("torch-tensorrt"))')"
 
         # The downloaded wheel has to carry the C++ runtime. A wheel built with
@@ -125,8 +131,17 @@ jobs:
         executorch_cmake_location="$(bazel query @executorch//:executorch/CMakeLists.txt --output=location)"
         export EXECUTORCH_SOURCE_DIR="$(dirname "${executorch_cmake_location%%:*}")"
         export EXECUTORCH_ROOT="${EXECUTORCH_SOURCE_DIR}"
-        # this is to verify the end user's workflow
-        python -m pip install pyyaml "executorch>=1.4.1,<1.5"
+        # This proves the range specifier that ships to users, the one in setup.py and the README,
+        # actually resolves to an installable wheel on the index. It runs in a fresh venv because
+        # the build interpreter already holds the exact pin, so a range install there resolves
+        # nothing and proves nothing. --no-deps keeps it to the executorch wheel itself rather than
+        # pulling torch again; the export and reference runner below deliberately stay on the build
+        # interpreter, whose pin is ABI-matched to the delegate just built. The venv is created
+        # before the range-ok marker so the marked install stays directly under its annotation,
+        # which the pin guard requires.
+        python -m venv "${RUNNER_TEMP}/range-check-venv"
+        # pin-check: range-ok
+        "${RUNNER_TEMP}/range-check-venv/bin/python" -m pip install --no-deps --extra-index-url "${EXECUTORCH_INDEX_URL}" "executorch>=1.5.0.dev20260904,<1.6"
         python examples/torchtrt_executorch_example/export_static_shape.py \
           --model_path="${RUNNER_TEMP}/torchtrt-reference-runner.pte"
         .github/scripts/verify-executorch-reference-runner.sh \

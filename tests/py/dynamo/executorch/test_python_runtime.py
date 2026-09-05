@@ -83,6 +83,27 @@ def test_missing_model():
         load_runtime_module().load("does-not-exist.pte")
 
 
+def test_activate_claims_both_extension_names():
+    """The alias has to cover the name the pinned ExecuTorch actually imports.
+
+    ExecuTorch renamed its pybind extension from _portable_lib to _C. Claiming only the old name is
+    silently ineffective: nothing imports it, the stock _C loads instead, and TensorRTBackend is
+    never registered. CI caught exactly that as "TensorRTBackend is not registered" once the pin
+    moved to a nightly carrying the new name.
+
+    Both are asserted, not just the current one, because an ExecuTorch older than the rename still
+    imports the legacy name and the delegate has to work against either.
+    """
+    delegate = load_delegate_module()
+    assert delegate._NATIVE_NAME == "executorch.extension.pybindings._C", (
+        "the alias no longer names the extension the pinned ExecuTorch imports, so the "
+        "interception is a no-op and the backend never registers"
+    )
+    assert (
+        delegate._LEGACY_NATIVE_NAME == "executorch.extension.pybindings._portable_lib"
+    ), "the pre-rename name is no longer claimed, so an older ExecuTorch is not intercepted"
+
+
 def test_activate_twice_is_safe(monkeypatch):
     delegate = load_delegate_module()
     monkeypatch.setattr(delegate, "_probe_portable_lib_dependencies", lambda: None)
@@ -123,6 +144,7 @@ def test_activate_rejects_preloaded_stock_wrapper(monkeypatch):
     delegate = load_delegate_module()
     stock_wrapper = types.ModuleType(delegate._WRAPPER_NAME)
     monkeypatch.delitem(sys.modules, delegate._NATIVE_NAME, raising=False)
+    monkeypatch.delitem(sys.modules, delegate._LEGACY_NATIVE_NAME, raising=False)
     monkeypatch.setitem(sys.modules, delegate._WRAPPER_NAME, stock_wrapper)
 
     with pytest.raises(
@@ -147,6 +169,7 @@ def test_activate_cleans_up_data_loader_when_native_import_fails(monkeypatch):
         delegate, "importlib", types.SimpleNamespace(import_module=fake_import)
     )
     monkeypatch.delitem(sys.modules, delegate._NATIVE_NAME, raising=False)
+    monkeypatch.delitem(sys.modules, delegate._LEGACY_NATIVE_NAME, raising=False)
     monkeypatch.delitem(sys.modules, delegate._DATA_LOADER_NAME, raising=False)
 
     with pytest.raises(delegate.DelegateCompatibilityError):
@@ -162,6 +185,7 @@ def test_activate_checks_native_dependencies_before_importing_data_loader(monkey
     calls = []
 
     monkeypatch.delitem(sys.modules, delegate._NATIVE_NAME, raising=False)
+    monkeypatch.delitem(sys.modules, delegate._LEGACY_NATIVE_NAME, raising=False)
     monkeypatch.delitem(sys.modules, delegate._WRAPPER_NAME, raising=False)
     monkeypatch.delitem(sys.modules, delegate._DATA_LOADER_NAME, raising=False)
 
@@ -185,6 +209,7 @@ def test_activate_dependency_probe_fails_before_data_loader_import(monkeypatch):
     imports = []
 
     monkeypatch.delitem(sys.modules, delegate._NATIVE_NAME, raising=False)
+    monkeypatch.delitem(sys.modules, delegate._LEGACY_NATIVE_NAME, raising=False)
     monkeypatch.delitem(sys.modules, delegate._WRAPPER_NAME, raising=False)
 
     def fail_probe():

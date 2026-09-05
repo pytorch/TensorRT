@@ -158,7 +158,7 @@ setup(
     install_requires=[
         f"torch=={public_version(torch.__version__)}",
         f"executorch=={public_version(executorch_version)}",
-        f"torch-tensorrt=={torchtrt_version()}",
+        f"torch-tensorrt=={public_version(torchtrt_version())}",
         f"{TENSORRT_DISTRIBUTION}=={tensorrt_version}",
         f"{CUDA_RUNTIME_DISTRIBUTION}=={cuda_runtime_version}",
     ],
