@@ -26,7 +26,14 @@ class TestLibTorchTensorRTLinkage(unittest.TestCase):
         cls.trt_plugin_paths = [
             distribution.locate_file(path)
             for distribution in importlib.metadata.distributions()
-            if distribution.metadata["Name"].replace("_", "-") == "tensorrt-cu13-libs"
+            if distribution.metadata["Name"]
+            .replace("_", "-")
+            .lower()
+            .startswith("tensorrt-cu")
+            and distribution.metadata["Name"]
+            .replace("_", "-")
+            .lower()
+            .endswith("-libs")
             for path in distribution.files or []
             if path.name.startswith("libnvinfer_plugin.so")
         ]
