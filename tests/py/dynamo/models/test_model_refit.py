@@ -11,7 +11,7 @@ import torch_tensorrt as torchtrt
 import torch_tensorrt as torch_trt
 from torch import nn
 from torch_tensorrt._utils import is_tensorrt_rtx_version_supported
-from torch_tensorrt.dynamo import refit_module_weights
+from torch_tensorrt.dynamo import partitioning, refit_module_weights
 from torch_tensorrt.dynamo._refit import (
     construct_refit_mapping,
     get_engine_from_encoded_engine,
@@ -68,7 +68,26 @@ def test_mapping():
     )
     new_gm = exp_program2.module()
     new_gm = post_lowering(new_gm, settings)
-    mapping = construct_refit_mapping(new_gm, trt_input, settings)
+
+    # construct_refit_mapping interprets whatever module it is handed, so it has to be
+    # handed the same subgraph the engine above was built from. refit_module_weights
+    # always partitions first and maps each accelerated submodule; this test was the
+    # only caller passing a whole, un-partitioned module. That only worked because the
+    # model happened to be fully convertible: on Turing (SM 7.5) TensorRT-RTX cannot
+    # serve resnet18's FP32 fc GEMM, so capability partitioning routes it to PyTorch and
+    # the engine does not contain it -- while the un-partitioned module still does, with
+    # no partitioner in construct_refit_mapping to fall back to. Partition here the same
+    # way compile_module does, so the mapping matches the engine on either architecture.
+    num_supported_ops, total_ops = partitioning.get_graph_converter_support(
+        new_gm, settings.torch_executed_ops
+    )
+    partitioned_gm, _ = partitioning.fast_partition(
+        new_gm,
+        min_block_size=min_block_size,
+        torch_executed_ops=settings.torch_executed_ops,
+        skip_fusion=(num_supported_ops == total_ops),
+    )
+    mapping = construct_refit_mapping(partitioned_gm._run_on_acc_0, trt_input, settings)
 
     refitter = trt.Refitter(engine, TRT_LOGGER)
     weight_list = refitter.get_all_weights()

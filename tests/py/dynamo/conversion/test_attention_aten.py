@@ -4,7 +4,7 @@ from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
 
-from .harness import DispatchTestCase
+from .harness import DispatchTestCase, skip_if_trt_rtx_turing
 
 
 class TestScaledDotProductAttention(DispatchTestCase):
@@ -112,6 +112,9 @@ class TestScaledDotProductAttention(DispatchTestCase):
         dropout_p=0.0,
         enable_gqa=False,
     ):
+        if dtype == torch.float32:
+            skip_if_trt_rtx_turing(self, "FP32 scaled dot-product attention")
+
         class SDPA(nn.Module):
             def forward(self, query, key, value, attn_mask=None):
                 return torch.ops.aten.scaled_dot_product_attention.default(
@@ -247,6 +250,9 @@ class TestScaledDotProductAttention(DispatchTestCase):
         dropout_p=0.0,
         enable_gqa=False,
     ):
+        if dtype == torch.float32:
+            skip_if_trt_rtx_turing(self, "FP32 scaled dot-product attention")
+
         class SDPA(nn.Module):
             def forward(self, query, key, value, attn_mask=None):
                 return torch.ops.aten.scaled_dot_product_attention.default(
@@ -352,6 +358,9 @@ class TestScaledDotProductAttention(DispatchTestCase):
         dropout_p=0.0,
         enable_gqa=False,
     ):
+        if dtype == torch.float32:
+            skip_if_trt_rtx_turing(self, "FP32 scaled dot-product attention")
+
         class SDPA(nn.Module):
             def forward(self, query, key, value, attn_mask=None):
                 return torch.ops.aten.scaled_dot_product_attention.default(
@@ -484,6 +493,9 @@ class TestScaledDotProductEfficientAttention(DispatchTestCase):
         dtype,
         dropout_p=0.0,
     ):
+        if dtype == torch.float32:
+            skip_if_trt_rtx_turing(self, "FP32 scaled dot-product attention")
+
         class EfficientSDPA(nn.Module):
             def forward(self, query, key, value, attn_bias=None):
                 attn = torch.ops.aten._scaled_dot_product_efficient_attention.default(
@@ -606,6 +618,9 @@ class TestScaledDotProductEfficientAttention(DispatchTestCase):
         dtype,
         dropout_p=0.0,
     ):
+        if dtype == torch.float32:
+            skip_if_trt_rtx_turing(self, "FP32 scaled dot-product attention")
+
         class EfficientSDPA(nn.Module):
             def forward(self, query, key, value, attn_bias=None):
                 attn = torch.ops.aten._scaled_dot_product_efficient_attention.default(

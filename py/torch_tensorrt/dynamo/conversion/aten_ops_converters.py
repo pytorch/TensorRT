@@ -4540,7 +4540,11 @@ def aten_ops_nonzero(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.linear.default, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.linear.default,
+    capability_validator=gemm_capability_validator,
+    supports_dynamic_shapes=True,
+)
 def aten_ops_linear(
     ctx: ConversionContext,
     target: Target,
@@ -4559,9 +4563,43 @@ def aten_ops_linear(
     )
 
 
+def attention_capability_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    """Reject fused attention TensorRT-RTX cannot serve when Turing (SM 7.5) is a target.
+
+    A fused attention op carries the same FP32 GEMMs ``gemm_capability_validator``
+    rejects, but inside the converter, so the graph holds one node and no ``mm``/``bmm``
+    for that guard to see. On Turing TRT-RTX this results in failure. Only the q/k/v
+    dtypes matter, so FP16 attention keeps running on TensorRT.
+    """
+    if not trt_rtx_targets_turing(settings):
+        return True
+
+    unsupported_dtypes = (torch.float32,)
+
+    def is_unsupported(operand: Argument) -> bool:
+        val = operand.meta.get("val") if hasattr(operand, "meta") else None
+        return bool(getattr(val, "dtype", None) in unsupported_dtypes)
+
+    qkv = node.args[:3]  # query, key, value
+    if any(map(is_unsupported, qkv)):
+        _LOGGER.debug(
+            "Attention '%s' is not supported on TensorRT-RTX for Turing (SM 7.5). "
+            "Falling back to PyTorch.",
+            node.name,
+        )
+        return False
+
+    return True
+
+
 def scaled_dot_product_attention_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
+    if not attention_capability_validator(node, settings):
+        return False
+
     attn_mask = args_bounds_check(node.args, 3, None)
     is_causal = args_bounds_check(node.args, 5, False)
     if is_causal and attn_mask is not None:
@@ -4660,6 +4698,9 @@ def aten_ops_scaled_dot_product_attention(
 def scaled_dot_product_flash_attention_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
+    if not attention_capability_validator(node, settings):
+        return False
+
     if args_bounds_check(node.args, 5, False):
         _LOGGER.debug("return_debug_mask is not yet supported.")
         return False
@@ -4754,6 +4795,9 @@ def aten_ops_scaled_dot_product_flash_attention(
 def scaled_dot_product_efficient_attention_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
+    if not attention_capability_validator(node, settings):
+        return False
+
     if args_bounds_check(node.args, 4, False):
         _LOGGER.debug("compute_log_sumexp is not yet supported.")
         return False
@@ -4840,6 +4884,7 @@ def scaled_dot_product_cudnn_attention_validator(
         _LOGGER.debug("return_debug_mask is not yet supported.")
         return False
 
+    # Delegating also picks up the Turing (SM 7.5) dtype guard.
     return scaled_dot_product_efficient_attention_validator(node, settings)
 
 
