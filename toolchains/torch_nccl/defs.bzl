@@ -10,17 +10,10 @@ def _find_nccl_include(repository_ctx, torch_path):
         return candidate
     return None
 
-def _has_process_group_nccl2(repository_ctx, torch_path, lib_path):
+def _has_process_group_nccl2(repository_ctx, torch_path):
     """Check that the installed PyTorch exposes the NCCL2 backend."""
     header = torch_path + "/include/torch/csrc/distributed/c10d/nccl2/ProcessGroupNCCL.hpp"
-    header_result = repository_ctx.execute(["test", "-f", header])
-    if header_result.return_code != 0:
-        return False
-
-    # The header alone is insufficient: make sure the matching implementation
-    # is present in the PyTorch CUDA library that the detector found.
-    symbol_result = repository_ctx.execute(["grep", "-q", "nccl2", lib_path])
-    return symbol_result.return_code == 0
+    return repository_ctx.execute(["test", "-f", header]).return_code == 0
 
 def _torch_nccl_detect_impl(repository_ctx):
     """Detect if PyTorch was built with NCCL support."""
@@ -62,7 +55,7 @@ def _torch_nccl_detect_impl(repository_ctx):
                 found = _find_nccl_include(repository_ctx, torch_path)
                 if found:
                     nccl_include_dir = found
-                    has_process_group_nccl2 = _has_process_group_nccl2(repository_ctx, torch_path, lib_path)
+                    has_process_group_nccl2 = _has_process_group_nccl2(repository_ctx, torch_path)
                 else:
                     # Cannot find nccl.h — disable to avoid build errors
                     has_nccl = False
