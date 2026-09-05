@@ -159,7 +159,7 @@ jobs:
 
   # Consolidated, agent-friendly report over this run's suites (informational).
   report:
-    needs: [standard, rtx, python-only, python-only-rtx, executorch-runtime-build, executorch-runtime-test]
+    needs: [standard, rtx, python-only, python-only-rtx, executorch-runtime-test]
     if: always()
     runs-on: ubuntu-latest
     steps:
