@@ -1,11 +1,13 @@
 import logging
 from typing import Collection, Dict, List, Mapping, Optional, Sequence, Tuple
 
+import tensorrt as trt
 import torch
 from torch.fx.graph_module import GraphModule
 from torch.fx.node import Target
 from torch.fx.passes.infra.partitioner import CapabilityBasedPartitioner, Partition
 from torch.fx.passes.operator_support import OperatorSupport, SupportDict
+from torch.utils._pytree import tree_flatten
 from torch_tensorrt.dynamo._defaults import (
     MIN_BLOCK_SIZE,
     REQUIRE_FULL_COMPILATION,
@@ -16,7 +18,7 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     ConverterRegistry,
 )
-from torch_tensorrt.dynamo.utils import COMPLEX_DTYPES
+from torch_tensorrt.dynamo.utils import COMPLEX_DTYPES, to_torch_device
 
 logger = logging.getLogger(__name__)
 
@@ -144,6 +146,7 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
         self.supported_operators: Dict[str, int] = {}
         self.unsupported_operators: Dict[str, int] = {}
         self.torch_executed_ops: Collection[Target] = torch_executed_ops
+        self._non_target_device_cache: Dict[torch.fx.Node, bool] = {}
 
     @staticmethod
     def _has_complex_dtype(node: torch.fx.Node) -> bool:
@@ -167,6 +170,81 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
         return False
 
     @staticmethod
+    def _tensor_devices(node: torch.fx.Node) -> List[torch.device]:
+        leaves, _ = tree_flatten(node.meta.get("val"))
+        return [leaf.device for leaf in leaves if isinstance(leaf, torch.Tensor)]
+
+    @staticmethod
+    def _same_device(left: torch.device, right: torch.device) -> bool:
+        return left.type == right.type and (
+            left.index is None or right.index is None or left.index == right.index
+        )
+
+    @classmethod
+    def _is_explicit_non_target_region(
+        cls,
+        node: torch.fx.Node,
+        target_device: torch.device,
+        cache: Dict[torch.fx.Node, bool],
+    ) -> bool:
+        """Return True for non-target tensors produced by an explicit transfer.
+
+        Torch-TensorRT historically accepts models traced with CPU example inputs
+        and relocates their engines to the requested CUDA device. Preserve that
+        behavior while preventing a device-changing op inside an otherwise CUDA
+        graph from starting a CPU region that a later converter absorbs.
+        """
+
+        if node in cache:
+            return cache[node]
+
+        output_devices = cls._tensor_devices(node)
+        if not output_devices or all(
+            cls._same_device(device, target_device) for device in output_devices
+        ):
+            cache[node] = False
+            return False
+
+        runtime_inputs = [
+            input_node
+            for input_node in node.all_input_nodes
+            if input_node.op != "get_attr"
+        ]
+        crosses_device = any(
+            not cls._same_device(input_device, output_device)
+            for input_node in runtime_inputs
+            for input_device in cls._tensor_devices(input_node)
+            for output_device in output_devices
+        )
+        inherited_transfer = any(
+            cls._is_explicit_non_target_region(input_node, target_device, cache)
+            for input_node in runtime_inputs
+        )
+        cache[node] = crosses_device or inherited_transfer
+        return cache[node]
+
+    @staticmethod
+    def _exceeds_max_tensor_rank(node: torch.fx.Node) -> bool:
+        """Return whether a node would move a rank unsupported by TensorRT."""
+
+        def _value_exceeds_limit(value: object) -> bool:
+            if isinstance(value, torch.Tensor):
+                return value.ndim > trt.Dims.MAX_DIMS
+            if isinstance(value, (tuple, list)):
+                return any(_value_exceeds_limit(item) for item in value)
+            if isinstance(value, dict):
+                return any(_value_exceeds_limit(item) for item in value.values())
+            return False
+
+        def _node_exceeds_limit(candidate: torch.fx.Node) -> bool:
+            value = candidate.meta.get("val", candidate.meta.get("example_value"))
+            return _value_exceeds_limit(value)
+
+        return _node_exceeds_limit(node) or any(
+            _node_exceeds_limit(input_node) for input_node in node.all_input_nodes
+        )
+
+    @staticmethod
     def _requires_output_allocator(node: torch.fx.Node) -> bool:
         # True if the converter selected for this node needs a TRT output allocator,
         # i.e. the node has a data-dependent output shape (e.g. nonzero or boolean
@@ -181,6 +259,31 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
     ) -> bool:
         node_name = ConverterRegistry.qualified_name_or_str(node.target)
 
+        settings = CONVERTERS.compilation_settings
+        if settings is not None and self._is_explicit_non_target_region(
+            node,
+            to_torch_device(settings.device),
+            self._non_target_device_cache,
+        ):
+            if not node.is_impure():
+                self.unsupported_operators[node_name] = (
+                    self.unsupported_operators.get(node_name, 0) + 1
+                )
+            logger.debug(
+                "Operator %s is not supported because it belongs to an explicit "
+                "non-target device region",
+                node_name,
+            )
+            return False
+
+        if self._exceeds_max_tensor_rank(node):
+            # TensorRT network inputs and outputs are limited by trt.Dims.
+            if not node.is_impure():
+                self.unsupported_operators[node_name] = (
+                    self.unsupported_operators.get(node_name, 0) + 1
+                )
+            return False
+
         if self._has_complex_dtype(node):
             # Complex-dtype tensors are not supported by TensorRT; force PyTorch fallback
             # so the graph breaks around the complex cluster inserted by complex_graph_detection.
@@ -190,7 +293,6 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
                 )
             return False
 
-        settings = CONVERTERS.compilation_settings
         if (
             settings is not None
             and settings.fallback_data_dependent_ops

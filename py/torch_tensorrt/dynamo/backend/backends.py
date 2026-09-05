@@ -15,6 +15,7 @@ from torch_tensorrt._utils import is_tegra_platform
 from torch_tensorrt.dynamo import CompilationSettings
 from torch_tensorrt.dynamo._compiler import compile_module
 from torch_tensorrt.dynamo.lowering import (
+    filter_decomposition_table,
     get_decompositions,
     post_lowering,
     remove_detach,
@@ -81,11 +82,14 @@ def aot_torch_tensorrt_aten_backend(
             _pretraced_backend, settings=settings, engine_cache=engine_cache
         )
         settings_aot_autograd = {}
-        settings_aot_autograd["decompositions"] = get_decompositions(
-            settings.enable_experimental_decompositions,
-            settings.decompose_attention,
-            settings.use_distributed_mode_trace,
-            use_fp32_acc=settings.use_fp32_acc,
+        settings_aot_autograd["decompositions"] = filter_decomposition_table(
+            get_decompositions(
+                settings.enable_experimental_decompositions,
+                settings.decompose_attention,
+                settings.use_distributed_mode_trace,
+                use_fp32_acc=settings.use_fp32_acc,
+            ),
+            gm,
         )
         # This is added since detach lowering leads to alias nodes
         # Error - View operation returned a tensor that is the same as the input base tensor
@@ -132,10 +136,13 @@ def aot_torch_tensorrt_aten_backend(
         _pretraced_backend_autograd = functools.partial(
             _pretraced_backend, settings=aot_settings, engine_cache=engine_cache
         )
-        aot_decomps = get_decompositions(
-            settings.enable_experimental_decompositions,
-            settings.decompose_attention,
-            use_fp32_acc=settings.use_fp32_acc,
+        aot_decomps = filter_decomposition_table(
+            get_decompositions(
+                settings.enable_experimental_decompositions,
+                settings.decompose_attention,
+                use_fp32_acc=settings.use_fp32_acc,
+            ),
+            gm,
         )
         # Remove detach decompositions to avoid alias node errors.
         to_delete = {k for k in aot_decomps if "detach" in k._name}
@@ -333,11 +340,14 @@ def _pretraced_backend(
                     gm,
                     sample_inputs,
                     trace_joint=False,
-                    decompositions=get_decompositions(
-                        settings.enable_experimental_decompositions,
-                        settings.decompose_attention,
-                        settings.use_distributed_mode_trace,
-                        use_fp32_acc=settings.use_fp32_acc,
+                    decompositions=filter_decomposition_table(
+                        get_decompositions(
+                            settings.enable_experimental_decompositions,
+                            settings.decompose_attention,
+                            settings.use_distributed_mode_trace,
+                            use_fp32_acc=settings.use_fp32_acc,
+                        ),
+                        gm,
                     ),
                 )
 

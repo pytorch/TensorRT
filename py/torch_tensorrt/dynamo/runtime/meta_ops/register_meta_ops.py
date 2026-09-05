@@ -2,6 +2,7 @@ import base64
 import logging
 from typing import Any, Dict, List
 
+import sympy
 import torch
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
 
@@ -9,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 def _apply_symbolic_shape_expressions(
-    inputs: List[torch.Tensor], shape_info: Dict[str, List[Dict[str, Any]]]
+    inputs: List[Any], shape_info: Dict[str, List[Dict[str, Any]]]
 ) -> List[torch.Tensor]:
     """
     Apply symbolic shape expressions to create output fake tensors.
@@ -34,6 +35,13 @@ def _apply_symbolic_shape_expressions(
     input_info = shape_info.get("inputs", [])
     output_info = shape_info.get("outputs", [])
 
+    tensor_inputs = [value for value in inputs if isinstance(value, torch.Tensor)]
+    if not tensor_inputs:
+        raise RuntimeError(
+            "[torch.ops.tensorrt.execute_engine]: At least one tensor input is required to infer the engine output device"
+        )
+    output_device = tensor_inputs[0].device
+
     fake_mode = detect_fake_mode(inputs)
     if fake_mode is None:
         # No fake mode - shouldn't happen, but fall back to concrete shapes
@@ -44,30 +52,172 @@ def _apply_symbolic_shape_expressions(
                 for s in info["shape_exprs"]
             ]
             outputs.append(
-                torch.empty(shape, dtype=info["dtype"], device=inputs[0].device)
+                torch.empty(shape, dtype=info["dtype"], device=output_device)
             )
         return outputs
 
-    # Build a mapping from compile-time symbolic expressions to runtime SymInts
-    # by aligning captured input info with actual runtime input tensors
-    symbol_to_symint = {}
-    symbol_to_concrete = {}
-    shape_env = None
+    # Shape symbols are local to a ShapeEnv. The expressions in shape_info came
+    # from the ShapeEnv used to compile the engine, so they must not be inserted
+    # verbatim into the unrelated ShapeEnv doing this fake execution. Both
+    # environments can contain a symbol called u0 for different quantities.
+    #
+    # Give every compile-time symbol a private identity before relating input
+    # expressions to their runtime counterparts. Sympy symbols compare by name
+    # and assumptions, whereas Dummy objects are unique even when their printed
+    # names match a runtime symbol.
+    compile_symbols = {
+        symbol
+        for info in (*input_info, *output_info)
+        for expr in info["shape_exprs"]
+        if not isinstance(expr, int)
+        for symbol in expr.free_symbols
+    }
+    compile_symbol_namespace = {
+        symbol: sympy.Dummy(symbol.name, integer=True) for symbol in compile_symbols
+    }
+
+    def in_compile_namespace(expr: sympy.Expr) -> sympy.Expr:
+        return expr.xreplace(compile_symbol_namespace)
+
+    # Prefer the ShapeEnv owned by the active FakeTensorMode. Inputs may all be
+    # statically shaped even when a data-dependent engine output is symbolic.
+    shape_env = getattr(fake_mode, "shape_env", None)
+    compile_input_symbols = set()
+    compile_to_runtime: Dict[sympy.Expr, sympy.Expr] = {}
+    runtime_expr_to_symint = {}
+    composite_input_equations = []
 
     # Align inputs: for each captured input, match it with the corresponding runtime input
-    for idx, (inp_tensor, inp_info) in enumerate(zip(inputs, input_info)):
-        for d, s in zip(inp_tensor.shape, inp_info["shape_exprs"]):
+    for inp_tensor, inp_info in zip(inputs, input_info):
+        if inp_info.get("is_scalar"):
+            continue
+        for d, compile_expr in zip(inp_tensor.shape, inp_info["shape_exprs"]):
+            if isinstance(compile_expr, int):
+                continue
+
+            compile_expr = in_compile_namespace(compile_expr)
+            compile_input_symbols.update(compile_expr.free_symbols)
             if isinstance(d, torch.SymInt):
-                symbol_to_symint[s] = d
+                runtime_expr = d.node.expr
+                runtime_expr_to_symint[runtime_expr] = d
                 if shape_env is None:
                     shape_env = d.node.shape_env
+            else:
+                runtime_expr = sympy.Integer(d)
 
-            elif isinstance(d, int):
-                symbol_to_concrete[s] = d
+            if compile_expr.is_Symbol:
+                if compile_expr in compile_to_runtime:
+                    residual = compile_to_runtime[compile_expr] - runtime_expr
+                    # Two runtime SymInts can be tied to the same compile-time
+                    # symbol yet be distinct symbol objects here -- e.g. a
+                    # shared torch.export.Dim gets reallocated as separate,
+                    # SymInts on retrace/re-export. Preserve the compile-time
+                    # equality by installing it as a guard in the active
+                    # ShapeEnv instead of requiring the symbols to have
+                    # already been merged.
+                    error_message = (
+                        "[torch.ops.tensorrt.execute_engine]: Runtime input shapes "
+                        f"disagree on compile-time symbol {compile_expr}: already "
+                        f"mapped to {compile_to_runtime[compile_expr]} from an earlier "
+                        f"input, but this input maps it to {runtime_expr}"
+                    )
+                    if shape_env is not None:
+                        residual = shape_env.simplify(residual)
+                    residual = sympy.simplify(residual)
+                    if residual != 0 and (
+                        shape_env is None
+                        or not shape_env.guard_or_defer_runtime_assert(
+                            sympy.Eq(residual, 0), error_message
+                        )
+                    ):
+                        raise RuntimeError(error_message)
+                compile_to_runtime[compile_expr] = runtime_expr
+            else:
+                # Store the difference: sympy.Eq can auto-collapse to a bare
+                # Boolean with no .lhs/.rhs (e.g. Eq(2*d, 7) -> False).
+                composite_input_equations.append(compile_expr - runtime_expr)
 
             logger.debug(
-                f"[torch.ops.tensorrt.execute_engine]: Meta kernel captured and mapped symbol from input {inp_tensor} (compile time symbol: {s}, new symbol: {d})"
+                f"[torch.ops.tensorrt.execute_engine]: Meta kernel captured input shape mapping from {compile_expr} to {runtime_expr}"
             )
+
+    # A constrained input can be recorded as an expression such as 2*s0.
+    # Solve those equations for compile-time symbols not mapped by a direct
+    # symbolic dimension.
+    unresolved_input_symbols = compile_input_symbols - compile_to_runtime.keys()
+    if composite_input_equations and unresolved_input_symbols:
+        equations = [
+            equation.xreplace(compile_to_runtime)
+            for equation in composite_input_equations
+        ]
+        solutions = sympy.solve(
+            equations,
+            tuple(sorted(unresolved_input_symbols, key=str)),
+            dict=True,
+        )
+        if len(solutions) == 1:
+            # Underdetermined systems still return one dict, but a value can
+            # contain other unresolved compile-time symbols, e.g. solve(s0+s1-10,
+            # (s0,s1)) -> {s0: 10-s1}. Only accept fully resolved values.
+            for symbol, value in solutions[0].items():
+                if not (value.free_symbols & compile_input_symbols):
+                    compile_to_runtime[symbol] = value
+
+    # Validate every composite equation, even if unresolved_input_symbols was
+    # empty above (a symbol already mapped elsewhere doesn't mean this
+    # relationship was actually satisfied by these runtime inputs).
+    for diff in composite_input_equations:
+        residual = sympy.simplify(diff.xreplace(compile_to_runtime))
+        unresolved_symbols = residual.free_symbols & compile_input_symbols
+        if unresolved_symbols:
+            raise RuntimeError(
+                "[torch.ops.tensorrt.execute_engine]: Could not verify the compile-time "
+                f"input relationship {diff} == 0 against these runtime shapes "
+                f"(unresolved residual: {residual})"
+            )
+        if shape_env is not None:
+            residual = sympy.simplify(shape_env.simplify(residual))
+        if residual == 0:
+            continue
+        error_message = (
+            "[torch.ops.tensorrt.execute_engine]: Runtime input shapes violate "
+            f"a relationship captured at compile time: {diff} == 0 does not hold "
+            f"for these inputs (residual {residual} != 0)"
+        )
+        if shape_env is not None and shape_env.guard_or_defer_runtime_assert(
+            sympy.Eq(residual, 0), error_message
+        ):
+            continue
+        if residual.is_number:
+            raise RuntimeError(error_message)
+        # Still symbolic: can't prove it holds, so fail closed.
+        raise RuntimeError(
+            "[torch.ops.tensorrt.execute_engine]: Could not verify the compile-time "
+            f"input relationship {diff} == 0 against these runtime shapes "
+            f"(unresolved residual: {residual})"
+        )
+
+    # Symbols which occur only in engine outputs represent quantities created
+    # by the engine, such as the row count of nonzero. Allocate fresh runtime
+    # symbols once per fake invocation, preserve sharing between output
+    # expressions, and mark them as valid tensor sizes.
+    output_only_symbols = {
+        symbol
+        for info in output_info
+        for expr in info["shape_exprs"]
+        if not isinstance(expr, int)
+        for symbol in in_compile_namespace(expr).free_symbols
+        if symbol not in compile_input_symbols
+    }
+    if output_only_symbols and shape_env is None:
+        raise RuntimeError(
+            "[torch.ops.tensorrt.execute_engine]: No shape_env available during meta kernel execution"
+        )
+    for symbol in sorted(output_only_symbols, key=str):
+        runtime_symint = shape_env.create_unbacked_symint()
+        shape_env._constrain_range_for_size(runtime_symint.node.expr)
+        compile_to_runtime[symbol] = runtime_symint.node.expr
+        runtime_expr_to_symint[runtime_symint.node.expr] = runtime_symint
 
     # Create output fake tensors with symbolic shapes
     logger.debug(f"Deserialized output shape expressions: {output_info}")
@@ -80,78 +230,40 @@ def _apply_symbolic_shape_expressions(
                     # Concrete dimension
                     output_shape.append(expr)
                 else:
-                    logger.debug(f"Symbolic expression: {expr}")
-                    # Symbolic expression (sympy expr)
-
-                    # Check if this expression uses any symbols that are now concrete
-                    has_concrete_symbols = any(
-                        sym in symbol_to_concrete for sym in expr.free_symbols
+                    compile_expr = in_compile_namespace(expr)
+                    missing_input_symbols = (
+                        compile_expr.free_symbols
+                        & compile_input_symbols - compile_to_runtime.keys()
                     )
-
-                    if has_concrete_symbols:
-                        # Case 2: Some compile-time symbols are now concrete ints
-                        # Evaluate the expression to a concrete value
-                        try:
-                            # Build substitution dict with concrete values
-                            subs_dict = {}
-                            for sym in expr.free_symbols:
-                                if sym in symbol_to_concrete:
-                                    subs_dict[sym] = symbol_to_concrete[sym]
-                                elif sym in symbol_to_symint:
-                                    subs_dict[sym] = symbol_to_symint[sym].node.hint
-                                else:
-                                    subs_dict[sym] = sym
-
-                            val = expr.subs(subs_dict)
-                            concrete_dim = int(val)
-                            output_shape.append(concrete_dim)
-                            logger.debug(
-                                f"Evaluated {expr} to concrete value {concrete_dim} using concrete mappings"
-                            )
-                        except Exception as e:
-                            raise RuntimeError(
-                                f"[torch.ops.tensorrt.execute_engine]: Failed to evaluate symbolic expression {expr} "
-                                f"with concrete values. Free symbols: {expr.free_symbols}, "
-                                f"Concrete mappings: {symbol_to_concrete}, "
-                                f"SymInt mappings: {list(symbol_to_symint.keys())}. Error: {e}"
-                            )
-                    elif expr in symbol_to_symint:
-                        # Case 1a: Direct mapping - compile-time symbol is represented by runtime SymInt
-                        output_shape.append(symbol_to_symint[expr])
-                        logger.debug(
-                            f"Reused SymInt from input: {expr} -> {symbol_to_symint[expr]}"
-                        )
-                    elif shape_env is not None:
-                        # Case 1b: Create new SymInt from expression using existing SymInts
-                        try:
-                            # Calculate hint by substituting known values
-                            hint_val = expr.subs(
-                                {
-                                    sym: symbol_to_symint[sym].node.hint
-                                    for sym in expr.free_symbols
-                                    if sym in symbol_to_symint
-                                }
-                            )
-                            hint = int(hint_val) if hint_val.is_number else None
-
-                            # Create new SymInt from the expression
-                            output_symint = shape_env.create_symintnode(expr, hint=hint)
-                            output_shape.append(output_symint)
-                            logger.debug(
-                                f"Created new SymInt for {expr} with hint {hint}"
-                            )
-                        except Exception as e:
-                            raise RuntimeError(
-                                f"[torch.ops.tensorrt.execute_engine]: Failed to create SymInt for expression {expr}. "
-                                f"Error: {e}"
-                            )
-                    else:
+                    if missing_input_symbols:
                         raise RuntimeError(
-                            "[torch.ops.tensorrt.execute_engine]: No shape_env available during meta kernel execution"
+                            "[torch.ops.tensorrt.execute_engine]: Could not map "
+                            f"compile-time input symbols {missing_input_symbols} "
+                            f"while applying output expression {expr}"
                         )
+
+                    runtime_expr = sympy.simplify(
+                        compile_expr.xreplace(compile_to_runtime)
+                    )
+                    logger.debug(
+                        f"Remapped symbolic output expression {expr} to {runtime_expr}"
+                    )
+                    if runtime_expr.is_number:
+                        output_shape.append(int(runtime_expr))
+                    elif runtime_expr in runtime_expr_to_symint:
+                        output_shape.append(runtime_expr_to_symint[runtime_expr])
+                    else:
+                        try:
+                            output_shape.append(
+                                shape_env.create_symintnode(runtime_expr, hint=None)
+                            )
+                        except Exception as e:
+                            raise RuntimeError(
+                                f"[torch.ops.tensorrt.execute_engine]: Failed to create SymInt for remapped expression {runtime_expr} (captured as {expr}). Error: {e}"
+                            ) from e
 
             outputs.append(
-                torch.empty(output_shape, dtype=info["dtype"], device=inputs[0].device)
+                torch.empty(output_shape, dtype=info["dtype"], device=output_device)
             )
     logger.debug(
         f"[torch.ops.tensorrt.execute_engine]: Meta kernel found the following output FakeTensors: {outputs}"

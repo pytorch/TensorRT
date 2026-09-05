@@ -40,6 +40,7 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
 from torch_tensorrt.dynamo.debug._DebuggerConfig import DebuggerConfig
 from torch_tensorrt.dynamo.debug._supports_debugger import fn_supports_debugger
 from torch_tensorrt.dynamo.lowering import (
+    filter_decomposition_table,
     get_decompositions,
     post_lowering,
     pre_export_lowering,
@@ -395,11 +396,14 @@ def cross_compile_for_windows(
     logger.info("Compilation Settings: %s\n", settings)
     exported_program = pre_export_lowering(exported_program, settings)
     exported_program = exported_program.run_decompositions(
-        get_decompositions(
-            enable_experimental_decompositions,
-            decompose_attention,
-            use_distributed_mode_trace,
-            use_fp32_acc=use_fp32_acc,
+        filter_decomposition_table(
+            get_decompositions(
+                enable_experimental_decompositions,
+                decompose_attention,
+                use_distributed_mode_trace,
+                use_fp32_acc=use_fp32_acc,
+            ),
+            exported_program.graph_module,
         )
     )
 
@@ -802,11 +806,14 @@ def compile(
     logger.info("Compilation Settings: %s\n", settings)
     exported_program = pre_export_lowering(exported_program, settings)
     exported_program = exported_program.run_decompositions(
-        get_decompositions(
-            enable_experimental_decompositions,
-            decompose_attention,
-            use_distributed_mode_trace,
-            use_fp32_acc=use_fp32_acc,
+        filter_decomposition_table(
+            get_decompositions(
+                enable_experimental_decompositions,
+                decompose_attention,
+                use_distributed_mode_trace,
+                use_fp32_acc=use_fp32_acc,
+            ),
+            exported_program.graph_module,
         )
     )
 
@@ -1438,7 +1445,11 @@ def compile_module(
                 str(name),
                 str(submodule.graph),
             )
-            submodule.to(to_torch_device(settings.device))
+            # Only undo the explicit compilation-time offload. Otherwise this
+            # would relocate parameters that the source graph intentionally
+            # kept on the host.
+            if settings.offload_module_to_cpu:
+                submodule.to(to_torch_device(settings.device))
             continue
 
         if name not in submodule_node_dict:
@@ -2104,11 +2115,14 @@ def convert_exported_program_to_serialized_trt_engine(
     logger.info("Compilation Settings: %s\n", settings)
     exported_program = pre_export_lowering(exported_program, settings)
     exported_program = exported_program.run_decompositions(
-        get_decompositions(
-            enable_experimental_decompositions,
-            decompose_attention,
-            use_distributed_mode_trace,
-            use_fp32_acc=use_fp32_acc,
+        filter_decomposition_table(
+            get_decompositions(
+                enable_experimental_decompositions,
+                decompose_attention,
+                use_distributed_mode_trace,
+                use_fp32_acc=use_fp32_acc,
+            ),
+            exported_program.graph_module,
         )
     )
 

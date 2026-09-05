@@ -888,6 +888,20 @@ def inline_trt_modules(
     """
     Replace TRT submodules with trt engine nodes.
     """
+    fake_mode = detect_fake_mode(
+        tuple(
+            node.meta["val"]
+            for node in gm.graph.nodes
+            if node.op == "placeholder" and "val" in node.meta
+        )
+    )
+
+    def scalar_tensor_meta(dtype: torch.dtype, device: torch.device) -> torch.Tensor:
+        if fake_mode is None:
+            return torch.empty((), dtype=dtype, device="meta")
+        with fake_mode:
+            return torch.empty((), dtype=dtype, device=device)
+
     for name, _ in gm.named_children():
         if "_run_on_acc" not in name:
             continue
@@ -904,16 +918,52 @@ def inline_trt_modules(
             raise ValueError(
                 f"trt_module_node: {trt_module_node.name} does not have the metadata which should be set during dynamo compile_module step."
             )
-        num_outputs = len(trt_module_node.meta["val"])
+
+        shape_info = trt_module.symbolic_shape_expressions or {}
+        input_info = shape_info.get("inputs", [])
+        output_info = shape_info.get("outputs", [])
+        original_output_vals = trt_module_node.meta["val"]
+        if not isinstance(original_output_vals, (tuple, list)):
+            original_output_vals = [original_output_vals]
+        num_outputs = len(original_output_vals)
+
+        engine_output_vals = []
+        for index, value in enumerate(original_output_vals):
+            if index < len(output_info) and output_info[index].get("is_scalar"):
+                engine_output_vals.append(
+                    scalar_tensor_meta(
+                        output_info[index]["dtype"], trt_module.target_device
+                    )
+                )
+            else:
+                engine_output_vals.append(value)
+
         # Insert a call_function node to perform inference on TRT engine
         with gm.graph.inserting_before(trt_module_node):
+            engine_inputs = list(trt_module_node.args)
+            for index, info in enumerate(input_info):
+                if index >= len(engine_inputs) or not info.get("is_scalar"):
+                    continue
+                scalar_input = gm.graph.call_function(
+                    torch.ops.aten.scalar_tensor.default,
+                    (engine_inputs[index],),
+                    {
+                        "dtype": info["dtype"],
+                        "device": trt_module.target_device,
+                    },
+                )
+                scalar_input.meta["val"] = scalar_tensor_meta(
+                    info["dtype"], trt_module.target_device
+                )
+                engine_inputs[index] = scalar_input
+
             if cross_compile_module:
                 engine_info = trt_module._pack_engine_info()
                 engine_bytes = engine_info[ENGINE_IDX]
                 engine_info[ENGINE_IDX] = base64.b64encode(engine_bytes).decode("utf-8")
                 trt_node = gm.graph.call_function(
                     torch.ops.tensorrt.no_op_placeholder_for_execute_engine.default,
-                    (trt_module_node.args, *engine_info),
+                    (tuple(engine_inputs), *engine_info),
                 )
             else:
                 engine_name = f"{name}_engine"
@@ -922,28 +972,50 @@ def inline_trt_modules(
 
                 trt_node = gm.graph.call_function(
                     torch.ops.tensorrt.execute_engine.default,
-                    (trt_module_node.args, engine_node),
+                    (tuple(engine_inputs), engine_node),
                 )
                 engine_node.meta["val"] = CustomObjArgument(
                     name=engine_node.name, class_fqn=""
                 )
             assert num_outputs > 0
-            trt_node.meta["val"] = trt_module_node.meta["val"]
+            trt_node.meta["val"] = engine_output_vals
+
+        def restore_scalar_output(
+            getitem_node: torch.fx.Node, output_index: int
+        ) -> torch.fx.Node:
+            getitem_node.meta["val"] = engine_output_vals[output_index]
+            if output_index >= len(output_info) or not output_info[output_index].get(
+                "is_scalar"
+            ):
+                return getitem_node
+
+            with gm.graph.inserting_after(getitem_node):
+                scalar_output = gm.graph.call_function(
+                    torch.ops.aten.item.default, (getitem_node,)
+                )
+                scalar_output.meta["val"] = original_output_vals[output_index]
+            getitem_node.replace_all_uses_with(
+                scalar_output, delete_user_cb=lambda user: user is not scalar_output
+            )
+            return scalar_output
 
         if num_outputs == 1:
-            # Insert getitem nodes as outputs (for export serialization to work)
+            # Insert a getitem because execute_engine always returns Tensor[].
             with gm.graph.inserting_after(trt_node):
                 getitem_output = gm.graph.call_function(operator.getitem, (trt_node, 0))
-                getitem_output.meta["val"] = trt_node.meta["val"]
-            trt_module_node.replace_all_uses_with(getitem_output)
+            replacement = restore_scalar_output(getitem_output, 0)
+            trt_module_node.replace_all_uses_with(replacement)
         else:
-            # Multiple outputs case:
-            # Replace uses of submodule with the trt_node.
-            # getitem nodes are already added inherently by the partitioner
+            # Multiple-output partitioner graphs already contain getitem users.
             trt_module_node.replace_all_uses_with(trt_node)
-            getitem_nodes = trt_node.users
-            for idx, getitem_node in enumerate(getitem_nodes):
-                getitem_node.meta["val"] = trt_node.meta["val"][idx]
+            for getitem_node in list(trt_node.users):
+                if (
+                    getitem_node.target is not operator.getitem
+                    or len(getitem_node.args) < 2
+                    or not isinstance(getitem_node.args[1], int)
+                ):
+                    continue
+                restore_scalar_output(getitem_node, getitem_node.args[1])
 
         # Expose the engine's aliased (KV-cache) outputs as graph-level buffer
         # mutations so the ExecuTorch path sees a real mutable buffer instead of
