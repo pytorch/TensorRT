@@ -8,7 +8,7 @@ one ``torch.export`` graph that calls those engines.
 
 .. code-block:: python
 
-    from torch_tensorrt.hf.exporters import EdgeExporter, EdgeConfig
+    from hf.exporters import EdgeExporter, EdgeConfig
 
     exporter = EdgeExporter()
     config = EdgeConfig(dryrun=True, engine_dir="/tmp/pi05_edge")
@@ -19,6 +19,9 @@ shape as Transformers export: ``exporter.export(model, inputs, config)``. The
 difference is what happens inside. Instead of tracing the whole policy as one
 graph, Edge compiles one TensorRT engine per component, then records a small
 outer graph that only *calls* those engines.
+
+The code is in ``tools/hf``. The entry points are ``tools/hf/run_pi05_export.py``,
+``run_groot_export.py``, and ``run_nemotron_export.py``.
 
 .. note::
 
@@ -67,8 +70,8 @@ Before ``export()``, load the Edge-LLM plugins and force HuggingFace attention t
 
 .. code-block:: python
 
-    from torch_tensorrt.hf.exporters.plugin.plugin_utils import load_plugins_for_trt
-    from torch_tensorrt.hf.exporters.utils import force_hf_attention
+    from hf.exporters.plugin.plugin_utils import load_plugins_for_trt
+    from hf.exporters.utils import force_hf_attention
 
     load_plugins_for_trt()
     force_hf_attention(policy.model.paligemma_with_expert.paligemma.model.vision_tower, "eager")
@@ -82,8 +85,8 @@ plus sample inputs, and call ``export()``.
 
 .. code-block:: python
 
-    from torch_tensorrt.hf.exporters import EdgeExporter, EdgeConfig
-    from torch_tensorrt.hf.exporters.plugin.plugin_utils import load_plugins_for_trt
+    from hf.exporters import EdgeExporter, EdgeConfig
+    from hf.exporters.plugin.plugin_utils import load_plugins_for_trt
 
     load_plugins_for_trt()
 
@@ -166,7 +169,7 @@ and no ``context_projection`` engine. Nemotron is a single
 ``spec.run()`` calls ``call_engine(...)``, so ``torch.export`` records **one
 node per engine**. Matching ``register_fake`` kernels give Dynamo the output
 shapes. Two packing ops live in the same file
-(``py/torch_tensorrt/hf/exporters/ops.py``):
+(``tools/hf/exporters/ops.py``):
 
 * ``edge_llm::fuse_prefix`` — PI05: concat vision tokens with language
   embeddings and gather the compact prefix.
@@ -178,20 +181,26 @@ These appear in the **outer** ExportedProgram. They are not TensorRT plugins.
 Patches
 -------
 
-HuggingFace ``DynamoExporter`` uses ``@register_patch`` plus a temporary class
-``setattr``. Edge uses the same contract.
+Edge does not wrap the policy in a new module. It temporarily replaces
+``Class.forward`` on the original HuggingFace / LeRobot class, compiles that
+submodule, then restores the method (dryrun leaves the replacement in place).
 
-Each family has a ``patches.py`` that registers factories on a backend name
-(``"pi05"``, ``"groot"``, ``"nemotron"``). A factory receives the **original**
-``Class.forward`` and returns a replacement. ``apply_patches(backend)`` resolves
-the dotted class path and does ``setattr(Cls, "forward", factory(original))``
-for the duration of ``export()``. After a real compile the original methods are
-restored. Dryrun leaves the replacements installed so ``execute_engine`` still
-hits the patched Python modules.
+``@register_patch`` does not install anything. It records a factory and a dotted
+class path on a backend (``"pi05"``, ``"groot"``, ``"nemotron"``).
+``apply_patches(backend)`` imports that class and does
+``setattr(Cls, "forward", factory(original))`` for the duration of
+``export()``.
+
+HuggingFace ``DynamoExporter`` uses the same two steps. The purpose is
+different. HF patches make the original modeling ``forward`` traceable. Edge
+patches change ``forward`` first so TensorRT traces plugin ops
+(``torch.ops.trt.*``), not HuggingFace attention. After compile, the outer
+graph is ``spec.run()`` → ``execute_engine``. There is no HF attention left
+to patch, so the HuggingFace ``"dynamo"`` registry does not apply.
 
 .. code-block:: python
 
-    from torch_tensorrt.hf.exporters.plugin.attn_patches import register_patch
+    from exporters.plugin.attn_patches import register_patch
 
     PI05 = "pi05"
 
@@ -207,15 +216,15 @@ hits the patched Python modules.
 
         return forward
 
-The replacement is the thing TensorRT traces. You compile the **original
-submodule** (``PaliGemmaModel``, ``PiGemmaModel``, ``FlowmatchingActionHead``, …),
-not a wrapper ``nn.Module``. The patched ``forward`` is what makes that submodule
-look like an Edge engine: a tensor in, a tensor out, plugin attention inside.
+You compile the original submodule (``PaliGemmaModel``, ``PiGemmaModel``,
+``FlowmatchingActionHead``, …), not a wrapper ``nn.Module``. The patched
+``forward`` is what TensorRT traces: a tensor in, a tensor out, plugin
+attention inside.
 
-When the same class is used in two roles, the patched ``forward`` dispatches.
-PI05 language is ``PiGemmaModel`` for both the language tower and the action
-expert. Edge prefill passes ``rope_rotary_cos_sin``; the action expert does not.
-If that argument is missing, the original HuggingFace forward runs:
+When the same class is used twice (PI05 language vs action expert), the
+patched ``forward`` checks for Edge arguments such as
+``rope_rotary_cos_sin``. If they are missing, the original HuggingFace
+``forward`` runs:
 
 .. code-block:: python
 
@@ -228,18 +237,52 @@ Attention patches follow the same rule: ``GemmaAttention.forward`` uses the
 language plugin when ``rope_rotary_cos_sin`` is present, otherwise eager HF
 attention.
 
-The spec installs the whole family backend once around the component loop:
+The spec installs the family once around the component loop:
 
 .. code-block:: python
 
     class Pi05Spec(EdgeSpec):
         def apply_patches(self, model=None):
-            from torch_tensorrt.hf.exporters.plugin.attn_patches import apply_patches
+            from exporters.plugin.attn_patches import apply_patches
             return apply_patches("pi05")
 
-Nemotron also wraps hybrid mixers on the live model inside ``apply_patches``
-(MoE packing needs the instance). That is still not a separate export wrapper;
-the compiled module is the original ``NemotronHForCausalLM``.
+When the decorator is enough
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+If ``type(module)`` is the class named in the dotted path,
+``@register_patch`` plus ``apply_patches`` is all you need. That is Siglip,
+Qwen3, Llama, ``GR00TN15``, the action head, and so on.
+
+When it is not
+^^^^^^^^^^^^^^
+
+The path must be the **same class object** as the live module. A look-alike
+file under another import is a different class. ``setattr`` on one does not
+change the other.
+
+``trust_remote_code=True`` downloads Hub ``.py`` files into HuggingFace's
+module cache and imports them. ``AutoModel.from_config`` then builds an
+instance in memory. That class's module path looks like
+``transformers_modules.<repo>.<hash>.modeling_...``. It is not stable and
+does not exist until load, so the decorator cannot name it. The cache stores
+source, not the ``nn.Module``.
+
+GR00T's Eagle is this case. The LeRobot path
+``lerobot.policies.groot.eagle2_hg_model....Eagle25VLForConditionalGeneration``
+is a different class from the HuggingFace cache copy that ``from_config``
+actually constructs.
+
+Live-object patches
+^^^^^^^^^^^^^^^^^^^
+
+``apply_groot_patches(model)`` is not a second decorator. It is the place
+that has the instance, so it can patch ``type(eagle_model)``. It still runs
+``apply_patches("groot")`` for every class that has a stable path.
+
+Nemotron's ``apply_nemotron_patches(model)`` is the same idea for mixers:
+the registry is string paths; anything that only exists on the live object
+needs ``model``. The compiled module is still the original
+``NemotronHForCausalLM``, not a wrapper.
 
 Add a new model
 ---------------
@@ -248,7 +291,7 @@ Add a new model
 and loops ``spec.components``. A new architecture is a new spec plus a patch
 backend.
 
-Create ``py/torch_tensorrt/hf/exporters/models/<family>/``:
+Create ``tools/hf/exporters/models/<family>/``:
 
 .. code-block:: text
 
@@ -262,21 +305,21 @@ exporter package loads:
 
 .. code-block:: python
 
-    from torch_tensorrt.hf.exporters.models.my_vla import spec as _my_vla  # noqa: F401
+    from hf.exporters.models.my_vla import spec as _my_vla  # noqa: F401
 
 1. Register the spec
 ^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: python
 
-    from torch_tensorrt.hf.exporters.spec import EdgeSpec, register_edge_spec
+    from hf.exporters.spec import EdgeSpec, register_edge_spec
 
     @register_edge_spec("my_vla")
     class MyVlaSpec(EdgeSpec):
         components = ("vision", "language", "action")
 
         def apply_patches(self, model=None):
-            from torch_tensorrt.hf.exporters.plugin.attn_patches import apply_patches
+            from hf.exporters.plugin.attn_patches import apply_patches
             from .patches import MY_VLA
             return apply_patches(MY_VLA)
 
@@ -452,7 +495,7 @@ either graph-breaks or fails. With a converter, the op becomes one TensorRT
 plugin layer.
 
 Converters live in
-``py/torch_tensorrt/hf/exporters/plugin/plugin_converter.py`` and are
+``tools/hf/exporters/plugin/plugin_converter.py`` and are
 registered with ``@dynamo_tensorrt_converter``. Example for ViT attention:
 
 .. code-block:: python

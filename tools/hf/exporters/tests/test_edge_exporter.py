@@ -6,9 +6,9 @@ from typing import Any
 import pytest
 import torch
 import torch.nn as nn
-from torch_tensorrt.hf.exporters import EdgeConfig, EdgeExporter, register_edge_spec
-from torch_tensorrt.hf.exporters.ops import call_engine
-from torch_tensorrt.hf.exporters.spec import ComponentBundle, EdgeSpec, registered_specs
+from exporters import EdgeConfig, EdgeExporter, register_edge_spec
+from exporters.ops import call_engine
+from exporters.spec import ComponentBundle, EdgeSpec, registered_specs
 
 
 @register_edge_spec("dummy_edge")
@@ -177,7 +177,7 @@ def test_edge_exporter_dryrun_keeps_attention_patch(tmp_path):
 
 @pytest.mark.unit
 def test_attn_patch_attribute_restores():
-    from torch_tensorrt.hf.exporters.plugin.attn_patches import patch_attribute
+    from exporters.plugin.attn_patches import patch_attribute
 
     class Owner:
         def go(self):
@@ -196,7 +196,7 @@ def test_attn_patch_attribute_restores():
 
 @pytest.mark.unit
 def test_language_attn_keeps_hf_forward_without_rope():
-    from torch_tensorrt.hf.exporters.plugin.attn_patches import (
+    from exporters.plugin.attn_patches import (
         _patch_language_attention,
     )
 
@@ -214,8 +214,8 @@ def test_language_attn_keeps_hf_forward_without_rope():
 
 @pytest.mark.unit
 def test_pi05_backend_registers_vision_and_language():
-    from torch_tensorrt.hf.exporters.models.pi05.patches import PI05
-    from torch_tensorrt.hf.exporters.plugin.attn_patches import _PATCHES
+    from exporters.models.pi05.patches import PI05
+    from exporters.plugin.attn_patches import _PATCHES
 
     paths = [p for p, _ in _PATCHES[PI05]]
     assert any("SiglipAttention.forward" in p for p in paths)
@@ -227,7 +227,7 @@ def test_pi05_backend_registers_vision_and_language():
 
 @pytest.mark.unit
 def test_paligemma_image_features_patch_returns_tensor():
-    from torch_tensorrt.hf.exporters.models.pi05.patches import (
+    from exporters.models.pi05.patches import (
         _patch_paligemma_image_features,
     )
 
@@ -262,7 +262,7 @@ def test_paligemma_image_features_patch_returns_tensor():
 
 @pytest.mark.unit
 def test_pi05_language_model_keeps_hf_forward_without_rope():
-    from torch_tensorrt.hf.exporters.models.pi05.patches import (
+    from exporters.models.pi05.patches import (
         _patch_pi05_language_model,
     )
 
@@ -279,7 +279,7 @@ def test_pi05_language_model_keeps_hf_forward_without_rope():
 
 @pytest.mark.unit
 def test_pi05_action_keeps_training_forward_without_prefix_kv():
-    from torch_tensorrt.hf.exporters.models.pi05.patches import (
+    from exporters.models.pi05.patches import (
         _patch_pi05_action_step_forward,
     )
 
@@ -294,10 +294,10 @@ def test_pi05_action_keeps_training_forward_without_prefix_kv():
 
 @pytest.mark.unit
 def test_language_attn_plugin_when_rope_present():
-    from torch_tensorrt.hf.exporters.plugin.attn_patches import (
+    from exporters.plugin.attn_patches import (
         _patch_language_attention,
     )
-    from torch_tensorrt.hf.exporters.plugin.plugin_utils import (
+    from exporters.plugin.plugin_utils import (
         _register_attention_plugin_op,
     )
 
@@ -336,8 +336,8 @@ def test_language_attn_plugin_when_rope_present():
 
 @pytest.mark.unit
 def test_groot_backend_registers_components():
-    from torch_tensorrt.hf.exporters.models.groot.patches import GROOT
-    from torch_tensorrt.hf.exporters.plugin.attn_patches import _PATCHES
+    from exporters.models.groot.patches import GROOT
+    from exporters.plugin.attn_patches import _PATCHES
 
     paths = [p for p, _ in _PATCHES[GROOT]]
     assert any("SiglipAttention.forward" in p for p in paths)
@@ -351,8 +351,8 @@ def test_groot_backend_registers_components():
 
 @pytest.mark.unit
 def test_nemotron_backend_registers_causal_lm():
-    from torch_tensorrt.hf.exporters.models.nemotron.patches import NEMOTRON
-    from torch_tensorrt.hf.exporters.plugin.attn_patches import _PATCHES
+    from exporters.models.nemotron.patches import NEMOTRON
+    from exporters.plugin.attn_patches import _PATCHES
 
     paths = [p for p, _ in _PATCHES[NEMOTRON]]
     assert any("NemotronHForCausalLM.forward" in p for p in paths)
@@ -360,7 +360,7 @@ def test_nemotron_backend_registers_causal_lm():
 
 @pytest.mark.unit
 def test_eagle_vision_patch_extracts_features():
-    from torch_tensorrt.hf.exporters.models.groot.patches import (
+    from exporters.models.groot.patches import (
         _patch_eagle_image_features,
     )
 
@@ -377,8 +377,35 @@ def test_eagle_vision_patch_extracts_features():
 
 
 @pytest.mark.unit
+def test_groot_patches_live_eagle_class():
+    from exporters.models.groot.patches import apply_groot_patches
+
+    class Eagle:
+        def extract_feature(self, pixel_values):
+            return pixel_values + 1
+
+        def forward(self, pixel_values, input_ids=None, **kwargs):
+            raise AssertionError("unpatched Eagle.forward should not run")
+
+    class Groot:
+        def __init__(self):
+            self.backbone = type("Backbone", (), {})()
+            self.backbone.eagle_model = Eagle()
+
+    class Policy:
+        def __init__(self):
+            self._groot_model = Groot()
+
+    policy = Policy()
+    eagle = policy._groot_model.backbone.eagle_model
+    pixel_values = torch.zeros(1, 3, 4, 4)
+    with apply_groot_patches(policy):
+        torch.testing.assert_close(eagle(pixel_values), pixel_values + 1)
+
+
+@pytest.mark.unit
 def test_eagle_vision_keeps_vlm_forward_with_input_ids():
-    from torch_tensorrt.hf.exporters.models.groot.patches import (
+    from exporters.models.groot.patches import (
         _patch_eagle_image_features,
     )
 
@@ -399,7 +426,7 @@ def test_eagle_vision_keeps_vlm_forward_with_input_ids():
 
 @pytest.mark.unit
 def test_groot_action_keeps_training_forward_without_context():
-    from torch_tensorrt.hf.exporters.models.groot.patches import (
+    from exporters.models.groot.patches import (
         _patch_groot_action_step_forward,
     )
 
@@ -413,7 +440,7 @@ def test_groot_action_keeps_training_forward_without_context():
 
 @pytest.mark.unit
 def test_groot_context_keeps_training_forward_without_hidden():
-    from torch_tensorrt.hf.exporters.models.groot.patches import (
+    from exporters.models.groot.patches import (
         _patch_groot_context_projection,
     )
 
@@ -427,7 +454,7 @@ def test_groot_context_keeps_training_forward_without_hidden():
 
 @pytest.mark.unit
 def test_nemotron_keeps_hf_forward_without_rope():
-    from torch_tensorrt.hf.exporters.models.nemotron.patches import (
+    from exporters.models.nemotron.patches import (
         _patch_nemotron_causal_lm,
     )
 
@@ -444,7 +471,7 @@ def test_nemotron_keeps_hf_forward_without_rope():
 
 @pytest.mark.unit
 def test_category_specific_linear_uses_index_select():
-    from torch_tensorrt.hf.exporters.models.groot.patches import (
+    from exporters.models.groot.patches import (
         _patch_category_specific_linear,
     )
 
@@ -470,3 +497,27 @@ def test_category_specific_linear_uses_index_select():
     out = layer(x, cat_ids)
     expected = torch.bmm(x, layer.W[cat_ids]) + layer.b[cat_ids].unsqueeze(1)
     torch.testing.assert_close(out, expected)
+
+
+@pytest.mark.unit
+def test_measure_parity_and_bench(capsys):
+    from exporters.measure import cuda_ms, parity, print_bench, speedup
+
+    a = torch.ones(2, 2)
+    parity("dummy A vs C (TRT)", a, a)
+    log = capsys.readouterr().out
+    assert "dummy A vs C (TRT)" in log
+    assert "close%=100.0" in log
+    assert speedup(10.0, 5.0) == "2.000x"
+    assert speedup(0.0, 5.0) == "n/a"
+
+    elapsed = cuda_ms(lambda: torch.ones(2, 2).sum(), warmup=1, iters=3)
+    assert elapsed >= 0.0
+
+    print_bench({"vision": (10.0, 5.0), "language": (4.0, 2.0)})
+    log = capsys.readouterr().out
+    assert "vision eager execute: 10.000 ms" in log
+    assert "vision trt execute: 5.000 ms" in log
+    assert "total speedup: 2.000x" in log
+    print_bench({})
+    assert capsys.readouterr().out == ""
