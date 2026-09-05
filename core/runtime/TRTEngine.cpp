@@ -6,6 +6,7 @@
 #include "NvInfer.h"
 #include "c10/cuda/CUDACachingAllocator.h"
 #include "c10/cuda/CUDAStream.h"
+#include "c10/util/Type.h"
 #include "torch/csrc/jit/frontend/function_schema_parser.h"
 #include "torch/cuda.h"
 
@@ -913,7 +914,13 @@ bool TRTEngine::bind_nccl_comm() {
   TORCHTRT_CHECK(backend != nullptr, "ProcessGroup '" << this->group_name << "' has no NCCL backend");
 
   auto* nccl_pg = dynamic_cast<c10d::ProcessGroupNCCL*>(backend.get());
-  TORCHTRT_CHECK(nccl_pg != nullptr, "Backend is not ProcessGroupNCCL");
+  // Name the type that arrived. getBackend returned non-null, so something is there; without
+  // printing it the failure says only that the cast missed, which is not enough to tell a wrapper
+  // apart from a different concrete group.
+  TORCHTRT_CHECK(
+      nccl_pg != nullptr,
+      "Backend for ProcessGroup '" << this->group_name << "' is not ProcessGroupNCCL, got "
+                                   << c10::demangle(typeid(*backend).name()));
 
   at::cuda::set_device(this->device_info.id);
 
