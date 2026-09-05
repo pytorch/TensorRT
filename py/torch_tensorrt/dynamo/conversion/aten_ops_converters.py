@@ -24,6 +24,7 @@ from torch_tensorrt._features import needs_not_tensorrt_rtx
 from torch_tensorrt._utils import (
     is_tensorrt_rtx_version_supported,
     is_tensorrt_version_supported,
+    trt_rtx_targets_turing,
 )
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo._SourceIR import SourceIR
@@ -846,12 +847,62 @@ def aten_ops_gelu(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.matmul, supports_dynamic_shapes=True)
-@dynamo_tensorrt_converter(torch.ops.aten.matmul.default, supports_dynamic_shapes=True)
-@dynamo_tensorrt_converter(torch.ops.aten.dot.default, supports_dynamic_shapes=True)
-@dynamo_tensorrt_converter(torch.ops.aten.mm.default, supports_dynamic_shapes=True)
-@dynamo_tensorrt_converter(torch.ops.aten.mv.default, supports_dynamic_shapes=True)
-@dynamo_tensorrt_converter(torch.ops.aten.bmm.default, supports_dynamic_shapes=True)
+def gemm_capability_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    """Reject FP32 GEMMs on TensorRT-RTX when Turing (SM 7.5) is a build target.
+
+    Only operand dtype matters, so fp16 GEMMs accumulating in fp32 (``use_fp32_acc``)
+    keep running on TensorRT.
+    """
+    if not trt_rtx_targets_turing(settings):
+        return True
+
+    def is_fp32(operand: Argument) -> bool:
+        val = operand.meta.get("val") if hasattr(operand, "meta") else None
+        return bool(getattr(val, "dtype", None) == torch.float32)
+
+    if any(map(is_fp32, node.args[:2])):
+        _LOGGER.debug(
+            "FP32 GEMM '%s' is not supported on TensorRT-RTX for Turing "
+            "(SM 7.5). Falling back to PyTorch.",
+            node.name,
+        )
+        return False
+
+    return True
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.matmul,
+    capability_validator=gemm_capability_validator,
+    supports_dynamic_shapes=True,
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.matmul.default,
+    capability_validator=gemm_capability_validator,
+    supports_dynamic_shapes=True,
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.dot.default,
+    capability_validator=gemm_capability_validator,
+    supports_dynamic_shapes=True,
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.mm.default,
+    capability_validator=gemm_capability_validator,
+    supports_dynamic_shapes=True,
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.mv.default,
+    capability_validator=gemm_capability_validator,
+    supports_dynamic_shapes=True,
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.bmm.default,
+    capability_validator=gemm_capability_validator,
+    supports_dynamic_shapes=True,
+)
 def aten_ops_matmul(
     ctx: ConversionContext,
     target: Target,
@@ -1227,7 +1278,7 @@ def _index_copy_kv_eligible(
     if len(node.args) < 4:
         return False
     if input_node is None:
-        input_node = node.args[0]  # type: ignore[assignment]
+        input_node = node.args[0]
     dim, _index_node, src_node = node.args[1:4]
 
     if not isinstance(input_node, Node) or input_node.op != "placeholder":
@@ -2859,7 +2910,7 @@ _ABSORBING_BITWISE_SCALAR = {
 
 
 def _is_absorbing_bitwise_scalar(target: Target, scalar: Any) -> bool:
-    """Would TensorRT mis-evaluate this scalar bitwise op (see above)?"""
+    """Would TensorRT evaluate this scalar bitwise op incorrectly (see above)?"""
     if target not in _ABSORBING_BITWISE_SCALAR:
         return False
     # A non-bool scalar is rejected by the dtype check further down anyway, and
@@ -3214,6 +3265,14 @@ def aten_ops_le(
     )
 
 
+# aten.convolution(input, weight, bias, stride, padding, dilation, transposed,
+#                  output_padding, groups)
+_CONV_ARG_INPUT = 0
+_CONV_ARG_STRIDE = 3
+_CONV_ARG_DILATION = 5
+_CONV_ARG_TRANSPOSED = 6
+
+
 def convolution_capability_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
@@ -3227,9 +3286,9 @@ def convolution_capability_validator(
         return True
 
     if (
-        args_bounds_check(node.args, 6)  # transposed?
-        and (stride := args_bounds_check(node.args, 3))
-        and (dilation := args_bounds_check(node.args, 5))
+        args_bounds_check(node.args, _CONV_ARG_TRANSPOSED)
+        and (stride := args_bounds_check(node.args, _CONV_ARG_STRIDE))
+        and (dilation := args_bounds_check(node.args, _CONV_ARG_DILATION))
         and any(s > 1 for s in stride)
         and any(d > 1 for d in dilation)
     ):
@@ -3239,6 +3298,22 @@ def convolution_capability_validator(
             node.name,
         )
         return False
+
+    # No valid kernel config for 3D ConvFwd on SM 7.5: the engine builds, but
+    # createExecutionContext() then returns nullptr. Transposed 3D is a distinct layer
+    # and is unaffected. aten.convolution input is (N, C, *spatial), so ndim 5 is 3D.
+    is_forward_conv = not args_bounds_check(node.args, _CONV_ARG_TRANSPOSED)
+    if trt_rtx_targets_turing(settings) and is_forward_conv:
+        input_node = node.args[_CONV_ARG_INPUT]
+        val = input_node.meta.get("val") if hasattr(input_node, "meta") else None
+        if (ndim := getattr(val, "ndim", None)) == 5:
+            _LOGGER.debug(
+                "3D convolution '%s' (ndim %s) is not supported on TensorRT-RTX for "
+                "Turing (SM 7.5). Falling back to PyTorch.",
+                node.name,
+                ndim,
+            )
+            return False
 
     return True
 
@@ -3675,7 +3750,11 @@ def aten_ops_argmin(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.addmm.default, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.addmm.default,
+    capability_validator=gemm_capability_validator,
+    supports_dynamic_shapes=True,
+)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),

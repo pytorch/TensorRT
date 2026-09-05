@@ -7,7 +7,7 @@ import sys
 import tempfile
 import urllib.request
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Tuple
 
 import tensorrt as trt
 import torch
@@ -396,3 +396,35 @@ def load_tensorrt_llm_for_nccl() -> bool:
             return False
         return load_and_initialize_trtllm_plugin(plugin_lib_path)
     return False
+
+
+# --- TensorRT-RTX architecture targeting -------------------------------------
+
+TURING_COMPUTE_CAPABILITY = (7, 5)
+
+
+def get_target_compute_capabilities(
+    settings: Optional[Any] = None,
+) -> Tuple[Tuple[int, int], ...]:
+    """Compute capabilities this compilation targets: the declared targets, or the
+    current device when none were declared.
+
+    Capability validators key off this rather than the build host, so a module compiled
+    on Ampere and shipped to Turing does not retain ops Turing cannot execute.
+    """
+    if settings and (targets := getattr(settings, "target_compute_capabilities", None)):
+        return tuple((int(major), int(minor)) for major, minor in targets)
+    return (torch.cuda.get_device_capability(),)
+
+
+def trt_rtx_targets_turing(settings: Optional[Any] = None) -> bool:
+    """True when TensorRT-RTX is in use and SM 7.5 is among the build targets.
+
+    A single compiled artifact carries a single partitioning, so an op unsupported on
+    *any* targeted architecture must fall back to PyTorch for all of them.
+    """
+    from torch_tensorrt._features import ENABLED_FEATURES
+
+    if not ENABLED_FEATURES.tensorrt_rtx:
+        return False
+    return TURING_COMPUTE_CAPABILITY in get_target_compute_capabilities(settings)

@@ -5,7 +5,7 @@ from parameterized import param, parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import ENABLED_FEATURES
 
-from .harness import DispatchTestCase
+from .harness import DispatchTestCase, skip_if_trt_rtx_turing
 
 # NOTE: accumulate=True with *duplicate* indices is NOT supported in TRT.
 # TensorRT's ScatterMode.ND overwrites on collision — there is no scatter_add
@@ -413,6 +413,12 @@ class TestIndexPutConverter(DispatchTestCase):
     ):
         if accumulate and ENABLED_FEATURES.tensorrt_rtx:
             pytest.skip("ScatterAdd plugin not available in TRT RTX")
+
+        # Keyed on the case's dtype rather than its index: the generated ids are bare
+        # test_index_put_<N>, and there is a commented-out param above, so any index-based
+        # list would drift the moment a case is added or restored.
+        if torch.bfloat16 in (source_tensor.dtype, value_tensor.dtype):
+            skip_if_trt_rtx_turing(self, "bfloat16")
 
         @torch._dynamo.assume_constant_result
         def get_indices_tensor():
