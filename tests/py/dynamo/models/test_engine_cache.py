@@ -672,7 +672,12 @@ class TestEngineCache(TestCase):
         if os.path.exists(engine_cache_dir):
             shutil.rmtree(engine_cache_dir)
 
-        def remove_timing_cache(path=TIMING_CACHE_PATH):
+        # Do not use the global timing cache here.  Pytest-xdist workers share it,
+        # and Windows does not allow one worker to remove it while another has it
+        # open.
+        timing_cache_path = os.path.join(engine_cache_dir, "timing_cache.bin")
+
+        def remove_timing_cache(path=timing_cache_path):
             if os.path.exists(path):
                 os.remove(path)
 
@@ -689,6 +694,7 @@ class TestEngineCache(TestCase):
             reuse_cached_engines=False,
             strip_engine_weights=False,
             refit_identical_engine_weights=False,
+            timing_cache_path=timing_cache_path,
         )
         torch.cuda.empty_cache()
 
@@ -741,6 +747,7 @@ class TestEngineCache(TestCase):
                 immutable_weights=immutable_weights,
                 strip_engine_weights=strip_engine_weights,
                 refit_identical_engine_weights=refit_identical_engine_weights,
+                timing_cache_path=timing_cache_path,
             )
 
             if strip_engine_weights:
