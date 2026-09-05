@@ -3390,7 +3390,55 @@ def aten_ops_convolution(
         )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten._cdist_forward.default)
+# Above this many rows in either operand, the p == 2 path of
+# impl.normalization.cdist_forward switches from a broadcast-subtract to a matrix
+# multiply. Kept deliberately in sync with the threshold in that converter.
+# aten._cdist_forward(x1, x2, p, compute_mode)
+_CDIST_ARG_P = 2
+_CDIST_ARG_COMPUTE_MODE = 3
+
+
+def cdist_forward_capability_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    """Reject the cdist variants whose converter emits a GEMM, on Turing (SM 7.5).
+
+    The GEMM is emitted *inside* the converter, so the graph holds one
+    ``_cdist_forward`` node and no ``mm``/``bmm`` for ``gemm_capability_validator`` to
+    reject, and TensorRT-RTX then fails. Which arguments emit one is decided by
+    ``cdist_emits_matmul``, the converter's own predicate, so the two cannot drift.
+    """
+    if not trt_rtx_targets_turing(settings):
+        return True
+
+    def operand_rows(operand: Argument) -> Optional[int]:
+        val = operand.meta.get("val") if hasattr(operand, "meta") else None
+        shape = getattr(val, "shape", None)
+        if shape is None or len(shape) < 2:
+            return None
+        rows = shape[-2]
+        return rows if isinstance(rows, int) else None
+
+    operands = node.args[:2]  # x1, x2
+    if not impl.normalization.ops.cdist_emits_matmul(
+        args_bounds_check(node.args, _CDIST_ARG_P, replacement=2.0),
+        args_bounds_check(node.args, _CDIST_ARG_COMPUTE_MODE, replacement=None),
+        [operand_rows(operand) for operand in operands],
+    ):
+        return True
+
+    _LOGGER.debug(
+        "cdist '%s' computes p=2 as a matrix multiply, which is not supported on "
+        "TensorRT-RTX for Turing (SM 7.5). Falling back to PyTorch.",
+        node.name,
+    )
+    return False
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten._cdist_forward.default,
+    capability_validator=cdist_forward_capability_validator,
+)
 def aten_ops_cdist_forward(
     ctx: ConversionContext,
     target: Target,
