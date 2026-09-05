@@ -75,6 +75,15 @@ struct EngineHandle {
   size_t num_aliased_outputs = 0;
   int device_id = 0;
   bool unified_memory = false;
+  // Whether exec_ctx was created kUSER_MANAGED and draws its activation scratch
+  // from the shared per-device pool (kSharedActivationScratchKey).
+  bool shared_scratch = false;
+  // The activation scratch the engine itself reports needing, read at init when
+  // shared_scratch is set. It bounds every shape the engine accepts, so execute()
+  // substitutes it whenever the per-call query answers zero -- which TensorRT does
+  // for a failed query, for an engine that genuinely needs none, and for shapes
+  // that need none.
+  size_t engine_scratch_bytes = 0;
   std::mutex mu;
   // Makes the skip-sync fast path safe to reuse: TensorRT forbids reconfiguring or
   // destroying an execution context while one of its enqueues is in flight, so when
@@ -86,6 +95,15 @@ struct EngineHandle {
 
   ~EngineHandle();
 };
+
+// Runtime backend option that backs execution-context activation scratch with a
+// shared per-device pool instead of giving every context its own. Boolean,
+// default false. Read by TensorRTBackend::set_option below, and delivered as
+//   executorch::runtime::set_option("TensorRTBackend", options.view())
+// A context's allocation strategy is fixed when the context is created, so a
+// later call governs only the engines loaded after it, and a pooled context and
+// a private-scratch one coexist in one process.
+inline constexpr char kSharedActivationScratchKey[] = "use_shared_activation_scratch";
 
 class TensorRTBackend final : public ::executorch::runtime::BackendInterface {
  public:
@@ -102,12 +120,25 @@ class TensorRTBackend final : public ::executorch::runtime::BackendInterface {
   // past return, order any other stream against this one, and synchronize the stream
   // before reading device-resident outputs. The selected stream must be on the engine's
   // device, and calls on one handle must not overlap each other or its destruction.
+  // With the shared activation scratch pool (kSharedActivationScratchKey) one
+  // buffer per device backs every context created while the option was on. Calls
+  // on two such handles on one device may overlap: a per-device lock held across
+  // the enqueue serializes them, so they do not run concurrently on the device. A
+  // handle whose context was created while the option was off keeps its own
+  // scratch and is not subject to this.
   // Note that other CUDA delegates sharing the same guard may instead synchronize before
   // returning, so do not assume results are ready on return from this one.
   ::executorch::runtime::Error execute(
       ::executorch::runtime::BackendExecutionContext& context,
       ::executorch::runtime::DelegateHandle* handle,
       ::executorch::runtime::Span<::executorch::runtime::EValue*> args) const override;
+
+  // Applies the runtime backend options a caller passes to
+  // executorch::runtime::set_option("TensorRTBackend", ...). The only key read is
+  // kSharedActivationScratchKey, a boolean.
+  ::executorch::runtime::Error set_option(
+      ET_UNUSED ::executorch::runtime::BackendOptionContext& context,
+      const ::executorch::runtime::Span<::executorch::runtime::BackendOption>& backend_options) override;
 
   void destroy(::executorch::runtime::DelegateHandle* handle) const override;
 };

@@ -85,6 +85,17 @@ the removed `CudaStreamGuard`:
   complete, order any cross-stream producers/consumers with their own events,
   and synchronize the stream before reading outputs on the host.
 - With no guard active, the backend falls back to `cudaStreamPerThread`.
+- With the `use_shared_activation_scratch` backend option enabled, one buffer
+  per device backs the activation scratch of every execution context created
+  while it was on, so no two enqueues against it may overlap. The backend
+  enforces this itself: it holds a per-device lock from the claim on the buffer
+  through the enqueue and the completion event recorded on it, so two
+  `execute()` calls on one device are serialized at submission and the second's
+  stream waits on the first's enqueue. They may run on one stream or on two, and
+  they may be submitted concurrently from two threads, but they will not run
+  concurrently on the device, so the pool costs the parallelism between them.
+  Contexts created while the option was off keep their own scratch and are
+  unaffected.
 - The reference-runner smoke test runs inference inside a caller-stream guard on
   the discrete-GPU CI configuration, where all inputs and outputs are host-backed
   and therefore take the synchronized staging path. CI separately asserts that the
@@ -103,6 +114,63 @@ the removed `CudaStreamGuard`:
   the method inputs and outputs are host-backed, so the device-resident
   asynchronous return described above is still uncovered and the interaction
   between a green context and the internal completion event remains untested.
+
+## Shared activation scratch
+
+A TensorRT execution context allocates its own activation scratch and holds it
+for as long as the context lives, so a model lowered to N single-layer engines
+pays N copies and can run out of device memory on the layer count alone. The
+`use_shared_activation_scratch` backend option (a boolean, off by default)
+instead backs every context on a device from one buffer, grown to the largest
+requirement any call on that device has asked for:
+
+```cpp
+#include <executorch/runtime/backend/interface.h>
+
+executorch::runtime::BackendOptions<1> options;
+options.set_option("use_shared_activation_scratch", true);
+const executorch::runtime::Error err =
+    executorch::runtime::set_option("TensorRTBackend", options.view());
+if (err != executorch::runtime::Error::Ok) {
+  return err; // nothing was set: every context still allocates its own scratch
+}
+```
+
+`Error::NotFound` means no backend is registered under that name, which is what a
+binary that has not linked the backend archive gets. Nothing forces the check: the
+free `executorch::runtime::set_option` is not `ET_NODISCARD`, so dropping its
+return compiles.
+
+N per-engine copies collapse to one, so the reclaimed memory is the sum of the N
+requirements less the largest of them. Set the option before loading the methods
+whose engines should use the pool, and read the `use_shared_activation_scratch`
+bullet of the caller-stream contract above: engines sharing a buffer do not run
+concurrently on the device. The pool never shrinks, so the largest scratch it was
+ever asked for stays allocated until the process exits.
+
+The buffer grows when a call asks for more than every call before it did, and a
+growth is not free. It frees the buffer it replaces, and `cudaFree` waits for
+everything queued on the device, not only for the enqueues that used that buffer,
+so it can stall for far longer than the event wait that precedes it. The backend
+keeps that stall out from under the per-device lock, so it does not hold up
+another engine on the device, but it does fall after the growing call's own
+enqueue, so that one `execute()` waits for its own engine work too.
+
+What an engine answers when asked how much it needs is decided when it is built,
+not when it runs. The builder's `kRUNTIME_ACTIVATION_RESIZE_10_10` preview feature
+makes an engine report what the shapes just bound need; without it, whether an
+engine does that or reports its profile maximum depends on how TensorRT planned
+it. Either way the pool can settle well above the live data, and nothing the
+runtime does changes it.
+
+How often the pool grows follows from that. The backend asks afresh on every
+`execute()`, after the input shapes are bound, so an engine whose answer does not
+vary with the bound shapes grows the pool at most once, on its first run. For a
+program built only from such engines, running the largest one first leaves the
+pool with a single allocation. An engine whose answer does vary can grow it on any
+call whose shapes need more than every call before them, so with one of those in
+the program no run order bounds the number of allocations. One engine over a
+`[1..4, 512, 512]` profile is either, depending on how it was built.
 
 ## Standalone Backend Archive
 

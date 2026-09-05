@@ -173,6 +173,9 @@ target_compile_definitions(torch_tensorrt_executorch_backend
 target_include_directories(torch_tensorrt_executorch_backend PRIVATE
   "${TORCH_TENSORRT_SOURCE_DIR}"
   "${TORCH_TENSORRT_SOURCE_DIR}/cpp/include"
+  # Headers the backend sources include but that are not part of the installed
+  # API, such as SharedScratchPool.h.
+  "${TORCH_TENSORRT_SOURCE_DIR}/cpp/src"
   "${EXECUTORCH_SOURCE_DIR}/.."
   "${EXECUTORCH_SOURCE_DIR}/runtime/core/portable_type/c10")
 if(NOT TARGET extension_cuda)

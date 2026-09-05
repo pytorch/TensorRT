@@ -191,6 +191,31 @@ cc_library(
     ],
 )
 
+# Implementation detail of :tensorrt_executorch_backend, so the header sits under
+# src/ and ships with the sources rather than in the installed API set. A caller
+# turning the pool on needs only the option key, which is in TensorRTBackend.h.
+cc_library(
+    name = "tensorrt_executorch_shared_scratch_pool",
+    hdrs = [
+        "src/torch_tensorrt/executorch/SharedScratchPool.h",
+    ],
+    strip_include_prefix = "src",
+    target_compatible_with = select({
+        ":linux_x86_64": [],
+        ":sbsa": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = select({
+        ":linux_x86_64": [
+            "@cuda//:cuda_headers",
+        ],
+        ":sbsa": [
+            "@cuda//:cuda_headers",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
 cc_library(
     name = "tensorrt_executorch_backend",
     srcs = [
@@ -211,6 +236,7 @@ cc_library(
     deps = [
         ":tensorrt_executorch_binding_names",
         ":tensorrt_executorch_blob_header",
+        ":tensorrt_executorch_shared_scratch_pool",
         ":tensorrt_executorch_weight_streaming_budget",
     ] + select({
         ":linux_x86_64": [
@@ -235,6 +261,7 @@ filegroup(
     srcs = [
         "src/torch_tensorrt/executorch/CMakeLists.txt",
         "src/torch_tensorrt/executorch/README.md",
+        "src/torch_tensorrt/executorch/SharedScratchPool.h",
         "src/torch_tensorrt/executorch/TensorRTBackend.cpp",
         "src/torch_tensorrt/executorch/TensorRTBlobHeader.cpp",
         "src/torch_tensorrt/executorch/WeightStreamingBudget.cpp",
