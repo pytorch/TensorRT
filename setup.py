@@ -616,14 +616,6 @@ dynamo_packages = [
     "torch_tensorrt.dynamo.runtime",
     "torch_tensorrt.dynamo.tools",
     "torch_tensorrt.executorch",
-    "torch_tensorrt.hf",
-    "torch_tensorrt.hf.exporters",
-    "torch_tensorrt.hf.exporters.models",
-    "torch_tensorrt.hf.exporters.models.common",
-    "torch_tensorrt.hf.exporters.models.groot",
-    "torch_tensorrt.hf.exporters.models.nemotron",
-    "torch_tensorrt.hf.exporters.models.pi05",
-    "torch_tensorrt.hf.exporters.plugin",
     "torch_tensorrt.runtime",
 ]
 
@@ -663,14 +655,6 @@ dynamo_package_dir = {
     "torch_tensorrt.dynamo.runtime": "py/torch_tensorrt/dynamo/runtime",
     "torch_tensorrt.dynamo.tools": "py/torch_tensorrt/dynamo/tools",
     "torch_tensorrt.executorch": "py/torch_tensorrt/executorch",
-    "torch_tensorrt.hf": "py/torch_tensorrt/hf",
-    "torch_tensorrt.hf.exporters": "py/torch_tensorrt/hf/exporters",
-    "torch_tensorrt.hf.exporters.models": "py/torch_tensorrt/hf/exporters/models",
-    "torch_tensorrt.hf.exporters.models.common": "py/torch_tensorrt/hf/exporters/models/common",
-    "torch_tensorrt.hf.exporters.models.groot": "py/torch_tensorrt/hf/exporters/models/groot",
-    "torch_tensorrt.hf.exporters.models.nemotron": "py/torch_tensorrt/hf/exporters/models/nemotron",
-    "torch_tensorrt.hf.exporters.models.pi05": "py/torch_tensorrt/hf/exporters/models/pi05",
-    "torch_tensorrt.hf.exporters.plugin": "py/torch_tensorrt/hf/exporters/plugin",
     "torch_tensorrt.runtime": "py/torch_tensorrt/runtime",
 }
 
