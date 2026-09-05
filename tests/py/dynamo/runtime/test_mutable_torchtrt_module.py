@@ -655,3 +655,165 @@ def test_custom_model_with_kwarg_different_input():
 
     # Clean up model env
     torch._dynamo.reset()
+
+
+class _PartiallyFallenBackNet(nn.Module):
+    """A net whose trailing Linear can be pinned to PyTorch with torch_executed_ops."""
+
+    def __init__(self):
+        super().__init__()
+        self.conv1 = nn.Conv2d(3, 12, 3, padding=1)
+        self.bn = nn.BatchNorm2d(12)
+        self.conv2 = nn.Conv2d(12, 12, 3, padding=1)
+        self.fc1 = nn.Linear(12 * 56 * 56, 10)
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = F.relu(x)
+        x = self.bn(x)
+        x = F.max_pool2d(x, (2, 2))
+        x = self.conv2(x)
+        x = F.relu(x)
+        x = F.max_pool2d(x, (2, 2))
+        x = torch.flatten(x, 1)
+        return self.fc1(x)
+
+
+# Keeping a weight-carrying op in PyTorch is what makes this a partial fallback, and
+# saying so explicitly means the test reproduces on any GPU rather than depending on
+# what a particular card cannot convert.
+_PARTIAL_FALLBACK_SPEC = {
+    "pass_through_build_failures": True,
+    "optimization_level": 1,
+    "min_block_size": 1,
+    "ir": "dynamo",
+    "immutable_weights": False,
+    "torch_executed_ops": {
+        "torch.ops.aten.linear.default",
+        "torch.ops.aten.addmm.default",
+    },
+}
+
+
+def _torch_executed_state(gm):
+    """The state the compiled module still executes in PyTorch.
+
+    These are the same tensor objects the source model holds -- the graph module shares
+    them rather than copying -- so offloading the source model moves them too.
+    """
+    state = []
+    for name, submodule in gm.named_children():
+        if "_run_on_acc" in name:
+            continue
+        state += list(submodule.named_parameters()) + list(submodule.named_buffers())
+    return state
+
+
+def _assert_state_on(named_tensors, device_type, label):
+    for name, tensor in named_tensors:
+        assertions.assertEqual(
+            tensor.device.type,
+            device_type,
+            msg=f"{label} {name} is on {tensor.device}, expected {device_type}.",
+        )
+
+
+def _all_state(module):
+    return list(module.named_parameters()) + list(module.named_buffers())
+
+
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    "TorchScript Frontend is not available",
+)
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.refit,
+    "Refit feature is not supported in Python 3.13 or higher",
+)
+@pytest.mark.unit
+def test_refit_keeps_torch_executed_weights_on_device():
+    torch.manual_seed(0)
+    model = _PartiallyFallenBackNet().eval().to("cuda")
+    args = [torch.rand((1, 3, 224, 224)).to("cuda")]
+
+    mutable_module = torch_trt.MutableTorchTensorRTModule(
+        model, **_PARTIAL_FALLBACK_SPEC
+    )
+    mutable_module(*args)
+
+    assertions.assertTrue(
+        _torch_executed_state(mutable_module.gm),
+        msg=f"Nothing was left to PyTorch, so this test cannot catch the regression it targets.",
+    )
+
+    torch.manual_seed(2)
+    model2 = _PartiallyFallenBackNet().eval().to("cuda")
+    mutable_module.load_state_dict(model2.state_dict())
+
+    # The refit happens here, and it must not drag the PyTorch-executed weights off the
+    # device while their activations stay on it.
+    expected_outputs, refitted_outputs = model2(*args), mutable_module(*args)
+    assertions.assertTrue(
+        check_output_equal(expected_outputs, refitted_outputs),
+        msg=f"The output of original and refitted Mutable Module is not the same.",
+    )
+
+    _assert_state_on(_all_state(mutable_module.gm), "cuda", "Compiled module state")
+    # offload_module_to_cpu was never requested, so nothing should have been offloaded.
+    _assert_state_on(
+        _all_state(mutable_module.original_model), "cuda", "Source model state"
+    )
+
+    # Clean up model env
+    torch._dynamo.reset()
+
+
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    "TorchScript Frontend is not available",
+)
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.refit,
+    "Refit feature is not supported in Python 3.13 or higher",
+)
+@pytest.mark.unit
+def test_offload_module_to_cpu_keeps_torch_executed_weights_on_device():
+    torch.manual_seed(0)
+    model = _PartiallyFallenBackNet().eval().to("cuda")
+    args = [torch.rand((1, 3, 224, 224)).to("cuda")]
+
+    compile_spec = dict(_PARTIAL_FALLBACK_SPEC, offload_module_to_cpu=True)
+
+    mutable_module = torch_trt.MutableTorchTensorRTModule(model, **compile_spec)
+    mutable_module(*args)
+
+    torch.manual_seed(2)
+    model2 = _PartiallyFallenBackNet().eval().to("cuda")
+    mutable_module.load_state_dict(model2.state_dict())
+    mutable_module(*args)
+
+    needed_on_device = {
+        id(tensor) for _, tensor in _torch_executed_state(mutable_module.gm)
+    }
+    assertions.assertTrue(
+        needed_on_device,
+        msg=f"Nothing was left to PyTorch, so this test cannot catch the regression it targets.",
+    )
+    _assert_state_on(_all_state(mutable_module.gm), "cuda", "Compiled module state")
+
+    # The offload still offloads: everything TensorRT absorbed leaves the device. What
+    # the graph module still executes in PyTorch is the same tensor object the source
+    # model holds, so it necessarily stays behind.
+    offloaded = [
+        (name, tensor)
+        for name, tensor in _all_state(mutable_module.original_model)
+        if id(tensor) not in needed_on_device
+    ]
+    assertions.assertTrue(
+        offloaded,
+        msg=f"The source model kept all of its state on the device, so nothing was offloaded.",
+    )
+    _assert_state_on(offloaded, "cpu", "Offloaded source model state")
+
+    # Clean up model env
+    torch._dynamo.reset()
