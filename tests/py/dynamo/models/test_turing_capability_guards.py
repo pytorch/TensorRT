@@ -70,6 +70,33 @@ class Conv2d(nn.Module):
         return self.conv(x)
 
 
+class PaddedConv3d(nn.Module):
+    """A conv3d the 3D-conv guard never sees as a convolution.
+
+    fuse_pad_into_convolution folds the pad into the conv and rewrites the pair as
+    tensorrt::conv_asym_pad, erasing the aten.convolution node. It fires for any
+    zero-fill, non-negative pad -- asymmetry is not required.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.conv = nn.Conv3d(4, 8, 3, padding=0)
+
+    def forward(self, x):
+        return self.conv(F.pad(x, (1, 1, 1, 1, 2, 0)))
+
+
+class PaddedConv2d(nn.Module):
+    """Same fusion, 2D -- which Turing does support."""
+
+    def __init__(self):
+        super().__init__()
+        self.conv = nn.Conv2d(4, 8, 3, padding=0)
+
+    def forward(self, x):
+        return self.conv(F.pad(x, (0, 1, 0, 1)))
+
+
 @unittest.skipIf(
     not ENABLED_FEATURES.tensorrt_rtx,
     "Turing capability guards only apply to TensorRT-RTX",
@@ -153,6 +180,23 @@ class TestTuringCapabilityGuards(TestCase):
         inputs = (torch.randn(1, 4, 16, 16).cuda(),)
         compiled = self._compile(mod, inputs, target_compute_capabilities=[TURING])
         self.assertGreater(_trt_submodule_count(compiled), 0)
+
+    def test_declared_turing_target_falls_back_padded_conv3d(self):
+        # The fused op needs its own guard: by partitioning time the aten.convolution
+        # node the conv guard keys on no longer exists.
+        mod = PaddedConv3d()
+        inputs = (torch.randn(1, 4, 8, 8, 8).cuda(),)
+        compiled = self._compile(mod, inputs, target_compute_capabilities=[TURING])
+        self.assertEqual(_trt_submodule_count(compiled), 0)
+        self._assert_matches_eager(mod, compiled, inputs)
+
+    def test_declared_turing_target_keeps_padded_conv2d_on_trt(self):
+        # Only rank 3 is rejected; the fused op must keep serving 2D.
+        mod = PaddedConv2d()
+        inputs = (torch.randn(1, 4, 16, 16).cuda(),)
+        compiled = self._compile(mod, inputs, target_compute_capabilities=[TURING])
+        self.assertGreater(_trt_submodule_count(compiled), 0)
+        self._assert_matches_eager(mod, compiled, inputs)
 
     def test_declared_turing_target_keeps_transposed_conv3d_on_trt(self):
         # Transposed 3D convolution is a distinct layer and does work on Turing.
