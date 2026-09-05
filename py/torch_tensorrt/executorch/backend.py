@@ -1,7 +1,8 @@
 # ExecuTorch TensorRT backend: serialize engines to a libtorch-free runtime blob.
 
+import json
 import operator
-from typing import Any, List, final
+from typing import Any, Container, Iterable, List, Optional, Set, final
 
 import torch
 import torch.fx
@@ -31,6 +32,19 @@ from torch_tensorrt.executorch.serialization import (
 )
 
 _BINDING_DELIM = "%"
+
+# CompileSpec key naming the aliased outputs a delegate deliberately does not
+# carry. Its value is the JSON list of those engine output binding names (see
+# _serialize_elided_output_names), NOT a bare flag: only the aliased outputs
+# backed by a registered buffer are elided, so the backend must exempt exactly
+# those and still reject a delegate that dropped any other binding. export()
+# appends a method-wide instance to signal the opt-in; TensorRTPartitioner strips
+# that one and re-derives the per-engine value it puts on each delegate's
+# DelegationSpec, the only channel that reaches preprocess (see
+# TensorRTPartitioner._partition_elided_output_names). Without it a delegate
+# short of its aliased outputs is a bug, not a zero-copy program, and stays an
+# error.
+ZERO_COPY_KV_COMPILE_SPEC_KEY = "zero_copy_kv"
 
 
 def _schema_name(target: Any) -> str:
@@ -274,7 +288,10 @@ def _reorder_input_names_for_executorch(
 
 
 def _validate_output_binding_order(
-    edge_program: ExportedProgram, engine_node: Any, output_names: List[str]
+    edge_program: ExportedProgram,
+    engine_node: Any,
+    output_names: List[str],
+    elidable_output_names: Optional[Container[str]] = None,
 ) -> None:
     """Check the delegate's outputs are the engine's output bindings, in order.
 
@@ -286,19 +303,45 @@ def _validate_output_binding_order(
     delegate -- would swap the names silently. Inputs cannot rely on position at
     all and recover their order by node identity in
     ``_reorder_input_names_for_executorch``.
+
+    ``elidable_output_names`` names the bindings the delegate is *allowed* to
+    have dropped, which zero-copy KV sets to exactly the aliased outputs export
+    rewired to write in place (never the whole aliased_io): the engine's in-place
+    write through the aliased input already is the buffer update, so no argument
+    is passed for them. Pass ``None`` (the default) when elision was not asked
+    for, and the delegate must carry every binding.
+
+    A delegate that dropped its aliased outputs because nothing declared them as
+    mutations looks exactly like a zero-copy one, and the runtime reads elision off
+    a single argument count, so it cannot tell them apart either. That is also why
+    a partial drop stays an error: the count cannot express which bindings went.
     """
+    elidable_names = elidable_output_names if elidable_output_names is not None else ()
+    all_indices = list(range(len(output_names)))
+    unaliased_indices = [
+        i for i in all_indices if output_names[i] not in elidable_names
+    ]
+
     output_node = next(
         node for node in edge_program.graph_module.graph.nodes if node.op == "output"
     )
     out_args = list(output_node.args[0])
     # A single-output engine is returned directly rather than through a getitem,
-    # and one binding has no order to get wrong.
+    # and one binding has no order to get wrong. The same holds under elision
+    # when exactly one binding is left unaliased.
     if len(out_args) == 1 and out_args[0] is engine_node:
-        if len(output_names) != 1:
+        if len(all_indices) != 1 and len(unaliased_indices) != 1:
+            remaining = (
+                f", {len(unaliased_indices)} of them after eliding the in-place "
+                "outputs"
+                if unaliased_indices != all_indices
+                else ""
+            )
             raise ValueError(
                 "TensorRT ExecuTorch backend: the delegate returns the engine node "
                 f"directly but the engine declares {len(output_names)} output "
-                "bindings; only a single-output engine can be returned unwrapped."
+                f"bindings{remaining}; only a single-output engine can be returned "
+                "unwrapped."
             )
         return
     indices: List[Any] = []
@@ -315,13 +358,59 @@ def _validate_output_binding_order(
                 "node; cannot establish a reliable output binding order."
             )
         indices.append(node.args[1])
-    if indices != list(range(len(output_names))):
+    if indices not in (all_indices, unaliased_indices):
+        expected = (
+            f"{all_indices}, or {unaliased_indices} with the in-place outputs elided"
+            if unaliased_indices != all_indices
+            else f"{all_indices}"
+        )
+        # Outputs are missing and nothing exempted them. That is what an export
+        # asking for zero_copy_kv looks like when the aliased-buffer mark did not
+        # reach the partitioner, so no delegate was stamped and none is exempt --
+        # a failure mode with no other symptom, hence naming it here.
+        unexempted_drop = elidable_output_names is None and len(indices) < len(
+            all_indices
+        )
         raise ValueError(
             "TensorRT ExecuTorch backend: delegate outputs map to engine output "
-            f"indices {indices}, expected {list(range(len(output_names)))} -- the "
-            "runtime binds output i to output_binding_names[i], so a permuted or "
-            "incomplete output list would bind the wrong tensors."
+            f"indices {indices}, expected {expected} -- the runtime binds each "
+            "output it is given in binding order, so a permuted, incomplete, or "
+            "partially elided output list would bind the wrong tensors."
+            + (
+                " No output was declared elidable for this delegate, so if the "
+                "export asked for zero_copy_kv the aliased-buffer mark did not "
+                "survive lowering."
+                if unexempted_drop
+                else ""
+            )
         )
+
+
+def _serialize_elided_output_names(names: Iterable[str]) -> bytes:
+    """Encode the elided aliased-output binding names for the compile spec.
+
+    JSON, not the ``%`` / ``@`` delimiters that separate ``engine_info``'s
+    binding-name and aliased_io fields, so a binding name containing one of those
+    cannot corrupt the record.
+    """
+    return json.dumps(sorted(set(names))).encode("utf-8")
+
+
+def _elided_output_names(compile_specs: List[CompileSpec]) -> Optional[Set[str]]:
+    """The aliased-output binding names export declared elidable, or ``None``.
+
+    ``None`` when no zero-copy spec is present, which keeps a missing output an
+    error: only a caller who asked for zero-copy may drop the aliased outputs,
+    and then only exactly the ones export rewired to write in place.
+    """
+    for spec in compile_specs:
+        if getattr(spec, "key", None) != ZERO_COPY_KV_COMPILE_SPEC_KEY:
+            continue
+        value = spec.value
+        if isinstance(value, (bytes, bytearray)):
+            value = bytes(value).decode("utf-8")
+        return set(json.loads(value))
+    return None
 
 
 def _get_str(engine_info: List[Any], index: int, default: str = "") -> str:
@@ -375,7 +464,12 @@ class TensorRTBackend(BackendDetails):  # type: ignore[misc]
         output_names = _split_binding_names(
             _get_str(engine_info, OUTPUT_BINDING_NAMES_IDX)
         )
-        _validate_output_binding_order(edge_program, engine_node, output_names)
+        _validate_output_binding_order(
+            edge_program,
+            engine_node,
+            output_names,
+            _elided_output_names(compile_specs),
+        )
         io_bindings = [
             TensorRTIOBinding(name=name, is_input=True) for name in input_names
         ] + [TensorRTIOBinding(name=name, is_input=False) for name in output_names]

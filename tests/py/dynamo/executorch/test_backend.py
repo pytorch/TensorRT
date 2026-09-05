@@ -9,6 +9,7 @@ import pytest
 executorch = pytest.importorskip("executorch.exir")
 
 import torch  # noqa: E402
+from executorch.exir.backend.compile_spec_schema import CompileSpec  # noqa: E402
 from torch.export.graph_signature import InputKind  # noqa: E402
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (  # noqa: E402
     ALIASED_IO_IDX,
@@ -437,3 +438,176 @@ def test_validate_output_binding_order_accepts_unwrapped_single_output():
     g.output((engine,))
     ep = SimpleNamespace(graph_module=torch.fx.GraphModule(torch.nn.Module(), g))
     _validate_output_binding_order(ep, engine, ["out"])
+
+
+@pytest.mark.unit
+def test_validate_output_binding_order_accepts_elided_aliased_outputs():
+    """Zero-copy KV drops the in-place outputs from the delegate entirely.
+
+    The engine still declares them as bindings -- the runtime binds them to
+    their aliased input's tensor -- but no delegate argument is passed for them.
+    """
+    from torch_tensorrt.executorch.backend import _validate_output_binding_order
+
+    ep, engine = _engine_partition([0])
+    _validate_output_binding_order(ep, engine, ["out0", "kv0", "kv1"], {"kv0", "kv1"})
+
+
+@pytest.mark.unit
+def test_validate_output_binding_order_rejects_elision_that_was_not_requested():
+    """The same graph is a bug unless the caller asked for zero-copy.
+
+    Aliased outputs missing because nothing declared them as buffer mutations
+    look identical to aliased outputs deliberately elided, here and at runtime.
+    So the default stays strict and only an explicit opt-in relaxes it.
+
+    It is also the shape a zero-copy export produces when the aliased-buffer mark
+    never reaches the partitioner: nothing is stamped, so nothing is exempt. The
+    message names the feature, because that failure has no other symptom.
+    """
+    from torch_tensorrt.executorch.backend import _validate_output_binding_order
+
+    ep, engine = _engine_partition([0])
+    with pytest.raises(ValueError, match="engine output indices") as excinfo:
+        _validate_output_binding_order(ep, engine, ["out0", "kv0", "kv1"])
+    assert "zero_copy_kv" in str(excinfo.value)
+
+
+@pytest.mark.unit
+def test_validate_output_binding_order_still_accepts_aliased_outputs_threaded():
+    """Not eliding is the pre-existing shape and stays legal: without zero-copy
+    each aliased output is a delegate output like any other."""
+    from torch_tensorrt.executorch.backend import _validate_output_binding_order
+
+    ep, engine = _engine_partition([0, 1, 2])
+    _validate_output_binding_order(ep, engine, ["out0", "kv0", "kv1"], {"kv0", "kv1"})
+
+
+@pytest.mark.unit
+def test_validate_output_binding_order_rejects_partially_elided_outputs():
+    """Half-elision is a lost buffer update, and the runtime cannot express it:
+    it infers elision from one argument count, so it is all-or-nothing."""
+    from torch_tensorrt.executorch.backend import _validate_output_binding_order
+
+    ep, engine = _engine_partition([0, 1])
+    with pytest.raises(ValueError, match="engine output indices") as excinfo:
+        _validate_output_binding_order(
+            ep, engine, ["out0", "kv0", "kv1"], {"kv0", "kv1"}
+        )
+    # The mark plainly did survive -- these bindings were declared elidable -- so
+    # the lost-mark hint would be a wrong lead here.
+    assert "zero_copy_kv" not in str(excinfo.value)
+
+
+@pytest.mark.unit
+def test_validate_output_binding_order_rejects_permutation_of_elided_outputs():
+    """Elision removes outputs; it does not license reordering the survivors."""
+    from torch_tensorrt.executorch.backend import _validate_output_binding_order
+
+    ep, engine = _engine_partition([2, 0])
+    with pytest.raises(ValueError, match="engine output indices"):
+        _validate_output_binding_order(ep, engine, ["out0", "kv0", "out2"], {"kv0"})
+
+
+def _aliased_edge_program(present_indices, out_names, aliased_io_map):
+    """A one-engine partition declaring aliased_io whose delegate keeps only
+    ``present_indices`` of its output bindings (the rest elided, as zero-copy
+    export produces). One input, ``tokens``, which the aliases point at."""
+    from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import serialize_aliased_io
+
+    engine_info = [""] * SERIALIZATION_LEN
+    engine_info[ENGINE_IDX] = _engine_tensor(b"engine-bytes")
+    engine_info[INPUT_BINDING_NAMES_IDX] = "tokens"
+    engine_info[OUTPUT_BINDING_NAMES_IDX] = "%".join(out_names)
+    engine_info[ALIASED_IO_IDX] = serialize_aliased_io(aliased_io_map)
+
+    graph = torch.fx.Graph()
+    tokens = graph.placeholder("tokens")
+    engine_node = graph.call_function(_ENGINE_OP, ([tokens], *engine_info))
+    graph.output(
+        tuple(
+            graph.call_function(operator.getitem, (engine_node, i))
+            for i in present_indices
+        )
+    )
+    return SimpleNamespace(
+        graph_module=SimpleNamespace(graph=graph),
+        graph_signature=SimpleNamespace(
+            input_specs=[
+                SimpleNamespace(
+                    kind=InputKind.USER_INPUT, arg=SimpleNamespace(name="tokens")
+                )
+            ]
+        ),
+        constants={},
+    )
+
+
+@pytest.mark.unit
+def test_preprocess_rejects_elided_aliased_output_without_zero_copy_spec():
+    """The gate at preprocess: a delegate that dropped its aliased output is a
+    bug unless a zero-copy compile spec says the drop was deliberate. Deleting
+    the gate (treating the drop as always allowed) would let this pass silently.
+    """
+    from torch_tensorrt.executorch.backend import TensorRTBackend
+
+    edge_program = _aliased_edge_program(
+        present_indices=[0],
+        out_names=["logits", "out_k"],
+        aliased_io_map={"out_k": ("tokens", "kv_cache_update")},
+    )
+    with pytest.raises(ValueError, match="engine output indices"):
+        TensorRTBackend.preprocess(edge_program, [])
+
+
+@pytest.mark.unit
+def test_preprocess_accepts_elided_aliased_output_with_zero_copy_spec():
+    """The same delegate is accepted once the compile spec names the elided
+    binding, and only then."""
+    from torch_tensorrt.executorch.backend import (
+        ZERO_COPY_KV_COMPILE_SPEC_KEY,
+        TensorRTBackend,
+        _serialize_elided_output_names,
+    )
+
+    edge_program = _aliased_edge_program(
+        present_indices=[0],
+        out_names=["logits", "out_k"],
+        aliased_io_map={"out_k": ("tokens", "kv_cache_update")},
+    )
+    spec = CompileSpec(
+        ZERO_COPY_KV_COMPILE_SPEC_KEY, _serialize_elided_output_names(["out_k"])
+    )
+    # Does not raise, and produces a valid engine blob (aliased_io present bumps
+    # the blob format magic to TR02, so match the family, not the exact base).
+    result = TensorRTBackend.preprocess(edge_program, [spec])
+    assert isinstance(result.processed_bytes, bytes)
+    assert result.processed_bytes[:2] == TENSORRT_MAGIC[:2]
+
+
+@pytest.mark.unit
+def test_preprocess_rejects_a_non_buffer_alias_elided_alongside_a_buffer_alias():
+    """An engine mixing a buffer-backed aliased output (export rewired it and
+    named it in the spec) with a non-buffer-backed one (never rewired) must not
+    have the non-buffer one silently elided. The spec names only ``out_k``, so a
+    delegate that also dropped ``out_v`` is rejected -- exactly as it would be
+    without zero-copy."""
+    from torch_tensorrt.executorch.backend import (
+        ZERO_COPY_KV_COMPILE_SPEC_KEY,
+        TensorRTBackend,
+        _serialize_elided_output_names,
+    )
+
+    edge_program = _aliased_edge_program(
+        present_indices=[0],  # both out_k (buffer) and out_v (non-buffer) dropped
+        out_names=["logits", "out_k", "out_v"],
+        aliased_io_map={
+            "out_k": ("tokens", "kv_cache_update"),
+            "out_v": ("tokens", "kv_cache_update"),
+        },
+    )
+    spec = CompileSpec(
+        ZERO_COPY_KV_COMPILE_SPEC_KEY, _serialize_elided_output_names(["out_k"])
+    )
+    with pytest.raises(ValueError, match="engine output indices"):
+        TensorRTBackend.preprocess(edge_program, [spec])

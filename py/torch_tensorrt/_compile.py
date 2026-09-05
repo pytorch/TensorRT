@@ -815,6 +815,14 @@ def save(
                 resident. Requires the engine to have been compiled with
                 ``enable_weight_streaming=True``. See
                 :func:`torch_tensorrt.executorch.export` for the full description.
+                ``zero_copy_kv=`` (default ``False``, single-method only) opts a
+                decode method's KV cache into in-place updates: the TensorRT
+                engine writes the aliased KV buffer directly instead of receiving
+                a staging copy that ExecuTorch copies back afterward. Unlike the
+                direct ``executorch.export()`` + ``to_executorch()`` path -- where
+                producing zero-copy KV takes two paired calls the caller must not
+                forget -- ``save()`` owns both steps and installs the finalization
+                config itself, so a single ``zero_copy_kv=True`` is enough.
     """
     if isinstance(module, CudaGraphsTorchTensorRTModule):
         module = module.compiled_module
@@ -849,6 +857,7 @@ def save(
     executorch_weight_streaming_budget_per_engine = kwargs.pop(
         "weight_streaming_budget_per_engine", None
     )
+    executorch_zero_copy_kv = kwargs.pop("zero_copy_kv", False)
 
     if output_format not in accepted_formats:
         raise ValueError(
@@ -1028,6 +1037,11 @@ def save(
             "output_format='executorch' and will be ignored for "
             f"output_format='{output_format}'."
         )
+    if executorch_zero_copy_kv and output_format != "executorch":
+        logger.warning(
+            "zero_copy_kv= is only used with output_format='executorch' and will "
+            f"be ignored for output_format='{output_format}'."
+        )
     if output_format == "aot_inductor" and platform.system() != "Linux":
         raise ValueError(
             f"The AOT Inductor format is only supported on Linux, {platform.system()} is not a supported platform for this format"
@@ -1121,6 +1135,7 @@ def save(
                     compile_config=executorch_compile_config,
                     generate_etrecord=executorch_generate_etrecord,
                     weight_streaming_budget_per_engine=executorch_weight_streaming_budget_per_engine,
+                    zero_copy_kv=executorch_zero_copy_kv,
                 )
             else:
                 raise RuntimeError(
@@ -1238,6 +1253,7 @@ def save(
                         compile_config=executorch_compile_config,
                         generate_etrecord=executorch_generate_etrecord,
                         weight_streaming_budget_per_engine=executorch_weight_streaming_budget_per_engine,
+                        zero_copy_kv=executorch_zero_copy_kv,
                     )
                 else:
                     raise RuntimeError(
@@ -1364,6 +1380,7 @@ def save(
                         compile_config=executorch_compile_config,
                         generate_etrecord=executorch_generate_etrecord,
                         weight_streaming_budget_per_engine=executorch_weight_streaming_budget_per_engine,
+                        zero_copy_kv=executorch_zero_copy_kv,
                     )
                 else:
                     raise RuntimeError(
@@ -1402,7 +1419,11 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
             "(torch_tensorrt_runtime). Reinstall torch_tensorrt with the runtime extension."
         )
     try:
-        from torch_tensorrt.executorch import export
+        from torch_tensorrt.executorch import (
+            check_zero_copy_kv,
+            export,
+            zero_copy_backend_config,
+        )
     except ImportError:
         raise ImportError(
             "ExecuTorch is not installed. Install with: pip install "
@@ -1421,6 +1442,7 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
             )
 
     generate_etrecord = kwargs.get("generate_etrecord", False)
+    zero_copy_kv = kwargs.get("zero_copy_kv", False)
     # export() runs the TRT partitioner and to_edge_transform_and_lower itself; it
     # defaults compile_config to get_edge_compile_config() (_check_ir_validity=False,
     # since the TRT execute_engine placeholder graph fails edge IR validation) when a
@@ -1436,8 +1458,25 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
         weight_streaming_budget_per_engine=kwargs.get(
             "weight_streaming_budget_per_engine"
         ),
+        zero_copy_kv=zero_copy_kv,
     )
-    executorch_program = edge_program.to_executorch(config=kwargs.get("backend_config"))
+    # Unlike the direct export()+to_executorch() path -- where the two steps
+    # belong to different owners and pairing them is the caller's job -- save()
+    # owns both, so it installs the finalization pass itself. Wrapping preserves
+    # every field of the caller's config. save() installs the pass once; a
+    # backend_config that already carries it is wrapped again here, and
+    # finalization then raises.
+    backend_config = kwargs.get("backend_config")
+    if zero_copy_kv:
+        backend_config = zero_copy_backend_config(backend_config)
+    executorch_program = edge_program.to_executorch(config=backend_config)
+    if zero_copy_kv:
+        # save() holds the finalized program here, which is the only place the
+        # graph shows whether the caches actually reach the engine un-staged.
+        # Both halves of zero-copy no-op quietly when they find nothing to do, so
+        # without this a save() that asked for zero-copy could still write an
+        # ordinary staged .pte.
+        check_zero_copy_kv(executorch_program)
     with open(file_path, "wb") as f:
         executorch_program.write_to_file(f)
     _write_external_tensor_data(executorch_program, file_path)

@@ -207,3 +207,10 @@ Because the causal attention at position 1 covers positions 0..1, the two logits
 differ only if the KV written at position 0 persisted across `execute()` calls.
 The runner prints `[kv-check] PASS` and returns 0 on success, or fails if the
 two are identical (the update did not persist). It requires a CUDA device.
+
+That pair runs twice over, printing `caller stream: none` and then `caller
+stream: own`. The second scopes a `CallerStreamGuard` over the decode loop on a
+stream the runner creates, which is what lets the backend return from
+`execute()` with the enqueue still in flight; the first leaves the caller stream
+unset, so every `execute()` synchronizes before it returns. A zero-copy `.pte`
+reaches the skip-the-sync path only in the second, so both have to pass.

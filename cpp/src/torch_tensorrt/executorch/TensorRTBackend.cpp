@@ -440,6 +440,9 @@ Result<DelegateHandle*> TensorRTBackend::init(
   // Map each aliased output binding to the index of the input it aliases so
   // execute() can bind it to that input's device pointer (in-place).
   // Non-aliased models have an empty header.aliased_io -> all -1, unchanged path.
+  // The parser has already refused a blob claiming one output twice, so the count
+  // built below is one per distinct output binding, which is what execute()
+  // subtracts on.
   handle->output_aliased_input_idx.assign(handle->num_outputs, -1);
   handle->input_is_alias_target.assign(handle->num_inputs, false);
   for (const auto& ab : header.aliased_io) {
@@ -551,8 +554,10 @@ Result<DelegateHandle*> TensorRTBackend::init(
 // their addresses; no separate output allocation is required.
 //
 // Args layout (mirroring the Python exporter):
-//   args[0 .. num_inputs-1]             – input EValues
-//   args[num_inputs .. num_inputs+num_outputs-1] – output EValues
+//   args[0 .. num_inputs-1]                               -- input EValues
+//   args[num_inputs .. num_inputs+num_delegate_outputs-1] -- output EValues
+// num_delegate_outputs is num_outputs, less the aliased outputs when zero-copy KV
+// elided them from the delegate; see the arity branch at the top of execute().
 // ---------------------------------------------------------------------------
 Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle* handle, Span<EValue*> args) const {
   (void)context;
@@ -561,11 +566,35 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
 
   const size_t num_inputs = engine->num_inputs;
   const size_t num_outputs = engine->num_outputs;
-  // Caller-owned KV: every input is a delegate arg, and each aliased output is
-  // threaded as a delegate output arg (the caller-owned mutable buffer's mutation
-  // slot), so all engine bindings map 1:1 to delegate args.
-  const size_t num_delegate_outputs = num_outputs;
+  // Caller-owned KV comes in two shapes. Either each aliased output is threaded as
+  // a delegate output arg (the caller-owned mutable buffer's mutation slot), so all
+  // engine bindings map 1:1 to delegate args; or -- zero-copy KV -- the aliased
+  // outputs are elided from the delegate entirely, because the engine's in-place
+  // write through the aliased input already IS the buffer update. A .pte written
+  // before zero-copy existed still takes the first branch, and export will not emit
+  // the shorter arity unless zero-copy was asked for, so a short argument list
+  // cannot instead mean "the aliased outputs were never declared".
   const size_t num_delegate_inputs = num_inputs;
+  const size_t num_aliased_outputs = engine->num_aliased_outputs;
+  // The blob parser refuses a second aliased_io entry for an output already
+  // claimed, and init refuses an entry whose output is not one of the recorded
+  // output bindings, so this holds for any header that reached here. It is
+  // checked anyway because both subtractions below are unsigned: on a header
+  // built some other way they wrap and the length check then accepts any
+  // argument count. That wrap is all this catches. A duplicate entry inflates
+  // the count while staying within num_outputs, passes both checks, and still
+  // indexes one past the end of args; the parser's refusal is what stops that.
+  if (num_aliased_outputs > num_outputs) {
+    ET_LOG(
+        Error,
+        "TensorRTBackend::execute: %zu aliased output(s) recorded for %zu output binding(s)",
+        num_aliased_outputs,
+        num_outputs);
+    return Error::InvalidProgram;
+  }
+  const bool aliased_outputs_elided =
+      num_aliased_outputs > 0 && args.size() == num_delegate_inputs + num_outputs - num_aliased_outputs;
+  const size_t num_delegate_outputs = num_outputs - (aliased_outputs_elided ? num_aliased_outputs : 0);
   if (args.size() < num_delegate_inputs + num_delegate_outputs) {
     ET_LOG(
         Error,
@@ -795,9 +824,15 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
         ET_LOG(Error, "TensorRTBackend::execute: setTensorAddress failed for aliased output '%s'", name.c_str());
         return Error::InvalidState;
       }
-      // The aliased output IS a delegate output arg (the caller-owned mutable
-      // buffer's mutation slot). Consume it and record a reflect so ExecuTorch's
-      // write-back copy_ sees the engine's in-place update.
+      // Elided: setTensorAddress above pointed this output binding at the caller's
+      // buffer, so the engine writes the buffer itself; nothing to reflect into.
+      if (aliased_outputs_elided) {
+        continue;
+      }
+
+      // Otherwise the aliased output IS a delegate output arg (the caller-owned
+      // mutable buffer's mutation slot). Consume it and record a reflect so
+      // ExecuTorch's write-back copy_ sees the engine's in-place update.
       const size_t arg_i = arg_idx++;
       EValue* out_arg = args[arg_i];
       TORCHTRT_ET_CHECK_NOT_NULL(
@@ -945,10 +980,16 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // next execute() and the destructor wait before reusing/freeing exec_ctx. The D2H
   // copies live in the must_sync branch: an output staged to host always sets
   // output_staged_to_host, so outputs_needing_copy is empty on the skip path.
-  // An aliased reflect enqueues the engine's in-place update into the delegate
-  // output EValue on `stream`; ExecuTorch's buffer-mutation copy_ reads that EValue
-  // after execute() returns, so the reflect must complete first. A model with
-  // aliased outputs therefore always syncs here.
+  // A non-elided aliased reflect enqueues the engine's in-place update into the
+  // delegate output EValue on `stream`; ExecuTorch's buffer-mutation copy_ reads
+  // that EValue after execute() returns, so the reflect must complete first, and a
+  // model that threads its aliased outputs as delegate output args syncs here.
+  // Under zero-copy KV skipping the sync is correct, because the aliased buffer
+  // stays device-resident and its next reader is the following engine execute() --
+  // on the same `stream`, provided the runner honours the single-shared-stream
+  // contract every coalesced .pte already depends on. A host reader that
+  // inspected it immediately after execute() returns would see stale data unless
+  // it synchronized `stream` itself; ExecuTorch's KV path never does such a read.
   const bool aliased_reflect_pending = !aliased_reflects.empty();
   const bool must_sync =
       output_staged_to_host || input_staged_from_host || aliased_reflect_pending || !caller_stream_set;

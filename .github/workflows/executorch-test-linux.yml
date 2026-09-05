@@ -95,11 +95,15 @@ jobs:
           --model_path="${RUNNER_TEMP}/torchtrt-python.pte"
         python examples/torchtrt_executorch_example/export_kv_cache_decode.py \
           --model_path="${RUNNER_TEMP}/torchtrt-kv-cache-decode.pte"
+        python examples/torchtrt_executorch_example/export_kv_cache_decode.py \
+          --model_path="${RUNNER_TEMP}/torchtrt-kv-cache-decode-zero-copy.pte" \
+          --zero_copy
         python examples/torchtrt_executorch_example/export_coalesced.py \
           --model_path="${RUNNER_TEMP}/torchtrt-coalesced.pte"
         .github/scripts/verify-executorch-reference-runner.sh \
           "${RUNNER_TEMP}/torchtrt-python.pte" \
+          --coalesced="${RUNNER_TEMP}/torchtrt-coalesced.pte" \
           "${RUNNER_TEMP}/torchtrt-kv-cache-decode.pte" \
-          "${RUNNER_TEMP}/torchtrt-coalesced.pte"
+          "${RUNNER_TEMP}/torchtrt-kv-cache-decode-zero-copy.pte"
         python examples/executorch_reference_runner/load_model.py \
           --model_path="${RUNNER_TEMP}/torchtrt-python.pte" --num_runs=1

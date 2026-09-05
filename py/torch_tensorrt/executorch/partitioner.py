@@ -1,7 +1,7 @@
 # ExecuTorch partitioner: partition by execute_engine nodes.
 
 import logging
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Set, Tuple
 
 import torch
 from executorch.exir.backend.compile_spec_schema import CompileSpec
@@ -13,12 +13,18 @@ from executorch.exir.backend.partitioner import (
 from executorch.exir.backend.utils import tag_constant_data
 from torch.export import ExportedProgram
 from torch.fx.passes.infra.partitioner import CapabilityBasedPartitioner, Partition
+from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
+    OUTPUT_BINDING_NAMES_IDX,
+    deserialize_binding_names,
+)
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import DEVICE_IDX
 from torch_tensorrt.executorch.backend import (
+    ZERO_COPY_KV_COMPILE_SPEC_KEY,
     TensorRTBackend,
     _get_engine_info_for_node,
     _get_engine_nodes_in,
     _parse_device_id,
+    _serialize_elided_output_names,
 )
 from torch_tensorrt.executorch.operator_support import TensorRTOperatorSupport
 
@@ -127,6 +133,20 @@ class TensorRTPartitioner(Partitioner):  # type: ignore[misc]
     ) -> None:
         super().__init__()
         self.compile_specs = list(compile_specs) if compile_specs else []
+        # The zero-copy KV spec is stamped per-partition in partition(), never
+        # applied to every partition like the rest of compile_specs. Its presence
+        # here only records that this method asked for zero-copy; the actual
+        # elided binding names are derived per engine at partition time, so a
+        # method that lowers to several TensorRT delegates marks only the one
+        # whose aliased outputs were elided. It has to stay out of the shared
+        # list: a plain-compute delegate carrying the spec would make the
+        # un-staging cross-check demand an aliased buffer it never had.
+        self._zero_copy_requested = any(
+            s.key == ZERO_COPY_KV_COMPILE_SPEC_KEY for s in self.compile_specs
+        )
+        self._base_compile_specs = [
+            s for s in self.compile_specs if s.key != ZERO_COPY_KV_COMPILE_SPEC_KEY
+        ]
         # Mirror CudaPartitioner: a target_device CompileSpec drives ExecuTorch's
         # PropagateDevicePass, which tags delegate I/O TensorSpecs with the device
         # and serializes it into the .pte's extra_tensor_info. When the caller pins
@@ -134,8 +154,12 @@ class TensorRTPartitioner(Partitioner):  # type: ignore[misc]
         # its own engine node in partition() (engine nodes are not available here)
         # so a cuda:N engine is not mislabeled cuda:0.
         self._has_explicit_target_device = any(
-            s.key == _TARGET_DEVICE_COMPILE_SPEC_KEY for s in self.compile_specs
+            s.key == _TARGET_DEVICE_COMPILE_SPEC_KEY for s in self._base_compile_specs
         )
+        # ExecuTorch partitioners conventionally hold a delegation_spec. partition()
+        # builds a fresh DelegationSpec per partition and never reads this one; the
+        # only reader is _export._declared_method_name, on a partitioner the caller
+        # passes to export().
         self.delegation_spec = DelegationSpec(
             backend_id=TensorRTBackend.__name__,
             compile_specs=self.compile_specs,
@@ -176,6 +200,64 @@ class TensorRTPartitioner(Partitioner):  # type: ignore[misc]
             )
             return b"cuda:0"
 
+    def _partition_elided_output_names(
+        self, exported_program: ExportedProgram, partition: Partition
+    ) -> Set[str]:
+        """Engine output binding names this partition's delegate legitimately drops.
+
+        Zero-copy KV elides an engine's aliased output when its aliased input is a
+        buffer export rewired to be written in place -- marked on the placeholder
+        with ``_torch_tensorrt_aliased_buffer``. This is derived from THIS
+        partition's own engine (its ``aliased_io`` paired with the marks on its own
+        input placeholders), never from a method-wide name list, so a second engine
+        that happens to share an output binding name is never told it may drop that
+        binding. That is what lets a real lost output on the plain delegate still
+        raise while the KV delegate's genuine elision is exempted.
+
+        Any extraction failure returns an empty set: the delegate then carries every
+        binding and a genuinely missing aliased output stays an error in the
+        backend's ``_validate_output_binding_order``.
+        """
+        from torch_tensorrt.executorch._zero_copy import _aliased_inputs_by_output_index
+
+        try:
+            engine_nodes = _get_engine_nodes_in(partition.nodes)
+            if len(engine_nodes) != 1:
+                return set()
+            engine = engine_nodes[0]
+            aliased = _aliased_inputs_by_output_index(exported_program, engine)
+            if not aliased:
+                return set()
+            # Only OUTPUT_BINDING_NAMES_IDX is read, never the engine itself.
+            engine_info = _get_engine_info_for_node(
+                exported_program, engine, metadata_only=True
+            )
+            raw = engine_info[OUTPUT_BINDING_NAMES_IDX]
+            if isinstance(raw, bytes):
+                raw = raw.decode("utf-8", "replace")
+            output_names = deserialize_binding_names(str(raw or ""))
+            elided: Set[str] = set()
+            for output_index, input_node in aliased.items():
+                if (
+                    isinstance(input_node, torch.fx.Node)
+                    and input_node.meta.get("_torch_tensorrt_aliased_buffer")
+                    and 0 <= output_index < len(output_names)
+                ):
+                    elided.add(output_names[output_index])
+            return elided
+        except Exception as e:
+            # Broad by design, mirroring _resolve_target_device_for_partition: any
+            # extraction failure must not abort the export. It degrades safely --
+            # the delegate keeps every binding, so a truly-elided output is caught
+            # downstream rather than dropped.
+            logger.warning(
+                "zero-copy KV: could not resolve elided outputs for partition %s "
+                "(%s); the delegate will carry every binding.",
+                getattr(partition, "id", "?"),
+                e,
+            )
+            return set()
+
     def partition(self, exported_program: ExportedProgram) -> PartitionResult:
         capability_partitioner = CapabilityBasedPartitioner(
             exported_program.graph_module,
@@ -189,21 +271,31 @@ class TensorRTPartitioner(Partitioner):  # type: ignore[misc]
             tag = f"tensorrt_{partition.id}"
             for node in partition.nodes:
                 node.meta["delegation_tag"] = tag
-            if self._has_explicit_target_device:
-                partition_tags[tag] = self.delegation_spec
-            else:
-                partition_tags[tag] = DelegationSpec(
-                    backend_id=TensorRTBackend.__name__,
-                    compile_specs=self.compile_specs
-                    + [
-                        CompileSpec(
-                            _TARGET_DEVICE_COMPILE_SPEC_KEY,
-                            self._resolve_target_device_for_partition(
-                                exported_program, partition
-                            ),
-                        )
-                    ],
+            specs = list(self._base_compile_specs)
+            if not self._has_explicit_target_device:
+                specs.append(
+                    CompileSpec(
+                        _TARGET_DEVICE_COMPILE_SPEC_KEY,
+                        self._resolve_target_device_for_partition(
+                            exported_program, partition
+                        ),
+                    )
                 )
+            if self._zero_copy_requested:
+                elided = self._partition_elided_output_names(
+                    exported_program, partition
+                )
+                if elided:
+                    specs.append(
+                        CompileSpec(
+                            ZERO_COPY_KV_COMPILE_SPEC_KEY,
+                            _serialize_elided_output_names(elided),
+                        )
+                    )
+            partition_tags[tag] = DelegationSpec(
+                backend_id=TensorRTBackend.__name__,
+                compile_specs=specs,
+            )
 
         tag_constant_data(exported_program)
         _keep_mutated_buffers_above_delegate(exported_program)

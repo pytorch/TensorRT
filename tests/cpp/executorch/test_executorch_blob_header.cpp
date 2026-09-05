@@ -177,6 +177,37 @@ TEST(ExecuTorchTensorRTBlobHeader, InputNamedAliasedIoWithNoAliasesStillParses) 
   EXPECT_TRUE(header.aliased_io.empty());
 }
 
+TEST(ExecuTorchTensorRTBlobHeader, RejectsRepeatedAliasedIoOutput) {
+  // Two entries claiming out_k. They resolve to the same binding and the same
+  // engine alias, so nothing that looks the names up can tell them from one
+  // entry -- but a reader counting aliased outputs per entry counts out_k twice,
+  // which is how the backend sizes the delegate argument list.
+  const std::string metadata = R"({"io_bindings":[{"name":"in_k","is_input":true},{"name":"in_v","is_input":true},)"
+                               R"({"name":"out_k","is_input":false},{"name":"out_v","is_input":false}],)"
+                               R"("aliased_io":[{"output":"out_k","input":"in_k","kind":"kv_cache_update"},)"
+                               R"({"output":"out_k","input":"in_k","kind":"kv_cache_update"}]})";
+  const auto blob = make_blob(metadata, 4, TENSORRT_MAGIC_ALIASED_IO);
+
+  TensorRTBlobHeader header;
+  EXPECT_FALSE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
+}
+
+TEST(ExecuTorchTensorRTBlobHeader, ParsesAliasedIoEntriesForDistinctOutputs) {
+  // The minimal pair for the test above: the same blob with the second entry
+  // claiming its own output. A second entry is not itself the defect.
+  const std::string metadata = R"({"io_bindings":[{"name":"in_k","is_input":true},{"name":"in_v","is_input":true},)"
+                               R"({"name":"out_k","is_input":false},{"name":"out_v","is_input":false}],)"
+                               R"("aliased_io":[{"output":"out_k","input":"in_k","kind":"kv_cache_update"},)"
+                               R"({"output":"out_v","input":"in_v","kind":"kv_cache_update"}]})";
+  const auto blob = make_blob(metadata, 4, TENSORRT_MAGIC_ALIASED_IO);
+
+  TensorRTBlobHeader header;
+  ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
+  ASSERT_EQ(header.aliased_io.size(), 2u);
+  EXPECT_EQ(header.aliased_io[0].output, "out_k");
+  EXPECT_EQ(header.aliased_io[1].output, "out_v");
+}
+
 TEST(ExecuTorchTensorRTBlobHeader, RejectsUnknownFutureMagic) {
   constexpr char kFutureMagic[4] = {'T', 'R', '0', '3'};
   const std::string metadata = R"({"io_bindings":[{"name":"x","is_input":true}]})";

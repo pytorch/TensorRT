@@ -302,6 +302,22 @@ bool parse_metadata_json(const std::string& json, TensorRTBlobHeader& out) {
         }
       }
       if (!ab.output.empty() && !ab.input.empty()) {
+        // An output binding may be claimed by at most one entry. A second entry
+        // for the same output names the same binding, so nothing that resolves
+        // the names can tell the two apart -- but a reader that counts aliased
+        // outputs per entry, as TensorRTBackend does to size the delegate
+        // argument list, counts one output twice. Refuse the blob here, where
+        // the repeat is visible from the bytes alone.
+        bool already_claimed = false;
+        for (const auto& seen : out.aliased_io) {
+          if (seen.output == ab.output) {
+            already_claimed = true;
+            break;
+          }
+        }
+        if (already_claimed) {
+          return false;
+        }
         // The current Python serializer always writes "kind" (serialization.py),
         // and older blobs carry no aliased_io array at all, so this default is
         // defensive: it only fires for a blob that has an aliased_io entry but
