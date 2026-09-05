@@ -1,6 +1,9 @@
 """Whitebox tests for the RuntimeSettings data model + dispatch."""
 
 import dataclasses
+import io
+import os
+import tempfile
 import unittest
 
 import torch
@@ -11,6 +14,8 @@ from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.runtime import (
     RuntimeCache,
     RuntimeSettings,
+    apply_runtime_settings,
+    runtime_cache,
     runtime_config,
 )
 
@@ -18,15 +23,6 @@ from torch_tensorrt.runtime import (
 class SimpleModel(torch.nn.Module):
     def forward(self, x):
         return torch.relu(x) + 1.0
-
-
-def _apply_runtime_settings(compiled, rs):
-    """Apply ``RuntimeSettings`` to every inner ``TorchTensorRTModule``."""
-    from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
-
-    for _, mod in compiled.named_modules():
-        if isinstance(mod, TorchTensorRTModule):
-            mod.runtime_settings = rs
 
 
 def _compile_simple(*, runtime_settings=None):
@@ -47,7 +43,7 @@ def _compile_simple(*, runtime_settings=None):
     )
     torch._dynamo.reset()
     if runtime_settings is not None:
-        _apply_runtime_settings(compiled, runtime_settings)
+        apply_runtime_settings(compiled, runtime_settings)
     return compiled
 
 
@@ -310,7 +306,7 @@ class TestStateDictRoundTripRuntimeSettings(TestCase):
         dst.load_state_dict(state)  # routes through set_extra_state
         # B2 used to AttributeError on the next line because the slot
         # wasn't initialized after ``set_extra_state``.
-        _apply_runtime_settings(
+        apply_runtime_settings(
             dst, RuntimeSettings(cuda_graph_strategy="whole_graph_capture")
         )
 
@@ -399,6 +395,287 @@ class TestNestedRuntimeConfigCudagraphs(TestCase):
         with self.assertRaises(RuntimeError) as cm:
             enable_cudagraphs(compiled, cuda_graph_strategy="whole_graph_capture")
         self.assertIn("TRT-RTX-only", str(cm.exception))
+
+
+def _compile_with_inputs():
+    """Compile SimpleModel and return (compiled, inputs) for save/load tests."""
+    model = SimpleModel().eval().cuda()
+    inputs = [torch.randn(2, 3).cuda()]
+    compiled = torchtrt.compile(
+        model,
+        ir="dynamo",
+        inputs=inputs,
+        min_block_size=1,
+    )
+    torch._dynamo.reset()
+    return compiled, inputs
+
+
+def _save_load(compiled, inputs):
+    """Save ``compiled`` to a temp file and return the loaded ExportedProgram and GraphModule."""
+    with tempfile.NamedTemporaryFile(suffix=".ep", delete=False) as f:
+        ep_path = f.name
+    try:
+        torchtrt.save(compiled, ep_path, arg_inputs=inputs)
+        loaded_ep = torchtrt.load(ep_path)
+    finally:
+        try:
+            os.unlink(ep_path)
+        except OSError:
+            pass
+    loaded_gm = loaded_ep.module() if hasattr(loaded_ep, "module") else loaded_ep
+    return loaded_ep, loaded_gm
+
+
+class TestApplyRuntimeSettingsTypeErrors(TestCase):
+    """Rejection of bad arguments; no engine compile required."""
+
+    def test_settings_wrong_type_raises(self):
+        model = torch.nn.Linear(3, 3).cuda()
+        with self.assertRaises(TypeError) as cm:
+            apply_runtime_settings(model, {"cuda_graph_strategy": "disabled"})
+        self.assertIn("RuntimeSettings", str(cm.exception))
+
+    def test_target_wrong_type_raises(self):
+        with self.assertRaises(TypeError):
+            apply_runtime_settings("not_a_module", RuntimeSettings(runtime_cache=None))
+
+    def test_zero_engines_raises(self):
+        model = torch.nn.Linear(3, 3).cuda()
+        with self.assertRaises(RuntimeError) as cm:
+            apply_runtime_settings(model, RuntimeSettings(runtime_cache=None))
+        self.assertIn("no TRT engines", str(cm.exception))
+
+
+@unittest.skipIf(
+    not ENABLED_FEATURES.tensorrt_rtx,
+    "apply_runtime_settings dispatch requires TRT-RTX",
+)
+class TestApplyRuntimeSettingsModuleOwned(TestCase):
+    """Module-owned engines: string cache still accepted (module owns it)."""
+
+    def test_module_path_string_accepted(self):
+        compiled, inputs = _compile_with_inputs()
+        with tempfile.NamedTemporaryFile(suffix=".bin", delete=False) as f:
+            cache_path = f.name
+        try:
+            n = apply_runtime_settings(
+                compiled, RuntimeSettings(runtime_cache=cache_path)
+            )
+            self.assertGreaterEqual(n, 1)
+            _ = compiled(*inputs)
+            self.assertTrue(os.path.exists(cache_path))
+        finally:
+            try:
+                os.unlink(cache_path)
+            except OSError:
+                pass
+
+    def test_returns_engine_count(self):
+        compiled, _ = _compile_with_inputs()
+        n = apply_runtime_settings(compiled, RuntimeSettings(runtime_cache=None))
+        self.assertGreaterEqual(n, 1)
+
+
+@unittest.skipIf(
+    not ENABLED_FEATURES.tensorrt_rtx,
+    "AOT load tests require TRT-RTX",
+)
+class TestApplyRuntimeSettingsModuleLess(TestCase):
+    """Module-less engines from save/load."""
+
+    def test_path_string_raises_for_module_less_engine(self):
+        compiled, inputs = _compile_with_inputs()
+        _, loaded_gm = _save_load(compiled, inputs)
+        with self.assertRaises(TypeError) as cm:
+            apply_runtime_settings(
+                loaded_gm,
+                RuntimeSettings(runtime_cache="/tmp/should_not_be_created.bin"),
+            )
+        msg = str(cm.exception)
+        self.assertIn("runtime_cache", msg)
+        self.assertIn("RuntimeCache", msg)
+
+    def test_default_runtime_settings_raises_for_module_less_engine(self):
+        compiled, inputs = _compile_with_inputs()
+        _, loaded_gm = _save_load(compiled, inputs)
+        with self.assertRaises(TypeError) as cm:
+            apply_runtime_settings(loaded_gm, RuntimeSettings())
+        self.assertIn("runtime_cache", str(cm.exception))
+
+    def test_none_cache_applies_and_forward_runs(self):
+        compiled, inputs = _compile_with_inputs()
+        _, loaded_gm = _save_load(compiled, inputs)
+        n = apply_runtime_settings(loaded_gm, RuntimeSettings(runtime_cache=None))
+        self.assertGreaterEqual(n, 1)
+        out = loaded_gm(*inputs)
+        self.assertEqual(out.shape, inputs[0].shape)
+
+    def test_runtime_cache_applies_and_persists(self):
+        compiled, inputs = _compile_with_inputs()
+        _, loaded_gm = _save_load(compiled, inputs)
+        with tempfile.NamedTemporaryFile(suffix=".bin", delete=False) as f:
+            cache_path = f.name
+        try:
+            cache = RuntimeCache(path=cache_path, autosave_on_del=False)
+            n = apply_runtime_settings(
+                loaded_gm,
+                RuntimeSettings(runtime_cache=cache),
+            )
+            self.assertGreaterEqual(n, 1)
+            _ = loaded_gm(*inputs)
+            self.assertTrue(cache.has_cache())
+            cache.save()
+            size = os.path.getsize(cache_path)
+            self.assertGreater(size, 0)
+        finally:
+            try:
+                os.unlink(cache_path)
+            except OSError:
+                pass
+
+    def test_cuda_graph_strategy_field_takes_effect(self):
+        compiled, inputs = _compile_with_inputs()
+        _, loaded_gm = _save_load(compiled, inputs)
+        n = apply_runtime_settings(
+            loaded_gm,
+            RuntimeSettings(
+                cuda_graph_strategy="whole_graph_capture",
+                runtime_cache=None,
+            ),
+        )
+        self.assertGreaterEqual(n, 1)
+        out = loaded_gm(*inputs)
+        self.assertEqual(out.shape, inputs[0].shape)
+
+    def test_exported_program_reaches_same_engines_as_module(self):
+        compiled, inputs = _compile_with_inputs()
+        loaded_ep, loaded_gm = _save_load(compiled, inputs)
+        with tempfile.NamedTemporaryFile(suffix=".bin", delete=False) as f:
+            cache_path = f.name
+        try:
+            cache = RuntimeCache(path=cache_path, autosave_on_del=False)
+            n_ep = apply_runtime_settings(
+                loaded_ep, RuntimeSettings(runtime_cache=cache)
+            )
+            self.assertGreaterEqual(n_ep, 1)
+            _ = loaded_gm(*inputs)
+            self.assertTrue(cache.has_cache())
+        finally:
+            try:
+                os.unlink(cache_path)
+            except OSError:
+                pass
+
+    def test_warm_load_bytes_transferred(self):
+        """Caller must call .load() / .load_from_stream() to warm the cache before attach.
+
+        The module path auto-calls load() via _resolve_runtime_cache; there is no
+        equivalent hook on the module-less path.  Verify warm bytes actually land:
+        load_from_stream returns a byte count, so assertGreater(..., 0) is the
+        non-vacuous check.
+        """
+        compiled, inputs = _compile_with_inputs()
+        _, loaded_gm = _save_load(compiled, inputs)
+
+        with tempfile.NamedTemporaryFile(suffix=".bin", delete=False) as f:
+            cache_path = f.name
+        try:
+            cache_populate = RuntimeCache(path=cache_path, autosave_on_del=False)
+            apply_runtime_settings(
+                loaded_gm, RuntimeSettings(runtime_cache=cache_populate)
+            )
+            _ = loaded_gm(*inputs)
+            cache_populate.save()
+            with open(cache_path, "rb") as fh:
+                saved_bytes = fh.read()
+            self.assertGreater(len(saved_bytes), 0, "first save produced empty file")
+
+            _, loaded_gm2 = _save_load(compiled, inputs)
+            cache_warm = RuntimeCache(autosave_on_del=False)
+            n_bytes = cache_warm.load_from_stream(io.BytesIO(saved_bytes))
+            self.assertGreater(
+                n_bytes,
+                0,
+                "load_from_stream transferred 0 bytes — warm load did nothing",
+            )
+
+            n_engines = apply_runtime_settings(
+                loaded_gm2, RuntimeSettings(runtime_cache=cache_warm)
+            )
+            self.assertGreaterEqual(n_engines, 1)
+            _ = loaded_gm2(*inputs)
+            self.assertTrue(cache_warm.has_cache())
+        finally:
+            try:
+                os.unlink(cache_path)
+            except OSError:
+                pass
+
+
+@unittest.skipIf(
+    not ENABLED_FEATURES.tensorrt_rtx,
+    "Mixed target test requires TRT-RTX",
+)
+class TestApplyRuntimeSettingsMixedTarget(TestCase):
+    """Module + module-less engines in one call: string must fail whole-call."""
+
+    def test_mixed_target_string_fails_atomically(self):
+        compiled, inputs = _compile_with_inputs()
+        _, loaded_gm = _save_load(compiled, inputs)
+
+        from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
+            TorchTensorRTModule,
+        )
+
+        prior = {
+            mod: mod.runtime_settings
+            for _, mod in compiled.named_modules()
+            if isinstance(mod, TorchTensorRTModule) and mod.engine is not None
+        }
+
+        with self.assertRaises(TypeError):
+            apply_runtime_settings(
+                [compiled, loaded_gm],
+                RuntimeSettings(runtime_cache="/tmp/should_not_apply.bin"),
+            )
+
+        for mod, saved in prior.items():
+            self.assertEqual(mod.runtime_settings, saved)
+
+
+@unittest.skipIf(
+    not ENABLED_FEATURES.tensorrt_rtx,
+    "CM raise tests require TRT-RTX",
+)
+class TestContextManagerRaisesOnModuleLess(TestCase):
+    """runtime_config and runtime_cache raise on module-less engines."""
+
+    def test_runtime_config_raises_on_loaded_gm(self):
+        compiled, inputs = _compile_with_inputs()
+        _, loaded_gm = _save_load(compiled, inputs)
+        with self.assertRaises(TypeError) as cm:
+            with runtime_config(loaded_gm, runtime_cache=None):
+                pass
+        msg = str(cm.exception)
+        self.assertIn("apply_runtime_settings", msg)
+
+    def test_runtime_cache_raises_on_loaded_gm(self):
+        compiled, inputs = _compile_with_inputs()
+        _, loaded_gm = _save_load(compiled, inputs)
+        with tempfile.NamedTemporaryFile(suffix=".bin", delete=False) as f:
+            cache_path = f.name
+        try:
+            with self.assertRaises(TypeError) as cm:
+                with runtime_cache(loaded_gm, cache_path):
+                    pass
+            msg = str(cm.exception)
+            self.assertIn("apply_runtime_settings", msg)
+        finally:
+            try:
+                os.unlink(cache_path)
+            except OSError:
+                pass
 
 
 if __name__ == "__main__":
