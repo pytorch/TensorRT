@@ -1,5 +1,7 @@
 import ast
 import importlib
+import importlib.util
+import subprocess
 import sys
 import types
 from pathlib import Path
@@ -298,6 +300,14 @@ def test_public_api_symbols_present():
 _REPO_ROOT = Path(__file__).resolve().parents[4]
 _SETUP_PY = _REPO_ROOT / "setup.py"
 _RUNTIME_SETUP_PY = _REPO_ROOT / "py/torch-tensorrt-executorch-runtime/setup.py"
+_RUNTIME_PY = (
+    _REPO_ROOT
+    / "py/torch-tensorrt-executorch-runtime/torch_tensorrt_executorch_runtime/runtime.py"
+)
+_RUNTIME_INIT_PY = (
+    _REPO_ROOT
+    / "py/torch-tensorrt-executorch-runtime/torch_tensorrt_executorch_runtime/__init__.py"
+)
 
 
 @pytest.mark.unit
@@ -319,7 +329,10 @@ def test_runtime_extension_has_dependency_wheel_rpaths():
     assert "$ORIGIN/../torch/lib" in cmake
     assert "$ORIGIN/../tensorrt_libs" in cmake
     assert "$ORIGIN/../nvidia/cuda_runtime/lib" in cmake
+    assert "$ORIGIN/../nvidia/cu12/lib" in cmake
     assert "$ORIGIN/../nvidia/cu13/lib" in cmake
+    assert "CUDAToolkit_VERSION_MAJOR EQUAL 12" in cmake
+    assert "CUDAToolkit_VERSION_MAJOR EQUAL 13" in cmake
     assert "-Wl,-Bsymbolic" not in cmake
     assert "set(EXECUTORCH_BUILD_KERNELS_OPTIMIZED ON" in cmake
     assert "set(EXECUTORCH_BUILD_XNNPACK ON" in cmake
@@ -386,10 +399,6 @@ def _setup_tree():
     return ast.parse(_SETUP_PY.read_text(encoding="utf-8"))
 
 
-def _runtime_setup_tree():
-    return ast.parse(_RUNTIME_SETUP_PY.read_text(encoding="utf-8"))
-
-
 def _assignment_value(tree, name):
     for node in tree.body:
         if isinstance(node, ast.Assign) and any(
@@ -408,28 +417,34 @@ def _function_def(tree, name):
 
 
 @pytest.mark.unit
-def test_runtime_wheel_uses_public_torch_version():
-    function = _function_def(_runtime_setup_tree(), "public_version")
-    namespace = {}
+def test_runtime_wheel_selects_its_tensorrt_requirement_per_cuda_major():
+    """The TensorRT requirement must match the CUDA major used to build the wheel."""
+    setup_source = _RUNTIME_SETUP_PY.read_text(encoding="utf-8")
+    tree = ast.parse(setup_source)
+    function = _function_def(tree, "get_tensorrt_requirement")
+    fake_torch = types.SimpleNamespace(version=types.SimpleNamespace(cuda=None))
+    namespace: dict = {"torch": fake_torch}
     exec(
         compile(ast.Module(body=[function], type_ignores=[]), "<setup.py>", "exec"),
         namespace,
     )
 
-    assert namespace["public_version"]("2.14.0.dev20260726+cu132") == (
-        "2.14.0.dev20260726"
-    )
+    for cuda_version, requirement in (
+        ("12.6", "tensorrt-cu12>=11.1.0,<11.2"),
+        ("12.9", "tensorrt-cu12>=11.1.0,<11.2"),
+        ("13.0", "tensorrt-cu13>=11.1.0,<11.2"),
+        ("13.2", "tensorrt-cu13>=11.1.0,<11.2"),
+    ):
+        fake_torch.version.cuda = cuda_version
+        assert (
+            namespace["get_tensorrt_requirement"]() == requirement
+        ), f"CUDA {cuda_version} resolves the wrong TensorRT requirement"
 
-
-@pytest.mark.unit
-def test_runtime_wheel_pins_cuda_13_native_dependencies():
-    setup_source = _RUNTIME_SETUP_PY.read_text(encoding="utf-8")
-    assert 'TENSORRT_DISTRIBUTION = "tensorrt-cu13"' in setup_source
-    assert 'CUDA_RUNTIME_DISTRIBUTION = "nvidia-cuda-runtime"' in setup_source
-    assert "torch=={public_version(torch.__version__)}" in setup_source
-    assert "{TENSORRT_DISTRIBUTION}=={tensorrt_version}" in setup_source
-    assert "{CUDA_RUNTIME_DISTRIBUTION}=={cuda_runtime_version}" in setup_source
-    assert "nvidia-cuda-runtime-cu12" not in setup_source
+    # A CUDA-less torch and an unsupported major are refused rather than guessed at.
+    for cuda_version in (None, "11.8"):
+        fake_torch.version.cuda = cuda_version
+        with pytest.raises(RuntimeError):
+            namespace["get_tensorrt_requirement"]()
 
 
 @pytest.mark.unit
