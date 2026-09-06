@@ -164,11 +164,9 @@ def convert_binary_elementwise(
     trt_promoted_type = promoted_type.to(trt.DataType)
 
     # TensorRT's elementwise layer only accepts bool operands for genuine
-    # boolean logic ops (AND/OR/XOR). Two bool operands (e.g. mask * mask)
-    # correctly promote to bool by PyTorch's own rules, but every other op
-    # (PROD, SUM, comparisons, ...) rejects bool inputs outright -- fall
-    # back to a numeric type first, matching how PyTorch eager already
-    # treats e.g. bool_tensor * bool_tensor as numeric under the hood.
+    # boolean logic ops (AND/OR/XOR). Callers implementing boolean arithmetic
+    # must select the corresponding logical op before reaching this point;
+    # cast any remaining non-logic operation to a numeric type.
     if trt_promoted_type == trt.DataType.BOOL and op_type not in (
         trt.ElementWiseOperation.AND,
         trt.ElementWiseOperation.OR,

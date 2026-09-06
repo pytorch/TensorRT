@@ -25,6 +25,17 @@ class TestMulConverter(DispatchTestCase):
             inputs,
         )
 
+    def test_mul_bool_tensor(self):
+        class mul(nn.Module):
+            def forward(self, lhs_val, rhs_val):
+                return torch.ops.aten.mul.Tensor(lhs_val, rhs_val)
+
+        inputs = [
+            torch.randint(0, 2, (4, 8), dtype=torch.bool),
+            torch.randint(0, 2, (4, 8), dtype=torch.bool),
+        ]
+        self.run_test(mul(), inputs)
+
     @parameterized.expand(
         [
             ("2d_int", (2, 1), 1),
