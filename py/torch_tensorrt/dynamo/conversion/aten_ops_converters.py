@@ -4373,13 +4373,7 @@ def aten_ops_full(
 def nonzero_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
-    """Reject nonzero on TensorRT-RTX, which has no non-zero layer.
-
-    The rejection has to happen in a capability validator rather than in the
-    converter body. The partitioner only consults the validator, so a converter
-    that raises instead leaves the node inside a TensorRT block and fails the
-    build, never reaching the PyTorch fallback.
-    """
+    """Reject nonzero on TensorRT-RTX, which has no non-zero layer."""
     if not ENABLED_FEATURES.tensorrt_rtx:
         return True
 

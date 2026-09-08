@@ -8,6 +8,11 @@ from torch_tensorrt.dynamo.partitioning._global_partitioner import (
     TorchTensorRTOperatorSupport,
 )
 
+# TensorRT-RTX has no non-zero layer, so nonzero_validator rejects the node and no
+# converter is ever selected for it. Both the output-allocator predicate and node
+# support follow from whether a converter exists.
+NONZERO_HAS_TRT_CONVERTER = not ENABLED_FEATURES.tensorrt_rtx
+
 
 def test_fallback_data_dependent_ops_setting_default():
     # Off by default; opt-in only.
@@ -48,12 +53,10 @@ def test_requires_output_allocator_is_setting_independent():
     # _requires_output_allocator is a pure predicate: it reports whether the
     # converter selected for the node needs a TRT output allocator (decided per node
     # via the selected converter, not by op target), independent of any setting.
-    # On TensorRT-RTX nonzero_validator rejects the node, so no converter is
-    # selected and no output allocator is required.
     node = _nonzero_node()
     assert (
         TorchTensorRTOperatorSupport._requires_output_allocator(node)
-        is not ENABLED_FEATURES.tensorrt_rtx
+        is NONZERO_HAS_TRT_CONVERTER
     )
 
 
@@ -67,9 +70,7 @@ def test_output_allocator_node_falls_back_only_when_enabled():
         CONVERTERS.set_compilation_settings(
             CompilationSettings(fallback_data_dependent_ops=False)
         )
-        # On TensorRT-RTX nonzero has no usable converter at all, so it falls
-        # back whatever the setting says.
-        assert support.is_node_supported({}, node) is not ENABLED_FEATURES.tensorrt_rtx
+        assert support.is_node_supported({}, node) is NONZERO_HAS_TRT_CONVERTER
         CONVERTERS.set_compilation_settings(
             CompilationSettings(fallback_data_dependent_ops=True)
         )
