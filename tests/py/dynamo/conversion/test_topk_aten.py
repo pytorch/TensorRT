@@ -19,6 +19,10 @@ class TestSortConverter(DispatchTestCase):
             ((6, 4), 2, 1, False, False),
             # default dim:-1 largest:True, sorted:True
             ((3, 5, 12), 3),
+            # ITopKLayer requires rank >= 2; converter broadcasts rank-1
+            ((64,), 64, 0, True, True),
+            ((64,), 8, 0, False, True),
+            ((16,), 4, -1, True, True),
         ]
     )
     def test_topk(self, input_shape, k, dim=-1, largest=True, sorted=True):

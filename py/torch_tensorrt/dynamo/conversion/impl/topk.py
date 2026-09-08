@@ -194,26 +194,37 @@ def topk(
     sorted: Optional[bool],
     return_indices: bool = True,
 ) -> Union[TRTTensor, Tuple[TRTTensor, TRTTensor]]:
-    if largest:
-        topk_layer = ctx.net.add_topk(
-            input,
-            trt.TopKOperation.MAX,
-            k,
-            get_axes_for_reduce_op(get_positive_dim(dim, len(input.shape))),
+    # ITopKLayer requires rank >= 2 (same broadcast as argmax_argmin above).
+    is_rank_1 = len(input.shape) == 1
+    if is_rank_1:
+        input = impl.shuffle.reshape(
+            ctx, target, source_ir, f"{name}_broadcast", input, (*input.shape, 1)
         )
-    else:
-        topk_layer = ctx.net.add_topk(
-            input,
-            trt.TopKOperation.MIN,
-            k,
-            get_axes_for_reduce_op(get_positive_dim(dim, len(input.shape))),
-        )
+        dim = 0
+
+    topk_layer = ctx.net.add_topk(
+        input,
+        trt.TopKOperation.MAX if largest else trt.TopKOperation.MIN,
+        k,
+        get_axes_for_reduce_op(get_positive_dim(dim, len(input.shape))),
+    )
 
     # TensorRT ITopKLayer does not have a sorted flag, it is always returning the sorted topk elements
     # so here no matter sorted is True or False the returned the topk Tensor object is always sorted
     set_layer_name(topk_layer, target, f"{name}_topk", source_ir)
 
+    values = topk_layer.get_output(0)
+    indices = topk_layer.get_output(1)
+
+    if is_rank_1:
+        values = impl.shuffle.reshape(
+            ctx, target, source_ir, f"{name}_values_1d", values, (-1,)
+        )
+        indices = impl.shuffle.reshape(
+            ctx, target, source_ir, f"{name}_indices_1d", indices, (-1,)
+        )
+
     if return_indices:
-        return topk_layer.get_output(0), topk_layer.get_output(1)
+        return values, indices
     else:
-        return topk_layer.get_output(0)
+        return values
