@@ -168,6 +168,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         input_binding_names: Optional[Sequence[str]] = None,
         output_binding_names: Optional[Sequence[str]] = None,
         _debugger_config: Optional[DebuggerConfig] = None,
+        skip_conversion_validation: bool = False,
     ):
         super().__init__(module)
 
@@ -194,12 +195,16 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         # an xdist worker), making those ops incorrectly appear as disallowed.
         CONVERTERS.set_compilation_settings(compilation_settings)
         self.validate_compile_settings()
-        missing_ops = self.validate_conversion()
-        if missing_ops:
-            warnings.warn(
-                "Interpretation will fail due to missing operations \n"
-                + "\n".join(f"{i}" for i in missing_ops)
-            )
+        # compile_module already walked CONVERTERS via get_graph_converter_support.
+        # When that count was complete under require_full_compilation, this extra
+        # get() pass cannot find missing ops; skip it.
+        if not skip_conversion_validation:
+            missing_ops = self.validate_conversion()
+            if missing_ops:
+                warnings.warn(
+                    "Interpretation will fail due to missing operations \n"
+                    + "\n".join(f"{i}" for i in missing_ops)
+                )
 
         # Optimization profiles. Profiles are an ordered list on
         # ``Input.profiles``; profile index i is built from each input's
