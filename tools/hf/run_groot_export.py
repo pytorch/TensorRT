@@ -7,10 +7,6 @@ needs GrootEagleEncodeStep / embodiment_id from the policy wrapper.
 
 from __future__ import annotations
 
-import argparse
-import sys
-from pathlib import Path
-
 import torch  # noqa: E402
 import torch_tensorrt  # noqa: E402
 from exporters import EdgeConfig, EdgeExporter
@@ -49,13 +45,6 @@ def load_groot(device: torch.device) -> GrootPolicy:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--compile", action="store_true", help="Build TRT engines (default: dryrun)"
-    )
-    parser.add_argument("--engine-dir", default="/tmp/groot_edge_exporter")
-    args = parser.parse_args()
-
     load_plugins_for_trt()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -68,7 +57,9 @@ def main() -> None:
     force_hf_attention(eagle.language_model, "eager")
 
     exporter = EdgeExporter()
-    config = EdgeConfig(model_type="groot", engine_dir=args.engine_dir, max_seq_len=968)
+    config = EdgeConfig(
+        model_type="groot", engine_dir="/tmp/groot_edge_exporter", max_seq_len=968
+    )
 
     # Spec tokenizes libero via Eagle chat template because we pass the policy.
     sample_inputs = {"device": device, "dtype": dtype}
@@ -78,10 +69,7 @@ def main() -> None:
     print("runtime keys:", sorted(exporter.sample))
 
     with torch.no_grad():
-        if hasattr(program, "module"):
-            velocity = program.module()(**exporter.sample)
-        else:
-            velocity = program(**exporter.sample)
+        velocity = program.module()(**exporter.sample)
 
     out = velocity[0] if isinstance(velocity, (tuple, list)) else velocity
     print("velocity", tuple(out.shape), "mean", float(out.float().mean()))

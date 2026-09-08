@@ -8,8 +8,6 @@ pads to max_seq_len. apply_mamba_stub() must run before from_pretrained.
 from __future__ import annotations
 
 import argparse
-import sys
-from pathlib import Path
 
 import torch
 import torch_tensorrt
@@ -40,10 +38,6 @@ def load_nemotron(checkpoint: str, device: torch.device, dtype: torch.dtype):
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--compile", action="store_true", help="Build TRT engines (default: dryrun)"
-    )
-    parser.add_argument("--engine-dir", default="/tmp/nemotron_edge_exporter")
-    parser.add_argument(
         "--checkpoint",
         default="nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16",
     )
@@ -66,10 +60,8 @@ def main() -> None:
     exporter = EdgeExporter()
     config = EdgeConfig(
         model_type="nemotron_h",
-        engine_dir=args.engine_dir,
+        engine_dir="/tmp/nemotron_edge_exporter",
         max_seq_len=args.max_seq_len,
-        dryrun=not args.compile,
-        skip_runtime_export=False,
     )
     program = exporter.export(model, sample_inputs, config=config)
 
@@ -77,10 +69,7 @@ def main() -> None:
     print("runtime keys:", sorted(exporter.sample))
 
     with torch.no_grad():
-        if hasattr(program, "module"):
-            out = program.module()(**exporter.sample)
-        else:
-            out = program(**exporter.sample)
+        out = program.module()(**exporter.sample)
 
     logits = out[0] if isinstance(out, (tuple, list)) else out
     print("logits", tuple(logits.shape), "mean", float(logits.float().mean()))

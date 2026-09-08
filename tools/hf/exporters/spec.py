@@ -6,6 +6,7 @@ from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass, field
 from typing import Any
 
+import torch
 import torch.nn as nn
 
 _SPECS: dict[str, type[EdgeSpec]] = {}
@@ -35,11 +36,12 @@ class ComponentBundle:
     save_args: tuple[Any, ...]
     input_names: list[str]
     output_names: list[str]
+    parity_output: str | None = None
     extra_config: dict[str, Any] = field(default_factory=dict)
     trt_settings: dict[str, Any] = field(default_factory=dict)
-    patch_fn: Callable[[nn.Module], Any] | None = None
     context_attention_mask_type: int | None = None
     execute_args: tuple[Any, ...] | None = None
+    input_specs: tuple[Any, ...] | None = None
     model_type: str = "edge"
     engine_file: str = "engine.engine"
 
@@ -47,20 +49,20 @@ class ComponentBundle:
 class EdgeSpec(ABC):
     """Per-family flatten / runtime wiring.
 
-    ``EdgeExporter.export`` never branches on PI05 vs Nemotron. It only loops
-    ``spec.components``.
+    ``EdgeExporter.export`` never branches on PI05 vs Nemotron. It compiles
+    whatever ``prepare`` returns.
     """
-
-    components: tuple[str, ...] = ()
 
     def apply_patches(
         self, model: nn.Module | None = None
     ) -> AbstractContextManager[None]:
-        """Install this family's setattr replacements for the whole ``export()``.
+        """Install this family's setattr replacements for TensorRT tracing.
 
-        Default is a no-op. Families register factories on their own backend
-        and return ``apply_patches(backend)``. ``model`` is the export root;
-        Nemotron uses it to wrap hybrid mixers.
+        Installed only around ``compile_component``. Eager inference is the
+        original HuggingFace / LeRobot forward. Default is a no-op. Families
+        register factories on their own backend and return
+        ``apply_patches(backend)``. ``model`` is the export root; Nemotron uses
+        it to wrap hybrid mixers.
         """
         del model
         return nullcontext()
@@ -75,32 +77,53 @@ class EdgeSpec(ABC):
         """Caller payload → stem dict used by prepare/run."""
 
     @abstractmethod
-    def prepare(
+    def capture_eager_outputs(
         self,
-        name: str,
         model: nn.Module,
         sample: MutableMapping[str, Any],
-        upstream: Mapping[str, Any],
         config: Any,
-    ) -> ComponentBundle:
-        """Select the original submodule and build its trace/save tuple."""
+        bench: dict[str, float] | None = None,
+    ) -> dict[str, torch.Tensor]:
+        """Unpatched HF / LeRobot tensors, keyed like ``prepare``.
 
-    def capture_upstream(
+        Called before ``apply_patches``. One tensor per component: the value
+        e2e passes to ``parity`` (vision embeds, language ``last_hidden_state``,
+        action velocity). Optional ``bench`` records unpatched CUDA-event ms.
+        """
+
+    def create_dynamic_shapes(
         self,
-        name: str,
-        outputs: Any,
-        sample: Mapping[str, Any],
-        bundle: ComponentBundle,
-    ) -> dict[str, Any]:
-        """Map this engine's outputs into keys the next ``prepare`` needs."""
-        return {}
+        input_names: list[str],
+        trace_args: tuple[Any, ...],
+        *,
+        max_seq_len: int,
+    ) -> tuple[Any, ...] | None:
+        """``torch_tensorrt.Input`` specs for dual-profile language compile.
+
+        Default is no specs (static ``trace_args``). PI05 overrides this.
+        """
+        del input_names, trace_args, max_seq_len
+        return None
+
+    @abstractmethod
+    def prepare(
+        self,
+        model: nn.Module,
+        sample: MutableMapping[str, Any],
+        config: Any,
+    ) -> dict[str, ComponentBundle]:
+        """Build every component bundle in one call.
+
+        Example tensors for later stages come from unpatched eager packing
+        (or zeros of the trace shape), not from the previous engine.
+        """
 
     @abstractmethod
     def run(self, engines: Mapping[str, str], sample: Mapping[str, Any]) -> Any:
         """Packing + ``execute_engine`` calls. This is the dumped graph."""
 
     def runtime_kwargs(self, sample: Mapping[str, Any]) -> dict[str, Any]:
-        """Tensor kwargs for ``torch.export`` of :class:`EdgeRuntimeModule`."""
+        """Tensor kwargs for ``torch.export`` of the outer VLA graph."""
         return {
             key: value
             for key, value in sample.items()
