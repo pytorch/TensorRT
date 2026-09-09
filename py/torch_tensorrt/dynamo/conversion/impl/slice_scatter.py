@@ -79,6 +79,7 @@ class KVWriteStatus(Enum):
     OK = auto()
     FULL_OVERWRITE = auto()
     DYNAMIC_BOUNDS = auto()
+    DYNAMIC_DIM_SIZE = auto()
     BAD_DIM = auto()
 
 
@@ -92,9 +93,10 @@ def resolve_slice_scatter_write(
     """Resolve ``slice_scatter``'s slice bounds into the form ``_kv_eligible`` takes.
 
     Returns ``(start, end, step, status)``. Under ``OK`` and ``FULL_OVERWRITE`` the
-    three bounds are Python ``int``s, with the op's defaults filled in and negative
-    indices counted from the end; under ``DYNAMIC_BOUNDS`` and ``BAD_DIM`` all three
-    are ``None``, since nothing resolved. ``status`` is one of:
+    three bounds are Python ``int``s, with the op's defaults filled in, negative
+    indices counted from the end and the whole slice clamped to the dim; under the
+    other statuses all three are ``None``, since nothing resolved. ``status`` is one
+    of:
 
     * ``OK`` — the bounds are concrete, and the caller goes on to
       ``_kv_eligible(cache_shape, dim, start, end - start)``.
@@ -105,6 +107,9 @@ def resolve_slice_scatter_write(
       under this status.
     * ``DYNAMIC_BOUNDS`` — a bound is not a Python ``int``, so the converter
       raises ``NotImplementedError``.
+    * ``DYNAMIC_DIM_SIZE`` — the dim being written is dynamic, so no bound resolves
+      against it, concrete ones included. ``aten_ops_slice_scatter``'s validator rejects
+      these so they run in PyTorch; the converter raises if one reaches it anyway.
     * ``BAD_DIM`` — ``dim`` is either not a Python ``int`` or does not index
       ``cache_shape``; the converter raises ``IndexError`` for both. A
       ``numpy.int64`` is rejected on the type check even when its value is in range.
@@ -123,17 +128,29 @@ def resolve_slice_scatter_write(
     if not isinstance(dim, int) or not -len(cache_shape) <= dim < len(cache_shape):
         return None, None, None, KVWriteStatus.BAD_DIM
     dim_size = cache_shape[dim]
+    # A dynamic dim reaches the converter as DYNAMIC_DIM (-1) and the predictor as a
+    # SymInt; neither is a size to resolve a bound against, concrete ones included --
+    # with nothing to clamp to, an end past the dim stands as a write wider than it.
+    if not (isinstance(dim_size, int) and dim_size >= 0):
+        return None, None, None, KVWriteStatus.DYNAMIC_DIM_SIZE
 
     if start is None:
         start = 0
-    if isinstance(start, int) and start < 0 and isinstance(dim_size, int):
-        start = dim_size + start
-    if end is None:
-        end = dim_size
-    if isinstance(end, int) and end < 0 and isinstance(dim_size, int):
-        end = dim_size + end
     if step is None:
         step = 1
+    if end is None:
+        end = dim_size
+
+    if isinstance(start, int) and start < 0:
+        start = dim_size + start
+    if isinstance(end, int) and end < 0:
+        end = dim_size + end
+    # Aten clamps a slice to its dim, and so must this: unclamped, the open end
+    # reaches the fallback's np.arange as an INT64_MAX-long index range.
+    if isinstance(start, int):
+        start = min(max(start, 0), dim_size)
+    if isinstance(end, int):
+        end = min(max(end, 0), dim_size)
 
     # A slice covering the whole dim is a plain copy of the source whatever `step` is
     # made of, so it is settled before the bounds are required to be concrete: `step`
@@ -141,7 +158,6 @@ def resolve_slice_scatter_write(
     if (
         isinstance(start, int)
         and isinstance(end, int)
-        and isinstance(dim_size, int)
         and start == 0
         and end == dim_size
         and step == 1
@@ -284,6 +300,14 @@ def slice_scatter(
     if status is KVWriteStatus.DYNAMIC_BOUNDS:
         raise NotImplementedError(
             "slice_scatter with dynamic start/end/step is not yet supported"
+        )
+
+    if status is KVWriteStatus.DYNAMIC_DIM_SIZE:
+        # The validator keeps these out of TensorRT, so this is only reachable for a
+        # node it could not read a shape from.
+        raise NotImplementedError(
+            f"slice_scatter: dim {dim} of the input is dynamic, so this write's bounds "
+            "cannot be resolved without its size"
         )
     # OK is the only status left, and it resolves all three bounds to Python ints.
     assert start is not None and end is not None and step is not None
