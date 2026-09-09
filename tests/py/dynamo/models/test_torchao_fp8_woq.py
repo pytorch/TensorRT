@@ -241,3 +241,81 @@ def test_linear_int4_woq():
         ),
     )
     torch._dynamo.reset()
+
+
+def _has_nvfp4_support() -> bool:
+    if not torch.cuda.is_available():
+        return False
+    try:
+        import tensorrt as trt
+        from torchao.prototype.mx_formats.nvfp4_tensor import NVFP4Tensor  # noqa: F401
+
+        return hasattr(trt.DataType, "FP4")
+    except Exception:
+        return False
+
+
+@pytest.mark.unit
+@unittest.skipIf(importlib.util.find_spec("torchao") is None, "torchao not installed")
+@unittest.skipIf(not torch.cuda.is_available(), "CUDA is required")
+@unittest.skipIf(not _has_nvfp4_support(), "TensorRT FP4 DataType is required")
+def test_linear_nvfp4_woq():
+    import sys
+    from pathlib import Path
+
+    example_dir = (
+        Path(__file__).resolve().parents[4] / "examples" / "dynamo" / "torchao"
+    )
+    sys.path.insert(0, str(example_dir))
+    from nvfp4_utils import pre_process_model_for_export, quantize_linear_nvfp4
+
+    class LinearModel(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.linear = torch.nn.Linear(64, 128)
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            return self.linear(x)
+
+    model = LinearModel().eval().to(dtype=torch.bfloat16, device="cuda")
+    example_input = torch.randn(8, 64, dtype=torch.bfloat16, device="cuda")
+    quantize_linear_nvfp4(model)
+    model = pre_process_model_for_export(model)
+
+    exp_program = torch.export.export(model, (example_input,), strict=True)
+
+    dq_nodes = [
+        n
+        for n in exp_program.graph.nodes
+        if n.target == torch.ops.torchao_trt.dequantize_nvfp4.default
+    ]
+    assertions.assertTrue(
+        len(dq_nodes) >= 1,
+        msg="Exported graph is missing torchao_trt.dequantize_nvfp4",
+    )
+
+    trt_mod = torchtrt.dynamo.compile(
+        exp_program,
+        inputs=[example_input],
+        min_block_size=1,
+        use_explicit_typing=True,
+        require_full_compilation=True,
+        immutable_weights=True,
+        cache_built_engines=False,
+        reuse_cached_engines=False,
+    )
+
+    with torch.no_grad():
+        eager_out = model(example_input)
+        trt_out = trt_mod(example_input)
+    if isinstance(trt_out, (list, tuple)):
+        trt_out = trt_out[0]
+    cos_sim = cosine_similarity(eager_out, trt_out)
+    assertions.assertTrue(
+        cos_sim > COSINE_THRESHOLD,
+        msg=(
+            "TorchAO NVFP4 WOQ TRT outputs don't match eager. "
+            f"Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}"
+        ),
+    )
+    torch._dynamo.reset()

@@ -329,6 +329,82 @@ def quantize_affine_float8(
     return quantize_layer.get_output(0)
 
 
+def dequantize_nvfp4(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    qdata: Union[torch.Tensor, TRTTensor],
+    block_scale: Union[torch.Tensor, TRTTensor],
+    per_tensor_scale: Union[torch.Tensor, TRTTensor],
+    rows: Union[int, torch.Tensor],
+    cols: Union[int, torch.Tensor],
+    output_dtype: torch.dtype,
+) -> TRTTensor:
+    """Map torchao_trt.dequantize_nvfp4 to two-level TensorRT dequantize.
+
+    TorchAO stores NVFP4 block scales in a padded/swizzled layout. TensorRT
+    wants the logical ``[N, K/16]`` FP8 block-scale tensor, an FP4 weight
+    constant, and a FP32 global scale. Activations stay high precision; this
+    is weight-only storage, not native FP4 MMA.
+    """
+    if not all(
+        isinstance(x, torch.Tensor) for x in (qdata, block_scale, per_tensor_scale)
+    ):
+        raise ValueError("NVFP4 weight DQ requires constant qdata and scales")
+
+    from torchao.prototype.mx_formats.utils import from_blocked
+
+    def _as_dim_int(value: Union[int, torch.Tensor]) -> int:
+        if isinstance(value, torch.Tensor):
+            return int(value.item())
+        return value
+
+    rows_i = _as_dim_int(rows)
+    cols_i = _as_dim_int(cols)
+
+    with unset_fake_temporarily():
+        logical_scale = from_blocked(block_scale, rows_i, cols_i // 16).contiguous()
+
+    qdata_trt = get_trt_tensor(
+        ctx,
+        qdata,
+        f"{name}_qdata_fp4",
+        target_quantized_type=trt.DataType.FP4,
+    )
+    block_scale_trt = get_trt_tensor(
+        ctx,
+        logical_scale,
+        f"{name}_block_scale_fp8",
+        target_quantized_type=trt.DataType.FP8,
+    )
+    global_scale_trt = get_trt_tensor(
+        ctx,
+        per_tensor_scale.float(),
+        f"{name}_global_scale",
+        dtype=torch.float32,
+        min_rank=0,
+    )
+    trt_output_dtype = _enums.dtype._from(output_dtype).to(trt.DataType)
+
+    scale_dq = ctx.net.add_dequantize(
+        block_scale_trt,
+        global_scale_trt,
+        output_type=trt_output_dtype,
+    )
+    scale_dq.axis = -1
+    set_layer_name(scale_dq, target, f"{name}_dequantize_scale", source_ir)
+
+    data_dq = ctx.net.add_dequantize(
+        qdata_trt,
+        scale_dq.get_output(0),
+        output_type=trt_output_dtype,
+    )
+    data_dq.axis = -1
+    set_layer_name(data_dq, target, f"{name}_dequantize_data", source_ir)
+    return data_dq.get_output(0)
+
+
 def dequantize_affine_float8(
     ctx: ConversionContext,
     target: Target,

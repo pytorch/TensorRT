@@ -228,6 +228,11 @@ Accuracy / Performance Issues
     :ref:`torch_export_qwen3_int4_woq`. Use symmetric INT4 (zero zero-point)
     and ``immutable_weights=True`` so engine constants stay ``Datatype: Int4``.
 
+    For **NVFP4 weight-only** quantization with TorchAO, see
+    :ref:`quantize_linear_nvfp4_woq` and :ref:`torch_export_flux_nvfp4_woq`.
+    Export must keep ``dequantize_nvfp4`` so the engine can keep
+    ``Datatype: FP4E2M1``.
+
 ----
 
 Distributed / Tensor-Parallel Issues
