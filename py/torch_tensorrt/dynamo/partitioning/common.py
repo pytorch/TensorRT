@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Set, Tuple
 
 import sympy
 import torch
@@ -12,6 +12,9 @@ from torch_tensorrt.dynamo.utils import (
     extract_var_range_info,
     extract_var_range_info_for_profile,
 )
+
+if TYPE_CHECKING:
+    from ._global_partitioner import TorchTensorRTOperatorSupport
 
 logger = logging.getLogger(__name__)
 
@@ -438,6 +441,19 @@ def get_graph_converter_support(
     Returns:
         The number of supported call_function nodes in the graph
     """
+    number_of_supported_nodes, total_functional_nodes, _ = (
+        get_graph_converter_support_overview(graph_module, torch_executed_ops)
+    )
+    return number_of_supported_nodes, total_functional_nodes
+
+
+def get_graph_converter_support_overview(
+    graph_module: torch.fx.GraphModule,
+    torch_executed_ops: Optional[Set[str]] = None,
+) -> Tuple[int, int, "TorchTensorRTOperatorSupport"]:
+    """As get_graph_converter_support, but also returns the operator support object,
+    which holds *which* operators are unsupported rather than just how many
+    """
     from ._global_partitioner import TorchTensorRTOperatorSupport
 
     # Instantiate operator support object and module dictionary
@@ -458,4 +474,4 @@ def get_graph_converter_support(
     # Print node support overview prior to partitioning
     op_support.print_support_overview(print_node_support=True)
 
-    return number_of_supported_nodes, total_functional_nodes
+    return number_of_supported_nodes, total_functional_nodes, op_support
