@@ -88,15 +88,47 @@ endif()
 
 mark_as_advanced(TensorRT_INCLUDE_DIR)
 
-if(TensorRT_INCLUDE_DIR AND EXISTS "${TensorRT_INCLUDE_DIR}/NvInfer.h")
-  file(STRINGS "${TensorRT_INCLUDE_DIR}/NvInfer.h" TensorRT_MAJOR REGEX "^#define NV_TENSORRT_MAJOR [0-9]+.*$")
-  file(STRINGS "${TensorRT_INCLUDE_DIR}/NvInfer.h" TensorRT_MINOR REGEX "^#define NV_TENSORRT_MINOR [0-9]+.*$")
-  file(STRINGS "${TensorRT_INCLUDE_DIR}/NvInfer.h" TensorRT_PATCH REGEX "^#define NV_TENSORRT_PATCH [0-9]+.*$")
+if(TensorRT_INCLUDE_DIR)
+  # TensorRT publishes its version macros in NvInferVersion.h. Older SDKs may
+  # expose them directly from NvInfer.h, so retain that file as a fallback.
+  set(_TensorRT_VERSION_HEADER "${TensorRT_INCLUDE_DIR}/NvInferVersion.h")
+  if(NOT EXISTS "${_TensorRT_VERSION_HEADER}")
+    set(_TensorRT_VERSION_HEADER "${TensorRT_INCLUDE_DIR}/NvInfer.h")
+  endif()
 
-  string(REGEX REPLACE "^#define NV_TENSORRT_MAJOR ([0-9]+).*$" "\\1" TensorRT_VERSION_MAJOR "${TensorRT_MAJOR}")
-  string(REGEX REPLACE "^#define NV_TENSORRT_MINOR ([0-9]+).*$" "\\1" TensorRT_VERSION_MINOR "${TensorRT_MINOR}")
-  string(REGEX REPLACE "^#define NV_TENSORRT_PATCH ([0-9]+).*$" "\\1" TensorRT_VERSION_PATCH "${TensorRT_PATCH}")
-  set(TensorRT_VERSION_STRING "${TensorRT_VERSION_MAJOR}.${TensorRT_VERSION_MINOR}.${TensorRT_VERSION_PATCH}")
+  if(EXISTS "${_TensorRT_VERSION_HEADER}")
+    foreach(component MAJOR MINOR PATCH)
+      # Some SDKs use a numeric NV_TENSORRT_* definition. DRIVE and recent
+      # enterprise headers instead alias NV_TENSORRT_* to a numeric
+      # TRT_*_ENTERPRISE definition in the same file.
+      file(STRINGS "${_TensorRT_VERSION_HEADER}" _TensorRT_VERSION_LINE
+        REGEX "^#define[ \t]+NV_TENSORRT_${component}[ \t]+[0-9]+.*$"
+      )
+      if(NOT _TensorRT_VERSION_LINE)
+        file(STRINGS "${_TensorRT_VERSION_HEADER}" _TensorRT_VERSION_LINE
+          REGEX "^#define[ \t]+TRT_${component}_ENTERPRISE[ \t]+[0-9]+.*$"
+        )
+      endif()
+
+      if(_TensorRT_VERSION_LINE)
+        string(REGEX REPLACE
+          "^#define[ \t]+[^ \t]+[ \t]+([0-9]+).*$"
+          "\\1"
+          TensorRT_VERSION_${component}
+          "${_TensorRT_VERSION_LINE}"
+        )
+      endif()
+      unset(_TensorRT_VERSION_LINE)
+    endforeach()
+
+    if(DEFINED TensorRT_VERSION_MAJOR
+       AND DEFINED TensorRT_VERSION_MINOR
+       AND DEFINED TensorRT_VERSION_PATCH)
+      set(TensorRT_VERSION_STRING
+        "${TensorRT_VERSION_MAJOR}.${TensorRT_VERSION_MINOR}.${TensorRT_VERSION_PATCH}"
+      )
+    endif()
+  endif()
 endif()
 
 include(FindPackageHandleStandardArgs)

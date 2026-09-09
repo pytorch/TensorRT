@@ -1,5 +1,7 @@
 import ast
 import importlib
+import shutil
+import subprocess
 import sys
 import types
 from pathlib import Path
@@ -339,6 +341,61 @@ def test_driveos_sdk_discovery_has_no_absolute_path_dependency():
     assert "ENV{TORCHTRT_TENSORRT_ROOT}" in tensorrt_finder
     assert "${CMAKE_LIBRARY_ARCHITECTURE}" in tensorrt_finder
     assert 'PATHS "/usr"' not in tensorrt_finder
+
+
+@pytest.mark.unit
+def test_tensorrt_cmake_finder_parses_enterprise_version_macros(tmp_path):
+    cmake = shutil.which("cmake")
+    if cmake is None:
+        pytest.skip("CMake is required to exercise FindTensorRT.cmake")
+
+    tensorrt_root = tmp_path / "tensorrt"
+    include_dir = tensorrt_root / "include"
+    library_dir = tensorrt_root / "lib"
+    include_dir.mkdir(parents=True)
+    library_dir.mkdir()
+    (include_dir / "NvInfer.h").write_text(
+        '#include "NvInferVersion.h"\n', encoding="utf-8"
+    )
+    (include_dir / "NvInferVersion.h").write_text(
+        "\n".join(
+            (
+                "#define TRT_MAJOR_ENTERPRISE 10",
+                "#define TRT_MINOR_ENTERPRISE 16",
+                "#define TRT_PATCH_ENTERPRISE 1",
+                "#define NV_TENSORRT_MAJOR TRT_MAJOR_ENTERPRISE",
+                "#define NV_TENSORRT_MINOR TRT_MINOR_ENTERPRISE",
+                "#define NV_TENSORRT_PATCH TRT_PATCH_ENTERPRISE",
+            )
+        ),
+        encoding="utf-8",
+    )
+    (library_dir / "libnvinfer.so").touch()
+
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    (project_dir / "CMakeLists.txt").write_text(
+        "\n".join(
+            (
+                "cmake_minimum_required(VERSION 3.18)",
+                "project(test_find_tensorrt LANGUAGES NONE)",
+                f'list(PREPEND CMAKE_MODULE_PATH "{_REPO_ROOT / "cmake/Modules"}")',
+                f'set(TensorRT_ROOT "{tensorrt_root}")',
+                "find_package(TensorRT 10.16.1 EXACT REQUIRED)",
+                'file(WRITE "${CMAKE_BINARY_DIR}/version.txt" "${TensorRT_VERSION_STRING}")',
+            )
+        ),
+        encoding="utf-8",
+    )
+
+    build_dir = tmp_path / "build"
+    subprocess.run(
+        [cmake, "-S", str(project_dir), "-B", str(build_dir)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert (build_dir / "version.txt").read_text(encoding="utf-8") == "10.16.1"
 
 
 @pytest.mark.unit
