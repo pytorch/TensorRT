@@ -1,5 +1,6 @@
 import copy
 import timeit
+from typing import Any, Callable, Optional, TypedDict
 
 import numpy as np
 import torch
@@ -8,6 +9,25 @@ from transformers.generation.stopping_criteria import (
     EosTokenCriteria,
     MaxLengthCriteria,
 )
+
+
+class IterTiming(TypedDict):
+    """Per-iteration prefill/decode timing record.
+
+    Fields:
+        ttft_s: Time-to-first-token (prefill latency) in seconds.
+        decode_s: Total decode-phase latency (all decode steps) in seconds.
+        total_s: ttft_s + decode_s; convenience for downstream aggregation.
+        prefill_tokens: Number of input tokens fed to the prefill forward pass.
+        decode_tokens: Number of tokens produced by the decode loop (does not
+            include the first token produced by the prefill step).
+    """
+
+    ttft_s: float
+    decode_s: float
+    total_s: float
+    prefill_tokens: int
+    decode_tokens: int
 
 
 def export_llm(model, inputs, min_seq_len=1, max_seq_len=16):
@@ -287,6 +307,228 @@ def record_stats(backend, timings, precision, batch_size=1, compile_time_s=None)
         "Compile Time(s)": compile_time_s,
     }
     return stats
+
+
+def _timed_generate_static_cache(
+    model: torch.nn.Module,
+    input_seq: torch.Tensor,
+    max_output_seq_length: int,
+    eos_token_id: int,
+) -> IterTiming:
+    """Single-iteration timed greedy decode with a static KV cache.
+
+    Splits timing into a prefill phase (TTFT - time to first token) and a
+    decode phase (all subsequent single-token steps). Both phases are
+    bracketed by ``torch.cuda.synchronize()`` so the measured wall-clock
+    time reflects GPU completion, not just kernel launches.
+    """
+    start_idx = 0
+    end_idx = input_seq.shape[1]
+    prefill_tokens = end_idx
+    position_ids = torch.arange(input_seq.shape[1]).unsqueeze(0).cuda()
+    kv_cache = get_zeroed_static_cache_inputs(model)
+
+    torch.cuda.synchronize()
+    prefill_start = timeit.default_timer()
+    input_signature = (input_seq, position_ids, *kv_cache, start_idx, end_idx)
+    logits_keys_values = model(*input_signature)
+    torch.cuda.synchronize()
+    ttft_s = timeit.default_timer() - prefill_start
+
+    logits = logits_keys_values[0]
+    kv_cache = logits_keys_values[1:]
+    next_tokens = torch.argmax(logits[:, -1, :], dim=-1, keepdim=True)
+    input_seq = next_tokens
+    start_idx = end_idx
+    end_idx = start_idx + 1
+
+    decode_tokens = 0
+    decode_start = timeit.default_timer()
+    while end_idx < max_output_seq_length:
+        position_ids = torch.tensor([[start_idx]], dtype=torch.int64).cuda()
+        input_signature = (input_seq, position_ids, *kv_cache, start_idx, end_idx)
+        logits_keys_values = model(*input_signature)
+        logits = logits_keys_values[0]
+        kv_cache = logits_keys_values[1:]
+        next_tokens = torch.argmax(logits[:, -1, :], dim=-1, keepdim=True)
+        input_seq = next_tokens
+        start_idx = end_idx
+        end_idx += 1
+        decode_tokens += 1
+    torch.cuda.synchronize()
+    decode_s = timeit.default_timer() - decode_start
+
+    return {
+        "ttft_s": ttft_s,
+        "decode_s": decode_s,
+        "total_s": ttft_s + decode_s,
+        "prefill_tokens": prefill_tokens,
+        "decode_tokens": decode_tokens,
+    }
+
+
+def _timed_generate_no_cache(
+    model: torch.nn.Module,
+    input_seq: torch.Tensor,
+    max_output_seq_length: int,
+    eos_token_id: int,
+) -> IterTiming:
+    """Single-iteration timed greedy decode without a KV cache.
+
+    Each decode step re-runs the full forward pass over the growing input
+    sequence. Prefill (first forward) and decode (remaining forwards) are
+    timed separately under explicit CUDA synchronization.
+    """
+    prefill_tokens = input_seq.shape[1]
+    target_decode_tokens = max_output_seq_length - prefill_tokens
+
+    position_ids = torch.arange(input_seq.shape[1], device=input_seq.device).unsqueeze(
+        0
+    )
+
+    torch.cuda.synchronize()
+    prefill_start = timeit.default_timer()
+    outputs = model(input_seq, position_ids=position_ids)
+    torch.cuda.synchronize()
+    ttft_s = timeit.default_timer() - prefill_start
+
+    logits = outputs.logits if hasattr(outputs, "logits") else outputs[0]
+    next_tokens = torch.argmax(logits[:, -1, :], dim=-1)
+    input_seq = torch.cat([input_seq, next_tokens[:, None]], dim=-1)
+
+    decode_tokens = 0
+    decode_start = timeit.default_timer()
+    while decode_tokens + 1 < target_decode_tokens:
+        position_ids = torch.arange(
+            input_seq.shape[1], device=input_seq.device
+        ).unsqueeze(0)
+        outputs = model(input_seq, position_ids=position_ids)
+        logits = outputs.logits if hasattr(outputs, "logits") else outputs[0]
+        next_tokens = torch.argmax(logits[:, -1, :], dim=-1)
+        input_seq = torch.cat([input_seq, next_tokens[:, None]], dim=-1)
+        decode_tokens += 1
+    torch.cuda.synchronize()
+    decode_s = timeit.default_timer() - decode_start
+
+    return {
+        "ttft_s": ttft_s,
+        "decode_s": decode_s,
+        "total_s": ttft_s + decode_s,
+        "prefill_tokens": prefill_tokens,
+        "decode_tokens": decode_tokens,
+    }
+
+
+def time_generate_split(
+    *,
+    model: torch.nn.Module,
+    inputs: torch.Tensor,
+    output_seq_length: int,
+    eos_token_id: int,
+    use_cache: bool = False,
+    iterations: int = 5,
+) -> list[IterTiming]:
+    """Measure per-iteration prefill / decode timings over ``iterations`` runs.
+
+    A single warmup pass (using the un-timed helper) is run before the
+    timed iterations. The warmup-fn / timed-fn pair is built up-front so
+    the warmup loop is no longer duplicated inside each ``use_cache``
+    branch.
+
+    Args:
+        model: The model (or compiled TRT module) to benchmark.
+        inputs: Input token tensor. ``.clone()`` is taken before each call
+            so the original tensor is not mutated.
+        output_seq_length: Total target sequence length (prefill + decode).
+        eos_token_id: EOS id; forwarded to the underlying generate helpers
+            (they ignore it when ``benchmark=True``).
+        use_cache: If True, use static-cache prefill/decode; else recompute
+            the full sequence each step.
+        iterations: Number of timed iterations.
+
+    Returns:
+        List of per-iteration ``IterTiming`` dicts.
+    """
+    if use_cache:
+        warmup_fn: Callable[[], Any] = lambda: generate_with_static_cache(
+            model, inputs.clone(), output_seq_length, eos_token_id
+        )
+        timed_fn: Callable[[], IterTiming] = lambda: _timed_generate_static_cache(
+            model, inputs.clone(), output_seq_length, eos_token_id
+        )
+    else:
+        warmup_fn = lambda: generate(
+            model, inputs.clone(), output_seq_length, eos_token_id
+        )
+        timed_fn = lambda: _timed_generate_no_cache(
+            model, inputs.clone(), output_seq_length, eos_token_id
+        )
+
+    _ = warmup_fn()
+    torch.cuda.synchronize()
+
+    timings: list[IterTiming] = []
+    for _ in range(iterations):
+        timings.append(timed_fn())
+    return timings
+
+
+def record_stats_split(
+    backend: str,
+    timings: list[IterTiming],
+    precision: str,
+    *,
+    batch_size: int = 1,
+    compile_time_s: Optional[float] = None,
+) -> dict[str, Any]:
+    """Aggregate per-iteration prefill/decode timings into a summary dict.
+
+    ``output_tokens`` is ``decode_tokens + 1`` — the prefill step itself
+    produces the first output token, then the decode loop produces
+    ``decode_tokens`` more.
+
+    Args:
+        backend: Free-form backend label (e.g. ``"TensorRT"``, ``"PyTorch"``).
+        timings: Per-iteration timings produced by ``time_generate_split``.
+        precision: Free-form precision label (e.g. ``"FP16"``).
+        batch_size: Batch size used during the run.
+        compile_time_s: Optional compile time in seconds; passthrough.
+
+    Returns:
+        Dict of summary stats (latencies in ms, throughputs in tok/s).
+    """
+    ttfts = np.array([t["ttft_s"] for t in timings])
+    decodes = np.array([t["decode_s"] for t in timings])
+    totals = np.array([t["total_s"] for t in timings])
+
+    prefill_tokens = timings[0]["prefill_tokens"]
+    decode_tokens = timings[0]["decode_tokens"]
+    output_tokens = decode_tokens + 1
+
+    decode_tps_mean = (
+        float((decode_tokens / decodes).mean()) if decode_tokens > 0 else 0.0
+    )
+    output_tps_mean = (
+        float((output_tokens / totals).mean()) if output_tokens > 0 else 0.0
+    )
+
+    return {
+        "Backend": backend,
+        "Model Precision": precision,
+        "Batch size": batch_size,
+        "Prefill tokens": prefill_tokens,
+        "Decode tokens": decode_tokens,
+        "Output tokens": output_tokens,
+        "Median TTFT(ms)": float(np.median(ttfts)) * 1000,
+        "Mean TTFT(ms)": float(ttfts.mean()) * 1000,
+        "Median Decode(ms)": float(np.median(decodes)) * 1000,
+        "Mean Decode(ms)": float(decodes.mean()) * 1000,
+        "Median Total(ms)": float(np.median(totals)) * 1000,
+        "Mean Total(ms)": float(totals.mean()) * 1000,
+        "Decode tokens/s (mean)": decode_tps_mean,
+        "Output tokens/s (mean)": output_tps_mean,
+        "Compile Time(s)": compile_time_s,
+    }
 
 
 def _prepare_mm_inputs(
