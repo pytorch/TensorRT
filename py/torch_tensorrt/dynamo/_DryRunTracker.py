@@ -68,7 +68,7 @@ class DryRunTracker:
     to_run_in_torch: List[str] = field(default_factory=list)
 
 
-@observable()
+@observable()  # type: ignore[misc]
 def dryrun_stats_display(
     dryrun_tracker: DryRunTracker, dryrun_enabled: Union[bool, str]
 ) -> None:
@@ -76,11 +76,17 @@ def dryrun_stats_display(
     formatted_stats = "\n"
 
     # Print overall stats about the graph, operator counts, etc.
+    total_ops = dryrun_tracker.total_ops_in_graph
+    coverage = (
+        round(dryrun_tracker.supported_ops_in_graph * 100 / total_ops, 2)
+        if total_ops
+        else 0.0
+    )
     formatted_stats += "+" * 50 + " Dry-Run Results for Graph " + "+" * 50 + "\n\n"
     formatted_stats += (
         f"The graph consists of {dryrun_tracker.total_ops_in_graph} Total Operators, "
         f"of which {dryrun_tracker.supported_ops_in_graph} operators are supported, "
-        f"{round(dryrun_tracker.supported_ops_in_graph*100/dryrun_tracker.total_ops_in_graph, 2)}% coverage\n\n"
+        f"{coverage}% coverage\n\n"
     )
     if dryrun_tracker.unsupported_ops:
         parsed_ops = "\n".join(

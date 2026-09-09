@@ -141,6 +141,19 @@ compilation pipelines.
 
 ----
 
+Built-in Observables
+----------------------
+
+Functions Torch-TensorRT already exposes as ``@observable``:
+
+``torch_tensorrt.dynamo._DryRunTracker.dryrun_stats_display``
+    Callbacks receive ``ctx.args == (dryrun_tracker, dryrun_enabled)``, giving the
+    dryrun report — operator coverage, unsupported ops, per-engine shapes — as
+    structured data. Fires once per ``compile_module`` call, whether or not ``dryrun``
+    is set. See :ref:`dryrun-programmatic`.
+
+----
+
 Observing Existing Compiler Functions
 ----------------------------------------
 
