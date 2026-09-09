@@ -589,12 +589,9 @@ class TestSliceScatterDerivationIsShared(TestCase):
         self.assertFalse(self._classify((2, 4, 16, 8), (2, 4, 16, 8), 2))
 
     def test_open_ended_slice_is_clamped_to_the_dim(self):
-        """``cache[:, :, 3:, :]`` lowers with ``end == INT64_MAX``, which the shared
-        derivation clamps to the dim as aten does, leaving the 13 slots from 3 to s_max
-        -- a KV-eligible write. Both sides have to clamp: the predictor takes the write
-        length from ``end - start``, so an unclamped end fails the ``start + update_len
-        <= s_max`` bound and files copy-back for a write the converter goes on to alias,
-        which is what ``assert_predicted_kv_aliased`` raises on."""
+        """``cache[:, :, 3:, :]`` lowers with ``end == INT64_MAX``, clamped to the dim
+        as aten does, leaving a KV-eligible 13-slot write. Both sides have to clamp, or
+        the predictor files copy-back for a write the converter goes on to alias."""
         for open_end in (sys.maxsize, 9223372036854775807):
             self.assertTrue(
                 self._classify((2, 4, 16, 8), (2, 4, 13, 8), 2, 3, open_end)
@@ -602,13 +599,8 @@ class TestSliceScatterDerivationIsShared(TestCase):
 
     def test_negative_start_is_normalised(self):
         """A negative ``start`` counts from the end for the converter, so the predictor
-        has to normalise it the same way -- ``resolve_slice_scatter_write`` is what pins
-        the resulting 12 -- before applying the ``start + update_len <= s_max`` bound.
-
-        Both of these now pass that bound, and no slice can fail it: ``end`` is clamped
-        to the dim, so ``start + update_len == end <= s_max`` holds by construction. The
-        bound still guards ``index_copy``, whose write position comes from an index
-        tensor rather than a slice."""
+        has to normalise it the same way. No slice can fail the ``start + update_len <=
+        s_max`` bound now that ``end`` is clamped; it still guards ``index_copy``."""
         # -4 normalises to 12; the write is the 4 slots from 12 to s_max.
         self.assertTrue(self._classify((2, 4, 16, 8), (2, 4, 4, 8), 2, -4, 16))
         # An end past the dim is clamped back to it, leaving the same 4-slot write.
@@ -694,12 +686,10 @@ class TestSliceScatterDerivationIsShared(TestCase):
             (None, None, None, KVWriteStatus.BAD_DIM),
         )
 
-    def test_a_dynamic_dim_leaves_relative_bounds_unresolved(self):
-        """A bound needing the size of a dynamic dim is reported rather than resolved
-        against a stand-in: reading TensorRT's -1 as a size is how ``cache[:, :, 3:]``
-        used to resolve to ``arange(3, -2)``, an empty write. Both shapes that dim
-        arrives in are checked -- -1 from TensorRT, a non-int for the fx graph's
-        ``SymInt`` -- since the two callers have to read them the same way."""
+    def test_a_dynamic_dim_leaves_every_bound_unresolved(self):
+        """Reading TensorRT's -1 as a size is how ``cache[:, :, 3:]`` used to resolve to
+        ``arange(3, -2)``, an empty write. Both -1 and a ``SymInt`` stand-in are
+        checked, since the two callers have to read them the same way."""
         from torch_tensorrt.dynamo.conversion.impl.slice_scatter import (
             KVWriteStatus,
             resolve_slice_scatter_write,
@@ -715,14 +705,12 @@ class TestSliceScatterDerivationIsShared(TestCase):
                 (None, None),
                 (-4, None),
                 (-4, 12),
+                (0, 40),
+                (1, 5),
             ):
                 self.assertEqual(
                     resolve_slice_scatter_write(shape, 2, start, end, 1), unresolved
                 )
-            self.assertEqual(
-                resolve_slice_scatter_write(shape, 2, 1, 5, 1),
-                (1, 5, 1, KVWriteStatus.OK),
-            )
 
 
 class TestCacheMustReachTheConverterAsANetworkInput(TestCase):

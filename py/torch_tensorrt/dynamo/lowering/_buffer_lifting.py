@@ -158,8 +158,8 @@ def _kv_write_will_alias(
     ``index_copy`` its fallback cannot express). The first two both have a write-back
     to preserve -- for a full overwrite the source *is* the buffer's new contents --
     and the ones that raise never get as far as needing one. One more never reaches a
-    converter: a ``slice_scatter`` whose bounds need the size of a dynamic dim, which
-    its validator runs in PyTorch, and which needs the copy-back like any other.
+    converter: a ``slice_scatter`` written on a dynamic dim, which its validator runs
+    in PyTorch, and which needs the copy-back like any other.
     Imports are local to avoid a lowering<->conversion import cycle.
     """
     if not (isinstance(value_node, torch.fx.Node) and value_node.op == "call_function"):

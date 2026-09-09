@@ -1313,10 +1313,9 @@ def aten_ops_index_copy_fallback(
 def slice_scatter_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
-    """Reject a write whose bounds need the size of the dim it writes -- a negative
-    index, or the open end torch.export writes for ``x[..., start:]`` -- when that dim
-    is dynamic. The converter cannot resolve those (see ``resolve_slice_scatter_write``)
-    and raises, so they run in PyTorch until it gains dynamic bounds.
+    """Reject a write on a dynamic dim: with no size to clamp to, no bound resolves,
+    concrete ones included (see ``resolve_slice_scatter_write``). These raise in the
+    converter, so they run in PyTorch until it gains dynamic bounds.
 
     Missing metadata is passed, not rejected: the KV-cache classifier in
     ``lowering/_buffer_lifting.py`` reads the same metadata, and vetoing a write it
