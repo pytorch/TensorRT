@@ -243,6 +243,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         serialized_info: SerializedTensorRTEngineFmt,
         *,
         profile_execution: bool = False,
+        cuda_engine: Optional[Any] = None,
     ) -> None:
         self._profile_execution = profile_execution
         self.profile_path_prefix = tempfile.gettempdir()
@@ -294,8 +295,10 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         self._active_profile_index = 0
         self._auto_select_profiles = False
 
-        self._load_serialized_info(serialized_info)
-        self._setup_engine()
+        self._load_serialized_info(
+            serialized_info, allow_empty_engine=cuda_engine is not None
+        )
+        self._setup_engine(live_cuda_engine=cuda_engine)
 
     # --- public property forwards ---
 
@@ -365,9 +368,14 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         slots, with ``ENGINE_IDX`` base64-encoded (matches ``def_pickle`` getter).
         """
         serialized_info = list(self.serialized_info)
-        serialized_info[ENGINE_IDX] = base64.b64encode(
-            serialized_info[ENGINE_IDX]
-        ).decode("utf-8")
+        engine_bytes = serialized_info[ENGINE_IDX]
+        live_engine = getattr(self, "cuda_engine", None)
+        if not engine_bytes and live_engine is not None:
+            engine_bytes = bytes(live_engine.serialize())
+            serialized_info[ENGINE_IDX] = engine_bytes
+            self.serialized_engine = engine_bytes
+            self.serialized_info[ENGINE_IDX] = engine_bytes
+        serialized_info[ENGINE_IDX] = base64.b64encode(engine_bytes).decode("utf-8")
         return (serialized_info, "TRTEngine")
 
     def __setstate__(self, state: Any) -> None:
@@ -426,7 +434,9 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         return "real"
 
     def _load_serialized_info(
-        self, serialized_info: SerializedTensorRTEngineFmt
+        self,
+        serialized_info: SerializedTensorRTEngineFmt,
+        allow_empty_engine: bool = False,
     ) -> None:
         if len(serialized_info) != SERIALIZATION_LEN:
             raise RuntimeError(
@@ -438,7 +448,9 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         self.name = str(self.serialized_info[NAME_IDX]).replace(".", "_")
         self.serialized_device_info = str(self.serialized_info[DEVICE_IDX])
         self.serialized_engine = self.serialized_info[ENGINE_IDX]
-        if not isinstance(self.serialized_engine, (bytes, bytearray)):
+        if allow_empty_engine and not self.serialized_engine:
+            self.serialized_engine = b""
+        elif not isinstance(self.serialized_engine, (bytes, bytearray)):
             raise TypeError("Expected serialized engine as bytes")
 
         self.in_binding_names = deserialize_binding_names(
@@ -533,7 +545,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         """
         return self._num_execution_contexts_created
 
-    def _setup_engine(self) -> None:
+    def _setup_engine(self, live_cuda_engine: Optional[Any] = None) -> None:
         multi_gpu_device_check()
         if self.serialized_target_platform == str(Platform.UNKNOWN):
             raise RuntimeError(
@@ -549,9 +561,14 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             )
 
         self.runtime = trt.Runtime(TRT_LOGGER)
-        self.cuda_engine = self.runtime.deserialize_cuda_engine(self.serialized_engine)
-        if self.cuda_engine is None:
-            raise RuntimeError("Unable to deserialize the TensorRT engine")
+        if live_cuda_engine is not None:
+            self.cuda_engine = live_cuda_engine
+        else:
+            self.cuda_engine = self.runtime.deserialize_cuda_engine(
+                self.serialized_engine
+            )
+            if self.cuda_engine is None:
+                raise RuntimeError("Unable to deserialize the TensorRT engine")
 
         if self.cuda_engine.streamable_weights_size > 0:
             budget_bytes = self.cuda_engine.get_weight_streaming_automatic_budget()
