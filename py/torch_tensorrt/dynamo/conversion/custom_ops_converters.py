@@ -79,6 +79,7 @@ if ENABLED_FEATURES.native_trt_collectives:
             SourceIR.ATEN,
             name,
             [args[0]],
+            group_name=args[2] if len(args) > 2 else None,
         )
 
     @dynamo_tensorrt_converter(
@@ -103,6 +104,7 @@ if ENABLED_FEATURES.native_trt_collectives:
             name,
             [args[0]],
             reduce_op=reduce_op,
+            group_name=args[3] if len(args) > 3 else None,
         )
 
     @dynamo_tensorrt_converter(
@@ -126,6 +128,7 @@ if ENABLED_FEATURES.native_trt_collectives:
             name,
             [args[0]],
             reduce_op=reduce_op,
+            group_name=args[2] if len(args) > 2 else None,
         )
 
     @dynamo_tensorrt_converter(
@@ -147,6 +150,7 @@ if ENABLED_FEATURES.native_trt_collectives:
             SourceIR.ATEN,
             name,
             [args[0]],
+            group_name=args[3] if len(args) > 3 else None,
         )
 
     @dynamo_tensorrt_converter(
@@ -164,7 +168,13 @@ if ENABLED_FEATURES.native_trt_collectives:
         """Scatter using native TensorRT DistCollective API."""
         root = args[1] if len(args) > 1 else 0
         return impl.nccl_ops.nccl_scatter_native(
-            ctx, target, SourceIR.ATEN, name, [args[0]], root=root
+            ctx,
+            target,
+            SourceIR.ATEN,
+            name,
+            [args[0]],
+            root=root,
+            group_name=args[2] if len(args) > 2 else None,
         )
 
     @dynamo_tensorrt_converter(
@@ -182,7 +192,13 @@ if ENABLED_FEATURES.native_trt_collectives:
         """Gather using native TensorRT DistCollective API."""
         root = args[1] if len(args) > 1 else 0
         return impl.nccl_ops.nccl_gather_native(
-            ctx, target, SourceIR.ATEN, name, [args[0]], root=root
+            ctx,
+            target,
+            SourceIR.ATEN,
+            name,
+            [args[0]],
+            root=root,
+            group_name=args[2] if len(args) > 2 else None,
         )
 
 
