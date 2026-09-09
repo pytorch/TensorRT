@@ -20,6 +20,7 @@ from .complex_decomposition_adapter import (
 from .complex_graph_rewrite import complex_graph_detection
 from .constant_folding import constant_fold
 from .decompose_dynamic_slice_scatter import decompose_dynamic_slice_scatter
+from .decompose_unsupported_attention import decompose_unsupported_attention
 from .eliminate_sym_min_int64_max import eliminate_sym_min_int64_max
 from .force_causal_efficient_attention import force_causal_efficient_attention
 from .fuse_pad_into_convolution import fuse_pad_into_convolution
@@ -68,6 +69,7 @@ post_lowering_pass_list = [
     remove_num_users_is_0_nodes,
     complex_lowering_pass,
     force_causal_efficient_attention,
+    decompose_unsupported_attention,
     eliminate_sym_min_int64_max,
     normalize_negative_slice_stop,
     annotate_fp8_sdpa,
