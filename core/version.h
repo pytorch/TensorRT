@@ -1,0 +1,7 @@
+#pragma once
+
+#ifdef CUDA_VERSION
+#define TORCHTRT_CUDA_13_WORKAROUND (CUDA_VERSION >= 13000)
+#else
+#define TORCHTRT_CUDA_13_WORKAROUND 0
+#endif

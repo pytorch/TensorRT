@@ -44,6 +44,11 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
           util::logging::get_logger().get_is_colored_output_on()) {
   // TODO: Support FP16 and FP32 from JIT information
   if (settings.device.gpu_id) {
+    int device_count;
+    cudaError_t err = cudaGetDeviceCount(&device_count);
+    TORCHTRT_CHECK(err == cudaSuccess, "Failed to get CUDA device count");
+    TORCHTRT_CHECK(device_count > 0, "No CUDA devices available but gpu_id specified: " << settings.device.gpu_id);
+    TORCHTRT_CHECK(settings.device.gpu_id < device_count, "gpu_id " << settings.device.gpu_id << " out of range, available devices: " << device_count);
     TORCHTRT_CHECK(
         cudaSetDevice(settings.device.gpu_id) == cudaSuccess, "Unable to set gpu id: " << settings.device.gpu_id);
   }
