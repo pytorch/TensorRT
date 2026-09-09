@@ -1,37 +1,42 @@
-"""Disk cache for Torch-TensorRT's lowered FX GraphModules.
+"""Cache for Torch-TensorRT's lowered FX GraphModules.
 
 The engine cache is later in the pipeline: its key is a TensorRT subgraph after
 decomposition, lowering, and partitioning.  This cache is keyed from the
 ExportedProgram before those passes so a warm compile can skip host-side graph
 work and resume from the post-lowering ATen GraphModule.
 
-The artifact is a torch.save of a node-list GraphModule (ops, args, names,
-state_dict), not an ExportedProgram and not FX __reduce__ retrace. Retrace
-rebuilds a different graph (node count/names) that breaks TRT conversion.
+Storage is any ``BaseEngineCache`` (disk, memory, remote). The payload is a
+``torch.save`` of a node-list GraphModule (ops, args, names, state_dict), not
+an ExportedProgram and not FX ``__reduce__`` retrace. Retrace rebuilds a
+different graph (node count/names) that breaks TRT conversion.
 """
 
 from __future__ import annotations
 
 import hashlib
 import importlib
+import io
 import logging
 import operator
-import os
 import pickle
-import tempfile
 import time
 from dataclasses import dataclass, fields
-from typing import Any, Dict, Optional, Sequence, Tuple
+from typing import Any, Dict, Optional, Sequence, Tuple, Union
 
 import tensorrt as trt
 import torch
 from torch_tensorrt._Input import Input
 from torch_tensorrt._version import __version__ as torch_tensorrt_version
+from torch_tensorrt.dynamo._engine_cache import BaseEngineCache, DiskEngineCache
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
 logger = logging.getLogger(__name__)
 
 _CACHE_FORMAT_VERSION = 5
+# Prefix blob keys so graph entries can share a BaseEngineCache with engines
+# without colliding. Underscore (not colon) so DiskEngineCache can use the key
+# as a directory name on Windows.
+_LOWERING_KEY_PREFIX = "lowering_"
 _NON_SEMANTIC_SETTINGS = {
     "cache_built_engines",
     "reuse_cached_engines",
@@ -490,12 +495,26 @@ def _serialize_entry(entry: LoweringCacheEntry) -> Tuple[Any, ...]:
         raise BypassLoweringCache(str(exc)) from exc
 
 
-class DiskLoweringCache:
-    """Store lowered GraphModule artifacts under a stable pre-lowering key."""
+def _blob_key(key: str) -> str:
+    return f"{_LOWERING_KEY_PREFIX}{key}"
 
-    def __init__(self, cache_dir: str) -> None:
-        self.cache_dir = cache_dir
-        os.makedirs(cache_dir, exist_ok=True)
+
+class DiskLoweringCache:
+    """Store lowered GraphModule artifacts on a ``BaseEngineCache`` blob store."""
+
+    def __init__(
+        self,
+        store: Union[BaseEngineCache, str],
+        cache_size: Optional[int] = None,
+    ) -> None:
+        if isinstance(store, str):
+            from torch_tensorrt.dynamo._defaults import ENGINE_CACHE_SIZE
+
+            self.store: BaseEngineCache = DiskEngineCache(
+                store, ENGINE_CACHE_SIZE if cache_size is None else cache_size
+            )
+        else:
+            self.store = store
 
     @staticmethod
     def can_cache(settings: CompilationSettings) -> bool:
@@ -553,18 +572,15 @@ class DiskLoweringCache:
         )
         return digest
 
-    def _entry_path(self, key: str) -> str:
-        return os.path.join(self.cache_dir, key[:2], key)
-
     def load(self, key: str) -> Optional[LoweringCacheEntry]:
-        directory = self._entry_path(key)
-        artifact_path = os.path.join(directory, "lowered.pt")
-        if not os.path.exists(artifact_path):
+        blob_key = _blob_key(key)
+        blob = self.store.load(blob_key)
+        if blob is None:
             logger.info("Lowering cache miss for key %s", key)
             return None
         try:
             version, serialized_gm, lifted_buffers = torch.load(
-                artifact_path, map_location="cpu", weights_only=False
+                io.BytesIO(blob), map_location="cpu", weights_only=False
             )
             if version != _CACHE_FORMAT_VERSION:
                 raise BypassLoweringCache(
@@ -578,32 +594,22 @@ class DiskLoweringCache:
             lowered_module.recompile()
         except Exception as exc:
             logger.warning(
-                "Ignoring unreadable lowering cache entry %s: %s", directory, exc
+                "Ignoring unreadable lowering cache entry %s: %s", blob_key, exc
             )
             return None
-        os.utime(artifact_path, None)
         logger.info("Lowering cache hit for key %s", key)
         return LoweringCacheEntry(lowered_module, tuple(lifted_buffers))
 
     def save(self, key: str, entry: LoweringCacheEntry) -> torch.fx.GraphModule:
-        directory = self._entry_path(key)
-        os.makedirs(directory, exist_ok=True)
-        fd, temporary_path = tempfile.mkstemp(
-            prefix="lowered-", suffix=".pt", dir=directory
-        )
-        os.close(fd)
         try:
             payload = _serialize_entry(entry)
+            buffer = io.BytesIO()
             with torch.utils._python_dispatch._disable_current_modes():
-                torch.save(payload, temporary_path)
-            os.replace(temporary_path, os.path.join(directory, "lowered.pt"))
+                torch.save(payload, buffer)
+            self.store.save(_blob_key(key), buffer.getvalue())
             logger.info("Saved lowering cache entry for key %s", key)
         except BypassLoweringCache as exc:
-            logger.warning("Bypassing lowering cache save for %s: %s", directory, exc)
-            if os.path.exists(temporary_path):
-                os.remove(temporary_path)
+            logger.warning("Bypassing lowering cache save for %s: %s", key, exc)
         except Exception as exc:
-            logger.warning("Failed to save lowering cache entry %s: %s", directory, exc)
-            if os.path.exists(temporary_path):
-                os.remove(temporary_path)
+            logger.warning("Failed to save lowering cache entry %s: %s", key, exc)
         return entry.lowered_module
