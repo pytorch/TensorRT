@@ -38,6 +38,7 @@ from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes.complex_graph_rewrite import (
     complex_graph_detection,
 )
+from torch_tensorrt.dynamo.lowering.passes.constant_folding import constant_fold
 
 # ---------------------------------------------------------------------------
 # 1. Infrastructure
@@ -1263,4 +1264,93 @@ def test_non_tensor_scalar_placeholder(scale):
 
     xq = torch.randn(1, 2, 4, 8)
     freqs = torch.polar(torch.ones(1, 2, 4, 4), torch.randn(1, 2, 4, 4))
-    _export_and_lower(RotaryComplex(), (xq, freqs, scale))
+    gm = _export_and_lower(RotaryComplex(), (xq, freqs, scale))
+
+    placeholder_vals = [
+        node.meta["val"]
+        for node in gm.graph.nodes
+        if node.op == "placeholder" and "val" in node.meta
+    ]
+    if isinstance(scale, torch.Tensor):
+        # A 0-dim tensor stays a tensor: smoke test only, not guard coverage
+        assert placeholder_vals, "export produced no placeholder metadata"
+    else:
+        # The guard only runs for non-tensor vals; fail if export specialized it away
+        kinds = [type(val).__name__ for val in placeholder_vals]
+        assert any(not isinstance(val, torch.Tensor) for val in placeholder_vals), (
+            f"scale={scale!r} did not survive export as a non-tensor "
+            f"placeholder; placeholder vals were {kinds}"
+        )
+
+
+@pytest.mark.unit
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA required")
+def test_cpu_offloaded_frozen_param_is_aligned():
+    """A CPU-offloaded folded constant keeping cuda metadata must be realigned."""
+
+    class M(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            # Non-scalar, so scalar promotion cannot excuse a device mismatch
+            self.register_buffer("w", torch.randn(3, 4))
+
+        def forward(self, z):
+            return (z * z) * (self.w * 2)
+
+    model = M().cuda().eval()
+    z = torch.randn(3, 4, dtype=torch.complex64, device="cuda")
+    with torch.no_grad():
+        exp = torch.export.export(model, (z,))
+    gm = exp.module()
+
+    # Offloading stores the constant on CPU; its inherited meta still says cuda
+    gm = constant_fold(gm, CompilationSettings(offload_module_to_cpu=True))
+
+    offloaded = [
+        node
+        for node in gm.graph.nodes
+        if node.op == "get_attr"
+        and str(node.target).startswith("_frozen_param")
+        and isinstance(node.meta.get("val"), torch.Tensor)
+        and node.meta["val"].device.type == "cuda"
+        and getattr(gm, str(node.target)).device.type == "cpu"
+    ]
+    assert offloaded, "expected a CPU-offloaded _frozen_param with cuda metadata"
+
+    complex_graph_detection(gm, CompilationSettings())
+
+    for node in offloaded:
+        assert (
+            getattr(gm, str(node.target)).device.type == "cpu"
+        ), f"{node.target}: propagation must not move the module's parameters"
+
+
+@pytest.mark.unit
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA required")
+def test_independent_cpu_branch_stays_on_cpu():
+    """An unrelated CPU attribute must stay on CPU despite a cuda placeholder."""
+
+    class M(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.register_buffer("cpu_table", torch.arange(4))
+
+        def forward(self, z):
+            return z * z, self.cpu_table + 1
+
+    # Module stays on CPU so the table is genuinely CPU, not offloaded
+    z = torch.randn(3, 4, dtype=torch.complex64, device="cuda")
+    gm = _export_and_lower(M().eval(), (z,))
+
+    cpu_branch = [
+        node
+        for node in gm.graph.nodes
+        if isinstance(node.meta.get("val"), torch.Tensor)
+        and node.meta["val"].dtype == torch.int64
+        and tuple(node.meta["val"].shape) == (4,)
+    ]
+    assert cpu_branch, "the independent CPU branch disappeared from the graph"
+    for node in cpu_branch:
+        assert (
+            node.meta["val"].device.type == "cpu"
+        ), f"{node.name}: CPU branch moved to {node.meta['val'].device}"
