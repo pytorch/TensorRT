@@ -22,6 +22,11 @@ Export emits ``dequantize_nvfp4``, which Torch-TensorRT maps to two-level
 ``IDequantizeLayer`` so the engine can keep ``Datatype: FP4E2M1``. This is
 storage + DQ, not native FP4 MMA.
 
+MXFP4 uses TorchAO ``MXDynamicActivationMXWeightConfig`` (there is no MXFP4
+weight-only config). Export emits ``dequantize_mxfp4``, which Torch-TensorRT
+maps to FP4 + E8M0 ``IDequantizeLayer`` (block size 32). Activations stay
+BF16 in this path.
+
 .. code-block:: bash
 
     pip install -r ../requirements.txt
@@ -33,4 +38,6 @@ storage + DQ, not native FP4 MMA.
     python torch_export_qwen3_int4_woq.py
     python quantize_linear_nvfp4_woq.py
     python torch_export_flux_nvfp4_woq.py
+    python quantize_linear_mxfp4.py
+    python torch_export_flux_mxfp4.py
 """

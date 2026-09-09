@@ -14,5 +14,6 @@ the Mutable Torch-TensorRT Module.
    Example: Compiling FLUX.1-dev with the dynamo backend <../_rendered_examples/dynamo/torch_export_flux_dev>
    Example: FLUX.1-dev INT4 WOQ <../_rendered_examples/dynamo/torchao/torch_export_flux_int4_woq>
    Example: FLUX.1-dev NVFP4 WOQ <../_rendered_examples/dynamo/torchao/torch_export_flux_nvfp4_woq>
+   Example: FLUX.1-dev MXFP4 <../_rendered_examples/dynamo/torchao/torch_export_flux_mxfp4>
    Example: Qwen3-8B INT4 WOQ <../_rendered_examples/dynamo/torchao/torch_export_qwen3_int4_woq>
    Example: Mutable Torch TensorRT Module <../_rendered_examples/dynamo/mutable_torchtrt_module_example>

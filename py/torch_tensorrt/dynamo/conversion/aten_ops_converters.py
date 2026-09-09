@@ -1173,6 +1173,43 @@ else:
         )
 
 
+try:
+    from torch_tensorrt.dynamo.conversion import mxfp4_custom_op  # noqa: F401
+
+    assert torch.ops.torchao_trt.dequantize_mxfp4.default
+except Exception:
+    _LOGGER.debug(
+        "torchao MXFP4 custom op not available; skipping "
+        "torchao_trt.dequantize_mxfp4 converter. Install torchao with "
+        "prototype.mx_formats to compile TorchAO MXFP4 models."
+    )
+else:
+
+    @dynamo_tensorrt_converter(
+        torch.ops.torchao_trt.dequantize_mxfp4.default,
+        supports_dynamic_shapes=False,
+    )
+    def aten_ops_torchao_dequantize_mxfp4(
+        ctx: ConversionContext,
+        target: Target,
+        args: Tuple[Argument, ...],
+        kwargs: Dict[str, Argument],
+        name: str,
+    ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+        return impl.quantize.dequantize_mxfp4(
+            ctx,
+            target,
+            SourceIR.ATEN,
+            name,
+            args[0],
+            args[1],
+            args[2],
+            args[3],
+            args[4],
+            args[5],
+        )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.squeeze.dim, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.squeeze.dims, supports_dynamic_shapes=True)
 def aten_ops_squeeze(

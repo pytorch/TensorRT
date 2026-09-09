@@ -329,6 +329,12 @@ def quantize_affine_float8(
     return quantize_layer.get_output(0)
 
 
+def _as_dim_int(value: Union[int, torch.Tensor]) -> int:
+    if isinstance(value, torch.Tensor):
+        return int(value.item())
+    return value
+
+
 def dequantize_nvfp4(
     ctx: ConversionContext,
     target: Target,
@@ -344,7 +350,7 @@ def dequantize_nvfp4(
     """Map torchao_trt.dequantize_nvfp4 to two-level TensorRT dequantize.
 
     TorchAO stores NVFP4 block scales in a padded/swizzled layout. TensorRT
-    wants the logical ``[N, K/16]`` FP8 block-scale tensor, an FP4 weight
+    wants the logical [N, K/16] FP8 block-scale tensor, an FP4 weight
     constant, and a FP32 global scale. Activations stay high precision; this
     is weight-only storage, not native FP4 MMA.
     """
@@ -354,11 +360,6 @@ def dequantize_nvfp4(
         raise ValueError("NVFP4 weight DQ requires constant qdata and scales")
 
     from torchao.prototype.mx_formats.utils import from_blocked
-
-    def _as_dim_int(value: Union[int, torch.Tensor]) -> int:
-        if isinstance(value, torch.Tensor):
-            return int(value.item())
-        return value
 
     rows_i = _as_dim_int(rows)
     cols_i = _as_dim_int(cols)
@@ -398,6 +399,88 @@ def dequantize_nvfp4(
     data_dq = ctx.net.add_dequantize(
         qdata_trt,
         scale_dq.get_output(0),
+        output_type=trt_output_dtype,
+    )
+    data_dq.axis = -1
+    set_layer_name(data_dq, target, f"{name}_dequantize_data", source_ir)
+    return data_dq.get_output(0)
+
+
+def _e8m0_constant(
+    ctx: ConversionContext,
+    scale_e8m0: torch.Tensor,
+    name: str,
+) -> TRTTensor:
+    """Create a TRT E8M0 constant from TorchAO float8_e8m0fnu scales."""
+    # get_trt_tensor maps uint8 to FP4; build E8M0 weights directly and
+    # record the torch buffer so the data_ptr stays alive through build.
+    u8 = scale_e8m0.detach().contiguous().view(torch.uint8).cpu()
+    weights = to_trt_weights(
+        ctx,
+        u8,
+        name,
+        "CONSTANT",
+        "CONSTANT",
+        dtype=trt.DataType.E8M0,
+    )
+    constant = ctx.net.add_constant(tuple(u8.shape), weights)
+    constant.name = name
+    return constant.get_output(0)
+
+
+def dequantize_mxfp4(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    qdata: Union[torch.Tensor, TRTTensor],
+    block_scale_e8m0: Union[torch.Tensor, TRTTensor],
+    rows: Union[int, torch.Tensor],
+    cols: Union[int, torch.Tensor],
+    block_size: Union[int, torch.Tensor],
+    output_dtype: torch.dtype,
+) -> TRTTensor:
+    """Map torchao_trt.dequantize_mxfp4 to TensorRT dequantize.
+
+    TorchAO stores MX scales in a padded/swizzled layout. TensorRT wants
+    logical [N, K/block_size] E8M0 scales, an FP4 weight constant, and
+    IDequantizeLayer. Myelin accepts FP4 + E8M0 at block size 32; it
+    rejects FP4 + float32 scales at that block size. Activations stay high
+    precision; this is MXFP4 weight storage, not native MXFP4xMXFP4 MMA.
+    """
+    if not all(isinstance(x, torch.Tensor) for x in (qdata, block_scale_e8m0)):
+        raise ValueError("MXFP4 weight DQ requires constant qdata and scales")
+
+    from torchao.prototype.mx_formats.utils import from_blocked
+
+    rows_i = _as_dim_int(rows)
+    cols_i = _as_dim_int(cols)
+    block_size_i = _as_dim_int(block_size)
+    if cols_i % block_size_i != 0:
+        raise ValueError(
+            f"cols ({cols_i}) must be divisible by block_size ({block_size_i})"
+        )
+    n_blocks = cols_i // block_size_i
+
+    with unset_fake_temporarily():
+        logical_e8m0 = from_blocked(block_scale_e8m0, rows_i, n_blocks).contiguous()
+
+    qdata_trt = get_trt_tensor(
+        ctx,
+        qdata,
+        f"{name}_qdata_fp4",
+        target_quantized_type=trt.DataType.FP4,
+    )
+    block_scale_trt = _e8m0_constant(
+        ctx,
+        logical_e8m0,
+        f"{name}_block_scale_e8m0",
+    )
+    trt_output_dtype = _enums.dtype._from(output_dtype).to(trt.DataType)
+
+    data_dq = ctx.net.add_dequantize(
+        qdata_trt,
+        block_scale_trt,
         output_type=trt_output_dtype,
     )
     data_dq.axis = -1
