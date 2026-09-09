@@ -124,6 +124,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         requires_native_multidevice: bool = False,
         symbolic_shape_expressions: Optional[Dict[str, List[Dict[str, Any]]]] = None,
         aliased_io: Optional[Dict[str, Tuple[str, str]]] = None,
+        cuda_engine: Optional[Any] = None,
     ):
         """Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs
         a PyTorch ``torch.nn.Module`` around it. Uses the Torch-TensorRT runtime extension to run the engines
@@ -162,13 +163,14 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                 )
 
         Args:
-            serialized_engine: Raw TRT engine bytes (``None`` if restoring state only).
+            serialized_engine: Raw TRT engine bytes (``None`` if restoring state only, or when wrapping a live ``cuda_engine``).
             input_binding_names: Input tensor names in ``forward`` order.
             output_binding_names: Output tensor names in return order.
             name: Logical name for logging and serialization.
             settings: Compilation/runtime settings (device, lazy init, cross-compile, etc.).
             requires_output_allocator: Engine needs TRT dynamic output allocation.
             symbolic_shape_expressions: Optional symbolic shape metadata from compile.
+            cuda_engine: Live ``tensorrt.ICudaEngine`` from the builder. When set, setup wraps it and skips deserialize.
         """
         super().__init__()
 
@@ -182,6 +184,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.hardware_compatible = settings.hardware_compatible
         self.settings = copy.deepcopy(settings)
         self.serialized_engine = serialized_engine
+        self._live_cuda_engine = cuda_engine
         self.engine: Optional[Any] = None
         self.requires_output_allocator = requires_output_allocator
         self.dynamically_allocate_resources = settings.dynamically_allocate_resources
@@ -205,7 +208,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.target_device = self._resolve_target_device()
 
         if (
-            serialized_engine
+            (serialized_engine or cuda_engine)
             and not self.settings.lazy_engine_init
             and not self.settings.enable_cross_compile_for_windows
         ):
@@ -220,8 +223,10 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         result = cls.__new__(cls)
         memo[id(self)] = result
         for k, v in self.__dict__.items():
-            if k == "engine":
-                object.__setattr__(result, k, v)  # shallow: reuse the same C++ Engine
+            if k in ("engine", "_live_cuda_engine"):
+                object.__setattr__(
+                    result, k, v
+                )  # shallow: TRT engine objects are not deepcopyable
             else:
                 object.__setattr__(result, k, copy.deepcopy(v, memo))
         return result
@@ -232,7 +237,23 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             return torch.device(f"cuda:{self.settings.device.gpu_id}")
         return torch.device(f"cuda:{torch.cuda.current_device()}")
 
-    def _pack_engine_info(self) -> List[str | bytes]:
+    def _ensure_serialized_engine(self) -> bytes:
+        """Return engine bytes, serializing a live ICudaEngine on first save."""
+        if self.serialized_engine:
+            return self.serialized_engine
+        live = self._live_cuda_engine
+        if live is None and self.engine is not None:
+            live = getattr(self.engine, "cuda_engine", None)
+        if live is None:
+            raise RuntimeError(
+                "TorchTensorRTModule has neither serialized engine bytes nor a live ICudaEngine to serialize"
+            )
+        self.serialized_engine = bytes(live.serialize())
+        return self.serialized_engine
+
+    def _pack_engine_info(
+        self, engine_bytes: Optional[bytes] = None
+    ) -> List[str | bytes]:
         target_device = (
             self.settings.device
             if self.settings.device is not None
@@ -261,8 +282,11 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             if ENABLED_FEATURES.torch_tensorrt_runtime
             else serialize_device_info(target_device)
         )
-        assert self.serialized_engine is not None
-        engine_info[ENGINE_IDX] = self.serialized_engine
+        engine_info[ENGINE_IDX] = (
+            engine_bytes
+            if engine_bytes is not None
+            else self._ensure_serialized_engine()
+        )
         engine_info[INPUT_BINDING_NAMES_IDX] = serialize_binding_names(
             self.input_binding_names
         )
@@ -454,9 +478,15 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         if self.engine is not None:
             return
 
-        if not ENABLED_FEATURES.torch_tensorrt_runtime:
-            from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
+        from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
 
+        if getattr(self, "_live_cuda_engine", None) is not None:
+            self.engine = TRTEngine(
+                self._pack_engine_info(engine_bytes=b""),
+                profile_execution=self.profiling_enabled,
+                cuda_engine=self._live_cuda_engine,
+            )
+        elif not ENABLED_FEATURES.torch_tensorrt_runtime:
             self.engine = TRTEngine(
                 self._pack_engine_info(),
                 profile_execution=self.profiling_enabled,
@@ -482,6 +512,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         if (
             ENABLED_FEATURES.torch_tensorrt_runtime
             and self.engine.requires_native_multidevice
+            and not isinstance(self.engine, TRTEngine)
         ):
             from torch_tensorrt.distributed._distributed import (
                 get_active_group_name,
@@ -511,7 +542,11 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         return metadata
 
     def get_extra_state(self) -> SerializedTorchTensorRTModuleFmt:
-        if self.engine is not None:
+        if (
+            self.engine is not None
+            or self.serialized_engine
+            or getattr(self, "_live_cuda_engine", None) is not None
+        ):
             engine_info = self._pack_engine_info()
             engine_bytes = engine_info[ENGINE_IDX]
             assert isinstance(engine_bytes, (bytes, bytearray))
@@ -522,24 +557,12 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                 self.input_binding_names,
                 self.output_binding_names,
             )
-        elif self.serialized_engine:
-            engine_info = self._pack_engine_info()
-            engine_bytes = engine_info[ENGINE_IDX]
-            assert isinstance(engine_bytes, bytes)
-            engine_info[ENGINE_IDX] = base64.b64encode(engine_bytes)
-            return (
-                self.name,
-                engine_info,
-                self.input_binding_names,
-                self.output_binding_names,
-            )
-        else:
-            return (
-                self.name,
-                None,
-                self.input_binding_names,
-                self.output_binding_names,
-            )
+        return (
+            self.name,
+            None,
+            self.input_binding_names,
+            self.output_binding_names,
+        )
 
     def set_extra_state(self, state: SerializedTorchTensorRTModuleFmt) -> None:
         self.name = state[0]
@@ -549,6 +572,8 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             serialized_engine_info[ENGINE_IDX] = base64.b64decode(
                 serialized_engine_info[ENGINE_IDX]
             )
+            self.serialized_engine = serialized_engine_info[ENGINE_IDX]
+            self._live_cuda_engine = None
             self.hardware_compatible = bool(
                 int(serialized_engine_info[HW_COMPATIBLE_IDX])
             )
@@ -587,6 +612,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             self.engine = None
             self.settings = CompilationSettings()
             self.hardware_compatible = False
+            self._live_cuda_engine = None
 
         self.input_binding_names = state[2]
         self.output_binding_names = state[3]
@@ -737,9 +763,28 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             else:
                 input_tensors.append(torch.tensor(i).cuda())
 
-        outputs: List[torch.Tensor] = torch.ops.tensorrt.execute_engine(
-            list(input_tensors), self.engine
-        )
+        from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
+
+        if isinstance(self.engine, TRTEngine):
+            raw = self.engine.execute(input_tensors)
+            output_list: List[torch.Tensor] = (
+                [raw] if isinstance(raw, torch.Tensor) else list(raw)
+            )
+            input_storages = {
+                tensor.untyped_storage()._cdata for tensor in input_tensors
+            }
+            outputs = [
+                (
+                    output.clone()
+                    if output.untyped_storage()._cdata in input_storages
+                    else output
+                )
+                for output in output_list
+            ]
+        else:
+            outputs = torch.ops.tensorrt.execute_engine(
+                list(input_tensors), self.engine
+            )
 
         # The interpreter may have appended extra "side-effect" outputs to
         # satisfy the network-output requirement of aliased layers (e.g.
