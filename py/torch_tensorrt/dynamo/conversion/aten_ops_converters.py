@@ -1030,6 +1030,108 @@ if is_tensorrt_version_supported("10.8.0"):
             )
 
 
+try:
+    import torchao  # noqa: F401
+
+    assert torch.ops.torchao.dequantize_affine.default
+except Exception:
+    _LOGGER.debug(
+        "torchao not available; skipping torchao.dequantize_affine converter. "
+        "Install torchao to compile TorchAO weight-only quantized models."
+    )
+else:
+
+    @dynamo_tensorrt_converter(
+        torch.ops.torchao.dequantize_affine.default,
+        supports_dynamic_shapes=False,
+    )
+    def aten_ops_torchao_dequantize_affine(
+        ctx: ConversionContext,
+        target: Target,
+        args: Tuple[Argument, ...],
+        kwargs: Dict[str, Argument],
+        name: str,
+    ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+        # dequantize_affine(input, block_size, scale, zero_point, input_dtype,
+        #                   quant_min=None, quant_max=None, output_dtype=...)
+        output_dtype = kwargs.get("output_dtype")
+        if output_dtype is None:
+            output_dtype = args[7] if len(args) > 7 else torch.float16
+        input_dtype = args[4] if len(args) > 4 else None
+        return impl.quantize.dequantize_affine(
+            ctx,
+            target,
+            SourceIR.ATEN,
+            name,
+            args[0],
+            args[1],
+            args[2],
+            output_dtype,
+            input_dtype=input_dtype,
+        )
+
+
+try:
+    from torchao.quantization.quant_primitives import (  # noqa: F401
+        _dequantize_affine_float8_non_decomposed,
+        _quantize_affine_float8_non_decomposed,
+    )
+
+    assert torch.ops.torchao.quantize_affine_float8_non_decomposed.default
+    assert torch.ops.torchao.dequantize_affine_float8_non_decomposed.default
+except Exception:
+    _LOGGER.debug(
+        "torchao float8_non_decomposed ops not available; skipping static FP8 "
+        "Q/DQ converters. Import torchao quantization primitives to compile "
+        "TorchAO static FP8 graphs."
+    )
+else:
+
+    @dynamo_tensorrt_converter(
+        torch.ops.torchao.quantize_affine_float8_non_decomposed.default,
+        supports_dynamic_shapes=True,
+    )
+    def aten_ops_torchao_quantize_affine_float8(
+        ctx: ConversionContext,
+        target: Target,
+        args: Tuple[Argument, ...],
+        kwargs: Dict[str, Argument],
+        name: str,
+    ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+        return impl.quantize.quantize_affine_float8(
+            ctx,
+            target,
+            SourceIR.ATEN,
+            name,
+            args[0],
+            args[1],
+        )
+
+    @dynamo_tensorrt_converter(
+        torch.ops.torchao.dequantize_affine_float8_non_decomposed.default,
+        supports_dynamic_shapes=True,
+    )
+    def aten_ops_torchao_dequantize_affine_float8(
+        ctx: ConversionContext,
+        target: Target,
+        args: Tuple[Argument, ...],
+        kwargs: Dict[str, Argument],
+        name: str,
+    ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+        output_dtype = (
+            args[2] if len(args) > 2 else kwargs.get("output_dtype", torch.bfloat16)
+        )
+        return impl.quantize.dequantize_affine_float8(
+            ctx,
+            target,
+            SourceIR.ATEN,
+            name,
+            args[0],
+            args[1],
+            output_dtype,
+        )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.squeeze.dim, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.squeeze.dims, supports_dynamic_shapes=True)
 def aten_ops_squeeze(
@@ -1227,7 +1329,7 @@ def _index_copy_kv_eligible(
     if len(node.args) < 4:
         return False
     if input_node is None:
-        input_node = node.args[0]  # type: ignore[assignment]
+        input_node = node.args[0]
     dim, _index_node, src_node = node.args[1:4]
 
     if not isinstance(input_node, Node) or input_node.op != "placeholder":

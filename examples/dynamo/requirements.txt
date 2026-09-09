@@ -6,3 +6,4 @@ matplotlib
 pandas
 huggingface_hub
 opencv-python
+torchao

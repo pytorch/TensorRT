@@ -215,6 +215,14 @@ Accuracy / Performance Issues
     See `NVIDIA ModelOpt documentation <https://nvidia.github.io/TensorRT-Model-Optimizer/>`_
     for the full list of built-in quantization configs and customization options.
 
+    For **FP8 weight-only** quantization with TorchAO (no calibration loop), see
+    :ref:`quantize_linear_fp8_woq` and :ref:`torch_export_flux_fp8_woq`. Those
+    examples keep ``dequantize_affine`` in the graph so TensorRT can emit an
+    ``IDequantizeLayer`` on an FP8 weight constant.
+
+    For **static FP8** (activations and weights, with a calibration loop), see
+    :ref:`quantize_linear_fp8_static`.
+
 ----
 
 Distributed / Tensor-Parallel Issues
