@@ -137,11 +137,25 @@ def unified_dtype_converter(
         raise TypeError("%s is not a supported dtype" % dtype)
 
 
+def _module_occupies_cuda(module: torch.nn.Module) -> bool:
+    """True if any parameter or buffer still lives on CUDA."""
+    for tensor in module.parameters():
+        if tensor.is_cuda:
+            return True
+    for tensor in module.buffers():
+        if tensor.is_cuda:
+            return True
+    return False
+
+
 def deallocate_module(module: torch.fx.GraphModule) -> None:
+    """Move the FX module to CPU and free cached CUDA blocks for the TRT builder.
+
+    No-op when nothing is on CUDA, so a second call after compile() already
+    offloaded (and CPU-only compiles) skip ``to("cpu")`` / ``empty_cache`` / ``gc``.
     """
-    This is a helper function to delete the instance of module. We first move it to CPU and then
-    delete the object. This function ensures the GPU memory occupied by the module is released effectively after this call
-    """
+    if not torch.cuda.is_available() or not _module_occupies_cuda(module):
+        return
     module.to(CPU_DEVICE)
     torch.cuda.empty_cache()
     gc.collect()
@@ -993,10 +1007,11 @@ def get_cpu_memory_usage() -> Any:
 def release_host_and_device_memory() -> None:
     gc.collect()
     if torch.cuda.is_available():
+        # One sync so builder work has finished before empty_cache; a second
+        # sync after ipc_collect does not free extra blocks.
         torch.cuda.synchronize()
         torch.cuda.empty_cache()
         torch.cuda.ipc_collect()
-        torch.cuda.synchronize()
 
     if (
         platform.system() == "Linux"

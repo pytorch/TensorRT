@@ -1,8 +1,10 @@
 import unittest
+from unittest import mock
 
 import torch
 import torch_tensorrt
 from torch_tensorrt.dynamo.utils import (
+    deallocate_module,
     get_torch_tensor,
     prepare_inputs,
     to_torch_device,
@@ -137,6 +139,38 @@ class TestPrepareInputs(unittest.TestCase):
 
         bool_result = prepare_inputs(True)
         self.assertIsInstance(bool_result, torch_tensorrt.Input)
+
+
+class _TinyLinear(torch.nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.linear = torch.nn.Linear(2, 2)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.linear(x)
+
+
+class TestDeallocateModule(unittest.TestCase):
+    def test_cpu_module_skips_empty_cache(self) -> None:
+        gm = torch.fx.symbolic_trace(_TinyLinear().eval())
+        with mock.patch("torch.cuda.empty_cache") as empty_cache:
+            deallocate_module(gm)
+        empty_cache.assert_not_called()
+        self.assertEqual(next(gm.parameters()).device.type, "cpu")
+
+    @unittest.skipUnless(torch.cuda.is_available(), "CUDA required")
+    def test_cuda_module_moves_to_cpu(self) -> None:
+        gm = torch.fx.symbolic_trace(_TinyLinear().eval().cuda())
+        deallocate_module(gm)
+        self.assertEqual(next(gm.parameters()).device.type, "cpu")
+
+    @unittest.skipUnless(torch.cuda.is_available(), "CUDA required")
+    def test_second_call_is_noop(self) -> None:
+        gm = torch.fx.symbolic_trace(_TinyLinear().eval().cuda())
+        deallocate_module(gm)
+        with mock.patch("torch.cuda.empty_cache") as empty_cache:
+            deallocate_module(gm)
+        empty_cache.assert_not_called()
 
 
 if __name__ == "__main__":
