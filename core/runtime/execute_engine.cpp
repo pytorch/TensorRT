@@ -239,11 +239,18 @@ std::vector<at::Tensor> create_output_tensors(
                        .requires_grad(false);
     try {
       outputs[pyt_idx] = std::move(at::empty(dims, options).contiguous());
-    } catch (const std::exception& e) {
-      TORCHTRT_THROW_ERROR(
-          "Failed to allocate output \"" << name << "\" of engine " << compiled_engine->name << " with shape " << dims
-                                         << " and dtype " << type << ".\n"
-                                         << e.what());
+    } catch (c10::Error& e) {
+      TORCH_RETHROW(
+          e,
+          "Failed to allocate output \"",
+          name,
+          "\" of engine ",
+          compiled_engine->name,
+          " with shape ",
+          dims,
+          " and dtype ",
+          type,
+          ".");
     }
   }
 
@@ -302,11 +309,14 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     try {
       dynamic_workspace =
           torch::empty({workspace_bytes}, torch::TensorOptions().dtype(torch::kUInt8).device(torch::kCUDA));
-    } catch (const std::exception& e) {
-      TORCHTRT_THROW_ERROR(
-          "Failed to allocate the " << workspace_bytes << "-byte activation workspace of engine "
-                                    << compiled_engine->name << ".\n"
-                                    << e.what());
+    } catch (c10::Error& e) {
+      TORCH_RETHROW(
+          e,
+          "Failed to allocate the ",
+          workspace_bytes,
+          "-byte activation workspace of engine ",
+          compiled_engine->name,
+          ".");
     }
     ctx->setDeviceMemoryV2(dynamic_workspace.data_ptr(), workspace_bytes);
   }
