@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import io
 import logging
 from typing import Any, Dict, List, NamedTuple, Optional, Sequence, Tuple
 
@@ -33,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 class SerializedInterpreterResult(NamedTuple):
-    serialized_engine: bytes
+    serialized_engine: Optional[bytes]
     input_names: List[str]
     output_names: List[str]
     requires_output_allocator: bool
@@ -46,6 +45,14 @@ class SerializedInterpreterResult(NamedTuple):
     # and bind the same device pointer).
     aliased_io: Dict[str, Tuple[str, str]] = {}
     num_user_outputs: Optional[int] = None
+    # Live builder engine from interpret(). In-process convert_module wraps this
+    # and skips serialize/deserialize. None on cache hit (bytes only).
+    cuda_engine: Any = None
+
+
+def _host_memory_to_bytes(serialized: Any) -> bytes:
+    """Copy a TensorRT serialize() buffer into owned Python bytes."""
+    return bytes(serialized)
 
 
 def infer_module_output_dtypes(
@@ -186,12 +193,11 @@ def pull_cached_engine(
             # for TensorRT >= 10.14, we set INCLUDE_REFIT flag to make the engine refittable
             if hasattr(trt.SerializationFlag, "INCLUDE_REFIT"):
                 serialization_config.set_flag(trt.SerializationFlag.INCLUDE_REFIT)
-            serialized_engine = engine.serialize_with_config(serialization_config)
+            serialized_engine = _host_memory_to_bytes(
+                engine.serialize_with_config(serialization_config)
+            )
 
             del engine
-            with io.BytesIO() as engine_bytes:
-                engine_bytes.write(serialized_engine)
-                serialized_engine = engine_bytes.getvalue()
 
         return SerializedInterpreterResult(
             serialized_engine=serialized_engine,
@@ -226,6 +232,7 @@ def interpret_module_to_result(
     input_binding_names: Optional[Sequence[str]] = None,
     output_binding_names: Optional[Sequence[str]] = None,
     skip_conversion_validation: bool = False,
+    serialize_engine: bool = True,
 ) -> SerializedInterpreterResult:
     """Interpret an FX module to a TRTInterpreterResult
     Args:
@@ -235,6 +242,11 @@ def interpret_module_to_result(
         engine_cache: Engine cache instance
         skip_conversion_validation: If True, skip TRTInterpreter.validate_conversion.
             Set by compile_module when require_full_compilation already proved full converter coverage.
+        serialize_engine: If True, serialize the built ICudaEngine into bytes.
+            convert_module sets this False so the live engine can be wrapped
+            without a serialize/deserialize roundtrip. Cache insert still
+            serializes from the live engine when cache_built_engines is set.
+            convert_exported_program_to_serialized_trt_engine keeps the default.
     Returns:
         SerializedInterpreterResult
     """
@@ -384,10 +396,9 @@ def _interpret_module_to_result_impl(
                 hash_val, interpreter_result, engine_cache, settings, inputs
             )
 
-    serialized_engine = interpreter_result.engine.serialize()
-    with io.BytesIO() as engine_bytes:
-        engine_bytes.write(serialized_engine)
-        serialized_engine = engine_bytes.getvalue()
+    serialized_engine = None
+    if serialize_engine:
+        serialized_engine = _host_memory_to_bytes(interpreter_result.engine.serialize())
         logger.debug(
             f"CPU memory usage after serializing engine: {get_cpu_memory_usage()} MB"
         )
@@ -401,6 +412,7 @@ def _interpret_module_to_result_impl(
         symbolic_shape_expressions=symbolic_shape_expressions,
         aliased_io=interpreter_result.aliased_io,
         num_user_outputs=interpreter_result.num_user_outputs,
+        cuda_engine=interpreter_result.engine,
     )
 
     return serialized_interpreter_result
@@ -431,6 +443,8 @@ def convert_module(
         settings,
         engine_cache=engine_cache,
         skip_conversion_validation=skip_conversion_validation,
+        # Cross-compile must persist bytes; in-process compile wraps the live engine.
+        serialize_engine=settings.enable_cross_compile_for_windows,
     )
 
     if not ENABLED_FEATURES.torch_tensorrt_runtime:
@@ -465,4 +479,5 @@ def convert_module(
         symbolic_shape_expressions=serialized_interpreter_result.symbolic_shape_expressions,
         aliased_io=serialized_interpreter_result.aliased_io,
         num_user_outputs=serialized_interpreter_result.num_user_outputs,
+        cuda_engine=serialized_interpreter_result.cuda_engine,
     )
