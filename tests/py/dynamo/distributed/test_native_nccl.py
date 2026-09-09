@@ -91,21 +91,28 @@ def has_native_collective_api() -> bool:
 
 
 def trt_supports_collective_subgroups() -> bool:
-    """Whether this TensorRT can build a child communicator for a subset of the bound one.
+    """Whether this TensorRT routes a collective to a subset of the bound communicator.
 
-    ``addDistCollective``'s ``groups`` array selects a subset of the communicator installed by
-    ``setCommunicator``, which is what lets one engine carry collectives on several different
-    groups -- a CP x TP mesh, for instance. Measured on 8 GPUs, every rank binding the same
-    8-rank communicator and passing the same rank array:
+    ``setCommunicator`` installs one communicator that "must be uniform across all
+    multi-device instances", and each ``addDistCollective`` layer names its group as a subset
+    of it. TensorRT splits a child communicator per group, which is what lets one engine carry
+    collectives on several groups -- a CP x TP mesh.
 
-      TRT 11.2.0.86-md-moe-ep  subsets work: ``[0,1,2,3]`` -> 10, ``[4,5,6,7]`` -> 26, and
-                               CP4 x TP2 in a single engine -> 360 on every rank.
-      TRT 11.2.1.2             a subset containing rank 0 is silently ignored and reduces over
-                               the whole communicator (36 instead of 10); a subset without
-                               rank 0 fails with "Did not properly set the child communicator".
+    That routing was fixed by TensorRT **MR !49040** ("Fix DistCollective subgroup communicator
+    routing", 2026-08-20), which derives the split colour/key from the parent communicator's
+    rank instead of assuming rank 0. It is present on TensorRT ``main`` and ``rel-11.4``, and
+    absent from the 11.2.1.x releases and ``rel-11.3``.
 
-    Detecting this needs a real multi-rank run, so it cannot be probed cheaply from a skipIf.
-    Opt in with ``TORCHTRT_TEST_COLLECTIVE_SUBGROUPS=1`` on a TensorRT that supports it.
+    Measured on 8 GPUs, every rank binding the same 8-rank communicator:
+
+      with the fix     subset ``[0,1,2,3]`` -> 10 to its members, ``[4,5,6,7]`` -> 26 to its
+                       members, and CP4 x TP2 in a single engine -> 360 on every rank.
+      without it       a subset containing rank 0 is silently ignored and reduces over the
+                       whole communicator (36 instead of 10); a subset without rank 0 fails
+                       with "Did not properly set the child communicator".
+
+    Detecting this needs a real multi-rank run, so it cannot be probed from a skipIf. Opt in
+    with ``TORCHTRT_TEST_COLLECTIVE_SUBGROUPS=1`` once building against TensorRT >= 11.4.
     """
     return os.environ.get("TORCHTRT_TEST_COLLECTIVE_SUBGROUPS") == "1"
 
@@ -2910,8 +2917,8 @@ class TestMultirankNccl4GPU(MultirankNcclBase):
     @unittest.skipIf(not has_nccl_collectives(), "No NCCL collective support available")
     @unittest.skipUnless(
         trt_supports_collective_subgroups(),
-        "TensorRT cannot build child communicators for a subset of the bound communicator "
-        "(broken on 11.2.1.2); set TORCHTRT_TEST_COLLECTIVE_SUBGROUPS=1 on a build that can",
+        "needs TensorRT subgroup routing (TRT MR !49040, in main and rel-11.4; absent from "
+        "11.2.1.x) — set TORCHTRT_TEST_COLLECTIVE_SUBGROUPS=1 when building against it",
     )
     @requires_nccl()
     @skip_if_lt_x_gpu(4)
