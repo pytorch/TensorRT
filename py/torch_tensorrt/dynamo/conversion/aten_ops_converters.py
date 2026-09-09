@@ -1058,6 +1058,9 @@ else:
         if output_dtype is None:
             output_dtype = args[7] if len(args) > 7 else torch.float16
         input_dtype = args[4] if len(args) > 4 else None
+        zero_point = kwargs.get("zero_point")
+        if zero_point is None and len(args) > 3:
+            zero_point = args[3]
         return impl.quantize.dequantize_affine(
             ctx,
             target,
@@ -1068,6 +1071,7 @@ else:
             args[2],
             output_dtype,
             input_dtype=input_dtype,
+            zero_point=zero_point,
         )
 
 
@@ -1298,28 +1302,28 @@ def _index_copy_kv_eligible(
     *,
     input_node: Optional[Node] = None,
 ) -> bool:
-    """Validator for the KV-cache fast path of ``aten.index_copy.default``.
+    """Validator for the KV-cache fast path of aten.index_copy.default.
 
-    Returns True only for the narrow case our ``IKVCacheUpdateLayer``
+    Returns True only for the narrow case our IKVCacheUpdateLayer
     emitter can handle without a graph break:
 
     * Input is an FX placeholder (i.e. a network input — required for
       aliasing).
-    * Input has rank 4 and fully static shape ``[b, d, s_max, h]``.
-    * ``dim`` argument is exactly ``2``.
-    * Source tensor has rank 4 with ``shape[2] == 1`` (single-position
-      write; matches HF's per-step ``StaticCache.update`` call).
+    * Input has rank 4 and fully static shape [b, d, s_max, h].
+    * dim argument is exactly 2.
+    * Source tensor has rank 4 with shape[2] == 1 (single-position
+      write; matches HF's per-step StaticCache.update call).
     * Batch is 1 (avoids writeIndices broadcasting; trivially extensible
       to larger batches when needed).
 
     Cases that fail this validator fall through to
-    ``aten_ops_index_copy_fallback``.
+    aten_ops_index_copy_fallback.
 
-    ``input_node`` overrides which node the input checks are applied to. The
+    input_node overrides which node the input checks are applied to. The
     partitioner never passes it: by the time this runs as a capability validator,
     lowering has settled what the input is. The pre-conversion classifier in
-    ``lowering/_buffer_lifting.py`` runs before that and passes the node lowering
-    will leave behind, which is not always ``node.args[0]``.
+    lowering/_buffer_lifting.py runs before that and passes the node lowering
+    will leave behind, which is not always node.args[0].
     """
     # That same classifier marks a write it filed copy-back rather than KV, and its
     # value is a graph output by now. Aliasing it as well would hand the runtime an
@@ -1346,7 +1350,7 @@ def _index_copy_kv_eligible(
         return False  # batch > 1 deferred; see index_copy.index_copy_kv
 
     # IKVCacheUpdateLayer scatters along the sequence axis, which is axis 2 in
-    # the KV-cache layout it requires: ``[batch, num_heads, s_max, head_dim]``.
+    # the KV-cache layout it requires: [batch, num_heads, s_max, head_dim].
     # A write on any other axis is not a cache-position update and cannot be
     # expressed by the layer, so it must fall through to the scatter fallback.
     if dim != 2:

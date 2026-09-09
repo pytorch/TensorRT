@@ -170,3 +170,74 @@ def test_linear_fp8_static():
         ),
     )
     torch._dynamo.reset()
+
+
+@pytest.mark.unit
+@unittest.skipIf(importlib.util.find_spec("torchao") is None, "torchao not installed")
+@unittest.skipIf(not torch.cuda.is_available(), "CUDA is required")
+def test_linear_int4_woq():
+    import sys
+    from pathlib import Path
+
+    example_dir = (
+        Path(__file__).resolve().parents[4] / "examples" / "dynamo" / "torchao"
+    )
+    sys.path.insert(0, str(example_dir))
+    from int4_utils import pre_process_model_for_export, quantize_linear_int4_symmetric
+    from utils import exclude_dq_from_constant_folding
+
+    class LinearModel(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.linear = torch.nn.Linear(64, 128)
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            return self.linear(x)
+
+    model = LinearModel().eval().to(dtype=torch.bfloat16, device="cuda")
+    example_input = torch.randn(8, 64, dtype=torch.bfloat16, device="cuda")
+    quantize_linear_int4_symmetric(model, group_size=32)
+    model = pre_process_model_for_export(model)
+    assertions.assertTrue(
+        torch.all(model.linear.weight.zero_point == 0).item(),
+        msg="INT4 WOQ test expected symmetric zero_point",
+    )
+
+    with exclude_dq_from_constant_folding():
+        exp_program = torch.export.export(model, (example_input,), strict=True)
+
+    dq_nodes = [
+        n
+        for n in exp_program.graph.nodes
+        if n.target == torch.ops.torchao.dequantize_affine.default
+    ]
+    assertions.assertTrue(
+        len(dq_nodes) >= 1,
+        msg="Exported graph is missing torchao.dequantize_affine",
+    )
+
+    trt_mod = torchtrt.dynamo.compile(
+        exp_program,
+        inputs=[example_input],
+        min_block_size=1,
+        use_explicit_typing=True,
+        require_full_compilation=True,
+        immutable_weights=True,
+        cache_built_engines=False,
+        reuse_cached_engines=False,
+    )
+
+    with torch.no_grad():
+        eager_out = model(example_input)
+        trt_out = trt_mod(example_input)
+    if isinstance(trt_out, (list, tuple)):
+        trt_out = trt_out[0]
+    cos_sim = cosine_similarity(eager_out, trt_out)
+    assertions.assertTrue(
+        cos_sim > COSINE_THRESHOLD,
+        msg=(
+            "TorchAO INT4 WOQ TRT outputs don't match eager. "
+            f"Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}"
+        ),
+    )
+    torch._dynamo.reset()

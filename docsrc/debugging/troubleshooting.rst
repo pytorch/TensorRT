@@ -223,6 +223,11 @@ Accuracy / Performance Issues
     For **static FP8** (activations and weights, with a calibration loop), see
     :ref:`quantize_linear_fp8_static`.
 
+    For **INT4 weight-only** quantization with TorchAO, see
+    :ref:`quantize_linear_int4_woq`, :ref:`torch_export_flux_int4_woq`, and
+    :ref:`torch_export_qwen3_int4_woq`. Use symmetric INT4 (zero zero-point)
+    and ``immutable_weights=True`` so engine constants stay ``Datatype: Int4``.
+
 ----
 
 Distributed / Tensor-Parallel Issues

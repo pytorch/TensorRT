@@ -104,7 +104,7 @@ sphinx_gallery_conf = {
         "tutorials/_rendered_examples/distributed_inference",
     ],
     # Exclude pure utility modules that aren't standalone runnable examples.
-    "ignore_pattern": r"(utils\.py|static_fp8_utils\.py|rotary_embedding\.py|tensor_parallel_initialize_dist\.py)",
+    "ignore_pattern": r"(utils\.py|static_fp8_utils\.py|int4_utils\.py|rotary_embedding\.py|tensor_parallel_initialize_dist\.py)",
 }
 
 # Setup the breathe extension
