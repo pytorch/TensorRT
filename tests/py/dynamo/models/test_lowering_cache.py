@@ -1,15 +1,31 @@
 import os
 import tempfile
 import unittest
+from typing import Dict, Optional
 
 import torch
 from torch_tensorrt._Input import Input
+from torch_tensorrt.dynamo._engine_cache import BaseEngineCache, DiskEngineCache
 from torch_tensorrt.dynamo._lowering_cache import (
     DiskLoweringCache,
     LoweringCacheEntry,
+    _blob_key,
 )
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering import post_lowering, pre_export_lowering
+
+_TEST_CACHE_SIZE = 50 * 1024 * 1024
+
+
+class MemoryEngineCache(BaseEngineCache):
+    def __init__(self) -> None:
+        self.blobs: Dict[str, bytes] = {}
+
+    def save(self, hash: str, blob: bytes, *args: object, **kwargs: object) -> None:
+        self.blobs[hash] = blob
+
+    def load(self, hash: str, *args: object, **kwargs: object) -> Optional[bytes]:
+        return self.blobs.get(hash)
 
 
 class _Linear(torch.nn.Module):
@@ -84,6 +100,9 @@ class TestDiskLoweringCache(unittest.TestCase):
 
         self.assertNotEqual(first, second)
 
+    def _cache(self, directory: str) -> DiskLoweringCache:
+        return DiskLoweringCache(DiskEngineCache(directory, _TEST_CACHE_SIZE))
+
     def test_round_trip(self) -> None:
         exported_program = torch.export.export(_Linear().eval(), self.inputs)
         exported_program = pre_export_lowering(exported_program, self.settings)
@@ -93,13 +112,16 @@ class TestDiskLoweringCache(unittest.TestCase):
         entry = LoweringCacheEntry(graph_module, ())
 
         with tempfile.TemporaryDirectory() as directory:
-            cache = DiskLoweringCache(directory)
+            cache = self._cache(directory)
             restored_module = cache.save("a" * 64, entry)
             loaded = cache.load("a" * 64)
 
         self.assertIsNotNone(loaded)
         assert loaded is not None
         self.assertIsInstance(loaded.lowered_module, torch.fx.GraphModule)
+        # post_lowering leaves forward stale; serialize walks graph.nodes.
+        # load() already recompiles the deserialized module.
+        restored_module.recompile()
         torch.testing.assert_close(
             loaded.lowered_module(*self.inputs), restored_module(*self.inputs)
         )
@@ -122,9 +144,9 @@ class TestDiskLoweringCache(unittest.TestCase):
         )
 
         with tempfile.TemporaryDirectory() as directory:
-            cache = DiskLoweringCache(directory)
+            cache = self._cache(directory)
             cache.save("b" * 64, LoweringCacheEntry(graph_module, ()))
-            artifact = os.path.join(directory, "b" * 2, "b" * 64, "lowered.pt")
+            artifact = os.path.join(directory, _blob_key("b" * 64), "blob.bin")
             self.assertTrue(os.path.exists(artifact))
             self.assertLess(os.path.getsize(artifact), 1_000_000)
             self.assertFalse(
@@ -155,16 +177,36 @@ class TestDiskLoweringCache(unittest.TestCase):
         )
 
         with tempfile.TemporaryDirectory() as directory:
-            cache = DiskLoweringCache(directory)
+            cache = self._cache(directory)
             restored = cache.save("c" * 64, LoweringCacheEntry(graph_module, ()))
             loaded = cache.load("c" * 64)
 
         self.assertIsNotNone(loaded)
         assert loaded is not None
+        restored.recompile()
         torch.testing.assert_close(loaded.lowered_module(*inputs), restored(*inputs))
 
     def test_bypasses_non_full_compilation(self) -> None:
         self.assertFalse(DiskLoweringCache.can_cache(CompilationSettings()))
+
+    def test_uses_shared_base_engine_cache(self) -> None:
+        exported_program = torch.export.export(_Linear().eval(), self.inputs)
+        exported_program = pre_export_lowering(exported_program, self.settings)
+        graph_module = post_lowering(
+            exported_program.run_decompositions({}).module(), self.settings
+        )
+        store = MemoryEngineCache()
+        cache = DiskLoweringCache(store)
+        cache.save("d" * 64, LoweringCacheEntry(graph_module, ()))
+
+        self.assertIn(_blob_key("d" * 64), store.blobs)
+        loaded = cache.load("d" * 64)
+        self.assertIsNotNone(loaded)
+        assert loaded is not None
+        self.assertEqual(
+            [node.name for node in loaded.lowered_module.graph.nodes],
+            [node.name for node in graph_module.graph.nodes],
+        )
 
 
 if __name__ == "__main__":

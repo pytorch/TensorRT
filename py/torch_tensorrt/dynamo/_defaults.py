@@ -46,7 +46,11 @@ ENGINE_CACHE_SIZE = 5368709120  # 5GB
 CUSTOM_ENGINE_CACHE = None
 CACHE_LOWERED_GRAPHS = False
 REUSE_CACHED_LOWERED_GRAPHS = False
-LOWERING_CACHE_DIR = os.path.join(ENGINE_CACHE_DIR, "lowered_graphs")
+# Sibling of ENGINE_CACHE_DIR so DiskEngineCache LRU on the engine dir cannot
+# rmtree the lowering store as if it were an engine hash directory.
+LOWERING_CACHE_DIR = os.path.join(
+    tempfile.gettempdir(), "torch_tensorrt_lowering_cache"
+)
 USE_FP32_ACC = False
 REFIT_IDENTICAL_ENGINE_WEIGHTS = False
 STRIP_ENGINE_WEIGHTS = False

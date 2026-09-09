@@ -557,10 +557,10 @@ def compile(
         reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
         engine_cache_dir (str): Directory to store the cached TRT engines
         engine_cache_size (int): Maximum hard-disk space (bytes) to use for the engine cache, default is 1GB. If the cache exceeds this size, the oldest engines will be removed by default
-        custom_engine_cache (Optional[BaseEngineCache]): Engine cache instance to use for saving and loading engines. Users can provide their own engine cache by inheriting from BaseEngineCache. If used, engine_cache_dir and engine_cache_size will be ignored.
-        cache_lowered_graphs (bool): Whether to save lowered and partitioned graphs for warm compilation
-        reuse_cached_lowered_graphs (bool): Whether to reuse lowered and partitioned graphs before decomposition
-        lowering_cache_dir (str): Directory used by the lowered graph cache
+        custom_engine_cache (Optional[BaseEngineCache]): Cache instance for engines and, if enabled, lowered graphs. Users can provide their own cache by inheriting from BaseEngineCache. If used, engine_cache_dir, engine_cache_size, and lowering_cache_dir will be ignored. Graph entries are stored under a ``lowering_`` key prefix.
+        cache_lowered_graphs (bool): Whether to save lowered graphs for warm compilation
+        reuse_cached_lowered_graphs (bool): Whether to reuse lowered graphs before decomposition
+        lowering_cache_dir (str): Directory used by the default lowered-graph DiskEngineCache. Ignored if custom_engine_cache is set.
         use_fp32_acc (bool): Enable FP32 accumulation for FP16 matmul layers while retaining FP16
             inputs and outputs. When combined with ``decompose_attention=True``, the complete
             decomposed FP16 scaled dot product attention calculation runs in FP32 and only its
@@ -797,7 +797,12 @@ def compile(
                 "enable_autocast=False, and use_distributed_mode_trace=False"
             )
         else:
-            lowering_cache = DiskLoweringCache(lowering_cache_dir)
+            store = (
+                custom_engine_cache
+                if custom_engine_cache is not None
+                else DiskEngineCache(lowering_cache_dir, engine_cache_size)
+            )
+            lowering_cache = DiskLoweringCache(store)
             lowering_cache_key = lowering_cache.get_hash(
                 exported_program, trt_arg_inputs, trt_kwarg_inputs, settings
             )
