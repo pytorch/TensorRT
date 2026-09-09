@@ -756,12 +756,25 @@ class TestCollectiveGroupRanks(unittest.TestCase):
         """The common ascending case is unaffected by preserving order."""
         self.assertEqual(list(self._resolve_with([0, 1, 2, 3])), [0, 1, 2, 3])
 
-    def test_unresolvable_group_falls_back_to_world(self) -> None:
-        """An unresolvable group name falls back to the world group rather than raising."""
+    def test_unresolvable_group_raises_rather_than_widening_to_world(self) -> None:
+        """A named-but-unresolvable group must fail the build, not silently go world-wide.
+
+        Falling back would build a collective over every rank, which is the silent
+        wrong-results failure this resolution exists to prevent.
+        """
         from torch_tensorrt.dynamo.conversion.impl import nccl_ops
 
-        result = nccl_ops._collective_group_ranks("no_such_group", world_size=4)
-        self.assertEqual(list(result), [0, 1, 2, 3])
+        with self.assertRaises(RuntimeError) as cm:
+            nccl_ops._collective_group_ranks("no_such_group", world_size=4)
+        self.assertIn("no_such_group", str(cm.exception))
+
+    def test_no_group_name_uses_world(self) -> None:
+        """With no group named, the collective is over the world group by construction."""
+        from torch_tensorrt.dynamo.conversion.impl import nccl_ops
+
+        self.assertEqual(
+            list(nccl_ops._collective_group_ranks(None, world_size=4)), [0, 1, 2, 3]
+        )
 
 
 class TestNativeCollectiveNumRanks(unittest.TestCase):
@@ -2204,17 +2217,24 @@ def _multirank_two_dimensional_mesh_routing(
     setup_nccl_for_torch_tensorrt()
 
     # Every rank must create every group, in the same order, for the handles to match.
-    cp_groups = [dist.new_group(ranks=[0, 2]), dist.new_group(ranks=[1, 3])]
-    tp_groups = [dist.new_group(ranks=[0, 1]), dist.new_group(ranks=[2, 3])]
-    cp_group = cp_groups[rank % 2]
-    tp_group = tp_groups[rank // 2]
-    # PyTorch creates the ncclComm_t lazily; bind_nccl_comm() reads a null pointer until
-    # at least one collective has run on the group. A real collective is used rather than
+    cp_ranks = [[0, 2], [1, 3]]
+    tp_ranks = [[0, 1], [2, 3]]
+    cp_groups = [dist.new_group(ranks=r) for r in cp_ranks]
+    tp_groups = [dist.new_group(ranks=r) for r in tp_ranks]
+    cp_members, cp_group = cp_ranks[rank % 2], cp_groups[rank % 2]
+    tp_members, tp_group = tp_ranks[rank // 2], tp_groups[rank // 2]
+
+    # PyTorch creates the ncclComm_t lazily; bind_nccl_comm() reads a null pointer until at
+    # least one collective has run on the group. A real collective is used rather than
     # dist.barrier(), which for NCCL infers the device when device_ids is omitted and can
     # pick the wrong one on a multi-GPU rank, hanging the group.
+    #
+    # Membership is read off the rank lists rather than queried: new_group() hands back
+    # GroupMember.NON_GROUP_MEMBER on ranks outside the group, and get_process_group_ranks()
+    # raises on that sentinel.
     seed = torch.zeros(1, device=device)
-    for group in cp_groups + tp_groups:
-        if rank in dist.get_process_group_ranks(group):
+    for members, group in zip(cp_ranks + tp_ranks, cp_groups + tp_groups):
+        if rank in members:
             dist.all_reduce(seed, group=group)
 
     class AllReduceOnGroup(nn.Module):
@@ -2231,12 +2251,22 @@ def _multirank_two_dimensional_mesh_routing(
     inp = torch.full((1, 8), float(rank + 1), device=device)
     world_total = float(sum(r + 1 for r in range(world_size)))
 
-    for axis, group in (("TP", tp_group), ("CP", cp_group)):
-        members = dist.get_process_group_ranks(group)
+    # Bind the WORLD communicator, not either subgroup. addDistCollective's rank array is
+    # "rank IDs in the communicator" and selects a subset of it, so the communicator has to
+    # be the one those IDs are numbered in. Binding a subgroup instead would make the
+    # global ranks of a group like [2, 3] out of range for its own 2-rank communicator.
+    # Binding the world group is also what lets one engine carry collectives on several
+    # different subgroups, since the runtime binds a single communicator per engine.
+    world_group = dist.group.WORLD
+
+    for axis, group, members in (
+        ("TP", tp_group, tp_members),
+        ("CP", cp_group, cp_members),
+    ):
         expected_value = float(sum(r + 1 for r in members))
         model = AllReduceOnGroup(group.group_name).to(device).eval()
 
-        with distributed_context(group):
+        with distributed_context(world_group):
             trt_model = torch.compile(
                 model,
                 backend="torch_tensorrt",
@@ -2262,8 +2292,59 @@ def _multirank_two_dimensional_mesh_routing(
                 f"expected {expected_value}{hint}"
             )
 
+    # Both axes inside ONE model, i.e. one engine carrying collectives on two different
+    # subgroups. This is the case binding the world communicator is meant to support.
+    #
+    # A plain TP-then-CP sum would be indistinguishable from the bug: summing over both
+    # mesh axes covers all four ranks, which is exactly the world sum. Scaling between the
+    # two collectives breaks that symmetry -- correct routing gives (3 or 7) * 10 summed
+    # down the CP axis = 100 everywhere, while two world-routed all_reduces give 400.
+    class TwoAxisModel(nn.Module):
+        def __init__(self, tp_name: str, cp_name: str) -> None:
+            super().__init__()
+            self.tp_name = tp_name
+            self.cp_name = cp_name
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            y = torch.ops._c10d_functional.all_reduce.default(x, "sum", self.tp_name)
+            y = torch.ops._c10d_functional.wait_tensor.default(y)
+            y = y * 10.0
+            z = torch.ops._c10d_functional.all_reduce.default(y, "sum", self.cp_name)
+            return torch.ops._c10d_functional.wait_tensor.default(z)
+
+    two_axis = TwoAxisModel(tp_group.group_name, cp_group.group_name).to(device).eval()
+    with distributed_context(world_group):
+        trt_two_axis = torch.compile(
+            two_axis,
+            backend="torch_tensorrt",
+            dynamic=False,
+            options={"min_block_size": 1, "use_distributed_mode_trace": True},
+        )
+        with torch.no_grad():
+            combined = trt_two_axis(inp)
+
+    # Each CP peer contributes its own TP-group sum, scaled by 10.
+    def tp_sum_for(r: int) -> float:
+        return float(sum(m + 1 for m in tp_ranks[r // 2]))
+
+    cp_expected = sum(tp_sum_for(peer) * 10.0 for peer in cp_members)
+    if not torch.allclose(combined, torch.full((1, 8), cp_expected, device=device)):
+        got = combined[0, 0].item()
+        both_world = world_total * 10.0 * world_size
+        hint = (
+            " -- that is what two world-routed all_reduces return, so neither collective "
+            "was routed to its own subgroup"
+            if abs(got - both_world) < 1e-6
+            else ""
+        )
+        raise AssertionError(
+            f"rank {rank}: TP({tp_members}) then CP({cp_members}) in one model returned "
+            f"{got}, expected {cp_expected}{hint}"
+        )
+
     print(
-        f"[rank {rank}] 2-D mesh routing OK (CP and TP each reduced over their own group)"
+        f"[rank {rank}] 2-D mesh routing OK (CP and TP each reduced over their own group, "
+        f"separately and in a single engine)"
     )
 
 

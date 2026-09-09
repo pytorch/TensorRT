@@ -81,13 +81,17 @@ def _get_distributed_rank_and_world_size() -> Tuple[int, int]:
 
 
 def _collective_group_ranks(group_name: Optional[str], world_size: int) -> np.ndarray:
-    """Global ranks of the collective's process group.
+    """Ranks that participate in this collective, as IDs in the bound communicator.
 
-    The native ``add_dist_collective`` layer needs the set of ranks that participate in
-    *this* collective. Resolving it from the op's ``group_name`` lets a collective target a
-    process **subgroup** (e.g. context/sequence-parallel over one subgroup while tensor-parallel
-    uses another -- a 2-D device mesh) instead of always the whole world. Falls back to the world
-    group when the group cannot be resolved (single-program / group not created in this process).
+    ``addDistCollective`` documents ``groups`` as "a flat array of rank IDs in the
+    communicator", selecting the subset that takes part and defining each one's group-local
+    rank by position. The runtime binds one communicator per engine, so these are that
+    communicator's rank IDs -- global ranks when the world communicator is bound, which is
+    what lets a single engine host collectives on several different subgroups (e.g. context
+    parallel on one mesh axis and tensor parallel on the other).
+
+    Resolving the op's ``group_name`` is what lets a collective target a subgroup at all;
+    without it every collective is built over the whole world.
     """
     if group_name:
         try:
@@ -103,12 +107,19 @@ def _collective_group_ranks(group_name: Optional[str], world_size: int) -> np.nd
             # yielding [5, 2] would be read as [2, 5], swapping which rank receives which
             # slice. Sorting is not needed for agreement either: every member resolves the
             # same group_name to the same group and therefore already sees the same order.
-            ranks = dist.get_process_group_ranks(_resolve_process_group(group_name))
-            return np.array(ranks, dtype=np.int64)
-        except Exception as e:  # noqa: BLE001
-            logger.warning(
-                f"Could not resolve process group '{group_name}' ({e}); using world group"
-            )
+            pg = _resolve_process_group(group_name)
+        except Exception as e:
+            # Do not fall back to the world group here. The op named a group, so falling
+            # back would build a collective spanning every rank -- the exact silent
+            # wrong-results failure this function exists to prevent. Fail the build instead.
+            raise RuntimeError(
+                f"Collective names process group '{group_name}', which could not be "
+                f"resolved in this process ({e}). Refusing to fall back to the world "
+                f"group: that would reduce across every rank and silently return wrong "
+                f"results. Ensure the group is created before compiling."
+            ) from e
+        return np.array(dist.get_process_group_ranks(pg), dtype=np.int64)
+    # No group named: the collective is over the world group by construction.
     return np.arange(world_size, dtype=np.int64)
 
 
