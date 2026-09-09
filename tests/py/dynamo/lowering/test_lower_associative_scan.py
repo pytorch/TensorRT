@@ -65,9 +65,9 @@ def _has_associative_scan(gm: torch.fx.GraphModule) -> bool:
     return False
 
 
-def _pytorch_segments(compiled) -> list:
-    """Names of the segments the partitioner left in PyTorch."""
-    return [name for name, _ in compiled.named_children() if "_run_on_gpu" in name]
+def _segments(compiled) -> list:
+    """Partitioner submodule names: ``_run_on_acc_*`` TRT, ``_run_on_gpu_*`` PyTorch."""
+    return [name for name, _ in compiled.named_children()]
 
 
 def _lower_exported(model, inputs, experimental: bool = False):
@@ -81,6 +81,19 @@ def _lower_exported(model, inputs, experimental: bool = False):
 
 @unittest.skipIf(not torch.cuda.is_available(), "CUDA required")
 class TestLowerAssociativeScan(TestCase):
+    def assert_fully_converted(self, compiled):
+        """Absence of a PyTorch segment alone would pass vacuously on a rename."""
+        segments = _segments(compiled)
+        self.assertEqual(
+            [s for s in segments if "_run_on_gpu" in s],
+            [],
+            f"part of the scan fell back to PyTorch: {segments}",
+        )
+        self.assertTrue(
+            any("_run_on_acc" in s for s in segments),
+            f"no TRT engine was built: {segments}",
+        )
+
     def test_pointwise_scan_removed_from_graph(self):
         b, d, s, n = 1, 4, 8, 16
         model = _mamba_scan_module("pointwise").cuda().eval()
@@ -121,14 +134,9 @@ class TestLowerAssociativeScan(TestCase):
         torch.testing.assert_close(out, ref, rtol=1e-4, atol=1e-4)
 
         compiled = torch_tensorrt.dynamo.compile(
-            ep,
-            inputs=list(inputs),
-            enabled_precisions={torch.float32},
-            min_block_size=1,
+            ep, inputs=list(inputs), min_block_size=1
         )
-        self.assertEqual(
-            _pytorch_segments(compiled), [], "the scan must run entirely in TRT"
-        )
+        self.assert_fully_converted(compiled)
         trt_out = compiled(*[t.clone() for t in inputs])
         torch.testing.assert_close(trt_out, ref, rtol=1e-3, atol=1e-3)
 
@@ -152,14 +160,9 @@ class TestLowerAssociativeScan(TestCase):
         self.assertEqual(len(adds), math.ceil(math.log2(s)))
 
         compiled = torch_tensorrt.dynamo.compile(
-            ep,
-            inputs=list(inputs),
-            enabled_precisions={torch.float32},
-            min_block_size=1,
+            ep, inputs=list(inputs), min_block_size=1
         )
-        self.assertEqual(
-            _pytorch_segments(compiled), [], "the scan must run entirely in TRT"
-        )
+        self.assert_fully_converted(compiled)
         torch.testing.assert_close(
             compiled(*[t.clone() for t in inputs]), ref, rtol=1e-3, atol=1e-3
         )
@@ -174,9 +177,7 @@ class TestLowerAssociativeScan(TestCase):
                 def combine_fn(left, right):
                     return left + right
 
-                return associative_scan(
-                    combine_fn, x, dim=0, combine_mode="pointwise"
-                )
+                return associative_scan(combine_fn, x, dim=0, combine_mode="pointwise")
 
         model = SumScan().cuda().eval()
         x = torch.randn(8, 4, device="cuda")
