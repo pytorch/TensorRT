@@ -36,6 +36,10 @@ set(EXECUTORCH_BUILD_EXTENSION_DATA_LOADER ON CACHE BOOL "" FORCE)
 set(EXECUTORCH_BUILD_EXTENSION_FLAT_TENSOR ON CACHE BOOL "" FORCE)
 set(EXECUTORCH_BUILD_EXTENSION_MODULE ON CACHE BOOL "" FORCE)
 set(EXECUTORCH_BUILD_EXTENSION_NAMED_DATA_MAP ON CACHE BOOL "" FORCE)
+option(
+  TORCHTRT_ENABLE_DRIVE_OS_COMPAT
+  "Enable DRIVE OS compatibility for the ExecuTorch CUDA backend"
+  OFF)
 
 if(NOT EXECUTORCH_SOURCE_DIR)
   message(FATAL_ERROR "EXECUTORCH_SOURCE_DIR is empty. Set it to an ExecuTorch source checkout, for example -DEXECUTORCH_SOURCE_DIR=/path/to/executorch")
@@ -58,26 +62,30 @@ find_package(CUDAToolkit REQUIRED)
 add_subdirectory("${EXECUTORCH_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/executorch")
 add_subdirectory("${TORCHTRT_EXECUTORCH_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/torch_tensorrt_executorch")
 
-# ExecuTorch's CUDA shim target is defined in the source tree added above. Give
-# it every include directory discovered by FindCUDAToolkit; DRIVE exposes some
-# toolkit headers (including curand_kernel.h) outside CUDA's injected default
-# include directory.
-target_include_directories(aoti_cuda_shims PRIVATE ${CUDAToolkit_INCLUDE_DIRS})
+if(TORCHTRT_ENABLE_DRIVE_OS_COMPAT)
+  message(STATUS "Torch-TensorRT DRIVE OS compatibility: enabled")
 
-# The pinned ExecuTorch release links the cuRAND host library even though its
-# CUDA shims use only the device-side API from curand_kernel.h. DRIVE does not
-# ship a conventional libcurand development target, so remove that unused link.
-# Keep this local to the reference runner instead of modifying the pinned
-# ExecuTorch checkout.
-foreach(_torch_tensorrt_curand_property LINK_LIBRARIES INTERFACE_LINK_LIBRARIES)
-  get_target_property(_torch_tensorrt_curand_value
-    aoti_cuda_shims ${_torch_tensorrt_curand_property})
-  if(_torch_tensorrt_curand_value AND CUDA::curand IN_LIST _torch_tensorrt_curand_value)
-    list(REMOVE_ITEM _torch_tensorrt_curand_value CUDA::curand)
-    set_property(TARGET aoti_cuda_shims
-      PROPERTY ${_torch_tensorrt_curand_property} "${_torch_tensorrt_curand_value}")
-  endif()
-endforeach()
+  # ExecuTorch's CUDA shim target is defined in the source tree added above.
+  # Give it every include directory discovered by FindCUDAToolkit; DRIVE exposes
+  # some toolkit headers (including curand_kernel.h) outside CUDA's injected
+  # default include directory.
+  target_include_directories(aoti_cuda_shims PRIVATE ${CUDAToolkit_INCLUDE_DIRS})
+
+  # The pinned ExecuTorch release links the cuRAND host library even though its
+  # CUDA shims use only the device-side API from curand_kernel.h. DRIVE does not
+  # ship a conventional libcurand development target, so remove that unused
+  # link. Keep this local to the reference runner instead of modifying the
+  # pinned ExecuTorch checkout.
+  foreach(_torch_tensorrt_curand_property LINK_LIBRARIES INTERFACE_LINK_LIBRARIES)
+    get_target_property(_torch_tensorrt_curand_value
+      aoti_cuda_shims ${_torch_tensorrt_curand_property})
+    if(_torch_tensorrt_curand_value AND CUDA::curand IN_LIST _torch_tensorrt_curand_value)
+      list(REMOVE_ITEM _torch_tensorrt_curand_value CUDA::curand)
+      set_property(TARGET aoti_cuda_shims
+        PROPERTY ${_torch_tensorrt_curand_property} "${_torch_tensorrt_curand_value}")
+    endif()
+  endforeach()
+endif()
 
 add_executable(example_executorch_runner main.cpp)
 target_link_libraries(
