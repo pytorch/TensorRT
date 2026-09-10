@@ -133,9 +133,6 @@ ATen Core Ops — Converted
 - aten.pow.Tensor_Tensor(Tensor self, Tensor exponent) -> Tensor
 - aten.prod(Tensor self, \*, ScalarType? dtype=None) -> Tensor
 - aten.prod.dim_int(Tensor self, int dim, bool keepdim=False, \*, ScalarType? dtype=None) -> Tensor
-- aten.rand(SymInt[] size, \*, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor
-- aten.randn(SymInt[] size, \*, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor
-- aten.randperm(SymInt n, \*, ScalarType? dtype=long, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor
 - aten.reflection_pad1d(Tensor self, SymInt[2] padding) -> Tensor
 - aten.reflection_pad2d(Tensor self, SymInt[4] padding) -> Tensor
 - aten.reflection_pad3d(Tensor self, SymInt[6] padding) -> Tensor
