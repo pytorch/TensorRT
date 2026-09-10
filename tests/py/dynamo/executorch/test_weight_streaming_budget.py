@@ -70,7 +70,9 @@ def _patch_lowering(monkeypatch, engine_counts=None):
     )
     export_module = importlib.import_module("torch_tensorrt.executorch._export")
     engine_counts = engine_counts or {}
-    lower = MagicMock(return_value=object())
+    # export() reorders each method's mutations over every method the manager
+    # holds after lowering, so the stand-in has to answer that much.
+    lower = MagicMock(return_value=SimpleNamespace(methods=()))
     monkeypatch.setattr(executorch.exir, "to_edge_transform_and_lower", lower)
     monkeypatch.setattr(executorch_api, "TensorRTPartitioner", FakeTensorRTPartitioner)
     monkeypatch.setattr(executorch_api, "get_edge_compile_config", lambda: "default")
@@ -277,13 +279,22 @@ def test_save_rejects_negative_budget(tmp_path):
 
 @pytest.mark.unit
 def test_save_rejects_unknown_executorch_kwarg(tmp_path):
-    with pytest.raises(TypeError, match="unexpected keyword argument"):
+    with pytest.raises(TypeError, match="unexpected keyword argument") as excinfo:
         save(
             torch.nn.Linear(1, 1),
             str(tmp_path / "model.pte"),
             output_format="executorch",
             weight_streaming_budget_per_enginet=4096,
         )
+
+    # The message spells the supported set out, so someone who mistyped an option
+    # is told what to type instead. A hand-written list drifts the moment an
+    # option is added, and then tells them the flag they wanted is unsupported.
+    from torch_tensorrt._compile import _EXECUTORCH_SAVE_OPTIONS
+
+    assert len(_EXECUTORCH_SAVE_OPTIONS) > 1
+    for name in _EXECUTORCH_SAVE_OPTIONS:
+        assert repr(name) in str(excinfo.value)
 
 
 @pytest.mark.unit
