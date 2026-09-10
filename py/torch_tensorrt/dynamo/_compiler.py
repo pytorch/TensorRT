@@ -37,6 +37,9 @@ from torch_tensorrt.dynamo.conversion import (
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     DYNAMO_CONVERTERS as CONVERTERS,
 )
+from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
+    ConverterRegistry,
+)
 from torch_tensorrt.dynamo.debug._DebuggerConfig import DebuggerConfig
 from torch_tensorrt.dynamo.debug._supports_debugger import fn_supports_debugger
 from torch_tensorrt.dynamo.lowering import (
@@ -1390,7 +1393,31 @@ def compile_module(
             cpu_memory_budget=settings.cpu_memory_budget,
         )
 
-    dryrun_tracker.unsupported_ops = supported_ops.unsupported_operators
+    dryrun_tracker.unsupported_ops = supported_ops.fallback_operators
+
+    # Operators the caller named in torch_executed_ops are left out: that fallback was
+    # asked for. The set can hold either a qualified name string or an operator target
+    # object, and fallback_operators is keyed by name, so normalize to names first or a
+    # target object never matches and the caller is warned about their own choice.
+    excluded_names = {
+        ConverterRegistry.qualified_name_or_str(op)
+        for op in settings.torch_executed_ops
+    }
+    reported_fallbacks = {
+        node_name: count
+        for node_name, count in supported_ops.fallback_operators.items()
+        if node_name not in excluded_names
+    }
+    if reported_fallbacks:
+        named = ", ".join(
+            f"{node_name} + Operator Count: {count}"
+            for node_name, count in sorted(reported_fallbacks.items())
+        )
+        logger.warning(
+            f"{len(reported_fallbacks)} operator(s) have no TensorRT converter and will "
+            f"run in PyTorch, so this model was split around them: {named}. "
+            f"Compile with dryrun=True for the full report."
+        )
 
     # The global partitioner leaves non-TRT nodes as-is
     if not settings.use_fast_partitioner:

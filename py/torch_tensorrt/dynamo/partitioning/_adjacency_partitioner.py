@@ -39,8 +39,20 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
         # Initialize sets of supported/unsupported operators
         self.supported_operators: Dict[str, int] = {}
         self.unsupported_operators: Dict[str, int] = {}
+        # unsupported_operators skips impure nodes, so it cannot answer "did anything fall
+        # back". This one records every refusal.
+        self.fallback_operators: Dict[str, int] = {}
         self.torch_executed_ops = torch_executed_ops
         self._non_target_device_cache: Dict[torch.fx.Node, bool] = {}
+
+    def _record_fallback(self, node: torch.fx.Node, node_name: str) -> None:
+        # Only executable operators count as fallbacks. Placeholder and output nodes are
+        # graph structure, not operators, and recording them makes a fully supported graph
+        # report its own inputs and outputs as unconverted.
+        if node.op in CALLABLE_NODE_OPS:
+            self.fallback_operators[node_name] = (
+                self.fallback_operators.get(node_name, 0) + 1
+            )
 
     def is_node_supported(
         self, submodules: Dict[str, torch.nn.Module], node: torch.fx.Node
@@ -65,6 +77,7 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
                 "non-target device region",
                 node_name,
             )
+            self._record_fallback(node, node_name)
             return False
 
         if TorchTensorRTOperatorSupport._exceeds_max_tensor_rank(node):
@@ -73,6 +86,7 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
                 self.unsupported_operators[node_name] = (
                     self.unsupported_operators.get(node_name, 0) + 1
                 )
+            self._record_fallback(node, node_name)
             return False
 
         if TorchTensorRTOperatorSupport._has_complex_dtype(node):
@@ -81,6 +95,7 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
                 self.unsupported_operators[node_name] = (
                     self.unsupported_operators.get(node_name, 0) + 1
                 )
+            self._record_fallback(node, node_name)
             return False
 
         if (
@@ -94,6 +109,7 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
                 self.unsupported_operators[node_name] = (
                     self.unsupported_operators.get(node_name, 0) + 1
                 )
+            self._record_fallback(node, node_name)
             return False
 
         if (
@@ -116,6 +132,7 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
                 else:
                     self.unsupported_operators[node_name] += 1
 
+            self._record_fallback(node, node_name)
             return False
 
     def print_support_overview(self, num_trt_blocks: Optional[int] = None) -> None:
