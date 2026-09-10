@@ -35,20 +35,21 @@ def load_delegate_module():
     return module
 
 
-class FakeMethod:
-    def execute(self, inputs):
+class FakeProgram:
+    def method_names(self):
+        return {"forward"}
+
+    def run_method(self, name, inputs):
+        assert name == "forward"
         return [inputs[0] + 1]
 
 
-class FakeProgram:
-    method_names = {"forward"}
-
-    def load_method(self, name):
-        return FakeMethod() if name == "forward" else None
-
-
 class FakeRuntime:
-    def load_program(self, data):
+    backend_registry = types.SimpleNamespace(is_available=lambda name: True)
+
+
+class FakeNative:
+    def _load_for_executorch_from_buffer(self, data):
         self.data = data
         return FakeProgram()
 
@@ -56,7 +57,9 @@ class FakeRuntime:
 def test_load_and_forward(monkeypatch, tmp_path):
     delegate = types.ModuleType("torch_tensorrt_executorch_runtime")
     fake_runtime = FakeRuntime()
+    fake_native = FakeNative()
     delegate.get_runtime = lambda: fake_runtime
+    delegate.activate = lambda: fake_native
     monkeypatch.setitem(sys.modules, delegate.__name__, delegate)
     model = tmp_path / "model.pte"
     model.write_bytes(b"pte")
@@ -64,12 +67,13 @@ def test_load_and_forward(monkeypatch, tmp_path):
     program = load_runtime_module().load(model)
 
     assert program.forward(2) == [3]
-    assert program._data is fake_runtime.data
+    assert program._data is fake_native.data
 
 
 def test_unknown_method(monkeypatch, tmp_path):
     delegate = types.ModuleType("torch_tensorrt_executorch_runtime")
     delegate.get_runtime = FakeRuntime
+    delegate.activate = FakeNative
     monkeypatch.setitem(sys.modules, delegate.__name__, delegate)
     model = tmp_path / "model.pte"
     model.write_bytes(b"pte")

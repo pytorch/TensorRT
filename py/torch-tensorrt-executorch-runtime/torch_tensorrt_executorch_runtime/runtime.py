@@ -37,7 +37,7 @@ class Program:
 
     @property
     def method_names(self) -> Collection[str]:
-        return cast(Collection[str], self._program.method_names)
+        return cast(Collection[str], self._program.method_names())
 
     def run(self, inputs: Sequence[Any], method: str = "forward") -> Sequence[Any]:
         """Run a method using CPU inputs and return CPU outputs.
@@ -56,10 +56,7 @@ class Program:
             raise ValueError(
                 f"Unknown method {method!r}; available methods: {sorted(self.method_names)}"
             )
-        loaded = self._program.load_method(method)
-        if loaded is None:
-            raise RuntimeError(f"ExecuTorch failed to load method {method!r}")
-        return cast(Sequence[Any], loaded.execute(inputs))
+        return cast(Sequence[Any], self._program.run_method(method, list(inputs)))
 
     def forward(self, *inputs: Any) -> Sequence[Any]:
         return self.run(inputs, "forward")
@@ -75,7 +72,11 @@ def load(path: Union[str, Path]) -> Program:
     if not model_path.is_file():
         raise FileNotFoundError(f"ExecuTorch model not found: {model_path}")
     data = model_path.read_bytes()
-    return Program(_get_runtime().load_program(data), data)
+    _get_runtime()  # Activate the delegate and verify TensorRTBackend registration.
+    from torch_tensorrt_executorch_runtime import activate
+
+    # ExecuTorchModule honors device-planned arenas in ExecuTorch 1.4.
+    return Program(activate()._load_for_executorch_from_buffer(data), data)
 
 
 __all__ = ["Program", "load"]
