@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import logging
-from typing import Collection, Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import Collection, Dict, List, Mapping, Optional, Sequence, Set, Tuple
 
 import tensorrt as trt
 import torch
@@ -150,9 +150,9 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
         # Initialize sets of supported/unsupported operators
         self.supported_operators: Dict[str, int] = {}
         self.unsupported_operators: Dict[str, int] = {}
-        # unsupported_operators skips impure nodes, so it cannot answer "did anything
-        # fall back". This one records every refusal.
+        # Keep impure refusals out of the counters used to decide full support.
         self.fallback_operators: Dict[str, int] = {}
+        self.fallback_reasons: Dict[str, Set[str]] = {}
         self.torch_executed_ops: Collection[Target] = torch_executed_ops
         self._non_target_device_cache: Dict[torch.fx.Node, bool] = {}
 
@@ -283,14 +283,15 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
             "requires_output_allocator", False
         )
 
-    def _record_fallback(self, node: torch.fx.Node, node_name: str) -> None:
-        # Only executable operators count as fallbacks. Placeholder and output nodes are
-        # graph structure, not operators, and recording them makes a fully supported graph
-        # report its own inputs and outputs as unconverted.
+    def _record_fallback(
+        self, node: torch.fx.Node, node_name: str, reason: str
+    ) -> None:
+        # Structural nodes must not make a fully supported graph report fallback.
         if node.op in CALLABLE_NODE_OPS:
             self.fallback_operators[node_name] = (
                 self.fallback_operators.get(node_name, 0) + 1
             )
+            self.fallback_reasons.setdefault(node_name, set()).add(reason)
 
     def is_node_supported(
         self, submodules: Mapping[str, torch.nn.Module], node: torch.fx.Node
@@ -312,7 +313,7 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
                 "non-target device region",
                 node_name,
             )
-            self._record_fallback(node, node_name)
+            self._record_fallback(node, node_name, "explicit non-target device region")
             return False
 
         if self._exceeds_max_tensor_rank(node):
@@ -321,7 +322,7 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
                 self.unsupported_operators[node_name] = (
                     self.unsupported_operators.get(node_name, 0) + 1
                 )
-            self._record_fallback(node, node_name)
+            self._record_fallback(node, node_name, "tensor rank exceeds TensorRT limit")
             return False
 
         if self._has_complex_dtype(node):
@@ -331,7 +332,7 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
                 self.unsupported_operators[node_name] = (
                     self.unsupported_operators.get(node_name, 0) + 1
                 )
-            self._record_fallback(node, node_name)
+            self._record_fallback(node, node_name, "complex tensor dtype")
             return False
 
         if self._has_bf16_on_turing(node, settings):
@@ -354,7 +355,11 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
                 self.unsupported_operators[node_name] = (
                     self.unsupported_operators.get(node_name, 0) + 1
                 )
-            self._record_fallback(node, node_name)
+            self._record_fallback(
+                node,
+                node_name,
+                "data-dependent output shape (fallback_data_dependent_ops=True)",
+            )
             return False
 
         if (
@@ -377,7 +382,16 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
                 else:
                     self.unsupported_operators[node_name] += 1
 
-            self._record_fallback(node, node_name)
+            self._record_fallback(
+                node,
+                node_name,
+                (
+                    "excluded by torch_executed_ops"
+                    if node_name in self.torch_executed_ops
+                    or node.target in self.torch_executed_ops
+                    else "no validated TensorRT converter"
+                ),
+            )
             return False
 
     def print_support_overview(

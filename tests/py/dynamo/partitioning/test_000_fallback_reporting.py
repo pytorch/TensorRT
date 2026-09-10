@@ -5,34 +5,26 @@ import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import TestCase, run_tests
 
-WARNING_MARKER = "have no TensorRT converter and will run in PyTorch"
+SUMMARY_MARKER = "operator(s)"
 
 
-class _WarningCollector(logging.Filter):
-    """A filter rather than a handler, so the record is seen wherever it is emitted from.
-
-    Attaching a handler to the torch_tensorrt logger is not enough: the message comes from a
-    child logger and torch_tensorrt installs a root handler of its own during compilation.
-    """
+class _SummaryCollector(logging.Filter):
 
     def __init__(self) -> None:
         super().__init__()
         self.messages: list[str] = []
+        self.levels: list[int] = []
 
     def filter(self, record: logging.LogRecord) -> bool:
         message = record.getMessage()
-        if WARNING_MARKER in message:
+        if SUMMARY_MARKER in message:
             self.messages.append(message)
+            self.levels.append(record.levelno)
         return True
 
 
 class TestFallbackIsReported(TestCase):
-    """A model that falls back partly to PyTorch should say so at default verbosity.
-
-    The partition report exists already but is DEBUG, which is off by default, so a model
-    that quietly became several engines plus a PyTorch segment looked exactly like one that
-    compiled whole.
-    """
+    """Report fallback at INFO without warning about expected behavior."""
 
     @staticmethod
     def _six_linear_layers() -> torch.nn.ModuleList:
@@ -88,15 +80,12 @@ class TestFallbackIsReported(TestCase):
 
         return FullySupported().eval().cuda()
 
-    def _compile(self, module, inputs, **kwargs):
-        collector = _WarningCollector()
-        loggers = [logging.getLogger()] + [
-            logging.getLogger(name)
-            for name in list(logging.root.manager.loggerDict)
-            if name.startswith("torch_tensorrt")
-        ]
-        for each in loggers:
-            each.addFilter(collector)
+    def _compile(self, module, inputs, log_level=logging.INFO, **kwargs):
+        collector = _SummaryCollector()
+        logger = logging.getLogger("torch_tensorrt.dynamo._compiler")
+        previous_level = logger.level
+        logger.setLevel(log_level)
+        logger.addFilter(collector)
         try:
             compiled = torch_tensorrt.dynamo.compile(
                 torch.export.export(module, tuple(inputs)),
@@ -107,18 +96,29 @@ class TestFallbackIsReported(TestCase):
                 **kwargs,
             )
         finally:
-            for each in loggers:
-                each.removeFilter(collector)
+            logger.removeFilter(collector)
+            logger.setLevel(previous_level)
+        self.assertTrue(all(level == logging.INFO for level in collector.levels))
         segments = [name for name, _ in compiled.named_children()]
         return segments, collector.messages
 
     @parameterized.expand(
         [
-            ("impure_refusal", "_impure_fallback_module", "rand_like"),
-            ("complex_dtype_refusal", "_complex_fallback_module", "fft"),
+            (
+                "impure_refusal",
+                "_impure_fallback_module",
+                "rand_like",
+                "no validated TensorRT converter",
+            ),
+            (
+                "complex_dtype_refusal",
+                "_complex_fallback_module",
+                "fft",
+                "complex tensor dtype",
+            ),
         ]
     )
-    def test_fallback_is_reported(self, _, factory, expected_operator):
+    def test_fallback_is_reported(self, _, factory, expected_operator, expected_reason):
         """Both of these split the graph, and a refusal on any path has to be reported, not
         only one of them."""
         inputs = [torch.randn(8, 64, device="cuda")]
@@ -131,6 +131,7 @@ class TestFallbackIsReported(TestCase):
             len(messages), 1, f"expected exactly one report, got {messages}"
         )
         self.assertIn(expected_operator, messages[0])
+        self.assertIn(expected_reason, messages[0])
 
     def test_fully_supported_module_is_silent(self):
         """Nothing fell back, so there is nothing to report."""
@@ -142,20 +143,18 @@ class TestFallbackIsReported(TestCase):
         )
         self.assertEqual(messages, [])
 
-    def test_requested_fallback_is_silent(self):
-        """The caller asked for this operator to stay in PyTorch, so warning about it would
-        be telling them about their own choice."""
+    @parameterized.expand([("fast", True), ("global", False)])
+    def test_requested_fallback_is_reported(self, _, use_fast_partitioner):
         inputs = [torch.randn(8, 64, device="cuda")]
         segments, messages = self._compile(
             self._fully_supported_module(),
             inputs,
             torch_executed_ops={"torch.ops.aten.relu.default"},
+            use_fast_partitioner=use_fast_partitioner,
         )
-        self.assertTrue(
-            any("_run_on_gpu" in segment for segment in segments),
-            f"expected a PyTorch segment, got {segments}",
-        )
-        self.assertEqual(messages, [])
+        self.assertEqual(len(messages), 1)
+        self.assertIn("torch.ops.aten.relu.default + Operator Count: 6", messages[0])
+        self.assertIn("excluded by torch_executed_ops", messages[0])
 
     def test_global_partitioner_reports_too(self):
         """The global partitioner is the automatic fallback when the fast one raises, so a
@@ -182,19 +181,45 @@ class TestFallbackIsReported(TestCase):
         )
         self.assertEqual(messages, [])
 
-    def test_requested_fallback_by_target_is_silent(self):
-        """torch_executed_ops accepts an operator target object, not only a qualified name
-        string. The report filter keys on names, so a target object has to be normalized or
-        the caller is warned about a fallback they asked for."""
+    @parameterized.expand([("fast", True), ("global", False)])
+    def test_requested_fallback_by_target_is_reported(self, _, use_fast_partitioner):
         inputs = [torch.randn(8, 64, device="cuda")]
         segments, messages = self._compile(
             self._fully_supported_module(),
             inputs,
             torch_executed_ops={torch.ops.aten.relu.default},
+            use_fast_partitioner=use_fast_partitioner,
         )
-        self.assertTrue(
-            any("_run_on_gpu" in segment for segment in segments),
-            f"expected a PyTorch segment, got {segments}",
+        self.assertEqual(len(messages), 1)
+        self.assertIn("torch.ops.aten.relu.default + Operator Count: 6", messages[0])
+        self.assertIn("excluded by torch_executed_ops", messages[0])
+
+    @parameterized.expand([("fast", True), ("global", False)])
+    def test_mixed_fallback_reasons(self, _, use_fast_partitioner):
+        inputs = [torch.randn(8, 64, device="cuda")]
+        _, messages = self._compile(
+            self._impure_fallback_module(),
+            inputs,
+            torch_executed_ops={torch.ops.aten.relu.default},
+            use_fast_partitioner=use_fast_partitioner,
+        )
+        self.assertEqual(len(messages), 1)
+        self.assertIn(
+            "torch.ops.aten.rand_like.default + Operator Count: 1 "
+            "(Reasons: no validated TensorRT converter)",
+            messages[0],
+        )
+        self.assertIn(
+            "torch.ops.aten.relu.default + Operator Count: 6 "
+            "(Reasons: excluded by torch_executed_ops)",
+            messages[0],
+        )
+        self.assertLess(messages[0].index("rand_like"), messages[0].index("relu"))
+
+    def test_warning_level_suppresses_summary(self):
+        inputs = [torch.randn(8, 64, device="cuda")]
+        _, messages = self._compile(
+            self._impure_fallback_module(), inputs, log_level=logging.WARNING
         )
         self.assertEqual(messages, [])
 
