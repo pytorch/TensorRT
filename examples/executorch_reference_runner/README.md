@@ -112,14 +112,15 @@ already declare the extra. If an older installation lacks it, first install the
 intended compatible Torch-TensorRT wheel deliberately. Adding the extra may change
 dependencies, so use a fresh environment to preserve an existing working stack.
 
-The extra installs `executorch` only. The delegate runtime,
-`torch-tensorrt-executorch-runtime`, is not yet published to any index: its requirement in the
-top-level `setup.py` is commented out for that reason. Build and install it from source following
-`py/torch-tensorrt-executorch-runtime/README.md`. That wheel contains an ExecuTorch Python runtime
-with `TensorRTBackend` linked into its backend registry, and loading a `.pte` through the delegate
+The extra installs `executorch` only. Install the matching companion artifact,
+`torch-tensorrt-executorch-runtime`, or build and install it from source following
+`py/torch-tensorrt-executorch-runtime/README.md`. That wheel ships just the TensorRT delegate, a
+single shared library that registers itself with the ExecuTorch runtime from the `executorch`
+distribution rather than bundling a runtime of its own, and loading a `.pte` through the delegate
 needs it.
 
-Then load and run the model:
+The Python example uses ExecuTorch's Module API to back planned device arenas
+with CUDA memory. Then load and run the model:
 
 ```bash
 python examples/executorch_reference_runner/load_model.py \
@@ -189,9 +190,9 @@ Enabling `EXECUTORCH_BUILD_CUDA` does not make this runner depend on libtorch. I
 needs `EXECUTORCH_BUILD_EXTENSION_TENSOR=ON`, which is set automatically, and the
 result links no libtorch and no libc10.
 
-This path is verified by hand, not in CI: the CI configuration builds the runner
-without the CUDA delegate. It also takes the synchronized path, because the method
-inputs and outputs are host-backed.
+The green-context option is not exercised by CI. The reference-runner checks
+use the CUDA-enabled build with an ordinary stream and host-backed method inputs
+and outputs.
 
 ## Caller-Owned KV-Cache Persistence Check
 
