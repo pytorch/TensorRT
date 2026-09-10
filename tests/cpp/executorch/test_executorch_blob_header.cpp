@@ -309,9 +309,9 @@ TEST(ExecuTorchTensorRTBlobHeader, InputNamedLikeAScalarKeyIsNotReadAsOne) {
   // The io_bindings array holds caller-chosen tensor names, which is why the scalars are not simply
   // searched for across the whole object. Written without the aliased-io magic, because that magic
   // now promises an alias array and this blob carries none.
-  const auto blob = make_blob(
-      R"({"io_bindings":[{"name":"device_id","is_input":true},{"name":"out_0","is_input":false}],)"
-      R"("device_id":3,"hardware_compatible":true})");
+  const auto blob =
+      make_blob(R"({"io_bindings":[{"name":"device_id","is_input":true},{"name":"out_0","is_input":false}],)"
+                R"("device_id":3,"hardware_compatible":true})");
 
   TensorRTBlobHeader header;
   ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
