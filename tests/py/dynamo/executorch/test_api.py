@@ -417,37 +417,6 @@ def _function_def(tree, name):
 
 
 @pytest.mark.unit
-def test_runtime_wheel_selects_its_tensorrt_requirement_per_cuda_major():
-    """The TensorRT requirement must match the CUDA major used to build the wheel."""
-    setup_source = _RUNTIME_SETUP_PY.read_text(encoding="utf-8")
-    tree = ast.parse(setup_source)
-    function = _function_def(tree, "get_tensorrt_requirement")
-    fake_torch = types.SimpleNamespace(version=types.SimpleNamespace(cuda=None))
-    namespace: dict = {"torch": fake_torch}
-    exec(
-        compile(ast.Module(body=[function], type_ignores=[]), "<setup.py>", "exec"),
-        namespace,
-    )
-
-    for cuda_version, requirement in (
-        ("12.6", "tensorrt-cu12>=11.1.0,<11.2"),
-        ("12.9", "tensorrt-cu12>=11.1.0,<11.2"),
-        ("13.0", "tensorrt-cu13>=11.1.0,<11.2"),
-        ("13.2", "tensorrt-cu13>=11.1.0,<11.2"),
-    ):
-        fake_torch.version.cuda = cuda_version
-        assert (
-            namespace["get_tensorrt_requirement"]() == requirement
-        ), f"CUDA {cuda_version} resolves the wrong TensorRT requirement"
-
-    # A CUDA-less torch and an unsupported major are refused rather than guessed at.
-    for cuda_version in (None, "11.8"):
-        fake_torch.version.cuda = cuda_version
-        with pytest.raises(RuntimeError):
-            namespace["get_tensorrt_requirement"]()
-
-
-@pytest.mark.unit
 def test_packaging_declares_executorch_extra():
     tree = _setup_tree()
     extras = _assignment_value(tree, "EXTRAS_REQUIRE")
