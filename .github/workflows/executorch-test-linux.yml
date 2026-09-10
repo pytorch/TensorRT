@@ -102,6 +102,11 @@ jobs:
           exit "${check_status}"
         fi
 
+        # Resolve the user-facing range without reusing the build's installed pin.
+        python -m venv "${RUNNER_TEMP}/range-check-venv"
+        # pin-check: range-ok
+        "${RUNNER_TEMP}/range-check-venv/bin/python" -m pip install --no-deps --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" "executorch>=1.5.0.dev20260905,<1.6"
+
         source tests/py/utils/ci_helpers.sh
         trt_tier_executorch
 

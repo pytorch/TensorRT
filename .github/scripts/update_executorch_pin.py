@@ -151,10 +151,8 @@ def _upper_bound(version: str) -> str:
 # tests/py/dynamo/executorch/test_executorch_pin.py enumerates, which are the only sites that are
 # actually pins. A new legitimate site must be added here and to that guard together.
 _PIN_SITES = (
-    ".github/workflows/executorch-build-linux.yml",
+    ".github/workflows/build_linux.yml",
     ".github/workflows/executorch-test-linux.yml",
-    ".github/workflows/release-linux-x86_64.yml",
-    ".github/workflows/release-linux-aarch64.yml",
     "MODULE.bazel",
     "docker/MODULE.bazel.docker",
     "docker/MODULE.bazel.ngc",

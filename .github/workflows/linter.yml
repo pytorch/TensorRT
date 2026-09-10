@@ -86,7 +86,7 @@ jobs:
           # asserts about. Neither pytest nor pyyaml is in requirements.txt or
           # dependency-groups.lint, so the step exited 1 without running.
           # test_update_executorch_pin imports packaging to order versions the way pip does.
-          uv pip install --system pytest pyyaml packaging
+          uv pip install --system pytest pyyaml packaging setuptools wheel
       - name: Lint Python
         run: |
           cd $GITHUB_WORKSPACE
