@@ -108,6 +108,37 @@ def test_available_versions_parses_the_pip_line(monkeypatch) -> None:
     ]
 
 
+@pytest.mark.parametrize("channel", ["cu126", "cu128", "cu134"])
+def test_main_rejects_unsupported_nightly_channels_before_querying(
+    monkeypatch, channel
+) -> None:
+    def unexpected_query(*args):
+        pytest.fail("an unsupported channel must not query the index")
+
+    monkeypatch.setattr(updater, "available_versions", unexpected_query)
+    with pytest.raises(SystemExit) as error:
+        updater.main(["--channel", channel])
+    assert error.value.code == 2
+
+
+@pytest.mark.parametrize("channel", ["cu130", "cu132"])
+def test_main_reads_versions_from_the_selected_nightly_channel(
+    monkeypatch, channel
+) -> None:
+    calls = []
+
+    def versions(index_args):
+        calls.append(index_args)
+        return _NIGHTLY_LIST
+
+    monkeypatch.setattr(updater, "available_versions", versions)
+    monkeypatch.setattr(updater, "read_pin", lambda field: "1.5.0.dev20200103")
+    assert updater.main(["--channel", channel]) == 0
+    assert calls == [
+        ["--pre", "--index-url", f"https://download.pytorch.org/whl/nightly/{channel}"]
+    ]
+
+
 def _synthesize_wheel(path: Path, body: str) -> None:
     with zipfile.ZipFile(path, "w") as archive:
         archive.writestr("executorch/version.py", body)

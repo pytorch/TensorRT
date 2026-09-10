@@ -301,6 +301,8 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     args = parser.parse_args(argv)
+    if args.track == "nightly" and args.channel not in {"cu130", "cu132"}:
+        parser.error("supported TensorRT nightly CUDA channels are cu130 and cu132")
 
     index_args = _index_args(args.track, args.channel)
     target = pick_target(available_versions(index_args), args.track)
