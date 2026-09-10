@@ -107,6 +107,26 @@ class TestSelectConverterOne(DispatchTestCase):
 
         self.run_test_with_dynamic_shape(select(), input_specs)
 
+    def test_select_runtime_index(self):
+        """The index is a tensor rather than a constant here, which is what a preceding Torch
+        subgraph produces. Selecting row 3 of an (8, 4) input must give shape (4,), the same
+        as eager: add_gather keeps the axis it gathers along unless the index is rank 0.
+        """
+
+        class SelectRuntimeIndex(nn.Module):
+            def forward(self, values, positions):
+                index = torch.ops.aten.sum.default(positions)
+                return torch.ops.aten.select.int(values, 0, index)
+
+        inputs = [
+            torch.randn(8, 4),
+            torch.tensor([1, 2], dtype=torch.int64),
+        ]
+        self.run_test(
+            SelectRuntimeIndex(),
+            inputs,
+        )
+
 
 if __name__ == "__main__":
     run_tests()

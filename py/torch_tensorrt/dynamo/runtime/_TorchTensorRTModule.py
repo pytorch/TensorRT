@@ -730,7 +730,8 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         #
         # This also avoids the need for type-checking inputs, since they are now explicitly casted to Torch tensors
         input_tensors: List[torch.Tensor] = []
-        for i in inputs:
+        input_info = (self.symbolic_shape_expressions or {}).get("inputs", [])
+        for index, i in enumerate(inputs):
             if isinstance(i, torch.Tensor):
                 if not i.is_cuda:
                     logger.warning(
@@ -741,7 +742,19 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                     i = i.cuda()
                 input_tensors.append(i)
             else:
-                input_tensors.append(torch.tensor(i).cuda())
+                # A scalar produced by a preceding Torch subgraph. Its binding rank is not
+                # always the same: an integer index is declared rank 1 while a float is
+                # declared rank 0, so build it at the rank this binding records rather than
+                # a fixed one. setInputShape refuses a mismatch without naming either side.
+                scalar_tensor = torch.tensor(i)
+                declared_rank = (
+                    input_info[index].get("binding_rank", 0)
+                    if index < len(input_info)
+                    else 0
+                )
+                while scalar_tensor.dim() < declared_rank:
+                    scalar_tensor = scalar_tensor.unsqueeze(0)
+                input_tensors.append(scalar_tensor.cuda())
 
         outputs: List[Any] = torch.ops.tensorrt.execute_engine(
             list(input_tensors), self.engine
