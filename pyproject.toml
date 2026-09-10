@@ -122,7 +122,10 @@ quantization = [
 # which compiles user-supplied CUDA C++ kernels via NVRTC. The high-level
 # launch/compile API (``cuda.core``) lives in cuda-core; cuda-python's
 # bindings are still pulled in for the lower-level driver/runtime shims.
-kernels = ["cuda-python", "cuda-core"]
+# cuda-tile >=1.3 exposes the AOT compilation API. ``tileiras`` comes from the
+# CUDA Toolkit used to build/test this project; users without it can install
+# cuda-tile's ``tileiras`` extra as documented for ``cutile_op``.
+kernels = ["cuda-python", "cuda-core", "cuda-tile>=1.3.0,<2"]
 
 [project.urls]
 Homepage = "https://pytorch.org/tensorrt"

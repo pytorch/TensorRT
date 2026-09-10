@@ -6272,6 +6272,7 @@ docs = [
 kernels = [
     { name = "cuda-core", marker = "sys_platform == 'linux' or sys_platform == 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
     { name = "cuda-python", marker = "sys_platform == 'linux' or sys_platform == 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "cuda-tile", marker = "sys_platform == 'linux' or sys_platform == 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
 ]
 lint = [
     { name = "black", marker = "sys_platform == 'linux' or sys_platform == 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
@@ -6359,6 +6360,7 @@ docs = [
 kernels = [
     { name = "cuda-core" },
     { name = "cuda-python" },
+    { name = "cuda-tile", specifier = ">=1.3.0,<2" },
 ]
 lint = [
     { name = "black", specifier = ">=24.0.0" },

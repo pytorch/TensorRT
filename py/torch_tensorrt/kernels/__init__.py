@@ -1,13 +1,12 @@
 """
 torch_tensorrt.kernels  (experimental)
 =======================================
-Register custom CUDA C++ kernels — compiled at runtime with NVRTC via
-**cuda-python** — as TensorRT Quick Deployable Plugins (QDP). Tensor-only
-declarative kernels use AOT plugin launches when available; kernels with
-``ScalarInput`` use TensorRT's QDP JIT path so runtime scalar attributes can
-be forwarded by value.
+Register custom CUDA C++ and cuTile kernels as TensorRT Quick Deployable
+Plugins (QDP). Tensor-only declarative kernels use AOT plugin launches when
+available; CUDA C++ kernels with ``ScalarInput`` use TensorRT's QDP JIT path so
+runtime scalar attributes can be forwarded by value.
 
-The module exposes a single registration entry point for source kernels:
+The module exposes three registration entry points:
 
 ``cuda_kernel_op`` — fully declarative for the common cases, with optional
     overrides for everything else. Describe the kernel via :class:`KernelSpec`
@@ -21,6 +20,12 @@ The module exposes a single registration entry point for source kernels:
     entirely; you supply ``meta_fn`` / ``eager_fn`` / ``aot_fn`` directly.
     Useful when the PTX comes from an external compiler (Triton, a cached
     NVRTC output, etc.).
+
+``cutile_op`` — register a ``@ct.kernel`` cuTile program. Compiles the kernel
+    to PTX for you, reorders its parameters from cuTile's per-array
+    ``(ptr, extents..., strides...)`` layout into TensorRT's launch order, and
+    derives the AOT launch — so you only supply the array ``signature``, the
+    ``ct.Constant`` values, a ``grid``, and a ``meta_fn``.
 
 Minimal example — declarative ``cuda_kernel_op``::
 
@@ -65,7 +70,7 @@ from torch_tensorrt.kernels._dsl import (
     SameAs,
     ScalarInput,
 )
-from torch_tensorrt.kernels._ops import cuda_kernel_op, ptx_op
+from torch_tensorrt.kernels._ops import cuda_kernel_op, cutile_op, ptx_op
 
 __all__ = [
     "Custom",
@@ -80,5 +85,6 @@ __all__ = [
     "SameAs",
     "ScalarInput",
     "cuda_kernel_op",
+    "cutile_op",
     "ptx_op",
 ]

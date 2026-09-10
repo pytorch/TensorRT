@@ -234,7 +234,7 @@ def register_cuda_python_plugin(
     precompiled_ptx: Optional[bytes] = None,
     use_aot_if_available: bool = True,
 ) -> None:
-    """Register a NVRTC-compiled CUDA kernel as a TensorRT QDP plugin end-to-end.
+    """Register a CUDA kernel as a TensorRT QDP plugin end-to-end.
 
     Steps performed:
     1. Compile kernel source to PTX via NVRTC (skipped if ``precompiled_ptx`` is passed).
@@ -243,14 +243,15 @@ def register_cuda_python_plugin(
     4. Register the AOT impl with the compiled PTX.
     5. Register the Torch-TensorRT converter via generate_plugin_converter().
 
-    ``precompiled_ptx`` lets higher-level entry points (e.g. ``cuda_kernel_op``)
-    avoid a redundant second NVRTC pass when they already compiled the source
-    to build an eager kernel handle.
+    ``precompiled_ptx`` lets higher-level entry points such as ``ptx_op`` and
+    ``cutile_op`` bypass NVRTC, or lets ``cuda_kernel_op`` avoid a redundant
+    second pass after compiling an eager kernel handle.
     """
     if spec.aot_fn is None:
         raise ValueError(
             f"CudaPythonSpec.aot_fn must be set before registering plugin '{op_name}'. "
-            "Pass aot_fn= to cuda_python() or assign spec.aot_fn directly."
+            "Pass aot_fn= to the public kernel entry point or assign "
+            "spec.aot_fn directly."
         )
 
     if precompiled_ptx is not None:
