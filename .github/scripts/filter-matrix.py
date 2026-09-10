@@ -13,8 +13,8 @@ disabled_cuda_versions: List[str] = []
 # jetpack 6.2 only officially supports python 3.10 and cu126
 jetpack_python_versions: List[str] = ["3.10"]
 jetpack_cuda_versions: List[str] = ["cu126"]
-# CUDA 12.6 wheels are published for x86_64 only. Keep the Arm matrices on
-# CUDA 13, including Windows Arm/AArch64.
+# CUDA 12.6 remains available for x86_64 releases, but not for nightlies.
+# Keep the Arm matrices on CUDA 13, including Windows Arm/AArch64.
 x86_cuda_versions: List[str] = ["cu126", "cu130", "cu132", "cu134"]
 arm_cuda_versions: List[str] = ["cu130", "cu132", "cu134"]
 
@@ -83,6 +83,11 @@ def filter_matrix_item(
             return True
         return False
     else:
+        if (
+            item.get("channel", "nightly") == "nightly"
+            and item["desired_cuda"] == "cu126"
+        ):
+            return False
         cuda_versions = (
             arm_cuda_versions
             if item["gpu_arch_type"] in {"cuda-aarch64", "cuda-arm64"}
