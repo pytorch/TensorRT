@@ -1170,7 +1170,47 @@ def aten_ops_clamp(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.gather.default)
+def gather_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    """Keep cases the TensorRT gather cannot serve on the PyTorch path.
+
+    An empty index gives the engine a zero size output binding, which TensorRT refuses to
+    enqueue. The call still returns, so every other output of that engine silently comes
+    back zeroed. An engine built for a float64 input expects float32 and rejects the
+    caller's tensor at run time unless truncate_double is set, and a uint8 output fails the
+    engine build outright. All three ran correctly in PyTorch before this converter
+    accepted dynamic shapes.
+    """
+    data_meta = (
+        node.args[0].meta.get("tensor_meta") if hasattr(node.args[0], "meta") else None
+    )
+    index_meta = (
+        node.args[2].meta.get("tensor_meta") if hasattr(node.args[2], "meta") else None
+    )
+    if index_meta is not None and 0 in tuple(index_meta.shape):
+        _LOGGER.debug("gather with an empty index is not supported, falling back")
+        return False
+    if data_meta is None:
+        return True
+    if data_meta.dtype == torch.uint8:
+        _LOGGER.debug("gather with a uint8 input is not supported, falling back")
+        return False
+    if data_meta.dtype == torch.float64 and not (
+        settings is not None and settings.truncate_double
+    ):
+        _LOGGER.debug(
+            "gather with a float64 input needs truncate_double=True, falling back"
+        )
+        return False
+    return True
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.gather.default,
+    capability_validator=gather_validator,
+    supports_dynamic_shapes=True,
+)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
