@@ -18,8 +18,7 @@ if [[ ${TENSORRT_VERSION} != "" ]]; then
 fi
 
 TORCH=$(grep "^torch>" py/requirements.txt)
-TORCH_INDEX_CU_VERSION=${TORCH_INDEX_CU_VERSION:-${CU_VERSION}}
-INDEX_URL=https://download.pytorch.org/whl/${CHANNEL}/${TORCH_INDEX_CU_VERSION}
+INDEX_URL=https://download.pytorch.org/whl/${CHANNEL}/${CU_VERSION}
 
 # The workflow installs torch before this script runs. Avoid uninstalling and
 # force-reinstalling it here: with the shortened Windows conda prefix, pip can
@@ -27,11 +26,7 @@ INDEX_URL=https://download.pytorch.org/whl/${CHANNEL}/${TORCH_INDEX_CU_VERSION}
 python -m pip install --pre "${TORCH}" --index-url "${INDEX_URL}" \
   --extra-index-url https://pypi.org/simple || exit 1
 
-if [[ -n "${TORCHTRT_CROSS_COMPILE_CUDA_HOME:-}" ]]; then
-  export CUDA_HOME="${TORCHTRT_CROSS_COMPILE_CUDA_HOME//\\//}"
-else
-  export CUDA_HOME="${CUDA_PATH//\\//}"
-fi
+export CUDA_HOME="${CUDA_PATH//\\//}"
 
 export TORCH_INSTALL_PATH="$(python -c "import torch, os; print(os.path.dirname(torch.__file__).replace('\\\\', '/'))")" || exit 1
 
@@ -44,7 +39,7 @@ cp -r fmt-12.0.0/include/fmt/ $TORCH_INSTALL_PATH/include/
 ls -lart $TORCH_INSTALL_PATH/include/fmt/
 
 # TensorRT archives have different CUDA compatibility ceilings. CI provides
-# CU_VERSION in the PyTorch wheel format (for example, cu132).
+# CU_VERSION in the PyTorch wheel format (for example, cu134).
 case "${CU_VERSION}" in
     cu12*)
         export TENSORRT_CUDA_VERSION_UPPER_BOUND="12.9"

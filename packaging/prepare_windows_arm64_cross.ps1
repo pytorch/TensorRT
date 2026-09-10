@@ -71,10 +71,8 @@ if (-not (Test-Path -LiteralPath $cudaVersionFile -PathType Leaf)) {
     throw "CUDA version file is missing: $cudaVersionFile"
 }
 $cudaVersion = (Get-Content -LiteralPath $cudaVersionFile -Raw | ConvertFrom-Json).cuda.version
-# TODO: When CUDA 13.4 is officially released, update this preview-specific message
-# and the CI installer URL to use the official CUDA Toolkit distribution.
 if ($cudaVersion -notlike '13.4*') {
-    throw "Windows ARM64 builds require CUDA 13.4 Preview; got '$cudaVersion'"
+    throw "Windows ARM64 builds require CUDA 13.4; got '$cudaVersion'"
 }
 $pythonHeader = Join-Path $pythonRoot "include\Python.h"
 $pythonImportLibrary = Join-Path $pythonRoot "libs\python313.lib"
