@@ -396,17 +396,41 @@ jobs:
       # its packaging, manylinux repair, GitHub artifact, and PyTorch-index
       # upload follow the exact same path as torch-tensorrt itself.
       - name: Build the ExecuTorch runtime wheel
-        if: ${{ inputs.build-executorch-runtime }}
+        id: executorch-runtime
+        if: ${{ inputs.build-executorch-runtime && startsWith(matrix.desired_cuda, 'cu13') }}
         working-directory: ${{ inputs.repository }}
         shell: bash -l {0}
         run: |
           set -euxo pipefail
           source "${BUILD_ENV_FILE}"
-          # The runtime links against the just-built standard wheel. Install it
-          # without resolving dependencies so it cannot replace the matrix's
-          # pinned torch/TensorRT packages.
-          ${CONDA_RUN} python -m pip install --no-deps dist/torch_tensorrt*.whl
-          ${CONDA_RUN} python -m pip install pyyaml \
+          # Preserve the matrix's torch while installing the just-built main wheel.
+          ${CONDA_RUN} python -m pip install --no-deps dist/torch_tensorrt-*.whl
+          ${CONDA_RUN} python - <<'PY'
+          import importlib.metadata
+          import subprocess
+          import sys
+
+          from packaging.requirements import Requirement
+          from packaging.utils import canonicalize_name
+
+          main = importlib.metadata.distribution("torch-tensorrt")
+          library = main.locate_file("torch_tensorrt/lib/libtorchtrt.so")
+          if not library.is_file():
+              sys.exit("The main wheel has no libtorchtrt.so; the companion needs the full runtime build")
+          # Native archives do not install Python metadata. Reuse the main wheel's selection.
+          requirements = [Requirement(value) for value in main.requires or []]
+          tensorrt = [
+              str(requirement) for requirement in requirements
+              if canonicalize_name(requirement.name) in {
+                  "tensorrt", "tensorrt-cu13", "tensorrt-cu13-bindings", "tensorrt-cu13-libs"
+              }
+              and (requirement.marker is None or requirement.marker.evaluate())
+          ]
+          if not tensorrt:
+              sys.exit("The main wheel declares no CUDA 13 TensorRT dependencies")
+          subprocess.check_call([sys.executable, "-m", "pip", "install", *tensorrt])
+          PY
+          ${CONDA_RUN} python -m pip install pyyaml patchelf "wheel>=0.40" \
             --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" \
             "executorch==1.5.0.dev20260911"
           TORCH_CUDA_ARCH_LIST="$(${CONDA_RUN} python .github/scripts/filter-executorch-cuda-arches.py "${TORCH_CUDA_ARCH_LIST:-}")"
@@ -445,7 +469,17 @@ jobs:
                 continue
             fi
             abs_pkg=$(realpath $pkg)
-            ./test-infra/.github/scripts/repair_manylinux_2_28.sh $abs_pkg
+            if [[ "$(basename "${pkg}")" == torch_tensorrt_executorch_runtime-* ]]; then
+              # The shared repair script only handles CPython-tagged wheels.
+              case "${ARCH}" in
+                x86_64) platform_tag=manylinux_2_28_x86_64 ;;
+                aarch64) platform_tag=manylinux_2_39_aarch64 ;;
+                *) echo "Unsupported delegate architecture: ${ARCH}" >&2; exit 1 ;;
+              esac
+              ${CONDA_RUN} python -m wheel tags --remove --platform-tag "${platform_tag}" "${abs_pkg}"
+            else
+              ./test-infra/.github/scripts/repair_manylinux_2_28.sh "${abs_pkg}"
+            fi
           done
       - name: Run Post-Script
         if: ${{ inputs.post-script != '' }}
@@ -453,6 +487,33 @@ jobs:
         with:
           repository: ${{ inputs.repository  }}
           script: ${{ inputs.post-script }}
+      - name: Check the repaired ExecuTorch runtime wheel
+        if: ${{ steps.executorch-runtime.outcome == 'success' }}
+        shell: bash -l {0}
+        working-directory: ${{ inputs.repository }}
+        run: |
+          set -euo pipefail
+          source "${BUILD_ENV_FILE}"
+          shopt -s nullglob
+          wheels=(dist/torch_tensorrt_executorch_runtime-*.whl)
+          if [[ ${#wheels[@]} -ne 1 ]]; then
+            echo "Expected one repaired ExecuTorch companion, found ${#wheels[@]}" >&2
+            exit 1
+          fi
+          ${CONDA_RUN} python .github/scripts/check-executorch-runtime-wheel.py "${wheels[0]}" --architecture "${ARCH}"
+          ${CONDA_RUN} python -m pip install --no-deps "${wheels[0]}"
+          delegate="$(TORCH_TENSORRT_SKIP_DELEGATE_REGISTRATION=1 ${CONDA_RUN} python -c 'import torch_tensorrt_executorch_runtime as m; print(m._delegate_path())')"
+          # Build-machine library paths must not hide a broken installed RUNPATH.
+          if ! resolution="$(env -u LD_LIBRARY_PATH ldd -r "${delegate}" 2>&1)"; then
+            printf '%s\n' "${resolution}" >&2
+            exit 1
+          fi
+          printf '%s\n' "${resolution}"
+          if grep -E "not found|undefined symbol" <<< "${resolution}"; then
+            echo "The installed delegate has unresolved dependencies" >&2
+            exit 1
+          fi
+          env -u LD_LIBRARY_PATH ${CONDA_RUN} python -c "import torch_tensorrt_executorch_runtime"
       - name: Inventory packaged wheels
         # Keep this immediately before the smoke test/upload boundary.  When a
         # matrix row fails downstream, its log shows exactly which repaired

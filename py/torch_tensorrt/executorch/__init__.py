@@ -2,7 +2,7 @@
 
 Runtime loading is provided by the optional
 ``torch-tensorrt-executorch-runtime`` distribution and dispatched through
-``torch_tensorrt.load(..., format="executorch")``.
+``executorch.runtime`` after importing ``torch_tensorrt_executorch_runtime``.
 """
 
 import importlib.util
