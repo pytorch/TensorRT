@@ -14,6 +14,16 @@ The companion ``kv_cache_decode_check`` reference runner loads the resulting
 ``.pte`` and asserts that a decode step observes the KV a previous step wrote
 (i.e. the cache is shared across ``execute()`` calls).
 
+``--zero_copy`` exports the same model with the engine writing the cache buffer
+directly, instead of ExecuTorch staging a copy for the delegate and copying the
+result back. The persistence check is the same, and it is the check that matters
+here: zero-copy removes the copy that was making the update stick, so if the
+engine's in-place write is not reaching the caller's buffer the run fails. What
+it cannot see is a ``--zero_copy`` export that degenerated into an ordinary
+staged ``.pte`` -- the two are indistinguishable to it -- so this example hands
+its finalized program to ``check_zero_copy_kv`` and raises rather than write
+one. Nothing does that for it: on the two-call path the check is the caller's.
+
 Prerequisites
 -------------
 Install Torch-TensorRT with the ExecuTorch extra before running this example::
@@ -22,6 +32,7 @@ Install Torch-TensorRT with the ExecuTorch extra before running this example::
 """
 
 import argparse
+import os
 
 import torch
 import torch_tensorrt
@@ -81,10 +92,58 @@ class KVDecodeStep(torch.nn.Module):
         return self.lm(self.o(out))
 
 
+def _save_zero_copy(trt_gm: torch.fx.GraphModule, inputs: tuple, path: str) -> None:
+    """Save a .pte whose engine updates the KV cache in place.
+
+    Zero-copy needs both ends of the Edge boundary: ``zero_copy_kv`` before
+    lowering, and ``zero_copy_backend_config`` on the config the program is
+    finalized with. Omitting the second leaves the cache staged and its updates
+    dropped, and nothing raises -- ``to_executorch()`` is ExecuTorch's and
+    finalizes whatever config it is handed -- so the finalized program is read
+    back through ``check_zero_copy_kv`` here, which is what a caller on this
+    path owes.
+    ``torch_tensorrt.save(output_format="executorch", zero_copy_kv=True)`` owns
+    both steps, checks the result itself, and is the shorter way to the same
+    .pte; this spells them out because all three are shown, and because a
+    program that reaches ``to_executorch()`` by any other route has to do the
+    same.
+    """
+    from torch_tensorrt.executorch import (
+        check_zero_copy_kv,
+        export,
+        zero_copy_backend_config,
+    )
+
+    # retrace=True here, retrace=False for the plain save() below, so the two
+    # exporters are both covered. Which way round matters: the legacy exporter
+    # declares the aliased KV outputs while building the program, so on that lane
+    # export()'s declaration pass reads each engine's aliased_io only to find the
+    # mutations already declared. A retraced program arrives undeclared, so this
+    # is the lane where that read decides anything -- where an engine-aliased
+    # cache is told from an ordinary copy-back buffer.
+    edge = export(trt_gm, arg_inputs=inputs, retrace=True, zero_copy_kv=True)
+    program = edge.to_executorch(zero_copy_backend_config())
+    check_zero_copy_kv(program)
+    with open(path, "wb") as output:
+        program.write_to_file(output)
+    if program._tensor_data:
+        # A delegate carrying external weights (the CUDA backend does) keeps them
+        # outside the .pte, and write_to_file does not persist them; without the
+        # .ptd next to it the .pte cannot load. This model has none, but a model
+        # built from this one may.
+        program.write_tensor_data_to_file(os.path.dirname(os.path.abspath(path)))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--model_path", default="kv_cache_decode.pte", help="Path to save the .pte"
+    )
+    parser.add_argument(
+        "--zero_copy",
+        action="store_true",
+        help="Let the engine write the KV cache in place (elides the aliased "
+        "delegate outputs; needs a runtime that supports them).",
     )
     args = parser.parse_args()
 
@@ -101,13 +160,16 @@ def main() -> None:
             min_block_size=1,
             truncate_double=True,
         )
-        torch_tensorrt.save(
-            trt_gm,
-            args.model_path,
-            output_format="executorch",
-            arg_inputs=(tokens, input_pos),
-            retrace=False,
-        )
+        if args.zero_copy:
+            _save_zero_copy(trt_gm, (tokens, input_pos), args.model_path)
+        else:
+            torch_tensorrt.save(
+                trt_gm,
+                args.model_path,
+                output_format="executorch",
+                arg_inputs=(tokens, input_pos),
+                retrace=False,
+            )
         print(f"Saved {args.model_path} successfully.")
 
 
