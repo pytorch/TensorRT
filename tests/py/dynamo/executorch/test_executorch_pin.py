@@ -16,6 +16,7 @@ commit named two different ExecuTorch trees.
 """
 
 import ast
+import json
 import os
 import pathlib
 import re
@@ -206,10 +207,8 @@ def _expected(path: str, number: int, version: str) -> str:
     return f"executorch>={version},<{major}.{int(minor) + 1}"
 
 
-# Nightly channels that actually carry the pinned ExecuTorch line. cu124 and cu128 exist on the
-# index but are frozen at a CPU-only 0.5.0.dev build, so a recipe pointed at them resolves nothing
-# the pin can use. Only these three serve the 1.5.0.dev wheels this change installs.
-_PUBLISHED_NIGHTLY_CHANNELS = frozenset({"cu126", "cu130", "cu132"})
+# Current TensorRT nightly channels. Retained cu126 artifacts do not mean new wheels publish there.
+_PUBLISHED_NIGHTLY_CHANNELS = frozenset({"cu130", "cu132"})
 
 # Tracked files with no suffix that still carry install commands. justfile writes the nightly
 # ExecuTorch install for local builds, so the printed-install walk has to read it by name.
@@ -582,6 +581,116 @@ def test_the_runtime_wheel_pins_executorch_to_the_public_pin() -> None:
         f"wheel requires the ExecuTorch it was compiled against, but it declares "
         f"{entries['executorch']}"
     )
+
+
+def _declared_cuda_versions(name: str) -> set[str]:
+    """Read a CUDA version list the matrix filter declares, so a new row does not need editing here."""
+    for node in ast.parse(
+        (REPO_ROOT / ".github/scripts/filter-matrix.py").read_text(encoding="utf-8")
+    ).body:
+        target = getattr(node, "target", None) or next(
+            iter(getattr(node, "targets", [])), None
+        )
+        if isinstance(target, ast.Name) and target.id == name:
+            return {element.value for element in node.value.elts}
+    raise AssertionError(f"filter-matrix.py declares no {name}")
+
+
+@pytest.mark.unit
+def test_matrix_keeps_every_cuda_13_row_the_pin_supports():
+    """The Arm matrix must offer the same CUDA 13 rows as x86, since the pin supports both."""
+    x86 = _declared_cuda_versions("x86_cuda_versions")
+    arm = _declared_cuda_versions("arm_cuda_versions")
+    assert arm == {cuda for cuda in x86 if not cuda.startswith("cu12")}
+
+
+@pytest.mark.parametrize("channel", ["nightly", "test", "release", None])
+@pytest.mark.parametrize("arch", ["cuda", "cuda-aarch64", "cuda-arm64"])
+@pytest.mark.parametrize("use_rtx", ["true", "false"])
+def test_matrix_keeps_cuda_12_only_for_release_channels(channel, arch, use_rtx):
+    supported = _declared_cuda_versions(
+        "x86_cuda_versions" if arch == "cuda" else "arm_cuda_versions"
+    )
+    rows = [
+        {
+            "python_version": "3.12",
+            "desired_cuda": cuda,
+            "gpu_arch_type": arch,
+            **({"channel": channel} if channel is not None else {}),
+        }
+        for cuda in sorted(supported | {"cu126"})
+    ]
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(REPO_ROOT / ".github/scripts/filter-matrix.py"),
+            "--matrix",
+            json.dumps({"include": rows}),
+            "--limit-pr-builds",
+            "false",
+            "--use-rtx",
+            use_rtx,
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    actual = {row["desired_cuda"] for row in json.loads(result.stdout)["include"]}
+    expected = {cuda for cuda in supported if not cuda.startswith("cu12")}
+    assert expected, "the matrix filter declares no CUDA 13 rows to keep"
+    if channel in {"test", "release"} and arch == "cuda":
+        expected.add("cu126")
+    assert actual == expected
+
+
+def test_jetpack_matrix_keeps_its_separate_cuda_contract():
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(REPO_ROOT / ".github/scripts/filter-matrix.py"),
+            "--matrix",
+            json.dumps(
+                {
+                    "include": [
+                        {
+                            "python_version": "3.10",
+                            "desired_cuda": "cu126",
+                            "gpu_arch_type": "cuda-aarch64",
+                            "channel": "nightly",
+                        }
+                    ]
+                }
+            ),
+            "--jetpack",
+            "true",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    rows = json.loads(result.stdout)["include"]
+    assert len(rows) == 1
+    assert rows[0]["desired_cuda"] == "cu126"
+    assert rows[0]["container_image"] == "nvcr.io/nvidia/l4t-jetpack:r36.4.0"
+
+
+@pytest.mark.parametrize("channel", ["cu126", "cu130", "cu132", "cu134"])
+def test_install_channel_guard_rejects_unsupported_nightly_recipes(
+    tmp_path, monkeypatch, channel
+):
+    recipe = tmp_path / "README.md"
+    recipe.write_text(
+        '```bash\npython -m pip install --pre "torch-tensorrt[executorch]" '
+        f"--extra-index-url https://download.pytorch.org/whl/nightly/{channel}\n```\n"
+    )
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "add", "README.md"], check=True)
+    monkeypatch.setattr(sys.modules[__name__], "REPO_ROOT", tmp_path)
+    if channel in {"cu130", "cu132"}:
+        test_every_printed_install_instruction_names_the_nightly_channel()
+    else:
+        with pytest.raises(AssertionError, match=f"nightly/{channel}"):
+            test_every_printed_install_instruction_names_the_nightly_channel()
 
 
 def test_the_runner_follows_the_row_s_cuda_version(monkeypatch) -> None:
@@ -1201,8 +1310,8 @@ def test_every_printed_install_instruction_names_the_nightly_channel():
             suffix = channel.group(1)
             if suffix and suffix not in _PUBLISHED_NIGHTLY_CHANNELS:
                 missing.append(
-                    f"{name}:{line} installs from nightly/{suffix}, which the project does not "
-                    f"publish for; expected one of {sorted(_PUBLISHED_NIGHTLY_CHANNELS)}"
+                    f"{name}:{line} installs from nightly/{suffix}, which is not a supported "
+                    f"TensorRT nightly channel; expected one of {sorted(_PUBLISHED_NIGHTLY_CHANNELS)}"
                 )
             # The named-distribution form needs --pre. "torch-tensorrt[executorch]" with no
             # version pin resolves to the stable PyPI wheel, which carries no executorch extra at
