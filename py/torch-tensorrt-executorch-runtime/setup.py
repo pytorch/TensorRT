@@ -19,6 +19,7 @@ HERE = pathlib.Path(__file__).resolve().parent
 REPO_ROOT = HERE.parents[1]
 BAZEL_TARGET = "//py/torch-tensorrt-executorch-runtime/native:delegate_native"
 BUILD_NONCE = os.getenv("TORCH_TENSORRT_EXECUTORCH_BUILD_NONCE", uuid.uuid4().hex)
+TARGET_PLATFORM = os.getenv("TORCHTRT_TARGET_PLATFORM", "").strip().lower()
 
 
 def get_runtime_version() -> str:
@@ -45,6 +46,10 @@ TORCH_TENSORRT_REQUIREMENT = "torch-tensorrt>=2.15.0.dev0,<2.16.0"
 
 
 def get_tensorrt_requirement() -> str:
+    """Return the TensorRT requirement for the selected CUDA platform."""
+    if TARGET_PLATFORM == "driveos":
+        return "tensorrt>=10.16.1,<10.17.0"
+
     cuda_version = torch.version.cuda
     if cuda_version is None:
         raise RuntimeError(
