@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <filesystem>
+#include <optional>
 #include <utility>
 
 #include <cuda_runtime.h>
@@ -14,10 +15,14 @@
 #include "torch/torch.h"
 
 #ifdef ENABLE_TRT_NCCL_COLLECTIVES
+#include "c10/util/Type.h"
 #include "torch/csrc/distributed/c10d/GroupRegistry.hpp"
 #include "torch/csrc/distributed/c10d/NCCLUtils.hpp"
 #include "torch/csrc/distributed/c10d/ProcessGroup.hpp"
 #include "torch/csrc/distributed/c10d/ProcessGroupNCCL.hpp"
+#ifdef TORCHTRT_HAS_PROCESS_GROUP_NCCL2
+#include "torch/csrc/distributed/c10d/nccl2/ProcessGroupNCCL.hpp"
+#endif
 #endif
 
 namespace torch_tensorrt {
@@ -39,6 +44,23 @@ constexpr int32_t kDynamicDim = -1;
     return std::any_of(dims.d, dims.d + dims.nbDims, [](int32_t d) { return d == kDynamicDim; });
   });
 }
+
+#ifdef ENABLE_TRT_NCCL_COLLECTIVES
+// PyTorch exposes both the legacy ProcessGroupNCCL and the newer nccl2
+// implementation under the built-in "nccl" backend. Both provide the raw
+// ncclComm_t that TensorRT's setCommunicator() expects.
+std::optional<int64_t> get_nccl_comm_ptr(c10d::Backend* backend) {
+  if (auto* legacy_nccl = dynamic_cast<c10d::ProcessGroupNCCL*>(backend)) {
+    return legacy_nccl->getCommPtr();
+  }
+#ifdef TORCHTRT_HAS_PROCESS_GROUP_NCCL2
+  if (auto* nccl2 = dynamic_cast<c10d::nccl2::ProcessGroupNCCL*>(backend)) {
+    return nccl2->getCommPtr();
+  }
+#endif
+  return std::nullopt;
+}
+#endif
 } // namespace
 
 std::string slugify(std::string s) {
@@ -912,17 +934,19 @@ bool TRTEngine::bind_nccl_comm() {
   auto backend = pg->getBackend(c10d::ProcessGroup::BackendType::NCCL);
   TORCHTRT_CHECK(backend != nullptr, "ProcessGroup '" << this->group_name << "' has no NCCL backend");
 
-  auto* nccl_pg = dynamic_cast<c10d::ProcessGroupNCCL*>(backend.get());
-  TORCHTRT_CHECK(nccl_pg != nullptr, "Backend is not ProcessGroupNCCL");
+  auto comm_ptr = get_nccl_comm_ptr(backend.get());
+  TORCHTRT_CHECK(
+      comm_ptr.has_value(),
+      "Unsupported NCCL backend for ProcessGroup '" << this->group_name
+                                                    << "': " << c10::demangle(typeid(*backend).name()));
 
   at::cuda::set_device(this->device_info.id);
 
-  int64_t comm_ptr = nccl_pg->getCommPtr();
   // Soft-return when NCCL hasn't run a collective yet.  The communicator is
   // created lazily by PyTorch on the first collective — callers should ensure
   // at least one collective (e.g. dist.barrier()) has been issued before the
   // first TRT forward pass.
-  if (comm_ptr == 0) {
+  if (*comm_ptr == 0) {
     LOG_DEBUG(
         "NCCL communicator not yet initialized for device " << this->device_info.id
                                                             << "; NCCL bind deferred until first execute_engine call.");
@@ -931,7 +955,7 @@ bool TRTEngine::bind_nccl_comm() {
 
   // Distributed engines must hold a live IExecutionContext at bind time.
   // The ``exec_ctx()`` getter materializes it lazily on first call.
-  exec_ctx()->setCommunicator(reinterpret_cast<void*>(comm_ptr));
+  exec_ctx()->setCommunicator(reinterpret_cast<void*>(*comm_ptr));
   this->nccl_initialized = true;
   LOG_INFO("NCCL comm bound (rank=" << this->rank << ", device=" << this->device_info.id << ")");
   return true;
