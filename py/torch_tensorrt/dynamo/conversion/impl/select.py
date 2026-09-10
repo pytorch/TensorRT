@@ -36,7 +36,7 @@ def select(
     name: str,
     input: ITensor,
     dim: int,
-    index: int,
+    index: Union[int, ITensor],
 ) -> ITensor:
     if not isinstance(input, ITensor):
         raise RuntimeError(
@@ -47,10 +47,24 @@ def select(
     ranks = len(input.shape)
     dim = get_positive_dim(dim, ranks)
 
-    indices_tensor = get_trt_tensor(
-        ctx, np.array(index, dtype=np.int32), f"{name}_indices_tensor"
-    )
+    if isinstance(index, ITensor):
+        # The index was computed at runtime, so it cannot be folded into a constant.
+        indices_tensor = cast_trt_tensor(
+            ctx, index, trt.int32, f"{name}_cast_index_tensor", target, source_ir
+        )
+        # add_gather keeps the axis it gathers along for an index of rank 1 or higher, and
+        # a scalar crossing a partition boundary arrives as shape (1,), so squeezing to
+        # rank 0 is what makes the result match eager.
+        if len(indices_tensor.shape) == 1 and indices_tensor.shape[0] == 1:
+            indices_tensor = impl.shuffle.reshape(
+                ctx, target, source_ir, f"{name}_index_rank0", indices_tensor, ()
+            )
+    else:
+        indices_tensor = get_trt_tensor(
+            ctx, np.array(index, dtype=np.int32), f"{name}_indices_tensor"
+        )
     layer = ctx.net.add_gather(input, indices_tensor, dim)
+    set_layer_name(layer, target, f"{name}_gather", source_ir)
 
     return layer.get_output(0)
 
