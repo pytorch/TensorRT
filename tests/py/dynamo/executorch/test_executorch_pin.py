@@ -96,13 +96,8 @@ NO_NIGHTLY_MARKER = "pin-check: no-nightly"
 # minimum rather than an exact count, since the stacked runtime-wheel change removes one README
 # site and an exact count could not hold on both branches.
 _EXPECTED_REQUIREMENT_SITES = {
-    ".github/workflows/executorch-build-linux.yml": 2,
-    ".github/workflows/executorch-test-linux.yml": 1,
-    # The release lane builds the runtime wheel too, so it installs ExecuTorch and therefore pins it.
-    # It arrived with the CUDA 12.6 rows and named a stale release off the default index, which is
-    # exactly what these checks exist to catch.
-    ".github/workflows/release-linux-x86_64.yml": 1,
-    ".github/workflows/release-linux-aarch64.yml": 1,
+    ".github/workflows/build_linux.yml": 1,
+    ".github/workflows/executorch-test-linux.yml": 2,
     "MODULE.bazel": 1,
     "docker/MODULE.bazel.docker": 1,
     "docker/MODULE.bazel.ngc": 1,
@@ -218,7 +213,7 @@ _EXTENSIONLESS_INSTALL_FILES = frozenset({"justfile"})
 # assignment in the tree to resolve. An unresolved variable is accepted only if it is one of
 # these; every other unresolved name, including a typo of a real one, fails the channel check
 # rather than passing on sight. Empty today: every ExecuTorch install channels through either a
-# literal nightly URL or ${EXECUTORCH_INDEX_URL}, which is assigned in executorch-build-linux.yml
+# literal nightly URL or a locally assigned index variable, and is therefore resolvable.
 # and therefore resolvable. Kept as the explicit seam a future environment-provided index goes
 # through.
 _ENVIRONMENT_INDEX_VARIABLES: frozenset[str] = frozenset()
@@ -341,9 +336,8 @@ def test_every_install_that_names_a_channel_can_resolve_its_variable() -> None:
     )
 
     for path in (
-        ".github/workflows/release-linux-x86_64.yml",
-        ".github/workflows/release-linux-aarch64.yml",
-        ".github/workflows/executorch-build-linux.yml",
+        ".github/workflows/build_linux.yml",
+        ".github/workflows/executorch-test-linux.yml",
     ):
         text = (REPO_ROOT / path).read_text(encoding="utf-8")
         for line in text.splitlines():
@@ -353,6 +347,40 @@ def test_every_install_that_names_a_channel_can_resolve_its_variable() -> None:
                 f"{path} builds a nightly channel URL but installs no ExecuTorch, so the URL is "
                 "either dead code or the install lost its pin"
             )
+
+
+@pytest.mark.parametrize(
+    "caller,job",
+    [
+        ("_test-linux.yml", "build"),
+        ("release-linux-x86_64.yml", "release-wheel-artifacts"),
+        ("release-linux-aarch64.yml", "release-wheel-artifacts"),
+    ],
+)
+def test_runtime_callers_use_the_shared_pinned_build(caller, job):
+    import yaml
+
+    workflow = yaml.safe_load((REPO_ROOT / ".github/workflows" / caller).read_text())
+    build = workflow["jobs"][job]
+    assert build["uses"] == "./.github/workflows/build_linux.yml"
+    assert build["with"]["build-executorch-runtime"] in (
+        True,
+        "${{ !inputs.python-only && !inputs.use-rtx }}",
+    )
+    shared = yaml.safe_load(
+        (REPO_ROOT / ".github/workflows/build_linux.yml").read_text()
+    )
+    step = next(
+        s
+        for s in shared["jobs"]["build"]["steps"]
+        if s.get("name") == "Build the ExecuTorch runtime wheel"
+    )
+    assert step["if"].startswith("${{ inputs.build-executorch-runtime")
+    assert f'executorch=={_versions()["__executorch_version__"]}' in step["run"]
+    assert "${CONDA_RUN} python -m pip install pyyaml" in step["run"]
+    assert "nightly/${CU_VERSION}" in step["run"]
+    assert "release-executorch-runtime-wheel-artifacts" not in workflow["jobs"]
+    assert not (REPO_ROOT / ".github/workflows/executorch-build-linux.yml").exists()
 
 
 def test_every_requirement_matches_the_pin() -> None:
@@ -532,55 +560,41 @@ def test_derived_requirements_match_the_pin(monkeypatch) -> None:
 _RUNTIME_SETUP_PY = "py/torch-tensorrt-executorch-runtime/setup.py"
 
 
-def _runtime_install_requires() -> dict[str, str]:
-    """The runtime wheel's ``install_requires`` entries, each mapped to its source text.
+def test_the_runtime_wheel_pins_executorch_to_the_public_pin(monkeypatch) -> None:
+    """Evaluate the metadata without invoking a native build."""
+    import importlib.metadata
+    import runpy
+    import types
 
-    Read as source, not imported: importing this setup.py runs a Bazel build. The values are
-    f-strings built at build time from the installed distributions, so the source segment is what
-    the check compares, not a resolved string.
-    """
-    tree = ast.parse((REPO_ROOT / _RUNTIME_SETUP_PY).read_text(encoding="utf-8"))
-    source = (REPO_ROOT / _RUNTIME_SETUP_PY).read_text(encoding="utf-8")
-    call = next(
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "setup"
+    import setuptools
+
+    pin = _versions()["__executorch_version__"]
+    torch = types.ModuleType("torch")
+    torch.version = types.SimpleNamespace(cuda="13.2")
+    torch.__version__ = "2.15.0.dev20200103+cu132"
+    monkeypatch.setitem(sys.modules, "torch", torch)
+    monkeypatch.setenv(
+        "TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION", "0.1.0.dev20200103+cu132"
     )
-    requires = next(
-        keyword.value for keyword in call.keywords if keyword.arg == "install_requires"
+    installed = {
+        "executorch": f"{pin}+cu132",
+        "torch-tensorrt": torch.__version__,
+        "tensorrt-cu13": "11.2.1",
+        "nvidia-cuda-runtime": "13.2.0",
+    }
+    original_version = importlib.metadata.version
+    monkeypatch.setattr(
+        importlib.metadata,
+        "version",
+        lambda name: installed[name] if name in installed else original_version(name),
     )
-    entries = {}
-    for element in requires.elts:
-        text = ast.get_source_segment(source, element)
-        distribution = re.match(r'f?"([A-Za-z0-9_.-]+)', text)
-        if distribution:
-            entries[distribution.group(1)] = text
-    return entries
-
-
-def test_the_runtime_wheel_pins_executorch_to_the_public_pin() -> None:
-    """The runtime wheel's own ExecuTorch requirement has to pin the pinned version, stripped.
-
-    This is the one requirement whose native code is compiled against the ExecuTorch runtime, so a
-    wheel that requires a different ExecuTorch than it was built against loads a mismatched runtime.
-    The literal search above cannot see it: setup.py builds the string from the installed
-    distribution, so ``executorch==`` is followed by a brace, not a digit. Loosening it to a bare
-    ``executorch`` left every other test green.
-    """
-    entries = _runtime_install_requires()
-    assert (
-        "executorch" in entries
-    ), f"{_RUNTIME_SETUP_PY} install_requires no longer pins executorch: {sorted(entries)}"
-    # The value is built from installed_version("executorch"), the same source torch and
-    # torch-tensorrt use, and stripped of its local label the same way. Compare the source text so
-    # a bare name, a hardcoded version, or a different version source is rejected.
-    assert (
-        entries["executorch"] == 'f"executorch=={public_version(executorch_version)}"'
-    ), (
-        f"{_RUNTIME_SETUP_PY} must pin executorch to public_version(executorch_version), so the "
-        f"wheel requires the ExecuTorch it was compiled against, but it declares "
-        f"{entries['executorch']}"
-    )
+    metadata = {}
+    monkeypatch.setattr(setuptools, "setup", lambda **kwargs: metadata.update(kwargs))
+    runpy.run_path(str(REPO_ROOT / _RUNTIME_SETUP_PY))
+    requirements = [
+        r for r in metadata["install_requires"] if r.startswith("executorch")
+    ]
+    assert requirements == [f"executorch=={pin}"]
 
 
 def _declared_cuda_versions(name: str) -> set[str]:
@@ -898,7 +912,7 @@ def test_the_pinned_commit_is_the_pinned_wheels_own_source() -> None:
         # No evidence either way rather than a mismatch to report: only the wheel the pin names
         # carries the commit the pin should agree with. Every CI install path that builds or
         # tests the delegate requests the pin exactly -- the one deliberate range is the
-        # end-user install rehearsal in executorch-build-linux.yml -- so arriving here usually
+        # end-user install rehearsal in executorch-test-linux.yml -- so arriving here usually
         # means the environment was built some other way, and that wheel's commit says nothing
         # about whether the two pins agree.
         pytest.skip(
@@ -1627,7 +1641,7 @@ def test_the_range_install_runs_in_a_fresh_venv():
     # The end-user range install has to resolve the specifier from scratch. Run in the build
     # interpreter, which already holds the exact pin, and pip resolves nothing and proves nothing.
     # This locks the fresh-venv shape so it cannot silently regress to an in-place install.
-    workflow = (REPO_ROOT / ".github/workflows/executorch-build-linux.yml").read_text(
+    workflow = (REPO_ROOT / ".github/workflows/executorch-test-linux.yml").read_text(
         encoding="utf-8"
     )
     marker = "# pin-check: range-ok"
