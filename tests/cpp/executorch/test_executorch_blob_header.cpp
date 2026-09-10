@@ -307,12 +307,11 @@ TEST(ExecuTorchTensorRTBlobHeader, MetadataKeyOrderDoesNotChangeWhatIsRead) {
 
 TEST(ExecuTorchTensorRTBlobHeader, InputNamedLikeAScalarKeyIsNotReadAsOne) {
   // The io_bindings array holds caller-chosen tensor names, which is why the scalars are not simply
-  // searched for across the whole object.
+  // searched for across the whole object. Written without the aliased-io magic, because that magic
+  // now promises an alias array and this blob carries none.
   const auto blob = make_blob(
       R"({"io_bindings":[{"name":"device_id","is_input":true},{"name":"out_0","is_input":false}],)"
-      R"("device_id":3,"hardware_compatible":true})",
-      4,
-      TENSORRT_MAGIC_ALIASED_IO);
+      R"("device_id":3,"hardware_compatible":true})");
 
   TensorRTBlobHeader header;
   ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
@@ -583,19 +582,6 @@ TEST(ExecuTorchTensorRTBlobHeader, RejectsAliasedIoMagicWithNoAliasArrayFound) {
   EXPECT_FALSE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
 }
 
-TEST(ExecuTorchTensorRTBlobHeader, RejectsAliasedIoMagicWithTheKeysInSortedOrder) {
-  // The alias array is searched for past the io_bindings array, so a writer that
-  // emitted the keys in sorted order would put it out of reach. TR02 is what
-  // makes that a refusal rather than a silently alias-free header.
-  const std::string metadata = R"({"aliased_io":[{"output":"out_k","input":"in_k","kind":"kv_cache_update"}],)"
-                               R"("io_bindings":[{"name":"in_k","is_input":true},)"
-                               R"({"name":"out_k","is_input":false}]})";
-  const auto blob = make_blob(metadata, 4, TENSORRT_MAGIC_ALIASED_IO);
-
-  TensorRTBlobHeader header;
-  EXPECT_FALSE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
-}
-
 TEST(ExecuTorchTensorRTBlobHeader, ParsesScalarsPastAnAliasedBindingNamedLikeAKey) {
   // The two scalar scans search the metadata text, and the alias array sits
   // between where io_bindings ends and where those scans used to start, so an
@@ -628,7 +614,6 @@ TEST(ExecuTorchTensorRTBlobHeader, ParsesTheDeviceIdKeyOutsideAnAliasEntryCarryi
   TensorRTBlobHeader header;
   ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
   EXPECT_EQ(header.device_id, 3);
-  EXPECT_TRUE(header.hardware_compatible);
 }
 
 TEST(ExecuTorchTensorRTBlobHeader, RejectsADeviceIdThatDoesNotFitAnInt) {

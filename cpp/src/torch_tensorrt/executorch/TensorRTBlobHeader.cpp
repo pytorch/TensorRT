@@ -226,8 +226,16 @@ bool parse_metadata_json(const std::string& json, bool expects_aliased_io, Tenso
   if (bindings_pos == std::string::npos) {
     return false;
   }
-  const std::size_t arr_start = json.find('[', bindings_pos);
-  if (arr_start == std::string::npos) {
+  // The array has to be the value of the key, not merely the next '[' in the text.
+  // A blob whose io_bindings is an object would otherwise be walked from an
+  // unrelated bracket further on, and whatever entries sit there get recorded as
+  // this engine's bindings, which is a wrong answer rather than a refusal.
+  const std::size_t bindings_colon = json.find(':', bindings_pos);
+  if (bindings_colon == std::string::npos) {
+    return false;
+  }
+  const std::size_t arr_start = skip_ws(json, bindings_colon + 1);
+  if (arr_start >= json.size() || json[arr_start] != '[') {
     return false;
   }
 
