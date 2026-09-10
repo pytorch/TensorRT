@@ -285,16 +285,38 @@ def test_load_executorch_dispatches_to_delegate(monkeypatch):
     )
 
 
+_PUBLIC_API_SYMBOLS = (
+    "get_edge_compile_config",
+    "TensorRTPartitioner",
+    "TensorRTBackend",
+    "export",
+    "zero_copy_backend_config",
+    "check_zero_copy_kv",
+)
+
+
 @pytest.mark.unit
 def test_public_api_symbols_present():
     module = importlib.import_module("torch_tensorrt.executorch")
-    assert "get_edge_compile_config" in module.__all__
-    assert "TensorRTPartitioner" in module.__all__
-    assert "TensorRTBackend" in module.__all__
-    assert "export" in module.__all__
+    assert set(module.__all__) == set(_PUBLIC_API_SYMBOLS)
     assert "Program" not in module.__all__
     assert "load" not in module.__all__
     assert "to_executorch" not in module.__all__
+
+
+@pytest.mark.unit
+def test_public_api_symbols_are_bound_not_just_advertised():
+    # __all__ is a literal written out in both branches of the
+    # _has_executorch_exir() guard, so reading it cannot tell whether the
+    # package binds what it advertises. Resolve each name instead.
+    module = importlib.import_module("torch_tensorrt.executorch")
+    if module._has_executorch_exir():
+        for name in _PUBLIC_API_SYMBOLS:
+            assert getattr(module, name) is not None
+    else:
+        for name in _PUBLIC_API_SYMBOLS:
+            with pytest.raises(ImportError, match=name):
+                getattr(module, name)
 
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
@@ -743,6 +765,10 @@ def _patch_executorch_lowering(monkeypatch, captured):
             return _FakeETRecord()
 
     class _FakeEdge:
+        # export() reorders each method's mutations after lowering, over every
+        # method the manager holds. No method here holds a program to reorder.
+        methods = ()
+
         def to_executorch(self, config=None):
             captured["backend_config"] = config
             return _FakeExec()
