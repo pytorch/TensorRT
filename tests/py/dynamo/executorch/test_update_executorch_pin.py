@@ -207,6 +207,33 @@ _FAKE_VERSION = "1.5.0.dev20200103"
 _FAKE_COMMIT = "deadbeef" * 5
 
 
+def test_shared_workflow_pin_sites_follow_a_bump(tmp_path, monkeypatch):
+    """The relocated pins must be rewritten, including the fresh-venv range."""
+    version = updater.read_pin("__executorch_version__")
+    commit = updater.read_pin("__executorch_commit__")
+    for name in updater._PIN_SITES:
+        source = _REPO_ROOT / name
+        target = tmp_path / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(source.read_bytes())
+    versions = tmp_path / "dev_dep_versions.yml"
+    versions.write_text(
+        f'__executorch_version__: "{version}"\n__executorch_commit__: "{commit}"\n'
+    )
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "add", "."], check=True)
+    monkeypatch.setattr(updater, "_REPO_ROOT", tmp_path)
+    monkeypatch.setattr(updater, "_VERSIONS_FILE", versions)
+    assert updater.write_pins(_FAKE_VERSION, _FAKE_COMMIT)
+    build = (tmp_path / ".github/workflows/build_linux.yml").read_text()
+    test = (tmp_path / ".github/workflows/executorch-test-linux.yml").read_text()
+    assert f"executorch=={_FAKE_VERSION}" in build
+    assert f"executorch=={_FAKE_VERSION}" in test
+    assert f"executorch>={_FAKE_VERSION},<1.6" in test
+    assert version not in build + test
+    assert not updater.write_pins(_FAKE_VERSION, _FAKE_COMMIT)
+
+
 def test_write_pins_leaves_a_tree_the_guard_accepts(tmp_path, monkeypatch) -> None:
     # The one test that matters most: after a bump, the whole pin guard has to pass, because
     # that guard is what the generated pull request will be judged by. A rewrite that the
