@@ -32,6 +32,7 @@ HERE = pathlib.Path(__file__).resolve().parent
 REPO_ROOT = HERE.parents[1]
 BAZEL_TARGET = "//py/torch-tensorrt-executorch-runtime/native:delegate_native"
 BUILD_NONCE = os.getenv("TORCH_TENSORRT_EXECUTORCH_BUILD_NONCE", uuid.uuid4().hex)
+TARGET_PLATFORM = os.getenv("TORCHTRT_TARGET_PLATFORM", "").strip().lower()
 CUDA_RUNTIME_DISTRIBUTION = "nvidia-cuda-runtime"
 # Named the way ExecuTorch names its own delegates, because that is what this now is. The wheel
 # ships this exact filename: a consumer looking for a delegate beside ExecuTorch's own
@@ -378,7 +379,12 @@ class BazelBuild(build_py):
         )
 
 
-TENSORRT_DISTRIBUTION = "tensorrt-cu13"
+def tensorrt_distribution() -> str:
+    """Use the platform TensorRT package on DRIVE; preserve the normal CUDA wheel."""
+    return "tensorrt" if TARGET_PLATFORM == "driveos" else "tensorrt-cu13"
+
+
+TENSORRT_DISTRIBUTION = tensorrt_distribution()
 
 
 class WheelTag(bdist_wheel):
