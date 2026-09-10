@@ -11,13 +11,15 @@
 #include <cstring>
 #include <limits>
 #include <string>
+#include <unordered_set>
 
 namespace torch_tensorrt {
 namespace executorch_backend {
 namespace {
 
-// TR02 marks a blob whose metadata carries aliased_io; TR01 is one without. This
-// parser handles aliased_io, so it accepts either.
+// TR02 marks a blob whose metadata carries aliased_io; TR01 is one without.
+// This parser handles aliased_io, so it accepts either, and holds TR02 to its
+// promise: see the cross-check at the end of parse_metadata_json.
 constexpr char TENSORRT_MAGIC[4] = {'T', 'R', '0', '1'};
 constexpr char TENSORRT_MAGIC_ALIASED_IO[4] = {'T', 'R', '0', '2'};
 constexpr uint32_t METADATA_OFFSET_FIELD_OFFSET = 4;
@@ -34,6 +36,16 @@ std::size_t skip_ws(const std::string& s, std::size_t pos) {
   return pos;
 }
 
+// A backslash is dropped and the character after it kept. That is the correct
+// decoding for \" \\ and \/ and the wrong one for every other escape, which a
+// JSON reader turns into a control character, a codepoint, or an error. Nothing
+// this parser reads can carry one. Every string it compares is either a key or
+// an alias kind, which TensorRTBlobMetadata.to_json writes as literals, or a
+// binding name, and on the only path that writes these blobs an input binding is
+// named for its Edge placeholder -- which torch.export has already reduced to
+// [A-Za-z0-9_] -- and an output binding is output0..N. So json.dumps has nothing
+// to escape, and the values skip_value walks past need only their end, which
+// this finds either way.
 std::size_t parse_string(const std::string& s, std::size_t pos, std::string& out) {
   if (pos >= s.size() || s[pos] != '"') {
     return std::string::npos;
@@ -203,7 +215,7 @@ std::size_t find_top_level_key(const std::string& json, const char* key) {
   return std::string::npos;
 }
 
-bool parse_metadata_json(const std::string& json, TensorRTBlobHeader& out) {
+bool parse_metadata_json(const std::string& json, bool expects_aliased_io, TensorRTBlobHeader& out) {
   out.input_binding_names.clear();
   out.output_binding_names.clear();
   out.aliased_io.clear();
@@ -219,6 +231,15 @@ bool parse_metadata_json(const std::string& json, TensorRTBlobHeader& out) {
     return false;
   }
 
+  // A TensorRT engine has one name space for its tensors, so a name repeated
+  // across io_bindings -- in either list -- cannot be two bindings. It is
+  // accepted by every name lookup, which stops at the first match, and then
+  // contradicted by every address bind, which is keyed on the name and so
+  // overwrites whatever the earlier slot bound. For an aliased output the
+  // address overwritten is the caller's buffer, and the engine's in-place
+  // update lands somewhere else. Refuse the blob here, where the repeat is
+  // visible from the bytes alone.
+  std::unordered_set<std::string> claimed_bindings;
   std::size_t pos = arr_start + 1;
   while (true) {
     pos = skip_ws(json, pos);
@@ -240,7 +261,7 @@ bool parse_metadata_json(const std::string& json, TensorRTBlobHeader& out) {
 
     std::string name;
     bool is_input = false;
-    bool saw_name = false;
+    bool saw_is_input = false;
 
     while (true) {
       pos = skip_ws(json, pos);
@@ -269,11 +290,11 @@ bool parse_metadata_json(const std::string& json, TensorRTBlobHeader& out) {
 
       if (key == "name") {
         pos = parse_string(json, pos, name);
-        saw_name = pos != std::string::npos;
-        if (!saw_name) {
+        if (pos == std::string::npos) {
           return false;
         }
       } else if (key == "is_input") {
+        saw_is_input = true;
         if (json.compare(pos, 4, "true") == 0) {
           is_input = true;
           pos += 4;
@@ -291,12 +312,35 @@ bool parse_metadata_json(const std::string& json, TensorRTBlobHeader& out) {
       }
     }
 
-    if (saw_name && !name.empty()) {
-      if (is_input) {
-        out.input_binding_names.push_back(name);
-      } else {
-        out.output_binding_names.push_back(name);
-      }
+    // A nameless entry cannot be refused earlier because the keys may arrive in
+    // any order, so it is refused here, beside the repeat. Skipping it instead
+    // would shorten the recorded list while the delegate's argument list keeps
+    // its full length, and the two are only inferred from the engine when both
+    // are empty -- so one real name beside a blank leaves a short list that no
+    // longer lines up with the engine's bindings. An absent "name" key needs no
+    // flag of its own, unlike is_input below: the string is still empty here.
+    if (name.empty()) {
+      return false;
+    }
+    // is_input has no safe default, so an entry without it is refused beside
+    // the nameless one. The initializer here reads the binding as an output
+    // and TensorRTIOBinding.is_input in serialization.py defaults to an input,
+    // so the two readers of these bytes would disagree -- and one binding
+    // changing list shifts every index after it, which on a static-shape
+    // engine leaves nothing for shape inference to object to: it runs on the
+    // wrong tensors. A key misspelled by one byte is the same case, since it
+    // falls through to skip_value and leaves the initializer standing. The
+    // writer always emits the key.
+    if (!saw_is_input) {
+      return false;
+    }
+    if (!claimed_bindings.insert(name).second) {
+      return false;
+    }
+    if (is_input) {
+      out.input_binding_names.push_back(name);
+    } else {
+      out.output_binding_names.push_back(name);
     }
   }
 
@@ -310,6 +354,8 @@ bool parse_metadata_json(const std::string& json, TensorRTBlobHeader& out) {
       return false;
     }
     ++apos;
+    std::unordered_set<std::string> claimed_outputs;
+    std::unordered_set<std::string> claimed_inputs;
     while (true) {
       apos = skip_ws(json, apos);
       if (apos >= json.size()) {
@@ -365,21 +411,61 @@ bool parse_metadata_json(const std::string& json, TensorRTBlobHeader& out) {
           return false;
         }
       }
-      if (!ab.output.empty() && !ab.input.empty()) {
-        // The current Python serializer always writes "kind" (serialization.py),
-        // and older blobs carry no aliased_io array at all, so this default is
-        // defensive: it only fires for a blob that has an aliased_io entry but
-        // omits "kind". Default to the TRT-enforced kind so init()'s kind
-        // validation treats an absent key the same as the Python runtime rather
-        // than rejecting it as unknown.
-        if (ab.kind.empty()) {
-          ab.kind = "kv_cache_update";
-        }
-        out.aliased_io.push_back(std::move(ab));
+      // An entry missing either name is refused rather than skipped, for the
+      // reason the binding walk above gives and one more: init() counts the
+      // entries it accepts and execute() subtracts that count from the delegate
+      // argument list, so a dropped entry surfaces as an argument-count error at
+      // every execute, which never mentions aliasing, instead of at parse, which
+      // the blob-header tests reach without a GPU.
+      if (ab.output.empty() || ab.input.empty()) {
+        return false;
       }
+      // An output binding may be claimed by at most one entry. A second entry
+      // for the same output names the same binding, so nothing that resolves
+      // the names can tell the two apart -- but a reader that counts aliased
+      // outputs per entry, as TensorRTBackend does to size the delegate
+      // argument list, counts one output twice. Refuse the blob here, where
+      // the repeat is visible from the bytes alone.
+      if (!claimed_outputs.insert(ab.output).second) {
+        return false;
+      }
+      // An input may likewise be claimed by at most one entry. Two entries
+      // naming different outputs and one input record the same input index
+      // for both, and execute() binds each aliased output to that index's
+      // caller pointer -- one address with two writers, so whichever the
+      // engine writes second wins and the other update disappears with no
+      // error. TensorRT's own aliasing rules out the kv_cache_update kind
+      // (init cross-checks it against getAliasedInputTensor), but the user
+      // kind is only compared on shape, so two same-shaped outputs onto one
+      // input would pass.
+      if (!claimed_inputs.insert(ab.input).second) {
+        return false;
+      }
+      // The current Python serializer always writes "kind" (serialization.py),
+      // and older blobs carry no aliased_io array at all, so this default is
+      // defensive: it only fires for a blob that has an aliased_io entry but
+      // omits "kind". Default to the TRT-enforced kind so init()'s kind
+      // validation treats an absent key the same as the Python runtime rather
+      // than rejecting it as unknown.
+      if (ab.kind.empty()) {
+        ab.kind = "kv_cache_update";
+      }
+      out.aliased_io.push_back(std::move(ab));
     }
   }
 
+  // The magic says which of the two shapes this blob is, and until here nothing
+  // compared that against what was parsed. TR02 means the metadata carries
+  // aliased_io, so an empty list is a blob whose alias array this walk did not
+  // find: absent, truncated away, or one byte wrong in the key. The threaded shape
+  // does not fail afterwards, it quietly gives every aliased output storage of its
+  // own and stops updating the caller's cache, which is the outcome the aliasing
+  // code exists to make impossible. The converse is not refused: a TR01 blob
+  // carrying an alias array is read as aliased and run correctly here, and
+  // refusing it would only turn a blob this runtime handles into one it does not.
+  if (expects_aliased_io && out.aliased_io.empty()) {
+    return false;
+  }
   const std::size_t hw_key = find_top_level_key(json, "\"hardware_compatible\"");
   const std::size_t device_key = find_top_level_key(json, "\"device_id\"");
   return parse_bool_after_key(json, hw_key, "\"hardware_compatible\"", out.hardware_compatible) &&
@@ -398,8 +484,8 @@ bool TensorRTBlobHeader::parse(const void* data, std::size_t size, TensorRTBlobH
   }
 
   const auto* bytes = static_cast<const uint8_t*>(data);
-  if (std::memcmp(bytes, TENSORRT_MAGIC, sizeof(TENSORRT_MAGIC)) != 0 &&
-      std::memcmp(bytes, TENSORRT_MAGIC_ALIASED_IO, sizeof(TENSORRT_MAGIC_ALIASED_IO)) != 0) {
+  const bool aliased_io_magic = std::memcmp(bytes, TENSORRT_MAGIC_ALIASED_IO, sizeof(TENSORRT_MAGIC_ALIASED_IO)) == 0;
+  if (!aliased_io_magic && std::memcmp(bytes, TENSORRT_MAGIC, sizeof(TENSORRT_MAGIC)) != 0) {
     return false;
   }
 
@@ -438,7 +524,7 @@ bool TensorRTBlobHeader::parse(const void* data, std::size_t size, TensorRTBlobH
   }
 
   std::string json(reinterpret_cast<const char*>(bytes + out.metadata_offset), out.metadata_size);
-  return parse_metadata_json(json, out);
+  return parse_metadata_json(json, aliased_io_magic, out);
 }
 
 } // namespace executorch_backend
