@@ -22,6 +22,7 @@ REPO_ROOT = HERE.parents[1]
 BAZEL_TARGET = "//py/torch-tensorrt-executorch-runtime/native:delegate_native"
 BUILD_NONCE = os.getenv("TORCH_TENSORRT_EXECUTORCH_BUILD_NONCE", uuid.uuid4().hex)
 CUDA_RUNTIME_DISTRIBUTION = "nvidia-cuda-runtime"
+TARGET_PLATFORM = os.getenv("TORCHTRT_TARGET_PLATFORM", "").strip().lower()
 
 
 def torchtrt_version() -> str:
@@ -51,6 +52,11 @@ def installed_version(distribution: str) -> str:
 
 def tensorrt_distribution() -> str:
     """Return the TensorRT distribution matching the PyTorch CUDA build."""
+    # DRIVE OS provides TensorRT through the platform ``tensorrt`` package,
+    # rather than the CUDA-major-specific packages published for general Linux.
+    if TARGET_PLATFORM == "driveos":
+        return "tensorrt"
+
     cuda_version = torch.version.cuda
     if cuda_version is None:
         raise RuntimeError("CUDA-enabled PyTorch is required to build this wheel")

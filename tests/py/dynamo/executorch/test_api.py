@@ -324,6 +324,21 @@ def test_driveos_packaging_requires_tensorrt_10_16():
 
 
 @pytest.mark.unit
+def test_runtime_wheel_uses_platform_tensorrt_on_driveos():
+    function = _function_def(_runtime_setup_tree(), "tensorrt_distribution")
+    namespace = {
+        "TARGET_PLATFORM": "driveos",
+        "torch": types.SimpleNamespace(version=types.SimpleNamespace(cuda="13.2")),
+    }
+    exec(
+        compile(ast.Module(body=[function], type_ignores=[]), "<setup.py>", "exec"),
+        namespace,
+    )
+
+    assert namespace["tensorrt_distribution"]() == "tensorrt"
+
+
+@pytest.mark.unit
 def test_driveos_packaging_selects_driveos_bazel_config():
     source = ast.unparse(_function_def(_setup_tree(), "build_libtorchtrt_cxx11_abi"))
     assert 'cmd.append("--config=driveos")' in source
