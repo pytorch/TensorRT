@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=aa682d6b"></script>
+    <script src="../../../_static/documentation_options.js?v=df85b014"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -599,7 +599,7 @@ document.write(`
 <p>This example illustrates the state of the art model <a class="reference external" href="https://huggingface.co/black-forest-labs/FLUX.1-dev">FLUX.1-dev</a> optimized using Torch-TensorRT.</p>
 <p><strong>FLUX.1 [dev]</strong> is a 12 billion parameter rectified flow transformer capable of generating images from text descriptions. It is an open-weight, guidance-distilled model for non-commercial applications.</p>
 <p>To run this demo, you need to have access to Flux model (request for access if you do not have it already on the <a class="reference external" href="https://huggingface.co/black-forest-labs/FLUX.1-dev">FLUX.1-dev</a> page) and install the following dependencies</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="n">sentencepiece</span><span class="o">==</span><span class="s2">"0.2.0"</span> <span class="n">transformers</span><span class="o">==</span><span class="s2">"4.48.2"</span> <span class="n">accelerate</span><span class="o">==</span><span class="s2">"1.3.0"</span> <span class="n">diffusers</span><span class="o">==</span><span class="s2">"0.32.2"</span> <span class="n">protobuf</span><span class="o">==</span><span class="s2">"5.29.3"</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="n">sentencepiece</span><span class="o">==</span><span class="s2">"0.2.0"</span> <span class="n">transformers</span><span class="o">==</span><span class="s2">"5.14.1"</span> <span class="n">accelerate</span><span class="o">==</span><span class="s2">"1.3.0"</span> <span class="n">diffusers</span><span class="o">==</span><span class="s2">"0.40.0"</span> <span class="n">protobuf</span><span class="o">==</span><span class="s2">"5.29.3"</span>
 </pre></div>
 </div>
 <p>There are different components of the <code class="docutils literal notranslate"><span class="pre">FLUX.1-dev</span></code> pipeline such as <code class="docutils literal notranslate"><span class="pre">transformer</span></code>, <code class="docutils literal notranslate"><span class="pre">vae</span></code>, <code class="docutils literal notranslate"><span class="pre">text_encoder</span></code>, <code class="docutils literal notranslate"><span class="pre">tokenizer</span></code> and <code class="docutils literal notranslate"><span class="pre">scheduler</span></code>. In this example, we demonstrate optimizing the <code class="docutils literal notranslate"><span class="pre">transformer</span></code> component of the model (which typically consumes &gt;95% of the e2e diffusion latency)</p>
@@ -768,7 +768,7 @@ generate_image(pipe, ["A golden retriever holding a sign to code"], "dog_code")
 </div>
 </div>
 <p>The generated image is as shown below</p>
-<p><img alt="2c60ef24b9484d96924842a0f9fc5e97" src="file://dog_code.png" /></p>
+<p><img alt="aae8137a93124d5fbf2ba5fd920dc727" src="file://dog_code.png" /></p>
 </section>
 </section>
 
