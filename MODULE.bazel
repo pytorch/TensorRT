@@ -45,8 +45,8 @@ new_git_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:git.bzl"
 
 local_torch = use_repo_rule("//toolchains:local_torch.bzl", "local_torch")
 
-# Build the portable runtime and delegate from the installed wheel's source revision.
-# The provenance test checks that the source commit and wheel version agree.
+# Keep the C++ source headers paired with the installed ExecuTorch runtime.
+# The Python companion uses the installed wheel's CMake package directly.
 new_git_repository(
     name = "executorch",
     build_file = "@//third_party/executorch:BUILD",
