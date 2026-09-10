@@ -9,10 +9,11 @@ torch_tensorrt.kernels
 
 .. note::
 
-   This module is **experimental**.  It requires ``cuda-python`` at runtime
-   and TensorRT ``>=10.7.0`` (and not ``10.14.x``) for Quick Deployable
-   Plugin (QDP) support.  Install ``cuda-python`` with ``pip install
-   cuda-python``.
+   This module is **experimental** and requires TensorRT ``>=10.7.0`` (but not
+   ``10.14.x``) for Quick Deployable Plugin (QDP) support. CUDA C++ kernels
+   require ``cuda-python`` and ``cuda-core``; cuTile kernels additionally
+   require ``cuda-tile`` and ``tileiras`` as described below. From a source
+   checkout, install all frontend packages with ``pip install --group kernels``.
 
 Overview
 --------
@@ -143,11 +144,11 @@ embedding the PTX, and the Torch-TensorRT converter::
         ct.store(out, index=(pid,),
                  tile=ct.load(x, index=(pid,), shape=(tile_size,)) + 1.0)
 
-    def add_one_meta(X: torch.Tensor) -> torch.Tensor:
-        return torch.empty_like(X)
+    def add_one_meta(x: torch.Tensor) -> torch.Tensor:
+        return torch.empty_like(x)
 
     ttk.cutile_op(
-        "my::add_one",
+        "cutile_example::add_one",
         kernel=add_one_kernel,
         signature={"x": "fp32", "out": "fp32"},
         meta_fn=add_one_meta,
@@ -157,12 +158,21 @@ embedding the PTX, and the Torch-TensorRT converter::
         constants={"tile_size": TILE},
     )
 
+Install the AOT API with ``pip install 'cuda-tile>=1.3,<2'`` and expose
+``tileiras`` from a system CUDA Toolkit compatible with the installed
+``cuda-tile`` through ``PATH`` or ``CUDA_HOME``. In environments without
+separately pinned CUDA Toolkit packages, the ``cuda-tile[tileiras]`` extra can
+provide the compiler instead; its CUDA package constraints must match the rest
+of the environment.
+
 ``signature`` lists the kernel's array parameters in declaration order —
 inputs first, then outputs — mapped to their element type: a
 :class:`torch.dtype`, a dtype name like ``"float32"``, or a short alias
 like ``"fp32"``.  ``constants`` supplies the ``ct.Constant`` values baked
 into the compiled symbol.  ``grid`` receives ``trtp.TensorDesc`` objects, so use
 ``.shape_expr`` to stay symbolic and keep one engine valid across shapes.
+Input names and order must match the Torch schema inferred from ``meta_fn``;
+this is how each TensorRT pointer is tied to its intended kernel parameter.
 
 Because the launch is built from symbolic shape expressions, ``cutile_op``
 supports dynamic shapes by default.  Pass ``eager_fn`` to also give the op
@@ -170,6 +180,15 @@ a CUDA implementation outside TensorRT, or ``aot_fn`` to replace the
 derived launch entirely.  Threads-per-block comes from the ``.reqntid`` the
 compiled kernel declares — cuTile vectorizes, so this is often below the
 tile size, and it is a hard requirement rather than a hint.
+
+A custom ``aot_fn`` must return the extents and strides described by
+``signature`` in a ``trtp.SymIntExprs`` container, in input-then-output order.
+``cutile_op`` checks the container, item type, and count, but the caller owns
+the symbolic values and their order; a semantic mismatch can silently corrupt
+the result. Block dimensions must be build-time constants and must exactly
+match the compiled kernel's ``.reqntid`` when one is present. Caller-supplied
+dynamic shared memory is unsupported and must be zero. These launch properties
+are checked before TensorRT accepts the launch.
 
 .. note::
 
@@ -196,20 +215,24 @@ tile size, and it is a hard requirement rather than a hint.
    a second op if you need a second dtype — multi-config autotuning is not
    yet supported.
 
-   ``tileiras``, the cuTile compiler, ships with ``cuda-tile`` but is not on
-   ``PATH`` by default; add the package's bin directory (e.g.
-   ``<site-packages>/nvidia/cu13/bin``) before registering cuTile kernels.
+   The Torch operator schema must contain Tensor inputs and Tensor outputs
+   only. Runtime scalar parameters cannot be forwarded by this AOT ABI; make
+   them ``ct.Constant`` parameters and supply them through ``constants``.
 
    ``tileiras`` emits the PTX ISA of the toolkit it was built against, which
    can be newer than the installed driver loads.  Nothing catches that on its
    own: TensorRT builds the engine, and at inference the plugin logs
    ``onShapeChange status -1`` while ``enqueue`` still returns, so the model
    silently produces wrong numbers.  :func:`cutile_op` therefore offers the
-   compiled PTX to the driver at registration.  If it is refused, the
-   ``.version`` header is lowered to what the driver accepts, the result is
-   re-checked, and a warning names both versions; if no header makes it
-   loadable, registration raises.  Aligning the driver with the cuda-tile
-   toolchain removes the step; ``max_ptx_version=`` pins the header manually.
+   exact compiled PTX to the driver at registration and raises if it is
+   refused. Align the driver with the cuda-tile toolchain; only pass
+   ``max_ptx_version=`` to explicitly cap the header when you have independently
+   verified that the compiled instructions are compatible.
+
+   ``arch_override=`` may be used to cross-compile for another GPU. PTX for the
+   current device is checked by loading it through the CUDA driver; a different
+   target cannot be checked locally and must be validated on that target before
+   deployment.
 
 Kernel signature convention
 ---------------------------

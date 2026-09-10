@@ -29,8 +29,24 @@ def _has_module(*names: str) -> bool:
     return False
 
 
+def _has_cutile_toolchain() -> bool:
+    """Whether the AOT API and a compiler discoverable by cuTile are present."""
+    if not _has_module("cuda.tile"):
+        return False
+
+    try:
+        from cuda.tile._compile import _find_compiler_bin
+        from cuda.tile.compilation import export_kernel  # noqa: F401
+
+        _find_compiler_bin()
+    except (ImportError, AttributeError, FileNotFoundError, OSError, ValueError):
+        return False
+    return True
+
+
 skip_no_cutile = pytest.mark.skipif(
-    not _has_module("cuda.tile"), reason="cuda-tile not installed"
+    not _has_cutile_toolchain(),
+    reason="cuda-tile >=1.3 and its tileiras compiler are required",
 )
 
 # The cuda-core ``cuda.core`` API is the NVRTC/QDP backend.
@@ -199,12 +215,16 @@ extern "C" __global__ void ttk_kp_sin_cos(
 """
 
 
-def register_once(register_fn):
-    """Invoke `register_fn()`; swallow duplicate-registration errors on re-run."""
-    try:
-        register_fn()
-    except Exception:
-        pass
+_REGISTERED_OPS = set()
+
+
+def register_once(register_fn, *, key=None):
+    """Register once per worker without hiding a real registration failure."""
+    token = register_fn if key is None else key
+    if token in _REGISTERED_OPS:
+        return
+    register_fn()
+    _REGISTERED_OPS.add(token)
 
 
 def assert_ran_in_engine(trt_module, op_name: str) -> None:

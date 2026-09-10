@@ -78,7 +78,7 @@ class Suite:
     verbose: bool = False  # -v
     variants: tuple[Variant, ...] = ALL_VARIANTS
     platforms: tuple[Platform, ...] = ALL_PLATFORMS  # channels this suite runs on
-    setup: tuple[str, ...] = ()  # named pre-steps: hub|executorch|cuda-core|mpi
+    setup: tuple[str, ...] = ()  # named pre-steps; validated by ``ci doctor``
     follow: tuple[tuple[str, ...], ...] = ()  # extra argv to run AFTER pytest
     env: dict[str, str] = field(default_factory=dict)
     runner: str | None = None  # GHA runner label; None = matrix.validation_runner
@@ -299,7 +299,7 @@ _L2: list[Suite] = [
         lanes=("nightly",),
         cwd="tests/py/kernels",
         paths=(".",),
-        setup=("cuda-core",),
+        setup=("cuda-core", "cuda-tile"),
         jobs="auto",
         variants=("standard",),
         platforms=("linux-x86_64",),

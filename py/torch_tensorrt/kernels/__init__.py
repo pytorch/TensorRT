@@ -1,13 +1,12 @@
 """
 torch_tensorrt.kernels  (experimental)
 =======================================
-Register custom CUDA C++ kernels — compiled at runtime with NVRTC via
-**cuda-python** — as TensorRT Quick Deployable Plugins (QDP). Tensor-only
-declarative kernels use AOT plugin launches when available; kernels with
-``ScalarInput`` use TensorRT's QDP JIT path so runtime scalar attributes can
-be forwarded by value.
+Register custom CUDA C++ and cuTile kernels as TensorRT Quick Deployable
+Plugins (QDP). Tensor-only declarative kernels use AOT plugin launches when
+available; CUDA C++ kernels with ``ScalarInput`` use TensorRT's QDP JIT path so
+runtime scalar attributes can be forwarded by value.
 
-The module exposes a single registration entry point for source kernels:
+The module exposes three registration entry points:
 
 ``cuda_kernel_op`` — fully declarative for the common cases, with optional
     overrides for everything else. Describe the kernel via :class:`KernelSpec`

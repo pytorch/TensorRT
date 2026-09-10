@@ -15,7 +15,7 @@ Three functions, three paths into the same registration funnel:
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Mapping, Optional, Sequence, Union
 
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import ConverterPriority
@@ -76,7 +76,7 @@ def cuda_kernel_op(
     _require_qdp_plugin()
 
     # Late import to avoid circular imports and keep the decorator cheap.
-    from torch_tensorrt.kernels._register import register_qdp_plugin
+    from torch_tensorrt.kernels._register import register_cuda_python_plugin
 
     _validation._validate_spec(
         spec,
@@ -101,7 +101,7 @@ def cuda_kernel_op(
     elif spec.inputs and spec.outputs:
         final_schema = _derive._build_schema(spec)
     else:
-        # Let register_qdp_plugin fall back to _infer_schema(meta_fn).
+        # Let register_cuda_python_plugin fall back to _infer_schema(meta_fn).
         final_schema = None
 
     cuda_spec = CudaPythonSpec(
@@ -128,7 +128,7 @@ def cuda_kernel_op(
             isinstance(input_spec, ScalarInput) for input_spec in (spec.inputs or [])
         )
 
-    register_qdp_plugin(
+    register_cuda_python_plugin(
         op_name=op_name,
         spec=cuda_spec,
         meta_fn=final_meta,
@@ -165,7 +165,7 @@ def ptx_op(
     """
     _require_qdp_plugin()
 
-    from torch_tensorrt.kernels._register import register_qdp_plugin
+    from torch_tensorrt.kernels._register import register_cuda_python_plugin
 
     spec = CudaPythonSpec(
         kernel_source="",
@@ -173,7 +173,7 @@ def ptx_op(
         aot_fn=aot_fn,
         eager_fn=eager_fn,
     )
-    register_qdp_plugin(
+    register_cuda_python_plugin(
         op_name=op_name,
         spec=spec,
         meta_fn=meta_fn,
@@ -190,13 +190,13 @@ def ptx_op(
 def cutile_op(
     op_name: str,
     kernel: Any,
-    signature: Dict[str, Any],
+    signature: Mapping[str, Any],
     meta_fn: Callable[..., Any],
     *,
     grid: Optional[Callable[..., Any]] = None,
-    constants: Optional[Dict[str, int]] = None,
+    constants: Optional[Mapping[str, Union[bool, int, float]]] = None,
     ndim: int = 1,
-    block_size: Optional[int] = None,
+    block_size: Optional[Union[int, Sequence[int]]] = None,
     aot_fn: Optional[Callable[..., Any]] = None,
     eager_fn: Optional[Callable[..., Any]] = None,
     arch_override: Optional[str] = None,
@@ -220,8 +220,8 @@ def cutile_op(
         def relu(x, out, tile_size: ct.Constant[int]): ...
 
     ``signature`` names the arrays in that order; ``constants`` supplies the
-    ``ct.Constant`` values. See :mod:`torch_tensorrt.kernels._cutile` for why the
-    PTX has to be permuted.
+    ``ct.Constant`` values. The cuTile entry-point documentation explains why
+    the PTX has to be permuted.
 
     Args:
         op_name: qualified op name ``"ns::name"``. After registration
@@ -247,22 +247,28 @@ def cutile_op(
         ndim: the rank each array is compiled for. Defaults to 1, matching
             kernels written against a flattened view; a rank-1 array's extent is
             the tensor's element count, so such an op accepts any input shape.
-        block_size: threads per block. Defaults to the ``.reqntid`` the compiled
-            kernel declares, which is authoritative — pass this only for kernels
-            that declare none.
+        block_size: one to three block dimensions. Defaults to the ``.reqntid``
+            the compiled kernel declares, which is authoritative. Pass this only
+            for kernels that declare none and only with the derived ``grid`` path.
         aot_fn: optional replacement for the derived AOT launch
             (``callable(inputs, outputs, tactic) -> (KernelLaunchParams,
             extra_args)``), used instead of ``grid``. The PTX is still permuted,
-            so the override must emit extra arguments in the order
-            :func:`~torch_tensorrt.kernels._cutile.cutile_param_order` expects:
-            every input array's extents and strides, then every output's.
+            so the override must emit extra arguments in cuTile ABI order:
+            every input array's extents and strides, then every output's, in a
+            ``trtp.SymIntExprs`` container. The wrapper checks the container,
+            item type, and count, but the caller owns the values and order. Its
+            block dimensions must be static and exactly match the compiled
+            kernel's ``.reqntid`` when one is declared; dynamic shared memory
+            must be zero.
         eager_fn: optional CUDA eager implementation registered on the torch
             op. Omit if the op is only used through ``torch_tensorrt.compile``.
         arch_override: target architecture such as ``"sm_100"``. Defaults to the
-            current device's compute capability.
-        max_ptx_version: ISA ceiling for the embedded PTX, as a ``90``-style
-            int (``.version 9.0``). Defaults to what the running driver
-            accepts; the header is capped only when the emitted ISA is newer.
+            current device's compute capability. An override for a different
+            architecture is a cross-compile, so its PTX cannot be driver-checked
+            locally and must be verified on the target device.
+        max_ptx_version: explicit ISA ceiling for the embedded PTX, as a
+            ``90``-style int (``.version 9.0``). The compiler's header is left
+            unchanged by default. A capped candidate is verified by the driver.
         capability_validator: optional extra predicate gating conversion. It is
             combined with the dtype check derived from ``signature`` — both must
             pass for the op to be lowered to the plugin.
@@ -283,34 +289,80 @@ def cutile_op(
     _require_qdp_plugin()
 
     from torch_tensorrt.kernels import _cutile
-    from torch_tensorrt.kernels._register import tensor_arity
+    from torch_tensorrt.kernels._register import _torch_op_already_registered
 
-    constants = dict(constants or {})
+    schema_info = _cutile.analyze_tensor_schema(op_name, meta_fn, schema)
+    raw_constants = {} if constants is None else constants
+
+    if eager_fn is not None and not callable(eager_fn):
+        raise ValueError(f"cutile_op '{op_name}' eager_fn must be callable.")
+    if capability_validator is not None and not callable(capability_validator):
+        raise ValueError(
+            f"cutile_op '{op_name}' capability_validator must be callable."
+        )
+
+    def _ensure_name_available() -> None:
+        if _torch_op_already_registered(op_name):
+            raise ValueError(
+                f"cutile_op '{op_name}' is already registered with PyTorch; "
+                "choose a unique op_name."
+            )
 
     # Validate before compiling: nothing here needs the kernel built, and every
     # rule it enforces would otherwise surface as wrong numbers, not an error.
     layout = _cutile.validate_cutile_config(
         op_name,
         signature,
-        constants,
-        tensor_arity(meta_fn, schema),
+        raw_constants,
+        (schema_info.num_inputs, schema_info.num_outputs),
         default_ndim=ndim,
-        derived_launch=aot_fn is None,
-        has_grid=grid is not None,
+        input_names=schema_info.input_names,
     )
+    constants_dict = dict(raw_constants)
 
+    if aot_fn is None:
+        if not callable(grid):
+            raise ValueError(
+                f"cutile_op '{op_name}' needs a callable grid= to derive the "
+                "launch, or a callable aot_fn= to replace it."
+            )
+    else:
+        if not callable(aot_fn):
+            raise ValueError(f"cutile_op '{op_name}' aot_fn must be callable.")
+        if grid is not None:
+            raise ValueError(
+                f"cutile_op '{op_name}' was given both grid= and aot_fn=; the "
+                "custom aot_fn builds the whole launch, so grid would be ignored."
+            )
+        if block_size is not None:
+            raise ValueError(
+                f"cutile_op '{op_name}' block_size is only used with the derived "
+                "grid launch and would be ignored by the custom aot_fn."
+            )
+
+    # Fail closed instead of letting the shared legacy registrar treat an
+    # unrelated existing Torch op as an idempotent registration.
+    _ensure_name_available()
     ptx, kernel_name, reqntid = _cutile.compile_cutile_to_ptx(
-        op_name, kernel, layout, constants, arch_override, max_ptx_version
+        op_name, kernel, layout, constants_dict, arch_override, max_ptx_version
     )
 
     if aot_fn is None:
-        assert grid is not None  # validate_cutile_config enforces exactly one
+        assert grid is not None
         aot_fn = _cutile.make_aot_fn(
             op_name,
             layout,
             grid,
-            _cutile.resolve_block_threads(op_name, kernel_name, reqntid, block_size),
+            _cutile.resolve_block_dims(op_name, kernel_name, reqntid, block_size),
         )
+    else:
+        aot_fn = _cutile.make_checked_aot_fn(
+            op_name, kernel_name, layout, reqntid, aot_fn
+        )
+
+    # Compilation can execute arbitrary toolchain code, so check again in case
+    # it registered the name re-entrantly before handing off to ``ptx_op``.
+    _ensure_name_available()
 
     # Everything past this point is "register pre-compiled PTX", which is
     # exactly what ptx_op is; the only cuTile-specific addition is the dtype
@@ -328,6 +380,6 @@ def cutile_op(
         capability_validator=_cutile.make_dtype_capability_validator(
             op_name, layout, capability_validator
         ),
-        schema=schema,
+        schema=schema_info.schema,
     )
     _LOGGER.info("cutile_op '%s' registered (kernel: %s)", op_name, kernel_name)

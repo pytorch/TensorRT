@@ -178,7 +178,14 @@ trt_tier_l2_plugin() {
         # ``cuda.core`` API (Device / Program / launch). NVIDIA split this out
         # of the old cuda-python umbrella into the cuda-core distribution for
         # CUDA 13+, so installing cuda-python alone is no longer enough.
-        ( _trt_py -m pip install cuda-python cuda-core
+        ( _trt_py -m pip install cuda-python cuda-core 'cuda-tile>=1.3.0,<2'
+          # System CUDA Toolkit 13.1+ can contain tileiras; compatibility also
+          # depends on the cuda-tile release. Require it on those rows;
+          # cu126/cu130 retain the other kernel tests while pytest skips only
+          # the compiler-dependent cuTile integrations.
+          if [[ ! "${CU_VERSION:-}" =~ ^cu([0-9]+)$ ]] || (( 10#${BASH_REMATCH[1]} >= 131 )); then
+              _trt_py -c "from cuda.tile.compilation import export_kernel; from cuda.tile._compile import _find_compiler_bin; _find_compiler_bin()"
+          fi
           cd "${TRT_REPO_ROOT}/tests/py/kernels"
           _trt_py -m pytest -ra $(_trt_nproc auto) --junitxml="$(_trt_xml dynamo_kernels_test_results)" . "$@" )
     fi

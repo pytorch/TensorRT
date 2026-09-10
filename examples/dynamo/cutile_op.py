@@ -18,6 +18,9 @@ agree, and a mismatch does not fail — the kernel reads whatever landed in each
 slot and returns plausible-looking garbage. ``cutile_op`` permutes the compiled
 PTX's parameter list and supplies the matching extents and strides as AOT extra
 arguments, so the kernel binds what it expects.
+
+This example requires ``cuda-tile>=1.3,<2`` and ``tileiras`` from a system CUDA
+Toolkit compatible with that package, on ``PATH`` or under ``CUDA_HOME``.
 """
 
 import argparse
@@ -64,36 +67,35 @@ def add_one_kernel(x, out, tile_size: ct.Constant[int]):
 #   range of shapes.
 # * ``meta_fn`` — shape/dtype inference for FakeTensors (the Torch schema is
 #   inferred from its type hints).
-# * ``eager_fn`` — optional; lets ``torch.ops.my.add_one`` also run outside
+# * ``eager_fn`` — optional; lets ``torch.ops.cutile_example.add_one`` also run outside
 #   TensorRT.
 
 
-def add_one_meta(X: torch.Tensor) -> torch.Tensor:
-    return torch.empty_like(X)
+def add_one_meta(x: torch.Tensor) -> torch.Tensor:
+    return torch.empty_like(x)
 
 
-def add_one_eager(X: torch.Tensor) -> torch.Tensor:
-    Y = torch.empty_like(X)
-    flat_x = X.contiguous().reshape(-1)
-    flat_y = Y.reshape(-1)
+def add_one_eager(x: torch.Tensor) -> torch.Tensor:
+    out = torch.empty_like(x)
+    flat_x = x.contiguous().reshape(-1)
+    flat_out = out.reshape(-1)
     ct.launch(
         torch.cuda.current_stream().cuda_stream,
         (ct.cdiv(flat_x.numel(), TILE_SIZE), 1, 1),
         add_one_kernel,
-        (flat_x, flat_y, TILE_SIZE),
+        (flat_x, flat_out, TILE_SIZE),
     )
-    return Y
+    return out
 
 
 ttk.cutile_op(
-    "my::add_one",
+    "cutile_example::add_one",
     kernel=add_one_kernel,
     signature={"x": "fp32", "out": "fp32"},
     meta_fn=add_one_meta,
     grid=lambda inputs, outputs: (trtp.cdiv(inputs[0].shape_expr.numel(), TILE_SIZE),),
     constants={"tile_size": TILE_SIZE},
     eager_fn=add_one_eager,
-    supports_dynamic_shapes=True,
 )
 
 
@@ -104,7 +106,7 @@ ttk.cutile_op(
 
 class AddOne(torch.nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return torch.ops.my.add_one(x)
+        return torch.ops.cutile_example.add_one(x)
 
 
 if __name__ == "__main__":
@@ -123,12 +125,5 @@ if __name__ == "__main__":
     print("engine compiled with the AOT QDP plugin")
 
     trt_out = trt_model(x)
-    if torch.allclose(trt_out, ref, atol=1e-5):
-        print("cutile_op AOT QDP plugin ran correctly under Torch-TensorRT")
-    else:
-        print(
-            "WARNING: TRT output did not match. Check that the CUDA driver "
-            "supports the kernel's PTX ISA (a toolkit newer than the driver "
-            "can require capping via max_ptx_version); registration, compile "
-            "and engine build succeeded."
-        )
+    assert torch.allclose(trt_out, ref, atol=1e-5), "cutile_op TRT output mismatch"
+    print("cutile_op AOT QDP plugin ran correctly under Torch-TensorRT")
