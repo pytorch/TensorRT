@@ -32,6 +32,7 @@ cmake(
     cache_entries = {
         "CMAKE_BUILD_TYPE": "Release",
         "EXECUTORCH_CMAKE_FILE": "$(execpath @executorch//:executorch/CMakeLists.txt)",
+        "EXECUTORCH_ENABLE_LOGGING": "ON",
         "PYTHON_EXECUTABLE": "$${PYTHON_BIN_PATH}",
         "TORCH_HEADER_MARKER": "$(execpath @libtorch//:include/torch/headeronly/util/TypeTraits.h)",
         "TORCH_TENSORRT_SOURCE_DIR": "$$EXT_BUILD_ROOT$$",

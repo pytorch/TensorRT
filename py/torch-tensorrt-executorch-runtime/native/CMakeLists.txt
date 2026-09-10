@@ -283,12 +283,19 @@ endforeach()
 # directories under site-packages, relative to this extension package.
 # Preserve these paths in both the Bazel-collected build output and installed
 # extension so importing the wheel does not depend on LD_LIBRARY_PATH.
+if(CUDAToolkit_VERSION_MAJOR EQUAL 12)
+  set(_torch_tensorrt_executorch_cuda_rpath "$ORIGIN/../nvidia/cu12/lib")
+elseif(CUDAToolkit_VERSION_MAJOR EQUAL 13)
+  set(_torch_tensorrt_executorch_cuda_rpath "$ORIGIN/../nvidia/cu13/lib")
+else()
+  message(FATAL_ERROR "Unsupported CUDA major version: ${CUDAToolkit_VERSION_MAJOR}")
+endif()
 set(_torch_tensorrt_executorch_runtime_rpath
   "$ORIGIN"
   "$ORIGIN/../torch/lib"
   "$ORIGIN/../tensorrt_libs"
   "$ORIGIN/../nvidia/cuda_runtime/lib"
-  "$ORIGIN/../nvidia/cu13/lib")
+  "${_torch_tensorrt_executorch_cuda_rpath}")
 set_target_properties(portable_lib PROPERTIES
   BUILD_WITH_INSTALL_RPATH ON
   INSTALL_RPATH "${_torch_tensorrt_executorch_runtime_rpath}"

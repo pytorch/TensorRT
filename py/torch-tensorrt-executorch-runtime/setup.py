@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import importlib.metadata
 import os
 import pathlib
 import platform
-import re
 import shlex
 import shutil
 import subprocess
@@ -21,43 +19,41 @@ HERE = pathlib.Path(__file__).resolve().parent
 REPO_ROOT = HERE.parents[1]
 BAZEL_TARGET = "//py/torch-tensorrt-executorch-runtime/native:delegate_native"
 BUILD_NONCE = os.getenv("TORCH_TENSORRT_EXECUTORCH_BUILD_NONCE", uuid.uuid4().hex)
-CUDA_RUNTIME_DISTRIBUTION = "nvidia-cuda-runtime"
 
 
-def torchtrt_version() -> str:
-    if value := os.getenv("TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION"):
-        return value
-    version_py = REPO_ROOT / "py/torch_tensorrt/_version.py"
-    if version_py.exists():
-        if m := re.search(r'__version__\s*=\s*["\']([^"\']+)', version_py.read_text()):
-            return m.group(1)
-    return (REPO_ROOT / "version.txt").read_text().strip()
+def get_runtime_version() -> str:
+    """Match the primary wheel's local-version convention with this wheel's base."""
+    if version := os.getenv("TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION"):
+        return version
 
-
-def public_version(version: str) -> str:
-    """Drop a PEP 440 local suffix that may not be present on package indexes."""
-    return version.partition("+")[0]
-
-
-def installed_version(distribution: str) -> str:
-    """Return the version of a dependency in the native build environment."""
+    base_version = (HERE / "version.txt").read_text().strip()
     try:
-        return importlib.metadata.version(distribution)
-    except importlib.metadata.PackageNotFoundError as error:
-        raise RuntimeError(
-            f"{distribution} must be installed to build the ExecuTorch runtime wheel"
-        ) from error
+        revision = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"], cwd=REPO_ROOT, text=True
+        ).strip()
+    except (OSError, subprocess.CalledProcessError):
+        print("WARNING: Could not get git revision short hash, using default one")
+        revision = "0000000"
+    return f"{base_version}.dev0+{revision}"
 
 
-def tensorrt_distribution() -> str:
-    """Return the TensorRT distribution matching the PyTorch CUDA build."""
+RUNTIME_VERSION = get_runtime_version()
+
+TORCH_REQUIREMENT = "torch>=2.15.0.dev0,<2.16.0"
+EXECUTORCH_REQUIREMENT = "executorch==1.4.1"
+TORCH_TENSORRT_REQUIREMENT = "torch-tensorrt>=2.15.0.dev0,<2.16.0"
+
+
+def get_tensorrt_requirement() -> str:
     cuda_version = torch.version.cuda
     if cuda_version is None:
-        raise RuntimeError("CUDA-enabled PyTorch is required to build this wheel")
-    if cuda_version.startswith("12.6"):
-        return "tensorrt-cu12"
+        raise RuntimeError(
+            "CUDA enabled PyTorch is required to build this wheel found None"
+        )
+    if cuda_version.startswith("12."):
+        return "tensorrt-cu12>=11.2.1,<11.3"
     if cuda_version.startswith("13."):
-        return "tensorrt-cu13"
+        return "tensorrt-cu13>=11.2.1,<11.3"
     raise RuntimeError(f"Unsupported CUDA version: {cuda_version}")
 
 
@@ -89,6 +85,15 @@ class BazelBuild(build_ext):
             f"--action_env=PYTHON_BIN_PATH={sys.executable}",
             f"--action_env=TORCH_TENSORRT_EXECUTORCH_BUILD_NONCE={BUILD_NONCE}",
         ]
+        # Bazel actions run with a restricted environment.  In particular,
+        # rules_foreign_cc's CMake invocation does not inherit this process's
+        # TORCH_CUDA_ARCH_LIST unless it is made an action environment value.
+        # Without it, ExecuTorch's CMake falls back to its common architecture
+        # list (including compute_50), which CUDA 13 rejects.
+        cuda_arch_list = os.getenv("TORCH_CUDA_ARCH_LIST")
+        if cuda_arch_list:
+            print(f"Forwarding TORCH_CUDA_ARCH_LIST to Bazel actions: {cuda_arch_list}")
+            command.append(f"--action_env=TORCH_CUDA_ARCH_LIST={cuda_arch_list}")
         dist_dir_arch = (
             "aarch64-linux-gnu"
             if platform.machine() in {"aarch64", "arm64"}
@@ -137,16 +142,14 @@ class BazelBuild(build_ext):
             source = built.parent / dependency
             if not source.is_file():
                 raise RuntimeError(f"Bazel did not produce {source}")
-            shutil.copy2(source, output.parent / dependency)
+            destination = output.parent / dependency
+            destination.unlink(missing_ok=True)
+            shutil.copy2(source, destination)
 
 
-TENSORRT_DISTRIBUTION = tensorrt_distribution()
-executorch_version = installed_version("executorch")
-tensorrt_version = installed_version(TENSORRT_DISTRIBUTION)
-cuda_runtime_version = installed_version(CUDA_RUNTIME_DISTRIBUTION)
 setup(
     name="torch-tensorrt-executorch-runtime",
-    version=torchtrt_version(),
+    version=RUNTIME_VERSION,
     description="Torch-TensorRT delegate for the ExecuTorch Python runtime",
     packages=find_packages(),
     ext_modules=[
@@ -156,11 +159,10 @@ setup(
     cmdclass={"build_ext": BazelBuild},
     python_requires=">=3.10",
     install_requires=[
-        f"torch=={public_version(torch.__version__)}",
-        f"executorch=={public_version(executorch_version)}",
-        f"torch-tensorrt=={torchtrt_version()}",
-        f"{TENSORRT_DISTRIBUTION}=={tensorrt_version}",
-        f"{CUDA_RUNTIME_DISTRIBUTION}=={cuda_runtime_version}",
+        TORCH_REQUIREMENT,
+        EXECUTORCH_REQUIREMENT,
+        TORCH_TENSORRT_REQUIREMENT,
+        get_tensorrt_requirement(),
     ],
     zip_safe=False,
 )

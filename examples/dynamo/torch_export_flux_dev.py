@@ -13,7 +13,7 @@ To run this demo, you need to have access to Flux model (request for access if y
 
 .. code-block:: python
 
-    pip install sentencepiece=="0.2.0" transformers=="4.48.2" accelerate=="1.3.0" diffusers=="0.32.2" protobuf=="5.29.3"
+    pip install sentencepiece=="0.2.0" transformers=="5.14.1" accelerate=="1.3.0" diffusers=="0.40.0" protobuf=="5.29.3"
 
 There are different components of the ``FLUX.1-dev`` pipeline such as ``transformer``, ``vae``, ``text_encoder``, ``tokenizer`` and ``scheduler``. In this example,
 we demonstrate optimizing the ``transformer`` component of the model (which typically consumes >95% of the e2e diffusion latency)

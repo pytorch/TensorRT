@@ -24,7 +24,8 @@ INDEX_URL=https://download.pytorch.org/whl/${CHANNEL}/${TORCH_INDEX_CU_VERSION}
 # The workflow installs torch before this script runs. Avoid uninstalling and
 # force-reinstalling it here: with the shortened Windows conda prefix, pip can
 # rediscover a half-removed torch dist-info through the original C:\ path.
-python -m pip install --pre "${TORCH}" --index-url "${INDEX_URL}" || exit 1
+python -m pip install --pre "${TORCH}" --index-url "${INDEX_URL}" \
+  --extra-index-url https://pypi.org/simple || exit 1
 
 if [[ -n "${TORCHTRT_CROSS_COMPILE_CUDA_HOME:-}" ]]; then
   export CUDA_HOME="${TORCHTRT_CROSS_COMPILE_CUDA_HOME//\\//}"
