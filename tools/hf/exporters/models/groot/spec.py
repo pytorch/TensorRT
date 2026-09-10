@@ -21,7 +21,6 @@ from .helpers import (
     _groot,
     make_embodiment_id,
 )
-from .patches import apply_groot_patches
 
 
 def _export_module(module: nn.Module, sample: Mapping[str, Any]) -> nn.Module:
@@ -43,7 +42,16 @@ def _causal_lm(language: nn.Module) -> nn.Module:
 @register_edge_spec("groot", "gr00t")
 class GrootSpec(EdgeSpec):  # type: ignore[misc]
     def apply_patches(self, model=None):
-        return apply_groot_patches(model)
+        from ...plugin.attn_patches import apply_patches, patch_attribute
+        from .helpers import _groot
+
+        with apply_patches(GROOT):
+            if model is None:
+                yield
+                return
+            eagle_cls = type(_groot(model).backbone.eagle_model)
+            with patch_attribute(eagle_cls, "forward", _patch_eagle_image_features):
+                yield
 
     def prepare_sample_inputs(
         self, model: nn.Module, raw: Mapping[str, Any], config: Any
