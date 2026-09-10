@@ -5835,44 +5835,44 @@ wheels = [
 
 [[package]]
 name = "tensorrt-cu13"
-version = "11.2.1.2"
+version = "11.3.0.99"
 source = { registry = "https://pypi.nvidia.com/" }
 dependencies = [
     { name = "tensorrt-cu13-bindings", marker = "sys_platform == 'linux' or sys_platform == 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
     { name = "tensorrt-cu13-libs", marker = "sys_platform == 'linux' or sys_platform == 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
 ]
-sdist = { url = "https://pypi.nvidia.com/tensorrt-cu13/tensorrt_cu13-11.2.1.2.tar.gz", hash = "sha256:5a15c04615c59338d8f95205f5a24e7dfe18086d4a3449ddd5992e75f0f829b9" }
+sdist = { url = "https://pypi.nvidia.com/tensorrt-cu13/tensorrt_cu13-11.3.0.99.tar.gz", hash = "sha256:6410ec3c25e661faf217620365b0c661024933b8fdb03c5190172690e8070162" }
 
 [[package]]
 name = "tensorrt-cu13-bindings"
-version = "11.2.1.2"
+version = "11.3.0.99"
 source = { registry = "https://pypi.nvidia.com/" }
 wheels = [
-    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-11.2.1.2-cp310-none-manylinux_2_28_x86_64.whl", hash = "sha256:88de2cec5c6ba41259ff039deff23e2de2254ac64abe99dc1b93fa8f5fcac6ca" },
-    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-11.2.1.2-cp310-none-manylinux_2_35_aarch64.whl", hash = "sha256:b4cacb718fb02fe7277e46efeaae1f1b8a737262020e33ffc4b203968d4889d9" },
-    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-11.2.1.2-cp310-none-win_amd64.whl", hash = "sha256:58829fd96276822bd2b4e65f1fc28ff91b0874e2b68aa71be140aaedb9adb791" },
-    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-11.2.1.2-cp311-none-manylinux_2_28_x86_64.whl", hash = "sha256:98d10a4374ecd5e37858f8d9a1769c2719b4302e6c0bcd24c8a47fa16921bf5e" },
-    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-11.2.1.2-cp311-none-manylinux_2_35_aarch64.whl", hash = "sha256:f02d6fac4edc53b5197c2c61ea7dc1d5095fd03083c3ab323c96bb74c5f7fedc" },
-    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-11.2.1.2-cp311-none-win_amd64.whl", hash = "sha256:6ec82c7ac44daec4ae46197925ed50c5b9135121544bbcbfb254409164100cd1" },
-    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-11.2.1.2-cp312-none-manylinux_2_28_x86_64.whl", hash = "sha256:b3ba3b47a13b8c37c6f55e72502ddc2b369adc7f4c3e49eb9398836a204669ae" },
-    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-11.2.1.2-cp312-none-manylinux_2_35_aarch64.whl", hash = "sha256:994c8d528ef55a4d3a1416f485499d7210c2e903f3c9c93cc721501786549c58" },
-    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-11.2.1.2-cp312-none-win_amd64.whl", hash = "sha256:6b4c7fb311543bf99e8c513e7a89677eeb443101848b60a7b0d782e3c8cf3e48" },
-    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-11.2.1.2-cp313-none-manylinux_2_28_x86_64.whl", hash = "sha256:4c4370517a6d7cdcb21c0463bf12fd8190a629a05276e82ca0eccc76f4e1c176" },
-    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-11.2.1.2-cp313-none-manylinux_2_35_aarch64.whl", hash = "sha256:48bed389fcebad02f574cdd880d2a68015fa771aac8e0fd0ea688df457da5b41" },
-    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-11.2.1.2-cp313-none-win_amd64.whl", hash = "sha256:5efa6822b8a69d1342f18c086fdaa4ec25fdcc9e13857ee6c210e49f5c7dc9f4" },
-    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-11.2.1.2-cp314-none-manylinux_2_28_x86_64.whl", hash = "sha256:837d512ee78f79c309bd654928146837c2a4dc5e2c81e6b2f9af7d0b04f7d4aa" },
-    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-11.2.1.2-cp314-none-manylinux_2_35_aarch64.whl", hash = "sha256:323183f29c6675a39204939b8a4a83489e51ce30d4bc2b53e76ae6c44b056798" },
-    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-11.2.1.2-cp314-none-win_amd64.whl", hash = "sha256:0b7e513e2cd70bf608d1bc36885519e16ae7c6b2cff8c0eaf166134a1739670b" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-11.3.0.99-cp310-none-manylinux_2_28_x86_64.whl", hash = "sha256:cef8cf2bdc2be35a422ed69f100d8137ed86102ba253c3284c08fa64fa143e77" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-11.3.0.99-cp310-none-manylinux_2_35_aarch64.whl", hash = "sha256:47757532410dbd3279b9e7e9d94c562eefdbb60995cb3191e34bd79352ca36f2" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-11.3.0.99-cp310-none-win_amd64.whl", hash = "sha256:19de577927026cc2427eb825d6357a0d2b08c2ad0add5171673955aec4a62d38" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-11.3.0.99-cp311-none-manylinux_2_28_x86_64.whl", hash = "sha256:b49359f9735e7bb2d5f5fb2f1419992f51adef303dd5f62f9872b738c7acba92" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-11.3.0.99-cp311-none-manylinux_2_35_aarch64.whl", hash = "sha256:fad30fa57f61a33c625d6e9716e41362b8ddaaf16b1d096969432646dfe53c28" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-11.3.0.99-cp311-none-win_amd64.whl", hash = "sha256:4d1c7a6a053b429edae72ffdb7ad719a3a38bc027734f5d6ae8d5ce9c97ef403" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-11.3.0.99-cp312-none-manylinux_2_28_x86_64.whl", hash = "sha256:91b4e4cbe385dfd405ad8cfd927c6c22d5cd431895929b74a31f9887761c09b3" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-11.3.0.99-cp312-none-manylinux_2_35_aarch64.whl", hash = "sha256:bb5b014cdddbc3215815c88a968cf22dd113f325b203937335ec3fdd5b9c8614" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-11.3.0.99-cp312-none-win_amd64.whl", hash = "sha256:83ce38483b329dec1a1df7ccf5a465319f9d3a16db6686e1e17ed89f8bfee8ab" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-11.3.0.99-cp313-none-manylinux_2_28_x86_64.whl", hash = "sha256:0a3fe4a0d8ce0b19dfb516ebc0c8c0809655e8dbd8e1d498b0e4dbdddd6a872d" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-11.3.0.99-cp313-none-manylinux_2_35_aarch64.whl", hash = "sha256:81cdbb8b0c80c19301b637f320920f4095c58df2d72253e72a1d912a3cbb577b" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-11.3.0.99-cp313-none-win_amd64.whl", hash = "sha256:bc458d6805e0405ffcef440671bad933c5d9b425c3890d51ce6cbb26daeb4100" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-11.3.0.99-cp314-none-manylinux_2_28_x86_64.whl", hash = "sha256:4de928ba22b6ca4cc426d243a5e9b1055149e790c76850df82038d1457ec77c8" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-11.3.0.99-cp314-none-manylinux_2_35_aarch64.whl", hash = "sha256:82dfd45ee1b0f34572d2aa3baee49383ec9ce56592724bd423e331b40e4a02d1" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-11.3.0.99-cp314-none-win_amd64.whl", hash = "sha256:95e162d5321b0907cdd9a2a8ef2dca9a35c832f03618ff259ee018c326115968" },
 ]
 
 [[package]]
 name = "tensorrt-cu13-libs"
-version = "11.2.1.2"
+version = "11.3.0.99"
 source = { registry = "https://pypi.nvidia.com/" }
 wheels = [
-    { url = "https://pypi.nvidia.com/tensorrt-cu13-libs/tensorrt_cu13_libs-11.2.1.2-py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:c2b7c6c3972b986bc66b219aff79cc4de80c845c188c38d4eacd8a0643854753" },
-    { url = "https://pypi.nvidia.com/tensorrt-cu13-libs/tensorrt_cu13_libs-11.2.1.2-py3-none-manylinux_2_35_aarch64.whl", hash = "sha256:ef6f7f89aadc6ab5417b40d4b9dacb308af2bf952fb1a29b987dac8d29006b22" },
-    { url = "https://pypi.nvidia.com/tensorrt-cu13-libs/tensorrt_cu13_libs-11.2.1.2-py3-none-win_amd64.whl", hash = "sha256:6e4b8b5ef990f4de4ba15eef79281f2acaca04186ed18ea5ab3f79d1379c21a0" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-libs/tensorrt_cu13_libs-11.3.0.99-py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:cef957e0b48a525f2bcc8849742de06883cedcc6b96185b9cf0b17c9c75a858a" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-libs/tensorrt_cu13_libs-11.3.0.99-py3-none-manylinux_2_35_aarch64.whl", hash = "sha256:0205735080669d4aecfe34e49d125f171d930ab94018a3ee89e9d91c34f99381" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-libs/tensorrt_cu13_libs-11.3.0.99-py3-none-win_amd64.whl", hash = "sha256:9d504bd9f77a93b30f5c782c1a3cb3f4e53595ea100347360134e5adea198eff" },
 ]
 
 [[package]]
@@ -6312,9 +6312,9 @@ requires-dist = [
     { name = "numpy" },
     { name = "packaging", specifier = ">=23" },
     { name = "psutil" },
-    { name = "tensorrt-cu13", specifier = ">=11.2.1,<11.3.0" },
-    { name = "tensorrt-cu13-bindings", specifier = ">=11.2.1,<11.3.0" },
-    { name = "tensorrt-cu13-libs", specifier = ">=11.2.1,<11.3.0" },
+    { name = "tensorrt-cu13", specifier = ">=11.3.0,<11.4.0" },
+    { name = "tensorrt-cu13-bindings", specifier = ">=11.3.0,<11.4.0" },
+    { name = "tensorrt-cu13-libs", specifier = ">=11.3.0,<11.4.0" },
     { name = "torch", specifier = ">=2.15.0.dev0,<2.16.0", index = "https://download.pytorch.org/whl/nightly/cu130" },
     { name = "typing-extensions", specifier = ">=4.7.0" },
 ]

@@ -51,7 +51,7 @@ case "${CU_VERSION}" in
         export TENSORRT_RTX_CUDA_VERSION_UPPER_BOUND="12.9"
         ;;
     cu13*)
-        export TENSORRT_CUDA_VERSION_UPPER_BOUND="13.3"
+        export TENSORRT_CUDA_VERSION_UPPER_BOUND="13.4"
         export TENSORRT_RTX_CUDA_VERSION_UPPER_BOUND="13.4"
         ;;
     *)
