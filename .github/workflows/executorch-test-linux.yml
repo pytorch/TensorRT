@@ -99,6 +99,15 @@ jobs:
         source tests/py/utils/ci_helpers.sh
         trt_tier_executorch
 
+        # This job builds the reference runner, whose CMakeLists forces
+        # EXECUTORCH_BUILD_CUDA=ON, so it compiles the same aoti_cuda_shims the build job
+        # does and needs the same architecture floor. It sources the channel's build env,
+        # which on cu126 asks for architectures without __dp4a, so filter here too rather
+        # than moving that failure from the build job into this one.
+        TORCH_CUDA_ARCH_LIST="$(python .github/scripts/filter-executorch-cuda-arches.py "${TORCH_CUDA_ARCH_LIST:-}")"
+        export TORCH_CUDA_ARCH_LIST
+        echo "TORCH_CUDA_ARCH_LIST=${TORCH_CUDA_ARCH_LIST}"
+
         bazel build //:libtorchtrt --compilation_mode opt --config=linux
         # Execute the delegate C++ unit tests as well as building the Python
         # examples below. Bazel's cc_import provides unversioned CUDA/TensorRT

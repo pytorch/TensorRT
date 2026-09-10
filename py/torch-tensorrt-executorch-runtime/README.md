@@ -71,6 +71,12 @@ Consequently, the Python API does not use the backend's device-resident
 input/output fast path. Applications that need to keep inputs and outputs on
 GPU should use the ExecuTorch C++ runner.
 
+The device copies around the delegate need the program's device-tagged
+memory-planned arenas backed by real device memory, which ExecuTorch does only
+through its Module API. `Program` therefore loads through
+`_load_for_executorch_from_buffer` rather than through `executorch.runtime`,
+whose program loader plans every arena on the host.
+
 ## Use
 
 ```bash
