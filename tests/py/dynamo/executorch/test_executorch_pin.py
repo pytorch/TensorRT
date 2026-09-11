@@ -64,7 +64,9 @@ BAZEL_COMMIT = re.compile(
 )
 
 # Anywhere else the commit appears it is named on the same line, as a shell default or prose.
-NAMED_COMMIT = re.compile(r"executorch[_a-z]*[^0-9a-f]*([0-9a-f]{40})", re.IGNORECASE)
+NAMED_COMMIT = re.compile(
+    r"(^|[^0-9A-Za-z._-])executorch[_a-z]*[^0-9a-f]*([0-9a-f]{40})", re.IGNORECASE
+)
 
 PAIRING_TEST = "test_the_pinned_commit_is_the_pinned_wheels_own_source"
 # A requirement takes the install-time range only when a comment carrying this exact token sits
@@ -985,7 +987,7 @@ def test_every_source_commit_matches_the_pin() -> None:
         # this scan green. The Bazel walk above already strips comments; do the same here.
         if _is_commented_out(path, text):
             continue
-        for actual in NAMED_COMMIT.findall(_without_trailing_comment(path, text)):
+        for _, actual in NAMED_COMMIT.findall(_without_trailing_comment(path, text)):
             found += 1
             seen[path] += 1
             if actual != commit:
@@ -994,6 +996,43 @@ def test_every_source_commit_matches_the_pin() -> None:
     assert found, "no ExecuTorch source commit found, so this test is not looking"
     _assert_every_site_present(seen, _EXPECTED_COMMIT_SITES, "naming the source commit")
     assert not wrong, f"pin says {commit}:\n  " + "\n  ".join(wrong)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("prefix", ["MY_", "OTHER_", "my.", "my-"])
+@pytest.mark.parametrize("pinned", [False, True])
+def test_source_pin_guard_ignores_other_names(tmp_path, monkeypatch, prefix, pinned):
+    commit = "a" * 40
+    actual = commit if pinned else "main"
+    decoy = "b" * 40 if pinned else commit
+    (tmp_path / "runner.sh").write_text(
+        f"export EXECUTORCH_REF={actual}\n{prefix}EXECUTORCH_REF={decoy}\n"
+    )
+    (tmp_path / "baseline.sh").write_text(f"EXECUTORCH_REF={commit}\n")
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "add", "."], check=True)
+    monkeypatch.setitem(globals(), "REPO_ROOT", tmp_path)
+    monkeypatch.setitem(
+        globals(), "_versions", lambda: {"__executorch_commit__": commit}
+    )
+    monkeypatch.setitem(
+        globals(), "_EXPECTED_COMMIT_SITES", {"runner.sh": 1, "baseline.sh": 1}
+    )
+    if pinned:
+        test_every_source_commit_matches_the_pin()
+    else:
+        with pytest.raises(AssertionError, match="runner.sh carries 0 of 1"):
+            test_every_source_commit_matches_the_pin()
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("pinned", [False, True])
+def test_source_pin_check_detects_removed_name_boundary(tmp_path, monkeypatch, pinned):
+    pattern = NAMED_COMMIT.pattern.replace("(^|[^0-9A-Za-z._-])", "()")
+    assert pattern != NAMED_COMMIT.pattern
+    monkeypatch.setitem(globals(), "NAMED_COMMIT", re.compile(pattern, re.IGNORECASE))
+    with pytest.raises(AssertionError if pinned else pytest.fail.Exception):
+        test_source_pin_guard_ignores_other_names(tmp_path, monkeypatch, "MY_", pinned)
 
 
 @pytest.mark.unit
