@@ -1727,6 +1727,57 @@ def test_unsupported_install_channels_give_guidance(cuda):
     assert "pip install" not in message and "https://" not in message
 
 
+@pytest.mark.parametrize("platform", ["linux", "win32"])
+@pytest.mark.parametrize("install_rc", [0, 7])
+def test_final_wheel_install_controls_the_appended_script(platform, install_rc):
+    script = (REPO_ROOT / ".github/scripts/install-torch-tensorrt.sh").read_text()
+    stubs = r"""
+uname() { echo x86_64; }
+python() {
+    if [[ "$*" == *"sys.platform"* ]]; then
+        echo "$TEST_PLATFORM"
+    elif [[ "$*" == *"sysconfig"* ]]; then
+        echo /fake/site-packages
+    elif [[ "$*" == *"torch_tensorrt"*".whl"* ]]; then
+        echo final-wheel-install
+        return "$TEST_INSTALL_RC"
+    fi
+}
+"""
+    result = subprocess.run(
+        ["bash"],
+        input=stubs + script + "\necho appended-caller-ran\n",
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "TEST_PLATFORM": platform,
+            "TEST_INSTALL_RC": str(install_rc),
+            "CHANNEL": "nightly",
+            "CU_VERSION": "cu130",
+            "RUNNER_ARTIFACT_DIR": "/fake/artifacts",
+        },
+    )
+    assert "final-wheel-install" in result.stdout, result.stderr
+    assert result.returncode == (1 if install_rc else 0), result.stderr
+    assert ("appended-caller-ran" in result.stdout) is (install_rc == 0)
+
+
+@pytest.mark.parametrize("platform", ["linux", "win32"])
+def test_installer_check_detects_lost_exit_guard(monkeypatch, platform):
+    path = REPO_ROOT / ".github/scripts/install-torch-tensorrt.sh"
+    original = Path.read_text
+    text = path.read_text().replace(" || exit 1", "")
+    monkeypatch.setattr(
+        Path,
+        "read_text",
+        lambda p, *a, **kw: text if p == path else original(p, *a, **kw),
+    )
+    with pytest.raises(AssertionError):
+        test_final_wheel_install_controls_the_appended_script(platform, 7)
+
+
 @pytest.mark.parametrize("side_effect", [False, True])
 def test_docgen_pin_reader_accepts_only_the_allowed_ast(monkeypatch, side_effect):
     path = REPO_ROOT / ".github/workflows/docgen.yml"
