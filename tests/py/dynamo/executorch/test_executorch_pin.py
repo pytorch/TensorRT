@@ -635,14 +635,20 @@ def test_jetpack_matrix_keeps_its_separate_cuda_contract():
     assert rows[0]["container_image"] == "nvcr.io/nvidia/l4t-jetpack:r36.4.0"
 
 
-@pytest.mark.parametrize("channel", ["cu126", "cu130", "cu132", "cu134"])
+@pytest.mark.unit
+@pytest.mark.parametrize("channel", ["cu126", "cu130", "cu132", "cu134", "cpu", "rocm"])
+@pytest.mark.parametrize("variable", [False, True])
 def test_install_channel_guard_rejects_unsupported_nightly_recipes(
-    tmp_path, monkeypatch, channel
+    tmp_path, monkeypatch, channel, variable
 ):
+    url = f"https://download.pytorch.org/whl/nightly/{channel}"
+    assignment = f'INDEX="{url}"\n' if variable else ""
+    index = '"${INDEX}"' if variable else url
     recipe = tmp_path / "README.md"
     recipe.write_text(
-        '```bash\npython -m pip install --pre "torch-tensorrt[executorch]" '
-        f"--extra-index-url https://download.pytorch.org/whl/nightly/{channel}\n```\n"
+        f"```bash\n{assignment}"
+        'python -m pip install --pre "torch-tensorrt[executorch]" '
+        f"--extra-index-url {index}\n```\n"
     )
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
     subprocess.run(["git", "-C", str(tmp_path), "add", "README.md"], check=True)
@@ -652,6 +658,27 @@ def test_install_channel_guard_rejects_unsupported_nightly_recipes(
     else:
         with pytest.raises(AssertionError, match=f"nightly/{channel}"):
             test_every_printed_install_instruction_names_the_nightly_channel()
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("variable", [False, True])
+def test_install_channel_check_detects_removed_suffix_fix(
+    tmp_path, monkeypatch, variable
+):
+    import inspect
+
+    guard = test_every_printed_install_instruction_names_the_nightly_channel
+    source = inspect.getsource(guard)
+    fixed = r"nightly(?:/([A-Za-z0-9._-]+))?"
+    assert source.count(fixed) == 2
+    changed = source.replace(fixed, r"nightly(?:/(cu\d+))?")
+    namespace = {**globals(), "REPO_ROOT": tmp_path}
+    exec(compile(changed, __file__, "exec"), namespace)
+    monkeypatch.setitem(globals(), guard.__name__, namespace[guard.__name__])
+    with pytest.raises(pytest.fail.Exception, match="DID NOT RAISE"):
+        test_install_channel_guard_rejects_unsupported_nightly_recipes(
+            tmp_path, monkeypatch, "cpu", variable
+        )
 
 
 @pytest.mark.unit
@@ -1232,7 +1259,7 @@ def test_every_printed_install_instruction_names_the_nightly_channel():
             ]
             index_text = " ".join(indexes)
             channel = re.search(
-                r"download\.pytorch\.org/whl/nightly(?:/(cu\d+))?", index_text
+                r"download\.pytorch\.org/whl/nightly(?:/([A-Za-z0-9._-]+))?", index_text
             )
             # CI passes the channel through a variable rather than a literal URL. Capture the
             # variable name so its assignment can be resolved: accepting the reference on sight let
@@ -1254,7 +1281,8 @@ def test_every_printed_install_instruction_names_the_nightly_channel():
                     )
                     continue
                 channel = re.search(
-                    r"download\.pytorch\.org/whl/nightly(?:/(cu\d+))?", assignment
+                    r"download\.pytorch\.org/whl/nightly(?:/([A-Za-z0-9._-]+))?",
+                    assignment,
                 )
                 if not channel:
                     missing.append(
@@ -1265,7 +1293,7 @@ def test_every_printed_install_instruction_names_the_nightly_channel():
             if not channel:
                 missing.append(f"{name}:{line} names no nightly channel")
                 continue
-            # Concrete CUDA channels must be supported; variable row exports are checked separately.
+            # Literal channels must be supported; variable row exports are checked separately.
             suffix = channel.group(1)
             if suffix and suffix not in _PUBLISHED_NIGHTLY_CHANNELS:
                 missing.append(
