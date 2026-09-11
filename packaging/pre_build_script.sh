@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -x
+set -ex
 
 # Install dependencies
 python3 -m pip install pyyaml packaging

@@ -1,5 +1,7 @@
 
 install_cuda_aarch64() {
+    local nccl_cuda_version=""
+
     echo "install cuda ${CU_VERSION}"
     # CU_VERSION: cu130 --> CU_VER: 13-0
     CU_VER=${CU_VERSION:2:2}-${CU_VERSION:4:1}
@@ -23,20 +25,35 @@ install_cuda_aarch64() {
         # NVIDIA RHEL/SBSA NCCL RPMs are published per CUDA minor.
         if [[ ${CU_VERSION} == "cu134" ]]; then
             nccl_version="2.30.7-1"
+            # PyTorch is pinned to NCCL 2.30.7, whose newest SBSA RPM was
+            # published for CUDA 13.3. There is no 2.30.7+cuda13.4 RPM.
+            # NCCL built with an older CUDA 13.x toolkit is compatible with
+            # the CUDA 13.4 toolkit used by this build.
+            nccl_cuda_version="13.3"
         elif [[ ${CU_VERSION} == "cu132" ]]; then
             nccl_version="2.29.7-1"
+            nccl_cuda_version="13.2"
         elif [[ ${CU_VERSION} == "cu130" ]]; then
             nccl_version="2.27.7-1"
+            nccl_cuda_version="13.0"
         else
             echo "Unsupported CUDA version: ${CU_VERSION}"
             exit 1
         fi
     fi
 
+    # CUDA 12 NCCL packages use the same minor version as the toolkit.
+    nccl_cuda_version=${nccl_cuda_version:-${CU_DOT_VER}}
+
+    # Keep these transactions separate so an invalid NCCL pin cannot silently
+    # prevent the CUDA toolkit itself from being installed.
     dnf --nogpgcheck -y install cuda-compiler-${CU_VER}.aarch64 \
                    cuda-libraries-${CU_VER}.aarch64 \
-                   cuda-libraries-devel-${CU_VER}.aarch64 \
-                   libnccl-${nccl_version}+cuda${CU_DOT_VER} libnccl-devel-${nccl_version}+cuda${CU_DOT_VER} libnccl-static-${nccl_version}+cuda${CU_DOT_VER}
+                   cuda-libraries-devel-${CU_VER}.aarch64
+    dnf --nogpgcheck -y install \
+                   libnccl-${nccl_version}+cuda${nccl_cuda_version} \
+                   libnccl-devel-${nccl_version}+cuda${nccl_cuda_version} \
+                   libnccl-static-${nccl_version}+cuda${nccl_cuda_version}
     dnf clean all
     # nvshmem version is from https://github.com/pytorch/pytorch/blob/f9fa138a3910bd1de1e7acb95265fa040672a952/.ci/docker/common/install_cuda.sh#L67
     nvshmem_version=3.3.24
