@@ -50,8 +50,12 @@ class TensorRTBlobMetadata:
     target_platform: str = ""
 
     def to_json(self) -> bytes:
-        # Keep field order stable because the C++ parser is intentionally small
-        # and searches forward after io_bindings for the scalar fields.
+        # Keep field order stable because the C++ parser is intentionally small.
+        # It walks io_bindings, then aliased_io, then searches forward from the
+        # end of whichever of those two it last walked for the scalar fields --
+        # so a scalar written before either array is not found and keeps its
+        # C++-side default while the parse still succeeds. Any field added here
+        # that the C++ side reads by key must go after both arrays.
         data = {
             "io_bindings": [
                 {

@@ -120,3 +120,47 @@ def test_deserialize_accepts_both_magics(aliased_io):
     engine, parsed = deserialize_engine(serialize_engine(b"engine-bytes", metadata))
     assert engine == b"engine-bytes"
     assert parsed.aliased_io == aliased_io
+
+
+@pytest.mark.unit
+def test_to_json_writes_every_scalar_after_both_arrays():
+    """The ordering rule the C++ parser's scalar scans depend on.
+
+    ``TensorRTBlobHeader.cpp`` walks ``io_bindings``, then ``aliased_io``, then
+    searches forward from the end of whichever of those it last walked for the
+    scalar fields, so a scalar written ahead of either array is not found and
+    keeps its C++-side default while the parse still succeeds -- no error, and a
+    ``device_id`` of 0 means the engine deserializes on a GPU nobody named. The
+    C++ half of this rule is
+    ``ParsesEveryScalarFromTheWriterKeyOrder`` in
+    ``tests/cpp/executorch/test_executorch_blob_header.cpp``; this is the half
+    that fails when a field is added to ``to_json`` in the wrong place.
+
+    Every key that side reads by key is listed, not only the two scalars: a new
+    scalar it learns to read is only safe in the same position.
+    """
+    metadata = TensorRTBlobMetadata(
+        io_bindings=[
+            TensorRTIOBinding(name="in_k", dtype="float32", shape=[1, 2]),
+            TensorRTIOBinding(name="out_k", dtype="float32", is_input=False),
+        ],
+        aliased_io={"out_k": ("in_k", "kv_cache_update")},
+        hardware_compatible=True,
+        device_id=6,
+        target_platform="linux_x86_64",
+    )
+
+    text = metadata.to_json().decode("utf-8")
+    arrays_end = max(
+        text.index("]", text.index(key)) for key in ('"io_bindings"', '"aliased_io"')
+    )
+    for key in ('"hardware_compatible"', '"device_id"'):
+        assert text.index(key) > arrays_end, f"{key} is written before an array"
+
+    # Read back through the writer's own reader as well, so the ordering
+    # assertion is made about a payload that is otherwise correct.
+    restored = TensorRTBlobMetadata.from_json(metadata.to_json())
+    assert restored.hardware_compatible is True
+    assert restored.device_id == 6
+    assert restored.aliased_io == {"out_k": ("in_k", "kv_cache_update")}
+    assert [b.name for b in restored.io_bindings] == ["in_k", "out_k"]

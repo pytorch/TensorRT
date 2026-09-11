@@ -356,6 +356,153 @@ points but does not by itself give them shared mutable state.
     Neither case raises an error or a warning, so treat every shared payload as
     read-only.
 
+.. _executorch_zero_copy_kv:
+
+**Zero-copy KV cache**
+
+When a TensorRT engine has aliased I/O -- a KV cache it updates through an
+aliased binding -- running the engine over the cache already is the update.
+ExecuTorch does not know that, so by default it pays for the update twice per
+execution: it hands the delegate an ``_h2d_copy`` staging copy of the buffer
+instead of the buffer itself, then copies the engine's aliased output back into
+the buffer afterwards. For a KV cache both copies are cache-sized, per token.
+
+``zero_copy_kv=True`` removes them, so the engine writes the caller's buffer
+directly. Through the two-step ``export`` + ``to_executorch`` path it takes two
+calls, one at each end of the Edge boundary:
+
+.. code-block:: python
+
+    from torch_tensorrt.executorch import (
+        check_zero_copy_kv,
+        export,
+        zero_copy_backend_config,
+    )
+
+    edge = export(
+        {"prefill": prefill_program, "decode": decode_program},
+        zero_copy_kv=True,
+    )
+
+    # The argument is optional. Pass your own ExecutorchBackendConfig and
+    # zero_copy_backend_config composes onto it; every other field (memory
+    # planning, passes) is preserved.
+    program = edge.to_executorch(zero_copy_backend_config())
+
+    # Neither call is enforced -- see the warning below.
+    check_zero_copy_kv(program)
+
+Two fields of that config are not merely carried. The engine writes the cache
+wherever memory planning put it, so ``enable_non_cpu_memory_planning=False`` --
+which plans every tensor into a single host arena whatever device its
+``TensorSpec`` asks for -- cannot be combined with zero-copy KV:
+``to_executorch`` raises instead of writing a ``.pte`` whose every ``execute()``
+fails on a host pointer. That refusal reads the config object
+``zero_copy_backend_config`` returned, so two ways of setting the field are
+outside it. Building a new config out of the returned one with
+``dataclasses.replace`` copies the field by value and the pass by reference, so
+the pass goes on reading the config it was built for: call
+``zero_copy_backend_config`` again on the derived config. And a
+``memory_planning_pass`` of your own that does not already have an attribute of
+that name never receives the field at all -- ``to_executorch`` assigns it onto
+the planner rather than passing it -- so where the caches land is that planner's
+own business. Neither has to be left to the runtime to discover:
+``check_zero_copy_kv`` reads the arena planning actually chose -- on this path
+it is yours to call, as the warning below says. That planner does have to record
+the device of each arena it places, or the check refuses the program for saying
+nothing about where the cache lives -- see below. And
+``propagate_device_config.skip_h2d_for_method_inputs`` is refused outright:
+``PropagateDevicePass`` refuses to un-stage a method input
+whose placeholder does not have exactly one user, and a zero-copy cache always
+has two, so preserving that option would hand back a configuration that cannot
+finalize at all. It is refused wherever it is written -- in one
+``PropagateDeviceConfig`` or in a per-method dict of them -- and on every value
+that pass reads as on rather than only on ``True``, because it tests the field
+for truth without ever resolving it per method, so even a dict of ``False`` is
+on for every method. ``False`` and the empty dict are what it reads as off, and
+those are carried unchanged.
+
+It is opt-in rather than automatic because the resulting ``.pte`` needs a
+runtime that understands a delegate whose aliased outputs are elided. Producing
+one silently would break a runner built before this feature.
+
+.. warning::
+
+    **Both calls are required, and nothing enforces them.** Exporting with
+    ``zero_copy_kv=True`` removes the copy-back; finalizing without
+    ``zero_copy_backend_config`` leaves the engine writing a per-call staging
+    copy that is discarded, so the cache never updates. For a KV cache that is
+    wrong output, not a crash -- and it is a ``.pte`` that was written without
+    complaint, since ``to_executorch`` belongs to ExecuTorch and finalizes
+    whatever config it is given.
+
+    So finalizing a zero-copy export yourself is two obligations, on any manager
+    and by whatever route it was reached: pass ``zero_copy_backend_config``, and
+    hand the program that comes back to
+    ``torch_tensorrt.executorch.check_zero_copy_kv``, which reads the finalized
+    program and refuses one whose caches never reach the engine or ended up
+    planned somewhere it cannot write them -- while there is still no ``.pte``::
+
+        program = edge.transform(passes).to_executorch(zero_copy_backend_config())
+        torch_tensorrt.executorch.check_zero_copy_kv(program)
+
+    ``torch_tensorrt.save`` owns both ends and does both for you; it is the path
+    on which forgetting is not possible, and it is single-method only -- a
+    multi-method program has to take the two calls above.
+
+``torch_tensorrt.save`` finalizes the program itself, so a single
+``zero_copy_kv=True`` covers both steps:
+
+.. code-block:: python
+
+    torch_tensorrt.save(
+        trt_gm, "decode.pte", output_format="executorch",
+        arg_inputs=inputs, retrace=False,
+        zero_copy_kv=True,
+    )
+
+It installs ``zero_copy_backend_config`` for you, so there is no need to hand it
+one as ``backend_config`` as well: that installs the pass twice, which is
+redundant rather than an error -- the second run finds the buffers already
+un-staged. The two entry points are alternatives, not a pair.
+
+Three further responsibilities are the caller's. The first two nothing checks;
+the third is refused where it is visible in the ``.pte``:
+
+* **One CUDA stream for every delegate**, if the ``.pte`` is coalesced. Getting
+  this wrong is a race, not a deterministic error: it is intermittent and can
+  surface as wrong results *or* as an illegal memory access. See
+  :ref:`Running a coalesced .pte <executorch_single_stream>`.
+
+* **Synchronizing that stream before reading a cache on the host**, for any
+  zero-copy ``.pte`` a runner drives on a caller stream, coalesced or not. A
+  delegate whose aliased outputs are threaded through it reflects each one into
+  its delegate output and so waits for the engine before returning; zero-copy
+  elides those outputs, so there is nothing to reflect and ``execute()`` returns
+  with the engine still running. A single-delegate decode loop owes the
+  synchronization as much as a coalesced program does. It is only the caller
+  stream that brings the duty: with none installed ``execute()`` synchronizes
+  before it returns, as it does whenever a delegate input or output is staged
+  through the host.
+
+* **Sharing one cache between methods.** Zero-copy is per method: it makes each
+  method's engine write that method's buffer. Giving a prefill and a decode
+  method *the same* cache is a memory-planning question -- their mutable buffers
+  have to land at the same arena offsets -- which ExecuTorch's memory planner
+  owns and which is deployment-specific. Supply your own
+  ``memory_planning_pass`` for it; ``zero_copy_backend_config`` preserves it.
+  Such a planner has to record the device of each arena it places, which means
+  running ExecuTorch's ``apply_algo`` -- the only thing that writes
+  ``non_const_buffer_device`` -- and running it with
+  ``enable_non_cpu_memory_planning=True``, since that parameter defaults to
+  ``False`` and with it off ``apply_algo`` plans every spec into one CPU bucket
+  and records nothing either. Without that record the ``.pte`` reports every
+  planned buffer as CPU, and a runner that honours it backs the cache with host
+  memory the engine cannot write. ``check_zero_copy_kv`` refuses a program in
+  that state, under a message of its own rather than the host-arena one: what
+  it can read is that nothing says where the cache lives, not that your planner
+  put it among the host tensors.
+
 **Coalesced TensorRT + CUDA .pte**
 
 To run the ops TensorRT does not take on ExecuTorch's CUDA (AOTInductor) backend
@@ -390,6 +537,8 @@ must be pointed at those data files to load them.
     ``.pte`` into the same directory overwrites the blob and the first ``.pte``
     will fail to load. Save each coalesced model into its own directory.
 
+.. _executorch_single_stream:
+
 **Running a coalesced .pte: use a single CUDA stream**
 
 A coalesced ``.pte`` runs on more than one backend delegate (the TensorRT delegate
@@ -403,21 +552,34 @@ illegal memory access.
 
 The runtime does not impose a shared stream across delegates, so it is the
 **runner's responsibility** to run all delegates on one CUDA stream. Create a
-single stream and, for the duration of execution, direct every backend to use it
-(each backend exposes a caller-stream hook). All GPU work is then enqueued in order
-and every cross-boundary dependency is satisfied, while execution stays
-asynchronous.
+single stream and scope ``executorch::extension::cuda::CallerStreamGuard`` over it
+for the duration of execution. That one guard reaches every CUDA-capable
+delegate: they resolve a single shared ``libextension_cuda``, so the TensorRT
+backend and the CUDA backend read the same caller-stream storage. All GPU work is
+then enqueued in order and every cross-boundary dependency is satisfied, while
+execution stays asynchronous.
 
 If the runner reads a delegate's outputs between calls (for example, an
 autoregressive decode loop), synchronize the shared stream before reading: the
 work may still be in flight when ``execute()`` returns, and a host-side copy on
-the default stream will not wait for a non-blocking stream.
+the default stream will not wait for a non-blocking stream. A model that threads
+its aliased outputs through the delegate is insulated from this in practice:
+reflecting each aliased output into its delegate output makes the delegate wait
+for the engine before it returns. Under
+:ref:`zero-copy KV <executorch_zero_copy_kv>` those outputs are elided, so there
+is nothing to reflect and the delegate returns with the engine still running --
+the synchronization is then the only thing making a host read see the new values.
+
 **ExecuTorch lowering options**
 
-When ``output_format="executorch"``, ``torch_tensorrt.save`` forwards the following
-keyword arguments to ExecuTorch's ``to_edge_transform_and_lower(...)``. They are
-only consulted for the ``executorch`` format; passing them with any other
-``output_format`` logs a warning and is otherwise ignored.
+``torch_tensorrt.save`` takes these extra keyword arguments. They are only
+consulted for the ``executorch`` format; passing them with any other
+``output_format`` logs a warning and is otherwise ignored. Of the six below,
+``constant_methods``, ``transform_passes`` and ``compile_config`` are forwarded
+to ExecuTorch's ``to_edge_transform_and_lower(...)``, and so is
+``generate_etrecord``, which ``save`` also reads itself to write the record
+beside the ``.pte``. ``backend_config`` goes to ``to_executorch(...)`` instead,
+and ``zero_copy_kv`` is read by ``save`` on both sides of that boundary.
 
 * ``constant_methods`` — a ``dict`` of extra constant methods to embed in the
   ``.pte`` (e.g. ``{"get_max_seq_len": 2048}`` for an LLM runner).
@@ -430,6 +592,10 @@ only consulted for the ``executorch`` format; passing them with any other
   your graph carries TensorRT engines, set ``_check_ir_validity=False`` explicitly.
 * ``backend_config`` — an ``ExecutorchBackendConfig`` forwarded to
   ``to_executorch(...)``.
+* ``zero_copy_kv`` — a ``bool`` (default ``False``, single-method only). Lets the
+  TensorRT engine update an aliased KV cache in place. ``save`` owns both ends of
+  the Edge boundary, so this one argument covers what the two-call path spells
+  out; see :ref:`Zero-copy KV cache <executorch_zero_copy_kv>`.
 * ``generate_etrecord`` — a ``bool`` (default ``False``). When ``True``, an
   `ETRecord <https://pytorch.org/executorch/stable/etrecord.html>`_ is written
   next to the ``.pte`` as ``<base>_etrecord.bin`` (e.g. ``trt.pte`` →
