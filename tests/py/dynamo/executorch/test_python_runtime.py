@@ -644,8 +644,7 @@ def test_the_cuda_extension_probe_reads_the_installed_executorch(
     which types.ModuleType does not define, so under the fakes these tests use it always answered
     False and the branch it guards was unreachable.
     """
-    # By file path, like every other test here. import_module needs the package installed, and
-    # this lane installs ExecuTorch but not the delegate wheel, which is built by a separate job.
+    # Load checkout code with controlled dependencies, regardless of the installed companion.
     delegate = load_delegate_module()
 
     root = tmp_path / "executorch"
@@ -670,8 +669,7 @@ def test_the_cuda_extension_probe_survives_no_executorch(monkeypatch):
     # Import failure is not an ABI failure: with no ExecuTorch at all the library is absent, so
     # the CPU-wheel advice is correct and the probe must not raise on the way to saying so.
     monkeypatch.setitem(sys.modules, "executorch", None)
-    # By file path, like every other test here. import_module needs the package installed, and
-    # this lane installs ExecuTorch but not the delegate wheel, which is built by a separate job.
+    # Load checkout code with controlled dependencies, regardless of the installed companion.
     delegate = load_delegate_module()
     assert delegate._extension_cuda_present() is False
 
@@ -687,8 +685,7 @@ def test_a_present_but_broken_cuda_extension_is_not_diagnosed_as_a_cpu_wheel(
     # The whole point of the probe: the loader names the same library in both cases, so only
     # what is on disk distinguishes "you installed the CPU wheel" from "your CUDA wheel is
     # broken". Deleting the probe from the branch makes both cases give the CPU advice.
-    # By file path, like every other test here. import_module needs the package installed, and
-    # this lane installs ExecuTorch but not the delegate wheel, which is built by a separate job.
+    # Load checkout code with controlled dependencies, regardless of the installed companion.
     delegate = load_delegate_module()
 
     # The full submodule chain, because register() imports the registry before it loads the
@@ -745,8 +742,7 @@ def test_an_unloadable_executorch_is_not_reported_as_absent(
 ):
     # An ABI mismatch reaches the same except clause as a missing package but needs the opposite
     # repair. Answering both with "install executorch" told the user to reinstall what they had.
-    # By file path, like every other test here. import_module needs the package installed, and
-    # this lane installs ExecuTorch but not the delegate wheel, which is built by a separate job.
+    # Load checkout code with controlled dependencies, regardless of the installed companion.
     delegate = load_delegate_module()
 
     # A finder, because the code under test uses a plain `import` statement rather than
