@@ -9,7 +9,8 @@
 #
 #   find_package(executorch REQUIRED COMPONENTS backend_cuda)
 #   find_package(torchtrt_executorch REQUIRED)
-#   target_link_libraries(my_app PRIVATE executorch::runtime torchtrt::executorch_backend)
+#   target_link_libraries(my_app PRIVATE
+#     executorch::runtime executorch::backend_cuda torchtrt::executorch_backend)
 #
 # There is nothing to include. The delegate exposes no public header: it
 # registers itself with ExecuTorch's backend registry from a static initializer
