@@ -158,25 +158,11 @@ def _register_locked() -> None:
             f"delegate. The import failed with: {error}"
         ) from error
 
-    # RTLD_NOW so an under-linked delegate reports the missing symbol here, rather than
-    # crashing later inside execute(). RTLD_LOCAL because the delegate exports nothing anyone
-    # needs; it resolves its own imports through its DT_NEEDED entries, so widening the
-    # process-global namespace would only add collisions.
     path = _delegate_path()
-    # Snapshot the registry before loading. ExecuTorch's register_backend keeps the FIRST
-    # registration of a name and rejects later ones, so if TensorRTBackend is already present a
-    # second copy of this delegate is live and our load does not win. Checking only that the name
-    # is present afterward would report success while a different library serves the backend, so
-    # require that this load is the one that added it.
-    #
-    # "Already present" is not the same as "someone else's": anything that dlopened this very file
-    # first, a wheel check or a debugger or a wrapper, registers the name through OUR library.
-    # Rejecting that case blamed a second delegate that does not exist, and kept rejecting it on
-    # every retry, so adopt the existing registration instead when the file we would load is the one
-    # already in the process.
+    # A preloaded library may have lost registration to another copy. Check ownership below.
     if BACKEND_NAME in _registered_backend_names():
-        already_loaded = _delegate_already_loaded(path)
-        if already_loaded is None:
+        loaded = _delegate_already_loaded(path)
+        if loaded is None:
             raise DelegateCompatibilityError(
                 f"{BACKEND_NAME} is already registered before loading {path}, and that library is "
                 "not the one in this process, so another copy of the delegate is present. "
@@ -184,46 +170,50 @@ def _register_locked() -> None:
                 "not be the one used. Import this package once, and do not load a second "
                 "Torch-TensorRT delegate alongside it."
             )
-        _delegate = already_loaded
-        return
-    try:
-        loaded = ctypes.CDLL(path, mode=os.RTLD_NOW | os.RTLD_LOCAL)
-    except OSError as error:
-        # The CPU-wheel diagnosis fits exactly one failure: the delegate has a DT_NEEDED on
-        # libexecutorch_extension_cuda.so, which only ExecuTorch's CUDA wheels ship, and the pin
-        # this package declares names no local version label, so a +cpu wheel satisfies it and
-        # then cannot resolve that library. Every other OSError here means something else --
-        # a missing TensorRT or CUDA runtime, an undefined symbol, a libstdc++ too old for the
-        # delegate -- and answering all of them with "install a CUDA executorch" sends the
-        # reader after the wrong thing, so keep the loader's own message for those.
-        #
-        # "Names the library" is not the same as "the library is missing": an ABI failure inside a
-        # present libexecutorch_extension_cuda.so names it too, and telling that user to install
-        # the CUDA wheel they already have is the same wrong-thing problem. So confirm it is
-        # actually absent from the ExecuTorch that is installed before blaming a CPU wheel.
-        if (
-            "libexecutorch_extension_cuda" in str(error)
-            and not _extension_cuda_present()
-        ):
+    else:
+        try:
+            # Resolve imports eagerly; the ownership query needs only this local handle.
+            loaded = ctypes.CDLL(path, mode=os.RTLD_NOW | os.RTLD_LOCAL)
+        except OSError as error:
+            # A present CUDA extension can also fail to load because of an ABI mismatch.
+            if (
+                "libexecutorch_extension_cuda" in str(error)
+                and not _extension_cuda_present()
+            ):
+                raise DelegateCompatibilityError(
+                    f"Could not load the Torch-TensorRT ExecuTorch delegate from {path}. This "
+                    "requires a CUDA build of executorch, which ships "
+                    "libexecutorch_extension_cuda.so; a CPU build satisfies the version pin but "
+                    "not this dependency. Install torch, executorch, torch-tensorrt, and this "
+                    "package from the same release matrix."
+                ) from error
             raise DelegateCompatibilityError(
-                f"Could not load the Torch-TensorRT ExecuTorch delegate from {path}. This "
-                "requires a CUDA build of executorch, which ships "
-                "libexecutorch_extension_cuda.so; a CPU build satisfies the version pin but "
-                "not this dependency. Install torch, executorch, torch-tensorrt, and this "
+                f"Could not load the Torch-TensorRT ExecuTorch delegate from {path}: {error}. "
+                "The delegate links ExecuTorch's prebuilt runtime, TensorRT, and the CUDA runtime "
+                "from their own wheels, so install torch, executorch, torch-tensorrt, and this "
                 "package from the same release matrix."
             ) from error
-        raise DelegateCompatibilityError(
-            f"Could not load the Torch-TensorRT ExecuTorch delegate from {path}: {error}. "
-            "The delegate links ExecuTorch's prebuilt runtime, TensorRT, and the CUDA runtime "
-            "from their own wheels, so install torch, executorch, torch-tensorrt, and this "
-            "package from the same release matrix."
-        ) from error
 
-    if not _is_registered():
+    if BACKEND_NAME not in _registered_backend_names():
         raise DelegateCompatibilityError(
             f"Loading {path} did not register {BACKEND_NAME} with the ExecuTorch runtime, so "
             "a delegated program would fail to load. The delegate and the installed "
             "ExecuTorch were probably built against different runtimes."
+        )
+    try:
+        owns_registration = loaded.torch_tensorrt_owns_executorch_registration
+    except AttributeError as error:
+        raise DelegateCompatibilityError(
+            f"The delegate at {path} has no registration ownership query. "
+            "Reinstall this package so its Python module and native library match."
+        ) from error
+    owns_registration.argtypes = []
+    owns_registration.restype = ctypes.c_bool
+    if not owns_registration():
+        raise DelegateCompatibilityError(
+            f"The delegate at {path} does not own the {BACKEND_NAME} registration. "
+            "ExecuTorch keeps the first registration, so another library would execute "
+            "the delegated program. Do not load a second Torch-TensorRT delegate alongside it."
         )
     _delegate = loaded
 
@@ -255,20 +245,7 @@ def _registered_backend_names() -> list[str]:
     return _get_registered_backend_names()
 
 
-def _is_registered() -> bool:
-    return BACKEND_NAME in _registered_backend_names()
-
-
-# The import IS the registration, so a user never calls anything. The opt-out exists for callers that
-# need the module without the side effect: the tests, which drive the failure branches against fakes
-# and so must install those fakes before anything loads, and a packaging step that only wants the
-# metadata. ExecuTorch does the same thing in its Qualcomm backend, whose __init__ reads
-# EXECUTORCH_BUILDING_WHEEL to skip its own import-time SDK setup.
-#
-# Failure is deliberately loud rather than swallowed. This wheel exists only to register the backend,
-# so a load it cannot complete leaves nothing useful behind, and the diagnosis here names the actual
-# cause (a CPU-only ExecuTorch wheel, an ABI mismatch, an absent ExecuTorch) which ExecuTorch's own
-# later "backend not available" cannot.
+# Tooling can opt out; normal imports must fail if this delegate cannot own registration.
 if os.getenv("TORCH_TENSORRT_SKIP_DELEGATE_REGISTRATION", "0").lower() not in (
     "1",
     "true",
