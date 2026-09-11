@@ -128,6 +128,14 @@ python examples/executorch_reference_runner/load_model.py \
   --num_runs=1
 ```
 
+The legacy `torch_tensorrt.load(path, format="executorch")` entry point still
+works, but emits a deprecation warning. Its `method_names` property,
+`run(inputs, method="forward")`, and `forward(*inputs)` interface remain
+supported for at least six months after the deprecation first ships. It still
+copies CUDA inputs to CPU and supports embedded weights only. New applications
+should use the Module API shown above; device-resident programs must use it
+directly to keep their inputs on CUDA.
+
 ### C++
 
 Run the reference runner against a Torch-TensorRT compiled ExecuTorch model:
