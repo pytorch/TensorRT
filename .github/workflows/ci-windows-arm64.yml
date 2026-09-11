@@ -36,8 +36,10 @@ jobs:
     with:
       repository: ${{ github.repository }}
       ref: ""
+      # PyTorch does not publish Windows cu134 wheels yet. Use a cu132 host
+      # environment while build_windows.yml stages the cu134 ARM64 target.
       build-matrix: >-
-        {"include":[{"build_name":"windows-arm64-cross","python_version":"3.13","desired_cuda":"cu134","validation_runner":"windows.g5.4xlarge.nvidia.gpu"}]}
+        {"include":[{"build_name":"windows-arm64-cross","python_version":"3.13","desired_cuda":"cu132","validation_runner":"windows.g5.4xlarge.nvidia.gpu"}]}
       architecture: x64
       cross-compile: true
       pre-script: packaging/pre_build_script_windows.sh

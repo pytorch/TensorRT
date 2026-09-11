@@ -18,7 +18,10 @@ if [[ ${TENSORRT_VERSION} != "" ]]; then
 fi
 
 TORCH=$(grep "^torch>" py/requirements.txt)
-INDEX_URL=https://download.pytorch.org/whl/${CHANNEL}/${CU_VERSION}
+# Cross-builds may use an older CUDA channel for the runnable host PyTorch
+# while CUDA_HOME points at the newer ARM64 target toolkit.
+TORCH_INDEX_CU_VERSION=${TORCH_INDEX_CU_VERSION:-${CU_VERSION}}
+INDEX_URL=https://download.pytorch.org/whl/${CHANNEL}/${TORCH_INDEX_CU_VERSION}
 
 # The workflow installs torch before this script runs. Avoid uninstalling and
 # force-reinstalling it here: with the shortened Windows conda prefix, pip can
@@ -26,7 +29,11 @@ INDEX_URL=https://download.pytorch.org/whl/${CHANNEL}/${CU_VERSION}
 python -m pip install --pre "${TORCH}" --index-url "${INDEX_URL}" \
   --extra-index-url https://pypi.org/simple || exit 1
 
-export CUDA_HOME="${CUDA_PATH//\\//}"
+if [[ -n "${TORCHTRT_CROSS_COMPILE_CUDA_HOME:-}" ]]; then
+  export CUDA_HOME="${TORCHTRT_CROSS_COMPILE_CUDA_HOME//\\//}"
+else
+  export CUDA_HOME="${CUDA_PATH//\\//}"
+fi
 
 export TORCH_INSTALL_PATH="$(python -c "import torch, os; print(os.path.dirname(torch.__file__).replace('\\\\', '/'))")" || exit 1
 

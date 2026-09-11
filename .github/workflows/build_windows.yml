@@ -184,6 +184,39 @@ jobs:
       - uses: ./test-infra/.github/actions/setup-windows
         with:
           cuda-version: ${{ env.CU_VERSION }}
+      - name: Install CUDA 13.4 toolkit with ARM64 target libraries
+        if: inputs.cross-compile
+        shell: powershell
+        env:
+          CUDA_INSTALLER_URL: https://developer.download.nvidia.com/compute/cuda/13.4.1/local_installers/cuda_13.4.1_windows_x86_64.exe
+          CUDA_ROOT: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.4
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = Join-Path $env:RUNNER_TEMP "cuda_13.4.1_windows_x86_64.exe"
+          $cudaArm64Lib = Join-Path $env:CUDA_ROOT "lib\arm64\cudart.lib"
+          $maxAttempts = 3
+          for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+            try {
+              # Always redownload: a failed transfer can leave a partial installer behind.
+              Remove-Item -LiteralPath $installer -Force -ErrorAction SilentlyContinue
+              Invoke-WebRequest -Uri $env:CUDA_INSTALLER_URL -OutFile $installer
+              $process = Start-Process -FilePath $installer -ArgumentList "-s" -Wait -PassThru
+              if ($process.ExitCode -ne 0) { throw "CUDA 13.4 installer failed with exit code $($process.ExitCode)" }
+              if (-not (Test-Path -LiteralPath $cudaArm64Lib -PathType Leaf)) {
+                throw "CUDA 13.4 ARM64 target library was not installed: $cudaArm64Lib"
+              }
+              break
+            } catch {
+              if ($attempt -eq $maxAttempts) { throw }
+              $delaySeconds = 60 * $attempt
+              Write-Warning "CUDA 13.4 ARM64 installation attempt $attempt/$maxAttempts failed: $($_.Exception.Message). Retrying in $delaySeconds seconds."
+              Start-Sleep -Seconds $delaySeconds
+            }
+          }
+          "CUDA_PATH=$env:CUDA_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "CUDA_HOME=$env:CUDA_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "TORCHTRT_CROSS_COMPILE_CUDA_HOME=$env:CUDA_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          (Join-Path $env:CUDA_ROOT "bin") | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       - uses: ./test-infra/.github/actions/set-channel
       - name: Set PYTORCH_VERSION
         if: env.CHANNEL == 'test'
@@ -209,12 +242,15 @@ jobs:
       - name: Mark x64 TensorRT-RTX artifact
         if: ${{ inputs.architecture == 'x64' && inputs.cross-compile == false && inputs.use-rtx }}
         run: echo "ARTIFACT_NAME=${ARTIFACT_NAME}_rtx" >> "${GITHUB_ENV}"
-      - name: Export binary-build metadata for ARM64 cross build
+      - name: Export binary-build version for ARM64 cross build
         if: inputs.cross-compile
         working-directory: ${{ inputs.repository }}
         run: |
           source "${BUILD_ENV_FILE}"
           : "${BUILD_VERSION:?setup-binary-builds did not provide BUILD_VERSION}"
+          # The host build environment remains cu132, but the ARM64 target sysroot
+          # and published wheel target CUDA 13.4.
+          BUILD_VERSION="${BUILD_VERSION%+*}+cu134"
           echo "BUILD_VERSION=${BUILD_VERSION}" >> "${GITHUB_ENV}"
           : "${ARTIFACT_NAME:?setup-binary-builds did not provide ARTIFACT_NAME}"
           echo "ARTIFACT_NAME=${ARTIFACT_NAME}" >> "${GITHUB_ENV}"
@@ -545,13 +581,16 @@ jobs:
           CU_VERSION: ${{ env.CU_VERSION }}
           ARCH: ${{ inputs.cross-compile && 'arm64' || inputs.architecture }}
         run: |
+          artifact_cuda_version="${CU_VERSION}"
           if [[ "${{ inputs.cross-compile }}" == "true" ]]; then
-            artifact_name="${ARTIFACT_NAME}${{ inputs.python-only && '_python_only' || '' }}${{ inputs.use-rtx && '_rtx' || '' }}"
+            artifact_cuda_version="cu134"
+            artifact_name="${ARTIFACT_NAME/_${CU_VERSION}_/_${artifact_cuda_version}_}"
+            artifact_name="${artifact_name}${{ inputs.python-only && '_python_only' || '' }}${{ inputs.use-rtx && '_rtx' || '' }}"
           else
             # Standard and RTX builds share the same Python/CUDA matrix. Include
             # the backend so their concurrent uploads cannot overwrite or merge
             # into one artifact that a test from either channel may download.
-            artifact_name="${REPOSITORY//\//_}_${REF//\//_}_${PYTHON_VERSION}_${CU_VERSION}_${ARCH}${{ inputs.python-only && '_python_only' || '' }}${{ inputs.use-rtx && '_rtx' || '' }}"
+            artifact_name="${REPOSITORY//\//_}_${REF//\//_}_${PYTHON_VERSION}_${artifact_cuda_version}_${ARCH}${{ inputs.python-only && '_python_only' || '' }}${{ inputs.use-rtx && '_rtx' || '' }}"
           fi
           echo "ARTIFACT_NAME=${artifact_name}" >> "${GITHUB_ENV}"
       - name: Upload wheel to GitHub
@@ -573,7 +612,7 @@ jobs:
         name: Teardown Windows
 
   upload:
-    needs: build
+    needs: [build, prepare-upload]
     uses: pytorch/test-infra/.github/workflows/_binary_upload.yml@main
     # if it is the release wheel or tarball, then skip upload to pytorch index(release wheel are uploaded to pypi)
     if: ${{ inputs.python-only == false && inputs.skip-binary-upload == false && inputs.is-release-wheel == false && inputs.is-release-tarball == false }}
@@ -582,7 +621,7 @@ jobs:
       ref: ${{ inputs.ref }}
       test-infra-repository: ${{ inputs.test-infra-repository }}
       test-infra-ref: ${{ inputs.test-infra-ref }}
-      build-matrix: ${{ inputs.build-matrix }}
+      build-matrix: ${{ needs.prepare-upload.outputs.build-matrix }}
       trigger-event: ${{ inputs.trigger-event }}
       # setup-binary-upload builds its artifact name from this input. RTX wheels
       # use the same suffix as the build and test jobs; keep the actual build
@@ -592,6 +631,24 @@ jobs:
       R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
       R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
       R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+
+  prepare-upload:
+    needs: build
+    runs-on: ubuntu-latest
+    outputs:
+      build-matrix: ${{ steps.build-matrix.outputs.value }}
+    steps:
+      - id: build-matrix
+        env:
+          BUILD_MATRIX: ${{ inputs.build-matrix }}
+        run: |
+          if [[ "${{ inputs.cross-compile }}" == "true" ]]; then
+            # ARM64 cross builds use CUDA 13.4 target libraries and publish a cu134 artifact.
+            build_matrix="$(jq -c '.include |= map(.desired_cuda = "cu134")' <<< "${BUILD_MATRIX}")"
+          else
+            build_matrix="${BUILD_MATRIX}"
+          fi
+          echo "value=${build_matrix}" >> "${GITHUB_OUTPUT}"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}-${{ inputs.repository }}-${{ inputs.is-release-wheel }}-${{ inputs.is-release-tarball }}-${{ github.event_name == 'workflow_dispatch' }}-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'no-tag' }}-${{ inputs.use-rtx }}-${{ inputs.build-flavor }}
