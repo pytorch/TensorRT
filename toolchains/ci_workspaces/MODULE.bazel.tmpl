@@ -214,8 +214,8 @@ new_local_repository(
 new_git_repository(
     name = "executorch",
     build_file = "@//third_party/executorch:BUILD",
-    # executorch==1.5.0.dev20260905
-    commit = "04c314256bdac3744cca35db354fc980186de2cc",
+    # executorch==1.5.0.dev20260911
+    commit = "993dee0f7655d19d008260ba2d144e5a3028001d",
     patch_cmds = [
         "find . -mindepth 2 \\( -name BUILD -o -name BUILD.bazel \\) -delete",
         "mkdir executorch && find . -mindepth 1 -maxdepth 1 ! -name executorch ! -name BUILD ! -name BUILD.bazel ! -name REPO.bazel -exec cp -a {} executorch/ \\;",
