@@ -80,6 +80,9 @@ def main() -> None:
     )
     args = parser.parse_args()
     model_path = Path(args.model_path)
+    expected_path = model_path.with_suffix(".expected")
+    if model_path == expected_path:
+        parser.error("--model_path must not end in .expected")
 
     with torch.no_grad():
         model = CoalescedModel().eval().cuda()
@@ -172,7 +175,6 @@ def main() -> None:
             )
 
         reference = model(torch.ones(SHAPE).cuda())
-        expected_path = model_path.with_suffix(".expected")
         expected_path.write_text(
             "[{}]\n{:.4f}\n".format(
                 ",".join(str(dim) for dim in reference.shape),
