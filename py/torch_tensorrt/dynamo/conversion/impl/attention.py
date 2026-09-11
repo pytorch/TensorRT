@@ -430,17 +430,6 @@ def scaled_dot_product_efficient_attention(
             # TRT's IAttention layer does not support passing in both attn_bias/mask and causal mask at the same time,
             # so we convert causal mask to an additive causal mask and add it to the attn_bias
             attn_bias = get_trt_tensor(ctx, attn_bias, f"{name}_attn_bias")
-            # attn_bias is combined with an additive (query.dtype) causal mask below via
-            # elementwise add, so it must already be a matching-dtype additive bias.
-            if attn_bias.dtype != query.dtype:
-                attn_bias = cast_trt_tensor(
-                    ctx,
-                    attn_bias,
-                    query.dtype,
-                    f"{name}_cast_attn_bias",
-                    target,
-                    source_ir,
-                )
 
             L = impl.shape.shape(ctx, target, source_ir, f"{name}_L", query, -2)
             S = impl.shape.shape(ctx, target, source_ir, f"{name}_S", key, -2)
