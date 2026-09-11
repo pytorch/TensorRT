@@ -68,7 +68,7 @@ jobs:
         # --pre would apply to every other requirement in the same command too.
         python -m pip install pyyaml \
           --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" \
-          "executorch==1.5.0.dev20260905"
+          "executorch==1.5.0.dev20260911"
 
         # The standard wheel build packages the matching runtime wheel in its
         # artifact alongside torch_tensorrt*.whl; install it after the shared
@@ -105,7 +105,7 @@ jobs:
         # Resolve the user-facing range without reusing the build's installed pin.
         python -m venv "${RUNNER_TEMP}/range-check-venv"
         # pin-check: range-ok
-        "${RUNNER_TEMP}/range-check-venv/bin/python" -m pip install --no-deps --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" "executorch>=1.5.0.dev20260905,<1.6"
+        "${RUNNER_TEMP}/range-check-venv/bin/python" -m pip install --no-deps --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" "executorch>=1.5.0.dev20260911,<1.6"
 
         source tests/py/utils/ci_helpers.sh
         trt_tier_executorch
