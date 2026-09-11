@@ -70,16 +70,8 @@ set_target_properties(
     INTERFACE_COMPILE_FEATURES cxx_std_17
 )
 
-# The delegate registers itself from a static initializer, so the dependency has to survive the link
-# even if the consumer never names a symbol from it. --as-needed keeps a library only when something
-# in the link references it, and today the delegate happens to export enough that it is kept anyway;
-# that is incidental, not a guarantee, and it would stop being true the moment the exported surface
-# shrinks. --no-as-needed makes the outcome independent of that. Bracketed with push-state and
-# pop-state so the flag applies only to this library and does not change how the rest of the
-# consumer's link line is treated.
-#
-# This is the shared-library counterpart of the --whole-archive that the in-repo source build needs,
-# where the equivalent risk is real today: a static archive member nothing references IS dropped.
+# Retain the static registration even when the consumer references no delegate symbol.
+# Scope --no-as-needed to this library so unrelated dependencies can still be dropped.
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   set_property(
     TARGET torchtrt::executorch_backend
@@ -94,6 +86,6 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   set_property(
     TARGET torchtrt::executorch_backend
     APPEND
-    PROPERTY INTERFACE_LINK_OPTIONS "LINKER:-rpath,${_torchtrt_executorch_root}/lib"
+    PROPERTY INTERFACE_LINK_OPTIONS "LINKER:--enable-new-dtags,-rpath,${_torchtrt_executorch_root}/lib"
   )
 endif()
