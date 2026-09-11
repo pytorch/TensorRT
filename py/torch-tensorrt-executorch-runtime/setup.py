@@ -149,6 +149,35 @@ class BazelBuild(build_py):
     non-pure, and ``WheelTag`` below sets the interpreter and ABI to py3/none.
     """
 
+    def _generated_output_mapping(self) -> dict[str, str]:
+        package = "torch_tensorrt_executorch_runtime"
+        return {
+            str(pathlib.Path(self.build_lib) / package / filename): str(
+                pathlib.Path(self.get_package_dir(package)) / filename
+            )
+            for filename in (
+                f"lib/{DELEGATE_LIBRARY}",
+                "lib/cmake/torchtrt_executorch/torchtrt_executorch-config.cmake",
+                "lib/cmake/torchtrt_executorch/torchtrt_executorch-config-version.cmake",
+            )
+        }
+
+    def get_outputs(self, include_bytecode: bool = True) -> list[str]:
+        return list(
+            dict.fromkeys(
+                [
+                    *super().get_outputs(include_bytecode),
+                    *self._generated_output_mapping(),
+                ]
+            )
+        )
+
+    def get_output_mapping(self) -> dict[str, str]:
+        mapping = super().get_output_mapping()
+        if self.editable_mode:
+            mapping.update(self._generated_output_mapping())
+        return mapping
+
     def run(self) -> None:
         super().run()
 
@@ -211,12 +240,14 @@ class BazelBuild(build_py):
         if not built.is_file():
             raise RuntimeError(f"Bazel did not produce {built}")
 
-        output = (
-            pathlib.Path(self.build_lib)
-            / "torch_tensorrt_executorch_runtime"
-            / "lib"
-            / DELEGATE_LIBRARY
+        package = "torch_tensorrt_executorch_runtime"
+        # Editable build_lib is temporary; generated package data must survive its removal.
+        package_root = (
+            pathlib.Path(self.get_package_dir(package))
+            if self.editable_mode
+            else pathlib.Path(self.build_lib) / package
         )
+        output = package_root / "lib" / DELEGATE_LIBRARY
         output.parent.mkdir(parents=True, exist_ok=True)
         # Every stale artifact, not just a shared object in lib/. An incremental build over a tree
         # that once produced the bundled ExecuTorch runtime leaves those files under build_lib, and
@@ -228,10 +259,10 @@ class BazelBuild(build_py):
         # The package ROOT as well as lib/: the delegate moved into lib/, but the files this
         # removes were written to the root by the previous layout, so scanning only the new
         # directory leaves every one of them in place.
-        package_root = output.parent.parent
-        for stale in (*package_root.glob("*.so*"), package_root / "runtime.py"):
-            if stale.is_file():
-                stale.unlink()
+        if not self.editable_mode:
+            for stale in (*package_root.glob("*.so*"), package_root / "runtime.py"):
+                if stale.is_file():
+                    stale.unlink()
         for stale in output.parent.glob("*.so*"):
             if stale != output:
                 stale.unlink()
