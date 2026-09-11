@@ -190,3 +190,158 @@ def test_missing_tensorrt_provisioning_is_detected(tmp_path, monkeypatch, arch):
         AssertionError, match="No package metadata was found for tensorrt-cu13"
     ):
         test_shared_build_provisions_tensorrt_metadata(tmp_path, arch, "cu132", True)
+
+
+_DEVICE_EXPORT = 'python examples/torchtrt_executorch_example/export_device_resident.py \\\n  --model_path="${RUNNER_TEMP}/torchtrt-device-resident.pte"\n'
+_DEVICE_RUN = 'python examples/executorch_reference_runner/load_model_device_resident.py \\\n  --model_path="${RUNNER_TEMP}/torchtrt-device-resident.pte" --num_runs=2\n'
+
+
+def _assert_device_commands(tmp_path, workflow, failure=""):
+    job = workflow["jobs"]["test"]
+    assert job.get("if", "success()") in ("success()", "${{ success() }}")
+    assert job["uses"] == "./.github/workflows/linux-test.yml"
+    script = job["with"]["script"]
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(parents=True)
+    runner = tmp_path / "runner"
+    (runner / "bin").mkdir(parents=True)
+    artifacts = tmp_path / "artifacts"
+    artifacts.mkdir()
+    (artifacts / "torch_tensorrt_executorch_runtime-fixture.whl").touch()
+    helpers = tmp_path / "tests/py/utils/ci_helpers.sh"
+    helpers.parent.mkdir(parents=True)
+    helpers.write_text("trt_tier_executorch() { :; }\n")
+    dispatcher = bin_dir / "dispatch"
+    dispatcher.write_text(
+        f"#!{sys.executable}\n"
+        "import json, os, sys\nfrom pathlib import Path\n"
+        "tool, args = Path(sys.argv[0]).name, sys.argv[1:]\n"
+        "with open(os.environ['EVENTS'], 'a') as f: f.write(json.dumps([tool, *args]) + '\\n')\n"
+        "if tool == 'python':\n"
+        "    if args[:2] == ['-m', 'pip']: pass\n"
+        "    elif args[:2] == ['-m', 'venv']:\n"
+        "        p = Path(args[2]) / 'bin/python'; p.parent.mkdir(parents=True); p.symlink_to(os.environ['DISPATCH'])\n"
+        "    elif args[:4] == ['-u', '-X', 'faulthandler', '-c']: pass\n"
+        "    elif args[0] == '.github/scripts/filter-executorch-cuda-arches.py': print('8.0')\n"
+        "    elif args[0].startswith('examples/'):\n"
+        "        model = Path(next(a.split('=', 1)[1] for a in args if a.startswith('--model_path=')))\n"
+        "        if Path(args[0]).name.startswith('export_'): model.write_text('exported')\n"
+        "        else: assert model.read_text() == 'exported'\n"
+        "        if os.environ['FAILURE'] and os.environ['FAILURE'] == Path(args[0]).name: sys.exit(17)\n"
+        "    else: raise AssertionError(args)\n"
+        "elif tool == 'bazel':\n"
+        "    if args[0] == 'info': print(os.environ['RUNNER_TEMP'])\n"
+        "    elif args[0] == 'query': print(os.environ['RUNNER_TEMP'] + '/executorch/CMakeLists.txt:1:1')\n"
+        "    else: assert args[0] in ('build', 'test')\n"
+        "elif tool == 'curl': pass\n"
+        "elif tool == 'find': print(os.environ['RUNNER_TEMP'] + '/libs')\n"
+        "elif tool == 'verify-executorch-reference-runner.sh':\n"
+        "    assert all(Path(a).read_text() == 'exported' for a in args)\n"
+        "else: raise AssertionError((tool, args))\n"
+    )
+    dispatcher.chmod(0o755)
+    for tool in ("python", "bazel", "curl", "find"):
+        (bin_dir / tool).symlink_to(dispatcher)
+    (runner / "bin/bazel").symlink_to(dispatcher)
+    for tool in ("mkdir", "chmod", "sort", "head", "dirname"):
+        (bin_dir / tool).symlink_to(shutil.which(tool))
+    reference = tmp_path / ".github/scripts/verify-executorch-reference-runner.sh"
+    reference.parent.mkdir(parents=True)
+    reference.symlink_to(dispatcher)
+    result = _run(
+        script.replace("/opt/torch-tensorrt-builds", str(artifacts)),
+        tmp_path,
+        {
+            "PATH": str(bin_dir),
+            "RUNNER_TEMP": str(runner),
+            "CU_VERSION": "cu132",
+            "EVENTS": str(tmp_path / "events"),
+            "DISPATCH": str(dispatcher),
+            "FAILURE": failure,
+        },
+    )
+    events = [
+        json.loads(line) for line in (tmp_path / "events").read_text().splitlines()
+    ]
+    examples = [
+        event[1:]
+        for event in events
+        if event[0] == "python" and event[1].startswith("examples/")
+    ]
+    assert (
+        examples
+        == [
+            [
+                "examples/torchtrt_executorch_example/export_static_shape.py",
+                f"--model_path={runner}/torchtrt-python.pte",
+            ],
+            [
+                "examples/torchtrt_executorch_example/export_kv_cache_decode.py",
+                f"--model_path={runner}/torchtrt-kv-cache-decode.pte",
+            ],
+            [
+                "examples/torchtrt_executorch_example/export_coalesced.py",
+                f"--model_path={runner}/torchtrt-coalesced.pte",
+            ],
+            [
+                "examples/torchtrt_executorch_example/export_device_resident.py",
+                f"--model_path={runner}/torchtrt-device-resident.pte",
+            ],
+            [
+                "examples/executorch_reference_runner/load_model.py",
+                f"--model_path={runner}/torchtrt-python.pte",
+                "--num_runs=1",
+            ],
+            [
+                "examples/executorch_reference_runner/load_model_device_resident.py",
+                f"--model_path={runner}/torchtrt-device-resident.pte",
+                "--num_runs=2",
+            ],
+        ][: 4 if failure == "export_device_resident.py" else 6]
+    ), (
+        result.stdout + result.stderr
+    )
+    reference_calls = [e[1:] for e in events if e[0] == reference.name]
+    assert reference_calls == (
+        []
+        if failure == "export_device_resident.py"
+        else [
+            [
+                str(runner / f"torchtrt-{name}.pte")
+                for name in ("python", "kv-cache-decode", "coalesced")
+            ]
+        ]
+    )
+    assert result.returncode == (17 if failure else 0), result.stdout + result.stderr
+
+
+@pytest.mark.parametrize(
+    "failure", ["", "export_device_resident.py", "load_model_device_resident.py"]
+)
+def test_device_commands_execute_and_propagate_failure(tmp_path, failure):
+    _assert_device_commands(tmp_path, _workflow("executorch-test-linux.yml"), failure)
+
+
+@pytest.mark.parametrize(
+    "command", [_DEVICE_EXPORT, _DEVICE_RUN], ids=["export", "run"]
+)
+@pytest.mark.parametrize("mutation", ["commented", "disabled", "removed"])
+def test_device_command_removal_is_detected(tmp_path, command, mutation):
+    workflow = _workflow("executorch-test-linux.yml")
+    script = workflow["jobs"]["test"]["with"]["script"]
+    assert script.count(command) == 1
+    replacement = {
+        "commented": "".join("# " + line for line in command.splitlines(keepends=True)),
+        "disabled": "if false; then\n" + command + "fi\n",
+        "removed": "",
+    }[mutation]
+    workflow["jobs"]["test"]["with"]["script"] = script.replace(command, replacement)
+    with pytest.raises(AssertionError):
+        _assert_device_commands(tmp_path, workflow)
+
+
+def test_disabled_device_job_is_detected(tmp_path):
+    workflow = _workflow("executorch-test-linux.yml")
+    workflow["jobs"]["test"]["if"] = "${{ false }}"
+    with pytest.raises(AssertionError):
+        _assert_device_commands(tmp_path, workflow)

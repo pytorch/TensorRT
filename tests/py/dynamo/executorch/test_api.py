@@ -662,32 +662,9 @@ def _runtime_build_steps():
     return workflow["jobs"]["build"]["steps"]
 
 
-def test_the_export_runs_in_the_gpu_test_lane():
-    """Keep numerical execution in the GPU lane, with artifact checks on both builders."""
-    import yaml
-
-    workflow = yaml.safe_load(
-        (_REPO_ROOT / ".github/workflows/executorch-test-linux.yml").read_text()
-    )
-    script = workflow["jobs"]["test"]["with"]["script"]
-    for command in (
-        "export_static_shape.py",
-        "verify-executorch-reference-runner.sh",
-        "load_model.py",
-        "load_model_device_resident.py",
-    ):
-        assert any(
-            command in line
-            for line in script.splitlines()
-            if not line.lstrip().startswith("#")
-        )
-    _assert_the_checker_is_reachable(
-        script[
-            : script.index(
-                "python examples/torchtrt_executorch_example/export_static_shape.py"
-            )
-        ]
-    )
+@pytest.mark.unit
+def test_artifact_checks_run_after_the_shared_build():
+    """Artifact checks do not depend on GPU availability."""
     steps = _runtime_build_steps()
     check = next(
         step
@@ -700,16 +677,11 @@ def test_the_export_runs_in_the_gpu_test_lane():
 
 
 def test_the_build_script_never_imports_torch_tensorrt():
-    """The delegate builders have no GPU, and importing torch_tensorrt needs one.
+    """Building must not require a GPU through a compiler-package import.
 
-    The lowering passes call torch.cuda.get_device_capability() at import time while deciding
-    whether they are running on Tegra, so any import of the package in the build script fails with
-    "Found no NVIDIA driver on your system". The x86_64 builder happens to have a GPU, so this only shows up
-    on the aarch64 lane, and it cost a full build cycle twice: once when it was first written and
-    again when a revert restored the original line and nothing noticed.
+    The lowering passes query CUDA device capability at import time. Locate the
+    installed main wheel through distribution metadata on either architecture.
     """
-    import yaml
-
     script = next(
         step["run"]
         for step in _runtime_build_steps()
@@ -2017,42 +1989,8 @@ def _co_names_and_consts(code) -> list[str]:
 
 
 @pytest.mark.unit
-def test_ci_exercises_the_device_resident_boundary():
-    """The device-resident path needs its own lane, and it is easy to lose silently.
-
-    Every other program in this suite crosses the method boundary on the host, so nothing else
-    would notice if ``skip_h2d_for_method_inputs`` stopped taking effect. Two pieces have to stay
-    wired for that coverage to mean anything: the export, which asserts the serialized program
-    contains no boundary copy operator, and the Python runner, which feeds a CUDA tensor and
-    asserts the output never left the device.
-
-    Also asserted: the device-resident program is NOT passed to the C++ reference runner. That
-    runner feeds host tensors, which this program's contract forbids, so adding it there would
-    look like more coverage while actually testing the wrong thing.
-    """
-    workflow = (_REPO_ROOT / ".github/workflows/executorch-test-linux.yml").read_text(
-        encoding="utf-8"
-    )
-
-    assert "export_device_resident.py" in workflow, (
-        "the device-resident program is never exported, so no lane checks that the "
-        "skip_h2d/skip_d2h flags remove the boundary copies"
-    )
-    assert "load_model_device_resident.py" in workflow, (
-        "the device-resident program is exported but never executed, so nothing checks "
-        "that a CUDA input stays on the device at runtime"
-    )
-
-    reference_runner = re.search(
-        r"verify-executorch-reference-runner\.sh((?:[^\n]*\\\n)*[^\n]*)", workflow
-    )
-    assert reference_runner, "the C++ reference runner invocation is gone"
-    assert "device-resident" not in reference_runner.group(1), (
-        "the device-resident .pte is handed to the C++ reference runner, which feeds host "
-        "tensors; that program requires CUDA inputs, so this would test the wrong contract"
-    )
-
-    # The export must keep asserting on the program, not just set the flags and hope.
+def test_device_export_checks_the_serialized_boundary():
+    """Keep serialized boundary checks alongside the separate workflow execution tests."""
     export = (
         _REPO_ROOT / "examples/torchtrt_executorch_example/export_device_resident.py"
     ).read_text(encoding="utf-8")
@@ -2073,15 +2011,10 @@ def test_ci_exercises_the_device_resident_boundary():
 
 @pytest.mark.unit
 def test_ci_runtime_check_asserts_the_delegate_loads_and_registers():
-    """The one CI step that runs the built delegate must keep proving it registers.
+    """Keep the installed delegate load and backend-registration check effective.
 
-    executorch-test-linux.yml imports the delegate package, queries ExecuTorch's registry, and fails unless the
-    TensorRT delegate and the stock backends are all registered. It is the only end-to-end proof
-    that this change's delegate works rather than merely being shaped right, and nothing else
-    exercises it, so the whole one-liner could be reduced to `import sys` unnoticed. Read the
-    string the workflow runs and assert the pieces that make it a real check: it resolves the
-    runtime, queries the registry, names the delegate backend, and fails through sys.exit rather
-    than assert so `python -O` cannot compile the check away.
+    Numerical export and execution are separate checks in the same test lane.
+    This check must fail through sys.exit even under optimized Python.
     """
     import yaml
 
@@ -2147,7 +2080,7 @@ def test_ci_runtime_check_asserts_the_delegate_loads_and_registers():
     # after the check has already failed and can never fail the job; a plain substring search is
     # satisfied by that decoy even when the real call is neutered. Anchor on the executing form:
     # the env-prefixed call that begins its line. The gdb copy begins with `--args python`, so it
-    # does not match, and replacing the real call at line 88 with `true ||` turns this red.
+    # does not match, and replacing the status-bearing call with `true ||` turns this red.
     document = yaml.safe_load(workflow_text)
     scripts = [
         text
