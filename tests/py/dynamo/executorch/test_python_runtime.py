@@ -365,6 +365,75 @@ def test_the_opt_out_env_var_suppresses_the_import_side_effect(monkeypatch):
     assert delegate._delegate is None
 
 
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "value,skip",
+    [
+        (None, False),
+        ("", False),
+        ("0", False),
+        ("false", False),
+        ("FALSE", False),
+        ("off", False),
+        ("other", False),
+        (" true ", False),
+        ("1", True),
+        ("true", True),
+        ("TrUe", True),
+        ("yes", True),
+        ("YES", True),
+        ("on", True),
+        ("ON", True),
+    ],
+)
+def test_registration_opt_out_boolean_values(monkeypatch, value, skip):
+    registered = set()
+    _fake_executorch(monkeypatch, registered)
+    handle = _delegate_handle()
+    loads = []
+
+    def load(path, mode):
+        loads.append(path)
+        registered.add("TensorRTBackend")
+        return handle
+
+    monkeypatch.setattr(ctypes, "CDLL", load)
+    monkeypatch.setattr(os.path, "isfile", lambda path: True)
+    if value is None:
+        monkeypatch.delenv(SKIP_ENV, raising=False)
+    else:
+        monkeypatch.setenv(SKIP_ENV, value)
+    spec = importlib.util.spec_from_file_location(
+        "registration_flag_test", DELEGATE_PATH
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    assert len(loads) == (0 if skip else 1)
+    assert module._delegate is (None if skip else handle)
+    assert registered == (set() if skip else {"TensorRTBackend"})
+
+
+@pytest.mark.unit
+def test_registration_opt_out_rejects_missing_on_control(monkeypatch, tmp_path):
+    tree = ast.parse(DELEGATE_PATH.read_text())
+    checks = [
+        node
+        for node in tree.body
+        if isinstance(node, ast.If) and isinstance(node.test, ast.Compare)
+    ]
+    assert len(checks) == 1
+    values = checks[0].test.comparators[0].elts
+    assert sum(value.value == "on" for value in values) == 1
+    checks[0].test.comparators[0].elts = [
+        value for value in values if value.value != "on"
+    ]
+    path = tmp_path / "without_on.py"
+    path.write_text(ast.unparse(tree))
+    monkeypatch.setitem(globals(), "DELEGATE_PATH", path)
+    with pytest.raises(AssertionError):
+        test_registration_opt_out_boolean_values(monkeypatch, "ON", True)
+
+
 def test_register_loads_the_delegate_and_registers_the_backend(monkeypatch):
     delegate = load_delegate_module()
     registered = set()
