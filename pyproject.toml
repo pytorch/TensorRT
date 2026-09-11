@@ -168,6 +168,12 @@ norecursedirs = [
 
 [tool.uv]
 package = true
+cache-keys = [
+    { file = "pyproject.toml" },
+    { file = "setup.py" },
+    { file = "setup.cfg" },
+    { file = "dev_dep_versions.yml" },
+]
 environments = ["sys_platform == 'linux'", "sys_platform == 'win32'"]
 required-environments = [
     "sys_platform == 'linux' and python_version >= '3.10' and python_version <= '3.13' and platform_machine == 'x86_64'",

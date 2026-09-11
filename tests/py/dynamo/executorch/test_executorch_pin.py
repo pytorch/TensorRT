@@ -1945,6 +1945,28 @@ def test_update_workflow_requires_manual_downgrade_authority(tmp_path, allow):
     assert len(branches) == 2
 
 
+def test_uv_cache_tracks_pin_metadata():
+    import tomllib
+
+    config = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text())
+    keys = config["tool"]["uv"].get("cache-keys", [])
+    files = {key["file"] for key in keys if "file" in key}
+    assert {"pyproject.toml", "setup.py", "setup.cfg", "dev_dep_versions.yml"} <= files
+
+
+def test_uv_cache_guard_detects_missing_pin_key(monkeypatch):
+    path = REPO_ROOT / "pyproject.toml"
+    text = path.read_text().replace('{ file = "dev_dep_versions.yml" },', "")
+    original = Path.read_text
+    monkeypatch.setattr(
+        Path,
+        "read_text",
+        lambda p, *a, **kw: text if p == path else original(p, *a, **kw),
+    )
+    with pytest.raises(AssertionError):
+        test_uv_cache_tracks_pin_metadata()
+
+
 @pytest.mark.parametrize(
     "field,value",
     [
