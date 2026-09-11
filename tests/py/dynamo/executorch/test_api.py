@@ -409,6 +409,7 @@ def test_the_delegate_follows_the_main_wheels_cuda_versions():
     ],
 )
 @pytest.mark.parametrize("channel", ["nightly", "test"])
+@pytest.mark.unit
 def test_runtime_workflows_filter_cuda_12_without_changing_main_releases(
     tmp_path, workflow, channel
 ):
@@ -480,6 +481,7 @@ def test_runtime_workflows_filter_cuda_12_without_changing_main_releases(
 
 @pytest.mark.parametrize("enabled", [True, False])
 @pytest.mark.parametrize("cuda", ["cu126", "cu128", "cu130", "cu132", "cu134"])
+@pytest.mark.unit
 def test_shared_companion_build_is_gated_per_cuda_row(enabled, cuda):
     step = next(
         step
@@ -497,6 +499,7 @@ def test_shared_companion_build_is_gated_per_cuda_row(enabled, cuda):
 
 
 @pytest.mark.parametrize("arch,floor", [("x86_64", "2_28"), ("aarch64", "2_39")])
+@pytest.mark.unit
 def test_shared_repair_preserves_the_companion_payload(tmp_path, arch, floor):
     """Run the shared repair loop with real wheels and check tags, hashes, and routing."""
     from email.parser import BytesParser
@@ -589,6 +592,7 @@ def test_artifact_checks_run_after_the_shared_build():
     assert "ldd -r" in check["run"]
 
 
+@pytest.mark.unit
 def test_the_build_script_never_imports_torch_tensorrt():
     """Building must not require a GPU through a compiler-package import.
 
@@ -623,6 +627,7 @@ def test_the_build_script_never_imports_torch_tensorrt():
     assert not bare, f"the build script still imports torch_tensorrt: {bare}"
 
 
+@pytest.mark.unit
 def test_the_delegate_is_built_for_every_architecture_the_main_wheel_ships():
     """Both Linux architectures build the companion inside the standard artifact job."""
     import yaml
@@ -663,6 +668,7 @@ def test_the_delegate_is_built_for_every_architecture_the_main_wheel_ships():
     assert not (workflows / "executorch-build-linux.yml").exists()
 
 
+@pytest.mark.unit
 def test_the_guard_is_given_the_platform_it_must_compare_against():
     """Production passes the full architecture-specific tag to the artifact guard."""
     cmake = (
@@ -701,6 +707,7 @@ def test_the_guard_is_given_the_platform_it_must_compare_against():
         assert tag in guard, f"the guard has no floor entry for manylinux{tag}"
 
 
+@pytest.mark.unit
 def test_the_wheel_ships_a_cmake_package_for_cpp_consumers():
     """The delegate has to be linkable from C++, not just importable from Python.
 
