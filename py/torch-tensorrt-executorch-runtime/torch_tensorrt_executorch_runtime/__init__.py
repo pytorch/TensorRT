@@ -252,6 +252,7 @@ if os.getenv("TORCH_TENSORRT_SKIP_DELEGATE_REGISTRATION", "0").lower() not in (
     "1",
     "true",
     "yes",
+    "on",
 ):
     register()
 
