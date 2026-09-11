@@ -120,3 +120,46 @@ def test_collision_guard_removal_overwrites_model(monkeypatch, tmp_path):
     path = tmp_path / "model.expected"
     _export(monkeypatch, path, remove_guard=True)
     assert path.read_text() == "[64,64]\n0.5000\n"
+
+
+@pytest.mark.parametrize("optimize", [0, 2])
+@pytest.mark.parametrize(
+    "is_cuda,remove_guard", [(False, False), (True, False), (False, True)]
+)
+def test_device_input_check_precedes_load(monkeypatch, optimize, is_cuda, remove_guard):
+    path = _ROOT / "examples/executorch_reference_runner/load_model_device_resident.py"
+    tree = ast.parse(path.read_text())
+    tree.body = [
+        node for node in tree.body if not isinstance(node, (ast.Import, ast.ImportFrom))
+    ]
+    if remove_guard:
+        guards = [
+            node
+            for node in tree.body
+            if isinstance(node, ast.If) and ast.unparse(node.test) == "not x.is_cuda"
+        ]
+        assert len(guards) == 1
+        tree.body.remove(guards[0])
+    calls = []
+
+    def load(path):
+        calls.append(path)
+        raise LookupError("reached native load")
+
+    namespace = {
+        "argparse": argparse,
+        "Path": Path,
+        "torch": SimpleNamespace(
+            float32=object(),
+            cuda=SimpleNamespace(is_available=lambda: True),
+            ones=lambda *args, **kwargs: SimpleNamespace(is_cuda=is_cuda),
+        ),
+        "_load_for_executorch": load,
+    }
+    monkeypatch.setattr(sys, "argv", [str(path), "--model_path", "unused.pte"])
+    reaches_load = is_cuda or remove_guard
+    error = LookupError if reaches_load else RuntimeError
+    message = "reached native load" if reaches_load else "requires a CUDA input"
+    with pytest.raises(error, match=message):
+        exec(compile(tree, str(path), "exec", optimize=optimize), namespace)
+    assert calls == (["unused.pte"] if reaches_load else [])
