@@ -595,14 +595,18 @@ def load_cross_compiled_exported_program(file_path: str = "") -> Any:
 def load(
     file_path: str = "",
     extra_files: Optional[dict[str, Any]] = None,
+    *,
+    format: Optional[str] = None,
     **kwargs: Any,
 ) -> Any:
     """
-    Load either a TorchScript module or ExportedProgram file
+    Load a TorchScript, ExportedProgram, or ExecuTorch program.
 
     Arguments:
         file_path (str): Path to file on the disk
         extra_files (dict[str, Any]): Extra files to load with the model
+        format (Optional[str]): None detects TorchScript and ExportedProgram files.
+            The deprecated ``"executorch"`` option loads a ``.pte`` program.
 
     Example:
     # Load with extra files.
@@ -611,12 +615,17 @@ def load(
         print(extra_files["foo.txt"])
 
     Raises:
-        ValueError: If the file is not a TorchScript module or ExportedProgram file
+        ImportError: If ExecuTorch format is requested without its runtime dependencies
+        ValueError: If the format is unsupported or neither standard loader accepts the file
 
     Note:
-        An ExecuTorch ``.pte`` program is loaded and run through ExecuTorch itself, which owns that
-        runtime API. Install ``torch_tensorrt_executorch_runtime`` so the TensorRT delegate is
-        registered, then use ExecuTorch's Module API::
+        ``format="executorch"`` preserves the legacy ``method_names`` property,
+        ``run(inputs, method="forward")``, and ``forward(*inputs)`` interface.
+        CUDA inputs are copied to CPU. As before, ``extra_files`` and additional
+        kwargs are ignored for this format; external ``.ptd`` files are not supported.
+        This compatibility path will remain for at least six months after the
+        deprecation first ships. New code should import the TensorRT delegate and
+        use ExecuTorch's Module API directly::
 
             import torch_tensorrt_executorch_runtime  # noqa: F401
             from executorch.extension.pybindings.portable_lib import _load_for_executorch
@@ -625,15 +634,22 @@ def load(
             outputs = program.run_method("forward", (tensor,))
     """
 
-    # A caller carrying the old format="executorch" argument gets told where that moved, rather than
-    # having the keyword silently dropped. None is let through: it was the documented default, so a
-    # wrapper that forwards an optional format it received keeps working.
-    if kwargs.pop("format", None) is not None:
-        raise TypeError(
-            "load() no longer accepts a 'format' argument. An ExecuTorch .pte program is loaded "
-            "through ExecuTorch, which owns that runtime API: import "
-            "torch_tensorrt_executorch_runtime to register the TensorRT delegate, then use "
-            "executorch.extension.pybindings.portable_lib._load_for_executorch(path)."
+    if format == "executorch":
+        warnings.warn(
+            "torch_tensorrt.load(format='executorch') is deprecated and will remain "
+            "supported for at least six months after this deprecation first ships. "
+            "Import torch_tensorrt_executorch_runtime to register the TensorRT delegate, "
+            "then use executorch.extension.pybindings.portable_lib._load_for_executorch(path) "
+            "and module.run_method('forward', inputs).",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        from torch_tensorrt._executorch_compat import load as load_executorch
+
+        return load_executorch(file_path)
+    if format is not None:
+        raise ValueError(
+            f"Unsupported format {format!r}; expected None or 'executorch'"
         )
 
     # Ensure Python TRT engine ops are registered so torch.export.load can

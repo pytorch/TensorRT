@@ -282,42 +282,6 @@ def test_save_executorch_error_when_executorch_missing(monkeypatch, tmp_path):
 
 
 @pytest.mark.unit
-def test_load_does_not_accept_an_executorch_format():
-    """Loading a .pte is ExecuTorch's API, not this one.
-
-    ``load`` used to take ``format="executorch"`` and forward to a wrapper shipped in the delegate
-    wheel. That wrapper duplicated ExecuTorch's own ``Runtime``/``Program``, down to the line that
-    holds the file buffer alive, so it was removed along with the parameter. A consumer imports the
-    delegate package for its registration side effect and then uses ExecuTorch's Module API directly.
-    Asserted rather than assumed, because silently accepting and ignoring the keyword would leave
-    callers thinking the old path still worked.
-    """
-    from torch_tensorrt import _compile
-
-    with pytest.raises(TypeError, match="format"):
-        _compile.load("model.pte", format="executorch")
-
-    # None was the documented default, so a wrapper forwarding an optional format it received has
-    # to keep working. Rejecting it would break callers that never asked for ExecuTorch at all.
-    #
-    # What the error IS depends on the build, so this asserts only what matters: that it is not the
-    # guard's TypeError. A build with the TorchScript frontend raises ValueError from load()'s own
-    # "not a valid TorchScript module or ExportedProgram" path, while a build without it reaches the
-    # zipfile open and raises FileNotFoundError. Pinning either one makes this test pass on one build
-    # and fail on the other.
-    try:
-        _compile.load("does-not-exist.pt2", format=None)
-    except TypeError as error:  # pragma: no cover - the guard must not fire here
-        raise AssertionError(
-            f"load() rejected format=None, the documented default: {error}"
-        ) from error
-    except Exception:
-        pass  # Reached the real loader, which is the point: the guard let None through.
-    else:
-        raise AssertionError("load() of a missing file unexpectedly succeeded")
-
-
-@pytest.mark.unit
 def test_public_api_symbols_present():
     module = importlib.import_module("torch_tensorrt.executorch")
     assert "get_edge_compile_config" in module.__all__
