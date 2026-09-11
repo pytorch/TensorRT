@@ -82,7 +82,7 @@ summary *args:
 
 # Added without a rebuild via `uv pip install --group` (sidesteps the
 # test-ext↔quantization `uv sync` lockfile conflict). Run before `just lane full`.
-# Install optional test deps so model/kernels/quantization/executorch suites run
+# Install optional test deps for Linux with the project's CUDA 13.0 (cu130) default.
 install-test-ext:
     uv pip install --group test-ext --group kernels --group quantization
     # ExecuTorch's CUDA wheels are only on the PyTorch nightly index, so the channel is needed.
