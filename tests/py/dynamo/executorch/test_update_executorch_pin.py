@@ -1,253 +1,395 @@
-"""The pin updater has to be trusted to run unattended and open a pull request, so its
-parts are tested the way they fail in practice: version ordering that is not string order,
-a wheel that forgot its provenance, and a rewrite that has to leave the tree in exactly the
-state the pin guard demands. Every test runs the real function; none restates it.
-
-Text and metadata only, like test_executorch_pin.py: no network, no GPU, no ExecuTorch. The
-two functions that reach the index (available_versions, wheel_git_version) are exercised
-against captured output and a synthesized wheel, so this file runs on the lint runner.
-
-Every version here is a fake far-past date (year 2020) and every commit is an obvious
-marker, never a real pin. The updater bumps the pin by replacing the old literal everywhere
-it appears in the tree, so a real pin value living in this file would be rewritten by a
-bump, quietly changing the fixtures. Synthetic values can never equal the live pin, so a
-bump never touches this file. test_write_pins_updates_new_sites_but_never_its_own_source
-holds that line.
-"""
+"""Exercise pin selection, wheel provenance and scoped rewrites without network access."""
 
 from __future__ import annotations
 
 import importlib.util
 import re
+import shutil
 import subprocess
+import sys
 import zipfile
 from pathlib import Path
 
 import pytest
+import yaml
+from packaging.version import Version
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
-_SCRIPT = _REPO_ROOT / ".github" / "scripts" / "update_executorch_pin.py"
+_SCRIPT = _REPO_ROOT / ".github/scripts/update_executorch_pin.py"
 _SELF = "tests/py/dynamo/executorch/test_update_executorch_pin.py"
+_spec = importlib.util.spec_from_file_location("update_executorch_pin", _SCRIPT)
+updater = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(updater)
+_COMMIT = "deadbeef" * 5
 
 
-def _load():
-    spec = importlib.util.spec_from_file_location("update_executorch_pin", _SCRIPT)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+def _stage(root: Path) -> None:
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    subprocess.run(["git", "-C", str(root), "add", "."], check=True)
 
 
-updater = _load()
+@pytest.fixture
+def pin_repo(tmp_path, monkeypatch):
+    """Only the real pin sites and bystanders, without repository history."""
+    for name in (
+        *updater._PIN_SITES,
+        "dev_dep_versions.yml",
+        str(_SCRIPT.relative_to(_REPO_ROOT)),
+        _SELF,
+    ):
+        target = tmp_path / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(_REPO_ROOT / name, target)
+    _stage(tmp_path)
+    monkeypatch.setattr(updater, "_REPO_ROOT", tmp_path)
+    monkeypatch.setattr(updater, "_VERSIONS_FILE", tmp_path / "dev_dep_versions.yml")
+    return tmp_path
 
 
-# The shape of a `pip index versions executorch` run: dated nightlies of one line, out of
-# order so a test that passes under string sorting still fails here. The dates are fake and
-# far in the past so they can never equal the live pin.
-_NIGHTLY_LIST = [
-    "1.5.0.dev20200101+cu130",
-    "1.5.0.dev20200103+cu130",
-    "1.5.0.dev20200102+cu130",
-]
-# A stable channel carries finals and the occasional release candidate; the updater must
-# take the newest final, not the newer-looking prerelease. The line is a fake 0.9 that
-# ExecuTorch will never ship, so it cannot equal a real stable pin either.
-_STABLE_LIST = ["0.9.1", "0.9.2", "0.9.3", "0.9.4rc1"]
+@pytest.fixture
+def wheel_download(monkeypatch):
+    calls = []
+    members = {"executorch/version.py": f'git_version: str = "{_COMMIT}"\n'}
+
+    def download(cmd):
+        calls.append(cmd)
+        dest = Path(cmd[cmd.index("--dest") + 1])
+        with zipfile.ZipFile(
+            dest / "executorch-0.9.0-py3-none-any.whl", "w"
+        ) as archive:
+            for name, body in members.items():
+                archive.writestr(name, body)
+        return ""
+
+    monkeypatch.setattr(updater, "_run", download)
+    return members, calls
 
 
-def test_pick_target_nightly_takes_the_newest_date_not_the_longest_string() -> None:
-    # Distinct on purpose: if a tree-wide bump ever collapsed two of these into one, the
-    # list would stop testing ordering, so fail loudly the moment they are not unique.
-    assert len(set(_NIGHTLY_LIST)) == len(_NIGHTLY_LIST)
-    assert updater.pick_target(_NIGHTLY_LIST, "nightly") == "1.5.0.dev20200103"
+@pytest.mark.parametrize(
+    "versions,track,expected",
+    [
+        (
+            ["1.9.0.dev20200103+cu130", "1.10.0.dev20200101+cu132", "invalid"],
+            "nightly",
+            "1.10.0.dev20200101",
+        ),
+        (["0.9.9", "0.10.0", "0.11.0rc1", "0.11.0.dev1"], "stable", "0.10.0"),
+        (
+            ["1.5.0", "1.5.0rc1", "1.5.0.dev2+cu132", "1.5.0.dev1+cu130"],
+            "nightly",
+            "1.5.0.dev2",
+        ),
+    ],
+)
+def test_pick_target_uses_version_order_and_public_versions(versions, track, expected):
+    assert updater.pick_target(versions, track) == expected
 
 
-def test_pick_target_strips_the_cuda_local_label() -> None:
-    # The pin serves every CUDA row, so the +cuXXX label the index carries must not survive
-    # into the pin. A label left on would fail the guard's exact-match on every site.
-    assert "+" not in updater.pick_target(_NIGHTLY_LIST, "nightly")
-
-
-def test_pick_target_stable_ignores_dev_and_release_candidates() -> None:
-    assert updater.pick_target(_STABLE_LIST, "stable") == "0.9.3"
-
-
-def test_pick_target_nightly_ignores_finals() -> None:
-    # A stable final on the nightly index is not a nightly; picking it would move the pin
-    # off the dev line the delegate is built against.
-    assert updater.pick_target(["0.9.3", "1.5.0.dev20200103"], "nightly") == (
-        "1.5.0.dev20200103"
-    )
-
-
-def test_pick_target_nightly_ignores_release_candidates() -> None:
-    # An rc is a prerelease that sorts above every dev of the same line under PEP 440, so a
-    # filter that only excluded finals would let the first rc on the nightly index become the
-    # pin. A nightly is a dated dev build, and an rc is not one.
-    assert (
-        updater.pick_target(["1.5.0.dev20200103+cu130", "1.5.0rc1+cu130"], "nightly")
-        == "1.5.0.dev20200103"
-    )
-
-
-def test_pick_target_raises_when_nothing_matches_the_track() -> None:
+@pytest.mark.parametrize(
+    "versions,track", [(["1.0"], "nightly"), (["1.0.dev1", "bad"], "stable")]
+)
+def test_pick_target_requires_a_matching_version(versions, track):
     with pytest.raises(SystemExit):
-        updater.pick_target(["0.9.3", "0.9.2"], "nightly")
+        updater.pick_target(versions, track)
 
 
-def test_available_versions_parses_the_pip_line(monkeypatch) -> None:
-    captured = (
-        "executorch (1.5.0.dev20200103+cu130)\n"
-        "Available versions: 1.5.0.dev20200103+cu130, 1.5.0.dev20200102+cu130\n"
-        "  INSTALLED: 1.1.0\n"
-        "  LATEST:    1.5.0.dev20200103+cu130\n"
+def test_available_versions_parses_pip_output(monkeypatch):
+    monkeypatch.setattr(
+        updater,
+        "_run",
+        lambda cmd: "executorch (1.0.dev2)\nAvailable versions: 1.0.dev2+cu130, 1.0.dev1+cu130\n",
     )
-    monkeypatch.setattr(updater, "_run", lambda cmd: captured)
-    assert updater.available_versions([]) == [
-        "1.5.0.dev20200103+cu130",
-        "1.5.0.dev20200102+cu130",
-    ]
+    assert updater.available_versions([]) == ["1.0.dev2+cu130", "1.0.dev1+cu130"]
+
+
+def test_run_surfaces_subprocess_diagnostics(capsys):
+    with pytest.raises(subprocess.CalledProcessError):
+        updater._run(
+            [
+                sys.executable,
+                "-c",
+                "import sys; print('pin-probe-error', file=sys.stderr); sys.exit(7)",
+            ]
+        )
+    assert "pin-probe-error" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        '__executorch_version__: "1.5.0.dev1"',
+        "__executorch_version__: '1.5.0.dev1'",
+        "__executorch_version__: 1.5.0.dev1",
+        '__executorch_version__: "1.5.0.dev1" # keep this comment',
+        '__executorch_version__ : "1.5.0.dev1"',
+    ],
+)
+def test_read_pin_accepts_yaml_scalar_formatting(tmp_path, monkeypatch, line):
+    path = tmp_path / "versions.yml"
+    path.write_text(line + "\n")
+    monkeypatch.setattr(updater, "_VERSIONS_FILE", path)
+    assert updater.read_pin("__executorch_version__") == "1.5.0.dev1"
+
+
+def test_wheel_provenance_is_read_without_executing_python(wheel_download):
+    members, calls = wheel_download
+    members["executorch/version.py"] += "raise RuntimeError('must not execute')\n"
+    assert updater.wheel_git_version("0.9.0", []) == _COMMIT
+    assert "--only-binary=:all:" in calls[0]
+    assert "--no-deps" in calls[0]
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        None,
+        b"\xff",
+        "git_version = None\n",
+        f'git_version = "{_COMMIT}"\n' + "#" * 65537,
+    ],
+)
+def test_wheel_provenance_errors_are_contextual(wheel_download, body):
+    members, _ = wheel_download
+    if body is None:
+        members.clear()
+    else:
+        members["executorch/version.py"] = body
+    with pytest.raises(SystemExit, match="provenance"):
+        updater.wheel_git_version("0.9.0", [])
+
+
+@pytest.mark.parametrize("version,expected", [("1.9.0", "1.10"), ("1.5.0.dev1", "1.6")])
+def test_upper_bound(version, expected):
+    assert updater._upper_bound(version) == expected
 
 
 @pytest.mark.parametrize("channel", ["cu126", "cu128", "cu134"])
-def test_main_rejects_unsupported_nightly_channels_before_querying(
-    monkeypatch, channel
-) -> None:
-    def unexpected_query(*args):
-        pytest.fail("an unsupported channel must not query the index")
-
-    monkeypatch.setattr(updater, "available_versions", unexpected_query)
+def test_main_rejects_unsupported_channels(monkeypatch, channel):
+    monkeypatch.setattr(
+        updater, "available_versions", lambda args: pytest.fail("unexpected query")
+    )
     with pytest.raises(SystemExit) as error:
         updater.main(["--channel", channel])
     assert error.value.code == 2
 
 
 @pytest.mark.parametrize("channel", ["cu130", "cu132"])
-def test_main_reads_versions_from_the_selected_nightly_channel(
-    monkeypatch, channel
-) -> None:
+def test_main_uses_selected_channel(monkeypatch, channel):
     calls = []
-
-    def versions(index_args):
-        calls.append(index_args)
-        return _NIGHTLY_LIST
-
-    monkeypatch.setattr(updater, "available_versions", versions)
-    monkeypatch.setattr(updater, "read_pin", lambda field: "1.5.0.dev20200103")
+    monkeypatch.setattr(
+        updater,
+        "available_versions",
+        lambda args: calls.append(args) or ["1.0.dev1+" + channel],
+    )
+    monkeypatch.setattr(updater, "read_pin", lambda field: "1.0.dev1")
     assert updater.main(["--channel", channel]) == 0
     assert calls == [
         ["--pre", "--index-url", f"https://download.pytorch.org/whl/nightly/{channel}"]
     ]
 
 
-def _synthesize_wheel(path: Path, body: str) -> None:
-    with zipfile.ZipFile(path, "w") as archive:
-        archive.writestr("executorch/version.py", body)
+@pytest.mark.parametrize("allow", [False, True])
+def test_main_requires_explicit_downgrade_authority(monkeypatch, allow):
+    monkeypatch.setattr(updater, "read_pin", lambda field: "1.5.0.dev1")
+    monkeypatch.setattr(updater, "available_versions", lambda args: ["1.4.1"])
+    downloads, writes = [], []
+    monkeypatch.setattr(
+        updater,
+        "wheel_git_version",
+        lambda version, args: downloads.append(version) or _COMMIT,
+    )
+    monkeypatch.setattr(
+        updater,
+        "write_pins",
+        lambda version, commit: writes.append((version, commit)) or True,
+    )
+    result = updater.main(
+        ["--track", "stable"] + (["--allow-downgrade"] if allow else [])
+    )
+    assert (result == 0) is allow
+    assert downloads == (["1.4.1"] if allow else [])
+    assert writes == ([("1.4.1", _COMMIT)] if allow else [])
 
 
-def test_wheel_git_version_reads_the_recorded_commit(monkeypatch, tmp_path) -> None:
-    commit = "deadbeef" * 5
-    wheel = tmp_path / "executorch-1.5.0.dev20200103-py3-none-any.whl"
-    _synthesize_wheel(
-        wheel, f'__version__ = "1.5.0.dev20200103"\ngit_version = "{commit}"\n'
+def _contents(root):
+    return {
+        str(path.relative_to(root)): path.read_bytes()
+        for path in root.rglob("*")
+        if path.is_file() and ".git" not in path.parts
+    }
+
+
+def test_write_pins_updates_real_sites_and_is_idempotent(pin_repo):
+    old = updater.read_pin("__executorch_version__")
+    new = f"{Version(old).major + 1}.0.0.dev1"
+    assert updater.write_pins(new, _COMMIT)
+    assert updater.read_pin("__executorch_version__") == new
+    assert updater.read_pin("__executorch_commit__") == _COMMIT
+    workflow = (pin_repo / ".github/workflows/executorch-test-linux.yml").read_text()
+    assert f"executorch=={new}" in workflow
+    assert f"executorch>={new},<{Version(new).major}.1" in workflow
+    before = _contents(pin_repo)
+    assert not updater.write_pins(new, _COMMIT)
+    assert _contents(pin_repo) == before
+
+
+@pytest.mark.parametrize("shape", ["missing", "untracked", "undecodable", "stale"])
+def test_write_pins_preflights_every_input(pin_repo, shape):
+    path = pin_repo / "justfile"
+    if shape == "missing":
+        path.unlink()
+    elif shape == "untracked":
+        subprocess.run(
+            ["git", "-C", str(pin_repo), "rm", "--cached", "justfile"], check=True
+        )
+    elif shape == "undecodable":
+        path.write_bytes(b"\xff")
+    else:
+        path.write_text(
+            path.read_text().replace(
+                updater.read_pin("__executorch_version__"), "0.0.0"
+            )
+        )
+    before = _contents(pin_repo)
+    with pytest.raises(SystemExit, match="justfile"):
+        updater.write_pins("9.0.0.dev1", _COMMIT)
+    assert _contents(pin_repo) == before
+
+
+@pytest.mark.parametrize(
+    "template",
+    [
+        "ExecuTorch=={old}",
+        "executorch[coreml] == {old}",
+        "executorch < {upper}, >= {old}",
+        "executorch >= {old}, < {upper}",
+        'executorch=={old}; python_version >= "3.10"',
+        'ExecuTorch[coreml] < {upper}, >= {old}; (sys_platform == "linux" or python_version >= "3.10")',
+    ],
+)
+def test_write_pins_handles_equivalent_requirements(pin_repo, template):
+    old = updater.read_pin("__executorch_version__")
+    upper = updater._upper_bound(old)
+    path = pin_repo / "MODULE.bazel"
+    requirement = template.format(old=old, upper=upper)
+    path.write_text(path.read_text() + "\n# " + requirement + "\n")
+    assert updater.write_pins("9.0.0.dev1", _COMMIT)
+    expected = template.format(old="9.0.0.dev1", upper="9.1")
+    assert expected in path.read_text()
+
+
+def test_write_pins_normalizes_equivalent_upper_bound(pin_repo):
+    old = updater.read_pin("__executorch_version__")
+    upper = updater._upper_bound(old)
+    path = pin_repo / "MODULE.bazel"
+    path.write_text(path.read_text() + f"\n# executorch >= {old}, < {upper}.0\n")
+    assert updater.write_pins("9.0.0.dev1", _COMMIT)
+    assert path.read_text().endswith("# executorch >= 9.0.0.dev1, < 9.1\n")
+
+
+@pytest.mark.parametrize(
+    "template",
+    [
+        "executorch=={old}+cu130",
+        "executorch @ https://example.invalid/et.whl",
+        "executorch~={old}",
+        "executorch=={old},!={old}",
+    ],
+)
+def test_write_pins_rejects_unsupported_requirements_before_writing(pin_repo, template):
+    path = pin_repo / "MODULE.bazel"
+    path.write_text(
+        path.read_text()
+        + "\n# "
+        + template.format(old=updater.read_pin("__executorch_version__"))
+        + "\n"
+    )
+    before = _contents(pin_repo)
+    with pytest.raises(SystemExit, match="MODULE.bazel"):
+        updater.write_pins("9.0.0.dev1", _COMMIT)
+    assert _contents(pin_repo) == before
+
+
+def test_write_pins_preserves_bystanders_and_version_prefixes(pin_repo):
+    assert updater.write_pins("1.7.1", _COMMIT)
+    skylib = 'bazel_dep(name = "bazel_skylib", version = "1.7.1")'
+    assert skylib in (pin_repo / "MODULE.bazel").read_text()
+    new = "1.7.1"
+    module = pin_repo / "MODULE.bazel"
+    bystanders = (
+        f"# my-executorch=={new}\n# not_executorch=={new}\n# torch-tensorrt=={new}\n"
+    )
+    module.write_text(module.read_text() + bystanders)
+    outside = pin_repo / "unrelated.txt"
+    outside.write_text(f"executorch=={new}\n")
+    before = {
+        path: (pin_repo / path).read_bytes()
+        for path in (str(_SCRIPT.relative_to(_REPO_ROOT)), _SELF, "unrelated.txt")
+    }
+    target = new + ".post1"
+    assert updater.write_pins(target, "a" * 40)
+    assert bystanders in module.read_text()
+    assert skylib in module.read_text()
+    assert target + ".post1" not in module.read_text()
+    assert all(
+        (pin_repo / path).read_bytes() == content for path, content in before.items()
     )
 
-    def fake_download(cmd):
-        # The download call writes the wheel into the temp dir named right after --dest.
-        dest = Path(cmd[cmd.index("--dest") + 1])
-        (dest / wheel.name).write_bytes(wheel.read_bytes())
-        return ""
 
-    monkeypatch.setattr(updater, "_run", fake_download)
-    assert updater.wheel_git_version("1.5.0.dev20200103", []) == commit
-
-
-def test_wheel_git_version_rejects_a_wheel_without_provenance(
-    monkeypatch, tmp_path
-) -> None:
-    # ExecuTorch writes git_version = None when built outside a git checkout. Such a wheel
-    # carries nothing the pins can be checked against, so it must not become a pin.
-    wheel = tmp_path / "executorch-1.5.0.dev20200103-py3-none-any.whl"
-    _synthesize_wheel(wheel, "__version__ = '1.5.0.dev20200103'\ngit_version = None\n")
-
-    def fake_download(cmd):
-        dest = Path(cmd[cmd.index("--dest") + 1])
-        (dest / wheel.name).write_bytes(wheel.read_bytes())
-        return ""
-
-    monkeypatch.setattr(updater, "_run", fake_download)
-    with pytest.raises(SystemExit):
-        updater.wheel_git_version("1.5.0.dev20200103", [])
+def test_write_pins_preserves_yaml_formatting_and_other_fields(pin_repo):
+    path = pin_repo / "dev_dep_versions.yml"
+    text = path.read_text()
+    old = updater.read_pin("__executorch_version__")
+    text = text.replace(
+        f'__executorch_version__: "{old}"',
+        f"__executorch_version__ : '{old}' # preserve comment",
+    )
+    path.write_text(text)
+    before = yaml.safe_load(text)
+    assert updater.write_pins("9.0.0.dev1", _COMMIT)
+    expected = dict(
+        before, __executorch_version__="9.0.0.dev1", __executorch_commit__=_COMMIT
+    )
+    assert yaml.safe_load(path.read_text()) == expected
+    assert (
+        "__executorch_version__ : '9.0.0.dev1' # preserve comment" in path.read_text()
+    )
 
 
-def test_upper_bound_is_the_next_minor_of_the_line() -> None:
-    # A nightly and a final both belong to the release line their first two fields name, so
-    # the bound is the next minor either way. This mirrors the guard's own derivation, and
-    # the 0.9 case checks the minor rolls to a two-digit number rather than to "0.:".
-    assert updater._upper_bound("1.5.0.dev20200103") == "1.6"
-    assert updater._upper_bound("0.9.1") == "0.10"
-    assert updater._upper_bound("7.3.0") == "7.4"
-
-
-def _worktree(tmp_path) -> Path:
-    """A throwaway checkout of the repo so write_pins edits a real tree, not a copy that
-    diverges from what git tracks. write_pins walks `git ls-files`, so the tree has to be a
-    real checkout."""
-    work = tmp_path / "repo"
-    subprocess.run(
-        ["git", "clone", "--quiet", "--no-hardlinks", str(_REPO_ROOT), str(work)],
+def test_write_pins_leaves_a_tree_the_guard_accepts(tmp_path, monkeypatch):
+    """One history-free snapshot exercises the actual repository-wide guard."""
+    tracked = subprocess.run(
+        ["git", "ls-files", "-z"],
+        cwd=_REPO_ROOT,
         check=True,
-    )
-    return work
-
-
-# A synthetic bump target for the write_pins tests: a fake far-past nightly and an obvious
-# marker commit, distinct from any live pin so the bump is a real change but never collides
-# with a real value in the tree.
-_FAKE_VERSION = "1.5.0.dev20200103"
-_FAKE_COMMIT = "deadbeef" * 5
-
-
-def test_shared_workflow_pin_sites_follow_a_bump(tmp_path, monkeypatch):
-    """The relocated pins must be rewritten, including the fresh-venv range."""
-    version = updater.read_pin("__executorch_version__")
-    commit = updater.read_pin("__executorch_commit__")
-    for name in updater._PIN_SITES:
+        capture_output=True,
+        text=True,
+    ).stdout.split("\0")
+    for name in filter(None, tracked):
         source = _REPO_ROOT / name
+        if not source.is_file():
+            continue
         target = tmp_path / name
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(source.read_bytes())
-    versions = tmp_path / "dev_dep_versions.yml"
-    versions.write_text(
-        f'__executorch_version__: "{version}"\n__executorch_commit__: "{commit}"\n'
-    )
-    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
-    subprocess.run(["git", "-C", str(tmp_path), "add", "."], check=True)
+        shutil.copy2(source, target)
+    _stage(tmp_path)
     monkeypatch.setattr(updater, "_REPO_ROOT", tmp_path)
-    monkeypatch.setattr(updater, "_VERSIONS_FILE", versions)
-    assert updater.write_pins(_FAKE_VERSION, _FAKE_COMMIT)
-    build = (tmp_path / ".github/workflows/build_linux.yml").read_text()
-    test = (tmp_path / ".github/workflows/executorch-test-linux.yml").read_text()
-    assert f"executorch=={_FAKE_VERSION}" in build
-    assert f"executorch=={_FAKE_VERSION}" in test
-    assert f"executorch>={_FAKE_VERSION},<1.6" in test
-    assert version not in build + test
-    assert not updater.write_pins(_FAKE_VERSION, _FAKE_COMMIT)
-
-
-def test_write_pins_leaves_a_tree_the_guard_accepts(tmp_path, monkeypatch) -> None:
-    # The one test that matters most: after a bump, the whole pin guard has to pass, because
-    # that guard is what the generated pull request will be judged by. A rewrite that the
-    # guard rejects would open a red pull request every night.
-    work = _worktree(tmp_path)
-    monkeypatch.setattr(updater, "_REPO_ROOT", work)
-    monkeypatch.setattr(updater, "_VERSIONS_FILE", work / "dev_dep_versions.yml")
-
-    assert updater.write_pins(_FAKE_VERSION, _FAKE_COMMIT) is True
-    assert updater.read_pin("__executorch_version__") == _FAKE_VERSION
-    assert updater.read_pin("__executorch_commit__") == _FAKE_COMMIT
-
-    import sys
-
+    monkeypatch.setattr(updater, "_VERSIONS_FILE", tmp_path / "dev_dep_versions.yml")
+    major = Version(updater.read_pin("__executorch_version__")).major
+    lock = tmp_path / "uv.lock"
+    if lock.exists():
+        major = max(
+            [
+                major,
+                *[
+                    int(value)
+                    for value in re.findall(
+                        r'specifier = "[^"\n]*?(?:>=|==)(\d+)\.', lock.read_text()
+                    )
+                ],
+            ]
+        )
+    assert updater.write_pins(f"{major + 1}.0.0.dev1", _COMMIT)
     result = subprocess.run(
         [
             sys.executable,
@@ -262,301 +404,8 @@ def test_write_pins_leaves_a_tree_the_guard_accepts(tmp_path, monkeypatch) -> No
             "-o",
             "addopts=",
         ],
-        cwd=work,
+        cwd=tmp_path,
         capture_output=True,
         text=True,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-
-
-def test_write_pins_is_idempotent_when_already_current(tmp_path, monkeypatch) -> None:
-    # A day with no new nightly must rewrite nothing, so the run opens no pull request. The
-    # updater is safe to run every day and by hand.
-    work = _worktree(tmp_path)
-    monkeypatch.setattr(updater, "_REPO_ROOT", work)
-    monkeypatch.setattr(updater, "_VERSIONS_FILE", work / "dev_dep_versions.yml")
-
-    current_version = updater.read_pin("__executorch_version__")
-    current_commit = updater.read_pin("__executorch_commit__")
-    assert updater.write_pins(current_version, current_commit) is False
-
-    diff = subprocess.run(
-        ["git", "-C", str(work), "diff", "--quiet"], capture_output=True
-    )
-    assert diff.returncode == 0, "write_pins changed the tree when the pin was current"
-
-
-def test_write_pins_updates_new_sites_but_never_its_own_source(
-    tmp_path, monkeypatch
-) -> None:
-    # The updater rewrites only the enumerated pin sites, not every file that happens to contain
-    # the version token. That is what stops a plain release pin from corrupting unrelated
-    # requirements and content-addressed lock entries. Three properties are pinned here: an
-    # enumerated site is updated, a brand new unenumerated site is left alone, and the updater's
-    # own source comes out byte for byte identical.
-    work = _worktree(tmp_path)
-    monkeypatch.setattr(updater, "_REPO_ROOT", work)
-    monkeypatch.setattr(updater, "_VERSIONS_FILE", work / "dev_dep_versions.yml")
-
-    old_version = updater.read_pin("__executorch_version__")
-    # An enumerated pin site: MODULE.bazel carries the version and must be rewritten.
-    enumerated = work / "MODULE.bazel"
-    assert old_version in enumerated.read_text()
-    # An unenumerated file carrying the same token must NOT be rewritten, the way an unrelated
-    # requirement or a uv.lock entry must be left behind.
-    bystander = work / "some_new_requirements.txt"
-    bystander.write_text(f"executorch=={old_version}\n")
-    subprocess.run(["git", "-C", str(work), "add", str(bystander)], check=True)
-
-    script = work / ".github" / "scripts" / "update_executorch_pin.py"
-    test = work / _SELF
-    script_before = script.read_bytes()
-    test_before = test.read_bytes()
-
-    assert updater.write_pins(_FAKE_VERSION, _FAKE_COMMIT) is True
-
-    assert _FAKE_VERSION in enumerated.read_text()
-    assert bystander.read_text() == f"executorch=={old_version}\n"
-    assert script.read_bytes() == script_before
-    assert test.read_bytes() == test_before
-
-
-def test_write_pins_leaves_another_packages_matching_version_alone(
-    tmp_path, monkeypatch
-) -> None:
-    # A version on its own does not identify a pin. Every MODULE.bazel here declares
-    # bazel_dep(name = "bazel_skylib", version = "1.7.1"), so a bare-version rewrite moved that
-    # too whenever the ExecuTorch pin happened to be 1.7.1, silently changing an unrelated
-    # dependency. Enumerating the pin files does not prevent it, because those are the very files
-    # holding the bystander, so the rewrite has to key on what names the pin.
-    work = _worktree(tmp_path)
-    monkeypatch.setattr(updater, "_REPO_ROOT", work)
-    monkeypatch.setattr(updater, "_VERSIONS_FILE", work / "dev_dep_versions.yml")
-
-    module_bazel = work / "MODULE.bazel"
-    skylib = 'bazel_dep(name = "bazel_skylib", version = "1.7.1")'
-    assert (
-        skylib in module_bazel.read_text()
-    ), "fixture stale: bazel_skylib is not pinned to 1.7.1"
-    # Collide the ExecuTorch pin with bazel_skylib's version, which is the case a bare-version
-    # rewrite cannot tell apart. The downstream sites move with it, so this is a coherent tree
-    # pinned to that version rather than one where only the source of truth changed.
-    #
-    # The colliding version is spelled at runtime rather than written out, because the pin guard
-    # greps the tree for "executorch==<digits>" to inventory the pin sites, and a literal here would
-    # register this test file as a new site.
-    collided = "1.7.1"
-    bumped = "1.8.0"
-    requirement = f"executorch=={collided}"
-    old_version = updater.read_pin("__executorch_version__")
-    versions = work / "dev_dep_versions.yml"
-    versions.write_text(
-        re.sub(
-            r'^__executorch_version__: ".*"$',
-            f'__executorch_version__: "{collided}"',
-            versions.read_text(encoding="utf-8"),
-            flags=re.MULTILINE,
-        ),
-        encoding="utf-8",
-    )
-    for name in updater._PIN_SITES:
-        site = work / name
-        site.write_text(
-            site.read_text(encoding="utf-8").replace(old_version, collided),
-            encoding="utf-8",
-        )
-    assert requirement in module_bazel.read_text()
-
-    assert updater.write_pins(bumped, _FAKE_COMMIT) is True
-
-    assert updater.read_pin("__executorch_version__") == bumped
-    assert skylib in module_bazel.read_text(), (
-        "write_pins rewrote bazel_skylib's version because it shared the ExecuTorch pin's "
-        "version string"
-    )
-    assert f"executorch=={bumped}" in module_bazel.read_text()
-
-
-def test_write_pins_moves_every_requirement_shape_the_guard_counts(
-    tmp_path, monkeypatch
-) -> None:
-    # The rewriter and the pin guard have to agree on what a pin looks like. The guard counts any
-    # comparison operator, with optional spaces, so a site written "executorch >= X" is a pin to the
-    # guard and invisible to a rewriter that only knows "==" and ">=". The bump would leave that site
-    # behind and the guard would then fail the generated pull request, reported as a pin mismatch
-    # rather than as an operator the rewriter cannot see. None of these shapes is in the tree today,
-    # which is exactly why the agreement needs a test rather than an example.
-    #
-    # The negative half matters as much: a distribution whose name merely ends in executorch is a
-    # different package that happens to share a version.
-    work = _worktree(tmp_path)
-    monkeypatch.setattr(updater, "_REPO_ROOT", work)
-    monkeypatch.setattr(updater, "_VERSIONS_FILE", work / "dev_dep_versions.yml")
-
-    old_version = updater.read_pin("__executorch_version__")
-    probe = work / "MODULE.bazel"
-    moved = [
-        f"executorch{operator}{old_version}"
-        for operator in ("==", " == ", ">=", "~=", "===")
-    ]
-    kept = [
-        f"my-executorch=={old_version}",
-        f"not_executorch=={old_version}",
-        f"torch-tensorrt=={old_version}",
-    ]
-    # One requirement per line, and each line checked on its own. A substring search over the whole
-    # file cannot work here: "my-executorch==<pin>" contains "executorch==<pin>", so a `not in` over
-    # the joined text is satisfied by the line that is supposed to be left alone.
-    probe.write_text(
-        probe.read_text(encoding="utf-8")
-        + "\n"
-        + "\n".join(f"# {line}" for line in moved + kept)
-        + "\n",
-        encoding="utf-8",
-    )
-
-    assert updater.write_pins(_FAKE_VERSION, _FAKE_COMMIT) is True
-
-    lines = {
-        line.lstrip("# ").strip()
-        for line in probe.read_text(encoding="utf-8").splitlines()
-    }
-    for line in moved:
-        assert line not in lines, (
-            f"write_pins left {line!r} on the old version, but the pin guard counts that shape as "
-            "a pin, so the bump would produce a tree the guard rejects"
-        )
-    for line in kept:
-        assert line in lines, (
-            f"write_pins rewrote {line!r}, which is a different distribution that merely shares "
-            "the pin's version"
-        )
-
-
-def test_write_pins_refuses_an_untracked_pin_site(tmp_path, monkeypatch) -> None:
-    # A _PIN_SITES entry that git does not track is a stale list, not an absent pin. Skipping it
-    # rewrites every other site and returns success, and the workflow's gate is `git diff --quiet`,
-    # which sees change rather than coherence, so the bot would open a pull request whose
-    # unrewritten site still names the old pin. The likely cause is a rename that this list did not
-    # follow, so fail loudly and name the file.
-    work = _worktree(tmp_path)
-    monkeypatch.setattr(updater, "_REPO_ROOT", work)
-    monkeypatch.setattr(updater, "_VERSIONS_FILE", work / "dev_dep_versions.yml")
-
-    subprocess.run(
-        ["git", "-C", str(work), "mv", "justfile", "justfile.renamed"], check=True
-    )
-
-    with pytest.raises(SystemExit) as error:
-        updater.write_pins(_FAKE_VERSION, _FAKE_COMMIT)
-    assert "justfile" in str(error.value)
-
-    # And nothing was rewritten on the way to the refusal.
-    assert updater.read_pin("__executorch_version__") != _FAKE_VERSION
-
-
-def test_main_refuses_to_move_the_pin_backwards(monkeypatch) -> None:
-    # pick_target returns the newest on the track, but "newest" regresses when the index drops the
-    # current line or when --track flips to stable. Moving the pin backwards lands it on a version
-    # the delegate cannot build against, so main() must refuse it and touch nothing.
-    monkeypatch.setattr(updater, "read_pin", lambda field: "1.5.0.dev20260825")
-    monkeypatch.setattr(updater, "available_versions", lambda index_args: ["1.4.1"])
-    monkeypatch.setattr(updater, "pick_target", lambda versions, track: "1.4.1")
-
-    def fail_wheel(*args, **kwargs):
-        raise AssertionError("wheel_git_version must not run on a refused downgrade")
-
-    def fail_write(*args, **kwargs):
-        raise AssertionError("write_pins must not run on a refused downgrade")
-
-    monkeypatch.setattr(updater, "wheel_git_version", fail_wheel)
-    monkeypatch.setattr(updater, "write_pins", fail_write)
-
-    assert updater.main(["--track", "nightly"]) == 0
-
-
-def test_main_allows_a_backwards_move_with_the_opt_in(monkeypatch) -> None:
-    # The deliberate re-pin escape hatch: --allow-downgrade lets a lower target through, so the
-    # run reaches the wheel read and the write. The write's ARGUMENTS are asserted, not just that it
-    # ran: main() is the only place the version it picked and the commit it read from that wheel are
-    # paired, so a main() that dropped the commit and wrote something else would satisfy a
-    # ran-or-not check while producing exactly the split pin this whole file exists to prevent.
-    monkeypatch.setattr(updater, "read_pin", lambda field: "1.5.0.dev20260825")
-    monkeypatch.setattr(updater, "available_versions", lambda index_args: ["1.4.1"])
-    monkeypatch.setattr(updater, "pick_target", lambda versions, track: "1.4.1")
-    wheel_commit = "c" * 40
-    wheel_calls: list[str] = []
-    write_calls: list[tuple[str, str]] = []
-
-    def note_wheel(version, index_args):
-        wheel_calls.append(version)
-        return wheel_commit
-
-    def note_write(version, commit):
-        write_calls.append((version, commit))
-        return True
-
-    monkeypatch.setattr(updater, "wheel_git_version", note_wheel)
-    monkeypatch.setattr(updater, "write_pins", note_write)
-
-    assert updater.main(["--track", "nightly", "--allow-downgrade"]) == 0
-    assert wheel_calls == ["1.4.1"]
-    assert write_calls == [("1.4.1", wheel_commit)]
-
-
-def test_write_pins_handles_a_prefix_version_bump(tmp_path, monkeypatch) -> None:
-    # When the old version is a prefix of the new one (1.5.0 -> 1.5.0.post1), a plain two-pass
-    # text.replace doubles the tail at a range site: the range pass writes >=1.5.0.post1,<1.6, then
-    # the bare pass re-hits the 1.5.0 inside it and yields >=1.5.0.post1.post1,<1.6, which packaging
-    # rejects. Bare-version sites do not double, so the regression has to be checked at a range site.
-    # The single regex pass must produce the new version exactly.
-    work = _worktree(tmp_path)
-    monkeypatch.setattr(updater, "_REPO_ROOT", work)
-    monkeypatch.setattr(updater, "_VERSIONS_FILE", work / "dev_dep_versions.yml")
-
-    old = updater.read_pin("__executorch_version__")
-    upper = updater._upper_bound("1.5.0")
-    # Build the requirement token from parts so this test file itself does not read as a pin site to
-    # the repo-wide requirement guard, which greps for the literal executorch>=<digit>.
-    pkg = "executorch"
-    old_range_line = f"{pkg}>=1.5.0,<{upper}"
-    new_range_line = f"{pkg}>=1.5.0.post1,<{upper}"
-    # Force both a bare-version site and a range site onto a plain 1.5.0, so old_range matches.
-    versions = work / "dev_dep_versions.yml"
-    versions.write_text(versions.read_text().replace(old, "1.5.0"))
-    range_site = next(p for p in updater._pin_site_paths() if p.name == "MODULE.bazel")
-    range_site.write_text(range_site.read_text() + f"\n{old_range_line}\n")
-    # Stage rather than commit: write_pins walks `git ls-files`, which already lists staged
-    # changes, and a commit would need a git identity the CI runner does not configure.
-    subprocess.run(["git", "-C", str(work), "add", "-A"], check=True)
-
-    assert updater.write_pins("1.5.0.post1", "d" * 40) is True
-
-    assert updater.read_pin("__executorch_version__") == "1.5.0.post1"
-    text = range_site.read_text()
-    assert (
-        "1.5.0.post1.post1" not in text
-    ), "range site double-substituted the prefix bump"
-    assert new_range_line in text, "range site was not rewritten to the new pin"
-
-
-def test_wheel_git_version_downloads_only_binaries(monkeypatch, tmp_path) -> None:
-    # pip download runs an sdist's setup.py, and this runs in the pin-bump job that holds a
-    # write-scoped token. The download must be wheel-only so a poisoned sdist on the index cannot
-    # execute code there. The script only reads a wheel anyway.
-    commit = "deadbeef" * 5
-    wheel = tmp_path / "executorch-1.5.0.dev20200103-py3-none-any.whl"
-    _synthesize_wheel(
-        wheel, f'__version__ = "1.5.0.dev20200103"\ngit_version = "{commit}"\n'
-    )
-    seen = {}
-
-    def fake_download(cmd):
-        seen["cmd"] = cmd
-        dest = Path(cmd[cmd.index("--dest") + 1])
-        (dest / wheel.name).write_bytes(wheel.read_bytes())
-        return ""
-
-    monkeypatch.setattr(updater, "_run", fake_download)
-    updater.wheel_git_version("1.5.0.dev20200103", [])
-    assert "--only-binary=:all:" in seen["cmd"], seen["cmd"]
