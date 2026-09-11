@@ -858,9 +858,9 @@ def save(
         )
     if output_format == "executorch" and not _has_executorch_exir():
         raise ImportError(
-            "Saving in ExecuTorch format requires the executorch package with "
-            "executorch.exir, published for Linux only, to use "
-            "output_format='executorch'. Install with: " + executorch_install_command()
+            "Saving with output_format='executorch' requires executorch.exir. "
+            "This CUDA integration supports Linux. Setup: "
+            + executorch_install_command()
         )
     if output_format == "executorch":
         # Every executorch option is popped above, so a leftover kwarg is a typo. Fail
@@ -1407,8 +1407,9 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
         from torch_tensorrt.executorch import export
     except ImportError:
         raise ImportError(
-            "ExecuTorch is not installed, and is published for Linux only, to use "
-            "output_format='executorch'. Install with: " + executorch_install_command()
+            "Could not import the ExecuTorch export integration for "
+            "output_format='executorch'. This CUDA integration supports Linux. "
+            "Setup: " + executorch_install_command()
         )
     import torch_tensorrt.dynamo.runtime.meta_ops.register_meta_ops  # noqa: F401
 

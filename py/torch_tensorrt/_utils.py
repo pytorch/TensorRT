@@ -31,39 +31,27 @@ def sanitized_torch_version() -> Any:
     )
 
 
-def executorch_install_channel() -> str:
-    """The PyTorch nightly channel that carries the ExecuTorch build matching this torch.
-
-    ExecuTorch publishes a distinct wheel per CUDA channel (``+cu130`` and ``+cu132`` are separate
-    builds), so an install instruction has to name the channel that matches the user's torch, or a
-    CUDA 13.2 user installs a CUDA 13.0 ExecuTorch. Derived from ``torch.version.cuda`` rather than
-    hardcoded for that reason. Falls back to the literal placeholder ``cuXYZ`` when torch reports no
-    CUDA build, so the message stays honest instead of naming a channel the user cannot use.
-    """
-    cuda_version = torch.version.cuda
-    if not cuda_version:
-        return "cuXYZ"
-    major, _, minor = cuda_version.partition(".")
-    return f"cu{major}{minor or '0'}"
+def executorch_install_channel() -> str | None:
+    """Return a supported nightly channel matching the active PyTorch CUDA build."""
+    return {"13.0": "cu130", "13.2": "cu132"}.get(torch.version.cuda)
 
 
 def executorch_install_command() -> str:
-    """The exact ``pip install`` line for the ExecuTorch authoring stack, channel included.
+    """Return an install command, or guidance for an unsupported CUDA build.
 
-    Shared by every runtime error message that tells a user how to install ExecuTorch, so the
-    channel is derived once from the running torch and the three messages cannot drift from each
-    other or from the pin.
-
-    No ``--upgrade``: on a named requirement it upgrades the package itself, so a user on a
-    released ``torch_tensorrt`` would have that build replaced by a nightly, and ``torch`` pulled
-    along with it, when all they asked for was the extra. It is not needed either. Measured with
-    pip 25.0.1 against probe wheels shaped like this case: with the package already installed and
-    the extra missing, ``pip install "demo[executorch]"`` installs the extra's dependencies and
-    leaves the package alone.
+    Adding this package's missing extra does not need a blanket --upgrade, but pip
+    may still change dependencies to satisfy it. --pre permits prerelease candidates.
     """
+    channel = executorch_install_channel()
+    if channel is None:
+        return (
+            "This ExecuTorch integration requires Linux with a PyTorch CUDA 13.0 or "
+            "13.2 build. Use matching PyTorch, ExecuTorch and Torch-TensorRT wheels "
+            "in a fresh environment."
+        )
     return (
         'pip install --pre "torch_tensorrt[executorch]" '
-        f"--extra-index-url https://download.pytorch.org/whl/nightly/{executorch_install_channel()}"
+        f"--extra-index-url https://download.pytorch.org/whl/nightly/{channel}"
     )
 
 

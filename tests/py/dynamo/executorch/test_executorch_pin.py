@@ -732,10 +732,6 @@ def test_the_executorch_install_message_names_the_torch_channel() -> None:
     assert channel_130() == "cu130"
     assert "nightly/cu130" in command_130()
 
-    channel_none, command_none = _load_utils_channel_helpers(None)
-    assert channel_none() == "cuXYZ"
-    assert "nightly/cuXYZ" in command_none()
-
     # Check each installation error independently, not just one helper call per file.
     for path in (
         "py/torch_tensorrt/_compile.py",
@@ -776,6 +772,77 @@ def test_the_executorch_install_message_names_the_torch_channel() -> None:
             f"{path} has no ExecuTorch install message built with executorch_install_command(); "
             "either a site was removed or this scan no longer recognises it"
         )
+
+
+@pytest.mark.parametrize("cuda", ["13.0", "13.2", None])
+@pytest.mark.parametrize("entrypoint", ["lazy", "save", "_save_as_executorch"])
+def test_import_errors_preserve_context_and_install_guidance(
+    monkeypatch, cuda, entrypoint
+):
+    import __future__
+    import importlib.util
+    import types
+
+    _, command = _load_utils_channel_helpers(cuda)
+    utils = types.ModuleType("torch_tensorrt._utils")
+    utils.executorch_install_command = command
+    package = types.ModuleType("torch_tensorrt")
+    package.__path__ = []
+    monkeypatch.setitem(sys.modules, package.__name__, package)
+    monkeypatch.setitem(sys.modules, utils.__name__, utils)
+    original_find_spec = importlib.util.find_spec
+    monkeypatch.setattr(
+        importlib.util,
+        "find_spec",
+        lambda name, *a: (
+            None if name == "executorch.exir" else original_find_spec(name, *a)
+        ),
+    )
+    path = REPO_ROOT / "py/torch_tensorrt/executorch/__init__.py"
+    spec = importlib.util.spec_from_file_location("torch_tensorrt.executorch", path)
+    module = importlib.util.module_from_spec(spec)
+    monkeypatch.setitem(sys.modules, spec.name, module)
+    spec.loader.exec_module(module)
+
+    source = REPO_ROOT / "py/torch_tensorrt/_compile.py"
+    functions = [
+        node
+        for node in ast.parse(source.read_text()).body
+        if isinstance(node, ast.FunctionDef)
+        and node.name in {"save", "_save_as_executorch", "_has_executorch_exir"}
+    ]
+    namespace = {
+        "importlib": importlib,
+        "executorch_install_command": command,
+        "CudaGraphsTorchTensorRTModule": type("CudaGraphsStub", (), {}),
+        "_parse_module_type": lambda value: None,
+        "ENABLED_FEATURES": types.SimpleNamespace(torch_tensorrt_runtime=True),
+    }
+    exec(
+        compile(
+            ast.Module(functions, []),
+            str(source),
+            "exec",
+            flags=__future__.annotations.compiler_flag,
+        ),
+        namespace,
+    )
+    with pytest.raises(ImportError) as error:
+        if entrypoint == "lazy":
+            module.TensorRTBackend
+        elif entrypoint == "save":
+            namespace[entrypoint](object(), "unused.pte", output_format="executorch")
+        else:
+            namespace[entrypoint](object(), "unused.pte")
+    context = {
+        "lazy": "Cannot access torch_tensorrt.executorch.TensorRTBackend",
+        "save": "Saving with output_format='executorch' requires executorch.exir",
+        "_save_as_executorch": "Could not import the ExecuTorch export integration",
+    }
+    message = str(error.value)
+    assert context[entrypoint] in message
+    assert "This CUDA integration supports Linux" in message
+    assert message.endswith("Setup: " + command())
 
 
 def test_derived_requirements_roll_the_minor_over(tmp_path: Path) -> None:
@@ -1649,6 +1716,15 @@ def test_review_runner_empty_channel_uses_local_default(monkeypatch):
     monkeypatch.setenv("CU_VERSION", "")
     argv = _setup_commands("executorch")[0][0]
     assert argv[argv.index("--extra-index-url") + 1].endswith("/cu130")
+
+
+@pytest.mark.parametrize("cuda", [None, "", "12.6", "12.8", "13.4", "14.0"])
+def test_unsupported_install_channels_give_guidance(cuda):
+    channel, command = _load_utils_channel_helpers(cuda)
+    assert channel() is None
+    message = command()
+    assert "Linux" in message and "13.0" in message and "13.2" in message
+    assert "pip install" not in message and "https://" not in message
 
 
 @pytest.mark.parametrize("side_effect", [False, True])

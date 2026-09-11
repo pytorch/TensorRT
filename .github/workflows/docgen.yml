@@ -42,10 +42,8 @@ jobs:
               run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
             - name: Build Python Package
               run: |
-                  # The pin exactly, not the range the extra expands to: --pre plus a nightly
-                  # channel that gains a member daily would otherwise install whichever dev build
-                  # is newest that morning while the delegate compiles from the pinned commit.
-                  python3 -m pip install --pre ".[executorch]" \
+                  # Use the source-paired wheel, not a newer member of the authoring range.
+                  python3 -m pip install ".[executorch]" \
                     "executorch==$(python3 -c 'import yaml;print(yaml.safe_load(open("dev_dep_versions.yml"))["__executorch_version__"])')" \
                     --extra-index-url https://download.pytorch.org/whl/nightly/cu130
             - name: Install uv

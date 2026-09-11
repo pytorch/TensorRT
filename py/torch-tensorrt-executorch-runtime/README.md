@@ -36,6 +36,9 @@ of the wheel runtime contract.
 > were built against. An isolated build may download a newer, ABI-incompatible
 > PyTorch version.
 
+The example below assumes Linux with a matching CUDA 13.0 PyTorch and
+Torch-TensorRT installation. Use `cu132` for CUDA 13.2 throughout.
+
 ```bash
 export TensorRT_ROOT=/path/to/TensorRT
 
@@ -81,13 +84,14 @@ whose program loader plans every arena on the host.
 
 ## Use
 
-The wheel's dependencies (`executorch`, `torch-tensorrt`, and the CUDA
-runtime) resolve from the PyTorch nightly index, so install it with the same
-channel the build recipe used. `--pre` lets pip select the pinned ExecuTorch
-dev build:
+Use the same PyTorch nightly channel as the build for ExecuTorch and any
+nightly PyTorch or Torch-TensorRT dependencies. CUDA and TensorRT packages
+may resolve from PyPI or NVIDIA's index; the extra index applies to the whole
+dependency solve. The exact ExecuTorch dev pin and the explicit PyTorch and
+Torch-TensorRT dev-version ranges already permit their required prereleases.
 
 ```bash
-python -m pip install --pre dist/torch_tensorrt_executorch_runtime-*.whl \
+python -m pip install dist/torch_tensorrt_executorch_runtime-*.whl \
   --extra-index-url https://download.pytorch.org/whl/nightly/cu130
 ```
 

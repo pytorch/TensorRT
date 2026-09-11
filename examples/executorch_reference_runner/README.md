@@ -95,7 +95,9 @@ build-executorch-reference-runner/lib/libexecutorch_trt_backend.a
 
 ### Python
 
-Install the `executorch` authoring stack, which the `[executorch]` extra pulls in:
+In a fresh Linux CUDA 13.0 environment, install the `executorch` authoring
+stack through the `[executorch]` extra. Use `cu132` instead for CUDA 13.2,
+keeping PyTorch, ExecuTorch and Torch-TensorRT on the same channel:
 
 ```bash
 pip install --pre "torch-tensorrt[executorch]" \
@@ -104,8 +106,10 @@ pip install --pre "torch-tensorrt[executorch]" \
 
 The index is required, not optional: the extra's ExecuTorch floor names a dev build, and PyPI's
 `executorch` stops below it, so without the nightly channel pip reports no matching distribution.
-If a stable `torch-tensorrt` is already installed, add `--upgrade`, or pip keeps it and reports
-that it does not provide the `executorch` extra.
+`--pre` allows prereleases; it does not request an upgrade. Released versions can
+already declare the extra. If an older installation lacks it, first install the
+intended compatible Torch-TensorRT wheel deliberately. Adding the extra may change
+dependencies, so use a fresh environment to preserve an existing working stack.
 
 The extra installs `executorch` only. The delegate runtime,
 `torch-tensorrt-executorch-runtime`, is not yet published to any index: its requirement in the

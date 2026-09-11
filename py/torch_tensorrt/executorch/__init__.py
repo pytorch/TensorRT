@@ -26,8 +26,8 @@ if not _has_executorch_exir():
 
         raise ImportError(
             f"Cannot access torch_tensorrt.executorch.{name}: "
-            "ExecuTorch with executorch.exir is required, and is published for "
-            "Linux only. Install with: " + executorch_install_command()
+            "ExecuTorch with executorch.exir is required. This CUDA integration "
+            "supports Linux. Setup: " + executorch_install_command()
         )
 
     __all__ = [
