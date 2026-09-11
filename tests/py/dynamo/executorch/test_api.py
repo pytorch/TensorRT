@@ -9,7 +9,6 @@ import re
 import shutil
 import subprocess
 import sys
-import tempfile
 import types
 import zipfile
 from pathlib import Path
@@ -1883,8 +1882,24 @@ def test_runtime_wheel_version_is_independent_of_the_main_wheel(monkeypatch, tmp
 
 
 @pytest.mark.unit
-def test_cmake_version_uses_the_companion_distribution(tmp_path):
-    """Generate the real CMake version file and execute its compatibility checks."""
+@pytest.mark.parametrize(
+    "requested",
+    [
+        "0.1.0",
+        "0.2.0 EXACT",
+        "0.3.0",
+        "2.15.0",
+        "0.1...0.2",
+        "0.1...<0.2",
+        "0.2...0.3",
+        "0.1...<1",
+        "0.1...1",
+        "0.1...<1.1",
+        "0.1...<2",
+    ],
+)
+def test_cmake_version_uses_the_companion_distribution(tmp_path, requested):
+    """Compare real find_package results with CMake's SameMajorVersion generator."""
     cmake = shutil.which("cmake")
     if cmake is None:
         pytest.skip("cmake is not installed")
@@ -1909,7 +1924,7 @@ def test_cmake_version_uses_the_companion_distribution(tmp_path):
     )
     command = namespace["BazelBuild"]()
     command.distribution = types.SimpleNamespace(
-        get_version=lambda: "0.1.0.dev20200103+cu132"
+        get_version=lambda: "0.2.0.dev20200103+cu132"
     )
     command._install_cmake_package(tmp_path)
     version_file = (
@@ -1917,25 +1932,69 @@ def test_cmake_version_uses_the_companion_distribution(tmp_path):
         / "lib/cmake/torchtrt_executorch/torchtrt_executorch-config-version.cmake"
     )
     text = version_file.read_text()
-    assert 'set(PACKAGE_VERSION "0.1.0")' in text
-    assert 'set(TORCHTRT_EXECUTORCH_FULL_VERSION "0.1.0.dev20200103+cu132")' in text
-    for requested, major, compatible in (
-        ("0.1.0", "0", "TRUE"),
-        ("0.2.0", "0", "FALSE"),
-        ("2.15.0", "2", "FALSE"),
-    ):
-        probe = tmp_path / "probe.cmake"
-        probe.write_text(
-            f'set(PACKAGE_FIND_VERSION "{requested}")\n'
-            f'set(PACKAGE_FIND_VERSION_MAJOR "{major}")\n'
-            f'include("{version_file}")\n'
-            f'if(NOT PACKAGE_VERSION_COMPATIBLE STREQUAL "{compatible}")\n'
-            '  message(FATAL_ERROR "wrong companion version compatibility")\nendif()\n'
+    assert 'set(PACKAGE_VERSION "0.2.0")' in text
+    assert 'set(TORCHTRT_EXECUTORCH_FULL_VERSION "0.2.0.dev20200103+cu132")' in text
+    standard = tmp_path / "standard.cmake"
+    generator = tmp_path / "generate.cmake"
+    generator.write_text(
+        "include(CMakePackageConfigHelpers)\n"
+        f'write_basic_package_version_file("{standard}" VERSION "0.2.0" '
+        "COMPATIBILITY SameMajorVersion ARCH_INDEPENDENT)\n"
+    )
+    result = subprocess.run(
+        [cmake, "-P", str(generator)], capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    found = []
+    for name, version in (("generated", version_file), ("standard", standard)):
+        prefix = tmp_path / name / "prefix"
+        prefix.mkdir(parents=True)
+        (prefix / "probe-config.cmake").write_text("set(probe_FOUND TRUE)\n")
+        shutil.copyfile(version, prefix / "probe-config-version.cmake")
+        source = tmp_path / name / "app"
+        source.mkdir()
+        (source / "CMakeLists.txt").write_text(
+            "cmake_minimum_required(VERSION 3.28)\nproject(probe LANGUAGES NONE)\n"
+            f'find_package(probe {requested} QUIET CONFIG PATHS "{prefix}" NO_DEFAULT_PATH)\n'
+            'file(WRITE "${CMAKE_BINARY_DIR}/found.txt" "${probe_FOUND}")\n'
         )
+        binary = tmp_path / name / "build"
         result = subprocess.run(
-            [cmake, "-P", str(probe)], capture_output=True, text=True
+            [cmake, "-S", str(source), "-B", str(binary)],
+            capture_output=True,
+            text=True,
         )
         assert result.returncode == 0, result.stdout + result.stderr
+        found.append((binary / "found.txt").read_text())
+    assert (
+        found[0] == found[1]
+    ), f"{requested}: generated={found[0]}, standard={found[1]}"
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("requested", ["0.1...1", "0.1...<1.1", "0.1...<2"])
+def test_cmake_version_rejects_missing_range_major_guard(
+    monkeypatch, tmp_path, requested
+):
+    copyfile = shutil.copyfile
+
+    def without_range_major_guard(source, destination, **kwargs):
+        result = copyfile(source, destination, **kwargs)
+        if source.name == "torchtrt_executorch-config-version.cmake":
+            text, count = re.subn(
+                r'  if\(PACKAGE_FIND_VERSION_RANGE_MAX STREQUAL "INCLUDE"\n'
+                r".*?  elseif\(PACKAGE_VERSION VERSION_LESS PACKAGE_FIND_VERSION_MIN\)",
+                "  if(PACKAGE_VERSION VERSION_LESS PACKAGE_FIND_VERSION_MIN)",
+                Path(destination).read_text(),
+                flags=re.DOTALL,
+            )
+            assert count == 1
+            Path(destination).write_text(text)
+        return result
+
+    monkeypatch.setattr(shutil, "copyfile", without_range_major_guard)
+    with pytest.raises(AssertionError, match="generated=1, standard=0"):
+        test_cmake_version_uses_the_companion_distribution(tmp_path, requested)
 
 
 @pytest.mark.unit
