@@ -34,26 +34,15 @@ include(FindPackageHandleStandardArgs)
 # ExecuTorch uses for its own package, so the walk passes through a lib/ directory on the way out.
 # Testing for the library rather than for a directory named lib is what keeps it from stopping there.
 set(_torchtrt_executorch_root "${CMAKE_CURRENT_LIST_DIR}")
+unset(TORCHTRT_EXECUTORCH_BACKEND_LIBRARY)
 foreach(_ RANGE 4)
   if(EXISTS "${_torchtrt_executorch_root}/lib/libexecutorch_backend_tensorrt.so")
+    set(TORCHTRT_EXECUTORCH_BACKEND_LIBRARY
+      "${_torchtrt_executorch_root}/lib/libexecutorch_backend_tensorrt.so")
     break()
   endif()
   get_filename_component(_torchtrt_executorch_root "${_torchtrt_executorch_root}" DIRECTORY)
 endforeach()
-
-# Globbed rather than passed to find_library with a bare name, so a versioned soname
-# (libfoo.so.1) is found too, the way ExecuTorch's own package config does it.
-file(
-  GLOB _torchtrt_executorch_matches
-  "${_torchtrt_executorch_root}/lib/libexecutorch_backend_tensorrt.so"
-  "${_torchtrt_executorch_root}/lib/libexecutorch_backend_tensorrt.so.*"
-)
-if(_torchtrt_executorch_matches)
-  # Highest version first, so a prefix carrying two does not select by glob order.
-  list(SORT _torchtrt_executorch_matches)
-  list(REVERSE _torchtrt_executorch_matches)
-  list(GET _torchtrt_executorch_matches 0 TORCHTRT_EXECUTORCH_BACKEND_LIBRARY)
-endif()
 
 find_package_handle_standard_args(
   torchtrt_executorch
@@ -63,6 +52,8 @@ find_package_handle_standard_args(
 if(NOT torchtrt_executorch_FOUND)
   return()
 endif()
+
+set(TORCHTRT_EXECUTORCH_LIBRARIES torchtrt::executorch_backend)
 
 if(TARGET torchtrt::executorch_backend)
   # Another subproject already called find_package in this configure. Redefining
@@ -106,5 +97,3 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     PROPERTY INTERFACE_LINK_OPTIONS "LINKER:-rpath,${_torchtrt_executorch_root}/lib"
   )
 endif()
-
-set(TORCHTRT_EXECUTORCH_LIBRARIES torchtrt::executorch_backend)
