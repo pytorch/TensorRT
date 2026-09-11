@@ -126,6 +126,32 @@ releases up to 1.4.1 ship no linkable runtime at all. ExecuTorch is not built
 from source for this wheel, so no source checkout or `EXECUTORCH_SOURCE_DIR` is
 involved.
 
+### Rebuilding and editable installs
+
+After rebuilding a wheel, install it with `python -m pip install --no-deps
+--force-reinstall` followed by its path. This replaces an installed wheel with
+the same version. The delegate is a shared library, not a Python extension;
+`build_ext --inplace` does not rebuild it.
+
+For editable development, use the same matching dependencies and version setting:
+
+```bash
+python -m pip install --no-build-isolation --no-deps \
+  --editable py/torch-tensorrt-executorch-runtime
+```
+
+Repeat this command after native or CMake changes. Stop native consumers before
+rebuilding and restart them afterward; rebuilding does not update a loaded
+library. Python source changes are visible directly. For strict editable mode,
+add `--config-settings editable_mode=strict` and keep the generated link directory.
+The native library and generated CMake files live beside the source package in
+its generated library directory.
+
+`TORCH_TENSORRT_EXECUTORCH_DEBUG`, `TORCH_TENSORRT_ALLOW_UNPINNED_EXECUTORCH`,
+and `TORCH_TENSORRT_SKIP_DELEGATE_REGISTRATION` accept `1`, `true`, `yes`, or
+`on`, ignoring case. All other values, including unset, empty, `0`, and `false`,
+are false.
+
 ## Registration
 
 Loading the delegate adds `TensorRTBackend` to the backend registry that the
