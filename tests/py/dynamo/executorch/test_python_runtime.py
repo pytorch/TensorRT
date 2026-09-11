@@ -568,14 +568,10 @@ def test_register_reports_a_cpu_executorch_wheel(monkeypatch):
         delegate.register()
 
 
-def test_the_delegate_library_is_absent_from_a_source_checkout():
-    """The delegate is a build artifact, so locating it must fail cleanly when it is missing.
-
-    Run from a checkout, nothing has been built, so this exercises the real lookup rather than
-    a stubbed one and pins the error users see when they import the package without installing
-    the wheel.
-    """
+def test_the_delegate_library_is_absent_from_an_unbuilt_package(monkeypatch, tmp_path):
+    """Use an unbuilt location because the checkout may contain editable build outputs."""
     delegate = load_delegate_module()
+    monkeypatch.setattr(delegate, "__file__", str(tmp_path / "__init__.py"))
 
     with pytest.raises(delegate.DelegateCompatibilityError, match="missing"):
         delegate._delegate_path()
