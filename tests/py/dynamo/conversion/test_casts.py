@@ -45,11 +45,10 @@ class TestToCopyConverter(DispatchTestCase):
                 y = torch.ops.aten._to_copy.default(x, dtype=torch.half)
                 return y
 
-        inputs = [torch.rand((1, 3, 10))]
+        inputs = [torch.rand((1, 3, 10), dtype=torch.half)]
         self.run_test(
             ToCopyHalf(),
             inputs,
-            precision=torch.half,
         )
 
     def test_to_copy_float(self):
@@ -58,11 +57,10 @@ class TestToCopyConverter(DispatchTestCase):
                 y = torch.ops.aten._to_copy.default(x, dtype=torch.float)
                 return y
 
-        inputs = [torch.rand((1, 3, 10)).half()]
+        inputs = [torch.rand((1, 3, 10), dtype=torch.float)]
         self.run_test(
             ToCopyFloat(),
             inputs,
-            precision=torch.float,
         )
 
     def test_to_copy_bfloat16(self):
@@ -72,11 +70,10 @@ class TestToCopyConverter(DispatchTestCase):
                 y = y**2
                 return y
 
-        inputs = [torch.rand((1, 3, 10), dtype=torch.float32)]
+        inputs = [torch.rand((1, 3, 10), dtype=torch.bfloat16)]
         self.run_test(
             ToCopyBFloat16(),
             inputs,
-            precision=torch.float,
         )
 
     def test_to_copy_i64b(self):
@@ -100,11 +97,10 @@ class TestToCopyConverter(DispatchTestCase):
                 z = torch.ops.aten._to_copy.default(x_1, dtype=torch.float)
                 return y, z
 
-        inputs = [torch.rand((1, 3, 10))]
+        inputs = [torch.rand((1, 3, 10), dtype=torch.float)]
         self.run_test(
             ToCopyReturns(),
             inputs,
-            precision=torch.float,
         )
 
     def test_to_copy_validator_rejects_device_transfer(self):
