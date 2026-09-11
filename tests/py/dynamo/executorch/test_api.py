@@ -2907,7 +2907,10 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
         # an architecture the wheel is not built for has to be rejected, not just non-linux tags.
         tag = "linux_ppc64le"
     elif case == "requires_an_unpinned_executorch":
-        requires = [f"executorch=={pin.split('.')[0]}.0.0"]
+        requires = [
+            f"executorch>={pin}" if r.startswith("executorch==") else r
+            for r in requires
+        ]
     elif case == "requires_no_executorch":
         requires = ["torch==2.15.0.dev20260824"]
     elif case == "requires_a_mismatched_executorch_pin":
@@ -3011,6 +3014,7 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
         env={**os.environ, "PYTHONPATH": str(tmp_path)},
         capture_output=True,
         text=True,
+        timeout=30,
     )
     accepted = completed.returncode == 0
     assert accepted is should_pass, (
@@ -3026,6 +3030,7 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
             "expected torch_tensorrt_executorch_runtime/lib/libexecutorch_backend_tensorrt.so"
         ),
         "ships_no_cmake_package": "the wheel ships no CMake package",
+        "requires_an_unpinned_executorch": "the repository pins executorch==",
         "requires_a_mismatched_executorch_pin": "the repository pins executorch==",
     }
     expected_message = expected_messages.get(case)
@@ -3034,6 +3039,39 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
             f"{case} was rejected, but not through its own branch: expected "
             f"{expected_message!r} in\n{completed.stderr}"
         )
+
+
+@pytest.mark.unit
+def test_the_wheel_checker_rejects_removed_exactness(tmp_path):
+    """Removing exact-version enforcement must admit the otherwise valid loose fixture."""
+    test_the_wheel_checker_rejects_a_bad_wheel(
+        tmp_path, "requires_an_unpinned_executorch", False
+    )
+    checker = _REPO_ROOT / ".github/scripts/check-executorch-runtime-wheel.py"
+    source = checker.read_text()
+    clause = '                or str(matched[0].specifier) != f"=={expected_version}"\n'
+    assert source.count(clause) == 1
+    wheel = next(tmp_path.glob("*.whl"))
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import sys; __file__ = sys.argv.pop(1); "
+            "exec(compile(sys.argv.pop(1), __file__, 'exec'))",
+            str(checker),
+            source.replace(clause, ""),
+            str(wheel),
+            "--architecture",
+            "x86_64",
+        ],
+        cwd=_REPO_ROOT,
+        env={**os.environ, "PYTHONPATH": str(tmp_path)},
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "Validated " in result.stdout
 
 
 @pytest.mark.unit
