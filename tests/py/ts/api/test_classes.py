@@ -1,7 +1,7 @@
-import copy
 import unittest
 from typing import Dict
 
+import pytest
 import torch
 import torch_tensorrt as torchtrt
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
@@ -15,7 +15,7 @@ class TestInput(unittest.TestCase):
     def _verify_correctness(self, struct: torchtrt.Input, target: Dict) -> bool:
         internal = struct._to_internal()
 
-        list_eq = lambda al, bl: all([a == b for (a, b) in zip(al, bl)])
+        list_eq = lambda al, bl: all(a == b for (a, b) in zip(al, bl))
 
         eq = lambda a, b: a == b
 
@@ -316,6 +316,8 @@ class TestTorchTensorRTModule(unittest.TestCase):
         torchtrt.ENABLED_FEATURES.tensorrt_rtx,
         "layer info is different for tensorrt_rtx",
     )
+    @pytest.mark.trt_api
+    @pytest.mark.trt_layer_info
     def test_get_layer_info(self):
         """
         {

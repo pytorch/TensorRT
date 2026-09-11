@@ -3,13 +3,12 @@
 import dataclasses
 import unittest
 
+import pytest
 import torch
 import torch_tensorrt as torchtrt
-from parameterized import parameterized
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.runtime import (
-    RuntimeCache,
     RuntimeSettings,
     runtime_config,
 )
@@ -200,6 +199,9 @@ class TestLazyExecutionContextCreation(TestCase):
             if isinstance(mod, TorchTensorRTModule):
                 yield mod
 
+    @pytest.mark.trt_api
+    @pytest.mark.trt_runtime
+    @pytest.mark.trt_rtx_only
     def test_one_context_create_with_default_settings(self):
         compiled = _compile_simple()
         ttrt_modules = list(self._walk_engines(compiled))

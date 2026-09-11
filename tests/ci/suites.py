@@ -154,6 +154,24 @@ _L0: list[Suite] = [
         jobs="8",
     ),
     Suite(
+        # Focused contracts for the TensorRT / TensorRT-RTX APIs used by
+        # Torch-TensorRT. Keep paths explicit so this suite never pulls in
+        # model-zoo or torchvision dependencies during collection.
+        "trt-api",
+        tier="l0",
+        lanes=("fast", "full", "nightly"),
+        cwd="tests/py",
+        paths=(
+            "dynamo/runtime/test_000_convert_module_to_trt_engine.py",
+            "dynamo/conversion/test_engine_converter_binding_names.py",
+            "dynamo/automatic_plugin/test_plugin_attr_annotations.py",
+            "dynamo/runtime/test_004_runtime_settings.py",
+            "ts/api/test_classes.py",
+        ),
+        markers="trt_api",
+        jobs=_HEAVY,
+    ),
+    Suite(
         "ts-api",
         tier="l0",
         lanes=("fast", "full", "nightly"),
