@@ -358,84 +358,120 @@ _THREE_ARG_CASES = {
 
 
 @pytest.mark.unit
-def test_the_cmake_package_defines_a_linkable_target():
-    """Configure the package with real CMake and require the imported target to exist.
-
-    The sibling test searches the config for strings, and a string search cannot tell a working
-    package from a broken one: inserting ``return()`` after ``cmake_minimum_required`` makes the
-    config define nothing at all, and every string assertion still passes because the text it reads
-    is still there. find_package does not even error under REQUIRED in that case, so the failure
-    surfaces later as an unlinkable target in a consumer's build.
-
-    This runs cmake against a prefix laid out the way the wheel installs, with a stub library, and
-    asks for IMPORTED_LOCATION back. That is the property consumers depend on.
-    """
+@pytest.mark.parametrize(
+    "case", ["present", "absent", "optional", "repeat", "function", "versioned"]
+)
+def test_the_cmake_package_defines_a_linkable_target(tmp_path, case):
+    """Discover the fixed wheel library and restore outputs in each caller's scope."""
     cmake = shutil.which("cmake")
     if cmake is None:
-        pytest.skip("cmake is not installed, so the package cannot be configured here")
+        pytest.skip("cmake is not installed")
+    config = _RUNTIME_SETUP_PY.parent / "cmake/torchtrt_executorch-config.cmake"
+    prefix = tmp_path / "prefix"
+    cmake_dir = prefix / "lib/cmake/torchtrt_executorch"
+    cmake_dir.mkdir(parents=True)
+    shutil.copy2(config, cmake_dir / config.name)
+    library = prefix / "lib/libexecutorch_backend_tensorrt.so"
+    if case not in {"absent", "optional"}:
+        library.write_bytes(b"stub")
+    if case == "versioned":
+        library.with_suffix(".so.9").write_bytes(b"decoy")
 
-    package_dir = _REPO_ROOT / "py/torch-tensorrt-executorch-runtime"
-    config = package_dir / "cmake/torchtrt_executorch-config.cmake"
-    library = "libexecutorch_backend_tensorrt.so"
-
-    with tempfile.TemporaryDirectory() as tmp:
-        root = pathlib.Path(tmp)
-        # Exactly the wheel's layout: the config under lib/cmake/<name>/ beside the library in lib/.
-        cmake_dir = root / "prefix/lib/cmake/torchtrt_executorch"
-        cmake_dir.mkdir(parents=True)
-        shutil.copy2(config, cmake_dir / config.name)
-        (cmake_dir / "torchtrt_executorch-config-version.cmake").write_text(
-            'set(PACKAGE_VERSION "2.15.0")\nset(PACKAGE_VERSION_COMPATIBLE TRUE)\n',
-            encoding="utf-8",
-        )
-        # A stub is enough: configuring never opens the file, and building a real one here would
-        # need the whole ExecuTorch toolchain.
-        (root / "prefix/lib" / library).write_bytes(b"\x7fELF stub")
-
-        app = root / "app"
-        app.mkdir()
-        (app / "CMakeLists.txt").write_text(
-            "cmake_minimum_required(VERSION 3.28)\n"
-            "project(probe LANGUAGES NONE)\n"
+    discovery = "find_package(torchtrt_executorch REQUIRED)\n"
+    if case == "repeat":
+        discovery += (
+            "unset(TORCHTRT_EXECUTORCH_LIBRARIES)\n"
             "find_package(torchtrt_executorch REQUIRED)\n"
-            "if(NOT TARGET torchtrt::executorch_backend)\n"
-            '  message(FATAL_ERROR "NO_TARGET")\n'
-            "endif()\n"
+        )
+    elif case == "function":
+        discovery = (
+            "function(discover)\n"
+            + discovery
+            + "endfunction()\ndiscover()\n"
+            + discovery
+        )
+    elif case == "optional":
+        discovery = "find_package(torchtrt_executorch QUIET)\n"
+    if case in {"absent", "optional"}:
+        checks = (
+            "if(torchtrt_executorch_FOUND OR TARGET torchtrt::executorch_backend)\n"
+            '  message(FATAL_ERROR "missing delegate accepted")\nendif()\n'
+        )
+    else:
+        checks = (
+            'if(NOT TORCHTRT_EXECUTORCH_LIBRARIES STREQUAL "torchtrt::executorch_backend")\n'
+            '  message(FATAL_ERROR "missing library list")\nendif()\n'
             "get_target_property(location torchtrt::executorch_backend IMPORTED_LOCATION)\n"
-            'message(STATUS "LOCATION=${location}")\n'
+            f'if(NOT location STREQUAL "{library}")\n'
+            '  message(FATAL_ERROR "wrong delegate selected: ${location}")\nendif()\n'
             "get_target_property(options torchtrt::executorch_backend INTERFACE_LINK_OPTIONS)\n"
-            'message(STATUS "OPTIONS=${options}")\n',
-            encoding="utf-8",
+            'if(NOT options MATCHES "no-as-needed")\n'
+            '  message(FATAL_ERROR "missing retention options")\nendif()\n'
         )
-        result = subprocess.run(
-            [
-                cmake,
-                "-S",
-                str(app),
-                "-B",
-                str(app / "build"),
-                f"-DCMAKE_PREFIX_PATH={root / 'prefix'}",
-                "-DCMAKE_SYSTEM_NAME=Linux",
-            ],
-            capture_output=True,
-            text=True,
+    app = tmp_path / "app"
+    app.mkdir()
+    (app / "CMakeLists.txt").write_text(
+        "cmake_minimum_required(VERSION 3.28)\nproject(probe LANGUAGES NONE)\n"
+        + discovery
+        + checks
+    )
+    result = subprocess.run(
+        [
+            cmake,
+            "-S",
+            str(app),
+            "-B",
+            str(tmp_path / "build"),
+            f"-DCMAKE_PREFIX_PATH={prefix}",
+            "-DCMAKE_SYSTEM_NAME=Linux",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    output = result.stdout + result.stderr
+    if case == "absent":
+        assert result.returncode != 0, output
+        assert "TORCHTRT_EXECUTORCH_BACKEND_LIBRARY" in output, output
+    else:
+        assert result.returncode == 0, output
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("removed", ["required", "not_found", "outputs", "fixed_name"])
+def test_cmake_discovery_rejects_removed_guards(monkeypatch, tmp_path, removed):
+    config = _RUNTIME_SETUP_PY.parent / "cmake/torchtrt_executorch-config.cmake"
+    text = config.read_text()
+    if removed == "required":
+        text, count = re.subn(
+            r"find_package_handle_standard_args\(\s*torchtrt_executorch\s*"
+            r"REQUIRED_VARS TORCHTRT_EXECUTORCH_BACKEND_LIBRARY\s*\)",
+            "",
+            text,
         )
-        output = result.stdout + result.stderr
-        assert (
-            result.returncode == 0
-        ), f"find_package(torchtrt_executorch) failed:\n{output}"
-        assert "NO_TARGET" not in output, (
-            "find_package succeeded but defined no torchtrt::executorch_backend target, so a "
-            f"consumer has nothing to link:\n{output}"
+        assert count == 1
+        case = "absent"
+    elif removed == "not_found":
+        original = "if(NOT torchtrt_executorch_FOUND)\n  return()\nendif()"
+        assert text.count(original) == 1
+        text = text.replace(original, "")
+        case = "optional"
+    elif removed == "outputs":
+        original = "set(TORCHTRT_EXECUTORCH_LIBRARIES torchtrt::executorch_backend)"
+        assert text.count(original) == 1
+        text = text.replace(original, "") + "\n" + original + "\n"
+        case = "repeat"
+    else:
+        assert "libexecutorch_backend_tensorrt.so" in text
+        text = text.replace(
+            "libexecutorch_backend_tensorrt.so", "libexecutorch_backend_tensorrt.so.9"
         )
-        # The target has to point AT the library, not at the directory holding it. A walk that
-        # stops at the first lib/ it meets yields the directory and links nothing.
-        assert (
-            f"LOCATION={root / 'prefix/lib' / library}" in output
-        ), f"IMPORTED_LOCATION is not the delegate library:\n{output}"
-        assert (
-            "no-as-needed" in output
-        ), f"the target carries no --no-as-needed, so the backend can silently not register:\n{output}"
+        case = "versioned"
+    copied = tmp_path / "source/cmake" / config.name
+    copied.parent.mkdir(parents=True)
+    copied.write_text(text)
+    monkeypatch.setitem(globals(), "_RUNTIME_SETUP_PY", copied.parents[1] / "setup.py")
+    with pytest.raises(AssertionError):
+        test_the_cmake_package_defines_a_linkable_target(tmp_path, case)
 
 
 @pytest.mark.unit
