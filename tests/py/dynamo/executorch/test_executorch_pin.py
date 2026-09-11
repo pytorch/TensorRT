@@ -665,6 +665,7 @@ def test_install_channel_guard_rejects_unsupported_nightly_recipes(
             test_every_printed_install_instruction_names_the_nightly_channel()
 
 
+@pytest.mark.unit
 def test_the_runner_follows_the_row_s_cuda_version(monkeypatch) -> None:
     """The runner follows each row; cu130 is only the local default, not the cu132 PR row."""
     monkeypatch.syspath_prepend(str(REPO_ROOT / "tests"))
@@ -689,6 +690,36 @@ def test_the_runner_follows_the_row_s_cuda_version(monkeypatch) -> None:
     assert channel_for("cu130").endswith("/nightly/cu130")
     # Unset is a local run, and matches the index pyproject.toml resolves against by default.
     assert channel_for(None).endswith("/nightly/cu130")
+    assert channel_for("").endswith("/nightly/cu130")
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "channel", ["cpu", "13.2", "cu126", "cu128", "cu134", "CU132", " cu132"]
+)
+def test_runner_rejects_unsupported_cuda_channels(monkeypatch, channel):
+    from tests.ci import runner
+
+    monkeypatch.setenv("CU_VERSION", channel)
+    with pytest.raises(ValueError, match="CU_VERSION") as error:
+        runner._setup_commands("executorch")
+    assert repr(channel) in str(error.value)
+    assert "cu130" in str(error.value) and "cu132" in str(error.value)
+
+
+@pytest.mark.unit
+def test_runner_channel_check_detects_removed_validator(monkeypatch):
+    import inspect
+    from tests.ci import runner
+
+    source = inspect.getsource(runner._setup_commands)
+    changed = source.replace('if cuda not in {"cu130", "cu132"}:', "if False:")
+    assert changed != source
+    namespace = vars(runner).copy()
+    exec(compile(changed, runner.__file__, "exec"), namespace)
+    monkeypatch.setattr(runner, "_setup_commands", namespace["_setup_commands"])
+    with pytest.raises(pytest.fail.Exception, match="DID NOT RAISE"):
+        test_runner_rejects_unsupported_cuda_channels(monkeypatch, "cpu")
 
 
 def _load_utils_channel_helpers(fake_cuda: str | None):

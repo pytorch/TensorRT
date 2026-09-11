@@ -136,6 +136,10 @@ def _setup_commands(step: str) -> list[tuple[list[str], Path]]:
         # cu130 default is for a local run with no CU_VERSION set, and matches the torch index
         # pyproject.toml resolves against by default.
         cuda = os.environ.get("CU_VERSION") or "cu130"
+        if cuda not in {"cu130", "cu132"}:
+            raise ValueError(
+                f"Unsupported CU_VERSION {cuda!r}; expected cu130 or cu132 for ExecuTorch"
+            )
         return [
             (
                 launcher
