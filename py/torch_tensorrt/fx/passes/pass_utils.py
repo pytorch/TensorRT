@@ -489,7 +489,7 @@ class InputOutputDtypeInferInterpreter(torch.fx.Interpreter):
 def apply_bfloat_float_conversion(
     gm: torch.fx.GraphModule, inputs: Any, name: str
 ) -> None:
-    _LOGGER.info("Apply bfloat-float32 conversion on {name}")
+    _LOGGER.info(f"Apply bfloat-float32 conversion on {name}")
     interpreter = InputOutputDtypeInferInterpreter(gm)
     interpreter.run(*inputs)
 
