@@ -24,6 +24,10 @@ on:
         options:
           - nightly
           - stable
+      allow_downgrade:
+        description: "Allow proposing an older ExecuTorch version"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -46,8 +50,8 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install packaging
-        run: python -m pip install packaging
+      - name: Install updater dependencies
+        run: python -m pip install packaging pyyaml
 
       - name: Choose the track
         id: track
@@ -81,14 +85,19 @@ jobs:
         if: steps.track.outputs.track != ''
         env:
           TRACK: ${{ steps.track.outputs.track }}
+          ALLOW_DOWNGRADE: ${{ github.event_name == 'workflow_dispatch' && inputs.allow_downgrade }}
         run: |
           set -euo pipefail
-          python .github/scripts/update_executorch_pin.py --track "$TRACK"
+          args=(--track "$TRACK")
+          if [ "$ALLOW_DOWNGRADE" = "true" ]; then
+            args+=(--allow-downgrade)
+          fi
+          python .github/scripts/update_executorch_pin.py "${args[@]}"
           if git diff --quiet; then
             echo "the pin is already at the newest $TRACK wheel"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "version=$(sed -n 's/^__executorch_version__: "\(.*\)"$/\1/p' dev_dep_versions.yml)" >> "$GITHUB_OUTPUT"
+            echo "version=$(python -c 'import yaml; print(yaml.safe_load(open("dev_dep_versions.yml"))["__executorch_version__"])')" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Open a pull request
@@ -96,7 +105,7 @@ jobs:
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
           token: ${{ secrets.GH_PYTORCHBOT_TOKEN }}
-          branch: executorch-pin-update/${{ steps.track.outputs.track }}
+          branch: executorch-pin-update/${{ github.ref_name }}/${{ steps.track.outputs.track }}
           delete-branch: true
           commit-message: "Update ExecuTorch pin to ${{ steps.update.outputs.version }}"
           title: "Update ExecuTorch pin to ${{ steps.update.outputs.version }}"

@@ -1,46 +1,35 @@
-"""Every ExecuTorch pin in the repository must agree with dev_dep_versions.yml.
+"""Check exact build pins, compatible authoring ranges and installed-wheel provenance.
 
-Sites are discovered by search, not listed here. A list of paths would drift the same way
-the pins it checks drifted.
-
-Two spellings are correct, for different reasons, and which one a site needs depends on what
-that site produces. See the comment above EXECUTORCH_REQUIREMENT in setup.py. Requiring the
-right spelling per role is the point: installable metadata that pins exactly would reject a
-compatible patch release, and a build input that takes a range could resolve an ExecuTorch
-the artifact was not compiled against.
-
-Agreeing with the file is necessary but not sufficient, so
-test_the_pinned_commit_is_the_pinned_wheels_own_source closes the gap the others leave: they
-only prove the repository is self-consistent, which it would be even if the wheel and the
-commit named two different ExecuTorch trees.
+Discover requirements independently of the writer, and require known sites to remain present.
 """
 
 import ast
 import json
 import os
-import pathlib
 import re
+import shlex
 import subprocess
 import sys
 from collections import Counter
 from pathlib import Path
 
 import pytest
+import yaml
+from packaging.requirements import Requirement
+from packaging.utils import canonicalize_name
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 VERSIONS = REPO_ROOT / "dev_dep_versions.yml"
 
-# Every PEP 440 operator, not just the two this repository happens to use, and an optional
-# space before it. A site added with a compatible-release or bare-inequality operator is a site
-# that drifted from the pin, and it should be visible to the search rather than silently
-# exempt. Operators are named through the pattern rather than spelled out in prose here,
-# because the search below reads this file too and an example would read as such a site.
-# The whole specifier set, not just its first clause. Capturing up to the first comma compared
-# equal on "executorch==PIN,!=PIN", a specifier that excludes the very version it appears to pin,
-# and rejected the legal PEP 508 spelling with spaces around the operator.
+# Discovery in mixed source/prose; packaging validates the matched requirement.
+_CLAUSE = r"(?:===|==|>=|<=|~=|!=|<|>)\s*[0-9][0-9A-Za-z.!+*_-]*"
+_MARKER_VALUE = r"""(?:[a-z_]+|"[^"\n]*"|'[^'\n]*')"""
+_MARKER_ATOM = rf"(?:\([ \t]*)*{_MARKER_VALUE}[ \t]*(?:===|==|>=|<=|~=|!=|<|>|not[ \t]+in|in)[ \t]*{_MARKER_VALUE}(?:[ \t]*\))*"
 REQUIREMENT = re.compile(
-    r"executorch\s*(?:===|==|>=|<=|~=|!=|<|>)\s*[^\"'\s`,]+"
-    r"(?:\s*,\s*(?:===|==|>=|<=|~=|!=|<|>)\s*[^\"'\s`,]+)*"
+    r"(?<![0-9A-Za-z._-])executorch(?:\[[A-Za-z0-9_., -]+\])?\s*"
+    rf"(?:@\s*[^\s\"'`]+|{_CLAUSE}(?:\s*,\s*{_CLAUSE})*)"
+    rf"(?:\s*;\s*{_MARKER_ATOM}(?:\s+(?:and|or)\s+{_MARKER_ATOM})*)?",
+    re.IGNORECASE,
 )
 
 
@@ -57,8 +46,10 @@ def _requirement_disagrees(actual: str, expected: str, version: str) -> str:
         wanted = Requirement(expected)
     except InvalidRequirement as error:
         return f"which is not a valid requirement ({error})"
-    if parsed.name != wanted.name:
+    if canonicalize_name(parsed.name) != canonicalize_name(wanted.name):
         return f"which names {parsed.name}, not {wanted.name}"
+    if parsed.url:
+        return "direct URLs are not supported pin sites"
     if not parsed.specifier.contains(version, prereleases=True):
         return f"whose specifier excludes the pinned {version}"
     if set(parsed.specifier) != set(wanted.specifier):
@@ -82,11 +73,7 @@ PAIRING_TEST = "test_the_pinned_commit_is_the_pinned_wheels_own_source"
 # sentence someone can paste above a requirement without meaning to license a range there.
 USER_WORKFLOW_MARKER = "pin-check: range-ok"
 
-# A pip install of the plain torch-tensorrt wheel on a platform that has no ExecuTorch dev wheel
-# carries this token. win32 is the case: the glob it installs also matches the Linux-only runtime
-# wheel, so the channel scan reaches it, but ExecuTorch publishes no win32 nightly and the
-# [executorch] extra is Linux-only. An explicit token rather than inference, so the exemption is
-# deliberate and cannot be granted by accident to a Linux install that simply lost its index.
+# Windows installs only the main wheel, without the Linux companion or authoring extra.
 NO_NIGHTLY_MARKER = "pin-check: no-nightly"
 
 # The files expected to pin ExecuTorch, mapped to how many sites each must carry, excluding
@@ -109,9 +96,7 @@ _EXPECTED_REQUIREMENT_SITES = {
     "toolchains/ci_workspaces/MODULE.bazel.tmpl": 1,
 }
 
-# Same idea for the source commit the delegate compiles from. Five sites, not four: the
-# reference-runner README names the ref as a shell default, which the old nonzero check could
-# not distinguish from the four MODULE.bazel files.
+# Minimum source-commit sites, including the reference runner's shell default.
 _EXPECTED_COMMIT_SITES = {
     "MODULE.bazel": 1,
     "docker/MODULE.bazel.docker": 1,
@@ -148,15 +133,31 @@ def _assert_every_site_present(
 
 
 def _git(*arguments: str) -> str:
-    return subprocess.run(
+    result = subprocess.run(
         ["git", *arguments], cwd=REPO_ROOT, capture_output=True, text=True
-    ).stdout
+    )
+    assert result.returncode == 0 or (
+        arguments[0] == "grep" and result.returncode == 1
+    ), result.stderr
+    return result.stdout
+
+
+def _tracked_files() -> list[str]:
+    return [name for name in _git("ls-files", "-z").split("\0") if name]
+
+
+def _is_source_test(name: str) -> bool:
+    return (
+        name.startswith("tests/")
+        and Path(name).name.startswith("test_")
+        and name.endswith(".py")
+    )
 
 
 def _versions() -> dict:
-    # Matches how setup.py and versions.py read this file, without needing yaml here.
-    text = VERSIONS.read_text()
-    return dict(re.findall(r'^(__\w+__): "([^"]+)"', text, re.MULTILINE))
+    values = yaml.safe_load(VERSIONS.read_text(encoding="utf-8"))
+    assert isinstance(values, dict), "version source must be a YAML mapping"
+    return values
 
 
 def _has_marker_above(path: str, number: int, marker: str) -> bool:
@@ -184,12 +185,7 @@ def _wants_range(path: str, number: int) -> bool:
 
 
 def _release_line(version: str) -> tuple[str, str]:
-    """Split a pin into its major and minor, for either a release or a nightly.
-
-    ``1.4.1`` and ``1.5.0.dev20260822`` both belong to the release line their first two
-    fields name, so the range a site gets is derived from those and nothing else. Splitting
-    on every dot instead assumes three fields and raises on the nightly form.
-    """
+    """Read the release line shared by final and nightly versions."""
     major, minor = version.split(".")[:2]
     return major, minor
 
@@ -208,15 +204,6 @@ _PUBLISHED_NIGHTLY_CHANNELS = frozenset({"cu130", "cu132"})
 # Tracked files with no suffix that still carry install commands. justfile writes the nightly
 # ExecuTorch install for local builds, so the printed-install walk has to read it by name.
 _EXTENSIONLESS_INSTALL_FILES = frozenset({"justfile"})
-
-# Index-URL variables whose value legitimately arrives from the CI environment and so has no
-# assignment in the tree to resolve. An unresolved variable is accepted only if it is one of
-# these; every other unresolved name, including a typo of a real one, fails the channel check
-# rather than passing on sight. Empty today: every ExecuTorch install channels through either a
-# literal nightly URL or a locally assigned index variable, and is therefore resolvable.
-# and therefore resolvable. Kept as the explicit seam a future environment-provided index goes
-# through.
-_ENVIRONMENT_INDEX_VARIABLES: frozenset[str] = frozenset()
 
 # The bazel repositories annotate their pinned commit with the wheel it corresponds to, in a
 # comment, because bazel fetches by commit and has no requirement string to carry. Those are the
@@ -319,34 +306,28 @@ def _resolve_shell_assignment(text: str, variable: str, before: int) -> str | No
     return resolved
 
 
-def test_every_install_that_names_a_channel_can_resolve_its_variable() -> None:
-    """An install URL built from a shell variable must have that variable in scope.
-
-    The release lane's install reaches the nightly channel through CU_VERSION, which the reusable
-    build workflow sets as job-level env from the matrix row. If that ever stops being exported the
-    URL collapses to a directory that does not exist, pip falls back to the default index, and the
-    install silently resolves the wrong ExecuTorch instead of failing.
-    """
-    build_linux = (REPO_ROOT / ".github/workflows/build_linux.yml").read_text(
-        encoding="utf-8"
-    )
-    assert "CU_VERSION: ${{ matrix.desired_cuda }}" in build_linux, (
-        "build_linux.yml no longer exports CU_VERSION from the matrix row, so every install URL "
-        "built from it resolves to an empty channel"
-    )
-
-    for path in (
-        ".github/workflows/build_linux.yml",
-        ".github/workflows/executorch-test-linux.yml",
+def test_shared_workflows_export_the_row_cuda_channel() -> None:
+    for filename, job_name in (
+        ("build_linux.yml", "build"),
+        ("linux-test.yml", "test"),
     ):
-        text = (REPO_ROOT / path).read_text(encoding="utf-8")
-        for line in text.splitlines():
-            if "download.pytorch.org/whl/nightly/${CU_VERSION}" not in line:
-                continue
-            assert "executorch" in text, (
-                f"{path} builds a nightly channel URL but installs no ExecuTorch, so the URL is "
-                "either dead code or the install lost its pin"
-            )
+        workflow = yaml.safe_load(
+            (REPO_ROOT / ".github/workflows" / filename).read_text()
+        )
+        job = workflow["jobs"][job_name]
+        assert job["env"].get("CU_VERSION") == "${{ matrix.desired_cuda }}", filename
+        setup = next(
+            s
+            for s in job["steps"]
+            if s.get("uses", "").endswith("/setup-binary-builds")
+        )
+        assert setup["with"]["cuda-version"] == "${{ env.CU_VERSION }}", filename
+        assert all("CU_VERSION" not in s.get("env", {}) for s in job["steps"]), filename
+
+    workflow = yaml.safe_load(
+        (REPO_ROOT / ".github/workflows/executorch-test-linux.yml").read_text()
+    )
+    assert workflow["jobs"]["test"]["uses"] == "./.github/workflows/linux-test.yml"
 
 
 @pytest.mark.parametrize(
@@ -358,8 +339,6 @@ def test_every_install_that_names_a_channel_can_resolve_its_variable() -> None:
     ],
 )
 def test_runtime_callers_use_the_shared_pinned_build(caller, job):
-    import yaml
-
     workflow = yaml.safe_load((REPO_ROOT / ".github/workflows" / caller).read_text())
     build = workflow["jobs"][job]
     assert build["uses"] == "./.github/workflows/build_linux.yml"
@@ -389,11 +368,9 @@ def test_every_requirement_matches_the_pin() -> None:
     wrong = []
     found = 0
     seen: Counter[str] = Counter()
-    for line in _git(
-        "grep", "-nI", "-E", r"executorch ?(===|==|>=|<=|~=|!=|<|>) ?[0-9]"
-    ).splitlines():
+    for line in _git("grep", "-nIi", "executorch").splitlines():
         path, number, text = line.split(":", 2)
-        if path == VERSIONS.name:
+        if path == VERSIONS.name or _is_source_test(path) or path.startswith("docs/"):
             continue
         if _is_commented_out(path, text):
             # A comment is not a pin. Counting raw matches meant a site could be gutted to a bare
@@ -480,9 +457,7 @@ def test_derived_requirements_match_the_pin(monkeypatch) -> None:
     )
     assert _runner_requirement(REPO_ROOT) == f"executorch=={version}"
 
-    # The argument list CI actually runs, not just the string the helper derives. Dropping the
-    # requirement from the setup command left every one of these tests green: the step still
-    # succeeds, having installed no ExecuTorch, and the suite then skips on importorskip.
+    # The setup invocation must actually install the exact requirement.
     monkeypatch.syspath_prepend(str(REPO_ROOT / "tests"))
     from ci.runner import _executorch_requirement, _setup_commands
 
@@ -492,9 +467,7 @@ def test_derived_requirements_match_the_pin(monkeypatch) -> None:
         f"{argv}"
     )
 
-    # And the extra every documented `pip install "torch-tensorrt[executorch]"` relies on.
-    # Emptying it left these tests green too. Read as source rather than imported, because
-    # importing the top-level setup.py executes it.
+    # Read metadata as source to avoid invoking the top-level build.
     setup_tree = ast.parse((REPO_ROOT / "setup.py").read_text(encoding="utf-8"))
     extras = next(
         node.value
@@ -502,10 +475,7 @@ def test_derived_requirements_match_the_pin(monkeypatch) -> None:
         if isinstance(node, ast.Assign)
         and any(getattr(t, "id", None) == "EXTRAS_REQUIRE" for t in node.targets)
     )
-    # The published extras have to exist, or the loop below iterates nothing and deleting both
-    # keys is indistinguishable from them being correct. Only these two: an unrelated future extra
-    # has no reason to name ExecuTorch, and requiring it of every key made this test the one that
-    # turns red when someone adds "debug".
+    # Require the two documented extras, without constraining unrelated extras.
     published = {"executorch", "all"}
     present = {key.value for key in extras.keys if isinstance(key, ast.Constant)}
     assert published <= present, (
@@ -525,12 +495,9 @@ def test_derived_requirements_match_the_pin(monkeypatch) -> None:
             f"EXECUTORCH_REQUIREMENT exactly once: {named}"
         )
 
-    # docgen builds its overlay with a shell substitution, so neither the literal search nor the
-    # two helpers above can see it: `$(` is not a digit. Run the command it embeds and compare
-    # what it prints, which fails if the line is deleted or the key is renamed.
+    # The doc build reads the pin through shell substitution, outside the literal scan.
     workflow = (REPO_ROOT / ".github/workflows/docgen.yml").read_text(encoding="utf-8")
-    # Anchor to a live line: leading whitespace only, no "#". A commented-out install still
-    # carries the pattern, so a plain search stayed green when the whole step was disabled.
+    # A commented-out install is not an active pin site.
     embedded = re.search(
         r'^[ \t]*"executorch==\$\((python3 -c \'[^\']+\')\)"',
         workflow,
@@ -538,23 +505,14 @@ def test_derived_requirements_match_the_pin(monkeypatch) -> None:
     )
     assert embedded, (
         ".github/workflows/docgen.yml no longer pins ExecuTorch alongside the extra on a live "
-        "line. It installs with --pre from the nightly channel, so without the pin it resolves "
+        "line. Without the exact pin, the nightly index resolves "
         "through the range and takes whichever dev build is newest that day."
     )
-    # Compared as text, not executed. Running it meant whatever that line said got executed on
-    # every pull request: rewriting the one-liner to write a file left the test green and the file
-    # written. It has to read __executorch_version__ out of dev_dep_versions.yml and print nothing
-    # else, which is the property that makes the shell substitution equal the pin.
-    command = embedded.group(1)
-    reads_the_pin = re.fullmatch(
-        r"""python3 -c 'import yaml;print\(yaml\.safe_load\(open\("dev_dep_versions\.yml"\)\)"""
-        r"""\["__executorch_version__"\]\)'""",
-        command,
-    )
-    assert reads_the_pin, (
-        "the docgen pin no longer reads __executorch_version__ out of dev_dep_versions.yml, so "
-        f"what it installs is no longer the pin: {command}"
-    )
+    # Compare syntax trees without executing workflow-provided code.
+    command = shlex.split(embedded.group(1))
+    expected = 'import yaml; print(yaml.safe_load(open("dev_dep_versions.yml"))["__executorch_version__"])'
+    assert command[:2] == ["python3", "-c"] and len(command) == 3
+    assert ast.dump(ast.parse(command[2])) == ast.dump(ast.parse(expected)), command
 
 
 _RUNTIME_SETUP_PY = "py/torch-tensorrt-executorch-runtime/setup.py"
@@ -708,18 +666,9 @@ def test_install_channel_guard_rejects_unsupported_nightly_recipes(
 
 
 def test_the_runner_follows_the_row_s_cuda_version(monkeypatch) -> None:
-    """Call the runner and read the URL it builds, rather than matching its source.
-
-    The executorch suite is nightly-only, and the nightly matrix runs cu132 rows as well as cu130
-    ones, so a fixed channel would install a CUDA 13.0 ExecuTorch into a CUDA 13.2 job. PRs pin to
-    cu130, which is why watching PR CI cannot catch it. A source-text assertion could not catch it
-    either: keeping the ``os.environ.get`` line while hardcoding the URL passes one.
-    """
+    """The runner follows each row; cu130 is only the local default, not the cu132 PR row."""
     monkeypatch.syspath_prepend(str(REPO_ROOT / "tests"))
-    try:
-        from ci import runner
-    finally:
-        sys.path.pop(0)
+    from ci import runner
 
     def channel_for(cu_version: str | None) -> str:
         if cu_version is None:
@@ -743,13 +692,7 @@ def test_the_runner_follows_the_row_s_cuda_version(monkeypatch) -> None:
 
 
 def _load_utils_channel_helpers(fake_cuda: str | None):
-    """Exec ``executorch_install_channel``/``executorch_install_command`` with a stub torch.
-
-    ``py/torch_tensorrt/_utils.py`` imports ``tensorrt`` and the built ``torch_tensorrt``, neither
-    installed on the lint runner, so it cannot be imported here. Extract just the two functions and
-    exec them against a fake ``torch`` whose ``version.cuda`` is ``fake_cuda``, which is all they
-    read. This keeps the test on the source that ships rather than a copy of its logic.
-    """
+    """Execute the real helpers without importing their torch and TensorRT dependencies."""
     source = (REPO_ROOT / "py/torch_tensorrt/_utils.py").read_text(encoding="utf-8")
     tree = ast.parse(source)
     wanted = {"executorch_install_channel", "executorch_install_command"}
@@ -768,7 +711,7 @@ def _load_utils_channel_helpers(fake_cuda: str | None):
 
     namespace: dict[str, object] = {"torch": type("torch", (), {"version": _Version})}
     module = ast.Module(body=functions, type_ignores=[])
-    exec(compile(module, "<utils-extract>", "exec"), namespace)  # noqa: S102
+    exec(compile(module, "<utils-extract>", "exec"), namespace)
     return (
         namespace["executorch_install_channel"],
         namespace["executorch_install_command"],
@@ -776,24 +719,12 @@ def _load_utils_channel_helpers(fake_cuda: str | None):
 
 
 def test_the_executorch_install_message_names_the_torch_channel() -> None:
-    """The three ExecuTorch install messages derive their channel from the running torch.
-
-    ExecuTorch ships a distinct wheel per CUDA channel, so a message that hardcodes cu130 tells a
-    CUDA 13.2 user to install a CUDA 13.0 build. The messages route through
-    ``executorch_install_command`` so the channel is computed once from ``torch.version.cuda``.
-    A source-text assertion cannot see the value the format string produces, so exercise the helper
-    across both published 13.x channels and the no-CUDA fallback.
-    """
+    """Install advice follows the supported CUDA channel and does not request an upgrade."""
     channel, command = _load_utils_channel_helpers("13.2")
     assert channel() == "cu132"
     message = command()
     assert "download.pytorch.org/whl/nightly/cu132" in message, message
-    # --pre selects the dev pin. NOT --upgrade: on a named requirement it upgrades the package
-    # itself, replacing a user's released torch_tensorrt with a nightly when all they asked for was
-    # the extra, and it is not needed to add a missing extra in the first place. Asserting its
-    # absence, because the docstring here previously claimed the opposite and a measurement
-    # disproved it: with the package installed and the extra missing, plain
-    # `pip install "demo[executorch]"` does install the extra's dependencies.
+    # Permit prereleases without requesting replacement of an already suitable installation.
     assert "--pre" in message, message
     assert "--upgrade" not in message, message
 
@@ -801,19 +732,11 @@ def test_the_executorch_install_message_names_the_torch_channel() -> None:
     assert channel_130() == "cu130"
     assert "nightly/cu130" in command_130()
 
-    # No CUDA build reports a placeholder rather than a channel the user cannot install from.
     channel_none, command_none = _load_utils_channel_helpers(None)
     assert channel_none() == "cuXYZ"
     assert "nightly/cuXYZ" in command_none()
 
-    # Every message site has to delegate to the shared command, checked one site at a time. A
-    # whole-file substring pass cannot do that: with two sites in a file, "the helper is called
-    # somewhere" is satisfied by whichever site is still correct, so hardcoding a channel in the
-    # other one goes unnoticed. Worse, forbidding the literal cu130 only catches hardcoding the
-    # RIGHT channel, while cu126 or cu132 sail through and misdirect a user on that CUDA build.
-    #
-    # A "site" is a raise of ImportError whose message mentions installing ExecuTorch. Each one must
-    # obtain its command by calling the helper rather than by carrying a literal index URL.
+    # Check each installation error independently, not just one helper call per file.
     for path in (
         "py/torch_tensorrt/_compile.py",
         "py/torch_tensorrt/executorch/__init__.py",
@@ -857,8 +780,6 @@ def test_the_executorch_install_message_names_the_torch_channel() -> None:
 
 def test_derived_requirements_roll_the_minor_over(tmp_path: Path) -> None:
     # The upper bound is a version, not a decimal: 1.9 has to become 1.10, not 1.1.
-    # Spelled through a variable because the search above reads this file too, and a
-    # written-out requirement here would read as a site that drifted from the pin.
     version = "1.9.0"
     (tmp_path / "dev_dep_versions.yml").write_text(
         f'__executorch_version__: "{version}"\n'
@@ -962,19 +883,13 @@ def test_every_source_commit_matches_the_pin() -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("setup_rc,expected", [(0, 0), (7, 7)])
-def test_a_failed_setup_step_stops_the_suite(monkeypatch, setup_rc, expected):
-    """A setup step that fails must fail the run, not warn and continue into pytest.
-
-    Most of the ExecuTorch suite gates on ``pytest.importorskip``, so an install that fails makes
-    those files skip while everything else passes: the run reports success precisely when the
-    thing it exists to test is absent. That matters here because the pin names a nightly build,
-    which the channel eventually prunes. Replacing the ``return rc`` with ``continue`` kept every
-    other test in this file green, so assert on ``run_suite`` itself.
-    """
+@pytest.mark.parametrize("setup_rc", [0, 7])
+def test_a_failed_setup_step_stops_the_suite(monkeypatch, tmp_path, setup_rc):
+    """A failed setup must stop before import-skipped tests can report a false pass."""
     monkeypatch.syspath_prepend(str(REPO_ROOT / "tests"))
     from ci import runner
 
+    monkeypatch.setenv("RUNNER_TEST_RESULTS_DIR", str(tmp_path))
     calls: list[list[str]] = []
 
     class Completed:
@@ -991,7 +906,7 @@ def test_a_failed_setup_step_stops_the_suite(monkeypatch, setup_rc, expected):
     suite = next(s for s in runner.SUITES if s.name == "executorch")
     rc = runner.run_suite(suite, "standard")
 
-    assert rc == expected, f"run_suite returned {rc}, expected {expected}"
+    assert rc == setup_rc, f"run_suite returned {rc}, expected {setup_rc}"
     ran_pytest = any("pytest" in " ".join(argv) for argv in calls)
     assert ran_pytest is (setup_rc == 0), (
         "pytest ran even though a setup step failed"
@@ -1002,22 +917,7 @@ def test_a_failed_setup_step_stops_the_suite(monkeypatch, setup_rc, expected):
 
 @pytest.mark.unit
 def test_the_lockfile_records_the_same_executorch_range_as_setup_py():
-    """``uv.lock`` caches what ``setup.py`` declares, so it drifts when the pin moves.
-
-    A stale lock breaks nothing here, because only ``uv-update.yml`` runs ``uv sync --locked``,
-    and its resolved hashes come from a resolver run against the nightly index that cannot be
-    faked in an editor. So this accepts two states: the range the pin derives, and a range that
-    predates the pin.
-
-    It used to be a strict xfail, which meant the moment anyone refreshed the lock the assertion
-    passed and pytest reported that pass as a failure. The lint step runs this file on every pull
-    request, so that would have turned the lint job red repo-wide for a file none of those pull
-    requests touched. Nor is the lock only machine-generated: it was hand-refreshed twice inside
-    ordinary version-bump changes on 2026-08-23.
-
-    The literal pin search cannot see this file: it writes ``specifier = ">=1.4.1,<1.5"``, with no
-    ``executorch==`` for the grep to match.
-    """
+    """Allow the separately refreshed development lock to lag, but never lead the pin."""
     lock = REPO_ROOT / "uv.lock"
     if not lock.is_file():
         pytest.skip("no uv.lock in this checkout")
@@ -1092,79 +992,47 @@ def _blank_comments_preserving_length(block: str) -> str:
 
 
 def _install_invocation_window(block: str, match_offset: int) -> str:
-    """The slice of ``block`` belonging to the one pip/uv invocation that owns the match.
-
-    The channel and the requirement it channels have to belong to the *same* invocation. A window
-    bounded only at blank lines was too wide: it spanned every step of a contiguous YAML job and
-    every line of a shell if/else, so a ``--extra-index-url`` from a neighbouring ``pip install``,
-    an ``echo``, or prose satisfied the check for an install that carried none of its own. Two real
-    holes this closed: the win32 branch of ``install-torch-tensorrt.sh`` borrowed the else branch's
-    URL, and the ``.[executorch]`` step in ``docgen.yml`` borrowed the *Install base deps* step's.
-
-    An invocation runs from its ``pip``/``uv pip`` keyword to the next such keyword in the block, or
-    to the block's end. That single boundary spans a backslash-continued shell command, a YAML
-    ``run:`` body and a Python error message built from adjacent string fragments alike, because
-    none of those start a second invocation between the keyword and the URL. ``match_offset`` is a
-    ``block``-relative offset into the original (un-stripped) text, so a requirement that appears
-    twice in one block resolves to its own invocation rather than the first copy's. When no
-    invocation keyword precedes the match the whole block is returned, leaving non-install prose
-    matches to the caller's other filters.
-    """
+    """Find the shell command owning a match, respecting quotes and continuations."""
     scan = _blank_comments_preserving_length(block)
-    starts = [m.start() for m in _INSTALL_INVOCATION.finditer(scan)]
-    preceding = [s for s in starts if s <= match_offset]
-    if not preceding:
-        return block
-    begin = preceding[-1]
-    following = [s for s in starts if s > match_offset]
-    finish = following[0] if following else len(block)
-    return block[begin:finish]
+    starts = [
+        m.start()
+        for m in _INSTALL_INVOCATION.finditer(scan)
+        if m.start() <= match_offset
+    ]
+    if not starts:
+        return ""
+    begin = starts[-1]
+    quote = None
+    escaped = False
+    finish = len(scan)
+    for index in range(begin, len(scan)):
+        char = scan[index]
+        if escaped:
+            escaped = False
+            continue
+        if char == "\\" and quote != "'":
+            escaped = True
+        elif quote:
+            if char == quote:
+                quote = None
+        elif char in "\"'":
+            quote = char
+        elif char in "\n;|&":
+            finish = index
+            break
+    return scan[begin:finish] if begin <= match_offset < finish else ""
 
 
 @pytest.mark.unit
 def test_every_printed_install_instruction_names_the_nightly_channel():
-    """Every ``[executorch]`` install instruction has to carry the nightly index.
+    """Supported shell install examples must name the pinned runtime's nightly channel.
 
-    ExecuTorch is published only to the nightly CUDA channel, so an instruction without
-    ``--extra-index-url`` resolves nothing and the user gets a bare "no matching distribution".
-    The property had regressed and been re-fixed three times across this change with nothing
-    asserting it, which is the signature of a property no test covers.
-
-    Whole files rather than single lines: every one of these instructions wraps, so the extra and
-    the index land on different lines and a line-oriented check sees neither together. Tracked
-    files only, so a stale build directory cannot fail this.
+    Inspect each command's arguments, including continued lines, in tracked source files.
+    This is not a general shell or embedded-language parser.
     """
-    tracked = subprocess.run(
-        ["git", "ls-files", "-z"],
-        cwd=REPO_ROOT,
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout.split("\0")
+    tracked = _tracked_files()
 
-    # Two shapes need the channel: an instruction naming the [executorch] extra, and the CI
-    # install of a locally built torch-tensorrt wheel, whose ExecuTorch dependency resolves from
-    # the same index. The second is the site that regressed most often and carries no extra.
-    # The local-path spelling counts too. Matching only the named-distribution form left the four
-    # sites that write "pip install .[executorch]" unguarded: the nightly index could be deleted
-    # from all four with this test green.
-    # A fourth shape: a direct "executorch==<pin>" or "executorch>=<pin>" in a pip command. The
-    # runtime README build recipe installs ExecuTorch this way, and its nightly index could be
-    # deleted with this test green because none of the three shapes above match a bare
-    # distribution name. Gated on a pip context below so a requirement in pyproject or a comment
-    # is not mistaken for an install instruction.
-    # The built-wheel shape covers both the plain "torch_tensorrt*.whl" and the runtime wheel
-    # "torch_tensorrt_executorch_runtime-*.whl": the latter's install_requires names the same
-    # nightly ExecuTorch, so its documented install needs the channel too, and matching only the
-    # plain glob left the runtime README's Use command unscanned. It is gated on a real
-    # "pip install" without "--no-deps" below, so naming the file in an "ls" or a heredoc, or a
-    # "--no-deps" install that fetches nothing, is not mistaken for a dependency-resolving install.
-    # A fifth shape: a bare "pip install executorch" with no version operator. It resolves the
-    # stable 1.4.1 from PyPI, the version this change moves away from, and carries no operator so
-    # the shapes above miss it. Matched as a standalone distribution token and gated on a
-    # pip-install context below, so the word in a path, an import, a filename, or prose is not
-    # mistaken for an install. Like the named-distribution form it needs both the channel and
-    # --pre, since a bare name without --pre picks the stable release even off the nightly index.
+    # Named/local extras, built wheels and direct ExecuTorch installs resolve the same pin.
     extra = re.compile(
         r"""torch[-_]tensorrt\[[^]]*executorch[^]]*\]"""
         r"""|(?<![\w./-])\.\[[^]]*executorch[^]]*\]"""
@@ -1185,7 +1053,8 @@ def test_every_printed_install_instruction_names_the_nightly_channel():
         ):
             continue
         # This file states the rule; it is not itself an instruction.
-        if name == "tests/py/dynamo/executorch/test_executorch_pin.py":
+        if _is_source_test(name) or name == "py/torch_tensorrt/_utils.py":
+            # Generated advice is exercised by the install-helper tests.
             continue
         # docs/ is Sphinx output committed to the tree. Its sources live in docsrc/, which is
         # where a correction has to go, so flagging the generated copy sends the fix to a file
@@ -1206,20 +1075,14 @@ def test_every_printed_install_instruction_names_the_nightly_channel():
             block_end = text.find("\n\n", match.end())
             block = text[block_start : block_end if block_end != -1 else len(text)]
             block = _install_invocation_window(block, match.start() - block_start)
-            # Strip comments after windowing: a shell comment naming the channel or --pre is prose,
-            # not an argument pip sees, so a gutted install line with a decoy comment beside it must
-            # not satisfy the check. Whole-line comments drop entirely; a trailing "#" comment is
-            # cut, but not the "#cu130" fragment of a URL, which carries no space.
-            block = "\n".join(
-                re.sub(r"(?:^|\s)#.*$", "", bl)
-                for bl in block.splitlines()
-                if not bl.lstrip().startswith("#")
-            )
-            # A plain torch-tensorrt wheel install on a platform with no ExecuTorch dev wheel is
-            # exempt. win32 installs a glob that also matches the Linux-only runtime wheel, so the
-            # scan reaches it, but ExecuTorch publishes no win32 nightly. The marker has to sit
-            # directly above the invocation, and a separate test keeps it inside a win32 guard, so a
-            # gutted Linux install cannot claim it.
+            if not block:
+                continue
+            try:
+                argv = shlex.split(block.replace("\\\n", ""), comments=True)
+            except ValueError as error:
+                missing.append(f"{name}:{line} cannot parse install command: {error}")
+                continue
+            # The explicit exemption is valid only for the Windows main-wheel install.
             if _has_marker_above(name, line, NO_NIGHTLY_MARKER):
                 continue
             is_direct_install = bool(
@@ -1255,8 +1118,7 @@ def test_every_printed_install_instruction_names_the_nightly_channel():
                 # command line itself before treating it as the install target. A bare target there
                 # pins nothing even with --pre and the channel: pip resolves the newest nightly, not
                 # this pin. Nothing in the tree installs executorch bare, so it is always a defect.
-                command_line = text.splitlines()[line - 1]
-                if re.search(r"\bpip\s+(?:install|wheel)\b", command_line):
+                if "executorch" in argv:
                     missing.append(
                         f"{name}:{line} installs executorch by bare name, which pins nothing: pip "
                         "resolves the newest nightly rather than the pinned version"
@@ -1276,8 +1138,14 @@ def test_every_printed_install_instruction_names_the_nightly_channel():
                 or re.search(r"(?:^|\s)--no-deps(?:\s|$)", block)
             ):
                 continue
+            indexes = [
+                argv[i + 1]
+                for i, arg in enumerate(argv[:-1])
+                if arg in {"--extra-index-url", "--index-url"}
+            ]
+            index_text = " ".join(indexes)
             channel = re.search(
-                r"download\.pytorch\.org/whl/nightly(?:/(cu\d+))?", block
+                r"download\.pytorch\.org/whl/nightly(?:/(cu\d+))?", index_text
             )
             # CI passes the channel through a variable rather than a literal URL. Capture the
             # variable name so its assignment can be resolved: accepting the reference on sight let
@@ -1288,16 +1156,11 @@ def test_every_printed_install_instruction_names_the_nightly_channel():
                 block,
             )
             if not channel and variable_index:
-                # Resolve the variable's last assignment before this install and check the channel
-                # there. An unresolved variable is accepted only when it is a known workflow input
-                # whose value arrives from the CI environment; every other unresolved name, a typo
-                # among them, fails rather than passing on sight.
+                # An index variable must resolve to a preceding literal assignment.
                 assignment = _resolve_shell_assignment(
                     text, variable_index.group(1), match.start()
                 )
                 if assignment is None:
-                    if variable_index.group(1) in _ENVIRONMENT_INDEX_VARIABLES:
-                        continue
                     missing.append(
                         f"{name}:{line} channels through ${{{variable_index.group(1)}}}, which has "
                         "no assignment in the tree and is not a known CI index input"
@@ -1315,59 +1178,37 @@ def test_every_printed_install_instruction_names_the_nightly_channel():
             if not channel:
                 missing.append(f"{name}:{line} names no nightly channel")
                 continue
-            # A substring proves a string sits nearby, not that it resolves anything. Rewriting
-            # every channel in the tree to a nonexistent cu999 left this green. Not compared
-            # against __cuda_version__: the runtime error messages derive their channel from the
-            # user's torch build, and the documented recipes name a concrete published channel that
-            # carries the pinned ExecuTorch, so a literal cuXYZ here is checked only for being one
-            # the project publishes.
+            # Concrete CUDA channels must be supported; variable row exports are checked separately.
             suffix = channel.group(1)
             if suffix and suffix not in _PUBLISHED_NIGHTLY_CHANNELS:
                 missing.append(
                     f"{name}:{line} installs from nightly/{suffix}, which is not a supported "
                     f"TensorRT nightly channel; expected one of {sorted(_PUBLISHED_NIGHTLY_CHANNELS)}"
                 )
-            # The named-distribution form needs --pre. "torch-tensorrt[executorch]" with no
-            # version pin resolves to the stable PyPI wheel, which carries no executorch extra at
-            # all, so the command exits 0 with a warning and installs nothing the feature needs.
-            # The ".[executorch]" and built-wheel forms already pin executorch to a dev version,
-            # which enables prerelease selection on their own, so they do not need it.
+            # An unversioned named distribution needs permission to select a nightly.
+            # Older released extras can declare a different ExecuTorch requirement.
             named_distribution = re.fullmatch(
                 r"torch[-_]tensorrt\[[^]]*executorch[^]]*\]", match.group(0)
             )
             if named_distribution and not re.search(r"(?:^|\s)--pre(?:\s|$)", block):
                 missing.append(
                     f"{name}:{line} installs {match.group(0)} without --pre, so pip resolves the "
-                    "stable release with no executorch extra rather than the nightly prerelease"
+                    "stable release rather than allowing the intended nightly prerelease"
                 )
 
-    assert not missing, (
-        "these ExecuTorch install instructions do not name the nightly channel, so they "
-        f"resolve no ExecuTorch at all: {missing}"
-    )
+    assert (
+        not missing
+    ), f"these ExecuTorch install instructions do not satisfy the pinned nightly contract: {missing}"
 
 
 @pytest.mark.unit
 def test_the_no_nightly_marker_only_exempts_a_win32_install():
-    """The ``no-nightly`` exemption is legitimate only where no ExecuTorch dev wheel exists.
-
-    The channel scan skips an install carrying ``pin-check: no-nightly`` above it. That is correct
-    for win32, whose wheel glob also matches the Linux-only runtime wheel while ExecuTorch ships no
-    win32 nightly. Without this test the marker is a blanket silencer: strip the index from the
-    Linux install, paste the marker above it, and the channel scan stays green. Requiring the marker
-    to sit inside a ``win32`` platform guard keeps the exemption tied to the one case it describes.
-    """
-    tracked = subprocess.run(
-        ["git", "ls-files", "-z"],
-        cwd=REPO_ROOT,
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout.split("\0")
+    """Only the Windows main-wheel install may omit this Linux integration's nightly index."""
+    tracked = _tracked_files()
 
     misplaced = []
     for name in tracked:
-        if not name or name == "tests/py/dynamo/executorch/test_executorch_pin.py":
+        if not name or _is_source_test(name):
             continue
         path = REPO_ROOT / name
         if not path.is_file():
@@ -1407,19 +1248,11 @@ def test_the_pin_check_runs_in_ci():
     which leaves the lint job as the only path that runs it. Deleting that step is invisible
     otherwise: every test here still passes locally while nothing runs them in CI.
     """
-    # Parse the workflow and assert inside the owning job. Searching the file as one blob could
-    # not tell which job it was reading, so an identical install line in a sibling job that has no
-    # pin check satisfied it, and deleting the real one stayed green. A commented-out step also
-    # vanishes from the parse, where a text search still finds it.
-    import yaml
-
+    # A sibling job's dependency installation cannot prepare this job.
     workflow = yaml.safe_load(
         (REPO_ROOT / ".github/workflows/linter.yml").read_text(encoding="utf-8")
     )
-    # The workflow must actually run on pull requests. PyYAML reads the unquoted "on" key as the
-    # boolean True (the YAML 1.1 "Norway problem"), so accept either spelling, then require a
-    # pull_request trigger. Reducing "on:" to workflow_dispatch left every string in place while
-    # the workflow never fired on a pull request.
+    # PyYAML's YAML 1.1 loader reads an unquoted "on" key as True.
     triggers = workflow.get("on", workflow.get(True))
     trigger_names = set(triggers) if isinstance(triggers, (dict, list)) else {triggers}
     assert "pull_request" in trigger_names, (
@@ -1435,84 +1268,79 @@ def test_the_pin_check_runs_in_ci():
                 f"linter.yml narrows the pull_request trigger with {path_filter}, so a change to "
                 "the pin outside those paths would not run this check"
             )
-    # Match a live pytest invocation with pytest as the command word, not the filename anywhere
-    # in the script. A plain substring test was satisfied by a comment; an "anything before
-    # pytest" test was satisfied by "echo python3 -m pytest", which prints the command and runs
-    # nothing.
-    invocation = re.compile(
-        rf"^\s*(?:python[0-9.]*\s+-m\s+)?pytest\b[^\n]*{re.escape(pathlib.Path(__file__).name)}",
-        re.MULTILINE,
-    )
-    owning = [
-        (name, job, step)
-        for name, job in workflow["jobs"].items()
-        for step in job.get("steps", [])
-        if invocation.search(step.get("run") or "")
+    import tomllib
+
+    groups = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text())[
+        "dependency-groups"
     ]
-    assert owning, "no CI job invokes this file, so nothing here runs on a pull request"
-    name, job, step = owning[0]
-
-    # A falsy condition disables the step or the whole job while leaving every string in place, so
-    # check both. GitHub treats a bare "false", "${{ false }}" and any always-false expression the
-    # same way, so restrict each to the small set of conditions that can actually be true.
-    live_conditions = {"always()", "success()", "success() || failure()"}
-    step_condition = str(step.get("if", "always()"))
-    assert (
-        step_condition in live_conditions
-    ), f"the pin check step in {name} runs under {step_condition!r}, which may never be true"
-    job_condition = str(job.get("if", "always()"))
-    assert (
-        job_condition in live_conditions
-    ), f"job {name} runs under {job_condition!r}, so the pin check may never dispatch"
-
-    # Compared as text, not executed. This used to run the step's own shell body under bash
-    # against a stub, which meant whatever that body said got executed on every pull request:
-    # appending an "echo ... >> /tmp/marker" line to the step left this test GREEN and the marker
-    # written twice. That is the same defect this file already fixed for the docgen one-liner, and
-    # the reasoning there applies here. Assert the shape of the command instead: it has to invoke
-    # this file under pytest, with no flag that could deselect or neuter the run.
-    script = step["run"]
-    assert re.search(
-        r"python3 -m pytest\s+\S*tests/py/dynamo/executorch/test_executorch_pin\.py",
-        script,
-    ), f"the pin check step in {name} does not run this file under pytest: {script!r}"
-    for forbidden, why in (
-        ("--collect-only", "collection alone never runs an assertion"),
-        ("--co", "collection alone never runs an assertion"),
-        ("|| true", "the exit status is discarded, so a failure cannot fail the job"),
-        ("set +e", "the exit status is discarded, so a failure cannot fail the job"),
-        ("continue-on-error", "a failure cannot fail the job"),
-        ("--deselect", "a deselected test cannot fail"),
-        ("-k ", "a keyword filter can silently select nothing"),
-        ("exit 0", "the step reports success regardless of the result"),
-    ):
-        assert (
-            forbidden not in script
-        ), f"the pin check step in {name} contains {forbidden!r}, so {why}"
-
-    assert not step.get(
-        "continue-on-error"
-    ), f"the pin check step in {name} is continue-on-error, so a failure cannot fail the job"
-    assert not job.get(
-        "continue-on-error"
-    ), f"job {name} is continue-on-error, so a failed pin check cannot fail the workflow"
-
-    # pytest and pyyaml must be installed by an earlier step of the SAME job: neither
-    # requirements.txt nor dependency-groups.lint carries them, and without them the step exits 1
-    # on "No module named pytest" before running any assertion.
-    steps = job["steps"]
-    # Comment-stripped: a commented-out "uv pip install ... pytest pyyaml" still matched the raw
-    # text while installing nothing, so the step would die on a missing import at runtime.
-    earlier = "\n".join(
-        re.sub(r"(?:^|\s)#.*$", "", line)
-        for step_before in steps[: steps.index(step)]
-        for line in (step_before.get("run") or "").splitlines()
-        if not line.lstrip().startswith("#")
+    installed = {canonicalize_name(Requirement(dep).name) for dep in groups["lint"]}
+    assert {"pytest", "pyyaml", "packaging", "setuptools", "wheel"} <= installed
+    install_code = (
+        "import tomllib, subprocess; "
+        "deps = tomllib.load(open('pyproject.toml', 'rb'))['dependency-groups']['lint']; "
+        "subprocess.run(['uv', 'pip', 'install', '--system'] + deps, check=True)"
     )
-    for package in ("pytest", "pyyaml"):
-        assert re.search(
-            rf"uv pip install --system[^\n]*\b{package}\b", earlier
-        ), f"job {name} does not install {package} before the pin check, so the step cannot run"
+    live_conditions = {"always()", "success()", "success() || failure()"}
+    for module in ("test_executorch_pin.py", "test_update_executorch_pin.py"):
+        owning = [
+            (name, job, step)
+            for name, job in workflow["jobs"].items()
+            for step in job.get("steps", [])
+            if module in step.get("run", "")
+        ]
+        assert (
+            len(owning) == 1
+        ), f"expected one CI invocation of {module}, got {len(owning)}"
+        name, job, step = owning[0]
+        for owner in (job, step):
+            assert str(owner.get("if", "success()")) in live_conditions, (
+                name,
+                owner.get("if"),
+            )
+            assert not owner.get("continue-on-error"), name
+        assert step.get("shell", "bash") in {"bash", "sh"}
+        commands = [
+            shlex.split(line, comments=True)
+            for line in step["run"].replace("\\\n", "").splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        ]
+        assert len(commands) == 2 and commands[0] == [
+            "cd",
+            "$GITHUB_WORKSPACE",
+        ], commands
+        argv = commands[1]
+        assert argv[:4] == [
+            "python3",
+            "-m",
+            "pytest",
+            f"tests/py/dynamo/executorch/{module}",
+        ], argv
+        options = argv[4:]
+        assert "--noconftest" in options and "addopts=" in options, argv
+        while options:
+            option, *options = options
+            if option in {"-q", "-v", "--no-header", "--noconftest"}:
+                continue
+            assert option in {"-p", "-o"} and options, argv
+            value, *options = options
+            assert value == {"-p": "no:cacheprovider", "-o": "addopts="}[option], argv
+
+        earlier = job["steps"][: job["steps"].index(step)]
+        dependencies_ready = False
+        for previous in earlier:
+            if str(previous.get("if", "success()")) not in live_conditions:
+                continue
+            for line in previous.get("run", "").splitlines():
+                if not re.match(r"\s*python3\s+-c\s", line):
+                    continue
+                args = shlex.split(line, comments=True)
+                if args[:2] == ["python3", "-c"] and len(args) == 3:
+                    dependencies_ready |= ast.dump(ast.parse(args[2])) == ast.dump(
+                        ast.parse(install_code)
+                    )
+        assert (
+            dependencies_ready
+        ), f"{name} does not install the lint group before {module}"
 
 
 @pytest.mark.unit
@@ -1528,69 +1356,49 @@ def test_the_pairing_check_survives_the_gpu_lane_deselection() -> None:
     ``executorch-test-linux.yml``, which installs the pinned wheel and runs on pull requests once
     the runtime build succeeds. Both go through one of the two keyword expressions checked here.
     """
-    # Run pytest's own collection under each expression rather than grepping for the name. A
-    # string test passes on "and" in place of "or", which collects nothing at all, and on the
-    # name surviving only in a comment. Both leave the pairing check unreachable.
-    module = pathlib.Path(__file__).name
-    for path, pattern in (
-        ("tests/ci/suites.py", r'keyword=\(\s*(?:#[^\n]*\n\s*)*"([^"]+)"'),
-        # Anchored on the executorch junitxml name, because the file passes -k in several
-        # functions and the first match belongs to a different tier.
-        (
-            "tests/py/utils/ci_helpers.sh",
-            r'executorch_tests_results[^\n]*?-k "([^"]+)"',
-        ),
-    ):
-        text = (REPO_ROOT / path).read_text(encoding="utf-8")
-        found = re.search(pattern, text)
-        assert (
-            found
-        ), f"{path} no longer passes a single -k expression this test can read"
-        keyword = found.group(1)
-        assert "not test_executorch_pin" in keyword, (
-            f"{path} no longer deselects this module, so the source-consistency checks here "
-            "would run twice"
-        )
-        selected = subprocess.run(
+    from tests.ci.suites import by_name
+
+    suite = by_name("executorch")
+    captured = (
+        subprocess.run(
             [
-                sys.executable,
-                "-m",
-                "pytest",
-                str(pathlib.Path(__file__).parent),
-                "--collect-only",
-                "-q",
-                "--noconftest",
-                "-p",
-                "no:cacheprovider",
-                "-o",
-                "addopts=",
-                "-k",
-                keyword,
+                "bash",
+                "-c",
+                'source "$1"; _trt_py() { printf "%s\\0" "$@"; }; _trt_xml() { echo ignored.xml; }; trt_tier_executorch',
+                "capture",
+                str(REPO_ROOT / "tests/py/utils/ci_helpers.sh"),
             ],
+            cwd=REPO_ROOT,
+            env={**os.environ, "TRT_REPO_ROOT": str(REPO_ROOT)},
             capture_output=True,
             text=True,
-            cwd=REPO_ROOT,
-        ).stdout
-        assert f"{module}::{PAIRING_TEST}" in selected, (
-            f"{path} runs pytest with -k {keyword!r}, which does not select {PAIRING_TEST}, so "
-            "the only check that needs a real ExecuTorch installed runs nowhere"
+            check=True,
         )
-        others = [
-            line
-            for line in selected.splitlines()
-            if module in line and PAIRING_TEST not in line
-        ]
-        assert not others, (
-            f"{path} selects {len(others)} other tests from this module, which the lane "
-            f"deselects deliberately: {others[:2]}"
-        )
+        .stdout.rstrip("\0")
+        .split("\0")
+    )
+    assert captured[:2] == ["-m", "pytest"] and "executorch/" in captured, captured
+    assert captured.count("-k") == 1, captured
+    keywords = [suite.keyword, captured[captured.index("-k") + 1]]
+    from _pytest.mark.expression import Expression
 
-    # Proving the -k expression selects the pairing test says nothing about whether either route
-    # is actually wired to run it. Replacing the workflow's `trt_tier_executorch` call with `echo
-    # skipped`, or pointing the executorch suite at a lane name no runner requests, both leave the
-    # checks above green while the test runs nowhere. So assert each route reaches the tier.
-    import yaml
+    nodes = {
+        f"test_executorch_pin.py::{PAIRING_TEST}": True,
+        "test_executorch_pin.py::test_every_requirement_matches_the_pin": False,
+        "test_update_executorch_pin.py::test_write_pins_updates_real_sites_and_is_idempotent": False,
+        "test_api.py::test_export": True,
+    }
+    for keyword in keywords:
+        expression = Expression.compile(keyword)
+        actual = {
+            node: expression.evaluate(
+                lambda token, node=node: token.lower() in node.lower()
+            )
+            for node in nodes
+        }
+        assert actual == nodes, (keyword, actual)
 
+    # Both invocation routes must reach the suite, not merely define the right filter.
     workflow = yaml.safe_load(
         (REPO_ROOT / ".github/workflows/executorch-test-linux.yml").read_text(
             encoding="utf-8"
@@ -1638,28 +1446,27 @@ def test_the_pairing_check_survives_the_gpu_lane_deselection() -> None:
 
 
 def test_the_range_install_runs_in_a_fresh_venv():
-    # The end-user range install has to resolve the specifier from scratch. Run in the build
-    # interpreter, which already holds the exact pin, and pip resolves nothing and proves nothing.
-    # This locks the fresh-venv shape so it cannot silently regress to an in-place install.
-    workflow = (REPO_ROOT / ".github/workflows/executorch-test-linux.yml").read_text(
-        encoding="utf-8"
+    workflow = yaml.safe_load(
+        (REPO_ROOT / ".github/workflows/executorch-test-linux.yml").read_text()
     )
-    marker = "# pin-check: range-ok"
-    assert marker in workflow, "the range-ok install marker is gone"
-    after = workflow.split(marker, 1)[1].splitlines()
-    # The install command is the first non-empty line under the marker.
-    install = next(line for line in after if line.strip())
-    assert (
-        "range-check-venv" in install
-    ), f"the range-ok install no longer runs in a fresh venv: {install.strip()!r}"
+    script = workflow["jobs"]["test"]["with"]["script"]
+    before, after = script.split("# pin-check: range-ok", 1)
+    creation = [
+        shlex.split(line, comments=True)
+        for line in before.splitlines()
+        if re.match(r"\s*python\s+-m\s+venv\b", line)
+    ]
+    venv = "${RUNNER_TEMP}/range-check-venv"
+    assert ["python", "-m", "venv", venv] in creation
+    install = next(line for line in after.splitlines() if line.strip())
+    argv = shlex.split(install, comments=True)
+    assert argv[:5] == [venv + "/bin/python", "-m", "pip", "install", "--no-deps"], argv
 
 
 def test_the_pin_update_workflow_does_not_interpolate_untrusted_values_into_shell():
     # github.ref and inputs.track are attacker-influenceable text. Interpolated with ${{ }} into a
     # run: block they are shell source, so a crafted ref runs code in a job that holds a
     # write-scoped token. They must arrive through env and be read as "$REF" / "$TRACK" instead.
-    import yaml
-
     path = REPO_ROOT / ".github/workflows/executorch-pin-update.yml"
     text = path.read_text(encoding="utf-8")
     workflow = yaml.safe_load(text)
@@ -1684,3 +1491,387 @@ def test_the_pin_update_workflow_does_not_interpolate_untrusted_values_into_shel
         "the trigger values are no longer passed through env, so the ref guard cannot read them "
         "safely"
     )
+
+
+@pytest.mark.parametrize(
+    "module", ["test_executorch_pin.py", "test_update_executorch_pin.py"]
+)
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "--help",
+        "|| :",
+        "| cat",
+        "--collect-only",
+        "-k never",
+        "; true",
+        "> /dev/null",
+        "delete",
+    ],
+)
+def test_review_ci_guard_rejects_disabled_checks(monkeypatch, mutation, module):
+    path = REPO_ROOT / ".github/workflows/linter.yml"
+    workflow = yaml.safe_load(path.read_text())
+    steps = workflow["jobs"]["py-linting"]["steps"]
+    step = next(s for s in steps if module in s.get("run", ""))
+    if mutation == "delete":
+        steps.remove(step)
+    else:
+        step["run"] = step["run"].rstrip() + " " + mutation + "\n"
+    original = Path.read_text
+    monkeypatch.setattr(
+        Path,
+        "read_text",
+        lambda p, *a, **kw: (
+            yaml.safe_dump(workflow) if p == path else original(p, *a, **kw)
+        ),
+    )
+    with pytest.raises(AssertionError):
+        test_the_pin_check_runs_in_ci()
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "python -m pip install --pre \\\n  executorch \\\n  --extra-index-url https://download.pytorch.org/whl/nightly/cu130",
+        'python -m pip install --pre "torch-tensorrt[executorch]"\necho https://download.pytorch.org/whl/nightly/cu130',
+        'python -m pip install --pre "torch-tensorrt[executorch]" # https://download.pytorch.org/whl/nightly/cu130',
+        'python -m pip install --pre "torch-tensorrt[executorch]"; echo https://download.pytorch.org/whl/nightly/cu130',
+    ],
+)
+def test_review_install_guard_rejects_unrelated_tokens(tmp_path, monkeypatch, body):
+    (tmp_path / "README.md").write_text("```bash\n" + body + "\n```\n")
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "add", "."], check=True)
+    monkeypatch.setattr(sys.modules[__name__], "REPO_ROOT", tmp_path)
+    with pytest.raises(AssertionError):
+        test_every_printed_install_instruction_names_the_nightly_channel()
+
+
+@pytest.mark.parametrize("workflow_name", ["build_linux.yml", "linux-test.yml"])
+def test_review_cuda_export_is_required(monkeypatch, workflow_name):
+    path = REPO_ROOT / ".github/workflows" / workflow_name
+    original = Path.read_text
+    text = path.read_text().replace(
+        "CU_VERSION: ${{ matrix.desired_cuda }}", "REMOVED_CUDA: unused"
+    )
+    monkeypatch.setattr(
+        Path,
+        "read_text",
+        lambda p, *a, **kw: text if p == path else original(p, *a, **kw),
+    )
+    with pytest.raises(AssertionError):
+        test_shared_workflows_export_the_row_cuda_channel()
+
+
+def test_review_venv_name_in_comment_does_not_count(monkeypatch):
+    path = REPO_ROOT / ".github/workflows/executorch-test-linux.yml"
+    text = path.read_text().replace(
+        '"${RUNNER_TEMP}/range-check-venv/bin/python" -m pip install --no-deps',
+        "python -m pip install --no-deps # range-check-venv",
+    )
+    original = Path.read_text
+    monkeypatch.setattr(
+        Path,
+        "read_text",
+        lambda p, *a, **kw: text if p == path else original(p, *a, **kw),
+    )
+    with pytest.raises(AssertionError):
+        test_the_range_install_runs_in_a_fresh_venv()
+
+
+@pytest.mark.parametrize(
+    "actual",
+    [
+        "ExecuTorch==1.5.0.dev1",
+        "executorch[coreml] == 1.5.0.dev1",
+        'executorch==1.5.0.dev1; python_version >= "3.10"',
+        'executorch[coreml]==1.5.0.dev1; (sys_platform == "linux" or python_version >= "3.10")',
+    ],
+)
+def test_review_requirement_scanner_preserves_valid_shapes(actual):
+    matches = REQUIREMENT.findall(actual)
+    assert matches == [actual]
+    assert not _requirement_disagrees(
+        matches[0], "executorch==1.5.0.dev1", "1.5.0.dev1"
+    )
+
+
+@pytest.mark.parametrize(
+    "actual",
+    [
+        "my-executorch==1.5.0.dev1",
+        "not_executorch==1.5.0.dev1",
+        "not.executorch==1.5.0.dev1",
+    ],
+)
+def test_review_requirement_scanner_ignores_other_distributions(actual):
+    assert not REQUIREMENT.findall(actual)
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "__executorch_version__: '1.5.0.dev1'",
+        "__executorch_version__: 1.5.0.dev1",
+        '__executorch_version__ : "1.5.0.dev1" # pin',
+    ],
+)
+def test_review_yaml_readers_agree(tmp_path, monkeypatch, line):
+    source = tmp_path / "dev_dep_versions.yml"
+    source.write_text(line + "\n")
+    monkeypatch.setattr(sys.modules[__name__], "VERSIONS", source)
+    assert _versions()["__executorch_version__"] == "1.5.0.dev1"
+    assert _runner_requirement(tmp_path) == "executorch==1.5.0.dev1"
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("tier", "l9"),
+        ("lanes", ("nightl",)),
+        ("variants", ("bad",)),
+        ("platforms", ("darwin",)),
+    ],
+)
+def test_review_suite_rejects_unknown_values(field, value):
+    from tests.ci.suites import Suite
+
+    args = dict(name="probe", tier="l2", lanes=("nightly",))
+    args[field] = value
+    with pytest.raises(ValueError, match=field):
+        Suite(**args)
+
+
+def test_review_runner_empty_channel_uses_local_default(monkeypatch):
+    from tests.ci.runner import _setup_commands
+
+    monkeypatch.setenv("CU_VERSION", "")
+    argv = _setup_commands("executorch")[0][0]
+    assert argv[argv.index("--extra-index-url") + 1].endswith("/cu130")
+
+
+@pytest.mark.parametrize("side_effect", [False, True])
+def test_docgen_pin_reader_accepts_only_the_allowed_ast(monkeypatch, side_effect):
+    path = REPO_ROOT / ".github/workflows/docgen.yml"
+    original = Path.read_text
+    text = path.read_text()
+    embedded = re.search(r"python3 -c '([^']+)'", text)
+    assert embedded
+    old = embedded.group(1)
+    code = (
+        old.replace(";", ";  ").replace("print(", "print( ")
+        if not side_effect
+        else old + '; print("unexpected")'
+    )
+    text = text.replace(old, code)
+    monkeypatch.setattr(
+        Path,
+        "read_text",
+        lambda p, *a, **kw: text if p == path else original(p, *a, **kw),
+    )
+    if side_effect:
+        with pytest.raises(AssertionError):
+            test_derived_requirements_match_the_pin(monkeypatch)
+    else:
+        test_derived_requirements_match_the_pin(monkeypatch)
+
+
+@pytest.mark.parametrize("route", ["manifest", "shell"])
+@pytest.mark.parametrize("removed", ["updater", "pairing"])
+def test_gpu_filter_checks_detect_lost_selection(monkeypatch, tmp_path, route, removed):
+    from dataclasses import replace
+    from tests.ci import suites
+
+    def mutate(keyword):
+        if removed == "updater":
+            return keyword.replace(" and not test_update_executorch_pin", "")
+        return keyword.replace(f" or {PAIRING_TEST}", "")
+
+    if route == "manifest":
+        suite = suites.by_name("executorch")
+        original_by_name = suites.by_name
+        monkeypatch.setattr(
+            suites,
+            "by_name",
+            lambda name: (
+                replace(suite, keyword=mutate(suite.keyword))
+                if name == "executorch"
+                else original_by_name(name)
+            ),
+        )
+    else:
+        helper = REPO_ROOT / "tests/py/utils/ci_helpers.sh"
+        changed = tmp_path / "ci_helpers.sh"
+        changed.write_text(mutate(helper.read_text()))
+        original_run = subprocess.run
+
+        def run(argv, **kwargs):
+            return original_run(
+                [str(changed) if arg == str(helper) else arg for arg in argv], **kwargs
+            )
+
+        monkeypatch.setattr(subprocess, "run", run)
+    with pytest.raises(AssertionError):
+        test_the_pairing_check_survives_the_gpu_lane_deselection()
+
+
+@pytest.mark.parametrize(
+    "mutation", ["remove-install", "disable-install", "remove-pyyaml"]
+)
+def test_ci_guard_requires_dependencies_in_the_owning_job(monkeypatch, mutation):
+    workflow_path = REPO_ROOT / ".github/workflows/linter.yml"
+    metadata_path = REPO_ROOT / "pyproject.toml"
+    workflow = yaml.safe_load(workflow_path.read_text())
+    metadata = metadata_path.read_text()
+    steps = workflow["jobs"]["py-linting"]["steps"]
+    step = next(
+        step for step in steps if "['dependency-groups']['lint']" in step.get("run", "")
+    )
+    if mutation == "remove-install":
+        steps.remove(step)
+    elif mutation == "disable-install":
+        step["if"] = "false"
+    else:
+        metadata = metadata.replace('    "pyyaml>=6.0",', "")
+    original = Path.read_text
+    contents = {workflow_path: yaml.safe_dump(workflow), metadata_path: metadata}
+    monkeypatch.setattr(
+        Path,
+        "read_text",
+        lambda p, *a, **kw: contents[p] if p in contents else original(p, *a, **kw),
+    )
+    with pytest.raises(AssertionError):
+        test_the_pin_check_runs_in_ci()
+
+
+@pytest.mark.parametrize("remove_pin", [False, True])
+def test_requirement_discovery_ignores_fixtures_but_not_missing_sites(
+    tmp_path, monkeypatch, remove_pin
+):
+    pin = "1.5.0.dev1"
+    (tmp_path / "justfile").write_text(
+        "pip install executorch" + ("" if remove_pin else "==" + pin) + "\n"
+    )
+    fixture = tmp_path / "tests/test_fixture.py"
+    fixture.parent.mkdir()
+    fixture.write_text('requirement = "executorch==0.0.1"\n')
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "add", "."], check=True)
+    monkeypatch.setattr(sys.modules[__name__], "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(
+        sys.modules[__name__], "_versions", lambda: {"__executorch_version__": pin}
+    )
+    monkeypatch.setattr(
+        sys.modules[__name__], "_EXPECTED_REQUIREMENT_SITES", {"justfile": 1}
+    )
+    if remove_pin:
+        with pytest.raises(AssertionError):
+            test_every_requirement_matches_the_pin()
+    else:
+        test_every_requirement_matches_the_pin()
+
+
+@pytest.mark.parametrize("allow", [False, True])
+def test_update_workflow_requires_manual_downgrade_authority(tmp_path, allow):
+    workflow = yaml.safe_load(
+        (REPO_ROOT / ".github/workflows/executorch-pin-update.yml").read_text()
+    )
+    triggers = workflow.get("on", workflow.get(True))
+    declaration = triggers["workflow_dispatch"]["inputs"]["allow_downgrade"]
+    assert declaration["type"] == "boolean" and declaration["default"] is False
+    steps = workflow["jobs"]["update-pin"]["steps"]
+    step = next(step for step in steps if step.get("id") == "update")
+    assert (
+        step["env"]["ALLOW_DOWNGRADE"]
+        == "${{ github.event_name == 'workflow_dispatch' && inputs.allow_downgrade }}"
+    )
+    stubs = 'python() { printf "%s\\n" "$@"; }; git() { return 0; };\n'
+    result = subprocess.run(
+        ["bash"],
+        input=stubs + step["run"],
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "TRACK": "stable",
+            "ALLOW_DOWNGRADE": str(allow).lower(),
+            "GITHUB_OUTPUT": str(tmp_path / "output"),
+        },
+        check=True,
+    )
+    assert ("--allow-downgrade" in result.stdout.splitlines()) is allow
+    assert result.stdout.splitlines()[1:3] == ["--track", "stable"]
+    branch = next(
+        step for step in steps if "create-pull-request@" in step.get("uses", "")
+    )["with"]["branch"]
+    assert (
+        branch
+        == "executorch-pin-update/${{ github.ref_name }}/${{ steps.track.outputs.track }}"
+    )
+    branches = {
+        branch.replace("${{ github.ref_name }}", base).replace(
+            "${{ steps.track.outputs.track }}", "stable"
+        )
+        for base in ("release/2.14", "release-2.14")
+    }
+    assert len(branches) == 2
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("tier", "l9"),
+        ("lanes", ("nightl",)),
+        ("variants", ("bad",)),
+        ("platforms", ("darwin",)),
+    ],
+)
+def test_suite_validation_check_detects_removed_validator(monkeypatch, field, value):
+    from tests.ci.suites import Suite
+
+    monkeypatch.setattr(Suite, "__post_init__", lambda self: None)
+    with pytest.raises(pytest.fail.Exception, match="DID NOT RAISE"):
+        test_review_suite_rejects_unknown_values(field, value)
+
+
+@pytest.mark.parametrize(
+    "event,ref,track,expected",
+    [
+        ("schedule", "refs/heads/main", "", "nightly"),
+        ("schedule", "refs/heads/release/2.14", "", ""),
+        ("workflow_dispatch", "refs/heads/main", "nightly", "nightly"),
+        ("workflow_dispatch", "refs/heads/release/2.14", "stable", "stable"),
+        ("workflow_dispatch", "refs/heads/release/2.14", "nightly", None),
+    ],
+)
+def test_update_workflow_keeps_nightly_updates_on_main(
+    tmp_path, event, ref, track, expected
+):
+    workflow = yaml.safe_load(
+        (REPO_ROOT / ".github/workflows/executorch-pin-update.yml").read_text()
+    )
+    step = next(
+        step
+        for step in workflow["jobs"]["update-pin"]["steps"]
+        if step.get("id") == "track"
+    )
+    output = tmp_path / "output"
+    result = subprocess.run(
+        ["bash"],
+        input=step["run"],
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "EVENT": event,
+            "REF": ref,
+            "TRACK": track,
+            "GITHUB_OUTPUT": str(output),
+        },
+    )
+    if expected is None:
+        assert result.returncode != 0 and not output.exists()
+    else:
+        assert result.returncode == 0, result.stderr
+        assert output.read_text() == f"track={expected}\n"

@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import glob
 import os
-import re
 import shlex
 import subprocess
 import sys
@@ -24,17 +23,13 @@ REPO_ROOT = Path(
 
 
 def _executorch_requirement() -> str:
-    # Read the pin the way the drift test does, so this file is not a second
-    # place to edit when it moves. Regex rather than yaml: the runner declares
-    # no runtime dependencies of its own and importing it should not add one.
-    #
-    # Exact, not a range: the nightly channel gains a member every day, so a
-    # range would install whatever is newest while the delegate is compiled
-    # from the pinned commit. Pairing them is the point.
-    text = (REPO_ROOT / "dev_dep_versions.yml").read_text()
-    version = dict(re.findall(r'^(__\w+__): "([^"]+)"', text, re.MULTILINE))[
-        "__executorch_version__"
-    ]
+    # Import only for this suite; other runner operations do not need PyYAML.
+    import yaml
+
+    values = yaml.safe_load((REPO_ROOT / "dev_dep_versions.yml").read_text())
+    version = values["__executorch_version__"]
+    if not isinstance(version, str) or not version:
+        raise ValueError("__executorch_version__ must be a nonempty YAML string")
     return f"executorch=={version}"
 
 
@@ -140,7 +135,7 @@ def _setup_commands(step: str) -> list[tuple[list[str], Path]]:
         # cu130 ones; a fixed channel would install a CUDA 13.0 runtime into a 13.2 job. The
         # cu130 default is for a local run with no CU_VERSION set, and matches the torch index
         # pyproject.toml resolves against by default.
-        cuda = os.environ.get("CU_VERSION", "cu130")
+        cuda = os.environ.get("CU_VERSION") or "cu130"
         return [
             (
                 launcher
