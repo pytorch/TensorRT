@@ -617,7 +617,8 @@ def test_shared_repair_preserves_the_companion_payload(tmp_path, arch, floor):
     repair.chmod(0o755)
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
-    (bin_dir / "python").symlink_to(sys.executable)
+    (bin_dir / "python").write_text(f'#!/bin/sh\nexec "{sys.executable}" "$@"\n')
+    (bin_dir / "python").chmod(0o755)
     build_env = tmp_path / "build-env"
     build_env.write_text("export CONDA_RUN=''\n")
     calls = tmp_path / "repair-calls"
@@ -639,7 +640,10 @@ def test_shared_repair_preserves_the_companion_payload(tmp_path, arch, floor):
             "ARCH": arch,
             "REPAIR_CALLS": str(calls),
         },
+        timeout=30,
     )
+    (tmp_path / "stdout.log").write_text(result.stdout)
+    (tmp_path / "stderr.log").write_text(result.stderr)
     assert result.returncode == 0, result.stdout + result.stderr
     assert calls.read_text().splitlines() == [str(standard)]
     assert not wheel.exists()
@@ -3075,11 +3079,44 @@ def test_the_wheel_checker_rejects_removed_exactness(tmp_path):
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize("mutation", ["false-condition", "removed", "disabled-step"])
+def test_installed_check_rejects_disabled_resolution_guard(
+    tmp_path, monkeypatch, mutation
+):
+    steps = _runtime_build_steps()
+    step = next(
+        s
+        for s in steps
+        if s.get("name") == "Check the repaired ExecuTorch runtime wheel"
+    )
+    guard = 'if grep -E "not found|undefined symbol" <<< "${resolution}"; then'
+    assert step["run"].count(guard) == 1
+    if mutation == "disabled-step":
+        step["if"] = "${{ false }}"
+    elif mutation == "false-condition":
+        step["run"] = step["run"].replace(guard, "if false; then")
+    else:
+        start = step["run"].index(guard)
+        end = step["run"].index("fi\n", start) + len("fi\n")
+        step["run"] = step["run"][:start] + step["run"][end:]
+    monkeypatch.setitem(
+        test_the_wheel_build_resolves_the_delegate_from_its_installed_location.__globals__,
+        "_runtime_build_steps",
+        lambda: steps,
+    )
+    with pytest.raises(AssertionError):
+        test_the_wheel_build_resolves_the_delegate_from_its_installed_location(
+            tmp_path, "not found", "x86_64"
+        )
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("arch", ["x86_64", "aarch64"])
 @pytest.mark.parametrize(
     "failure", ["", "not found", "undefined symbol", "ldd", "import"]
 )
 def test_the_wheel_build_resolves_the_delegate_from_its_installed_location(
-    tmp_path, failure
+    tmp_path, failure, arch
 ):
     """Execute the shared check step with fake tools to verify ordering and failure propagation."""
     step = next(
@@ -3087,33 +3124,56 @@ def test_the_wheel_build_resolves_the_delegate_from_its_installed_location(
         for step in _runtime_build_steps()
         if step.get("name") == "Check the repaired ExecuTorch runtime wheel"
     )
+    assert step["if"] == "${{ steps.executorch-runtime.outcome == 'success' }}"
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
-    (tmp_path / "dist").mkdir()
-    (
+    test_the_wheel_checker_rejects_a_bad_wheel(
+        tmp_path, "aarch64_tag" if arch == "aarch64" else "well_formed", True
+    )
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    wheel = next(tmp_path.glob("*.whl"))
+    wheel.rename(dist / wheel.name)
+    checker = tmp_path / ".github/scripts/check-executorch-runtime-wheel.py"
+    checker.parent.mkdir(parents=True)
+    checker.symlink_to(_REPO_ROOT / ".github/scripts/check-executorch-runtime-wheel.py")
+    delegate = (
         tmp_path
-        / "dist/torch_tensorrt_executorch_runtime-0.1.0-py3-none-manylinux_2_28_x86_64.whl"
-    ).touch()
+        / "installed/torch_tensorrt_executorch_runtime/lib/libexecutorch_backend_tensorrt.so"
+    )
     env_file = tmp_path / "build-env"
     env_file.write_text("export CONDA_RUN=''\n")
     python = bin_dir / "python"
     python.write_text(
-        "#!/bin/bash\nset -eu\n"
-        'if [[ "$*" == *check-executorch-runtime-wheel.py* ]]; then echo checked >> "$EVENTS";\n'
-        'elif [[ "$*" == *"pip install"* ]]; then echo installed >> "$EVENTS";\n'
-        'elif [[ "$*" == *"_delegate_path()"* ]]; then\n'
-        '  [[ "${TORCH_TENSORRT_SKIP_DELEGATE_REGISTRATION:-}" == 1 ]]\n'
-        '  echo path >> "$EVENTS"; echo /installed/delegate.so;\n'
-        "else\n"
-        '  [[ -z "${LD_LIBRARY_PATH:-}" ]]\n'
-        '  echo imported >> "$EVENTS"\n'
-        '  [[ "$FAILURE" != import ]]\nfi\n'
+        f"#!{sys.executable}\n"
+        "import os, subprocess, sys\n"
+        "from pathlib import Path\n"
+        "from wheel.wheelfile import WheelFile\n"
+        "args = sys.argv[1:]\n"
+        "delegate = Path(os.environ['DELEGATE'])\n"
+        "if args[0] == '.github/scripts/check-executorch-runtime-wheel.py':\n"
+        "    subprocess.run([sys.executable, *args], check=True, timeout=15)\n"
+        "    event = 'checked'\n"
+        "elif args[:4] == ['-m', 'pip', 'install', '--no-deps']:\n"
+        "    with WheelFile(args[4]) as wheel: wheel.extractall('installed')\n"
+        "    event = 'installed'\n"
+        "elif args == ['-c', 'import torch_tensorrt_executorch_runtime as m; print(m._delegate_path())']:\n"
+        "    assert os.environ.get('TORCH_TENSORRT_SKIP_DELEGATE_REGISTRATION') == '1'\n"
+        "    assert delegate.is_file()\n"
+        "    event = 'path'; print(delegate)\n"
+        "else:\n"
+        "    assert args == ['-c', 'import torch_tensorrt_executorch_runtime']\n"
+        "    assert 'LD_LIBRARY_PATH' not in os.environ\n"
+        "    assert delegate.read_bytes() == b'\\x7fELF'\n"
+        "    event = 'imported'\n"
+        "with open(os.environ['EVENTS'], 'a') as f: f.write(event + '\\n')\n"
+        "if event == 'imported' and os.environ['FAILURE'] == 'import': sys.exit(1)\n"
     )
     ldd = bin_dir / "ldd"
     ldd.write_text(
         "#!/bin/bash\nset -eu\n"
         '[[ -z "${LD_LIBRARY_PATH:-}" ]]\n'
-        '[[ "$*" == "-r /installed/delegate.so" ]]\n'
+        '[[ "$#" == 2 && "$1" == -r && "$2" == "$DELEGATE" && -f "$2" ]]\n'
         'echo resolved >> "$EVENTS"\n'
         'echo "$FAILURE"\n'
         '[[ "$FAILURE" != ldd ]]\n'
@@ -3130,12 +3190,17 @@ def test_the_wheel_build_resolves_the_delegate_from_its_installed_location(
             **os.environ,
             "PATH": f"{bin_dir}:{os.environ['PATH']}",
             "BUILD_ENV_FILE": str(env_file),
-            "ARCH": "x86_64",
+            "ARCH": arch,
             "EVENTS": str(events),
             "FAILURE": failure,
+            "DELEGATE": str(delegate),
+            "PYTHONPATH": str(tmp_path),
             "LD_LIBRARY_PATH": "/build-only",
         },
+        timeout=30,
     )
+    (tmp_path / "stdout.log").write_text(result.stdout)
+    (tmp_path / "stderr.log").write_text(result.stderr)
     assert (result.returncode == 0) is (failure == ""), result.stdout + result.stderr
     expected = ["checked", "installed", "path", "resolved"]
     if failure in {"", "import"}:
