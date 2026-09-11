@@ -83,7 +83,8 @@ def executorch_cmake_prefix_path() -> str:
     if (
         pinned
         and public_version(pinned) != installed
-        and not os.getenv("TORCH_TENSORRT_ALLOW_UNPINNED_EXECUTORCH")
+        and os.getenv("TORCH_TENSORRT_ALLOW_UNPINNED_EXECUTORCH", "").lower()
+        not in ("1", "true", "yes", "on")
     ):
         raise RuntimeError(
             f"The installed ExecuTorch is {installed} but dev_dep_versions.yml pins "
@@ -159,7 +160,10 @@ class BazelBuild(build_py):
             raise RuntimeError("Could not find bazelisk or bazel in PATH")
 
         compilation_mode = (
-            "dbg" if os.getenv("TORCH_TENSORRT_EXECUTORCH_DEBUG") else "opt"
+            "dbg"
+            if os.getenv("TORCH_TENSORRT_EXECUTORCH_DEBUG", "").lower()
+            in ("1", "true", "yes", "on")
+            else "opt"
         )
         command = [
             bazel,
