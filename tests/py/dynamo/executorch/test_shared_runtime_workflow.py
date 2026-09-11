@@ -155,6 +155,18 @@ def test_shared_build_provisions_tensorrt_metadata(tmp_path, arch, cuda, release
     ]
     assert [Requirement(r) for r in selected] == [Requirement(r) for r in expected]
     assert events[0][:2] == ["install", "--no-deps"]
+    wheel_requirements = [
+        Requirement(arg)
+        for event in events
+        if event[0] == "install"
+        for arg in event[1:]
+        if arg.startswith("wheel")
+    ]
+    assert len(wheel_requirements) == 1
+    assert (
+        "0.37.1" not in wheel_requirements[0].specifier
+    ), "wheel tags needs wheel>=0.40"
+    assert "0.40.0" in wheel_requirements[0].specifier
     assert events[-1] == [
         "wheel",
         "--no-build-isolation",
@@ -166,6 +178,21 @@ def test_shared_build_provisions_tensorrt_metadata(tmp_path, arch, cuda, release
     assert (tmp_path / "built-version").read_text() == (
         "7.4.1" if release else f"7.4.1.dev20260911+{cuda}"
     )
+
+
+@pytest.mark.parametrize("arch", ["x86_64", "aarch64"])
+def test_missing_wheel_tool_minimum_is_detected(tmp_path, monkeypatch, arch):
+    workflow = _workflow("build_linux.yml")
+    step = next(
+        s
+        for s in workflow["jobs"]["build"]["steps"]
+        if s.get("id") == "executorch-runtime"
+    )
+    assert step["run"].count('"wheel>=0.40"') == 1
+    step["run"] = step["run"].replace('"wheel>=0.40"', "wheel")
+    monkeypatch.setitem(globals(), "_workflow", lambda _: workflow)
+    with pytest.raises(AssertionError, match="wheel tags needs"):
+        test_shared_build_provisions_tensorrt_metadata(tmp_path, arch, "cu132", True)
 
 
 @pytest.mark.parametrize("arch", ["x86_64", "aarch64"])
