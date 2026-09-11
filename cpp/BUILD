@@ -191,6 +191,122 @@ cc_library(
     ],
 )
 
+# Implementation detail of :tensorrt_executorch_backend, so the header sits under
+# src/ and ships with the sources rather than in the installed API set. A caller
+# turning the pool on needs only the option key, which is in TensorRTBackend.h.
+cc_library(
+    name = "tensorrt_executorch_shared_scratch_pool",
+    hdrs = [
+        "src/torch_tensorrt/executorch/SharedScratchPool.h",
+    ],
+    strip_include_prefix = "src",
+    target_compatible_with = select({
+        ":linux_x86_64": [],
+        ":sbsa": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = select({
+        ":linux_x86_64": [
+            "@cuda//:cuda_headers",
+        ],
+        ":sbsa": [
+            "@cuda//:cuda_headers",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+# The one internal entry point of :tensorrt_executorch_backend that its test calls
+# directly. Under src/ for the same reason as the pool header above: it is an
+# implementation detail of execute(), and an installed header declaring it would
+# make it API from the next release.
+#
+# It carries the definition and not only the declaration, so the target stands on
+# its own: a header target whose symbol another target defines links only for a
+# consumer that happens to depend on that one too.
+cc_library(
+    name = "tensorrt_executorch_pooled_scratch_install",
+    srcs = [
+        "src/torch_tensorrt/executorch/PooledScratchInstall.cpp",
+    ],
+    hdrs = [
+        "src/torch_tensorrt/executorch/PooledScratchInstall.h",
+    ],
+    strip_include_prefix = "src",
+    target_compatible_with = select({
+        ":linux_x86_64": [],
+        ":sbsa": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = select({
+        ":linux_x86_64": [
+            "@executorch//:executorch_headers",
+            "@tensorrt//:nvinfer",
+        ],
+        ":sbsa": [
+            "@executorch//:executorch_headers",
+            "@tensorrt_sbsa//:nvinfer",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+# The body of the pool's test-only reset. testonly and under src/, so it is in
+# neither the packaged include tree nor executorch_backend_source_files below: a
+# release build has no definition of it anywhere. SharedScratchPool.h keeps only
+# the friend declaration that lets this reach the registry's internals.
+cc_library(
+    name = "tensorrt_executorch_shared_scratch_pool_reset",
+    testonly = True,
+    hdrs = [
+        "src/torch_tensorrt/executorch/SharedScratchPoolReset.h",
+    ],
+    strip_include_prefix = "src",
+    target_compatible_with = select({
+        ":linux_x86_64": [],
+        ":sbsa": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":tensorrt_executorch_shared_scratch_pool",
+    ],
+)
+
+# The pool's test-only entry points. A separate target, and testonly, so the
+# released archive -- Bazel's :tensorrt_executorch_backend and CMake's
+# executorch_trt_backend, neither of which compiles this source -- carries no
+# definition of them and exports no symbol for them. One of them frees the live
+# pool with no wait for work in flight, which is not something a release build
+# should offer a caller.
+cc_library(
+    name = "tensorrt_executorch_shared_scratch_pool_test_hooks",
+    testonly = True,
+    srcs = [
+        "src/torch_tensorrt/executorch/SharedScratchPoolTestHooks.cpp",
+    ],
+    hdrs = [
+        "src/torch_tensorrt/executorch/SharedScratchPoolTestHooks.h",
+    ],
+    strip_include_prefix = "src",
+    target_compatible_with = select({
+        ":linux_x86_64": [],
+        ":sbsa": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":tensorrt_executorch_shared_scratch_pool",
+        ":tensorrt_executorch_shared_scratch_pool_reset",
+    ] + select({
+        ":linux_x86_64": [
+            "@cuda//:cudart",
+        ],
+        ":sbsa": [
+            "@cuda//:cudart",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
 cc_library(
     name = "tensorrt_executorch_backend",
     srcs = [
@@ -211,6 +327,8 @@ cc_library(
     deps = [
         ":tensorrt_executorch_binding_names",
         ":tensorrt_executorch_blob_header",
+        ":tensorrt_executorch_pooled_scratch_install",
+        ":tensorrt_executorch_shared_scratch_pool",
         ":tensorrt_executorch_weight_streaming_budget",
     ] + select({
         ":linux_x86_64": [
@@ -234,7 +352,10 @@ filegroup(
     name = "executorch_backend_source_files",
     srcs = [
         "src/torch_tensorrt/executorch/CMakeLists.txt",
+        "src/torch_tensorrt/executorch/PooledScratchInstall.cpp",
+        "src/torch_tensorrt/executorch/PooledScratchInstall.h",
         "src/torch_tensorrt/executorch/README.md",
+        "src/torch_tensorrt/executorch/SharedScratchPool.h",
         "src/torch_tensorrt/executorch/TensorRTBackend.cpp",
         "src/torch_tensorrt/executorch/TensorRTBlobHeader.cpp",
         "src/torch_tensorrt/executorch/WeightStreamingBudget.cpp",

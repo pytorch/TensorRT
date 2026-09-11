@@ -125,9 +125,6 @@ jobs:
           fi
           export LD_LIBRARY_PATH="${_dir}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
         done
-        bazel test //tests/cpp/executorch:executorch_backend_tests \
-          --compilation_mode opt --config=linux --test_output=errors \
-          --test_env=LD_LIBRARY_PATH
         executorch_cmake_location="$(bazel query @executorch//:executorch/CMakeLists.txt --output=location)"
         export EXECUTORCH_SOURCE_DIR="$(dirname "${executorch_cmake_location%%:*}")"
         export EXECUTORCH_ROOT="${EXECUTORCH_SOURCE_DIR}"
@@ -143,3 +140,33 @@ jobs:
           "${RUNNER_TEMP}/torchtrt-coalesced.pte"
         python examples/executorch_reference_runner/load_model.py \
           --model_path="${RUNNER_TEMP}/torchtrt-python.pte" --num_runs=1
+        # The backend C++ suite runs here, at the end, and not next to the Bazel
+        # build above, because `set -e` ends this script at the first failure and
+        # everything between the two would be traded away for it: the three
+        # exports, verify-executorch-reference-runner.sh -- which unpacks the
+        # release archive and builds the packaged CMake backend out of it, and so
+        # is what says the archive still carries every header that backend needs
+        # -- and load_model.py. Run last, a suite that fails because the device
+        # went missing or flaky costs none of them.
+        #
+        # --test_summary=detailed names every case that skipped, in Bazel's own
+        # summary rather than in the test log, which --test_output=errors prints
+        # nothing of for a target that passes. Cases in that suite skip for reasons
+        # the variable below does not cover -- its own coverage note lists them --
+        # and without those names a run in which the pool's growth and
+        # allocation-failure paths never executed looks like one in which they did.
+        #
+        # TORCHTRT_EXECUTORCH_REQUIRE_CUDA turns a case that skips for want of a
+        # CUDA device into a failure. Every row of this job's matrix is a CUDA row
+        # -- filter-matrix.py drops any whose desired_cuda is not a TensorRT CUDA
+        # version -- and linux-test.yml starts the container with `--gpus all` for
+        # those, so a skip here means the device went missing rather than that the
+        # runner never had one. Without the variable every case that needs a
+        # device skips, its target exits zero and is reported as a passing target
+        # that covered nothing -- 27 of the suite's 96 cases, the whole of
+        # test_shared_scratch_backend.
+        bazel test //tests/cpp/executorch:executorch_backend_tests \
+          --compilation_mode opt --config=linux --test_output=errors \
+          --test_summary=detailed \
+          --test_env=LD_LIBRARY_PATH \
+          --test_env=TORCHTRT_EXECUTORCH_REQUIRE_CUDA=1
