@@ -755,13 +755,7 @@ def test_the_delegate_is_built_for_every_architecture_the_main_wheel_ships():
 
 
 def test_the_guard_is_given_the_platform_it_must_compare_against():
-    """The symbol version ceiling needs the manylinux tag, and an unpassed argument is silent.
-
-    The guard skips the ceiling entirely when the tag is empty, so a build that forgets to pass it
-    loses the check without failing. The tag also has to differ per architecture: the aarch64 row
-    builds in manylinux_2_39 rather than 2_28, because TensorRT needs a newer glibc there, and
-    comparing that row against 2_28 rejects it for requiring what its own platform guarantees.
-    """
+    """Production passes the full architecture-specific tag to the artifact guard."""
     cmake = (
         _REPO_ROOT / "py/torch-tensorrt-executorch-runtime/native/CMakeLists.txt"
     ).read_text(encoding="utf-8")
@@ -780,7 +774,7 @@ def test_the_guard_is_given_the_platform_it_must_compare_against():
         "${TORCH_TENSORRT_MANYLINUX_TAG}" in invocation
     ), "the tag is computed but not passed to the guard, so the ceiling is skipped"
     assert (
-        'glibc_floor="${5:-}"' in guard
+        'manylinux_tag="${5-}"' in guard
     ), "the guard does not read a fifth argument, so the tag the build passes is ignored"
     # Per architecture, not one constant. Asserted on the set() calls rather than on the text,
     # because the tag names also appear in the comment explaining why they differ, so a substring
@@ -788,7 +782,7 @@ def test_the_guard_is_given_the_platform_it_must_compare_against():
     assigned = set(
         re.findall(r"set\(TORCH_TENSORRT_MANYLINUX_TAG \"([^\"]+)\"\)", cmake)
     )
-    assert assigned == {"manylinux_2_28", "manylinux_2_39"}, (
+    assert assigned == {"manylinux_2_28_x86_64", "manylinux_2_39_aarch64"}, (
         "the build assigns "
         f"{sorted(assigned)} as its manylinux tag, but the two architectures ship under different "
         "platforms and using one for both rejects the aarch64 row for requiring exactly what its "
@@ -1048,16 +1042,8 @@ def test_runtime_extension_consumes_the_prebuilt_executorch_runtime():
 
 
 @pytest.mark.unit
-def test_the_delegate_cannot_outgrow_the_runtime_it_loads_beside():
-    """The post-build guard must compare C++ symbol versions against the pinned runtime.
-
-    This wheel bundles no libstdc++, so both the delegate and ExecuTorch resolve against
-    whatever the host provides. A delegate built with a newer toolchain can require a GLIBCXX or
-    CXXABI version the host lacks while the ExecuTorch beside it loads fine, and that failure
-    appears on the user's machine rather than in the build, because the build container's own
-    toolchain libraries sit on LD_LIBRARY_PATH. Comparing against libexecutorch.so rather than a
-    hardcoded floor keeps the check honest when the pin moves.
-    """
+def test_the_delegate_checks_the_runtime_and_platform_policy():
+    """The runtime supplies registration; the platform supplies system symbol versions."""
     cmake = (
         _REPO_ROOT / "py/torch-tensorrt-executorch-runtime/native/CMakeLists.txt"
     ).read_text(encoding="utf-8")
@@ -1070,13 +1056,9 @@ def test_the_delegate_cannot_outgrow_the_runtime_it_loads_beside():
     assert "$<TARGET_FILE:executorch::runtime>" in cmake
     for family in ("GLIBCXX", "CXXABI"):
         assert family in guard, f"the guard does not look at {family} versions"
-    # Ordered numerically field by field, or 3.4.9 would outrank 3.4.21. The sort appears at two
-    # sites, highest() and the comparison itself, and mutating one alone leaves the other's copy to
-    # satisfy a single-occurrence check. Require both, so the behavioural case below is not the only
-    # thing standing between a text sort in highest() and a wrongly rejected delegate.
-    assert (
-        guard.count("sort -t. -k1,1n -k2,2n") >= 2
-    ), "the numeric version sort is not applied at both highest() and the comparison"
+    assert "policy_versions" in guard
+    assert "manylinux_2_28_x86_64" in guard
+    assert "manylinux_2_39_aarch64" in guard
 
 
 @pytest.mark.unit
@@ -1347,9 +1329,9 @@ def _assert_the_checker_is_reachable(prologue: str) -> None:
         ("floor_above_runtime", False),
         ("no_cxxabi", False),
         ("glibc_above_runtime", False),
-        ("named_node_missing_from_runtime", False),
+        ("named_node_missing_from_runtime", True),
         ("lower_compatible_nodes", True),
-        # GLIBCXX_3.4.22 is below the manylinux_2_28 ceiling of 3.4.25, so it is legitimately
+        # GLIBCXX_3.4.22 is below the manylinux_2_28 ceiling of 3.4.24, so it is legitimately
         # accepted now: the guard compares against the platform, not against the sibling wheel.
         ("one_std_thread_above_the_runtime", True),
         ("above_the_runtime", False),
@@ -1375,7 +1357,7 @@ def _assert_the_checker_is_reachable(prologue: str) -> None:
         ("unversioned_cxx_undef", False),
         ("versioned_cxx_undef", True),
         ("readelf_dynsyms_broken", False),
-        # Exercises highest()'s numeric sort: accepted numerically, rejected under a text sort.
+        # Policy membership must not depend on the runtime's numeric or textual node order.
         ("runtime_numbered_nodes_out_of_text_order", True),
         # Exercises the 4-argument exact-whole-RUNPATH branch production always selects.
         ("runpath_missing_a_sibling", False),
@@ -1475,54 +1457,37 @@ def test_the_guard_actually_rejects_a_bad_artifact(tmp_path, case, expect_pass):
             "  1: 000456    82 FUNC GLOBAL DEFAULT 8 "
             "_ZN10executorch7runtime16register_backendERKNS0_9BackendV2E\n"
         )
-    # The delegate's real floor is CXXABI_1.3.9 and no GLIBCXX; the runtime tops out at 3.4.21.
+    # Start with one allowed CXXABI requirement and vary only the family under test.
     target_v = "CXXABI_1.3.9"
     if case == "floor_above_runtime":
         target_v = "GLIBCXX_3.4.30 CXXABI_1.3.9"
     if case == "no_cxxabi":
         target_v = ""
-    # GLIBC is a family of its own: a delegate needing a newer glibc than the runtime fails on
-    # the same hosts, and it was not compared at all before review.
+    # GLIBC has its own platform policy, independent of the C++ families.
     if case == "glibc_above_runtime":
         target_v = "CXXABI_1.3.9 GLIBC_2.38"
     # CXXABI_TM_1 carries no dotted version, so a pattern demanding digits drops it silently.
     if case == "named_node_missing_from_runtime":
         target_v = "CXXABI_1.3.9 CXXABI_TM_1"
-    # Must be ACCEPTED. Symbol versioning is backward compatible: a runtime declaring GLIBC_2.34
-    # satisfies a delegate needing GLIBC_2.4, and one declaring GLIBCXX_3.4.21 satisfies
-    # GLIBCXX_3.4.11. An exact-set check rejected exactly this and broke the build against the
-    # runtime the delegate is pinned to.
-    # Must be REJECTED, and this is the case a manylinux baseline wrongly accepted: one step above
-    # the runtime's own maximum, which is all a std::thread costs. The wheel carries a bare
-    # linux_x86_64 tag, so nothing promises a host provides 3.4.22 just because it is old.
+    # Accepted: the platform permits this node even when the runtime does not require it.
     if case == "one_std_thread_above_the_runtime":
         target_v = "CXXABI_1.3.9 GLIBCXX_3.4.22"
     # Must be REJECTED. Further above still: GLIBCXX_3.4.26 is GCC 9's std::filesystem.
     if case == "above_the_runtime":
         target_v = "CXXABI_1.3.9 GLIBCXX_3.4.26"
-    # Must be REJECTED. GCC is its own family and had no case at all: dropping it from the loop
-    # left the whole file green, while dropping GLIBC turned a case red. It is also the family
-    # that discriminates most sharply in practice, spanning GCC_3.0 to GCC_4.0.0 inside the pinned
-    # ExecuTorch wheel.
+    # GCC_4.8.0 belongs to the x86_64 policy; above-policy rejection has separate coverage.
     if case == "gcc_above_the_runtime":
         target_v = "CXXABI_1.3.9 GCC_4.8.0"
     # Must be REJECTED. CXXABI had the same gap GCC did: dropping it from the loop left every case
     # green, because every other case declares a CXXABI the runtime satisfies.
     if case == "cxxabi_above_the_runtime":
         target_v = "CXXABI_1.3.15"
-    # Must be REJECTED, with a message that does not call the absence a version number. A family
-    # the runtime declares nothing from means it uses none of that library, so nothing beside the
-    # delegate guarantees a host provides what the delegate asks for.
+    # Accepted: the platform policy does not depend on which families the runtime uses.
     if case == "family_absent_from_runtime":
         target_v = "CXXABI_1.3.9 GLIBCXX_3.4.21"
     if case == "lower_compatible_nodes":
         target_v = "CXXABI_1.3 CXXABI_1.3.9 GLIBC_2.4 GLIBC_2.17 GLIBCXX_3.4.11 GCC_3.0"
-    # Must be ACCEPTED, and it is the one case that exercises highest()'s own numeric sort rather
-    # than the comparison's. The delegate needs GLIBCXX_3.4.21; the runtime declares 3.4.9 and
-    # 3.4.21. Numerically the runtime's ceiling is 3.4.21 and the delegate is within it, but a
-    # highest() that sorted as text would pick 3.4.9 as the runtime maximum and reject the delegate
-    # against the very runtime it is pinned to. The comparison site's own sort cannot cause this:
-    # it only ever compares the delegate's single required node against the ceiling highest() found.
+    # Accepted regardless of the order of the runtime's requirements.
     if case == "runtime_numbered_nodes_out_of_text_order":
         target_v = "CXXABI_1.3.9 GLIBCXX_3.4.21"
     # The runtime declares a spread, not just its maximum, the way a real library does.
@@ -1612,7 +1577,7 @@ def test_the_guard_actually_rejects_a_bad_artifact(tmp_path, case, expect_pass):
         argv.append(_GUARD_GOOD_RUNPATH)
         # The manylinux tag the row ships under. Without it the guard skips the symbol version
         # ceiling entirely, so every ceiling case would pass for the wrong reason.
-        argv.append("manylinux_2_28")
+        argv.append("manylinux_2_28_x86_64")
 
     result = subprocess.run(
         argv,

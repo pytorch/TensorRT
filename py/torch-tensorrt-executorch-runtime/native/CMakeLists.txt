@@ -21,15 +21,14 @@ find_package(Threads REQUIRED)
 # rebuild from source now comes from here, so the delegate links the same libexecutorch.so the
 # user's ExecuTorch already loaded rather than a second private copy of it.
 #
-# setup.py resolves the prefix from the imported executorch module and passes it through Bazel.
+# setup.py locates the prefix through installed distribution metadata and passes it through Bazel.
 # rules_foreign_cc merges its own dependency prefixes in, so this list is not empty even when
 # that value is, and the check below is only a clearer message for the case where CMake is
 # driven directly with no prefix at all.
 if(NOT CMAKE_PREFIX_PATH)
   message(FATAL_ERROR
     "CMAKE_PREFIX_PATH is empty, so the installed ExecuTorch cannot be located. Build this "
-    "wheel through its setup.py, which resolves the path from the imported executorch "
-    "module.")
+    "wheel through its setup.py, which locates the path through installed distribution metadata.")
 endif()
 find_package(executorch REQUIRED)
 
@@ -78,7 +77,7 @@ target_link_libraries(executorch_backend_tensorrt PRIVATE
 # after the objects, where the toolchain's own libstdc++.so linker script resolves those references:
 # it dynamic-links the old system libstdc++.so.6 for the stable, versioned symbols and pulls only the
 # newer helpers statically from its libstdc++_nonshared.a. The result carries a normal DT_NEEDED on
-# libstdc++.so.6 and needs no version above what the paired ExecuTorch already requires. A static C++
+# libstdc++.so.6; the artifact guard checks its versions against the wheel's platform policy. A static C++
 # runtime is deliberately avoided: this delegate is dlopened beside libtorch and ExecuTorch, and a
 # private libstdc++ would give it its own exception type_info and locale state, which breaks exceptions
 # and dynamic_cast across the boundary.
@@ -91,14 +90,12 @@ endif()
 # stream while every registration and import check still passes. The link-time guard requires a
 # DT_NEEDED on libexecutorch_extension_cuda.so, which only a shared target leaves; fail configuration
 # here too so the cause is named at configure time rather than as a missing DT_NEEDED later.
-if(TARGET executorch::extension_cuda)
-  get_target_property(_extension_cuda_type executorch::extension_cuda TYPE)
-  if(_extension_cuda_type STREQUAL "STATIC_LIBRARY")
-    message(FATAL_ERROR
-      "executorch::extension_cuda is a STATIC_LIBRARY; the delegate would absorb a private CUDA "
-      "stream implementation instead of sharing ExecuTorch's. Use a CUDA ExecuTorch build that "
-      "ships libexecutorch_extension_cuda.so.")
-  endif()
+get_target_property(_extension_cuda_type executorch::extension_cuda TYPE)
+if(_extension_cuda_type STREQUAL "STATIC_LIBRARY")
+  message(FATAL_ERROR
+    "executorch::extension_cuda is a STATIC_LIBRARY; the delegate would absorb a private CUDA "
+    "stream implementation instead of sharing ExecuTorch's. Use a CUDA ExecuTorch build that "
+    "ships libexecutorch_extension_cuda.so.")
 endif()
 
 # ExecuTorch exports each delegate as executorch::backend_<name>, backing a
@@ -137,13 +134,13 @@ set(TORCH_TENSORRT_DELEGATE_RUNPATH
   "$ORIGIN/../../nvidia/cu13/lib")
 string(JOIN ":" TORCH_TENSORRT_DELEGATE_RUNPATH_COLONS ${TORCH_TENSORRT_DELEGATE_RUNPATH})
 
-# The manylinux platform this row ships under, per architecture: .github/scripts/filter-matrix.py
-# sends the aarch64 row to a manylinux_2_39 image rather than 2_28, because TensorRT needs a newer
-# glibc there. One fixed tag rejected that row for requiring what its own builder provides.
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
-  set(TORCH_TENSORRT_MANYLINUX_TAG "manylinux_2_39")
+# Match the architecture-specific tags applied by the shared wheel build.
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
+  set(TORCH_TENSORRT_MANYLINUX_TAG "manylinux_2_39_aarch64")
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$")
+  set(TORCH_TENSORRT_MANYLINUX_TAG "manylinux_2_28_x86_64")
 else()
-  set(TORCH_TENSORRT_MANYLINUX_TAG "manylinux_2_28")
+  message(FATAL_ERROR "Unsupported companion architecture: ${CMAKE_SYSTEM_PROCESSOR}")
 endif()
 set_target_properties(executorch_backend_tensorrt PROPERTIES
   BUILD_WITH_INSTALL_RPATH ON
@@ -185,11 +182,8 @@ endif()
 # in-tree and links executorch::backend_cuda can link executorch::backend_tensorrt without
 # learning a second convention.
 #
-# In-tree only, deliberately. Exporting an installed tree would need a generated package config
-# file for find_package to resolve, and the wheel would have to ship it: the wheel carries only
-# the .so, and the Bazel rule declares no output directory for anything else, so an
-# install(EXPORT) here would generate targets files that reach no consumer on any path this
-# repository ships.
+# This alias is in-tree only. Bazel collects the native library; setup.py installs the
+# separate CMake package used by consumers of the wheel.
 add_library(executorch::backend_tensorrt ALIAS executorch_backend_tensorrt)
 
 # Registration happens in a static initializer, so a consumer references no symbol from this
@@ -208,10 +202,8 @@ install(TARGETS executorch_backend_tensorrt LIBRARY DESTINATION lib)
 # own copy, because a private copy would register into a registry nothing queries. Undefined is
 # the correct state for that symbol here, so assert it on the real artifact.
 #
-# The same check compares the delegate's C++ symbol-version floor against libexecutorch.so's, and
-# confirms libstdc++ is a dynamic dependency whose version ceiling the paired runtime already
-# satisfies. The newer C++ helpers come from libstdc++_nonshared.a (see the link libraries above),
-# so the delegate needs only the old, stable symbols the system libstdc++ provides.
+# The same check requires dynamic libstdc++ linkage and validates numeric and named symbol
+# versions against the architecture-specific manylinux policy.
 # eu-readelf too: the guard parses all three dialects, so it should be able to find all
 # three. Its output differs (bare RPATH, UNDEF for UND), which is why the guard accepts both.
 find_program(TORCH_TENSORRT_READELF NAMES readelf llvm-readelf eu-readelf)
@@ -222,8 +214,6 @@ if(NOT TORCH_TENSORRT_READELF AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
 endif()
 if(TORCH_TENSORRT_READELF)
   add_custom_command(TARGET executorch_backend_tensorrt POST_BUILD
-    # Invocation asserted by test_the_guard_is_wired_into_the_build: a POST_BUILD command that
-    # runs `true` instead of the guard leaves every source-text assertion green.
     COMMAND sh
       "${CMAKE_CURRENT_LIST_DIR}/check_imports_executorch_runtime.sh"
       "${TORCH_TENSORRT_READELF}"
