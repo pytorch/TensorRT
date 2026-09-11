@@ -114,29 +114,10 @@ def test_missing_model():
         load_runtime_module().load("does-not-exist.pte")
 
 
-def test_activate_claims_both_extension_names():
-    """The alias has to cover the name the pinned ExecuTorch actually imports.
-
-    ExecuTorch renamed its pybind extension from _portable_lib to _C. Claiming only the old name is
-    silently ineffective: nothing imports it, the stock _C loads instead, and TensorRTBackend is
-    never registered. CI caught exactly that as "TensorRTBackend is not registered" once the pin
-    moved to a nightly carrying the new name.
-
-    Both are asserted, not just the current one, because an ExecuTorch older than the rename still
-    imports the legacy name and the delegate has to work against either.
-    """
+def test_activate_claims_both_extension_names_and_is_idempotent(monkeypatch):
     delegate = load_delegate_module()
-    assert delegate._NATIVE_NAME == "executorch.extension.pybindings._C", (
-        "the alias no longer names the extension the pinned ExecuTorch imports, so the "
-        "interception is a no-op and the backend never registers"
-    )
-    assert (
-        delegate._LEGACY_NATIVE_NAME == "executorch.extension.pybindings._portable_lib"
-    ), "the pre-rename name is no longer claimed, so an older ExecuTorch is not intercepted"
-
-
-def test_activate_twice_is_safe(monkeypatch):
-    delegate = load_delegate_module()
+    modules = {}
+    monkeypatch.setattr(delegate, "sys", types.SimpleNamespace(modules=modules))
     monkeypatch.setattr(delegate, "_probe_portable_lib_dependencies", lambda: None)
     data_loader = types.ModuleType(delegate.__name__ + ".data_loader")
     native = types.ModuleType(delegate.__name__ + "._portable_lib")
@@ -154,12 +135,28 @@ def test_activate_twice_is_safe(monkeypatch):
     )
     assert delegate.activate() is native
     wrapper = types.ModuleType(delegate._WRAPPER_NAME)
-    monkeypatch.setitem(sys.modules, delegate._WRAPPER_NAME, wrapper)
+    modules[delegate._WRAPPER_NAME] = wrapper
     assert delegate.activate() is native
     assert imported == [data_loader.__name__, native.__name__]
-    assert sys.modules[delegate._NATIVE_NAME] is native
-    assert sys.modules[delegate._DATA_LOADER_NAME] is data_loader
-    assert sys.modules[delegate._WRAPPER_NAME] is wrapper
+    assert modules.get("executorch.extension.pybindings._C") is native
+    assert modules.get("executorch.extension.pybindings._portable_lib") is native
+    assert modules[delegate._DATA_LOADER_NAME] is data_loader
+    assert modules[delegate._WRAPPER_NAME] is wrapper
+
+
+@pytest.mark.parametrize("alias", ["_NATIVE_NAME", "_LEGACY_NATIVE_NAME"])
+def test_activation_check_detects_missing_alias(monkeypatch, alias):
+    source = DELEGATE_PATH.read_text()
+    assignment = f"    sys.modules[{alias}] = native\n"
+    assert assignment in source
+    delegate = types.ModuleType("torchtrt_et_delegate_test")
+    exec(
+        compile(source.replace(assignment, ""), str(DELEGATE_PATH), "exec"),
+        delegate.__dict__,
+    )
+    monkeypatch.setattr(sys.modules[__name__], "load_delegate_module", lambda: delegate)
+    with pytest.raises(AssertionError):
+        test_activate_claims_both_extension_names_and_is_idempotent(monkeypatch)
 
 
 def test_activate_rejects_preloaded_stock_runtime(monkeypatch):
