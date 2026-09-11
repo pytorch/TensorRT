@@ -1027,5 +1027,12 @@ const ::executorch::runtime::Backend kBackendId{"TensorRTBackend", &get_backend(
 const Error kRegistrationResult = ::executorch::runtime::register_backend(kBackendId);
 
 } // namespace
+
+#ifdef TORCH_TENSORRT_EXECUTORCH_RUNTIME
+extern "C" bool torch_tensorrt_owns_executorch_registration() {
+  return ::executorch::runtime::get_backend_class(kBackendId.name) == &get_backend();
+}
+#endif
+
 } // namespace executorch_backend
 } // namespace torch_tensorrt

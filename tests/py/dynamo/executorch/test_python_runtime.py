@@ -148,6 +148,175 @@ def _fake_executorch(monkeypatch, registered):
         monkeypatch.setitem(sys.modules, name, module)
 
 
+def _delegate_handle(owns_registration=True):
+    return types.SimpleNamespace(
+        torch_tensorrt_owns_executorch_registration=lambda: owns_registration
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("preloaded", [False, True])
+@pytest.mark.parametrize("owns_registration", [False, True])
+def test_register_checks_the_loaded_handles_ownership(
+    monkeypatch, preloaded, owns_registration
+):
+    delegate = load_delegate_module()
+    registered = {delegate.BACKEND_NAME} if preloaded else set()
+    _fake_executorch(monkeypatch, registered)
+    handle = _delegate_handle(owns_registration)
+    loads = []
+
+    def load(path, mode):
+        loads.append(mode)
+        registered.add(delegate.BACKEND_NAME)
+        return handle
+
+    monkeypatch.setattr(delegate, "_delegate_path", lambda: "/fake/delegate.so")
+    monkeypatch.setattr(delegate.ctypes, "CDLL", load)
+    if owns_registration:
+        delegate.register()
+        delegate.register()
+        assert delegate._delegate is handle
+        assert len(loads) == 1
+        query = handle.torch_tensorrt_owns_executorch_registration
+        assert query.argtypes == []
+        assert query.restype is ctypes.c_bool
+    else:
+        for _ in range(2):
+            with pytest.raises(
+                delegate.DelegateCompatibilityError, match="does not own"
+            ):
+                delegate.register()
+            assert delegate._delegate is None
+        assert len(loads) == 2
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("preloaded", [False, True])
+def test_ownership_regression_rejects_presence_only_acceptance(
+    monkeypatch, tmp_path, preloaded
+):
+    tree = ast.parse(DELEGATE_PATH.read_text())
+    checks = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.If)
+        and isinstance(node.test, ast.UnaryOp)
+        and isinstance(node.test.op, ast.Not)
+        and isinstance(node.test.operand, ast.Call)
+        and isinstance(node.test.operand.func, ast.Name)
+        and node.test.operand.func.id == "owns_registration"
+    ]
+    assert len(checks) == 1
+    checks[0].test = ast.parse(
+        "BACKEND_NAME not in _registered_backend_names()", mode="eval"
+    ).body
+    source = tmp_path / "presence_only.py"
+    source.write_text(ast.unparse(tree))
+    monkeypatch.setitem(globals(), "DELEGATE_PATH", source)
+    with pytest.raises(pytest.fail.Exception, match="DID NOT RAISE"):
+        test_register_checks_the_loaded_handles_ownership(monkeypatch, preloaded, False)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("preloaded", [False, True])
+def test_register_rejects_a_library_without_an_ownership_query(monkeypatch, preloaded):
+    delegate = load_delegate_module()
+    registered = {delegate.BACKEND_NAME} if preloaded else set()
+    _fake_executorch(monkeypatch, registered)
+
+    def load(path, mode):
+        registered.add(delegate.BACKEND_NAME)
+        return types.SimpleNamespace()
+
+    monkeypatch.setattr(delegate, "_delegate_path", lambda: "/fake/delegate.so")
+    monkeypatch.setattr(delegate.ctypes, "CDLL", load)
+    with pytest.raises(delegate.DelegateCompatibilityError, match="ownership query"):
+        delegate.register()
+    assert delegate._delegate is None
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("failure", ["missing_noload", "unloaded"])
+def test_register_rejects_a_foreign_registration(monkeypatch, failure):
+    delegate = load_delegate_module()
+    _fake_executorch(monkeypatch, {delegate.BACKEND_NAME})
+    monkeypatch.setattr(delegate, "_delegate_path", lambda: "/fake/delegate.so")
+    if failure == "missing_noload":
+        monkeypatch.delattr(delegate.os, "RTLD_NOLOAD", raising=False)
+
+    def load(path, mode):
+        raise OSError("not loaded")
+
+    monkeypatch.setattr(delegate.ctypes, "CDLL", load)
+    with pytest.raises(delegate.DelegateCompatibilityError, match="already registered"):
+        delegate.register()
+    assert delegate._delegate is None
+
+
+@pytest.mark.unit
+def test_register_retries_after_load_failure(monkeypatch):
+    delegate = load_delegate_module()
+    registered = set()
+    _fake_executorch(monkeypatch, registered)
+    handle = _delegate_handle()
+    attempts = 0
+
+    def load(path, mode):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise OSError("dependency temporarily unavailable")
+        registered.add(delegate.BACKEND_NAME)
+        return handle
+
+    monkeypatch.setattr(delegate, "_delegate_path", lambda: "/fake/delegate.so")
+    monkeypatch.setattr(delegate.ctypes, "CDLL", load)
+    with pytest.raises(delegate.DelegateCompatibilityError):
+        delegate.register()
+    assert delegate._delegate is None
+    delegate.register()
+    assert delegate._delegate is handle
+    assert attempts == 2
+
+
+@pytest.mark.unit
+def test_concurrent_registration_loads_and_checks_once(monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+    import time
+
+    delegate = load_delegate_module()
+    registered = set()
+    _fake_executorch(monkeypatch, registered)
+    start = Barrier(8)
+    loads = []
+    queries = []
+
+    def owns():
+        queries.append(True)
+        return True
+
+    handle = types.SimpleNamespace(torch_tensorrt_owns_executorch_registration=owns)
+
+    def load(path, mode):
+        loads.append(mode)
+        registered.add(delegate.BACKEND_NAME)
+        time.sleep(0.02)
+        return handle
+
+    def register(_):
+        start.wait(timeout=5)
+        delegate.register()
+
+    monkeypatch.setattr(delegate, "_delegate_path", lambda: "/fake/delegate.so")
+    monkeypatch.setattr(delegate.ctypes, "CDLL", load)
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        list(pool.map(register, range(8)))
+    assert len(loads) == len(queries) == 1
+    assert delegate._delegate is handle
+
+
 def test_importing_the_package_registers_the_backend(monkeypatch):
     """The whole contract of this wheel: the import is the registration.
 
@@ -164,7 +333,7 @@ def test_importing_the_package_registers_the_backend(monkeypatch):
     def fake_cdll(path, mode):
         loaded.append(path)
         registered.add("TensorRTBackend")
-        return types.SimpleNamespace()
+        return _delegate_handle()
 
     monkeypatch.setattr(ctypes, "CDLL", fake_cdll)
     monkeypatch.setattr(os.path, "isfile", lambda path: True)
@@ -205,7 +374,7 @@ def test_register_loads_the_delegate_and_registers_the_backend(monkeypatch):
     def fake_cdll(path, mode):
         loaded.append((path, mode))
         registered.add(delegate.BACKEND_NAME)
-        return types.SimpleNamespace()
+        return _delegate_handle()
 
     monkeypatch.setattr(delegate, "_delegate_path", lambda: "/fake/delegate.so")
     monkeypatch.setattr(delegate.ctypes, "CDLL", fake_cdll)
@@ -213,8 +382,7 @@ def test_register_loads_the_delegate_and_registers_the_backend(monkeypatch):
     assert delegate.register() is None
 
     assert [path for path, _ in loaded] == ["/fake/delegate.so"]
-    # RTLD_NOW so a missing symbol surfaces here instead of mid-execution, and RTLD_LOCAL
-    # because the delegate resolves its own imports and exports nothing others need.
+    # Resolve imports eagerly without adding the delegate's exports to the global namespace.
     assert loaded[0][1] == os.RTLD_NOW | os.RTLD_LOCAL
 
 
@@ -227,7 +395,7 @@ def test_register_twice_loads_the_delegate_once(monkeypatch):
     def fake_cdll(path, mode):
         loads.append(path)
         registered.add(delegate.BACKEND_NAME)
-        return types.SimpleNamespace()
+        return _delegate_handle()
 
     monkeypatch.setattr(delegate, "_delegate_path", lambda: "/fake/delegate.so")
     monkeypatch.setattr(delegate.ctypes, "CDLL", fake_cdll)

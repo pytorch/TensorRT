@@ -58,6 +58,7 @@ add_library(executorch_backend_tensorrt SHARED
 target_include_directories(executorch_backend_tensorrt PRIVATE
   "${TORCH_TENSORRT_SOURCE_DIR}"
   "${TORCH_TENSORRT_SOURCE_DIR}/cpp/include")
+target_compile_definitions(executorch_backend_tensorrt PRIVATE TORCH_TENSORRT_EXECUTORCH_RUNTIME)
 
 # Compile definitions and the C++ standard come from the package rather than being repeated
 # here. ET_EVENT_TRACER_ENABLED in particular has to match how the runtime was built: it
