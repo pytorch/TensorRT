@@ -51,8 +51,7 @@ python -m pip wheel --no-build-isolation --no-deps \
 
 The native build obtains the ExecuTorch source through Bazel; no separate
 source checkout or `EXECUTORCH_SOURCE_DIR` setting is required. The source
-commit pinned in `MODULE.bazel` is the revision recorded by the
-`executorch==1.5.0.dev20260911` wheel.
+commit pinned in `MODULE.bazel` is the revision recorded by the pinned wheel.
 
 The static ExecuTorch and delegate archives are intermediate build inputs;
 users receive the final native Python module and do not compile anything.

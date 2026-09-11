@@ -76,12 +76,8 @@ USER_WORKFLOW_MARKER = "pin-check: range-ok"
 # Windows installs only the main wheel, without the Linux companion or authoring extra.
 NO_NIGHTLY_MARKER = "pin-check: no-nightly"
 
-# The files expected to pin ExecuTorch, mapped to how many sites each must carry, excluding
-# dev_dep_versions.yml itself. A count per file rather than just the set of files, because a site
-# that loses its version stops matching the search entirely rather than reporting a mismatch, and
-# two of these files carry more than one site, so a set of paths let either quietly drop one. A
-# minimum rather than an exact count, since the stacked runtime-wheel change removes one README
-# site and an exact count could not hold on both branches.
+# Minimum live pin sites, independent of the writer: a removed version no longer matches
+# discovery. Additional documentation matches cannot replace these required sites.
 _EXPECTED_REQUIREMENT_SITES = {
     ".github/workflows/build_linux.yml": 1,
     ".github/workflows/executorch-test-linux.yml": 2,
@@ -89,8 +85,7 @@ _EXPECTED_REQUIREMENT_SITES = {
     "docker/MODULE.bazel.docker": 1,
     "docker/MODULE.bazel.ngc": 1,
     "justfile": 1,
-    # One: the fenced install command. The prose sentence below it is documentation, checked for
-    # pin agreement but not counted, so it cannot stand in for the command if that loses its pin.
+    # Require the fenced install command; prose cannot replace it.
     "py/torch-tensorrt-executorch-runtime/README.md": 1,
     "py/torch-tensorrt-executorch-runtime/pyproject.toml": 1,
     "toolchains/ci_workspaces/MODULE.bazel.tmpl": 1,
@@ -219,12 +214,7 @@ _ANNOTATED_COMMIT_SITES = frozenset(
 
 
 def _is_commented_out(path: str, text: str) -> bool:
-    """Whether this requirement sits in a comment rather than in live configuration.
-
-    A comment is not a pin: a site could be gutted to a bare ``executorch`` while the exact pin
-    lived on in a comment in the same file, which kept the per-file minimum satisfied and left the
-    real requirement unpinned.
-    """
+    """Ignore comment-only requirements, except deliberate Bazel commit annotations."""
     if path in _ANNOTATED_COMMIT_SITES:
         return False
     stripped = text.strip()
@@ -398,8 +388,7 @@ def test_every_requirement_matches_the_pin() -> None:
 
 
 def _setup_py_requirement(version: str) -> str:
-    # setup.py cannot be imported here, importing it starts a build, so lift out the
-    # statements that derive the requirement and evaluate only those.
+    # Isolate requirement derivation from setup's dependency discovery and command dispatch.
     derived = {"_executorch_major", "_executorch_minor", "EXECUTORCH_REQUIREMENT"}
     statements = [
         node
@@ -1014,7 +1003,7 @@ def test_a_failed_setup_step_stops_the_suite(monkeypatch, tmp_path, setup_rc):
 
 
 @pytest.mark.unit
-def test_the_lockfile_records_the_same_executorch_range_as_setup_py():
+def test_the_lockfile_executorch_range_does_not_lead_the_pin():
     """Allow the separately refreshed development lock to lag, but never lead the pin."""
     lock = REPO_ROOT / "uv.lock"
     if not lock.is_file():
