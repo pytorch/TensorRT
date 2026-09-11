@@ -81,6 +81,7 @@ def wheel_download(monkeypatch):
         ),
     ],
 )
+@pytest.mark.unit
 def test_pick_target_uses_version_order_and_public_versions(versions, track, expected):
     assert updater.pick_target(versions, track) == expected
 
@@ -88,11 +89,13 @@ def test_pick_target_uses_version_order_and_public_versions(versions, track, exp
 @pytest.mark.parametrize(
     "versions,track", [(["1.0"], "nightly"), (["1.0.dev1", "bad"], "stable")]
 )
+@pytest.mark.unit
 def test_pick_target_requires_a_matching_version(versions, track):
     with pytest.raises(SystemExit):
         updater.pick_target(versions, track)
 
 
+@pytest.mark.unit
 def test_available_versions_parses_pip_output(monkeypatch):
     monkeypatch.setattr(
         updater,
@@ -102,6 +105,7 @@ def test_available_versions_parses_pip_output(monkeypatch):
     assert updater.available_versions([]) == ["1.0.dev2+cu130", "1.0.dev1+cu130"]
 
 
+@pytest.mark.unit
 def test_run_surfaces_subprocess_diagnostics(capsys):
     with pytest.raises(subprocess.CalledProcessError):
         updater._run(
@@ -124,6 +128,7 @@ def test_run_surfaces_subprocess_diagnostics(capsys):
         '__executorch_version__ : "1.5.0.dev1"',
     ],
 )
+@pytest.mark.unit
 def test_read_pin_accepts_yaml_scalar_formatting(tmp_path, monkeypatch, line):
     path = tmp_path / "versions.yml"
     path.write_text(line + "\n")
@@ -131,6 +136,7 @@ def test_read_pin_accepts_yaml_scalar_formatting(tmp_path, monkeypatch, line):
     assert updater.read_pin("__executorch_version__") == "1.5.0.dev1"
 
 
+@pytest.mark.unit
 def test_wheel_provenance_is_read_without_executing_python(wheel_download):
     members, calls = wheel_download
     members["executorch/version.py"] += "raise RuntimeError('must not execute')\n"
@@ -148,6 +154,7 @@ def test_wheel_provenance_is_read_without_executing_python(wheel_download):
         f'git_version = "{_COMMIT}"\n' + "#" * 65537,
     ],
 )
+@pytest.mark.unit
 def test_wheel_provenance_errors_are_contextual(wheel_download, body):
     members, _ = wheel_download
     if body is None:
@@ -159,11 +166,13 @@ def test_wheel_provenance_errors_are_contextual(wheel_download, body):
 
 
 @pytest.mark.parametrize("version,expected", [("1.9.0", "1.10"), ("1.5.0.dev1", "1.6")])
+@pytest.mark.unit
 def test_upper_bound(version, expected):
     assert updater._upper_bound(version) == expected
 
 
 @pytest.mark.parametrize("channel", ["cu126", "cu128", "cu134"])
+@pytest.mark.unit
 def test_main_rejects_unsupported_channels(monkeypatch, channel):
     monkeypatch.setattr(
         updater, "available_versions", lambda args: pytest.fail("unexpected query")
@@ -174,6 +183,7 @@ def test_main_rejects_unsupported_channels(monkeypatch, channel):
 
 
 @pytest.mark.parametrize("channel", ["cu130", "cu132"])
+@pytest.mark.unit
 def test_main_uses_selected_channel(monkeypatch, channel):
     calls = []
     monkeypatch.setattr(
@@ -189,6 +199,7 @@ def test_main_uses_selected_channel(monkeypatch, channel):
 
 
 @pytest.mark.parametrize("allow", [False, True])
+@pytest.mark.unit
 def test_main_requires_explicit_downgrade_authority(monkeypatch, allow):
     monkeypatch.setattr(updater, "read_pin", lambda field: "1.5.0.dev1")
     monkeypatch.setattr(updater, "available_versions", lambda args: ["1.4.1"])
@@ -219,6 +230,7 @@ def _contents(root):
     }
 
 
+@pytest.mark.unit
 def test_write_pins_updates_real_sites_and_is_idempotent(pin_repo):
     old = updater.read_pin("__executorch_version__")
     new = f"{Version(old).major + 1}.0.0.dev1"
@@ -234,6 +246,7 @@ def test_write_pins_updates_real_sites_and_is_idempotent(pin_repo):
 
 
 @pytest.mark.parametrize("shape", ["missing", "untracked", "undecodable", "stale"])
+@pytest.mark.unit
 def test_write_pins_preflights_every_input(pin_repo, shape):
     path = pin_repo / "justfile"
     if shape == "missing":
@@ -267,6 +280,7 @@ def test_write_pins_preflights_every_input(pin_repo, shape):
         'ExecuTorch[coreml] < {upper}, >= {old}; (sys_platform == "linux" or python_version >= "3.10")',
     ],
 )
+@pytest.mark.unit
 def test_write_pins_handles_equivalent_requirements(pin_repo, template):
     old = updater.read_pin("__executorch_version__")
     upper = updater._upper_bound(old)
@@ -278,6 +292,7 @@ def test_write_pins_handles_equivalent_requirements(pin_repo, template):
     assert expected in path.read_text()
 
 
+@pytest.mark.unit
 def test_write_pins_normalizes_equivalent_upper_bound(pin_repo):
     old = updater.read_pin("__executorch_version__")
     upper = updater._upper_bound(old)
@@ -296,6 +311,7 @@ def test_write_pins_normalizes_equivalent_upper_bound(pin_repo):
         "executorch=={old},!={old}",
     ],
 )
+@pytest.mark.unit
 def test_write_pins_rejects_unsupported_requirements_before_writing(pin_repo, template):
     path = pin_repo / "MODULE.bazel"
     path.write_text(
@@ -310,6 +326,7 @@ def test_write_pins_rejects_unsupported_requirements_before_writing(pin_repo, te
     assert _contents(pin_repo) == before
 
 
+@pytest.mark.unit
 def test_write_pins_preserves_bystanders_and_version_prefixes(pin_repo):
     assert updater.write_pins("1.7.1", _COMMIT)
     skylib = 'bazel_dep(name = "bazel_skylib", version = "1.7.1")'
@@ -336,6 +353,7 @@ def test_write_pins_preserves_bystanders_and_version_prefixes(pin_repo):
     )
 
 
+@pytest.mark.unit
 def test_write_pins_preserves_yaml_formatting_and_other_fields(pin_repo):
     path = pin_repo / "dev_dep_versions.yml"
     text = path.read_text()

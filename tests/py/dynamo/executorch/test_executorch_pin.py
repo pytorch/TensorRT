@@ -298,6 +298,7 @@ def _resolve_shell_assignment(text: str, variable: str, before: int) -> str | No
     return resolved
 
 
+@pytest.mark.unit
 def test_shared_workflows_export_the_row_cuda_channel() -> None:
     for filename, job_name in (
         ("build_linux.yml", "build"),
@@ -330,6 +331,7 @@ def test_shared_workflows_export_the_row_cuda_channel() -> None:
         ("release-linux-aarch64.yml", "release-wheel-artifacts"),
     ],
 )
+@pytest.mark.unit
 def test_runtime_callers_use_the_shared_pinned_build(caller, job):
     workflow = yaml.safe_load((REPO_ROOT / ".github/workflows" / caller).read_text())
     build = workflow["jobs"][job]
@@ -354,6 +356,7 @@ def test_runtime_callers_use_the_shared_pinned_build(caller, job):
     assert not (REPO_ROOT / ".github/workflows/executorch-build-linux.yml").exists()
 
 
+@pytest.mark.unit
 def test_every_requirement_matches_the_pin() -> None:
     version = _versions()["__executorch_version__"]
 
@@ -429,6 +432,7 @@ def _runner_requirement(root: Path) -> str:
     ).stdout.strip()
 
 
+@pytest.mark.unit
 def test_derived_requirements_match_the_pin(monkeypatch) -> None:
     # setup.py and tests/ci/runner.py build their requirement from the pin, so the search
     # above cannot see them. Check the strings they produce instead.
@@ -509,6 +513,7 @@ def test_derived_requirements_match_the_pin(monkeypatch) -> None:
 _RUNTIME_SETUP_PY = "py/torch-tensorrt-executorch-runtime/setup.py"
 
 
+@pytest.mark.unit
 def test_the_runtime_wheel_pins_executorch_to_the_public_pin(monkeypatch) -> None:
     """Evaluate the metadata without invoking a native build."""
     import importlib.metadata
@@ -570,6 +575,7 @@ def test_matrix_keeps_every_cuda_13_row_the_pin_supports():
 @pytest.mark.parametrize("channel", ["nightly", "test", "release", None])
 @pytest.mark.parametrize("arch", ["cuda", "cuda-aarch64", "cuda-arm64"])
 @pytest.mark.parametrize("use_rtx", ["true", "false"])
+@pytest.mark.unit
 def test_matrix_keeps_cuda_12_only_for_release_channels(channel, arch, use_rtx):
     supported = _declared_cuda_versions(
         "x86_cuda_versions" if arch == "cuda" else "arm_cuda_versions"
@@ -606,6 +612,7 @@ def test_matrix_keeps_cuda_12_only_for_release_channels(channel, arch, use_rtx):
     assert actual == expected
 
 
+@pytest.mark.unit
 def test_jetpack_matrix_keeps_its_separate_cuda_contract():
     result = subprocess.run(
         [
@@ -767,6 +774,7 @@ def _load_utils_channel_helpers(fake_cuda: str | None):
     )
 
 
+@pytest.mark.unit
 def test_the_executorch_install_message_names_the_torch_channel() -> None:
     """Install advice follows the supported CUDA channel and does not request an upgrade."""
     channel, command = _load_utils_channel_helpers("13.2")
@@ -825,6 +833,7 @@ def test_the_executorch_install_message_names_the_torch_channel() -> None:
 
 @pytest.mark.parametrize("cuda", ["13.0", "13.2", None])
 @pytest.mark.parametrize("entrypoint", ["lazy", "save", "_save_as_executorch"])
+@pytest.mark.unit
 def test_import_errors_preserve_context_and_install_guidance(
     monkeypatch, cuda, entrypoint
 ):
@@ -894,6 +903,7 @@ def test_import_errors_preserve_context_and_install_guidance(
     assert message.endswith("Setup: " + command())
 
 
+@pytest.mark.unit
 def test_derived_requirements_roll_the_minor_over(tmp_path: Path) -> None:
     # The upper bound is a version, not a decimal: 1.9 has to become 1.10, not 1.1.
     version = "1.9.0"
@@ -964,6 +974,7 @@ def test_the_pinned_commit_is_the_pinned_wheels_own_source() -> None:
     )
 
 
+@pytest.mark.unit
 def test_every_source_commit_matches_the_pin() -> None:
     commit = _versions()["__executorch_commit__"]
 
@@ -1599,6 +1610,7 @@ def test_the_pairing_check_survives_the_gpu_lane_deselection() -> None:
     )
 
 
+@pytest.mark.unit
 def test_the_range_install_runs_in_a_fresh_venv():
     workflow = yaml.safe_load(
         (REPO_ROOT / ".github/workflows/executorch-test-linux.yml").read_text()
@@ -1617,6 +1629,7 @@ def test_the_range_install_runs_in_a_fresh_venv():
     assert argv[:5] == [venv + "/bin/python", "-m", "pip", "install", "--no-deps"], argv
 
 
+@pytest.mark.unit
 def test_the_pin_update_workflow_does_not_interpolate_untrusted_values_into_shell():
     # github.ref and inputs.track are attacker-influenceable text. Interpolated with ${{ }} into a
     # run: block they are shell source, so a crafted ref runs code in a job that holds a
@@ -1663,6 +1676,7 @@ def test_the_pin_update_workflow_does_not_interpolate_untrusted_values_into_shel
         "delete",
     ],
 )
+@pytest.mark.unit
 def test_review_ci_guard_rejects_disabled_checks(monkeypatch, mutation, module):
     path = REPO_ROOT / ".github/workflows/linter.yml"
     workflow = yaml.safe_load(path.read_text())
@@ -1693,6 +1707,7 @@ def test_review_ci_guard_rejects_disabled_checks(monkeypatch, mutation, module):
         'python -m pip install --pre "torch-tensorrt[executorch]"; echo https://download.pytorch.org/whl/nightly/cu130',
     ],
 )
+@pytest.mark.unit
 def test_review_install_guard_rejects_unrelated_tokens(tmp_path, monkeypatch, body):
     (tmp_path / "README.md").write_text("```bash\n" + body + "\n```\n")
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
@@ -1703,6 +1718,7 @@ def test_review_install_guard_rejects_unrelated_tokens(tmp_path, monkeypatch, bo
 
 
 @pytest.mark.parametrize("workflow_name", ["build_linux.yml", "linux-test.yml"])
+@pytest.mark.unit
 def test_review_cuda_export_is_required(monkeypatch, workflow_name):
     path = REPO_ROOT / ".github/workflows" / workflow_name
     original = Path.read_text
@@ -1718,6 +1734,7 @@ def test_review_cuda_export_is_required(monkeypatch, workflow_name):
         test_shared_workflows_export_the_row_cuda_channel()
 
 
+@pytest.mark.unit
 def test_review_venv_name_in_comment_does_not_count(monkeypatch):
     path = REPO_ROOT / ".github/workflows/executorch-test-linux.yml"
     text = path.read_text().replace(
@@ -1743,6 +1760,7 @@ def test_review_venv_name_in_comment_does_not_count(monkeypatch):
         'executorch[coreml]==1.5.0.dev1; (sys_platform == "linux" or python_version >= "3.10")',
     ],
 )
+@pytest.mark.unit
 def test_review_requirement_scanner_preserves_valid_shapes(actual):
     matches = REQUIREMENT.findall(actual)
     assert matches == [actual]
@@ -1759,6 +1777,7 @@ def test_review_requirement_scanner_preserves_valid_shapes(actual):
         "not.executorch==1.5.0.dev1",
     ],
 )
+@pytest.mark.unit
 def test_review_requirement_scanner_ignores_other_distributions(actual):
     assert not REQUIREMENT.findall(actual)
 
@@ -1771,6 +1790,7 @@ def test_review_requirement_scanner_ignores_other_distributions(actual):
         '__executorch_version__ : "1.5.0.dev1" # pin',
     ],
 )
+@pytest.mark.unit
 def test_review_yaml_readers_agree(tmp_path, monkeypatch, line):
     source = tmp_path / "dev_dep_versions.yml"
     source.write_text(line + "\n")
@@ -1788,6 +1808,7 @@ def test_review_yaml_readers_agree(tmp_path, monkeypatch, line):
         ("platforms", ("darwin",)),
     ],
 )
+@pytest.mark.unit
 def test_review_suite_rejects_unknown_values(field, value):
     from tests.ci.suites import Suite
 
@@ -1797,6 +1818,7 @@ def test_review_suite_rejects_unknown_values(field, value):
         Suite(**args)
 
 
+@pytest.mark.unit
 def test_review_runner_empty_channel_uses_local_default(monkeypatch):
     from tests.ci.runner import _setup_commands
 
@@ -1806,6 +1828,7 @@ def test_review_runner_empty_channel_uses_local_default(monkeypatch):
 
 
 @pytest.mark.parametrize("cuda", [None, "", "12.6", "12.8", "13.4", "14.0"])
+@pytest.mark.unit
 def test_unsupported_install_channels_give_guidance(cuda):
     channel, command = _load_utils_channel_helpers(cuda)
     assert channel() is None
@@ -1816,6 +1839,7 @@ def test_unsupported_install_channels_give_guidance(cuda):
 
 @pytest.mark.parametrize("platform", ["linux", "win32"])
 @pytest.mark.parametrize("install_rc", [0, 7])
+@pytest.mark.unit
 def test_final_wheel_install_controls_the_appended_script(platform, install_rc):
     script = (REPO_ROOT / ".github/scripts/install-torch-tensorrt.sh").read_text()
     stubs = r"""
@@ -1852,6 +1876,7 @@ python() {
 
 
 @pytest.mark.parametrize("platform", ["linux", "win32"])
+@pytest.mark.unit
 def test_installer_check_detects_lost_exit_guard(monkeypatch, platform):
     path = REPO_ROOT / ".github/scripts/install-torch-tensorrt.sh"
     original = Path.read_text
@@ -1866,6 +1891,7 @@ def test_installer_check_detects_lost_exit_guard(monkeypatch, platform):
 
 
 @pytest.mark.parametrize("side_effect", [False, True])
+@pytest.mark.unit
 def test_docgen_pin_reader_accepts_only_the_allowed_ast(monkeypatch, side_effect):
     path = REPO_ROOT / ".github/workflows/docgen.yml"
     original = Path.read_text
@@ -1893,6 +1919,7 @@ def test_docgen_pin_reader_accepts_only_the_allowed_ast(monkeypatch, side_effect
 
 @pytest.mark.parametrize("route", ["manifest", "shell"])
 @pytest.mark.parametrize("removed", ["updater", "pairing"])
+@pytest.mark.unit
 def test_gpu_filter_checks_detect_lost_selection(monkeypatch, tmp_path, route, removed):
     from dataclasses import replace
     from tests.ci import suites
@@ -1933,6 +1960,7 @@ def test_gpu_filter_checks_detect_lost_selection(monkeypatch, tmp_path, route, r
 @pytest.mark.parametrize(
     "mutation", ["remove-install", "disable-install", "remove-pyyaml"]
 )
+@pytest.mark.unit
 def test_ci_guard_requires_dependencies_in_the_owning_job(monkeypatch, mutation):
     workflow_path = REPO_ROOT / ".github/workflows/linter.yml"
     metadata_path = REPO_ROOT / "pyproject.toml"
@@ -1960,6 +1988,7 @@ def test_ci_guard_requires_dependencies_in_the_owning_job(monkeypatch, mutation)
 
 
 @pytest.mark.parametrize("remove_pin", [False, True])
+@pytest.mark.unit
 def test_requirement_discovery_ignores_fixtures_but_not_missing_sites(
     tmp_path, monkeypatch, remove_pin
 ):
@@ -1987,6 +2016,7 @@ def test_requirement_discovery_ignores_fixtures_but_not_missing_sites(
 
 
 @pytest.mark.parametrize("allow", [False, True])
+@pytest.mark.unit
 def test_update_workflow_requires_manual_downgrade_authority(tmp_path, allow):
     workflow = yaml.safe_load(
         (REPO_ROOT / ".github/workflows/executorch-pin-update.yml").read_text()
@@ -2032,6 +2062,7 @@ def test_update_workflow_requires_manual_downgrade_authority(tmp_path, allow):
     assert len(branches) == 2
 
 
+@pytest.mark.unit
 def test_uv_cache_tracks_pin_metadata():
     import tomllib
 
@@ -2041,6 +2072,7 @@ def test_uv_cache_tracks_pin_metadata():
     assert {"pyproject.toml", "setup.py", "setup.cfg", "dev_dep_versions.yml"} <= files
 
 
+@pytest.mark.unit
 def test_uv_cache_guard_detects_missing_pin_key(monkeypatch):
     path = REPO_ROOT / "pyproject.toml"
     text = path.read_text().replace('{ file = "dev_dep_versions.yml" },', "")
@@ -2063,6 +2095,7 @@ def test_uv_cache_guard_detects_missing_pin_key(monkeypatch):
         ("platforms", ("darwin",)),
     ],
 )
+@pytest.mark.unit
 def test_suite_validation_check_detects_removed_validator(monkeypatch, field, value):
     from tests.ci.suites import Suite
 
@@ -2081,6 +2114,7 @@ def test_suite_validation_check_detects_removed_validator(monkeypatch, field, va
         ("workflow_dispatch", "refs/heads/release/2.14", "nightly", None),
     ],
 )
+@pytest.mark.unit
 def test_update_workflow_keeps_nightly_updates_on_main(
     tmp_path, event, ref, track, expected
 ):
