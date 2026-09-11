@@ -1694,10 +1694,8 @@ def test_the_guard_is_wired_into_the_build():
 def test_the_delegate_is_exported_the_way_executorch_exports_its_backends():
     """The delegate must be linkable in-tree as executorch::backend_tensorrt.
 
-    ExecuTorch exports every backend under that spelling, so a project already linking
-    executorch::backend_cuda should not need a second convention for this one. In-tree only:
-    find_package would need a generated package config file, and the wheel ships only the .so,
-    so an install(EXPORT) here would produce targets files no consumer ever sees.
+    Match ExecuTorch's backend naming in-tree. Installed consumers use the wheel's
+    separate CMake package, which discovers the installed runtime and delegate.
     """
     cmake = (
         _REPO_ROOT / "py/torch-tensorrt-executorch-runtime/native/CMakeLists.txt"
@@ -1711,8 +1709,7 @@ def test_the_delegate_is_exported_the_way_executorch_exports_its_backends():
     )
     # The old name would ship the library as libtorch_tensorrt_executorch_backend.so.
     assert "torch_tensorrt_executorch_backend" not in cmake
-    # An export set without a package config file is dead weight: find_package cannot resolve
-    # it and the wheel does not carry it.
+    # The wheel's hand-written config defines its imported target without an export set.
     code = [line for line in cmake.splitlines() if not line.lstrip().startswith("#")]
     assert not [line for line in code if "install(EXPORT" in line]
 
