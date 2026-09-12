@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import importlib.util
-import re
 import shutil
 import subprocess
 import sys
@@ -374,8 +373,33 @@ def test_write_pins_preserves_yaml_formatting_and_other_fields(pin_repo):
     )
 
 
-def test_write_pins_leaves_a_tree_the_guard_accepts(tmp_path, monkeypatch):
-    """One history-free snapshot exercises the actual repository-wide guard."""
+@pytest.mark.unit
+def test_write_pins_updates_the_development_constraint(pin_repo):
+    import tomllib
+
+    path = pin_repo / "pyproject.toml"
+    assert updater.write_pins("9.0.0.dev1", _COMMIT)
+    constraints = tomllib.loads(path.read_text())["tool"]["uv"][
+        "constraint-dependencies"
+    ]
+    assert "executorch==9.0.0.dev1" in constraints
+
+
+@pytest.mark.unit
+def test_development_constraint_update_detects_removed_site(pin_repo, monkeypatch):
+    monkeypatch.setattr(
+        updater,
+        "_PIN_SITES",
+        tuple(name for name in updater._PIN_SITES if name != "pyproject.toml"),
+    )
+    with pytest.raises(AssertionError):
+        test_write_pins_updates_the_development_constraint(pin_repo)
+
+
+def test_write_pins_requires_a_separate_lock_refresh(tmp_path, monkeypatch):
+    """A history-free pin bump must pass source guards and fail only the stale lock."""
+    import xml.etree.ElementTree as ET
+
     tracked = subprocess.run(
         ["git", "ls-files", "-z"],
         cwd=_REPO_ROOT,
@@ -395,19 +419,10 @@ def test_write_pins_leaves_a_tree_the_guard_accepts(tmp_path, monkeypatch):
     monkeypatch.setattr(updater, "_VERSIONS_FILE", tmp_path / "dev_dep_versions.yml")
     major = Version(updater.read_pin("__executorch_version__")).major
     lock = tmp_path / "uv.lock"
-    if lock.exists():
-        major = max(
-            [
-                major,
-                *[
-                    int(value)
-                    for value in re.findall(
-                        r'specifier = "[^"\n]*?(?:>=|==)(\d+)\.', lock.read_text()
-                    )
-                ],
-            ]
-        )
+    locked = lock.read_bytes()
     assert updater.write_pins(f"{major + 1}.0.0.dev1", _COMMIT)
+    assert lock.read_bytes() == locked
+    report = tmp_path / "pin-guards.xml"
     result = subprocess.run(
         [
             sys.executable,
@@ -416,6 +431,7 @@ def test_write_pins_leaves_a_tree_the_guard_accepts(tmp_path, monkeypatch):
             "tests/py/dynamo/executorch/test_executorch_pin.py",
             "-q",
             "--no-header",
+            f"--junitxml={report}",
             "-p",
             "no:cacheprovider",
             "--noconftest",
@@ -426,4 +442,11 @@ def test_write_pins_leaves_a_tree_the_guard_accepts(tmp_path, monkeypatch):
         capture_output=True,
         text=True,
     )
-    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.returncode == 1, result.stdout + result.stderr
+    cases = ET.parse(report).findall(".//testcase")
+    assert not [case for case in cases if case.find("error") is not None], result.stdout
+    assert [
+        case.attrib["name"] for case in cases if case.find("failure") is not None
+    ] == ["test_the_lockfile_executorch_matches_the_pin"], (
+        result.stdout + result.stderr
+    )

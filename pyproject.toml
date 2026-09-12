@@ -190,6 +190,7 @@ conflicts = [
 ]
 constraint-dependencies = [
     "transformers>=5.14.1",
+    "executorch==1.5.0.dev20260911",
 ]
 
 [tool.uv.sources]

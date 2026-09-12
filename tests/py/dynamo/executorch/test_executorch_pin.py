@@ -87,6 +87,7 @@ _EXPECTED_REQUIREMENT_SITES = {
     "docker/MODULE.bazel.docker": 1,
     "docker/MODULE.bazel.ngc": 1,
     "justfile": 1,
+    "pyproject.toml": 1,
     # Require the fenced install command; prose cannot replace it.
     "py/torch-tensorrt-executorch-runtime/README.md": 1,
     "py/torch-tensorrt-executorch-runtime/pyproject.toml": 1,
@@ -1079,52 +1080,99 @@ def test_a_failed_setup_step_stops_the_suite(monkeypatch, tmp_path, setup_rc):
     )
 
 
-@pytest.mark.unit
-def test_the_lockfile_executorch_range_does_not_lead_the_pin():
-    """Allow the separately refreshed development lock to lag, but never lead the pin."""
-    lock = REPO_ROOT / "uv.lock"
-    if not lock.is_file():
-        pytest.skip("no uv.lock in this checkout")
-
-    recorded = set(
-        re.findall(
-            r'\{ name = "executorch", marker = "[^"]*", specifier = "([^"]+)" \}',
-            lock.read_text(encoding="utf-8"),
-        )
-    )
-    if not recorded:
-        pytest.skip("uv.lock records no executorch requirement")
-
-    version = _versions()["__executorch_version__"]
-    major, minor = _release_line(version)
-    expected = f">={version},<{major}.{int(minor) + 1}"
-    if recorded == {expected}:
-        return
-
-    # Behind the pin is the expected resting state until the lock is regenerated. Ahead of it is
-    # not: that means the lock names an ExecuTorch this repository does not pin.
+def _assert_development_lock_matches_pin(lock: dict, version: str) -> None:
+    from packaging.markers import Marker
     from packaging.specifiers import SpecifierSet
     from packaging.version import Version
 
-    # Ahead means the range's own lower bound is above the pin. Probing the specifier with sample
-    # versions was fragile in both directions: an upper-bound test missed an open-ended ">=1.7",
-    # and a low sentinel called the ordinary behind-the-pin state a failure.
-    pinned = Version(version)
-    ahead = [
-        entry
-        for entry in sorted(recorded)
-        if any(
-            clause.operator in {">=", ">", "==", "~=", "==="}
-            and Version(clause.version.rstrip(".*") or "0") > pinned
-            for clause in SpecifierSet(entry)
-        )
-    ]
-    assert not ahead, (
-        f"uv.lock records executorch {ahead}, which is ahead of the pinned {version}. The pin "
-        "derives "
-        + repr(expected)
-        + ", so run `uv lock --refresh` and commit the result."
+    refresh = (
+        "Regenerate uv.lock with PYTHON_ONLY=1 uv lock --refresh --prerelease=allow."
     )
+    constraints = [
+        entry
+        for entry in lock.get("manifest", {}).get("constraints", [])
+        if entry["name"] == "executorch"
+    ]
+    assert constraints == [{"name": "executorch", "specifier": f"=={version}"}], refresh
+    resolved = [p for p in lock.get("package", []) if p["name"] == "executorch"]
+    assert resolved and all(
+        Version(p["version"]).public == version for p in resolved
+    ), refresh
+    roots = [p for p in lock["package"] if p["name"] == "torch-tensorrt"]
+    assert len(roots) == 1, refresh
+    recorded = [
+        r
+        for r in roots[0].get("metadata", {}).get("requires-dist", [])
+        if r["name"] == "executorch"
+    ]
+    major, minor = _release_line(version)
+    expected = SpecifierSet(f">={version},<{major}.{int(minor) + 1}")
+    assert len(recorded) == 2 and all(
+        SpecifierSet(r["specifier"]) == expected for r in recorded
+    ), refresh
+    for platform in ("linux", "win32", "darwin"):
+        for extra in ("all", "executorch", ""):
+            selected = sum(
+                Marker(r.get("marker", "")).evaluate(
+                    {"sys_platform": platform, "extra": extra}
+                )
+                for r in recorded
+            )
+            assert selected == int(platform == "linux" and extra != ""), refresh
+
+
+@pytest.mark.unit
+def test_the_lockfile_executorch_matches_the_pin():
+    import tomllib
+
+    lock = tomllib.loads((REPO_ROOT / "uv.lock").read_text())
+    _assert_development_lock_matches_pin(lock, _versions()["__executorch_version__"])
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("local", ["", "+cu130", "+cu132"])
+@pytest.mark.parametrize(
+    "mutation", [None, "constraint", "resolved", "missing", "range", "marker"]
+)
+def test_development_lock_guard_rejects_drift(local, mutation):
+    version = "1.5.0.dev1"
+    constraint = {"name": "executorch", "specifier": f"=={version}"}
+    package = {"name": "executorch", "version": version + local}
+    requirements = [
+        {
+            "name": "executorch",
+            "specifier": f">={version},<1.6",
+            "marker": f"sys_platform == 'linux' and extra == '{extra}'",
+        }
+        for extra in ("all", "executorch")
+    ]
+    lock = {
+        "manifest": {"constraints": [constraint]},
+        "package": [
+            package,
+            {
+                "name": "torch-tensorrt",
+                "metadata": {
+                    "requires-dist": requirements,
+                },
+            },
+        ],
+    }
+    if mutation == "constraint":
+        constraint["specifier"] = ">=1.4.1"
+    elif mutation == "resolved":
+        package["version"] = "1.4.1"
+    elif mutation == "missing":
+        lock["package"].remove(package)
+    elif mutation == "range":
+        requirements[0]["specifier"] = ">=1.4.1,<1.5"
+    elif mutation == "marker":
+        requirements[0]["marker"] = "extra == 'all'"
+    if mutation is None:
+        _assert_development_lock_matches_pin(lock, version)
+    else:
+        with pytest.raises(AssertionError, match="Regenerate uv.lock"):
+            _assert_development_lock_matches_pin(lock, version)
 
 
 _INSTALL_INVOCATION = re.compile(
@@ -2030,7 +2078,9 @@ def test_update_workflow_requires_manual_downgrade_authority(tmp_path, allow):
         step["env"]["ALLOW_DOWNGRADE"]
         == "${{ github.event_name == 'workflow_dispatch' && inputs.allow_downgrade }}"
     )
-    stubs = 'python() { printf "%s\\n" "$@"; }; git() { return 0; };\n'
+    stubs = (
+        'python() { printf "%s\\n" "$@"; }; git() { return 0; }; uv() { return 0; };\n'
+    )
     result = subprocess.run(
         ["bash"],
         input=stubs + step["run"],
@@ -2060,6 +2110,111 @@ def test_update_workflow_requires_manual_downgrade_authority(tmp_path, allow):
         for base in ("release/2.14", "release-2.14")
     }
     assert len(branches) == 2
+
+
+@pytest.mark.unit
+def test_development_lock_constraint_matches_the_pin():
+    import tomllib
+
+    config = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text())
+    requirements = [
+        Requirement(value) for value in config["tool"]["uv"]["constraint-dependencies"]
+    ]
+    constraints = [r for r in requirements if r.name == "executorch"]
+    assert len(constraints) == 1
+    assert str(constraints[0].specifier) == f'=={_versions()["__executorch_version__"]}'
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "filename,job,step_id",
+    [
+        ("executorch-pin-update.yml", "update-pin", "update"),
+        ("uv-update.yml", "sync-uv-lock", "check-changes"),
+    ],
+)
+@pytest.mark.parametrize("lock_rc", [0, 7])
+@pytest.mark.parametrize("changed", [False, True])
+def test_lock_workflows_refresh_before_reporting_changes(
+    tmp_path, filename, job, step_id, lock_rc, changed
+):
+    workflow = yaml.safe_load((REPO_ROOT / ".github/workflows" / filename).read_text())
+    step = next(s for s in workflow["jobs"][job]["steps"] if s.get("id") == step_id)
+    stubs = r"""
+python() { echo update-pin; }
+uv() { printf 'lock:%s:%s\n' "$PYTHON_ONLY" "$*"; return "$LOCK_RC"; }
+git() { if [ "$1" = diff ]; then echo inspect-changes; return "$DIFF_RC"; fi; }
+"""
+    result = subprocess.run(
+        ["bash"],
+        input=stubs + step["run"],
+        capture_output=True,
+        text=True,
+        cwd=tmp_path,
+        env={
+            **os.environ,
+            "TRACK": "nightly",
+            "ALLOW_DOWNGRADE": "false",
+            "GITHUB_WORKSPACE": str(tmp_path),
+            "GITHUB_OUTPUT": str(tmp_path / "output"),
+            "LOCK_RC": str(lock_rc),
+            "DIFF_RC": str(int(changed)),
+        },
+    )
+    assert "lock:1:lock --refresh --prerelease=allow" in result.stdout, (
+        result.stdout + result.stderr
+    )
+    assert (result.returncode == 0) is (lock_rc == 0)
+    assert ("inspect-changes" in result.stdout) is (lock_rc == 0)
+    output = tmp_path / "output"
+    assert output.exists() is (changed and lock_rc == 0)
+    if output.exists():
+        flag = "changed=true" if job == "update-pin" else "has_changes=true"
+        assert flag in output.read_text().splitlines()
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "filename,job,step_id",
+    [
+        ("executorch-pin-update.yml", "update-pin", "update"),
+        ("uv-update.yml", "sync-uv-lock", "check-changes"),
+    ],
+)
+@pytest.mark.parametrize("removed", ["refresh", "metadata-mode", "failure-stop"])
+def test_lock_workflow_checks_detect_removed_fix(
+    tmp_path, monkeypatch, filename, job, step_id, removed
+):
+    path = REPO_ROOT / ".github/workflows" / filename
+    workflow = yaml.safe_load(path.read_text())
+    step = next(s for s in workflow["jobs"][job]["steps"] if s.get("id") == step_id)
+    old = step["run"]
+    if removed == "refresh":
+        step["run"] = old.replace("--refresh", "")
+    elif removed == "metadata-mode":
+        step["run"] = old.replace("PYTHON_ONLY=1", "PYTHON_ONLY=0")
+    else:
+        step["run"] = old.replace("set -euo pipefail", "set -uo pipefail").replace(
+            "exit 1", "true"
+        )
+    assert step["run"] != old
+    original = Path.read_text
+    monkeypatch.setattr(
+        Path,
+        "read_text",
+        lambda p, *a, **kw: (
+            yaml.safe_dump(workflow) if p == path else original(p, *a, **kw)
+        ),
+    )
+    with pytest.raises(AssertionError):
+        test_lock_workflows_refresh_before_reporting_changes(
+            tmp_path,
+            filename,
+            job,
+            step_id,
+            7 if removed == "failure-stop" else 0,
+            False,
+        )
 
 
 @pytest.mark.unit
