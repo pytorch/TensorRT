@@ -80,7 +80,7 @@ class BackendOpSupportTester(ops.OperatorSupportBase):  # type: ignore
                 and node.target not in self.torch_executed_ops
             ):
                 # If node is a proper, supported computational node, store the operator
-                if not node.is_impure() and node.op != "get_attr":
+                if node.op in CALLABLE_NODE_OPS:
                     if node_name not in self.supported_operators:
                         self.supported_operators[f"{backend_name}_{node_name}"] = 1
                     else:
@@ -88,7 +88,7 @@ class BackendOpSupportTester(ops.OperatorSupportBase):  # type: ignore
 
                 return True, backend_name
             else:
-                if i == len(self.backend_priority) - 1 and not node.is_impure():
+                if i == len(self.backend_priority) - 1 and node.op in CALLABLE_NODE_OPS:
                     if node_name not in self.unsupported_operators:
                         self.unsupported_operators[node_name] = 1
                     else:

@@ -56,7 +56,10 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
                 self._non_target_device_cache,
             )
         ):
-            if not node.is_impure():
+            # Record by node kind, not by is_impure(). is_impure() is also true for
+            # random and mutating operators, so it dropped exactly the refusals this
+            # dict exists to report.
+            if node.op in CALLABLE_NODE_OPS:
                 self.unsupported_operators[node_name] = (
                     self.unsupported_operators.get(node_name, 0) + 1
                 )
@@ -69,7 +72,7 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
 
         if TorchTensorRTOperatorSupport._exceeds_max_tensor_rank(node):
             # Keep unrepresentable tensors entirely in the Torch partition.
-            if not node.is_impure():
+            if node.op in CALLABLE_NODE_OPS:
                 self.unsupported_operators[node_name] = (
                     self.unsupported_operators.get(node_name, 0) + 1
                 )
@@ -77,7 +80,7 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
 
         if TorchTensorRTOperatorSupport._has_complex_dtype(node):
             # Complex-dtype tensors are not supported by TensorRT; force PyTorch fallback
-            if not node.is_impure():
+            if node.op in CALLABLE_NODE_OPS:
                 self.unsupported_operators[node_name] = (
                     self.unsupported_operators.get(node_name, 0) + 1
                 )
@@ -90,7 +93,7 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
         ):
             # data-dependent output shape needs a TRT output allocator, which some
             # runtimes cannot consume; honor the fallback and run the node in PyTorch
-            if not node.is_impure():
+            if node.op in CALLABLE_NODE_OPS:
                 self.unsupported_operators[node_name] = (
                     self.unsupported_operators.get(node_name, 0) + 1
                 )
@@ -102,7 +105,7 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
             and node.target not in self.torch_executed_ops
         ):
             # If node is a proper, supported computational node, store the operator
-            if not node.is_impure() and node.op != "get_attr":
+            if node.op in CALLABLE_NODE_OPS:
                 if node_name not in self.supported_operators:
                     self.supported_operators[node_name] = 1
                 else:
@@ -110,7 +113,7 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
 
             return True
         else:
-            if not node.is_impure():
+            if node.op in CALLABLE_NODE_OPS:
                 if node_name not in self.unsupported_operators:
                     self.unsupported_operators[node_name] = 1
                 else:

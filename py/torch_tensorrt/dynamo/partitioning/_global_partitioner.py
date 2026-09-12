@@ -7,6 +7,7 @@ from torch.fx.graph_module import GraphModule
 from torch.fx.node import Target
 from torch.fx.passes.infra.partitioner import CapabilityBasedPartitioner, Partition
 from torch.fx.passes.operator_support import OperatorSupport, SupportDict
+from torch.fx.passes.tools_common import CALLABLE_NODE_OPS
 from torch.utils._pytree import tree_flatten
 from torch_tensorrt.dynamo._defaults import (
     MIN_BLOCK_SIZE,
@@ -265,7 +266,10 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
             to_torch_device(settings.device),
             self._non_target_device_cache,
         ):
-            if not node.is_impure():
+            # Record by node kind, not by is_impure(). is_impure() is also true for
+            # random and mutating operators, so it dropped exactly the refusals this
+            # dict exists to report.
+            if node.op in CALLABLE_NODE_OPS:
                 self.unsupported_operators[node_name] = (
                     self.unsupported_operators.get(node_name, 0) + 1
                 )
@@ -278,7 +282,7 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
 
         if self._exceeds_max_tensor_rank(node):
             # TensorRT network inputs and outputs are limited by trt.Dims.
-            if not node.is_impure():
+            if node.op in CALLABLE_NODE_OPS:
                 self.unsupported_operators[node_name] = (
                     self.unsupported_operators.get(node_name, 0) + 1
                 )
@@ -287,7 +291,7 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
         if self._has_complex_dtype(node):
             # Complex-dtype tensors are not supported by TensorRT; force PyTorch fallback
             # so the graph breaks around the complex cluster inserted by complex_graph_detection.
-            if not node.is_impure():
+            if node.op in CALLABLE_NODE_OPS:
                 self.unsupported_operators[node_name] = (
                     self.unsupported_operators.get(node_name, 0) + 1
                 )
@@ -300,7 +304,7 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
         ):
             # data-dependent output shape needs a TRT output allocator, which some
             # runtimes cannot consume; honor the fallback and run the node in PyTorch
-            if not node.is_impure():
+            if node.op in CALLABLE_NODE_OPS:
                 self.unsupported_operators[node_name] = (
                     self.unsupported_operators.get(node_name, 0) + 1
                 )
@@ -312,7 +316,7 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
             and node.target not in self.torch_executed_ops
         ):
             # If node is a proper, supported computational node, store the operator
-            if not node.is_impure() and node.op != "get_attr":
+            if node.op in CALLABLE_NODE_OPS:
                 if node_name not in self.supported_operators:
                     self.supported_operators[node_name] = 1
                 else:
@@ -320,7 +324,7 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
 
             return True
         else:
-            if not node.is_impure():
+            if node.op in CALLABLE_NODE_OPS:
                 if node_name not in self.unsupported_operators:
                     self.unsupported_operators[node_name] = 1
                 else:
