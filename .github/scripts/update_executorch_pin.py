@@ -294,8 +294,10 @@ def main(argv: list[str] | None = None) -> int:
         help="explicitly authorize proposing a lower version; builds and tests still must pass",
     )
     args = parser.parse_args(argv)
-    if args.track == "nightly" and args.channel not in {"cu130", "cu132"}:
-        parser.error("supported TensorRT nightly CUDA channels are cu130 and cu132")
+    if args.track == "nightly" and not re.fullmatch(r"cu13\d+", args.channel):
+        parser.error(
+            "TensorRT nightlies are CUDA 13 only, so the channel must look like cu130"
+        )
     index_args = _index_args(args.track, args.channel)
     target = pick_target(available_versions(index_args), args.track)
     current = read_pin("__executorch_version__")
