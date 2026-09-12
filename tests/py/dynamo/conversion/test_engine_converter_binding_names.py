@@ -17,8 +17,9 @@ indexes positionally.
 
 import unittest
 
+import pytest
+import tensorrt as trt
 import torch
-import torch_tensorrt
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo._compiler import (
     BindingNameMismatchError,
@@ -26,8 +27,6 @@ from torch_tensorrt.dynamo._compiler import (
     _resolve_pytree_binding_names,
     convert_exported_program_to_serialized_trt_engine,
 )
-
-import tensorrt as trt
 
 DEVICE = torch.device("cuda", 0)
 
@@ -214,6 +213,8 @@ class TestEngineConverterBindingNames(TestCase):
         self.assertTrue(ok, "execute_async_v3 returned False")
         return outputs
 
+    @pytest.mark.trt_api
+    @pytest.mark.trt_engine_build
     def test_default_names_unchanged(self) -> None:
         model, inputs = self._two_output_model()
         program = _trace(model, inputs)
@@ -229,6 +230,8 @@ class TestEngineConverterBindingNames(TestCase):
         outs = self._binding_names(engine, trt.TensorIOMode.OUTPUT)
         self.assertEqual(outs, ["output0", "output1"])
 
+    @pytest.mark.trt_api
+    @pytest.mark.trt_engine_build
     def test_user_supplied_arg_and_output_names(self) -> None:
         model, inputs = self._two_output_model()
         program = _trace(model, inputs)

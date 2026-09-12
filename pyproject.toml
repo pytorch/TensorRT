@@ -145,6 +145,12 @@ markers = [
     "critical: a smoke/critical-path case run in the L1 tier (pytest -m critical); the L2 tier runs the complement (-m 'not critical')",
     "smoke: the fast-lane subset of a subsystem (pytest -m smoke); run on every push by the `fast` lane",
     "flaky: a known-flaky test, quarantined out of the gating lanes and tracked by an issue; still run in nightly",
+    "trt_api: directly validates a TensorRT or TensorRT-RTX API contract used by Torch-TensorRT",
+    "trt_engine_build: validates TensorRT or TensorRT-RTX engine construction",
+    "trt_layer_info: validates TensorRT engine-inspector and layer-information APIs",
+    "trt_plugin: validates TensorRT plugin APIs used by Torch-TensorRT",
+    "trt_runtime: validates TensorRT runtime and execution APIs used by Torch-TensorRT",
+    "trt_rtx_only: requires the TensorRT-RTX backend",
 ]
 norecursedirs = [
     "bazel-*",
