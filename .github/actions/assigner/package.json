@@ -21,8 +21,7 @@
   "dependencies": {
     "@actions/core": "^1.11.1",
     "@actions/github": "^6.0.0",
-    "fs": "^0.0.1-security",
-    "js-yaml": "^4.1.1"
+    "js-yaml": "^4.3.2"
   },
   "devDependencies": {
     "@types/node": "^17.0.35",
