@@ -8,6 +8,7 @@ must pass before that proposal is usable.
 from __future__ import annotations
 
 import argparse
+import ast
 import re
 import subprocess
 import sys
@@ -270,6 +271,25 @@ def write_pins(new_version: str, new_commit: str) -> bool:
     return changed
 
 
+def delegate_channels() -> list[str]:
+    """Nightly channels the delegate build accepts, read from the matrix filter."""
+    source = (_REPO_ROOT / ".github/scripts/filter-matrix.py").read_text(
+        encoding="utf-8"
+    )
+    declared = {}
+    for node in ast.parse(source).body:
+        target = getattr(node, "target", None) or next(
+            iter(getattr(node, "targets", [])), None
+        )
+        if isinstance(target, ast.Name) and isinstance(
+            getattr(node, "value", None), (ast.List, ast.Constant)
+        ):
+            declared[target.id] = ast.literal_eval(node.value)
+    major = declared["EXECUTORCH_CUDA_MAJOR"]
+    rows = set(declared["x86_cuda_versions"]) | set(declared["arm_cuda_versions"])
+    return sorted(row for row in rows if re.fullmatch(rf"cu{major}\d+", row))
+
+
 def _index_args(track: str, channel: str) -> list[str]:
     if track == "nightly":
         return [
@@ -299,7 +319,20 @@ def main(argv: list[str] | None = None) -> int:
             "TensorRT nightlies are CUDA 13 only, so the channel must look like cu130"
         )
     index_args = _index_args(args.track, args.channel)
-    target = pick_target(available_versions(index_args), args.track)
+    candidates = available_versions(index_args)
+    if args.track == "nightly":
+        # A version missing from any accepted channel would strand that row's own install.
+        for channel in delegate_channels():
+            if channel == args.channel:
+                continue
+            published = set(available_versions(_index_args(args.track, channel)))
+            candidates = [v for v in candidates if v in published]
+        if not candidates:
+            raise SystemExit(
+                "no executorch version is published in every channel the delegate build "
+                f"accepts ({', '.join(delegate_channels())})"
+            )
+    target = pick_target(candidates, args.track)
     current = read_pin("__executorch_version__")
     if target == current:
         print(f"executorch pin is already at the newest {args.track} version {current}")

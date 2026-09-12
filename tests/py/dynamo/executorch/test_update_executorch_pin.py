@@ -192,9 +192,52 @@ def test_main_uses_selected_channel(monkeypatch, channel):
     )
     monkeypatch.setattr(updater, "read_pin", lambda field: "1.0.dev1")
     assert updater.main(["--channel", channel]) == 0
-    assert calls == [
-        ["--pre", "--index-url", f"https://download.pytorch.org/whl/nightly/{channel}"]
+    # The selected channel is asked first, then every other channel the delegate accepts.
+    assert calls[0] == [
+        "--pre",
+        "--index-url",
+        f"https://download.pytorch.org/whl/nightly/{channel}",
     ]
+    queried = [args[-1].rsplit("/", 1)[-1] for args in calls]
+    assert sorted(queried) == updater.delegate_channels()
+
+
+@pytest.mark.unit
+def test_main_refuses_a_version_missing_from_an_accepted_channel(monkeypatch):
+    """The pin has to be installable by every row the delegate build accepts.
+
+    A newer version published in one channel only would leave the other rows asking their own
+    channel for a version it does not carry.
+    """
+    accepted = updater.delegate_channels()
+    assert len(accepted) > 1, accepted
+    newest_everywhere = "1.0.dev1"
+    per_channel = {ch: [newest_everywhere] for ch in accepted}
+    per_channel[accepted[0]] = [newest_everywhere, "1.0.dev2"]
+
+    monkeypatch.setattr(
+        updater,
+        "available_versions",
+        lambda args: per_channel[args[-1].rsplit("/", 1)[-1]],
+    )
+    monkeypatch.setattr(updater, "read_pin", lambda field: newest_everywhere)
+    # dev2 exists in one channel only, so the pin stays where it is rather than moving to it.
+    assert updater.main(["--channel", accepted[0]]) == 0
+
+
+@pytest.mark.unit
+def test_main_reports_when_no_version_spans_every_accepted_channel(monkeypatch):
+    accepted = updater.delegate_channels()
+    per_channel = {ch: [f"1.0.dev{i}"] for i, ch in enumerate(accepted)}
+    monkeypatch.setattr(
+        updater,
+        "available_versions",
+        lambda args: per_channel[args[-1].rsplit("/", 1)[-1]],
+    )
+    monkeypatch.setattr(updater, "read_pin", lambda field: "1.0.dev0")
+    with pytest.raises(SystemExit) as error:
+        updater.main(["--channel", accepted[0]])
+    assert "every channel the delegate build accepts" in str(error.value)
 
 
 @pytest.mark.parametrize("allow", [False, True])
