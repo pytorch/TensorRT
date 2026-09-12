@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import re
 import sys
 from typing import Any, Dict, List
 
@@ -22,6 +23,10 @@ arm_cuda_versions: List[str] = ["cu130", "cu132", "cu134"]
 # Full matrix runs on main / nightly / release branches.
 PR_PYTHON_VERSION: str = "3.12"
 PR_CUDA_VERSION: str = "cu134"
+
+# The delegate links CUDA 13 libraries. This narrows the row lists above, it does not widen
+# them: a new minor still has to be added there first.
+EXECUTORCH_CUDA_MAJOR: str = "13"
 
 jetpack_container_image: str = "nvcr.io/nvidia/l4t-jetpack:r36.4.0"
 sbsa_container_image: str = "quay.io/pypa/manylinux_2_39_aarch64"
@@ -140,6 +145,12 @@ def main(args: list[str]) -> None:
         default="false",
     )
 
+    parser.add_argument(
+        "--executorch-runtime",
+        action="store_true",
+        help="keep only CUDA 13 rows supported by the ExecuTorch delegate wheel",
+    )
+
     options = parser.parse_args(args)
     if options.matrix == "":
         raise ValueError("--matrix needs to be provided")
@@ -156,6 +167,10 @@ def main(args: list[str]) -> None:
     filtered_includes = []
 
     for item in includes:
+        if options.executorch_runtime and not re.fullmatch(
+            rf"cu{EXECUTORCH_CUDA_MAJOR}\d+", item["desired_cuda"]
+        ):
+            continue
         if filter_matrix_item(
             item,
             options.jetpack == "true",

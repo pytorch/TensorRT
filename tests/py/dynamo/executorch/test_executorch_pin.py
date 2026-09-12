@@ -19,6 +19,9 @@ from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
+# Same path, but never monkeypatched: some tests repoint REPO_ROOT at a temp tree and still
+# need to read the project's own declared values.
+_PROJECT_ROOT = REPO_ROOT
 VERSIONS = REPO_ROOT / "dev_dep_versions.yml"
 
 # Discovery in mixed source/prose; packaging validates the matched requirement.
@@ -196,8 +199,32 @@ def _expected(path: str, number: int, version: str) -> str:
     return f"executorch>={version},<{major}.{int(minor) + 1}"
 
 
-# Current TensorRT nightly channels. Retained cu126 artifacts do not mean new wheels publish there.
-_PUBLISHED_NIGHTLY_CHANNELS = frozenset({"cu130", "cu132"})
+def _executorch_cuda_major() -> str:
+    """The CUDA major the ExecuTorch integration supports.
+
+    Read from ``dev_dep_versions.yml``, which is the repository's own declaration of the CUDA
+    it targets and is independent of the guards under test. Deriving it from those guards
+    instead would make every assertion below agree with whatever they currently do, so a
+    guard that regressed to an older policy would still pass.
+    """
+    declared = yaml.safe_load(
+        (_PROJECT_ROOT / "dev_dep_versions.yml").read_text(encoding="utf-8")
+    )["__cuda_version__"]
+    return str(declared).split(".")[0]
+
+
+def _declared_cuda_channel() -> str:
+    """The channel name for the CUDA this repository declares, for example ``cu134``."""
+    declared = yaml.safe_load(
+        (_PROJECT_ROOT / "dev_dep_versions.yml").read_text(encoding="utf-8")
+    )["__cuda_version__"]
+    major, _, minor = str(declared).partition(".")
+    return f"cu{major}{minor}"
+
+
+def _is_published_nightly_channel(channel: str) -> bool:
+    return bool(re.fullmatch(rf"cu{_executorch_cuda_major()}\d+", channel))
+
 
 # Tracked files with no suffix that still carry install commands. justfile writes the nightly
 # ExecuTorch install for local builds, so the printed-install walk has to read it by name.
@@ -663,7 +690,7 @@ def test_install_channel_guard_rejects_unsupported_nightly_recipes(
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
     subprocess.run(["git", "-C", str(tmp_path), "add", "README.md"], check=True)
     monkeypatch.setattr(sys.modules[__name__], "REPO_ROOT", tmp_path)
-    if channel in {"cu130", "cu132"}:
+    if _is_published_nightly_channel(channel):
         test_every_printed_install_instruction_names_the_nightly_channel()
     else:
         with pytest.raises(AssertionError, match=f"nightly/{channel}"):
@@ -714,14 +741,79 @@ def test_the_runner_follows_the_row_s_cuda_version(monkeypatch) -> None:
 
     assert channel_for("cu132").endswith("/nightly/cu132")
     assert channel_for("cu130").endswith("/nightly/cu130")
+    # The repository's own declared CUDA row has to be installable, or CI installs ExecuTorch
+    # from a channel that does not match the torch the job was built with.
+    declared = _declared_cuda_channel()
+    assert channel_for(declared).endswith(f"/nightly/{declared}")
     # Unset is a local run, and matches the index pyproject.toml resolves against by default.
     assert channel_for(None).endswith("/nightly/cu130")
     assert channel_for("").endswith("/nightly/cu130")
 
 
 @pytest.mark.unit
+def test_the_supported_cuda_major_is_declared_once_per_place_that_needs_it():
+    """Every declaration of the supported CUDA major must agree with the repository's own.
+
+    Several sites spell it, and none can import the others: the runner and the pin updater both
+    execute as plain scripts, and the shared build gate is YAML. Sites that arrive later in the
+    stack are checked only where they exist. This is what stops those copies from drifting apart.
+    """
+    sources = {
+        "py/torch_tensorrt/_utils.py": r'^EXECUTORCH_CUDA_MAJOR = "(\d+)"',
+        "tests/ci/runner.py": r'^EXECUTORCH_CUDA_MAJOR = "(\d+)"',
+        ".github/scripts/filter-matrix.py": r'^EXECUTORCH_CUDA_MAJOR: str = "(\d+)"',
+    }
+    found = {}
+    for name, pattern in sources.items():
+        text = (_PROJECT_ROOT / name).read_text(encoding="utf-8")
+        match = re.search(pattern, text, re.MULTILINE)
+        assert match, f"{name} declares no EXECUTORCH_CUDA_MAJOR"
+        found[name] = match.group(1)
+
+    # The workflow gate is YAML and cannot import either, so it carries the prefix inline. It is
+    # checked only where it exists, because the delegate's shared build arrives later in the stack.
+    gate = yaml.safe_load(
+        (_PROJECT_ROOT / ".github/workflows/build_linux.yml").read_text()
+    )
+    step = next(
+        (
+            step
+            for job in gate["jobs"].values()
+            if isinstance(job, dict)
+            for step in job.get("steps", [])
+            if step.get("id") == "executorch-runtime"
+        ),
+        None,
+    )
+    if step is not None:
+        assert f"'cu{_executorch_cuda_major()}'" in step["if"], step["if"]
+
+    # Two sites spell the major inline. The companion's setup.py is the only one that raises at
+    # build time, so a stale value there breaks a build rather than a test. Each is checked only
+    # where the guard is present, since the delegate's own guard arrives later in the stack.
+    inline = {
+        "py/torch-tensorrt-executorch-runtime/setup.py": (
+            r'split\("\."\)\[0\] != "(\d+)"'
+        ),
+        ".github/scripts/update_executorch_pin.py": r'fullmatch\(r"cu(\d+)\\d\+"',
+    }
+    matched = 0
+    for name, pattern in inline.items():
+        path = _PROJECT_ROOT / name
+        if not path.is_file():
+            continue
+        match = re.search(pattern, path.read_text(encoding="utf-8"))
+        if match:
+            found[name] = match.group(1)
+            matched += 1
+    assert matched, "no inline declaration of the supported CUDA major was found"
+
+    assert set(found.values()) == {_executorch_cuda_major()}, found
+
+
+@pytest.mark.unit
 @pytest.mark.parametrize(
-    "channel", ["cpu", "13.2", "cu126", "cu128", "cu134", "CU132", " cu132"]
+    "channel", ["cpu", "13.2", "cu126", "cu128", "cu14", "CU132", " cu132"]
 )
 def test_runner_rejects_unsupported_cuda_channels(monkeypatch, channel):
     from tests.ci import runner
@@ -730,7 +822,7 @@ def test_runner_rejects_unsupported_cuda_channels(monkeypatch, channel):
     with pytest.raises(ValueError, match="CU_VERSION") as error:
         runner._setup_commands("executorch")
     assert repr(channel) in str(error.value)
-    assert "cu130" in str(error.value) and "cu132" in str(error.value)
+    assert f"cu{_executorch_cuda_major()}" in str(error.value)
 
 
 @pytest.mark.unit
@@ -739,8 +831,9 @@ def test_runner_channel_check_detects_removed_validator(monkeypatch):
     from tests.ci import runner
 
     source = inspect.getsource(runner._setup_commands)
-    changed = source.replace('if cuda not in {"cu130", "cu132"}:', "if False:")
-    assert changed != source
+    guard = 'if not re.fullmatch(rf"cu{EXECUTORCH_CUDA_MAJOR}\\d+", cuda):'
+    changed = source.replace(guard, "if False:")
+    assert changed != source, f"guard {guard!r} is gone, so this control checks nothing"
     namespace = vars(runner).copy()
     exec(compile(changed, runner.__file__, "exec"), namespace)
     monkeypatch.setattr(runner, "_setup_commands", namespace["_setup_commands"])
@@ -766,7 +859,19 @@ def _load_utils_channel_helpers(fake_cuda: str | None):
     class _Version:
         cuda = fake_cuda
 
-    namespace: dict[str, object] = {"torch": type("torch", (), {"version": _Version})}
+    # Carry the module's own constants: the helpers reference EXECUTORCH_CUDA_MAJOR, and
+    # restating its value here would defeat the point of reading it from one place.
+    constants = {
+        target.id: ast.literal_eval(node.value)
+        for node in tree.body
+        if isinstance(node, ast.Assign)
+        for target in node.targets
+        if isinstance(target, ast.Name) and isinstance(node.value, ast.Constant)
+    }
+    namespace: dict[str, object] = {
+        "torch": type("torch", (), {"version": _Version}),
+        **constants,
+    }
     module = ast.Module(body=functions, type_ignores=[])
     exec(compile(module, "<utils-extract>", "exec"), namespace)
     return (
@@ -1393,10 +1498,12 @@ def test_every_printed_install_instruction_names_the_nightly_channel():
                 continue
             # Literal channels must be supported; variable row exports are checked separately.
             suffix = channel.group(1)
-            if suffix and suffix not in _PUBLISHED_NIGHTLY_CHANNELS:
+            if suffix and not _is_published_nightly_channel(suffix):
                 missing.append(
                     f"{name}:{line} installs from nightly/{suffix}, which is not a supported "
-                    f"TensorRT nightly channel; expected one of {sorted(_PUBLISHED_NIGHTLY_CHANNELS)}"
+                    f"TensorRT nightly channel; expected a CUDA "
+                    f"{_executorch_cuda_major()} channel such as "
+                    f"cu{_executorch_cuda_major()}0"
                 )
             # An unversioned named distribution needs permission to select a nightly.
             # Older released extras can declare a different ExecuTorch requirement.
@@ -1875,14 +1982,31 @@ def test_review_runner_empty_channel_uses_local_default(monkeypatch):
     assert argv[argv.index("--extra-index-url") + 1].endswith("/cu130")
 
 
-@pytest.mark.parametrize("cuda", [None, "", "12.6", "12.8", "13.4", "14.0"])
+@pytest.mark.parametrize("cuda", [None, "", "12.6", "12.8", "14.0", "13", "13.x"])
 @pytest.mark.unit
 def test_unsupported_install_channels_give_guidance(cuda):
     channel, command = _load_utils_channel_helpers(cuda)
     assert channel() is None
     message = command()
-    assert "Linux" in message and "13.0" in message and "13.2" in message
+    major = _executorch_cuda_major()
+    assert "Linux" in message and major in message
     assert "pip install" not in message and "https://" not in message
+
+
+@pytest.mark.unit
+def test_the_declared_cuda_row_resolves_to_its_own_channel():
+    """The CUDA this repository declares maps to its own channel, with no per-minor edit.
+
+    Parametrised on the declared row rather than on invented minors. PyTorch publishes a CUDA
+    minor before ExecuTorch fills the matching channel, so asserting that an arbitrary minor
+    yields an install command would require printing a recipe that returns HTTP 403.
+    """
+    declared = _declared_cuda_channel()
+    major = _executorch_cuda_major()
+    minor = declared.removeprefix(f"cu{major}")
+    channel, command = _load_utils_channel_helpers(f"{major}.{minor}")
+    assert channel() == declared
+    assert f"nightly/{declared}" in command()
 
 
 @pytest.mark.parametrize("platform", ["linux", "win32"])

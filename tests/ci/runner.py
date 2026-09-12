@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import glob
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -20,6 +21,10 @@ from .suites import SUITES, Suite, Variant, by_name
 REPO_ROOT = Path(
     os.environ.get("TRT_REPO_ROOT", str(Path(__file__).resolve().parents[2]))
 )
+
+# Duplicated, not imported: this module runs as a plain script and must not require
+# torch_tensorrt to be importable. A test asserts the two agree.
+EXECUTORCH_CUDA_MAJOR = "13"
 
 
 def _executorch_requirement() -> str:
@@ -129,16 +134,13 @@ def _setup_commands(step: str) -> list[tuple[list[str], Path]]:
     if step == "hub":
         return [(launcher + ["hub.py"], REPO_ROOT / "tests/modules")]
     if step == "executorch":
-        # ExecuTorch's CUDA wheels are published only on the PyTorch nightly index, so the
-        # channel is needed here. Derived from CU_VERSION rather than fixed, because the
-        # executorch suite is nightly-only and the nightly matrix runs cu132 rows as well as
-        # cu130 ones; a fixed channel would install a CUDA 13.0 runtime into a 13.2 job. The
-        # cu130 default is for a local run with no CU_VERSION set, and matches the torch index
-        # pyproject.toml resolves against by default.
-        cuda = os.environ.get("CU_VERSION") or "cu130"
-        if cuda not in {"cu130", "cu132"}:
+        # Follows CU_VERSION rather than a fixed channel, or a job built against one CUDA
+        # runtime installs another. The default matches the index pyproject.toml resolves to.
+        cuda = os.environ.get("CU_VERSION") or f"cu{EXECUTORCH_CUDA_MAJOR}0"
+        if not re.fullmatch(rf"cu{EXECUTORCH_CUDA_MAJOR}\d+", cuda):
             raise ValueError(
-                f"Unsupported CU_VERSION {cuda!r}; expected cu130 or cu132 for ExecuTorch"
+                f"Unsupported CU_VERSION {cuda!r}; ExecuTorch needs a CUDA "
+                f"{EXECUTORCH_CUDA_MAJOR} channel such as cu{EXECUTORCH_CUDA_MAJOR}0"
             )
         return [
             (

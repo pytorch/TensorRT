@@ -22,6 +22,9 @@ _TENSORRT_LLM_VERSION_ = "1.2.0"
 # "libnvinfer.so.<N>: cannot open shared object file" error at dlopen time.
 _TENSORRT_LLM_REQUIRED_TENSORRT_MAJOR_MINOR_ = "10.14"
 
+# The delegate links CUDA 13 libraries, so the major is what decides support.
+EXECUTORCH_CUDA_MAJOR = "13"
+
 
 def sanitized_torch_version() -> Any:
     return (
@@ -32,8 +35,16 @@ def sanitized_torch_version() -> Any:
 
 
 def executorch_install_channel() -> str | None:
-    """Return a supported nightly channel matching the active PyTorch CUDA build."""
-    return {"13.0": "cu130", "13.2": "cu132"}.get(torch.version.cuda)
+    """Return the nightly channel matching the active PyTorch CUDA build, if supported.
+
+    Names the channel matching the installed torch. It does not promise that channel exists,
+    because PyTorch publishes a new CUDA minor before ExecuTorch fills it.
+    """
+    cuda_version = torch.version.cuda or ""
+    major, _, minor = cuda_version.partition(".")
+    if major != EXECUTORCH_CUDA_MAJOR or not minor.isdigit():
+        return None
+    return f"cu{major}{minor}"
 
 
 def executorch_install_command() -> str:
@@ -45,9 +56,9 @@ def executorch_install_command() -> str:
     channel = executorch_install_channel()
     if channel is None:
         return (
-            "This ExecuTorch integration requires Linux with a PyTorch CUDA 13.0 or "
-            "13.2 build. Use matching PyTorch, ExecuTorch and Torch-TensorRT wheels "
-            "in a fresh environment."
+            f"This ExecuTorch integration requires Linux with a PyTorch CUDA "
+            f"{EXECUTORCH_CUDA_MAJOR} build. Use matching PyTorch, ExecuTorch and "
+            "Torch-TensorRT wheels in a fresh environment."
         )
     return (
         'pip install --pre "torch_tensorrt[executorch]" '
