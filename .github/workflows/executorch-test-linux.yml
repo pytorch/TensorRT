@@ -66,7 +66,7 @@ jobs:
         # ExecuTorch's CUDA wheels live only on the PyTorch nightly index, so the channel is
         # needed. No --pre: a specifier naming a prerelease admits prereleases by itself, and
         # --pre would apply to every other requirement in the same command too.
-        python -m pip install pyyaml \
+        python -m pip install pyyaml "wheel>=0.40" \
           --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" \
           "executorch==1.5.0.dev20260911"
 

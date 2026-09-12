@@ -36,6 +36,24 @@ def _run(script, root, env):
     return result
 
 
+def _assert_test_wheel_dependency(command):
+    requirements = [Requirement(arg) for arg in command if arg.startswith("wheel")]
+    assert len(requirements) == 1, "ExecuTorch tests require wheel>=0.40"
+    assert "0.40.0" in requirements[0].specifier
+    assert "0.37.1" not in requirements[0].specifier
+
+
+@pytest.mark.parametrize("cuda", ["cu130", "cu132"])
+def test_manifest_suite_provisions_wheel(monkeypatch, cuda):
+    monkeypatch.syspath_prepend(str(ROOT))
+    from tests.ci import runner
+
+    monkeypatch.setenv("CU_VERSION", cuda)
+    commands = runner._setup_commands("executorch")
+    command, _ = next((argv, cwd) for argv, cwd in commands if "install" in argv)
+    _assert_test_wheel_dependency(command)
+
+
 @pytest.mark.parametrize("arch", ["x86_64", "aarch64"])
 @pytest.mark.parametrize("cuda", ["cu130", "cu132"])
 @pytest.mark.parametrize("release", [True, False])
@@ -84,12 +102,21 @@ def test_shared_build_provisions_tensorrt_metadata(tmp_path, arch, cuda, release
             + "".join(f"Requires-Dist: {r}\n" for r in requirements),
         )
     # Only the package-manager boundary is fake. Metadata lookups and selection run normally.
+    # The installed version comes from the requirement the real selector produced, so a
+    # TensorRT upgrade does not need editing here.
+    lower_bound = next(
+        specifier
+        for specifier in Requirement(expected[0]).specifier
+        if specifier.operator == ">="
+    )
+    installed_version = lower_bound.version.removesuffix(".0")
     (site / "pip.py").write_text(
         "import importlib.metadata as m, json, os, sys, zipfile\n"
         "from pathlib import Path\n"
         "from packaging.requirements import Requirement\n"
         "site = Path(__file__).parent\n"
         "args = sys.argv[1:]\n"
+        f"pinned = {installed_version!r}\n"
         "with open(os.environ['EVENTS'], 'a') as f: f.write(json.dumps(args) + '\\n')\n"
         "if args[0] == 'install':\n"
         "    for arg in args[1:]:\n"
@@ -97,16 +124,16 @@ def test_shared_build_provisions_tensorrt_metadata(tmp_path, arch, cuda, release
         "            with zipfile.ZipFile(arg) as w: w.extractall(site)\n"
         "        elif arg.startswith('tensorrt'):\n"
         "            r = Requirement(arg)\n"
-        "            assert '11.2.1.2' in r.specifier\n"
+        "            assert r.specifier.contains(pinned), (arg, pinned)\n"
         "            for name in (r.name, 'tensorrt-cu13', 'tensorrt-cu13-bindings', 'tensorrt-cu13-libs'):\n"
-        "                info = site / (name.replace('-', '_') + '-11.2.1.2.dist-info')\n"
+        "                info = site / (name.replace('-', '_') + '-' + pinned + '.dist-info')\n"
         "                info.mkdir(exist_ok=True)\n"
-        "                (info / 'METADATA').write_text(f'Name: {name}\\nVersion: 11.2.1.2\\n')\n"
+        "                (info / 'METADATA').write_text(f'Name: {name}\\nVersion: {pinned}\\n')\n"
         "elif args[0] == 'wheel':\n"
         "    installed = {d.metadata['Name']: d.version for d in m.distributions(path=[site])}\n"
         "    if 'tensorrt-cu13' not in installed: raise m.PackageNotFoundError('tensorrt-cu13')\n"
-        "    assert installed['tensorrt-cu13'] == '11.2.1.2'\n"
-        "    assert installed['tensorrt-cu13-libs'] == '11.2.1.2'\n"
+        "    assert installed['tensorrt-cu13'] == pinned\n"
+        "    assert installed['tensorrt-cu13-libs'] == pinned\n"
         "    Path(os.environ['BUILT_VERSION']).write_text(os.environ['TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION'])\n"
         "else: raise AssertionError(args)\n"
     )
@@ -290,6 +317,10 @@ def _assert_device_commands(tmp_path, workflow, failure=""):
     events = [
         json.loads(line) for line in (tmp_path / "events").read_text().splitlines()
     ]
+    setup = next(
+        event for event in events if event[:4] == ["python", "-m", "pip", "install"]
+    )
+    _assert_test_wheel_dependency(setup)
     examples = [
         event[1:]
         for event in events
@@ -365,6 +396,32 @@ def test_device_command_removal_is_detected(tmp_path, command, mutation):
     workflow["jobs"]["test"]["with"]["script"] = script.replace(command, replacement)
     with pytest.raises(AssertionError):
         _assert_device_commands(tmp_path, workflow)
+
+
+@pytest.mark.parametrize("entrypoint", ["manifest", "workflow"])
+def test_missing_test_wheel_dependency_is_detected(tmp_path, monkeypatch, entrypoint):
+    if entrypoint == "manifest":
+        monkeypatch.syspath_prepend(str(ROOT))
+        from tests.ci import runner
+
+        setup = runner._setup_commands
+        monkeypatch.setattr(
+            runner,
+            "_setup_commands",
+            lambda step: [
+                ([arg for arg in argv if not arg.startswith("wheel")], cwd)
+                for argv, cwd in setup(step)
+            ],
+        )
+        with pytest.raises(AssertionError, match="ExecuTorch tests require wheel"):
+            test_manifest_suite_provisions_wheel(monkeypatch, "cu132")
+    else:
+        workflow = _workflow("executorch-test-linux.yml")
+        script = workflow["jobs"]["test"]["with"]["script"]
+        assert script.count('"wheel>=0.40"') == 1
+        workflow["jobs"]["test"]["with"]["script"] = script.replace('"wheel>=0.40"', "")
+        with pytest.raises(AssertionError, match="ExecuTorch tests require wheel"):
+            _assert_device_commands(tmp_path, workflow)
 
 
 def test_disabled_device_job_is_detected(tmp_path):

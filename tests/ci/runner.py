@@ -150,6 +150,7 @@ def _setup_commands(step: str) -> list[tuple[list[str], Path]]:
                     "pip",
                     "install",
                     "pyyaml",
+                    "wheel>=0.40",
                     "--extra-index-url",
                     f"https://download.pytorch.org/whl/nightly/{cuda}",
                     _executorch_requirement(),
