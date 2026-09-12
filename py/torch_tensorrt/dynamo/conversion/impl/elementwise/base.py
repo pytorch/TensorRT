@@ -1,7 +1,7 @@
 import logging
 import operator
 import warnings
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Dict, Optional, Union
 
 import tensorrt as trt
 import torch
@@ -23,39 +23,53 @@ from torch_tensorrt.dynamo.types import TRTDataType, TRTElementWiseOp, TRTTensor
 logger = logging.getLogger(__name__)
 
 
-def get_python_op_from_trt_elementwise_op(
+_PYTHON_FOLD_OPS: Dict[TRTElementWiseOp, Callable[[Any, Any], Any]] = {
+    trt.ElementWiseOperation.SUM: operator.add,
+    trt.ElementWiseOperation.PROD: operator.mul,
+    trt.ElementWiseOperation.SUB: operator.sub,
+    trt.ElementWiseOperation.DIV: operator.truediv,
+    trt.ElementWiseOperation.POW: operator.pow,
+    trt.ElementWiseOperation.FLOOR_DIV: operator.floordiv,
+    trt.ElementWiseOperation.EQUAL: operator.eq,
+    trt.ElementWiseOperation.GREATER: operator.gt,
+    trt.ElementWiseOperation.LESS: operator.lt,
+    trt.ElementWiseOperation.MAX: max,
+    trt.ElementWiseOperation.MIN: min,
+    trt.ElementWiseOperation.AND: lambda a, b: bool(a) and bool(b),
+    trt.ElementWiseOperation.OR: lambda a, b: bool(a) or bool(b),
+    trt.ElementWiseOperation.XOR: lambda a, b: bool(a) != bool(b),
+}
+
+_TORCH_FOLD_OPS: Dict[TRTElementWiseOp, Callable[[Any, Any], Any]] = {
+    trt.ElementWiseOperation.MAX: torch.maximum,
+    trt.ElementWiseOperation.MIN: torch.minimum,
+    trt.ElementWiseOperation.AND: torch.logical_and,
+    trt.ElementWiseOperation.OR: torch.logical_or,
+    trt.ElementWiseOperation.XOR: torch.logical_xor,
+}
+
+
+def _fold_constants(
     trt_op: TRTElementWiseOp,
-) -> Callable[[Any, Any], Any]:
-    if trt_op == trt.ElementWiseOperation.SUM:
-        return operator.add
-    elif trt_op == trt.ElementWiseOperation.PROD:
-        return operator.mul
-    elif trt_op == trt.ElementWiseOperation.MAX:
-        return lambda a, b: max(a, b)
-    elif trt_op == trt.ElementWiseOperation.MIN:
-        return lambda a, b: min(a, b)
-    elif trt_op == trt.ElementWiseOperation.SUB:
-        return operator.sub
-    elif trt_op == trt.ElementWiseOperation.DIV:
-        return operator.truediv
-    elif trt_op == trt.ElementWiseOperation.POW:
-        return operator.pow
-    elif trt_op == trt.ElementWiseOperation.FLOOR_DIV:
-        return operator.floordiv
-    elif trt_op == trt.ElementWiseOperation.AND:
-        return lambda a, b: a and b
-    elif trt_op == trt.ElementWiseOperation.OR:
-        return lambda a, b: a or b
-    elif trt_op == trt.ElementWiseOperation.XOR:
-        return lambda a, b: (a or b) and not (a and b)
-    elif trt_op == trt.ElementWiseOperation.EQUAL:
-        return operator.eq
-    elif trt_op == trt.ElementWiseOperation.GREATER:
-        return operator.gt
-    elif trt_op == trt.ElementWiseOperation.LESS:
-        return operator.lt
-    else:
+    lhs_val: Any,
+    rhs_val: Any,
+) -> Union[int, float, bool, torch.Tensor]:
+    """Fold constants without changing scalar promotion or tensor rank."""
+    if not isinstance(lhs_val, (int, float, bool)):
+        lhs_val = torch.as_tensor(lhs_val)
+    if not isinstance(rhs_val, (int, float, bool)):
+        rhs_val = torch.as_tensor(rhs_val)
+    if trt_op not in _PYTHON_FOLD_OPS:
         raise RuntimeError(f"{trt_op} is not supported yet!")
+    if trt_op in _TORCH_FOLD_OPS and (
+        isinstance(lhs_val, torch.Tensor) or isinstance(rhs_val, torch.Tensor)
+    ):
+        dtype = torch.result_type(lhs_val, rhs_val)
+        return _TORCH_FOLD_OPS[trt_op](
+            torch.as_tensor(lhs_val, dtype=dtype), torch.as_tensor(rhs_val, dtype=dtype)
+        )
+    # Python operators also dispatch to Tensor methods, preserving weak scalar promotion.
+    return _PYTHON_FOLD_OPS[trt_op](lhs_val, rhs_val)
 
 
 def convert_binary_elementwise(
@@ -110,7 +124,7 @@ def convert_binary_elementwise(
             f"Both operands of the binary elementwise op {name} "
             "are constant. In this case, please consider constant fold the model first."
         )
-        return get_python_op_from_trt_elementwise_op(op_type)(lhs_val, rhs_val)
+        return _fold_constants(op_type, lhs_val, rhs_val)
 
     # If the following conditions are true:
     #  1. the network has implicit batch dimension,
