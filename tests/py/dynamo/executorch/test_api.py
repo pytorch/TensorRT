@@ -295,6 +295,41 @@ def test_public_api_symbols_present():
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
 _SETUP_PY = _REPO_ROOT / "setup.py"
+_FILTER_MATRIX_PY = _REPO_ROOT / ".github/scripts/filter-matrix.py"
+
+
+def _filter_matrix_declarations() -> dict[str, object]:
+    """Module-level literals declared by the matrix filter script."""
+    declared: dict[str, object] = {}
+    for node in ast.parse(_FILTER_MATRIX_PY.read_text(encoding="utf-8")).body:
+        target = getattr(node, "target", None) or next(
+            iter(getattr(node, "targets", [])), None
+        )
+        if isinstance(target, ast.Name) and isinstance(
+            getattr(node, "value", None), (ast.List, ast.Constant)
+        ):
+            declared[target.id] = ast.literal_eval(node.value)
+    return declared
+
+
+def _executorch_cuda_major() -> str:
+    return str(_filter_matrix_declarations()["EXECUTORCH_CUDA_MAJOR"])
+
+
+def _executorch_cuda_rows() -> set[str]:
+    """CUDA rows the delegate can take: the wheel matrix filtered to its CUDA major.
+
+    Read from the filter script rather than restated, so this asserts the two agree.
+    """
+    declared = _filter_matrix_declarations()
+    major = declared["EXECUTORCH_CUDA_MAJOR"]
+    return {
+        cuda
+        for cuda in declared["x86_cuda_versions"]  # type: ignore[union-attr]
+        if re.fullmatch(rf"cu{major}\d+", cuda)
+    }
+
+
 _RUNTIME_SETUP_PY = _REPO_ROOT / "py/torch-tensorrt-executorch-runtime/setup.py"
 _RUNTIME_INIT_PY = (
     _REPO_ROOT
@@ -486,8 +521,8 @@ def test_the_delegate_follows_the_main_wheels_cuda_versions():
         by_arch.setdefault(row["os"], set()).add(row["desired_cuda"])
 
     assert by_arch == {
-        "linux": {"cu130", "cu132"},
-        "linux-aarch64": {"cu130", "cu132"},
+        "linux": _executorch_cuda_rows(),
+        "linux-aarch64": _executorch_cuda_rows(),
     }
 
 
@@ -558,20 +593,19 @@ def test_runtime_workflows_filter_cuda_12_without_changing_main_releases(
             row["desired_cuda"] for row in json.loads(outputs["matrix"])["include"]
         }
         assert ordinary == (
-            {"cu130", "cu132"}
+            _executorch_cuda_rows()
             if arch == "cuda-aarch64"
-            else {"cu126", "cu130", "cu132"}
+            else _executorch_cuda_rows() | {"cu126"}
         )
         return
     selected = outputs["matrix"]
-    assert {row["desired_cuda"] for row in json.loads(selected)["include"]} == {
-        "cu130",
-        "cu132",
-    }
+    assert {
+        row["desired_cuda"] for row in json.loads(selected)["include"]
+    } == _executorch_cuda_rows()
 
 
 @pytest.mark.parametrize("enabled", [True, False])
-@pytest.mark.parametrize("cuda", ["cu126", "cu128", "cu130", "cu132", "cu134"])
+@pytest.mark.parametrize("cuda", ["cu126", "cu128", "cu130", "cu132", "cu134", "cu136"])
 @pytest.mark.unit
 def test_shared_companion_build_is_gated_per_cuda_row(enabled, cuda):
     step = next(
@@ -583,9 +617,14 @@ def test_shared_companion_build_is_gated_per_cuda_row(enabled, cuda):
     expression = expression.replace(
         "inputs.build-executorch-runtime", repr(enabled)
     ).replace("matrix.desired_cuda", repr(cuda))
+    # The workflow uses GitHub's startsWith; give the eval a Python equivalent.
+    expression = re.sub(
+        r"startsWith\(([^,]+), ([^)]+)\)", r"\1.startswith(\2)", expression
+    )
     expression = expression.replace("&&", "and").replace("||", "or")
+    major = _executorch_cuda_major()
     assert eval(expression, {"__builtins__": {}}) is (
-        enabled and cuda in {"cu130", "cu132"}
+        enabled and bool(re.fullmatch(rf"cu{major}\d+", cuda))
     )
 
 
