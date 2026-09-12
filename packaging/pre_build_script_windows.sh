@@ -18,6 +18,8 @@ if [[ ${TENSORRT_VERSION} != "" ]]; then
 fi
 
 TORCH=$(grep "^torch>" py/requirements.txt)
+# Cross-builds may use an older CUDA channel for the runnable host PyTorch
+# while CUDA_HOME points at the newer ARM64 target toolkit.
 TORCH_INDEX_CU_VERSION=${TORCH_INDEX_CU_VERSION:-${CU_VERSION}}
 INDEX_URL=https://download.pytorch.org/whl/${CHANNEL}/${TORCH_INDEX_CU_VERSION}
 
@@ -44,14 +46,14 @@ cp -r fmt-12.0.0/include/fmt/ $TORCH_INSTALL_PATH/include/
 ls -lart $TORCH_INSTALL_PATH/include/fmt/
 
 # TensorRT archives have different CUDA compatibility ceilings. CI provides
-# CU_VERSION in the PyTorch wheel format (for example, cu132).
+# CU_VERSION in the PyTorch wheel format (for example, cu134).
 case "${CU_VERSION}" in
     cu12*)
         export TENSORRT_CUDA_VERSION_UPPER_BOUND="12.9"
         export TENSORRT_RTX_CUDA_VERSION_UPPER_BOUND="12.9"
         ;;
     cu13*)
-        export TENSORRT_CUDA_VERSION_UPPER_BOUND="13.3"
+        export TENSORRT_CUDA_VERSION_UPPER_BOUND="13.4"
         export TENSORRT_RTX_CUDA_VERSION_UPPER_BOUND="13.4"
         ;;
     *)

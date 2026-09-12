@@ -31,13 +31,10 @@ on:
         default: both
 
 concurrency:
-  # Only NON-CI label events (component:*, cla signed, …) get their own per-label
-  # group, so auto-label churn never cancels the running pipeline. CI-control labels
-  # (ci:full / ci:nightly / backend:*) and real pushes share the PR group so they
-  # SUPERSEDE cleanly — exactly ONE pipeline per commit. Coexisting runs would
-  # otherwise collide inside build_linux.yml's own concurrency and cancel a
-  # half-built wheel (that is what cancelled the SBSA aarch64 build).
-  group: "${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}${{ (github.event.action == 'labeled' || github.event.action == 'unlabeled') && !contains(fromJSON('[\"ci: full\", \"ci: nightly\", \"backend: TensorRT\", \"backend: TensorRT-RTX\"]'), github.event.label.name) && format('-label-{0}', github.event.label.name) || '' }}"
+  # Non-CI labels and non-approved reviews get isolated groups, so automation and
+  # review comments cannot cancel the active pipeline. CI-control labels, approved
+  # reviews, and real pushes share the PR group and supersede it cleanly.
+  group: "${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}${{ github.event_name == 'pull_request_review' && github.event.review.state != 'approved' && format('-review-{0}', github.event.review.id) || '' }}${{ (github.event.action == 'labeled' || github.event.action == 'unlabeled') && !contains(fromJSON('[\"ci: full\", \"ci: nightly\", \"backend: TensorRT\", \"backend: TensorRT-RTX\"]'), github.event.label.name) && format('-label-{0}', github.event.label.name) || '' }}"
   cancel-in-progress: true
 
 permissions:

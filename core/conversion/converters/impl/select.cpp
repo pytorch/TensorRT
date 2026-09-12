@@ -146,10 +146,6 @@ auto select_registrations TORCHTRT_UNUSED =
                LOG_DEBUG("Gather tensor shape: " << out->getDimensions());
 
                if (out->getDimensions().nbDims != 1) {
-                 // IShuffleLayer removes redundant dimensions
-                 auto shuffle_layer = ctx->net->addShuffle(*out);
-                 TORCHTRT_CHECK(shuffle_layer, "Unable to create shuffle layer from node: " << *n);
-
                  auto num_zero_dimensions =
                      util::validateInputDimsForShuffle(out->getDimensions(), ctx->input_is_dynamic);
                  TORCHTRT_CHECK(
@@ -157,17 +153,26 @@ auto select_registrations TORCHTRT_UNUSED =
                      "Detected multiple zero dimensions and dynamic shape in aten::select, "
                          << "which is not currently supported in TensorRT");
 
-                 // If the input is not dynamic, and the tensor is empty (has some dimension 0)
-                 // Then 0 is no longer a placeholder for inherited dimensions
-                 if (!ctx->input_is_dynamic && (num_zero_dimensions > 0)) {
-                   LOG_DEBUG("Setting zero as a true dimension (not placeholder) in aten::select");
-                   shuffle_layer->setZeroIsPlaceholder(false);
-                 }
+                 auto squeezed_dims = util::squeezeDims(
+                     out->getDimensions(), dim, false, ctx->input_is_dynamic && (num_zero_dimensions > 0));
 
-                 shuffle_layer->setReshapeDimensions(util::squeezeDims(
-                     out->getDimensions(), dim, false, ctx->input_is_dynamic && (num_zero_dimensions > 0)));
-                 shuffle_layer->setName(util::node_info(n).c_str());
-                 out = shuffle_layer->getOutput(0);
+                 if (!ctx->input_is_dynamic && num_zero_dimensions > 0) {
+                   // A statically-empty tensor (a true 0-size dimension) has no data
+                   // to move, but building an IShuffleLayer to squeeze it trips a
+                   // TensorRT-internal squeezeDims assertion at build time on some
+                   // platforms (e.g. DGX Spark). Emit an empty constant of the target
+                   // shape directly instead, since it has zero elements either way.
+                   auto scalar_type = util::TRTDataTypeToScalarType(in->getType());
+                   auto empty_out = at::empty(util::toVec(squeezed_dims), at::TensorOptions().dtype(scalar_type));
+                   out = tensor_to_const(ctx, empty_out);
+                 } else {
+                   // IShuffleLayer removes redundant dimensions
+                   auto shuffle_layer = ctx->net->addShuffle(*out);
+                   TORCHTRT_CHECK(shuffle_layer, "Unable to create shuffle layer from node: " << *n);
+                   shuffle_layer->setReshapeDimensions(squeezed_dims);
+                   shuffle_layer->setName(util::node_info(n).c_str());
+                   out = shuffle_layer->getOutput(0);
+                 }
                }
 
                out = ctx->AssociateValueAndTensor(n->outputs()[0], out);

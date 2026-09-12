@@ -184,8 +184,6 @@ jobs:
       - uses: ./test-infra/.github/actions/setup-windows
         with:
           cuda-version: ${{ env.CU_VERSION }}
-      # TODO: When CUDA 13.4 is officially released, replace the prerelease installer URL below
-      # with the official CUDA Toolkit distribution URL.
       - name: Install CUDA 13.4 toolkit with ARM64 target libraries
         if: inputs.cross-compile
         shell: powershell
@@ -584,7 +582,6 @@ jobs:
           ARCH: ${{ inputs.cross-compile && 'arm64' || inputs.architecture }}
         run: |
           artifact_cuda_version="${CU_VERSION}"
-          # The cross-compiled ARM64 sysroot is CUDA 13.4; retain the host CUDA label otherwise.
           if [[ "${{ inputs.cross-compile }}" == "true" ]]; then
             artifact_cuda_version="cu134"
             artifact_name="${ARTIFACT_NAME/_${CU_VERSION}_/_${artifact_cuda_version}_}"

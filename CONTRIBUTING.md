@@ -62,7 +62,7 @@ We use the PyTorch Slack for communication about core development, integration w
 
 ### Controlling CI scope via PR labels
 
-**PR default:** build + L0 + L1 on a single representative config (Python 3.12 × CUDA 13.0). L2 (slow model-level suites) is opt-in on PRs. The full matrix ({Python 3.10–3.13} × {CUDA 13.0, 13.2}) runs on main / nightly / release branches.
+**PR default:** build + L0 + L1 on a single representative config (Python 3.12 × CUDA 13.4). L2 (slow model-level suites) is opt-in on PRs. The full matrix ({Python 3.10–3.13} × {CUDA 13.0, 13.2, 13.4}) runs on main / nightly / release branches.
 
 Apply labels in the PR's right sidebar and re-push (or close/reopen) to re-trigger:
 
