@@ -1785,6 +1785,41 @@ def test_the_range_install_runs_in_a_fresh_venv():
 
 
 @pytest.mark.unit
+def test_the_bump_pull_request_selects_the_lane_that_runs_the_delegate_suite():
+    """The daily bump must exercise ExecuTorch, not just the pin guards.
+
+    The end-to-end suite is nightly-lane only, and an unlabelled pull request resolves to the
+    fast lane, so without the label the bump would report green having never loaded the
+    delegate. The lane names are read from the decision workflow rather than assumed.
+    """
+    updater = yaml.safe_load(
+        (REPO_ROOT / ".github/workflows/executorch-pin-update.yml").read_text(
+            encoding="utf-8"
+        )
+    )
+    step = next(
+        s
+        for job in updater["jobs"].values()
+        for s in job.get("steps", [])
+        if "create-pull-request" in str(s.get("uses", ""))
+    )
+    labels = {
+        line.strip() for line in step["with"]["labels"].splitlines() if line.strip()
+    }
+
+    decide = (REPO_ROOT / ".github/workflows/_decide.yml").read_text(encoding="utf-8")
+    nightly_label = re.search(r"HAS_NIGHTLY_LABEL.*?'([^']+)'", decide).group(1)
+    assert (
+        nightly_label in labels
+    ), f"the bump pull request must carry {nightly_label!r}, or the delegate suite is skipped"
+
+    from tests.ci.suites import by_name
+
+    suite = by_name("executorch")
+    assert "nightly" in suite.lanes, suite.lanes
+
+
+@pytest.mark.unit
 def test_the_pin_update_workflow_does_not_interpolate_untrusted_values_into_shell():
     # github.ref and inputs.track are attacker-influenceable text. Interpolated with ${{ }} into a
     # run: block they are shell source, so a crafted ref runs code in a job that holds a
