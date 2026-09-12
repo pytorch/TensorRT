@@ -170,7 +170,7 @@ def test_upper_bound(version, expected):
     assert updater._upper_bound(version) == expected
 
 
-@pytest.mark.parametrize("channel", ["cu126", "cu128", "cu134"])
+@pytest.mark.parametrize("channel", ["cu126", "cu128", "cu14", "cpu", "cu13"])
 @pytest.mark.unit
 def test_main_rejects_unsupported_channels(monkeypatch, channel):
     monkeypatch.setattr(
@@ -181,7 +181,7 @@ def test_main_rejects_unsupported_channels(monkeypatch, channel):
     assert error.value.code == 2
 
 
-@pytest.mark.parametrize("channel", ["cu130", "cu132"])
+@pytest.mark.parametrize("channel", ["cu130", "cu132", "cu134"])
 @pytest.mark.unit
 def test_main_uses_selected_channel(monkeypatch, channel):
     calls = []
