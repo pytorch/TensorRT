@@ -162,6 +162,7 @@ def _setup_commands(step: str) -> list[tuple[list[str], Path]]:
                     "pip",
                     "install",
                     "pyyaml",
+                    "wheel>=0.40",
                     *index_args,
                     _executorch_requirement(),
                 ],
