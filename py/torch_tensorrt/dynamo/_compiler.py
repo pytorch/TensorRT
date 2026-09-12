@@ -1390,7 +1390,20 @@ def compile_module(
             cpu_memory_budget=settings.cpu_memory_budget,
         )
 
-    dryrun_tracker.unsupported_ops = supported_ops.unsupported_operators
+    dryrun_tracker.unsupported_ops = supported_ops.fallback_operators
+
+    if supported_ops.fallback_operators:
+        named = "; ".join(
+            f"{node_name} + Operator Count: {count} "
+            f"(Reasons: {', '.join(sorted(supported_ops.fallback_reasons[node_name]))})"
+            for node_name, count in sorted(supported_ops.fallback_operators.items())
+        )
+        logger.info(
+            "%d operator(s) will run in PyTorch: %s. "
+            "Compile with dryrun=True for the full report.",
+            len(supported_ops.fallback_operators),
+            named,
+        )
 
     # The global partitioner leaves non-TRT nodes as-is
     if not settings.use_fast_partitioner:
