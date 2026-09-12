@@ -4,13 +4,17 @@ from typing import Optional, Sequence, Union
 
 import numpy as np
 import tensorrt as trt
+import torch
 from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Target
+from torch_tensorrt import _enums
+from torch_tensorrt._utils import is_tensorrt_version_supported
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     calculate_strides,
+    cast_trt_tensor,
     flatten_dims,
     get_positive_dim,
     get_trt_tensor,
@@ -379,7 +383,7 @@ def expand(
     return layer.get_output(0)
 
 
-def cumsum(
+def _cumsum_with_loop(
     ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
@@ -387,6 +391,9 @@ def cumsum(
     input: TRTTensor,
     dim: int,
 ) -> TRTTensor:
+    # Kept for TensorRT without the cumulative layer. It seeds its accumulator with a
+    # float32 zero, so an integer total loses exactness above 2**24; the layer path does
+    # not have that problem.
     input_shape = input.shape
     dim = get_positive_dim(dim, len(input_shape))
     if input_shape[dim] < 0:
@@ -445,6 +452,66 @@ def cumsum(
     set_layer_name(loop_output, target, f"{name}_loop_output", source_ir)
     loop_output.set_input(1, trip_limit)
     return loop_output.get_output(0)
+
+
+def cumsum(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input: TRTTensor,
+    dim: int,
+    dtype: Optional[torch.dtype] = None,
+) -> TRTTensor:
+    if not is_tensorrt_version_supported("10.8.0"):
+        # No cumulative layer before this version, so build it out of a loop.
+        return _cumsum_with_loop(ctx, target, source_ir, name, input, dim)
+
+    # torch.cumsum accumulates a bool or integer input in int64 and returns int64, so
+    # accumulating in the input type would turn every non-zero running total for a bool
+    # input back into True. An explicit dtype argument overrides that choice.
+    input_dtype = _enums.dtype._from(input.dtype).to(torch.dtype)
+    if dtype is not None:
+        # The layer has no float64, so a caller who asked for it has already accepted
+        # float32 by setting truncate_double; the validator refuses it otherwise.
+        output_dtype = torch.float32 if dtype is torch.float64 else dtype
+    elif input_dtype.is_floating_point:
+        output_dtype = input_dtype
+    else:
+        output_dtype = torch.int64
+
+    # A running sum loses precision fast in a narrow float: every partial total is rounded
+    # to the operand type, so a long float16 or bfloat16 sum drifts far from eager, which
+    # accumulates in float32. Accumulate in float32 and cast the result back, the way the
+    # old loop did by seeding a float32 accumulator.
+    accumulator_dtype = output_dtype
+    if output_dtype in (torch.float16, torch.bfloat16):
+        accumulator_dtype = torch.float32
+
+    casted_input = cast_trt_tensor(
+        ctx, input, accumulator_dtype, f"{name}_casted", target, source_ir
+    )
+
+    # addCumulative requires a rank 0 axis; a shape (1,) axis fails its parameter check
+    # and returns None.
+    axis = get_trt_tensor(
+        ctx,
+        get_positive_dim(dim, len(input.shape)),
+        f"{name}_axis",
+        dtype=trt.int32,
+        min_rank=0,
+    )
+    layer = ctx.net.add_cumulative(
+        casted_input, axis, trt.CumulativeOperation.SUM, exclusive=False, reverse=False
+    )
+    assert layer, f"Failed to add a cumulative layer for {name}"
+    set_layer_name(layer, target, name, source_ir)
+    result = layer.get_output(0)
+    if accumulator_dtype is not output_dtype:
+        result = cast_trt_tensor(
+            ctx, result, output_dtype, f"{name}_output_cast", target, source_ir
+        )
+    return result
 
 
 def tile(

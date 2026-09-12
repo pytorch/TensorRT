@@ -1489,12 +1489,40 @@ def aten_ops_slice(
     )
 
 
+# The cumulative layer accepts these and nothing else. A dtype outside the set would abort
+# the whole compile from inside the cast, with a message naming neither cumsum nor the dtype.
+_CUMSUM_ACCUMULATOR_DTYPES = {
+    torch.float32,
+    torch.float16,
+    torch.bfloat16,
+    torch.int32,
+    torch.int64,
+}
+
+
 def cumsum_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
-    # TensorRT-RTX before 1.7 cannot build a refittable cumsum when its loop
-    # trip count is a constant. Standard TensorRT and TensorRT-RTX 1.7+ do not
-    # have this limitation.
+    requested_dtype = node.kwargs.get("dtype", None)
+    if (
+        requested_dtype is not None
+        and requested_dtype not in _CUMSUM_ACCUMULATOR_DTYPES
+    ):
+        # float64 is the exception: truncate_double already means the caller accepts
+        # float32, and the converter maps it. Everything else has to fall back.
+        if not (
+            requested_dtype is torch.float64
+            and settings is not None
+            and settings.truncate_double
+        ):
+            _LOGGER.debug(
+                f"cumsum with dtype={requested_dtype} is not supported by the cumulative "
+                "layer, falling back to PyTorch"
+            )
+            return False
+
+    # TensorRT-RTX before 1.7 cannot build a refittable cumsum when its trip count is a
+    # constant. Standard TensorRT and TensorRT-RTX 1.7+ do not have this limitation.
     if (
         is_tensorrt_rtx_version_supported("1.7")
         or settings is None
@@ -1528,7 +1556,7 @@ def cumsum_validator(
     if isinstance(axis_size, int) and axis_size >= 0:
         _LOGGER.debug(
             f"cumsum node {node.name} has a static axis {dim} of size {axis_size}; "
-            "TensorRT-RTX < 1.7 cannot build its refittable constant loop trip count."
+            "TensorRT-RTX < 1.7 cannot build a refittable cumsum with a constant extent."
         )
         return False
 
@@ -1563,6 +1591,7 @@ def aten_ops_cumsum(
         name,
         args[0],
         args[1],
+        kwargs.get("dtype", None),
     )
 
 
