@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -x
+set -ex
 
 # Install dependencies
 python3 -m pip install pyyaml packaging
@@ -73,14 +73,14 @@ if [[ ! -d "${TORCH_INSTALL_PATH}/include/c10" ]]; then
 fi
 
 # TensorRT archives have different CUDA compatibility ceilings. CI provides
-# CU_VERSION in the PyTorch wheel format (for example, cu132).
+# CU_VERSION in the PyTorch wheel format (for example, cu134).
 case "${CU_VERSION}" in
     cu12*)
         export TENSORRT_CUDA_VERSION_UPPER_BOUND="12.9"
         export TENSORRT_RTX_CUDA_VERSION_UPPER_BOUND="12.9"
         ;;
     cu13*)
-        export TENSORRT_CUDA_VERSION_UPPER_BOUND="13.3"
+        export TENSORRT_CUDA_VERSION_UPPER_BOUND="13.4"
         export TENSORRT_RTX_CUDA_VERSION_UPPER_BOUND="13.4"
         ;;
     *)

@@ -11,9 +11,10 @@ on:
       - v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+
   workflow_dispatch:
 concurrency:
-  # Keep one active ARM64 run per PR/ref; CI-control labels supersede the prior run,
-  # while unrelated label churn remains isolated.
-  group: "${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}${{ (github.event.action == 'labeled' || github.event.action == 'unlabeled') && !contains(fromJSON('[\"ci: full\", \"ci: nightly\", \"backend: TensorRT\", \"backend: TensorRT-RTX\"]'), github.event.label.name) && format('-label-{0}', github.event.label.name) || '' }}"
+  # Non-CI labels and non-approved reviews get isolated groups, so automation and
+  # review comments cannot cancel the active pipeline. CI-control labels, approved
+  # reviews, and real pushes share the PR group and supersede it cleanly.
+  group: "${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}${{ github.event_name == 'pull_request_review' && github.event.review.state != 'approved' && format('-review-{0}', github.event.review.id) || '' }}${{ (github.event.action == 'labeled' || github.event.action == 'unlabeled') && !contains(fromJSON('[\"ci: full\", \"ci: nightly\", \"backend: TensorRT\", \"backend: TensorRT-RTX\"]'), github.event.label.name) && format('-label-{0}', github.event.label.name) || '' }}"
   cancel-in-progress: true
 
 
@@ -22,12 +23,21 @@ permissions:
   contents: read
 
 jobs:
+  decide:
+    if: >-
+      github.event.action != 'labeled' ||
+      contains(fromJSON('["ci: full", "ci: nightly", "backend: TensorRT", "backend: TensorRT-RTX"]'), github.event.label.name)
+    uses: ./.github/workflows/_decide.yml
 
   build:
+    needs: decide
+    if: needs.decide.result == 'success' && needs.decide.outputs.lane != 'skip'
     uses: ./.github/workflows/build_windows.yml
     with:
       repository: ${{ github.repository }}
       ref: ""
+      # PyTorch does not publish Windows cu134 wheels yet. Use a cu132 host
+      # environment while build_windows.yml stages the cu134 ARM64 target.
       build-matrix: >-
         {"include":[{"build_name":"windows-arm64-cross","python_version":"3.13","desired_cuda":"cu132","validation_runner":"windows.g5.4xlarge.nvidia.gpu"}]}
       architecture: x64
@@ -39,15 +49,21 @@ jobs:
       skip-binary-upload: false
 
   gate:
-    needs: [build]
+    needs: [decide, build]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Gate Windows ARM64 builds
         env:
+          DECIDE_RESULT: ${{ needs.decide.result }}
+          LANE: ${{ needs.decide.outputs.lane }}
           BUILD_RESULT: ${{ needs.build.result }}
         run: |
           set -euo pipefail
+          if [[ "${DECIDE_RESULT}" == "skipped" || "${LANE}" == "skip" ]]; then
+            echo "Windows ARM64 build skipped for this event."
+            exit 0
+          fi
           if [[ "${BUILD_RESULT}" != "success" ]]; then
             exit 1
           fi

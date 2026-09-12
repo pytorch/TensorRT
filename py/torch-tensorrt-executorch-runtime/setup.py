@@ -51,9 +51,9 @@ def get_tensorrt_requirement() -> str:
             "CUDA enabled PyTorch is required to build this wheel found None"
         )
     if cuda_version.startswith("12."):
-        return "tensorrt-cu12>=11.2.1,<11.3"
+        return "tensorrt-cu12>=11.3.0,<11.4"
     if cuda_version.startswith("13."):
-        return "tensorrt-cu13>=11.2.1,<11.3"
+        return "tensorrt-cu13>=11.3.0,<11.4"
     raise RuntimeError(f"Unsupported CUDA version: {cuda_version}")
 
 
