@@ -37,16 +37,20 @@ def _installed_consumer(tmp_path, tools, config, old_dtags, example=None):
     (config_dir / _CONFIG.name).write_text(config)
     libraries = ["executorch_backend_tensorrt", "unrelated"]
     if example is not None:
-        libraries.append("executorch_backend_cuda")
+        components = ("backend_cuda", "kernels_optimized")
+        libraries.extend(f"executorch_{name}" for name in components)
         et_config = prefix / "lib/cmake/executorch"
         et_config.mkdir()
         (et_config / "executorch-config.cmake").write_text(
             "add_library(executorch::runtime INTERFACE IMPORTED)\n"
-            "add_library(executorch::backend_cuda SHARED IMPORTED)\n"
-            "set_target_properties(executorch::backend_cuda PROPERTIES\n"
-            f'  IMPORTED_LOCATION "{prefix}/lib/libexecutorch_backend_cuda.so"\n'
-            '  INTERFACE_LINK_OPTIONS "LINKER:--push-state,--no-as-needed,'
-            f'{prefix}/lib/libexecutorch_backend_cuda.so,--pop-state")\n'
+            + "".join(
+                f"add_library(executorch::{name} SHARED IMPORTED)\n"
+                f"set_target_properties(executorch::{name} PROPERTIES\n"
+                f'  IMPORTED_LOCATION "{prefix}/lib/libexecutorch_{name}.so"\n'
+                '  INTERFACE_LINK_OPTIONS "LINKER:--push-state,--no-as-needed,'
+                f'{prefix}/lib/libexecutorch_{name}.so,--pop-state")\n'
+                for name in components
+            )
         )
     for name in libraries:
         source = tmp_path / f"{name}.cpp"
@@ -175,12 +179,12 @@ def _mixed_example(sample):
 
 
 @pytest.mark.parametrize("sample", ["readme", "config"])
-@pytest.mark.parametrize("remove_cuda", [False, True])
-def test_documented_mixed_consumer(tmp_path, linker_tools, sample, remove_cuda):
+@pytest.mark.parametrize("removed", [None, "backend_cuda", "kernels_optimized"])
+def test_documented_mixed_consumer(tmp_path, linker_tools, sample, removed):
     example = _mixed_example(sample)
-    if remove_cuda:
-        assert example.count("executorch::backend_cuda") == 1
-        example = example.replace("executorch::backend_cuda", "")
+    if removed:
+        assert example.count(f"executorch::{removed}") == 1
+        example = example.replace(f"executorch::{removed}", "")
     dynamic, output = _installed_consumer(
         tmp_path, linker_tools, _CONFIG.read_text(), False, example
     )
@@ -189,5 +193,6 @@ def test_documented_mixed_consumer(tmp_path, linker_tools, sample, remove_cuda):
     assert "libunrelated.so" not in needed
     assert "executorch_backend_tensorrt" in output.splitlines()
     assert "unrelated" not in output.splitlines()
-    assert ("libexecutorch_backend_cuda.so" in needed) is not remove_cuda
-    assert ("executorch_backend_cuda" in output.splitlines()) is not remove_cuda
+    for name in ("backend_cuda", "kernels_optimized"):
+        assert (f"libexecutorch_{name}.so" in needed) is (removed != name)
+        assert (f"executorch_{name}" in output.splitlines()) is (removed != name)

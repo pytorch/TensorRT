@@ -18,11 +18,16 @@ Python users just import the package. A C++ app links it the same way it links
 one of ExecuTorch's own backends:
 
 ```cmake
-find_package(executorch REQUIRED COMPONENTS backend_cuda)
+find_package(executorch REQUIRED COMPONENTS backend_cuda kernels_optimized)
 find_package(torchtrt_executorch REQUIRED)
 target_link_libraries(my_app PRIVATE
-  executorch::runtime executorch::backend_cuda torchtrt::executorch_backend)
+  executorch::runtime executorch::backend_cuda
+  executorch::kernels_optimized torchtrt::executorch_backend)
 ```
+
+The optimized-kernel library supplies the `et_copy` host/device copy operators.
+For device-resident exports with `alloc_graph_output=False`, C++ Module callers
+must provide a CUDA output tensor with `Module::set_output` before execution.
 
 Point CMake at both wheels. The example above calls `find_package(executorch)`
 as well, and that package lives in its own distribution. ExecuTorch is a
