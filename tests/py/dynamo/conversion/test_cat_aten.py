@@ -368,6 +368,69 @@ class TestCatConverter(DispatchTestCase):
             inputs,
         )
 
+    @parameterized.expand(
+        [
+            ("leading_negative_dim", 0, -2, torch.float32),
+            ("middle_negative_dim", 1, -2, torch.float32),
+            ("trailing_positive_dim", 2, 2, torch.float32),
+            # The empty operand is float32 while the rest are not, so torch.cat
+            # promotes the result. Dropping the operand must not drop the promotion.
+            ("promotes_from_float16", 0, -2, torch.float16),
+            ("promotes_from_int32", 0, -2, torch.int32),
+        ]
+    )
+    def test_cat_rank1_empty_operand(self, _, position, dim, dtype):
+        """A rank-1 empty operand should not push the concatenation out of TensorRT.
+
+        transformers emits this on the first write to every layer of a DynamicCache, so
+        refusing it splits the graph once per layer.
+
+        The arithmetic after the concatenation is deliberate. With the concatenation as
+        the graph output the engine boundary casts the result back, which hides a wrong
+        internal dtype; the multiply makes it visible.
+        """
+
+        class CatRank1Empty(nn.Module):
+            def forward(self, x, y):
+                empty = torch.tensor([], dtype=torch.float32, device=x.device)
+                operands = [x, y]
+                operands.insert(position, empty)
+                return torch.ops.aten.cat.default(tuple(operands), dim) * 1000
+
+        inputs = [
+            torch.full((1, 2, 8, 4), 300, dtype=dtype, device="cuda"),
+            torch.full((1, 2, 8, 4), 300, dtype=dtype, device="cuda"),
+        ]
+        self.run_test(
+            CatRank1Empty(),
+            inputs,
+            use_dynamo_tracer=True,
+            enable_passes=True,
+        )
+
+    def test_cat_rank1_empty_float64_with_truncation(self):
+        """A float32 tensor concatenated with a float64 empty constant. torch.cat promotes
+        to float64, and dropping the empty operand carries that promoted dtype through, but
+        TensorRT has no float64. The converter test harness sets truncate_double, so the
+        caller accepts float32 and this has to build rather than raise. All operands are
+        rank 1, so the validator always accepted this shape and TensorRT compiled it before
+        the empty-operand change."""
+
+        class CatFloat64Empty(nn.Module):
+            def forward(self, x):
+                empty = torch.tensor([], dtype=torch.float64, device=x.device)
+                # Cast to float32 so the reference is float32 too: with truncate_double the
+                # engine returns float32, and the test compares dtype as well as values.
+                return torch.ops.aten.cat.default((empty, x), 0).to(torch.float32)
+
+        inputs = [torch.tensor([0.0, 1.0, 2.0], dtype=torch.float32, device="cuda")]
+        self.run_test(
+            CatFloat64Empty(),
+            inputs,
+            use_dynamo_tracer=True,
+            enable_passes=True,
+        )
+
 
 if __name__ == "__main__":
     run_tests()
