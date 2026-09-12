@@ -113,6 +113,13 @@ jobs:
           delete-branch: true
           commit-message: "Update ExecuTorch pin to ${{ steps.update.outputs.version }}"
           title: "Update ExecuTorch pin to ${{ steps.update.outputs.version }}"
+          # The end-to-end ExecuTorch suite only runs on the nightly lane, and an unlabelled
+          # pull request gets the fast one, so without these the bump would report green
+          # without the delegate having been exercised at all. Standard is named explicitly
+          # because that suite has no RTX variant to pay for.
+          labels: |
+            ci: nightly
+            backend: TensorRT
           # The delegate is built from the tree the pinned wheel was built from, so both
           # pins move together to the version and the commit that wheel records for itself.
           # The pin guards and the executorch end-to-end lane gate this pull request.
