@@ -7,11 +7,13 @@
 # app can link it out of the installed wheel instead of building this repo from
 # source:
 #
-#   find_package(executorch REQUIRED COMPONENTS backend_cuda)
+#   find_package(executorch REQUIRED COMPONENTS backend_cuda kernels_optimized)
 #   find_package(torchtrt_executorch REQUIRED)
 #   target_link_libraries(my_app PRIVATE
-#     executorch::runtime executorch::backend_cuda torchtrt::executorch_backend)
+#     executorch::runtime executorch::backend_cuda
+#     executorch::kernels_optimized torchtrt::executorch_backend)
 #
+# kernels_optimized supplies the et_copy host/device copy operators.
 # There is nothing to include. The delegate exposes no public header: it
 # registers itself with ExecuTorch's backend registry from a static initializer
 # inside the shared library, and everything a caller does afterwards is
