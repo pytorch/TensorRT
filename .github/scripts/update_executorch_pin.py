@@ -33,6 +33,7 @@ _PIN_SITES = (
     "docker/MODULE.bazel.docker",
     "docker/MODULE.bazel.ngc",
     "justfile",
+    "pyproject.toml",
     "py/torch-tensorrt-executorch-runtime/README.md",
     "py/torch-tensorrt-executorch-runtime/pyproject.toml",
     "toolchains/ci_workspaces/MODULE.bazel.tmpl",
