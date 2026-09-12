@@ -11,6 +11,10 @@ on:
     types: [submitted]
   push:
     branches: [main, nightly, 'release/**']
+    # Keep CI in lockstep with the release artifact workflows. A tag push is
+    # resolved by _decide.yml as the full lane.
+    tags:
+      - v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+
   workflow_dispatch:
     inputs:
       lane:
@@ -25,13 +29,10 @@ on:
         default: both
 
 concurrency:
-  # Only NON-CI label events (component:*, cla signed, …) get their own per-label
-  # group, so auto-label churn never cancels the running pipeline. CI-control labels
-  # (ci:full / ci:nightly / backend:*) and real pushes share the PR group so they
-  # SUPERSEDE cleanly — exactly ONE pipeline per commit. Coexisting runs would
-  # otherwise collide inside build_linux.yml's own concurrency and cancel a
-  # half-built wheel (that is what cancelled the SBSA aarch64 build).
-  group: "${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}${{ (github.event.action == 'labeled' || github.event.action == 'unlabeled') && !contains(fromJSON('[\"ci: full\", \"ci: nightly\", \"backend: TensorRT\", \"backend: TensorRT-RTX\"]'), github.event.label.name) && format('-label-{0}', github.event.label.name) || '' }}"
+  # Non-CI labels and non-approved reviews get isolated groups, so automation and
+  # review comments cannot cancel the active pipeline. CI-control labels, approved
+  # reviews, and real pushes share the PR group and supersede it cleanly.
+  group: "${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}${{ github.event_name == 'pull_request_review' && github.event.review.state != 'approved' && format('-review-{0}', github.event.review.id) || '' }}${{ (github.event.action == 'labeled' || github.event.action == 'unlabeled') && !contains(fromJSON('[\"ci: full\", \"ci: nightly\", \"backend: TensorRT\", \"backend: TensorRT-RTX\"]'), github.event.label.name) && format('-label-{0}', github.event.label.name) || '' }}"
   cancel-in-progress: true
 
 permissions:
@@ -109,9 +110,10 @@ jobs:
       name-prefix: "Python-only RTX "
       raw-matrix: ${{ needs.generate-matrix.outputs.matrix }}
 
-  # ExecuTorch runtime is supported by the standard TensorRT wheel only. Wait
-  # for the standard channel to upload its wheel artifact, but still build the
-  # runtime if a standard test fails.
+  # ExecuTorch runtime is bundled with the standard wheel artifact. The build
+  # uploads that artifact before the standard suite completes, so still run
+  # this independent coverage if a standard test fails. A cancelled standard
+  # channel may not have uploaded anything, so skip that case.
   #
   # A standard channel that was CANCELLED is different from one that failed a test:
   # it uploaded no wheel, so this job has nothing to download and dies with
@@ -120,32 +122,15 @@ jobs:
   # main shows ten red ExecuTorch rows whenever two commits land close together. The
   # standard channel has its own concurrency group, so it can be cancelled on its own
   # while this run continues.
-  executorch-runtime-build:
-    needs: [decide, generate-matrix, standard]
-    if: >-
-      !cancelled() &&
-      needs.decide.result == 'success' &&
-      needs.generate-matrix.result == 'success' &&
-      needs.standard.result != 'cancelled' &&
-      needs.decide.outputs.lane != 'skip' &&
-      needs.decide.outputs.backend != 'rtx'
-    uses: ./.github/workflows/executorch-build-linux.yml
-    with:
-      repository: pytorch/tensorrt
-      ref: ""
-      test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
-      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
-
   executorch-runtime-test:
-    needs: [decide, generate-matrix, executorch-runtime-build]
+    needs: [decide, generate-matrix, standard]
     if: >-
       always() &&
       needs.decide.result == 'success' &&
       needs.generate-matrix.result == 'success' &&
       needs.decide.outputs.lane != 'skip' &&
       needs.decide.outputs.backend != 'rtx' &&
-      needs.executorch-runtime-build.result == 'success'
+      needs.standard.result != 'cancelled'
     uses: ./.github/workflows/executorch-test-linux.yml
     with:
       repository: pytorch/tensorrt
@@ -156,7 +141,7 @@ jobs:
 
   # Required check. Fails ONLY on a genuine failure; skipped/cancelled don't block.
   gate:
-    needs: [decide, standard, rtx, python-only, python-only-rtx, executorch-runtime-build, executorch-runtime-test]
+    needs: [decide, standard, rtx, python-only, python-only-rtx, executorch-runtime-test]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -171,7 +156,7 @@ jobs:
 
   # Consolidated, agent-friendly report over this run's suites (informational).
   report:
-    needs: [standard, rtx, python-only, python-only-rtx, executorch-runtime-build, executorch-runtime-test]
+    needs: [standard, rtx, python-only, python-only-rtx, executorch-runtime-test]
     if: always()
     runs-on: ubuntu-latest
     steps:

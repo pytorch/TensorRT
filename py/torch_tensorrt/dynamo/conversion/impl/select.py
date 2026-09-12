@@ -772,6 +772,13 @@ def index_put_converter(
     else:
         N = 1
 
+    if isinstance(N, int) and N == 0:
+        # Empty index -> no-op. Building the scatter path anyway trips a
+        # TensorRT squeezeDims assertion on DGX Spark (GB10, SM 12.1).
+        identity_layer = ctx.net.add_identity(input_tensor)
+        set_layer_name(identity_layer, target, f"{name}_empty_index_noop", source_ir)
+        return identity_layer.get_output(0)
+
     # Compute shapes and volume for the free dimensions.
     # F_shapes: static ints (-1 for dynamic dims), used where static ints are required.
     # F_shape_values: per-free-dim size as int (static) or ITensor (dynamic).
