@@ -9,6 +9,7 @@ test_suite(
         ":test_executorch_binding_names",
         ":test_executorch_blob_header",
         ":test_executorch_weight_streaming_budget",
+        ":test_optimization_profile_selection",
     ],
 )
 
@@ -44,6 +45,23 @@ cc_test(
     srcs = ["test_executorch_weight_streaming_budget.cpp"],
     deps = [
         "//cpp:tensorrt_executorch_weight_streaming_budget",
+        "@googletest//:gtest_main",
+    ],
+)
+
+# Asserts against the profile-selection policy only, so unlike the runtime tests
+# it needs neither a GPU nor a TensorRT engine. It does need TensorRT headers,
+# hence the same platform gate the backend carries.
+cc_test(
+    name = "test_optimization_profile_selection",
+    srcs = ["test_optimization_profile_selection.cpp"],
+    target_compatible_with = select({
+        "//cpp:linux_x86_64": [],
+        "//cpp:sbsa": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "//cpp:tensorrt_executorch_optimization_profile_selection",
         "@googletest//:gtest_main",
     ],
 )
