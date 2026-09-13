@@ -64,12 +64,10 @@ jobs:
           TRACK: ${{ inputs.track }}
         run: |
           set -euo pipefail
-          # A manual run pins whatever it asked for, except that a release branch may only be
-          # pinned to a stable line: nightly off main would drift a cut release onto a nightly,
-          # which the schedule already refuses to do. The daily schedule pins the nightly line on
-          # main and does nothing on a release branch.
-          # The trigger values arrive through env, not template interpolation, so a crafted ref or
-          # input is shell data rather than shell source.
+          # A release branch may only take a stable line: a nightly would drift a cut release onto
+          # an unreleased ExecuTorch. The schedule takes nightly on main and stable on a release
+          # branch that has not shipped, so an open release follows ExecuTorch's own releases.
+          # Trigger values arrive through env, so a crafted ref is shell data, not shell source.
           if [ "$EVENT" = "workflow_dispatch" ]; then
             if [ "$TRACK" = "nightly" ] && [ "$REF" != "refs/heads/main" ]; then
               echo "refusing to pin $REF to a nightly; re-run with track=stable" >&2
@@ -78,8 +76,20 @@ jobs:
             echo "track=$TRACK" >> "$GITHUB_OUTPUT"
           elif [ "$REF" = "refs/heads/main" ]; then
             echo "track=nightly" >> "$GITHUB_OUTPUT"
+          elif [ "${REF#refs/heads/}" != "$REF" ] &&
+               printf '%s' "${REF#refs/heads/}" | grep -qE '^release/[0-9]+\.[0-9]+$'; then
+            # Only while the release is still open. Once it is tagged the pin is history.
+            version="${REF#refs/heads/release/}"
+            if [ "${RELEASE_TAGGED:-}" = "true" ] ||
+               { [ -z "${RELEASE_TAGGED:-}" ] &&
+                 git ls-remote --exit-code --tags origin "v${version}.*" >/dev/null 2>&1; }; then
+              echo "release $version already has a tag; its pin stays as shipped"
+              echo "track=" >> "$GITHUB_OUTPUT"
+            else
+              echo "track=stable" >> "$GITHUB_OUTPUT"
+            fi
           else
-            echo "no scheduled pin update on $REF; release pins do not drift"
+            echo "no scheduled pin update on $REF"
             echo "track=" >> "$GITHUB_OUTPUT"
           fi
 
