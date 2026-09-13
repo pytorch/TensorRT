@@ -26,6 +26,7 @@ import torch
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES, needs_cross_compile
 from torch_tensorrt._Input import Input
+from torch_tensorrt._utils import executorch_install_command
 from torch_tensorrt.dynamo.runtime._CudaGraphsTorchTensorRTModule import (
     CudaGraphsTorchTensorRTModule,
 )
@@ -87,13 +88,6 @@ __all__ = [
 def _has_executorch_exir() -> bool:
     try:
         return importlib.util.find_spec("executorch.exir") is not None
-    except ModuleNotFoundError:
-        return False
-
-
-def _has_executorch_runtime() -> bool:
-    try:
-        return importlib.util.find_spec("torch_tensorrt_executorch_runtime") is not None
     except ModuleNotFoundError:
         return False
 
@@ -608,14 +602,11 @@ def load(
     """
     Load a TorchScript, ExportedProgram, or ExecuTorch program.
 
-    By default, detects TorchScript and ExportedProgram files. Set
-    ``format="executorch"`` explicitly for an ExecuTorch ``.pte`` file.
-
     Arguments:
         file_path (str): Path to file on the disk
         extra_files (dict[str, Any]): Extra files to load with the model
-        format (Optional[str]): Set to ``"executorch"`` to load a ``.pte`` file
-            using the separately installed ExecuTorch runtime package.
+        format (Optional[str]): None detects TorchScript and ExportedProgram files.
+            The deprecated ``"executorch"`` option loads a ``.pte`` program.
 
     Example:
     # Load with extra files.
@@ -624,17 +615,36 @@ def load(
         print(extra_files["foo.txt"])
 
     Raises:
-        ImportError: If ExecuTorch format is requested without the runtime package
-        ValueError: If the format is unsupported or the file is not a TorchScript or ExportedProgram file
+        ImportError: If ExecuTorch format is requested without its runtime dependencies
+        ValueError: If the format is unsupported or neither standard loader accepts the file
+
+    Note:
+        ``format="executorch"`` preserves the legacy ``method_names`` property,
+        ``run(inputs, method="forward")``, and ``forward(*inputs)`` interface.
+        CUDA inputs are copied to CPU. As before, ``extra_files`` and additional
+        kwargs are ignored for this format; external ``.ptd`` files are not supported.
+        This compatibility path will remain for at least six months after the
+        deprecation first ships. New code should import the TensorRT delegate and
+        use ExecuTorch's Module API directly::
+
+            import torch_tensorrt_executorch_runtime  # noqa: F401
+            from executorch.extension.pybindings.portable_lib import _load_for_executorch
+
+            program = _load_for_executorch("model.pte")
+            outputs = program.run_method("forward", (tensor,))
     """
+
     if format == "executorch":
-        if not _has_executorch_runtime():
-            raise ImportError(
-                "Loading an ExecuTorch program requires the prebuilt "
-                "Torch-TensorRT ExecuTorch delegate. Install it with: "
-                "pip install torch-tensorrt-executorch-runtime"
-            )
-        from torch_tensorrt_executorch_runtime.runtime import load as load_executorch
+        warnings.warn(
+            "torch_tensorrt.load(format='executorch') is deprecated and will remain "
+            "supported for at least six months after this deprecation first ships. "
+            "Import torch_tensorrt_executorch_runtime to register the TensorRT delegate, "
+            "then use executorch.extension.pybindings.portable_lib._load_for_executorch(path) "
+            "and module.run_method('forward', inputs).",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        from torch_tensorrt._executorch_compat import load as load_executorch
 
         return load_executorch(file_path)
     if format is not None:
@@ -856,9 +866,9 @@ def save(
         )
     if output_format == "executorch" and not _has_executorch_exir():
         raise ImportError(
-            "Saving in ExecuTorch format requires the executorch package "
-            "with executorch.exir. Install with: pip install "
-            "\"torch_tensorrt[executorch]\" to use output_format='executorch'."
+            "Saving with output_format='executorch' requires executorch.exir. "
+            "This CUDA integration supports Linux. Setup: "
+            + executorch_install_command()
         )
     if output_format == "executorch":
         # Every executorch option is popped above, so a leftover kwarg is a typo. Fail
@@ -867,8 +877,9 @@ def save(
             raise TypeError(
                 "save() received unexpected keyword argument(s) for "
                 f"output_format='executorch': {sorted(kwargs)}. Supported executorch "
-                "options are 'partitioners', 'compile_specs', 'backend_config', and "
-                "'weight_streaming_budget_per_engine'."
+                "options are 'partitioners', 'compile_specs', 'backend_config', "
+                "'constant_methods', 'transform_passes', 'compile_config', "
+                "'generate_etrecord', and 'weight_streaming_budget_per_engine'."
             )
         # Validate the budget before the input and model-shape checks below, so a wrong
         # type is not reported as an unrelated failure.
@@ -1405,8 +1416,9 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
         from torch_tensorrt.executorch import export
     except ImportError:
         raise ImportError(
-            "ExecuTorch is not installed. Install with: pip install "
-            "\"torch_tensorrt[executorch]\" to use output_format='executorch'."
+            "Could not import the ExecuTorch export integration for "
+            "output_format='executorch'. This CUDA integration supports Linux. "
+            "Setup: " + executorch_install_command()
         )
     import torch_tensorrt.dynamo.runtime.meta_ops.register_meta_ops  # noqa: F401
 

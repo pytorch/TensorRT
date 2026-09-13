@@ -22,17 +22,20 @@ REPO_ROOT = Path(
     os.environ.get("TRT_REPO_ROOT", str(Path(__file__).resolve().parents[2]))
 )
 
+# Duplicated, not imported: this module runs as a plain script and must not require
+# torch_tensorrt to be importable. A test asserts the two agree.
+EXECUTORCH_CUDA_MAJOR = "13"
+
 
 def _executorch_requirement() -> str:
-    # Read the pin the way the drift test does, so this file is not a second
-    # place to edit when it moves. Regex rather than yaml: the runner declares
-    # no runtime dependencies of its own and importing it should not add one.
-    text = (REPO_ROOT / "dev_dep_versions.yml").read_text()
-    version = dict(re.findall(r'^(__\w+__): "([^"]+)"', text, re.MULTILINE))[
-        "__executorch_version__"
-    ]
-    major, minor = version.split(".")[:2]
-    return f"executorch>={version},<{major}.{int(minor) + 1}"
+    # Import only for this suite; other runner operations do not need PyYAML.
+    import yaml
+
+    values = yaml.safe_load((REPO_ROOT / "dev_dep_versions.yml").read_text())
+    version = values["__executorch_version__"]
+    if not isinstance(version, str) or not version:
+        raise ValueError("__executorch_version__ must be a nonempty YAML string")
+    return f"executorch=={version}"
 
 
 # Known transient cudagraph/TRT-driver flake signatures. Expand ONLY with
@@ -131,10 +134,27 @@ def _setup_commands(step: str) -> list[tuple[list[str], Path]]:
     if step == "hub":
         return [(launcher + ["hub.py"], REPO_ROOT / "tests/modules")]
     if step == "executorch":
+        # Follows CU_VERSION rather than a fixed channel, or a job built against one CUDA
+        # runtime installs another. The default matches the index pyproject.toml resolves to.
+        cuda = os.environ.get("CU_VERSION") or f"cu{EXECUTORCH_CUDA_MAJOR}0"
+        if not re.fullmatch(rf"cu{EXECUTORCH_CUDA_MAJOR}\d+", cuda):
+            raise ValueError(
+                f"Unsupported CU_VERSION {cuda!r}; ExecuTorch needs a CUDA "
+                f"{EXECUTORCH_CUDA_MAJOR} channel such as cu{EXECUTORCH_CUDA_MAJOR}0"
+            )
         return [
             (
                 launcher
-                + ["-m", "pip", "install", "pyyaml", _executorch_requirement()],
+                + [
+                    "-m",
+                    "pip",
+                    "install",
+                    "pyyaml",
+                    "wheel>=0.40",
+                    "--extra-index-url",
+                    f"https://download.pytorch.org/whl/nightly/{cuda}",
+                    _executorch_requirement(),
+                ],
                 REPO_ROOT,
             )
         ]
@@ -202,7 +222,20 @@ def run_suite(
             print(f"==> setup[{step}]: {shlex.join(argv)}", flush=True)
             rc = subprocess.run(argv, cwd=scwd, env=env).returncode
             if rc != 0:
-                print(f"::warning::setup step {step!r} exited {rc}", flush=True)
+                # Fail rather than warn and continue, for every setup step and not just the
+                # executorch one: a suite whose dependencies did not install cannot test what it
+                # was asked to test, whichever step failed. Most of the executorch suite gates on
+                # pytest.importorskip, so a failed install skips those files, leaves the rest
+                # passing, and reports success with a populated junit xml -- the run looks green
+                # precisely when the thing it exists to test is absent. This matters more now
+                # that the ExecuTorch pin names a nightly build, which is pruned from the
+                # channel eventually; when that happens this has to be loud.
+                print(
+                    f"::error::setup step {step!r} exited {rc}, so the suite cannot test what "
+                    "it was asked to test",
+                    flush=True,
+                )
+                return rc
 
     print(f"==> {suite.name} [{variant}]: {shlex.join(pytest_cmd)}", flush=True)
     rc = subprocess.run(pytest_cmd, cwd=cwd, env=env).returncode

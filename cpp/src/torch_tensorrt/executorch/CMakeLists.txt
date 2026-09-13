@@ -67,10 +67,21 @@ endforeach()
 # Select ExecuTorch's shared extension_cuda so every CUDA-capable delegate shares
 # one caller-stream thread-local. A static copy linked into a second shared object
 # would create a second thread-local and silently break the handshake, so every
-# branch below must resolve to one shared library. Precedence: an
-# ExecuTorch-provided target, then an explicit prebuilt shared library, then a
-# source build.
-if(TARGET extension_cuda)
+# branch below must resolve to one shared library. Precedence: the installed wheel's
+# package, then an ExecuTorch-provided target, then an explicit prebuilt shared
+# library, then a source build.
+if(TARGET executorch::extension_cuda)
+    # Already provided by a parent project that called find_package(executorch), i.e. the
+    # installed wheel. This file does not call it itself, because it is also configured
+    # standalone against a source tree. Aliased rather than queried for its type: the package
+    # only ever defines this as a shared imported target, so the static-copy hazard the other
+    # branches guard against cannot arise here. The wheel's config withholds these targets
+    # entirely below CMake 3.28, and none of the branches below can stand in for them: each
+    # needs an add_subdirectory of ExecuTorch, an explicit prebuilt library, or a source
+    # checkout, none of which a wheel-only consumer has. That case is diagnosed at the bottom of
+    # this chain rather than left to fail as a missing target.
+    add_library(extension_cuda ALIAS executorch::extension_cuda)
+elseif(TARGET extension_cuda)
     # Provided by ExecuTorch, e.g. add_subdirectory() with EXECUTORCH_BUILD_CUDA=ON.
     get_target_property(_extension_cuda_type extension_cuda TYPE)
     if(NOT _extension_cuda_type STREQUAL "SHARED_LIBRARY")
@@ -126,6 +137,15 @@ elseif(_torchtrt_executorch_source_root AND
         "${CMAKE_CURRENT_BINARY_DIR}/executorch_extension_cuda"
     )
 else()
+    # Name the version gate first when that is what happened, so a consumer who did everything
+    # right is not told to install what they already installed.
+    if(executorch_FOUND AND CMAKE_VERSION VERSION_LESS 3.28)
+        message(FATAL_ERROR
+            "The installed ExecuTorch wheel withholds its CMake targets below CMake 3.28, and "
+            "this build is running CMake ${CMAKE_VERSION}. Upgrade to 3.28 or newer, or point "
+            "EXECUTORCH_EXTENSION_CUDA_LIBRARY at the wheel's "
+            "libexecutorch_extension_cuda.so directly.")
+    endif()
     message(FATAL_ERROR
         "Torch-TensorRT's ExecuTorch backend requires ExecuTorch's shared "
         "extension_cuda library. Add ExecuTorch first with EXECUTORCH_BUILD_CUDA=ON, "
@@ -143,7 +163,11 @@ set(_torchtrt_executorch_link_libraries
     extension_cuda
 )
 
-if(TARGET executorch_core)
+if(TARGET executorch::runtime)
+    # The installed wheel's prebuilt runtime, which also carries the include directories,
+    # compile definitions and C++ standard it was built with.
+    list(APPEND _torchtrt_executorch_link_libraries executorch::runtime)
+elseif(TARGET executorch_core)
     list(APPEND _torchtrt_executorch_link_libraries executorch_core)
 elseif(TARGET executorch)
     list(APPEND _torchtrt_executorch_link_libraries executorch)

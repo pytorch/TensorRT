@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import re
 import sys
 from typing import Any, Dict, List
 
@@ -13,8 +14,8 @@ disabled_cuda_versions: List[str] = []
 # jetpack 6.2 only officially supports python 3.10 and cu126
 jetpack_python_versions: List[str] = ["3.10"]
 jetpack_cuda_versions: List[str] = ["cu126"]
-# CUDA 12.6 wheels are published for x86_64 only. Keep the Arm matrices on
-# CUDA 13, including Windows Arm/AArch64.
+# CUDA 12.6 remains available for x86_64 releases, but not for nightlies.
+# Keep the Arm matrices on CUDA 13, including Windows Arm/AArch64.
 x86_cuda_versions: List[str] = ["cu126", "cu130", "cu132", "cu134"]
 arm_cuda_versions: List[str] = ["cu130", "cu132", "cu134"]
 
@@ -22,6 +23,10 @@ arm_cuda_versions: List[str] = ["cu130", "cu132", "cu134"]
 # Full matrix runs on main / nightly / release branches.
 PR_PYTHON_VERSION: str = "3.12"
 PR_CUDA_VERSION: str = "cu134"
+
+# The delegate links CUDA 13 libraries. This narrows the row lists above, it does not widen
+# them: a new minor still has to be added there first.
+EXECUTORCH_CUDA_MAJOR: str = "13"
 
 jetpack_container_image: str = "nvcr.io/nvidia/l4t-jetpack:r36.4.0"
 sbsa_container_image: str = "quay.io/pypa/manylinux_2_39_aarch64"
@@ -83,6 +88,11 @@ def filter_matrix_item(
             return True
         return False
     else:
+        if (
+            item.get("channel", "nightly") == "nightly"
+            and item["desired_cuda"] == "cu126"
+        ):
+            return False
         cuda_versions = (
             arm_cuda_versions
             if item["gpu_arch_type"] in {"cuda-aarch64", "cuda-arm64"}
@@ -135,6 +145,12 @@ def main(args: list[str]) -> None:
         default="false",
     )
 
+    parser.add_argument(
+        "--executorch-runtime",
+        action="store_true",
+        help="keep only CUDA 13 rows supported by the ExecuTorch delegate wheel",
+    )
+
     options = parser.parse_args(args)
     if options.matrix == "":
         raise ValueError("--matrix needs to be provided")
@@ -151,6 +167,10 @@ def main(args: list[str]) -> None:
     filtered_includes = []
 
     for item in includes:
+        if options.executorch_runtime and not re.fullmatch(
+            rf"cu{EXECUTORCH_CUDA_MAJOR}\d+", item["desired_cuda"]
+        ):
+            continue
         if filter_matrix_item(
             item,
             options.jetpack == "true",

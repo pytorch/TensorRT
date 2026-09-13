@@ -1,0 +1,138 @@
+name: Update ExecuTorch pin
+
+# Keep the ExecuTorch pin close to upstream without a human running the bump by hand. On
+# main this tracks the nightly line every day; the newest wheel the index actually carries
+# is by definition the newest one that built, so a failed nightly simply leaves the pin
+# where it was. The bump lands as a pull request, not a direct push, so the existing pin
+# guards and the executorch end-to-end lane decide whether the new wheel is usable before
+# it reaches main.
+#
+# On a release branch the schedule is a no-op: a release pins a stable ExecuTorch and does
+# not drift. Re-pinning there is a manual dispatch with track=stable, which is the only way
+# the pin moves once a branch is cut.
+
+on:
+  schedule:
+    # A few hours after the nightly index publishes, so the freshest wheel is available.
+    - cron: "0 13 * * *"
+  workflow_dispatch:
+    inputs:
+      track:
+        description: "Which ExecuTorch line to pin to"
+        type: choice
+        default: nightly
+        options:
+          - nightly
+          - stable
+      allow_downgrade:
+        description: "Allow proposing an older ExecuTorch version"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-pin:
+    runs-on: ubuntu-latest
+    if: ${{ ! contains(github.actor, 'pytorchbot') }}
+    environment: pytorchbot-env
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.GH_PYTORCHBOT_TOKEN }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install updater dependencies
+        run: python -m pip install packaging pyyaml
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Choose the track
+        id: track
+        env:
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          TRACK: ${{ inputs.track }}
+        run: |
+          set -euo pipefail
+          # A manual run pins whatever it asked for, except that a release branch may only be
+          # pinned to a stable line: nightly off main would drift a cut release onto a nightly,
+          # which the schedule already refuses to do. The daily schedule pins the nightly line on
+          # main and does nothing on a release branch.
+          # The trigger values arrive through env, not template interpolation, so a crafted ref or
+          # input is shell data rather than shell source.
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            if [ "$TRACK" = "nightly" ] && [ "$REF" != "refs/heads/main" ]; then
+              echo "refusing to pin $REF to a nightly; re-run with track=stable" >&2
+              exit 1
+            fi
+            echo "track=$TRACK" >> "$GITHUB_OUTPUT"
+          elif [ "$REF" = "refs/heads/main" ]; then
+            echo "track=nightly" >> "$GITHUB_OUTPUT"
+          else
+            echo "no scheduled pin update on $REF; release pins do not drift"
+            echo "track=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Update the pin
+        id: update
+        if: steps.track.outputs.track != ''
+        env:
+          TRACK: ${{ steps.track.outputs.track }}
+          ALLOW_DOWNGRADE: ${{ github.event_name == 'workflow_dispatch' && inputs.allow_downgrade }}
+        run: |
+          set -euo pipefail
+          args=(--track "$TRACK")
+          if [ "$ALLOW_DOWNGRADE" = "true" ]; then
+            args+=(--allow-downgrade)
+          fi
+          python .github/scripts/update_executorch_pin.py "${args[@]}"
+          PYTHON_ONLY=1 uv lock --refresh --prerelease=allow
+          if git diff --quiet; then
+            echo "the pin and development lock are already current"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "version=$(python -c 'import yaml; print(yaml.safe_load(open("dev_dep_versions.yml"))["__executorch_version__"])')" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open a pull request
+        if: steps.update.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          token: ${{ secrets.GH_PYTORCHBOT_TOKEN }}
+          branch: executorch-pin-update/${{ github.ref_name }}/${{ steps.track.outputs.track }}
+          delete-branch: true
+          commit-message: "Update ExecuTorch pin to ${{ steps.update.outputs.version }}"
+          title: "Update ExecuTorch pin to ${{ steps.update.outputs.version }}"
+          # The end-to-end ExecuTorch suite only runs on the nightly lane, and an unlabelled
+          # pull request gets the fast one, so without these the bump would report green
+          # without the delegate having been exercised at all. Standard is named explicitly
+          # because that suite has no RTX variant to pay for.
+          labels: |
+            ci: nightly
+            backend: TensorRT
+          # The delegate is built from the tree the pinned wheel was built from, so both
+          # pins move together to the version and the commit that wheel records for itself.
+          # The pin guards and the executorch end-to-end lane gate this pull request.
+          body: |
+            Move the ExecuTorch pin to `${{ steps.update.outputs.version }}`, the newest
+            ${{ steps.track.outputs.track }} wheel on the index. The source commit is read
+            from that wheel, so the version pin and the source commit name one ExecuTorch.
+
+            Opened automatically. The pin consistency checks and the ExecuTorch delegate
+            build and test lane run here and decide whether this wheel is usable.
+          committer: Torch-TensorRT Github Bot <torch-tensorrt.github.bot@nvidia.com>
+          author: Torch-TensorRT Github Bot <torch-tensorrt.github.bot@nvidia.com>
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: true

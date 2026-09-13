@@ -44,7 +44,7 @@ torch_tensorrt/bin/example_executorch_runner
 ```bash
 # Get the ExecuTorch source snapshot this package is built against. Keep this in sync
 # with the executorch commit pinned in MODULE.bazel.
-EXECUTORCH_REF="${EXECUTORCH_REF:-e4d02f41f7909e8ed5bf4a14ffc520d733453d9f}"
+EXECUTORCH_REF="${EXECUTORCH_REF:-993dee0f7655d19d008260ba2d144e5a3028001d}"
 git clone --filter=blob:none --no-checkout \
   https://github.com/pytorch/executorch.git executorch
 pushd executorch
@@ -95,13 +95,32 @@ build-executorch-reference-runner/lib/libexecutorch_trt_backend.a
 
 ### Python
 
-Install the complete prebuilt Python runtime and delegate:
+In a fresh Linux CUDA 13 environment, install the `executorch` authoring
+stack through the `[executorch]` extra. Substitute the channel for your CUDA, such
+as `cu134` for CUDA 13.4, keeping PyTorch, ExecuTorch and Torch-TensorRT on the
+same channel:
 
 ```bash
-pip install "torch-tensorrt[executorch]"
+pip install --pre "torch-tensorrt[executorch]" \
+  --extra-index-url https://download.pytorch.org/whl/nightly/cu130
 ```
 
-Load and run the model without an ExecuTorch checkout or native build:
+The index is required, not optional: the extra's ExecuTorch floor names a dev build, and PyPI's
+`executorch` stops below it, so without the nightly channel pip reports no matching distribution.
+`--pre` allows prereleases; it does not request an upgrade. Released versions can
+already declare the extra. If an older installation lacks it, first install the
+intended compatible Torch-TensorRT wheel deliberately. Adding the extra may change
+dependencies, so use a fresh environment to preserve an existing working stack.
+
+The extra installs `executorch` only. Install the matching companion artifact,
+`torch-tensorrt-executorch-runtime`, or build and install it from source following
+`py/torch-tensorrt-executorch-runtime/README.md`. That wheel ships just the TensorRT delegate, a
+single shared library that registers itself with the ExecuTorch runtime from the `executorch`
+distribution rather than bundling a runtime of its own, and loading a `.pte` through the delegate
+needs it.
+
+The Python example uses ExecuTorch's Module API to back planned device arenas
+with CUDA memory. Then load and run the model:
 
 ```bash
 python examples/executorch_reference_runner/load_model.py \
@@ -109,9 +128,13 @@ python examples/executorch_reference_runner/load_model.py \
   --num_runs=1
 ```
 
-The extra installs `executorch` and the matching
-`torch-tensorrt-executorch-runtime` wheel. That wheel contains an ExecuTorch
-Python runtime with `TensorRTBackend` linked into its backend registry.
+The legacy `torch_tensorrt.load(path, format="executorch")` entry point still
+works, but emits a deprecation warning. Its `method_names` property,
+`run(inputs, method="forward")`, and `forward(*inputs)` interface remain
+supported for at least six months after the deprecation first ships. It still
+copies CUDA inputs to CPU and supports embedded weights only. New applications
+should use the Module API shown above; device-resident programs must use it
+directly to keep their inputs on CUDA.
 
 ### C++
 
@@ -175,9 +198,9 @@ Enabling `EXECUTORCH_BUILD_CUDA` does not make this runner depend on libtorch. I
 needs `EXECUTORCH_BUILD_EXTENSION_TENSOR=ON`, which is set automatically, and the
 result links no libtorch and no libc10.
 
-This path is verified by hand, not in CI: the CI configuration builds the runner
-without the CUDA delegate. It also takes the synchronized path, because the method
-inputs and outputs are host-backed.
+The green-context option is not exercised by CI. The reference-runner checks
+use the CUDA-enabled build with an ordinary stream and host-backed method inputs
+and outputs.
 
 ## Caller-Owned KV-Cache Persistence Check
 

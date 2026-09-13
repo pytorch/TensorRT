@@ -22,12 +22,47 @@ _TENSORRT_LLM_VERSION_ = "1.2.0"
 # "libnvinfer.so.<N>: cannot open shared object file" error at dlopen time.
 _TENSORRT_LLM_REQUIRED_TENSORRT_MAJOR_MINOR_ = "10.14"
 
+# The delegate links CUDA 13 libraries, so the major is what decides support.
+EXECUTORCH_CUDA_MAJOR = "13"
+
 
 def sanitized_torch_version() -> Any:
     return (
         torch.__version__
         if ".nv" not in torch.__version__
         else torch.__version__.split(".nv")[0]
+    )
+
+
+def executorch_install_channel() -> str | None:
+    """Return the nightly channel matching the active PyTorch CUDA build, if supported.
+
+    Names the channel matching the installed torch. It does not promise that channel exists,
+    because PyTorch publishes a new CUDA minor before ExecuTorch fills it.
+    """
+    cuda_version = torch.version.cuda or ""
+    major, _, minor = cuda_version.partition(".")
+    if major != EXECUTORCH_CUDA_MAJOR or not minor.isdigit():
+        return None
+    return f"cu{major}{minor}"
+
+
+def executorch_install_command() -> str:
+    """Return an install command, or guidance for an unsupported CUDA build.
+
+    Adding this package's missing extra does not need a blanket --upgrade, but pip
+    may still change dependencies to satisfy it. --pre permits prerelease candidates.
+    """
+    channel = executorch_install_channel()
+    if channel is None:
+        return (
+            f"This ExecuTorch integration requires Linux with a PyTorch CUDA "
+            f"{EXECUTORCH_CUDA_MAJOR} build. Use matching PyTorch, ExecuTorch and "
+            "Torch-TensorRT wheels in a fresh environment."
+        )
+    return (
+        'pip install --pre "torch_tensorrt[executorch]" '
+        f"--extra-index-url https://download.pytorch.org/whl/nightly/{channel}"
     )
 
 
