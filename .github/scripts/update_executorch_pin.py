@@ -290,6 +290,25 @@ def delegate_channels() -> list[str]:
     return sorted(row for row in rows if re.fullmatch(rf"cu{major}\d+", row))
 
 
+def _public_or_none(raw: str) -> str | None:
+    """The public part of a version string, or None when it does not parse."""
+    try:
+        return Version(raw).public
+    except InvalidVersion:
+        return None
+
+
+def _public_versions(index_args: list[str]) -> set[str]:
+    """Index versions with the CUDA local label removed, so channels are comparable."""
+    public = set()
+    for raw in available_versions(index_args):
+        try:
+            public.add(Version(raw).public)
+        except InvalidVersion:
+            continue
+    return public
+
+
 def _index_args(track: str, channel: str) -> list[str]:
     if track == "nightly":
         return [
@@ -321,12 +340,13 @@ def main(argv: list[str] | None = None) -> int:
     index_args = _index_args(args.track, args.channel)
     candidates = available_versions(index_args)
     if args.track == "nightly":
-        # A version missing from any accepted channel would strand that row's own install.
+        # Each channel labels its own build, so compare public versions. A version missing from
+        # any accepted channel would strand that row's own install.
         for channel in delegate_channels():
             if channel == args.channel:
                 continue
-            published = set(available_versions(_index_args(args.track, channel)))
-            candidates = [v for v in candidates if v in published]
+            published = _public_versions(_index_args(args.track, channel))
+            candidates = [v for v in candidates if _public_or_none(v) in published]
         if not candidates:
             raise SystemExit(
                 "no executorch version is published in every channel the delegate build "
