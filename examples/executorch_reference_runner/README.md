@@ -95,9 +95,10 @@ build-executorch-reference-runner/lib/libexecutorch_trt_backend.a
 
 ### Python
 
-In a fresh Linux CUDA 13.0 environment, install the `executorch` authoring
-stack through the `[executorch]` extra. Use `cu132` instead for CUDA 13.2,
-keeping PyTorch, ExecuTorch and Torch-TensorRT on the same channel:
+In a fresh Linux CUDA 13 environment, install the `executorch` authoring
+stack through the `[executorch]` extra. Substitute the channel for your CUDA, such
+as `cu134` for CUDA 13.4, keeping PyTorch, ExecuTorch and Torch-TensorRT on the
+same channel:
 
 ```bash
 pip install --pre "torch-tensorrt[executorch]" \
