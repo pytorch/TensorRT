@@ -36,8 +36,9 @@ of the wheel runtime contract.
 > were built against. An isolated build may download a newer, ABI-incompatible
 > PyTorch version.
 
-The example below assumes Linux with a matching CUDA 13.0 PyTorch and
-Torch-TensorRT installation. Use `cu132` for CUDA 13.2 throughout.
+The example below assumes Linux with a matching CUDA 13 PyTorch and
+Torch-TensorRT installation. Substitute the channel for your CUDA throughout, such
+as `cu134` for CUDA 13.4.
 
 ```bash
 export TensorRT_ROOT=/path/to/TensorRT
