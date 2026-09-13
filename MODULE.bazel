@@ -45,13 +45,13 @@ new_git_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:git.bzl"
 
 local_torch = use_repo_rule("//toolchains:local_torch.bzl", "local_torch")
 
-# Keep this pin synchronized with the ExecuTorch release installed in
-# py/torch-tensorrt-executorch-runtime/README.md.
+# Build the portable runtime and delegate from the installed wheel's source revision.
+# The provenance test checks that the source commit and wheel version agree.
 new_git_repository(
     name = "executorch",
     build_file = "@//third_party/executorch:BUILD",
-    # executorch==1.4.1
-    commit = "e4d02f41f7909e8ed5bf4a14ffc520d733453d9f",
+    # executorch==1.5.0.dev20260911
+    commit = "993dee0f7655d19d008260ba2d144e5a3028001d",
     patch_cmds = [
         "find . -mindepth 2 \\( -name BUILD -o -name BUILD.bazel \\) -delete",
         "mkdir executorch && find . -mindepth 1 -maxdepth 1 ! -name executorch ! -name BUILD ! -name BUILD.bazel ! -name REPO.bazel -exec cp -a {} executorch/ \\;",

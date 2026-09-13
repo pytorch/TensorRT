@@ -82,10 +82,19 @@ summary *args:
 
 # Added without a rebuild via `uv pip install --group` (sidesteps the
 # test-ext↔quantization `uv sync` lockfile conflict). Run before `just lane full`.
-# Install optional test deps so model/kernels/quantization/executorch suites run
+# Install optional test deps for Linux with the project's CUDA 13.0 (cu130) default.
 install-test-ext:
     uv pip install --group test-ext --group kernels --group quantization
-    uv pip install pyyaml "executorch>=1.4.1,<1.5"
+    # ExecuTorch's CUDA wheels are only on the PyTorch nightly index, so the channel is needed.
+    # No --pre: a specifier naming a prerelease admits prereleases by itself, and --pre would
+    # apply to pyyaml here too. cu130 matches the torch index this project resolves against by
+    # default.
+    #
+    # Exact, not a range: the nightly channel gains a member every day, and the delegate is
+    # compiled from the commit this version pairs with.
+    uv pip install pyyaml \
+      --extra-index-url https://download.pytorch.org/whl/nightly/cu130 \
+      "executorch==1.5.0.dev20260911"
 
 # ── Linting ───────────────────────────────────────────────────────────────────
 

@@ -88,3 +88,16 @@ jobs:
           python3 $GITHUB_WORKSPACE/.github/scripts/run_py_linter.py
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+      # These source checks need no GPU; --noconftest avoids importing torch.
+      - name: Check the ExecuTorch pin is consistent
+        if: always()
+        run: |
+          cd $GITHUB_WORKSPACE
+          python3 -m pytest tests/py/dynamo/executorch/test_executorch_pin.py \
+            -q --no-header -p no:cacheprovider --noconftest -o addopts=""
+      - name: Test the ExecuTorch pin updater
+        if: always()
+        run: |
+          cd $GITHUB_WORKSPACE
+          python3 -m pytest tests/py/dynamo/executorch/test_update_executorch_pin.py \
+            -q --no-header -p no:cacheprovider --noconftest -o addopts=""

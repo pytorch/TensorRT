@@ -44,7 +44,7 @@ torch_tensorrt/bin/example_executorch_runner
 ```bash
 # Get the ExecuTorch source snapshot this package is built against. Keep this in sync
 # with the executorch commit pinned in MODULE.bazel.
-EXECUTORCH_REF="${EXECUTORCH_REF:-e4d02f41f7909e8ed5bf4a14ffc520d733453d9f}"
+EXECUTORCH_REF="${EXECUTORCH_REF:-993dee0f7655d19d008260ba2d144e5a3028001d}"
 git clone --filter=blob:none --no-checkout \
   https://github.com/pytorch/executorch.git executorch
 pushd executorch
@@ -95,23 +95,37 @@ build-executorch-reference-runner/lib/libexecutorch_trt_backend.a
 
 ### Python
 
-Install the complete prebuilt Python runtime and delegate:
+In a fresh Linux CUDA 13 environment, install the `executorch` authoring
+stack through the `[executorch]` extra. Substitute the channel for your CUDA, such
+as `cu134` for CUDA 13.4, keeping PyTorch, ExecuTorch and Torch-TensorRT on the
+same channel:
 
 ```bash
-pip install "torch-tensorrt[executorch]"
+pip install --pre "torch-tensorrt[executorch]" \
+  --extra-index-url https://download.pytorch.org/whl/nightly/cu130
 ```
 
-Load and run the model without an ExecuTorch checkout or native build:
+The index is required, not optional: the extra's ExecuTorch floor names a dev build, and PyPI's
+`executorch` stops below it, so without the nightly channel pip reports no matching distribution.
+`--pre` allows prereleases; it does not request an upgrade. Released versions can
+already declare the extra. If an older installation lacks it, first install the
+intended compatible Torch-TensorRT wheel deliberately. Adding the extra may change
+dependencies, so use a fresh environment to preserve an existing working stack.
+
+The extra installs `executorch` only. The delegate runtime,
+`torch-tensorrt-executorch-runtime`, is not yet published to any index: its requirement in the
+top-level `setup.py` is commented out for that reason. Build and install it from source following
+`py/torch-tensorrt-executorch-runtime/README.md`. That wheel contains an ExecuTorch Python runtime
+with `TensorRTBackend` linked into its backend registry, and loading a `.pte` through the delegate
+needs it.
+
+Then load and run the model:
 
 ```bash
 python examples/executorch_reference_runner/load_model.py \
   --model_path=model.pte \
   --num_runs=1
 ```
-
-The extra installs `executorch` and the matching
-`torch-tensorrt-executorch-runtime` wheel. That wheel contains an ExecuTorch
-Python runtime with `TensorRTBackend` linked into its backend registry.
 
 ### C++
 

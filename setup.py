@@ -206,12 +206,24 @@ else:
 # The delegate is compiled from the ExecuTorch source revision pinned in MODULE.bazel, so the
 # installed wheel should agree with it. The upper bound is the load-bearing half: ExecuTorch's C++
 # runtime API is not stable across minor releases, and an unbounded floor would resolve a future
-# minor against a backend built for this one. Patch releases stay allowed because they come off the
-# same release branch; the exact pin belongs in the runtime package, which does derive it.
+# minor against a backend built for this one. Everything below that ceiling resolves: later 1.5
+# nightlies, a 1.5 release candidate, and 1.5 patch releases alike, since the exact pin belongs in
+# the runtime package, which does derive it.
+# The floor currently names a dev build, because the runtime split the delegate needs does not
+# exist in any ExecuTorch release yet: 1.4.1's executorch/lib carries no standalone linkable
+# runtime, and no CUDA wheel at all.
+# That also makes this range prefer a release as soon as one exists, since 1.5.0 sorts above
+# every 1.5.0.devN, so nothing here changes on the day it ships.
 _executorch_major, _executorch_minor = __executorch_version__.split(".")[:2]
+# Linux-only, and not incidentally: the delegate is a Linux shared object, ExecuTorch publishes
+# CUDA wheels for no other platform, and the feature is documented Linux-only. Without the marker
+# the extra also has to resolve for the win32 entry in pyproject.toml's uv required-environments,
+# where the only candidates are PyPI's, which stop at 1.4.1 -- so raising this floor above that
+# makes `uv lock` fail outright rather than pick something older.
 EXECUTORCH_REQUIREMENT = (
     f"executorch>={__executorch_version__},"
-    f"<{_executorch_major}.{int(_executorch_minor) + 1}"
+    f"<{_executorch_major}.{int(_executorch_minor) + 1}; "
+    "platform_system == 'Linux'"
 )
 # TODO: Enable this once the runtime wheel is published to the PyTorch index.
 # EXECUTORCH_RUNTIME_REQUIREMENT = (

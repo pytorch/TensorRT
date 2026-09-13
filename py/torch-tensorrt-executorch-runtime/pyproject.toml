@@ -2,10 +2,11 @@
 requires = [
     "setuptools>=68",
     "wheel>=0.40",
+    "pyyaml",
     # Native ABI dependencies supplied by the active Torch-TensorRT build
     # environment.
     # Builds must use --no-build-isolation; see README.md.
     "torch",
-    "executorch==1.4.1",
+    "executorch==1.5.0.dev20260911",
 ]
 build-backend = "setuptools.build_meta"

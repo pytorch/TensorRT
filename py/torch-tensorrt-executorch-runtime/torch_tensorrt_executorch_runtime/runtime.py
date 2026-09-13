@@ -15,13 +15,7 @@ def _load_module(data: bytes) -> Any:
     copy the exporter inserts around the delegate would hand ``cudaMemcpy`` a
     host destination and fail with ``invalid argument``.
     """
-    try:
-        from torch_tensorrt_executorch_runtime import activate, get_runtime
-    except ImportError as error:
-        raise ImportError(
-            "ExecuTorch Python inference requires the prebuilt delegate. "
-            'Install it with: pip install "torch-tensorrt[executorch]"'
-        ) from error
+    from torch_tensorrt_executorch_runtime import activate, get_runtime
 
     # get_runtime verifies TensorRTBackend is registered; activate returns the native module it
     # installed as the process portable runtime, which is what loads the program.

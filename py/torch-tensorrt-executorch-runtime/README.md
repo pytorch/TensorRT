@@ -36,18 +36,23 @@ of the wheel runtime contract.
 > were built against. An isolated build may download a newer, ABI-incompatible
 > PyTorch version.
 
+The example below assumes Linux with a matching CUDA 13 PyTorch and
+Torch-TensorRT installation. Substitute the channel for your CUDA throughout, such
+as `cu134` for CUDA 13.4.
+
 ```bash
 export TensorRT_ROOT=/path/to/TensorRT
 
-python -m pip install pyyaml "executorch==1.4.1"
+python -m pip install pyyaml \
+  --extra-index-url https://download.pytorch.org/whl/nightly/cu130 \
+  "executorch==1.5.0.dev20260911"
 python -m pip wheel --no-build-isolation --no-deps \
   --wheel-dir dist py/torch-tensorrt-executorch-runtime
 ```
 
 The native build obtains the ExecuTorch source through Bazel; no separate
 source checkout or `EXECUTORCH_SOURCE_DIR` setting is required. The source
-commit pinned in `MODULE.bazel` is the revision recorded by the
-`executorch==1.4.1` wheel.
+commit pinned in `MODULE.bazel` is the revision recorded by the pinned wheel.
 
 The static ExecuTorch and delegate archives are intermediate build inputs;
 users receive the final native Python module and do not compile anything.
@@ -79,8 +84,15 @@ whose program loader plans every arena on the host.
 
 ## Use
 
+Use the same PyTorch nightly channel as the build for ExecuTorch and any
+nightly PyTorch or Torch-TensorRT dependencies. CUDA and TensorRT packages
+may resolve from PyPI or NVIDIA's index; the extra index applies to the whole
+dependency solve. The exact ExecuTorch dev pin and the explicit PyTorch and
+Torch-TensorRT dev-version ranges already permit their required prereleases.
+
 ```bash
-python -m pip install torch-tensorrt-executorch-runtime
+python -m pip install dist/torch_tensorrt_executorch_runtime-*.whl \
+  --extra-index-url https://download.pytorch.org/whl/nightly/cu130
 ```
 
 ```python

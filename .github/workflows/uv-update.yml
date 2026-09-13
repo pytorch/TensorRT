@@ -9,6 +9,7 @@ on:
     paths:
       - 'pyproject.toml'
       - 'setup.py'
+      - 'dev_dep_versions.yml'
   workflow_dispatch:
 
 permissions:
@@ -61,7 +62,7 @@ jobs:
           set -x
           git config --global safe.directory "$GITHUB_WORKSPACE"
 
-          if ! uv lock --refresh --prerelease=allow --verbose; then
+          if ! PYTHON_ONLY=1 uv lock --refresh --prerelease=allow --verbose; then
             echo "Error: Failed to update uv.lock"
             exit 1
           fi
@@ -90,7 +91,7 @@ jobs:
           # --all-extras so the optional dependencies are covered too. Dependency
           # groups are not covered: --all-groups on its own is rejected, because
           # pyproject.toml declares test_ext and quantization as conflicting.
-          if ! uv sync --locked --prerelease=allow --no-install-project --all-extras; then
+          if ! PYTHON_ONLY=1 uv sync --locked --prerelease=allow --no-install-project --all-extras; then
             echo "Error: Failed to run uv sync --locked --prerelease=allow --no-install-project --all-extras"
             exit 1
           fi
