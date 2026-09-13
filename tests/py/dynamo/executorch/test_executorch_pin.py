@@ -2419,18 +2419,30 @@ def test_suite_validation_check_detects_removed_validator(monkeypatch, field, va
 
 
 @pytest.mark.parametrize(
-    "event,ref,track,expected",
+    "event,ref,track,expected,tagged",
     [
-        ("schedule", "refs/heads/main", "", "nightly"),
-        ("schedule", "refs/heads/release/2.14", "", ""),
-        ("workflow_dispatch", "refs/heads/main", "nightly", "nightly"),
-        ("workflow_dispatch", "refs/heads/release/2.14", "stable", "stable"),
-        ("workflow_dispatch", "refs/heads/release/2.14", "nightly", None),
+        ("schedule", "refs/heads/main", "", "nightly", "false"),
+        # An open release branch follows ExecuTorch's own releases until it is tagged.
+        ("schedule", "refs/heads/release/2.14", "", "stable", "false"),
+        # Once the release is tagged its pin is history and must not move.
+        ("schedule", "refs/heads/release/2.14", "", "", "true"),
+        # A branch that only looks like a release must not be treated as one.
+        (
+            "schedule",
+            "refs/heads/release/1.4-full-wheel-torch-dependency",
+            "",
+            "",
+            "false",
+        ),
+        ("schedule", "refs/heads/some-feature", "", "", "false"),
+        ("workflow_dispatch", "refs/heads/main", "nightly", "nightly", "false"),
+        ("workflow_dispatch", "refs/heads/release/2.14", "stable", "stable", "false"),
+        ("workflow_dispatch", "refs/heads/release/2.14", "nightly", None, "false"),
     ],
 )
 @pytest.mark.unit
-def test_update_workflow_keeps_nightly_updates_on_main(
-    tmp_path, event, ref, track, expected
+def test_update_workflow_picks_the_track_each_branch_may_use(
+    tmp_path, event, ref, track, expected, tagged
 ):
     workflow = yaml.safe_load(
         (REPO_ROOT / ".github/workflows/executorch-pin-update.yml").read_text()
@@ -2451,6 +2463,7 @@ def test_update_workflow_keeps_nightly_updates_on_main(
             "EVENT": event,
             "REF": ref,
             "TRACK": track,
+            "RELEASE_TAGGED": tagged,
             "GITHUB_OUTPUT": str(output),
         },
     )
