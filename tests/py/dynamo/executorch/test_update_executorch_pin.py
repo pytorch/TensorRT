@@ -185,11 +185,14 @@ def test_main_rejects_unsupported_channels(monkeypatch, channel):
 @pytest.mark.unit
 def test_main_uses_selected_channel(monkeypatch, channel):
     calls = []
-    monkeypatch.setattr(
-        updater,
-        "available_versions",
-        lambda args: calls.append(args) or ["1.0.dev1+" + channel],
-    )
+
+    def per_channel(args):
+        # Each channel labels its own build, exactly as the index does. A fixture that returned
+        # one label for every channel would let a raw-string comparison pass.
+        calls.append(args)
+        return ["1.0.dev1+" + args[-1].rsplit("/", 1)[-1]]
+
+    monkeypatch.setattr(updater, "available_versions", per_channel)
     monkeypatch.setattr(updater, "read_pin", lambda field: "1.0.dev1")
     assert updater.main(["--channel", channel]) == 0
     # The selected channel is asked first, then every other channel the delegate accepts.
@@ -211,24 +214,49 @@ def test_main_refuses_a_version_missing_from_an_accepted_channel(monkeypatch):
     """
     accepted = updater.delegate_channels()
     assert len(accepted) > 1, accepted
-    newest_everywhere = "1.0.dev1"
-    per_channel = {ch: [newest_everywhere] for ch in accepted}
-    per_channel[accepted[0]] = [newest_everywhere, "1.0.dev2"]
-
+    # Labelled per channel, as the index publishes them.
+    per_channel = {ch: [f"1.0.dev1+{ch}"] for ch in accepted}
+    per_channel[accepted[0]] = [f"1.0.dev1+{accepted[0]}", f"1.0.dev2+{accepted[0]}"]
     monkeypatch.setattr(
         updater,
         "available_versions",
         lambda args: per_channel[args[-1].rsplit("/", 1)[-1]],
     )
-    monkeypatch.setattr(updater, "read_pin", lambda field: newest_everywhere)
+    monkeypatch.setattr(updater, "read_pin", lambda field: "1.0.dev1")
     # dev2 exists in one channel only, so the pin stays where it is rather than moving to it.
     assert updater.main(["--channel", accepted[0]]) == 0
 
 
 @pytest.mark.unit
+def test_main_adopts_a_version_present_in_every_channel_despite_its_label(monkeypatch):
+    """The channels label the same build differently, so comparison must ignore the label.
+
+    This is the case the index actually produces: one version, three spellings. Comparing the
+    raw strings finds no overlap at all and rejects every candidate.
+    """
+    accepted = updater.delegate_channels()
+    per_channel = {ch: [f"1.0.dev1+{ch}", f"1.0.dev2+{ch}"] for ch in accepted}
+    written = {}
+    monkeypatch.setattr(
+        updater,
+        "available_versions",
+        lambda args: per_channel[args[-1].rsplit("/", 1)[-1]],
+    )
+    monkeypatch.setattr(updater, "read_pin", lambda field: "1.0.dev1")
+    monkeypatch.setattr(updater, "wheel_git_version", lambda v, a: "0" * 40)
+    monkeypatch.setattr(
+        updater,
+        "write_pins",
+        lambda version, commit: written.update(version=version, commit=commit) or True,
+    )
+    assert updater.main(["--channel", accepted[0]]) == 0
+    assert written["version"] == "1.0.dev2", written
+
+
+@pytest.mark.unit
 def test_main_reports_when_no_version_spans_every_accepted_channel(monkeypatch):
     accepted = updater.delegate_channels()
-    per_channel = {ch: [f"1.0.dev{i}"] for i, ch in enumerate(accepted)}
+    per_channel = {ch: [f"1.0.dev{i}+{ch}"] for i, ch in enumerate(accepted)}
     monkeypatch.setattr(
         updater,
         "available_versions",
