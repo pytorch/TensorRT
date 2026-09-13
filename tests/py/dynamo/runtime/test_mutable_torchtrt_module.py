@@ -338,6 +338,80 @@ def test_resnet18_modify_attribute():
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
 )
+@pytest.mark.unit
+def test_update_refit_condition_decides_from_weights():
+    # Regression for #4153. The decision must come from the weights themselves:
+    # the TRT↔PyTorch output gap exceeds ATOL/RTOL on H100/B100 even when nothing
+    # changed, so output equality cannot be what distinguishes these three cases.
+    class Tiny(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear = nn.Linear(4, 4)
+
+        def forward(self, x):
+            return self.linear(x)
+
+    torch.manual_seed(0)
+    inputs = [torch.randn(1, 4, device="cuda")]
+
+    def fresh_module():
+        torch.manual_seed(0)
+        model = Tiny().eval().to("cuda")
+        mod = torch_trt.MutableTorchTensorRTModule(
+            model, immutable_weights=False, min_block_size=1
+        )
+        mod(*inputs)
+        return mod
+
+    # Unchanged weights: reassigning the same Parameter is a no-op.
+    mutable_module = fresh_module()
+    mutable_module.linear.weight = nn.Parameter(
+        mutable_module.original_model.linear.weight
+    )
+    assertions.assertEqual(
+        mutable_module.refit_state.get_state(),
+        RefitFlag.UNKNOWN,
+        msg="Reassigning a weight Parameter should mark the module UNKNOWN.",
+    )
+    mutable_module.update_refit_condition()
+    assertions.assertEqual(
+        mutable_module.refit_state.get_state(),
+        RefitFlag.LIVE,
+        msg="Unchanged weight values must yield LIVE.",
+    )
+
+    # Changed values, same structure: refit.
+    mutable_module = fresh_module()
+    with torch.no_grad():
+        mutable_module.original_model.linear.weight.add_(1.0)
+    mutable_module.update_refit_condition()
+    assertions.assertEqual(
+        mutable_module.refit_state.get_state(),
+        RefitFlag.NEEDS_REFIT,
+        msg="Changed weight values must yield NEEDS_REFIT.",
+    )
+
+    # Changed structure: recompile.
+    mutable_module = fresh_module()
+    mutable_module.original_model.linear = nn.Linear(4, 8).eval().to("cuda")
+    mutable_module.update_refit_condition()
+    assertions.assertEqual(
+        mutable_module.refit_state.get_state(),
+        RefitFlag.NEEDS_RECOMPILE,
+        msg="A changed weight shape must yield NEEDS_RECOMPILE.",
+    )
+
+    torch._dynamo.reset()
+
+
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    "TorchScript Frontend is not available",
+)
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.refit,
+    "Refit feature is not supported in Python 3.13 or higher",
+)
 @unittest.skipIf(
     not importlib.util.find_spec("torchvision"), "torchvision not installed"
 )

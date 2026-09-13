@@ -14,7 +14,6 @@ from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._compiler import compile as dynamo_compile
 from torch_tensorrt.dynamo._refit import refit_module_weights
 from torch_tensorrt.dynamo.utils import (
-    check_output_equal,
     deallocate_module,
     to_torch_device,
     to_torch_tensorrt_device,
@@ -153,8 +152,11 @@ class MutableTorchTensorRTModule(object):
         self.arg_dynamic_shapes: Optional[tuple[Any]] = None
         self.kwarg_dynamic_shapes: Optional[dict[Any, Any]] = None
         self.serializable_dynamic_shapes_dims: dict[str, tuple[str, int, int]] = {}
-        self.run_info: Optional[tuple[Any, ...]] = None
         self.state_dict_metadata: dict[str, torch.Size] = {}
+        # CPU snapshot of weight values at last compile/refit. Used by
+        # update_refit_condition so LIVE does not depend on TRT↔PyTorch
+        # numerical agreement (H100/B100 gaps exceed ATOL/RTOL; see #4153).
+        self._state_dict_weights: dict[str, torch.Tensor] = {}
         self._store_state_dict_metadata()
         self.enable_weight_streaming = (
             kwargs["enable_weight_streaming"]
@@ -237,8 +239,25 @@ class MutableTorchTensorRTModule(object):
         return total_dynamic_shape
 
     def _store_state_dict_metadata(self) -> None:
+        self.state_dict_metadata = {}
+        self._state_dict_weights = {}
         for k, v in self.original_model.state_dict().items():
             self.state_dict_metadata[k] = v.shape
+            # Detach + CPU copy so later comparisons do not alias live params.
+            self._state_dict_weights[k] = v.detach().to("cpu", copy=True)
+
+    def _state_dict_values_match(self) -> bool:
+        # Older pickled modules may lack the snapshot; fall back to output compare.
+        weights = getattr(self, "_state_dict_weights", None)
+        if not weights:
+            return False
+        sd = self.original_model.state_dict()
+        if sd.keys() != weights.keys():
+            return False
+        for k, v in sd.items():
+            if not torch.equal(v.detach().cpu(), weights[k]):
+                return False
+        return True
 
     def load_state_dict(
         self, state_dict: Dict[str, Any], strict: bool = True, assign: bool = False
@@ -251,37 +270,28 @@ class MutableTorchTensorRTModule(object):
         return {k: torch.nn.Parameter(v, requires_grad=False) for k, v in sd.items()}
 
     def update_refit_condition(self) -> None:
-        # 2-stage check to determine whether the module should be intact, refitted, or recompiled.
+        # Decide whether the module should stay LIVE, be refitted, or be recompiled.
 
-        # Default refit
+        # Default: value-only weight change → refit.
         self.refit_state.set_state(RefitFlag.NEEDS_REFIT)
 
-        # Run the same inputs through pytorch model and compare the result to previous run of graph module
-        # to determine whether refit/recompilation is needed. If the output is the same, no further process needed.
-        if self.run_info:
-            args, kwargs, result = self.run_info
-            self.original_model.to(to_torch_device(self.trt_device))
-            new_result = self.original_model(*args, **kwargs)
-            deallocate_module(self.original_model)
-            if check_output_equal(result, new_result):
-                self.refit_state.set_state(RefitFlag.LIVE)
-                return
-
-        # Since we do not have access to the previous state_dict, we can only use state_dict_metadata
-        # to determine whether the keys or weight shape is changed.
+        # Structural changes (keys / shapes) require a full recompile.
         sd, sd_meta = self.original_model.state_dict(), self.state_dict_metadata
         if sd.keys() != sd_meta.keys():
-            # If keys are not identical, recompile.
             self.refit_state.set_state(RefitFlag.NEEDS_RECOMPILE)
             return
 
         for k in sd.keys():
             if sd[k].shape != sd_meta[k]:
-                # If weight shapes are not identical, recompile.
                 self.refit_state.set_state(RefitFlag.NEEDS_RECOMPILE)
                 return
 
-        return
+        # Exact weight match against the last compile/refit snapshot → nothing to do.
+        # Anything else changed the weights the engine was built from, so it needs a
+        # refit: comparing outputs instead would only prove the change was invisible
+        # for one cached input, and would depend on TRT↔PyTorch agreement (#4153).
+        if self._state_dict_values_match():
+            self.refit_state.set_state(RefitFlag.LIVE)
 
     def refit_gm(self) -> None:
         """
@@ -505,16 +515,13 @@ class MutableTorchTensorRTModule(object):
                 logger.error(e)
                 logger.error("Model refit failed. Recompiling the graph module.")
                 self.compile()
-                self._store_state_dict_metadata()
+            self._store_state_dict_metadata()
             self.refit_state.set_state(RefitFlag.LIVE)
 
         weight_streaming_ctx = (
             self.weight_streaming_ctx if self.enable_weight_streaming else None
         )
-        result = self.gm(*args, **kwargs)
-        # Storing inputs and outputs for verification when the state is unknown
-        self.run_info = (args, kwargs, result)
-        return result
+        return self.gm(*args, **kwargs)
 
     def to(self, *args: Any, **kwargs: Any) -> None:
         logger.warning(
