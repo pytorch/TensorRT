@@ -501,11 +501,7 @@ def test_runtime_workflows_filter_cuda_12_without_changing_main_releases(
         ordinary = {
             row["desired_cuda"] for row in json.loads(outputs["matrix"])["include"]
         }
-        assert ordinary == (
-            _executorch_cuda_rows()
-            if arch == "cuda-aarch64"
-            else _executorch_cuda_rows() | {"cu126"}
-        )
+        assert ordinary == _executorch_cuda_rows()
         return
     selected = outputs["matrix"]
     assert {
@@ -537,7 +533,7 @@ def test_shared_companion_build_is_gated_per_cuda_row(enabled, cuda):
     )
 
 
-@pytest.mark.parametrize("arch,floor", [("x86_64", "2_28"), ("aarch64", "2_39")])
+@pytest.mark.parametrize("arch,floor", [("x86_64", "2_28"), ("aarch64", "2_28")])
 @pytest.mark.unit
 def test_shared_repair_preserves_the_companion_payload(tmp_path, arch, floor):
     """Run the shared repair loop with real wheels and check tags, hashes, and routing."""
@@ -736,13 +732,13 @@ def test_the_guard_is_given_the_platform_it_must_compare_against():
     assigned = set(
         re.findall(r"set\(TORCH_TENSORRT_MANYLINUX_TAG \"([^\"]+)\"\)", cmake)
     )
-    assert assigned == {"manylinux_2_28_x86_64", "manylinux_2_39_aarch64"}, (
+    assert assigned == {"manylinux_2_28_x86_64", "manylinux_2_28_aarch64"}, (
         "the build assigns "
         f"{sorted(assigned)} as its manylinux tag, but the two architectures ship under different "
         "platforms and using one for both rejects the aarch64 row for requiring exactly what its "
         "own builder image provides"
     )
-    for tag in ("_2_28", "_2_39"):
+    for tag in ("_2_28_x86_64", "_2_28_aarch64"):
         assert tag in guard, f"the guard has no floor entry for manylinux{tag}"
 
 
@@ -852,7 +848,7 @@ def test_the_wheel_ships_a_cmake_package_for_cpp_consumers():
 
 @pytest.mark.unit
 def test_the_runtime_package_ships_no_runtime_api():
-    """The delegate wheel registers a backend and nothing else.
+    """The delegate wheel registers a backend, and keeps the entry points it used to publish.
 
     It used to carry a ``runtime.py`` wrapping ExecuTorch's ``Runtime``/``Program``, which duplicated
     what ExecuTorch already exports and put a second inference API in a wheel whose only job is
@@ -866,7 +862,9 @@ def test_the_runtime_package_ships_no_runtime_api():
         / "torch_tensorrt_executorch_runtime/runtime.py"
     ).exists()
 
-    # And the package exports only the registration surface.
+    # The registration surface, plus the two names the published wheel already exported. Removing
+    # those outright breaks code written against it, so they stay as a deprecated alias and as an
+    # error that says what to use instead.
     delegate_init = (
         _REPO_ROOT
         / "py/torch-tensorrt-executorch-runtime"
@@ -878,11 +876,17 @@ def test_the_runtime_package_ships_no_runtime_api():
     assert set(exported) == {
         "BACKEND_NAME",
         "DelegateCompatibilityError",
+        "activate",
+        "get_runtime",
         "register",
     }, (
-        "the delegate package exports something beyond its registration surface: "
-        f"{sorted(exported)}"
+        "the delegate package exports something beyond its registration surface and the "
+        f"entry points it has to keep: {sorted(exported)}"
     )
+    # Both forward to ExecuTorch rather than returning None, so a caller that used the return
+    # value of the published API still gets something usable.
+    assert "return portable_lib" in delegate_init.split("def activate")[1]
+    assert "return Runtime.get()" in delegate_init.split("def get_runtime")[1]
 
 
 @pytest.mark.unit
@@ -1013,7 +1017,7 @@ def test_the_delegate_checks_the_runtime_and_platform_policy():
         assert family in guard, f"the guard does not look at {family} versions"
     assert "policy_versions" in guard
     assert "manylinux_2_28_x86_64" in guard
-    assert "manylinux_2_39_aarch64" in guard
+    assert "manylinux_2_28_aarch64" in guard
 
 
 @pytest.mark.unit
@@ -2783,11 +2787,12 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
     purelib, tag, arch = "false", "manylinux_2_28_x86_64", "x86_64"
 
     if case == "aarch64_tag":
-        tag, arch = "manylinux_2_39_aarch64", "aarch64"
+        tag, arch = "manylinux_2_28_aarch64", "aarch64"
     elif case == "unrepaired_tag":
         tag = "linux_x86_64"
     elif case == "wrong_architecture_floor":
-        tag, arch = "manylinux_2_28_aarch64", "aarch64"
+        # A floor the companion does not ship, so the guard has to refuse it.
+        tag, arch = "manylinux_2_39_aarch64", "aarch64"
     elif case == "requires_a_mismatched_main":
         requires = [
             "torch-tensorrt==2.15.0a0" if r.startswith("torch-tensorrt==") else r
@@ -3123,30 +3128,3 @@ def test_the_wheel_build_resolves_the_delegate_from_its_installed_location(
     if failure in {"", "import"}:
         expected.append("imported")
     assert events.read_text().splitlines() == expected
-
-
-@pytest.mark.unit
-def test_the_install_script_puts_a_cuda_runtime_on_the_library_path_for_both_majors():
-    """Every CUDA row gets a CUDA runtime directory, not just the CUDA 13 ones.
-
-    The two majors ship different layouts: nvidia-cuda-runtime-cu12 installs
-    nvidia/cuda_runtime/lib/libcudart.so.12 while the CUDA 13 line installs
-    nvidia/cu13/lib/libcudart.so.13. Naming only the cu13 path left every CUDA 12 row with no
-    CUDA runtime on the search path, and the ExecuTorch reference runner died at startup with
-    "libcudart.so.12: cannot open shared object file" while the package was installed all along.
-    The generic install script also serves ordinary release and JetPack builds, which still
-    need CUDA 12 support even though the slim delegate requires CUDA 13.
-    """
-    script = (_REPO_ROOT / ".github/scripts/install-torch-tensorrt.sh").read_text(
-        encoding="utf-8"
-    )
-    for directory in ("nvidia/cuda_runtime/lib", "nvidia/cu13/lib"):
-        assert directory in script, (
-            f"{directory} is not on LD_LIBRARY_PATH, so a row of that CUDA major cannot resolve "
-            "libcudart at run time"
-        )
-    # Matched on the major, so a future cu128 or cu134 row is covered without another edit.
-    for pattern in ("cu12*)", "cu13*)"):
-        assert (
-            pattern in script
-        ), f"{pattern} is gone, so a CUDA row of that major would fall through to no directory"

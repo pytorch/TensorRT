@@ -24,6 +24,9 @@ from __future__ import annotations
 import ctypes
 import os
 import threading
+import warnings
+from types import ModuleType
+from typing import Any
 
 BACKEND_NAME = "TensorRTBackend"
 # The same name ExecuTorch gives its own delegates, and the exact filename the wheel ships.
@@ -245,6 +248,44 @@ def _registered_backend_names() -> list[str]:
     return _get_registered_backend_names()
 
 
+def activate() -> ModuleType:
+    """Deprecated: register the backend and return ExecuTorch's own portable runtime.
+
+    The companion published before this change swapped in its own bundled ``_portable_lib`` and
+    returned it. This package no longer bundles one, so it registers the backend and hands back
+    ExecuTorch's module, which is the one that now carries the delegate. A caller that only wanted
+    registration is unaffected; one that used the return value gets the module it was reaching for.
+    """
+    warnings.warn(
+        "activate() is deprecated; the backend registers on import. Call register() if you "
+        "need to register explicitly.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    register()
+    from executorch.extension.pybindings import portable_lib
+
+    return portable_lib
+
+
+def get_runtime() -> Any:
+    """Deprecated: ExecuTorch's runtime, which now owns execution for this backend.
+
+    The companion used to return a runtime of its own. ExecuTorch's ``Runtime.get()`` is that
+    object now, so this forwards to it rather than failing, and a caller that asked for a runtime
+    still gets one that can see the registered backend.
+    """
+    warnings.warn(
+        "get_runtime() is deprecated; use executorch.runtime.Runtime.get().",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    register()
+    from executorch.runtime import Runtime
+
+    return Runtime.get()
+
+
 # Tooling can opt out; normal imports must fail if this delegate cannot own registration.
 if os.getenv("TORCH_TENSORRT_SKIP_DELEGATE_REGISTRATION", "0").lower() not in (
     "1",
@@ -254,4 +295,10 @@ if os.getenv("TORCH_TENSORRT_SKIP_DELEGATE_REGISTRATION", "0").lower() not in (
 ):
     register()
 
-__all__ = ["BACKEND_NAME", "DelegateCompatibilityError", "register"]
+__all__ = [
+    "BACKEND_NAME",
+    "DelegateCompatibilityError",
+    "activate",
+    "get_runtime",
+    "register",
+]

@@ -179,6 +179,19 @@ class BazelBuild(build_py):
         return mapping
 
     def run(self) -> None:
+        # setuptools runs a customized build_py through a broad try/except during editable
+        # installs and downgrades any failure to a warning pip hides, so a failed native build
+        # would report "Successfully installed" with no delegate. SystemExit escapes that catch.
+        # A misconfiguration this file raises itself is left alone: it already stops the build,
+        # and rewriting it would hide which of the two went wrong.
+        try:
+            self._build()
+        except (SystemExit, RuntimeError):
+            raise
+        except BaseException as error:
+            raise SystemExit(f"ExecuTorch delegate build failed: {error}") from error
+
+    def _build(self) -> None:
         super().run()
 
         if sys.platform != "linux":

@@ -21,7 +21,7 @@ _RUNPATH = (
 )
 _REGISTER = "_ZN10executorch7runtime16register_backendERKNS0_7BackendE"
 _X86 = "manylinux_2_28_x86_64"
-_ARM = "manylinux_2_39_aarch64"
+_ARM = "manylinux_2_28_aarch64"
 _BASE_VERSIONS = "CXXABI_1.3 GLIBCXX_3.4.21 GLIBC_2.17 GCC_3.0"
 
 
@@ -155,7 +155,7 @@ def test_supplied_empty_option_is_rejected(artifact, position):
         "manylinux_2_28",
         "manylinux_2_39",
         "linux_x86_64",
-        "manylinux_2_28_aarch64",
+        "manylinux_2_39_aarch64",
         "manylinux_2_39_x86_64",
         "unknown",
     ],

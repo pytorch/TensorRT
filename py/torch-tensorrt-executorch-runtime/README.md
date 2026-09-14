@@ -77,7 +77,7 @@ outside these standard locations, its `lib` directory must be available through
 the system dynamic loader configuration or `LD_LIBRARY_PATH`.
 
 The shared Linux build tags this wheel with `wheel tags` after the native
-checks: `manylinux_2_28_x86_64` or `manylinux_2_39_aarch64`, with `py3-none`.
+checks: `manylinux_2_28_x86_64` or `manylinux_2_28_aarch64`, with `py3-none`.
 This updates wheel metadata and RECORD without bundling external libraries or
 changing the delegate. Payload, dependency metadata, and installed-library
 resolution are checked before the shared artifact is uploaded.
