@@ -1,7 +1,6 @@
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 from torch.fx.node import Node
-
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import ConverterPriority
 from torch_tensorrt.dynamo.conversion.plugins._generate_plugin import generate_plugin
@@ -17,6 +16,8 @@ def custom_op(
     supports_dynamic_shapes: bool = False,
     requires_output_allocator: bool = False,
     *,
+    aot_impl: Optional[Callable[..., Any]] = None,
+    autotune: Optional[Callable[..., Any]] = None,
     use_aot_if_available: bool = True,
     _aot_register: Optional[Callable[[], None]] = None,
 ) -> None:
@@ -24,7 +25,7 @@ def custom_op(
     Generate the Plugin and corresponding Plugin Converter using external kernels and TensorRT Quick Deployable Plugin APIs.
 
     Args:
-        plugin_name: the plugin name that is used to generate the plugin automatically.
+        op_name: the plugin name that is used to generate the plugin automatically.
             There should be existing kernels and pytorch custom operation for this plugin name.
         capability_validator:  A lambda that can take a ``torch.fx.Node`` and determine if the
             converter can properly handle this Node. If the validator returns ``False``, the subgraph
@@ -32,13 +33,19 @@ def custom_op(
         priority: Allows developers to override existing converters in the converter registry
         supports_dynamic_shapes: if dynamic shape is supported
         requires_output_allocator: if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators)
+        aot_impl: optional TensorRT QDP AOT implementation callback. The callback
+            must follow the ``tensorrt.plugin.aot_impl`` contract and return the
+            compiled kernel, launch parameters, and symbolic scalar expressions.
+        autotune: optional TensorRT QDP autotune callback. The callback must
+            follow the ``tensorrt.plugin.autotune`` contract. Its tactic IDs are
+            forwarded to ``aot_impl`` by TensorRT.
         use_aot_if_available: forwarded to ``generate_plugin_converter``; when ``True``
             (the default), the converter prefers the AOT impl if the op has one registered.
         _aot_register: internal hook used by ``torch_tensorrt.kernels`` to register a
             cuda-python AOT impl between the plugin descriptor and the converter. Not
             part of the public API; pass ``None`` (the default) for ordinary use.
     """
-    generate_plugin(op_name)
+    generate_plugin(op_name, aot_impl=aot_impl, autotune=autotune)
     if _aot_register is not None:
         _aot_register()
     generate_plugin_converter(
