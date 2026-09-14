@@ -102,7 +102,11 @@ jobs:
         run: |
           set -euo pipefail
           args=(--track "$TRACK")
-          if [ "$ALLOW_DOWNGRADE" = "true" ]; then
+          # A release branch inherits main's nightly pin, and every stable release sorts below a
+          # nightly, so the first re-pin of a cut branch is always a nominal downgrade. That is
+          # the whole point of the stable track, not a mistake to refuse, so allow it there and
+          # keep the guard for main.
+          if [ "$ALLOW_DOWNGRADE" = "true" ] || [ "$TRACK" = "stable" ]; then
             args+=(--allow-downgrade)
           fi
           python .github/scripts/update_executorch_pin.py "${args[@]}"

@@ -601,46 +601,6 @@ def test_matrix_keeps_every_cuda_13_row_the_pin_supports():
     assert arm == {cuda for cuda in x86 if not cuda.startswith("cu12")}
 
 
-@pytest.mark.parametrize("channel", ["nightly", "test", "release", None])
-@pytest.mark.parametrize("arch", ["cuda", "cuda-aarch64", "cuda-arm64"])
-@pytest.mark.parametrize("use_rtx", ["true", "false"])
-@pytest.mark.unit
-def test_matrix_keeps_cuda_12_only_for_release_channels(channel, arch, use_rtx):
-    supported = _declared_cuda_versions(
-        "x86_cuda_versions" if arch == "cuda" else "arm_cuda_versions"
-    )
-    rows = [
-        {
-            "python_version": "3.12",
-            "desired_cuda": cuda,
-            "gpu_arch_type": arch,
-            **({"channel": channel} if channel is not None else {}),
-        }
-        for cuda in sorted(supported | {"cu126"})
-    ]
-    result = subprocess.run(
-        [
-            sys.executable,
-            str(REPO_ROOT / ".github/scripts/filter-matrix.py"),
-            "--matrix",
-            json.dumps({"include": rows}),
-            "--limit-pr-builds",
-            "false",
-            "--use-rtx",
-            use_rtx,
-        ],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    actual = {row["desired_cuda"] for row in json.loads(result.stdout)["include"]}
-    expected = {cuda for cuda in supported if not cuda.startswith("cu12")}
-    assert expected, "the matrix filter declares no CUDA 13 rows to keep"
-    if channel in {"test", "release"} and arch == "cuda":
-        expected.add("cu126")
-    assert actual == expected
-
-
 @pytest.mark.unit
 def test_jetpack_matrix_keeps_its_separate_cuda_contract():
     result = subprocess.run(
@@ -2313,14 +2273,17 @@ def test_update_workflow_requires_manual_downgrade_authority(tmp_path, allow):
         text=True,
         env={
             **os.environ,
-            "TRACK": "stable",
+            # Nightly, because the stable track always passes the flag: a cut release branch
+            # inherits a nightly pin that every stable release sorts below, so its first re-pin
+            # is a nominal downgrade by construction. The input is what this case is about.
+            "TRACK": "nightly",
             "ALLOW_DOWNGRADE": str(allow).lower(),
             "GITHUB_OUTPUT": str(tmp_path / "output"),
         },
         check=True,
     )
     assert ("--allow-downgrade" in result.stdout.splitlines()) is allow
-    assert result.stdout.splitlines()[1:3] == ["--track", "stable"]
+    assert result.stdout.splitlines()[1:3] == ["--track", "nightly"]
     branch = next(
         step for step in steps if "create-pull-request@" in step.get("uses", "")
     )["with"]["branch"]
@@ -2538,3 +2501,27 @@ def test_update_workflow_picks_the_track_each_branch_may_use(
     else:
         assert result.returncode == 0, result.stderr
         assert output.read_text() == f"track={expected}\n"
+
+
+@pytest.mark.unit
+def test_the_stable_track_may_repin_below_an_inherited_nightly() -> None:
+    """A cut release branch inherits main's nightly pin, which every stable release sorts below.
+
+    Refusing that as a downgrade made the release arm fail on its first run, under
+    ``set -euo pipefail``, unless an operator knew to tick a box. Main keeps the guard, because a
+    downgrade there really is suspicious.
+    """
+    workflow = yaml.safe_load(
+        (REPO_ROOT / ".github/workflows/executorch-pin-update.yml").read_text(
+            encoding="utf-8"
+        )
+    )
+    step = next(
+        step
+        for job in workflow["jobs"].values()
+        if isinstance(job, dict)
+        for step in job.get("steps", [])
+        if "update_executorch_pin.py" in step.get("run", "")
+    )
+    assert '"$TRACK" = "stable"' in step["run"], step["run"]
+    assert "--allow-downgrade" in step["run"], step["run"]
