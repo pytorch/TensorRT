@@ -68,8 +68,8 @@ def main():
         name, version, _, tags = parse_wheel_filename(args.wheel.name)
         if name != "torch-tensorrt-executorch-runtime":
             reject(f"unexpected distribution: {name}")
-        floor = "2_39" if args.architecture == "aarch64" else "2_28"
-        expected_tag = f"py3-none-manylinux_{floor}_{args.architecture}"
+        # One floor for both architectures, matching every wheel this ships beside on the index.
+        expected_tag = f"py3-none-manylinux_2_28_{args.architecture}"
         if {str(tag) for tag in tags} != {expected_tag}:
             reject(f"expected repaired tag {expected_tag}, got {tags}")
         wheel_metadata = BytesParser().parsebytes(

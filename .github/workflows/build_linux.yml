@@ -470,7 +470,7 @@ jobs:
               # The shared repair script only handles CPython-tagged wheels.
               case "${ARCH}" in
                 x86_64) platform_tag=manylinux_2_28_x86_64 ;;
-                aarch64) platform_tag=manylinux_2_39_aarch64 ;;
+                aarch64) platform_tag=manylinux_2_28_aarch64 ;;
                 *) echo "Unsupported delegate architecture: ${ARCH}" >&2; exit 1 ;;
               esac
               ${CONDA_RUN} python -m wheel tags --remove --platform-tag "${platform_tag}" "${abs_pkg}"

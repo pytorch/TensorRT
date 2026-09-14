@@ -39,7 +39,7 @@ class Program:
 def load(path: Union[str, Path]) -> Program:
     """Load a program with embedded weights through ExecuTorch's Module API."""
     try:
-        from torch_tensorrt_executorch_runtime import register
+        import torch_tensorrt_executorch_runtime as delegate
     except ModuleNotFoundError as error:
         if error.name != "torch_tensorrt_executorch_runtime":
             raise
@@ -48,6 +48,17 @@ def load(path: Union[str, Path]) -> Program:
             "(torch_tensorrt_executorch_runtime). Install the delegate and ExecuTorch "
             "from the same release matrix."
         ) from error
+    # A companion published before the delegate became a single registration call exposes
+    # activate() instead. Accept it so upgrading this wheel alone keeps loading programs.
+    register = getattr(delegate, "register", None) or getattr(
+        delegate, "activate", None
+    )
+    if register is None:
+        raise ImportError(
+            "The installed torch_tensorrt_executorch_runtime exposes neither register() "
+            "nor activate(). Install a delegate from the same release matrix as "
+            "Torch-TensorRT."
+        )
 
     model_path = Path(path)
     if not model_path.is_file():

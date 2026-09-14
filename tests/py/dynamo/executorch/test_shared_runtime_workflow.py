@@ -148,7 +148,6 @@ def test_shared_build_provisions_tensorrt_metadata(tmp_path, arch, cuda, release
     (runtime / "version.txt").write_text("7.4.1\n")
     scripts = tmp_path / ".github/scripts"
     scripts.mkdir(parents=True)
-    shutil.copy2(ROOT / ".github/scripts/filter-executorch-cuda-arches.py", scripts)
     step = next(
         s
         for s in _workflow("build_linux.yml")["jobs"]["build"]["steps"]
@@ -276,7 +275,6 @@ def _assert_device_commands(tmp_path, workflow, failure=""):
         "    elif args[:2] == ['-m', 'venv']:\n"
         "        p = Path(args[2]) / 'bin/python'; p.parent.mkdir(parents=True); p.symlink_to(os.environ['DISPATCH'])\n"
         "    elif args[:4] == ['-u', '-X', 'faulthandler', '-c']: pass\n"
-        "    elif args[0] == '.github/scripts/filter-executorch-cuda-arches.py': print('8.0')\n"
         "    elif args[0].startswith('examples/'):\n"
         "        model = Path(next(a.split('=', 1)[1] for a in args if a.startswith('--model_path=')))\n"
         "        if Path(args[0]).name.startswith('export_'): model.write_text('exported')\n"
@@ -429,3 +427,87 @@ def test_disabled_device_job_is_detected(tmp_path):
     workflow["jobs"]["test"]["if"] = "${{ false }}"
     with pytest.raises(AssertionError):
         _assert_device_commands(tmp_path, workflow)
+
+
+@pytest.mark.unit
+def test_the_delegate_lane_narrows_the_matrix_to_cuda_13_rows() -> None:
+    """The lane passes --executorch-runtime, and the filter must act on it.
+
+    Nothing else asserted this, so deleting the flag from the workflow, or the branch it gates
+    in the filter, left every guard green while the lane silently tested rows whose channel
+    carries no ExecuTorch.
+    """
+    workflow = (ROOT / ".github/workflows/executorch-test-linux.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "--executorch-runtime" in workflow, workflow
+
+    script = ROOT / ".github/scripts/filter-matrix.py"
+    rows = [
+        {"desired_cuda": cuda, "python_version": "3.10", "gpu_arch_type": "cuda"}
+        for cuda in ("cu126", "cu130", "cu134")
+    ]
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            "--executorch-runtime",
+            "--use-rtx",
+            "false",
+            "--limit-pr-builds",
+            "false",
+            "--matrix",
+            json.dumps({"include": rows}),
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    kept = {row["desired_cuda"] for row in json.loads(result.stdout)["include"]}
+    assert kept and all(row.startswith("cu13") for row in kept), kept
+
+
+@pytest.mark.unit
+def test_the_loader_accepts_a_companion_that_only_exposes_activate() -> None:
+    """A companion published before registration became one call exposes activate().
+
+    The main wheel does not require a matching companion, so upgrading Torch-TensorRT alone
+    leaves that older companion installed. Importing `register` unconditionally raised
+    ImportError, which the loader's ModuleNotFoundError handler does not catch, so the failure
+    surfaced as a traceback rather than the guidance the same function exists to give.
+    """
+    source = (ROOT / "py/torch_tensorrt/_executorch_compat.py").read_text(
+        encoding="utf-8"
+    )
+    assert '"activate"' in source, source
+    assert (
+        "from torch_tensorrt_executorch_runtime import register" not in source
+    ), source
+
+
+@pytest.mark.unit
+def test_the_removed_entry_points_still_exist_as_shims() -> None:
+    """activate() and get_runtime() were public, so removing them outright breaks callers."""
+    package = ROOT / "py/torch-tensorrt-executorch-runtime"
+    source = (package / "torch_tensorrt_executorch_runtime/__init__.py").read_text(
+        encoding="utf-8"
+    )
+    assert "def activate(" in source, source
+    assert "def get_runtime(" in source, source
+    for name in ("activate", "get_runtime", "register"):
+        assert f'"{name}"' in source.split("__all__")[-1], name
+
+
+@pytest.mark.unit
+def test_a_failed_native_build_cannot_report_success() -> None:
+    """setuptools swallows a customized build_py during editable installs.
+
+    It wraps the command in a broad `except Exception` and downgrades the failure to a warning
+    pip hides, so a failed delegate build would leave pip printing "Successfully installed".
+    SystemExit derives from BaseException and escapes that catch.
+    """
+    source = (ROOT / "py/torch-tensorrt-executorch-runtime/setup.py").read_text(
+        encoding="utf-8"
+    )
+    assert 'raise SystemExit(f"ExecuTorch delegate build failed' in source, source
+    assert "except BaseException as error:" in source, source
