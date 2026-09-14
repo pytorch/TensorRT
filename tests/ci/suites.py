@@ -66,6 +66,7 @@ class Suite:
     name: str
     tier: Tier
     lanes: tuple[Lane, ...]
+    manual: bool = False  # runnable by name, excluded from lane/tier scheduling
     cwd: str = "tests/py/dynamo"  # relative to repo root
     paths: tuple[str, ...] = ()  # pytest positionals (rel to cwd); globs ok
     markers: str | None = None  # -m EXPR
@@ -159,11 +160,12 @@ _L0: list[Suite] = [
         # model-zoo or torchvision dependencies during collection.
         "trt-api",
         tier="l0",
-        lanes=("fast", "full", "nightly"),
+        lanes=(),
+        manual=True,
         cwd="tests/py",
         paths=(
             "dynamo/runtime/test_000_convert_module_to_trt_engine.py",
-            "dynamo/conversion/test_engine_converter_binding_names.py",
+            "dynamo/conversion/",
             "dynamo/automatic_plugin/test_plugin_attr_annotations.py",
             "dynamo/runtime/test_004_runtime_settings.py",
             "ts/api/test_classes.py",

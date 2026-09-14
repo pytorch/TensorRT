@@ -12,7 +12,6 @@ import os
 import re
 import shlex
 import subprocess
-import sys
 from pathlib import Path
 
 from .suites import SUITES, Suite, Variant, by_name
@@ -312,6 +311,8 @@ def select(
         if aff is not None:  # None → a broad change → do not narrow
             pool = [s for s in pool if s.name in aff]
     for s in pool:
+        if s.manual and not names:
+            continue
         if lane is not None and lane not in s.lanes:
             continue
         if tier is not None and s.tier != tier:

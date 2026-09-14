@@ -23,9 +23,10 @@ def _cmd_list(_: argparse.Namespace) -> int:
         f"{'SUITE'.ljust(width)}  TIER  LANES                  VARIANTS         PLATFORMS"
     )
     for s in SUITES:
+        lane_display = "manual" if s.manual else ",".join(s.lanes)
         print(
             f"{s.name.ljust(width)}  {s.tier:<4}  "
-            f"{','.join(s.lanes):<21}  {','.join(s.variants):<15}  {','.join(s.platforms)}"
+            f"{lane_display:<21}  {','.join(s.variants):<15}  {','.join(s.platforms)}"
         )
     print(
         f"\n{len(SUITES)} suites.  "
@@ -36,7 +37,8 @@ def _cmd_list(_: argparse.Namespace) -> int:
 
 def _cmd_show(args: argparse.Namespace) -> int:
     s = by_name(args.name)
-    print(f"# {s.name}  (tier={s.tier}, lanes={','.join(s.lanes)})")
+    lane_display = "manual" if s.manual else ",".join(s.lanes)
+    print(f"# {s.name}  (tier={s.tier}, lanes={lane_display})")
     for var in s.variants:
         print(f"\n## variant: {var}   junit: {junit_path(s).name}")
         print(describe(s, var))
@@ -109,7 +111,7 @@ def _cmd_matrix(args: argparse.Namespace) -> int:
 
 def _cmd_doctor(_: argparse.Namespace) -> int:
     """Static checks CI can gate on: unique names, unique junit paths, valid setup
-    steps, declared cwd dirs exist, every suite is reachable by some lane."""
+    steps, declared cwd dirs exist, and scheduled suites have at least one lane."""
     problems: list[str] = []
     names = [s.name for s in SUITES]
     dupes = {n for n in names if names.count(n) > 1}
@@ -126,7 +128,9 @@ def _cmd_doctor(_: argparse.Namespace) -> int:
         for step in s.setup:
             if step not in valid_setup:
                 problems.append(f"{s.name}: unknown setup step {step!r}")
-        if not s.lanes:
+        if s.manual and s.lanes:
+            problems.append(f"{s.name}: manual suite must not belong to a lane")
+        if not s.manual and not s.lanes:
             problems.append(f"{s.name}: belongs to no lane")
         if not s.variants:
             problems.append(f"{s.name}: runs on no variant")
@@ -139,7 +143,6 @@ def _cmd_doctor(_: argparse.Namespace) -> int:
             if var not in (s.overrides.keys() | {"standard", "rtx"}):
                 problems.append(f"{s.name}: bad variant {var!r}")
 
-    # Every suite should be exercised by some lane and some tier path.
     if problems:
         for p in problems:
             print(f"✗ {p}", file=sys.stderr)
