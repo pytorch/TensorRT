@@ -580,3 +580,23 @@ def test_the_updater_reads_the_cuda_major_from_the_matrix_alone(monkeypatch):
     source = Path(updater.__file__).read_text(encoding="utf-8")
     assert 'fullmatch(r"cu13' not in source, source
     assert 'default="cu13' not in source, source
+
+
+@pytest.mark.unit
+def test_delegate_channels_fails_loudly_when_the_matrix_moves(tmp_path, monkeypatch):
+    """A renamed or rewritten filter must break the bump, not silently read as empty.
+
+    Parsing the filter's source made a rename yield an empty declaration set, which read as
+    "no channels" rather than "cannot tell". Importing it raises instead.
+    """
+    monkeypatch.setattr(updater, "_REPO_ROOT", tmp_path)
+    with pytest.raises((SystemExit, FileNotFoundError)):
+        updater.delegate_channels()
+
+    scripts = tmp_path / ".github/scripts"
+    scripts.mkdir(parents=True)
+    (scripts / "filter-matrix.py").write_text(
+        "EXECUTORCH_CUDA_MAJOR = 13\n", encoding="utf-8"
+    )
+    with pytest.raises(AttributeError):
+        updater.delegate_channels()

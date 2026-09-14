@@ -8,7 +8,7 @@ must pass before that proposal is usable.
 from __future__ import annotations
 
 import argparse
-import ast
+import importlib.util
 import re
 import subprocess
 import sys
@@ -273,20 +273,18 @@ def write_pins(new_version: str, new_commit: str) -> bool:
 
 def delegate_channels() -> list[str]:
     """Nightly channels the delegate build accepts, read from the matrix filter."""
-    source = (_REPO_ROOT / ".github/scripts/filter-matrix.py").read_text(
-        encoding="utf-8"
-    )
-    declared = {}
-    for node in ast.parse(source).body:
-        target = getattr(node, "target", None) or next(
-            iter(getattr(node, "targets", [])), None
-        )
-        if isinstance(target, ast.Name) and isinstance(
-            getattr(node, "value", None), (ast.List, ast.Constant)
-        ):
-            declared[target.id] = ast.literal_eval(node.value)
-    major = declared["EXECUTORCH_CUDA_MAJOR"]
-    rows = set(declared["x86_cuda_versions"]) | set(declared["arm_cuda_versions"])
+    # Imported rather than parsed. The filter's own values are the source of truth, so reading
+    # them through the import machinery cannot drift from how the filter itself sees them, and a
+    # rename or a rewrite fails loudly instead of yielding an empty parse. Its name has hyphens
+    # and its entry point is guarded, so a spec import is both necessary and side effect free.
+    path = _REPO_ROOT / ".github/scripts/filter-matrix.py"
+    spec = importlib.util.spec_from_file_location("_trt_filter_matrix", path)
+    if spec is None or spec.loader is None:
+        raise SystemExit(f"cannot load the matrix filter from {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    major = module.EXECUTORCH_CUDA_MAJOR
+    rows = set(module.x86_cuda_versions) | set(module.arm_cuda_versions)
     channels = sorted(row for row in rows if re.fullmatch(rf"cu{major}\d+", row))
     if not channels:
         # Bumping the major before adding its rows is the documented order, and an empty list
