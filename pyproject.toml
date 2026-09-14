@@ -200,11 +200,6 @@ url = "https://download.pytorch.org/whl/nightly/cu128"
 explicit = false
 
 [[tool.uv.index]]
-name = "pytorch-nightly-cu126"
-url = "https://download.pytorch.org/whl/nightly/cu126"
-explicit = false
-
-[[tool.uv.index]]
 name = "pytorch-test-cu130"
 url = "https://download.pytorch.org/whl/test/cu130"
 explicit = false
@@ -215,11 +210,6 @@ url = "https://download.pytorch.org/whl/test/cu128"
 explicit = false
 
 [[tool.uv.index]]
-name = "pytorch-test-cu126"
-url = "https://download.pytorch.org/whl/test/cu126"
-explicit = false
-
-[[tool.uv.index]]
 name = "pytorch-release-cu130"
 url = "https://download.pytorch.org/whl/release/cu130"
 explicit = false
@@ -227,11 +217,6 @@ explicit = false
 [[tool.uv.index]]
 name = "pytorch-release-cu128"
 url = "https://download.pytorch.org/whl/release/cu128"
-explicit = false
-
-[[tool.uv.index]]
-name = "pytorch-release-cu126"
-url = "https://download.pytorch.org/whl/release/cu126"
 explicit = false
 
 # [[tool.uv.index]]

@@ -16,7 +16,6 @@ packages:
 
 - `torch/lib`
 - `tensorrt_libs`
-- `nvidia/cuda_runtime/lib` (CUDA 12)
 - `nvidia/cu13/lib` (CUDA 13)
 
 These packages are installed transitively with the matching `torch-tensorrt`

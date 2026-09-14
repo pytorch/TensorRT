@@ -407,9 +407,6 @@ jobs:
           # pinned torch/TensorRT packages.
           ${CONDA_RUN} python -m pip install --no-deps dist/torch_tensorrt*.whl
           ${CONDA_RUN} python -m pip install pyyaml "executorch==1.4.1"
-          TORCH_CUDA_ARCH_LIST="$(${CONDA_RUN} python .github/scripts/filter-executorch-cuda-arches.py "${TORCH_CUDA_ARCH_LIST:-}")"
-          export TORCH_CUDA_ARCH_LIST
-          echo "TORCH_CUDA_ARCH_LIST=${TORCH_CUDA_ARCH_LIST}"
           # Give the companion wheel the same channel/date and CUDA local-version
           # suffix as torch-tensorrt, while retaining its independent base version.
           main_version="$(sed 's/a0$//' version.txt)"
