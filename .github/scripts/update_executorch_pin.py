@@ -287,7 +287,15 @@ def delegate_channels() -> list[str]:
             declared[target.id] = ast.literal_eval(node.value)
     major = declared["EXECUTORCH_CUDA_MAJOR"]
     rows = set(declared["x86_cuda_versions"]) | set(declared["arm_cuda_versions"])
-    return sorted(row for row in rows if re.fullmatch(rf"cu{major}\d+", row))
+    channels = sorted(row for row in rows if re.fullmatch(rf"cu{major}\d+", row))
+    if not channels:
+        # Bumping the major before adding its rows is the documented order, and an empty list
+        # would turn the cross-channel check below into a silent no-op.
+        raise SystemExit(
+            f"the matrix declares no cu{major} row, so the delegate accepts no channel; "
+            "add the rows for that CUDA major before moving the pin"
+        )
+    return channels
 
 
 def _public_or_none(raw: str) -> str | None:
