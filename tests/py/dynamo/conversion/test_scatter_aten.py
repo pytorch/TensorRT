@@ -344,7 +344,7 @@ class TestScatterDtypeFixConverter(DispatchTestCase):
                 return torch.ops.aten.scatter.src(x, 1, index, src)
 
         inputs = [torch.arange(8, dtype=torch.int64).reshape(2, 4)]
-        self.run_test(TestModule(), inputs)
+        self.run_test(TestModule(), inputs, use_dynamo_tracer=True)
 
 
 if __name__ == "__main__":
