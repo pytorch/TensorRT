@@ -469,7 +469,23 @@ def scaled_dot_product_efficient_attention(
     else:
         if attn_bias is not None:
             attn_bias = get_trt_tensor(ctx, attn_bias, f"{name}_attn_bias")
-            attention_layer.mask = attn_bias
+            if attn_bias.dtype == trt.DataType.BOOL:
+                mask = attn_bias
+            elif attn_bias.dtype != query.dtype:
+                mask = cast_trt_tensor(
+                    ctx,
+                    attn_bias,
+                    query.dtype,
+                    f"{name}_cast_attn_bias",
+                    target,
+                    source_ir,
+                )
+            else:
+                mask = attn_bias
+            mask = _normalize_attention_mask_rank(
+                ctx, mask, query, f"{name}_normalize_attn_bias"
+            )
+            attention_layer.mask = mask
 
     fp8_norm = _maybe_set_fp8_softmax(ctx, name, attention_layer)
     attention_layer.decomposable = not fp8_norm
