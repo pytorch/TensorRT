@@ -1284,8 +1284,10 @@ def compile_module(
     CONVERTERS.set_compilation_settings(settings)
 
     # Check the number of supported operations in the graph
-    num_supported_ops, total_ops = partitioning.get_graph_converter_support(
-        gm, settings.torch_executed_ops
+    num_supported_ops, total_ops, op_support = (
+        partitioning.get_graph_converter_support_overview(
+            gm, settings.torch_executed_ops
+        )
     )
 
     dryrun_tracker.total_ops_in_graph = total_ops
@@ -1307,6 +1309,11 @@ def compile_module(
             f"{num_supported_ops} supported operations detected in subgraph containing {total_ops} computational nodes. "
             f"Skipping this subgraph, since min_block_size was detected to be {settings.min_block_size}"
         )
+
+        dryrun_tracker.unsupported_ops = op_support.unsupported_operators
+        dryrun_tracker.to_run_in_torch.extend(parse_non_trt_nodes(gm))
+        parse_graph_io(gm, dryrun_tracker)
+        dryrun_stats_display(dryrun_tracker, settings.dryrun)
         return gm
     else:
         logger.debug(
