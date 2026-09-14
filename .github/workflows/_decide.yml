@@ -6,6 +6,7 @@ name: _decide
 #
 #   lane:    fast (PR push) | full (approval / `ci: full` / main push) |
 #            nightly (nightly or release-branch push) | skip (non-approval review)
+#   suite:   trt-api when the opt-in `ci:trt-api` label is present; otherwise empty
 #   backend: standard | rtx | both  — from the `backend: TensorRT[-RTX]` labels
 #            (or the workflow_dispatch `backend` input)
 
@@ -18,6 +19,9 @@ on:
       backend:
         description: "standard | rtx | both"
         value: ${{ jobs.decide.outputs.backend }}
+      suite:
+        description: "Explicit manual suite, or empty for lane selection"
+        value: ${{ jobs.decide.outputs.suite }}
 
 jobs:
   decide:
@@ -25,6 +29,7 @@ jobs:
     outputs:
       lane: ${{ steps.pick.outputs.lane }}
       backend: ${{ steps.pick.outputs.backend }}
+      suite: ${{ steps.pick.outputs.suite }}
     steps:
       - id: pick
         env:
@@ -36,6 +41,7 @@ jobs:
           # smoke) on PR pushes. (The old `Force All Tests[L0+L1+L2]` label is gone.)
           HAS_FULL_LABEL: "${{ contains(github.event.pull_request.labels.*.name, 'ci: full') }}"
           HAS_NIGHTLY_LABEL: "${{ contains(github.event.pull_request.labels.*.name, 'ci: nightly') }}"
+          HAS_TRT_API_LABEL: "${{ contains(github.event.pull_request.labels.*.name, 'ci:trt-api') }}"
           # Backend labels narrow the engine; on a full/nightly run their absence
           # means BOTH. Exact match: 'backend: TensorRT' != 'backend: TensorRT-RTX'.
           HAS_RTX_LABEL: "${{ contains(github.event.pull_request.labels.*.name, 'backend: TensorRT-RTX') }}"
@@ -62,6 +68,11 @@ jobs:
             *)                  lane=fast ;;
           esac
           echo "lane=$lane" >> "$GITHUB_OUTPUT"
+          suite=""
+          if [ "$EVENT" = "pull_request" ] && [ "$HAS_TRT_API_LABEL" = "true" ]; then
+            suite=trt-api
+          fi
+          echo "suite=$suite" >> "$GITHUB_OUTPUT"
           # Backend: explicit labels win; otherwise a fast PR push stays
           # standard-only (cheap), while full/nightly default to BOTH engines.
           case "$EVENT" in
@@ -70,9 +81,10 @@ jobs:
               if   [ "$HAS_RTX_LABEL" = "true" ] && [ "$HAS_STD_LABEL" = "true" ]; then backend=both
               elif [ "$HAS_RTX_LABEL" = "true" ]; then backend=rtx
               elif [ "$HAS_STD_LABEL" = "true" ]; then backend=standard
+              elif [ -n "$suite" ]; then backend=both
               elif [ "$lane" = "fast" ]; then backend=standard
               else backend=both; fi ;;
             *)                  backend=both ;;   # push / approval / schedule
           esac
           echo "backend=$backend" >> "$GITHUB_OUTPUT"
-          echo "Resolved lane='$lane' backend='$backend' (event=$EVENT)."
+          echo "Resolved lane='$lane' suite='$suite' backend='$backend' (event=$EVENT)."

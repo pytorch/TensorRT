@@ -13,6 +13,10 @@ on:
         description: "fast | full | nightly"
         required: true
         type: string
+      suite:
+        description: "Explicit named suite; empty selects by lane"
+        type: string
+        default: ""
       use-rtx:
         description: "Test against TensorRT-RTX"
         type: boolean
@@ -123,9 +127,14 @@ jobs:
         run: |
           set -euo pipefail
           variant=${{ inputs.use-rtx && 'rtx' || 'standard' }}
-          json="$(python -m tests.ci matrix --platform windows --lane '${{ inputs.lane }}' --variant "${variant}")"
+          suite='${{ inputs.suite }}'
+          if [ -n "${suite}" ]; then
+            json="$(python -m tests.ci matrix --platform windows --suite "${suite}" --variant "${variant}")"
+          else
+            json="$(python -m tests.ci matrix --platform windows --lane '${{ inputs.lane }}' --variant "${variant}")"
+          fi
           echo "matrix=${json}" >> "$GITHUB_OUTPUT"
-          echo "Lane '${{ inputs.lane }}' (${variant}) windows suites:"; echo "${json}" | python -m json.tool
+          echo "Selection '${suite:-${{ inputs.lane }}}' (${variant}) windows suites:"; echo "${json}" | python -m json.tool
 
   test:
     needs: [substitute-runner, build, suite-matrix]

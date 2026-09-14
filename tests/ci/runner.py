@@ -326,7 +326,15 @@ def select(
     return jobs
 
 
-def matrix(**filters: str | None) -> list[dict[str, str]]:
+def matrix(
+    *,
+    lane: str | None = None,
+    tier: str | None = None,
+    variant: str | None = None,
+    platform: str | None = None,
+    names: list[str] | None = None,
+    changed: list[str] | None = None,
+) -> list[dict[str, str]]:
     """GitHub-Actions matrix ``include`` entries for the selected jobs."""
     return [
         {
@@ -339,5 +347,12 @@ def matrix(**filters: str | None) -> list[dict[str, str]]:
             # hardware (e.g. multi-GPU for distributed).
             "runner": s.for_variant(var)["runner"] or "",
         }
-        for s, var in select(**filters)
+        for s, var in select(
+            lane=lane,
+            tier=tier,
+            variant=variant,
+            platform=platform,
+            names=names,
+            changed=changed,
+        )
     ]

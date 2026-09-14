@@ -3,7 +3,7 @@
 list                       all suites, tiers, lanes, variants
 show <name>                a suite's resolved command per variant
 run <name> [opts] [-- ...]  run one suite (the call CI + just both make)
-matrix [--lane|--tier]     JSON matrix `include` for GitHub Actions
+matrix [--lane|--tier|--suite]  JSON matrix `include` for GitHub Actions
 doctor                     validate the manifest (CI lints this)
 """
 
@@ -100,6 +100,7 @@ def _cmd_matrix(args: argparse.Namespace) -> int:
     include = matrix(
         lane=args.lane,
         tier=args.tier,
+        names=[args.suite] if args.suite else None,
         variant=args.variant,
         platform=args.platform,
         changed=_read_changed(args),
@@ -227,6 +228,11 @@ def main(argv: list[str] | None = None) -> int:
     g = sp.add_mutually_exclusive_group()
     g.add_argument("--lane", choices=("fast", "full", "nightly", "python-only"))
     g.add_argument("--tier", choices=("l0", "l1", "l2"))
+    g.add_argument(
+        "--suite",
+        choices=tuple(s.name for s in SUITES),
+        help="select one named suite, including a manual suite",
+    )
     sp.add_argument("--variant", choices=("standard", "rtx"))
     sp.add_argument("--platform", choices=("linux-x86_64", "windows"))
     sp.add_argument(

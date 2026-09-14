@@ -17,6 +17,10 @@ on:
         description: "fast | full | nightly"
         required: true
         type: string
+      suite:
+        description: "Explicit named suite; empty selects by lane"
+        type: string
+        default: ""
       use-rtx:
         description: "Test against TensorRT-RTX (x86_64 only)"
         type: boolean
@@ -126,9 +130,14 @@ jobs:
         run: |
           set -euo pipefail
           variant=${{ inputs.use-rtx && 'rtx' || 'standard' }}
-          json="$(python -m tests.ci matrix --platform linux-x86_64 --lane '${{ inputs.lane }}' --variant "${variant}")"
+          suite='${{ inputs.suite }}'
+          if [ -n "${suite}" ]; then
+            json="$(python -m tests.ci matrix --platform linux-x86_64 --suite "${suite}" --variant "${variant}")"
+          else
+            json="$(python -m tests.ci matrix --platform linux-x86_64 --lane '${{ inputs.lane }}' --variant "${variant}")"
+          fi
           echo "matrix=${json}" >> "$GITHUB_OUTPUT"
-          echo "Lane '${{ inputs.lane }}' (${variant}) suites:"; echo "${json}" | python -m json.tool
+          echo "Selection '${suite:-${{ inputs.lane }}}' (${variant}) suites:"; echo "${json}" | python -m json.tool
 
   # One test job per suite (auto-skips when suite-matrix is skipped, i.e. SBSA).
   test:
