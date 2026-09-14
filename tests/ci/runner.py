@@ -140,9 +140,11 @@ def _setup_commands(step: str) -> list[tuple[list[str], Path]]:
         return [(launcher + ["hub.py"], REPO_ROOT / "tests/modules")]
     if step == "executorch":
         # ExecuTorch publishes CUDA builds only on the nightly channel matching the row's CUDA,
-        # so a CUDA 13 row installs from its own channel. Anything else, including CUDA 12,
-        # Jetson and CPU, resolves without an index rather than failing: those rows ran before
-        # this pin existed and the suite's own importorskip decides what it can test.
+        # so a CUDA 13 row installs from its own channel. Any other row gets no index, which
+        # leaves pip resolving the pinned dev build against PyPI, where no dev build exists.
+        # That install fails, and it is meant to: the suite runs only on CUDA 13 rows, so a
+        # failure here means the matrix sent it somewhere the delegate cannot work. Raising
+        # earlier was worse, because it also broke the CPU and Jetson rows that never install.
         cuda = os.environ.get("CU_VERSION") or ""
         index_args = (
             [

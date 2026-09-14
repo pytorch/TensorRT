@@ -746,8 +746,9 @@ def test_the_runner_follows_the_row_s_cuda_version(monkeypatch) -> None:
     # from a channel that does not match the torch the job was built with.
     declared = _declared_cuda_channel()
     assert channel_for(declared).endswith(f"/nightly/{declared}")
-    # Rows ExecuTorch publishes no CUDA build for resolve without an index rather than failing:
-    # CUDA 12, Jetson and CPU jobs installed and ran before this pin existed.
+    # Rows ExecuTorch publishes no CUDA build for get no index at all. The suite runs only on
+    # CUDA 13 rows, so reaching one of these means the matrix sent it somewhere the delegate
+    # cannot work, and the install failing there is the correct outcome.
     assert channel_for("cu126") is None
     assert channel_for("cu118") is None
     assert channel_for(None) is None
@@ -834,26 +835,28 @@ def test_the_supported_cuda_major_is_declared_once_per_place_that_needs_it():
     if step is not None:
         assert f"'cu{_executorch_cuda_major()}'" in step["if"], step["if"]
 
-    # Two sites spell the major inline. The companion's setup.py is the only one that raises at
-    # build time, so a stale value there breaks a build rather than a test. Each is checked only
-    # where the guard is present, since the delegate's own guard arrives later in the stack.
-    inline = {
-        "py/torch-tensorrt-executorch-runtime/setup.py": (
-            r'split\("\."\)\[0\] != "(\d+)"'
-        ),
-        ".github/scripts/update_executorch_pin.py": r'fullmatch\(r"cu(\d+)\\d\+"',
-    }
-    matched = 0
-    for name, pattern in inline.items():
+    # The companion's setup.py is the one site that still spells the major inline, because it
+    # raises at build time and cannot import the matrix filter. A site present on disk that
+    # matches no known spelling fails rather than being skipped, since a pattern that quietly
+    # matches nothing verifies nothing.
+    def _setup_py_major(text: str) -> str | None:
+        # The parent lists a branch per supported CUDA and rejects the rest, so the declared
+        # major is the highest branch it accepts. The child narrows to one and compares directly.
+        if match := re.search(r'split\("\."\)\[0\] != "(\d+)"', text):
+            return match.group(1)
+        branches = re.findall(
+            r'startswith\("(\d+)\."\):\s*\n\s*return "tensorrt-cu\1', text
+        )
+        return max(branches, key=int) if branches else None
+
+    inline = {"py/torch-tensorrt-executorch-runtime/setup.py": _setup_py_major}
+    for name, read_major in inline.items():
         path = _PROJECT_ROOT / name
         if not path.is_file():
             continue
-        match = re.search(pattern, path.read_text(encoding="utf-8"))
-        if match:
-            found[name] = match.group(1)
-            matched += 1
-    assert matched, "no inline declaration of the supported CUDA major was found"
-
+        major = read_major(path.read_text(encoding="utf-8"))
+        assert major, f"{name} declares the CUDA major in an unrecognised form"
+        found[name] = major
     assert set(found.values()) == {_executorch_cuda_major()}, found
 
 
@@ -864,11 +867,11 @@ def test_the_supported_cuda_major_is_declared_once_per_place_that_needs_it():
 def test_runner_omits_the_index_for_channels_executorch_does_not_publish(
     monkeypatch, channel
 ):
-    """Anything that is not a CUDA 13 channel installs without an index rather than failing.
+    """Anything that is not a CUDA 13 channel gets no index at all.
 
-    Raising here broke rows that installed and ran before this pin existed, including CUDA 12,
-    Jetson and CPU. A malformed value gets the same treatment: it names no channel, so there is
-    no channel to add.
+    Raising here broke the CPU and Jetson rows that never install ExecuTorch, so the check
+    moved to the index rather than the whole step. A malformed value gets the same treatment:
+    it names no channel, so there is no channel to add.
     """
     from tests.ci import runner
 

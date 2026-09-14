@@ -332,7 +332,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--track", choices=("nightly", "stable"), default="nightly")
     parser.add_argument(
         "--channel",
-        default="cu130",
+        default=None,
         help="nightly CUDA channel for version selection and provenance",
     )
     parser.add_argument(
@@ -341,10 +341,17 @@ def main(argv: list[str] | None = None) -> int:
         help="explicitly authorize proposing a lower version; builds and tests still must pass",
     )
     args = parser.parse_args(argv)
-    if args.track == "nightly" and not re.fullmatch(r"cu13\d+", args.channel):
-        parser.error(
-            "TensorRT nightlies are CUDA 13 only, so the channel must look like cu130"
-        )
+    if args.track == "nightly":
+        # Both the default and the check come from the matrix. Hardcoding either one strands the
+        # bump the moment a row is retired: the default would name a channel nobody builds, and
+        # the check would accept it.
+        accepted = delegate_channels()
+        if args.channel is None:
+            args.channel = accepted[0]
+        elif args.channel not in accepted:
+            parser.error(
+                f"the delegate builds {', '.join(accepted)}, so the channel must be one of them"
+            )
     index_args = _index_args(args.track, args.channel)
     candidates = available_versions(index_args)
     if args.track == "nightly":
