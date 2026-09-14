@@ -547,3 +547,36 @@ def test_delegate_channels_refuses_an_empty_accepted_set(tmp_path, monkeypatch):
     with pytest.raises(SystemExit) as error:
         updater.delegate_channels()
     assert "no cu14 row" in str(error.value), error.value
+
+
+@pytest.mark.unit
+def test_the_channel_default_and_check_follow_the_matrix(monkeypatch):
+    """Retiring a row must retire it here too.
+
+    The default channel and the channel check were both hardcoded, so retiring cu130 while
+    cu132 and cu134 remained left the default naming a channel nobody builds and the check
+    still accepting it.
+    """
+    accepted = ["cu132", "cu134"]
+    monkeypatch.setattr(updater, "delegate_channels", lambda: accepted)
+    asked = []
+    monkeypatch.setattr(
+        updater,
+        "available_versions",
+        lambda args: asked.append(args[-1].rsplit("/", 1)[-1]) or ["1.0.dev1"],
+    )
+    monkeypatch.setattr(updater, "read_pin", lambda field: "1.0.dev1")
+
+    assert updater.main([]) == 0
+    assert asked[0] == accepted[0], asked
+
+    with pytest.raises(SystemExit):
+        updater.main(["--channel", "cu130"])
+
+
+@pytest.mark.unit
+def test_the_updater_reads_the_cuda_major_from_the_matrix_alone(monkeypatch):
+    """No second copy of the major. A retired major must not survive in a hardcoded pattern."""
+    source = Path(updater.__file__).read_text(encoding="utf-8")
+    assert 'fullmatch(r"cu13' not in source, source
+    assert 'default="cu13' not in source, source
