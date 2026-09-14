@@ -1833,7 +1833,36 @@ class ComplexGraphRewriter:
             if existing_fake_mode is not None
             else FakeTensorMode(allow_non_fake_inputs=True)
         )
-        FakeTensorProp(self.gm, mode=prop_mode).propagate(*fake_inputs)
+
+        # offload_module_to_cpu leaves a folded constant on CPU while its node
+        # metadata still records cuda, which FakeTensorProp would then mix with
+        # fake cuda activations.  Realign each attr to the device its own meta
+        # claims, so genuinely-CPU attrs are left alone.
+        attr_devices: Dict[str, torch.device] = {}
+        for node in self.gm.graph.nodes:
+            if node.op != "get_attr":
+                continue
+            attr_val = node.meta.get("val", None)
+            if isinstance(attr_val, torch.Tensor):
+                attr_devices[str(node.target)] = attr_val.device
+
+        if not attr_devices:
+            FakeTensorProp(self.gm, mode=prop_mode).propagate(*fake_inputs)
+            return
+
+        class _DeviceAligningFakeTensorProp(FakeTensorProp):  # type: ignore[misc]
+            def fetch_attr(self, target: str) -> Any:
+                attr = super().fetch_attr(target)
+                device = attr_devices.get(target)
+                if (
+                    device is not None
+                    and isinstance(attr, torch.Tensor)
+                    and attr.device != device
+                ):
+                    return attr.to(device)
+                return attr
+
+        _DeviceAligningFakeTensorProp(self.gm, mode=prop_mode).propagate(*fake_inputs)
 
 
 def extract_real_imag(input, placeholder_or_func: bool = True):  # type: ignore
