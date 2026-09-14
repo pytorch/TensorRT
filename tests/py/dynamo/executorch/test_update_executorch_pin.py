@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import re
 import shutil
 import subprocess
 import sys
@@ -521,3 +522,28 @@ def test_write_pins_requires_a_separate_lock_refresh(tmp_path, monkeypatch):
     ] == ["test_the_lockfile_executorch_matches_the_pin"], (
         result.stdout + result.stderr
     )
+
+
+@pytest.mark.unit
+def test_delegate_channels_refuses_an_empty_accepted_set(tmp_path, monkeypatch):
+    """An empty channel list would make the cross-channel check pass by doing nothing.
+
+    Bumping the CUDA major before adding its matrix rows is the documented order, so this is
+    reachable in normal use rather than only through a hand-edited file.
+    """
+    source = (
+        Path(updater.__file__).parent.parent.parent / ".github/scripts/filter-matrix.py"
+    )
+    bumped = re.sub(
+        r"EXECUTORCH_CUDA_MAJOR\s*[:=].*",
+        "EXECUTORCH_CUDA_MAJOR: int = 14",
+        source.read_text(encoding="utf-8"),
+        count=1,
+    )
+    scripts = tmp_path / ".github/scripts"
+    scripts.mkdir(parents=True)
+    (scripts / "filter-matrix.py").write_text(bumped, encoding="utf-8")
+    monkeypatch.setattr(updater, "_REPO_ROOT", tmp_path)
+    with pytest.raises(SystemExit) as error:
+        updater.delegate_channels()
+    assert "no cu14 row" in str(error.value), error.value
