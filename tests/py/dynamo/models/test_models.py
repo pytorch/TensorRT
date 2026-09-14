@@ -634,3 +634,44 @@ def test_bf16_fallback_model(ir):
 
     # Clean up model env
     torch._dynamo.reset()
+
+
+@pytest.mark.unit
+def test_model_with_none_output(ir):
+    class ModelWithNoneOutput(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.relu = nn.ReLU()
+
+        def forward(self, x):
+            return self.relu(x), None
+
+    model = ModelWithNoneOutput().eval().to("cuda")
+    input = torch.randn((1, 5)).to("cuda")
+
+    compile_spec = {
+        "inputs": [
+            torchtrt.Input(
+                input.shape, dtype=torch.float, format=torch.contiguous_format
+            )
+        ],
+        "device": torchtrt.Device("cuda:0"),
+        "enabled_precisions": {torch.float},
+        "ir": ir,
+        "pass_through_build_failures": True,
+        "min_block_size": 1,
+        "cache_built_engines": False,
+        "reuse_cached_engines": False,
+    }
+
+    trt_mod = torchtrt.compile(model, **compile_spec)
+    trt_out = trt_mod(input)
+    assertions.assertIsInstance(trt_out, tuple)
+    assertions.assertEqual(len(trt_out), 2)
+    assertions.assertIsNone(trt_out[1])
+
+    torch_out = model(input)
+    torch.testing.assert_close(trt_out[0], torch_out[0])
+
+    # Clean up model env
+    torch._dynamo.reset()
