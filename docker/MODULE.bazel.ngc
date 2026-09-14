@@ -75,8 +75,8 @@ new_local_repository(
 new_git_repository(
     name = "executorch",
     build_file = "@//third_party/executorch:BUILD",
-    # executorch==1.6.0.dev20260913
-    commit = "18fe766764ddb67c378190007fa984b2e91f1f77",
+    # executorch==1.6.0.dev20260914
+    commit = "9a34b687428b271f73d4e92b1b12109a6de11f14",
     recursive_init_submodules = True,
     patch_cmds = [
         "find . -mindepth 2 \\( -name BUILD -o -name BUILD.bazel \\) -delete",

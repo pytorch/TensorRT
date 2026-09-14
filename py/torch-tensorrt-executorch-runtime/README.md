@@ -44,7 +44,7 @@ export TensorRT_ROOT=/path/to/TensorRT
 
 python -m pip install pyyaml \
   --extra-index-url https://download.pytorch.org/whl/nightly/cu130 \
-  "executorch==1.6.0.dev20260913"
+  "executorch==1.6.0.dev20260914"
 python -m pip wheel --no-build-isolation --no-deps \
   --wheel-dir dist py/torch-tensorrt-executorch-runtime
 ```
