@@ -317,7 +317,6 @@ class TestTorchTensorRTModule(unittest.TestCase):
         "layer info is different for tensorrt_rtx",
     )
     @pytest.mark.trt_api
-    @pytest.mark.trt_layer_info
     def test_get_layer_info(self):
         """
         {

@@ -214,7 +214,6 @@ class TestEngineConverterBindingNames(TestCase):
         return outputs
 
     @pytest.mark.trt_api
-    @pytest.mark.trt_engine_build
     def test_default_names_unchanged(self) -> None:
         model, inputs = self._two_output_model()
         program = _trace(model, inputs)
@@ -231,7 +230,6 @@ class TestEngineConverterBindingNames(TestCase):
         self.assertEqual(outs, ["output0", "output1"])
 
     @pytest.mark.trt_api
-    @pytest.mark.trt_engine_build
     def test_user_supplied_arg_and_output_names(self) -> None:
         model, inputs = self._two_output_model()
         program = _trace(model, inputs)

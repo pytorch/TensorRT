@@ -53,7 +53,6 @@ class TestScalarAttrAnnotation(unittest.TestCase):
             self.assertIs(typing.get_origin(annotation), np.ndarray)
 
     @pytest.mark.trt_api
-    @pytest.mark.trt_plugin
     def test_trt_validator_accepts_it(self):
         """End of the chain: TRT's own helpers must accept what we emit."""
         utils = pytest.importorskip(

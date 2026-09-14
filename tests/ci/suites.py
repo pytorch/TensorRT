@@ -155,23 +155,32 @@ _L0: list[Suite] = [
         jobs="8",
     ),
     Suite(
-        # Focused contracts for the TensorRT / TensorRT-RTX APIs used by
-        # Torch-TensorRT. Keep paths explicit so this suite never pulls in
-        # model-zoo or torchvision dependencies during collection.
+        # Manual umbrella for the TensorRT / TensorRT-RTX API contracts used by
+        # Torch-TensorRT: network conversion, engine build/inspection, runtime,
+        # refit, plugins, and TorchScript interoperability. Keep paths explicit
+        # so unrelated model-zoo tests are not collected.
         "trt-api",
         tier="l0",
         lanes=(),
         manual=True,
         cwd="tests/py",
         paths=(
-            "dynamo/runtime/test_000_convert_module_to_trt_engine.py",
             "dynamo/conversion/",
-            "dynamo/automatic_plugin/test_plugin_attr_annotations.py",
-            "dynamo/runtime/test_004_runtime_settings.py",
-            "ts/api/test_classes.py",
+            "dynamo/runtime/",
+            "dynamo/automatic_plugin/",
+            "dynamo/models/test_model_refit.py",
+            "dynamo/models/test_models_export.py",
+            "dynamo/models/test_weight_stripped_engine.py",
+            "kernels/test_cuda_kernel_op.py",
+            "ts/api/",
+            "ts/integrations/test_trt_intercompatibility.py",
         ),
         markers="trt_api",
         jobs=_HEAVY,
+        setup=("cuda-core",),
+        overrides={
+            "standard": {"markers": "trt_api and not trt_rtx_only"},
+        },
     ),
     Suite(
         "ts-api",

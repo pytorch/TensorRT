@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 
 from .runner import REPO_ROOT, describe, junit_path, matrix, run_suite, select
@@ -142,6 +143,33 @@ def _cmd_doctor(_: argparse.Namespace) -> int:
         for var in s.variants:
             if var not in (s.overrides.keys() | {"standard", "rtx"}):
                 problems.append(f"{s.name}: bad variant {var!r}")
+
+    # TRT contract markers imply membership in the manual trt-api umbrella.
+    # Keep this structural so doctor can run without importing torch/TRT or
+    # collecting GPU tests.
+    trt_suite = by_name("trt-api")
+    trt_root = REPO_ROOT / trt_suite.cwd
+    trt_paths = tuple(trt_root / path.rstrip("/") for path in trt_suite.paths)
+    contract_markers = ("trt_api", "trt_rtx_only")
+    for test_file in (REPO_ROOT / "tests/py").rglob("test_*.py"):
+        source = test_file.read_text(encoding="utf-8")
+        used_trt_markers = set(re.findall(r"pytest\.mark\.(trt_[a-z0-9_]+)", source))
+        unsupported = used_trt_markers.difference(contract_markers)
+        if unsupported:
+            problems.append(
+                f"{test_file.relative_to(REPO_ROOT)}: unsupported fine-grained "
+                f"TRT markers {sorted(unsupported)}"
+            )
+        if not any(f"pytest.mark.{marker}" in source for marker in contract_markers):
+            continue
+        if not any(
+            test_file == path or (path.is_dir() and path in test_file.parents)
+            for path in trt_paths
+        ):
+            problems.append(
+                f"{test_file.relative_to(REPO_ROOT)}: TRT API contract test is "
+                "not included in trt-api"
+            )
 
     if problems:
         for p in problems:

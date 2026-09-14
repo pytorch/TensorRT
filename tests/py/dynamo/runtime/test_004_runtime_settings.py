@@ -200,7 +200,6 @@ class TestLazyExecutionContextCreation(TestCase):
                 yield mod
 
     @pytest.mark.trt_api
-    @pytest.mark.trt_runtime
     @pytest.mark.trt_rtx_only
     def test_one_context_create_with_default_settings(self):
         compiled = _compile_simple()

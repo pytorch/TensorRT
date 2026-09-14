@@ -6,7 +6,7 @@ import torch_tensorrt
 from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 
-pytestmark = [pytest.mark.trt_api, pytest.mark.trt_engine_build]
+pytestmark = [pytest.mark.trt_api]
 
 
 class TestConvertModuleToTrtEngine(unittest.TestCase):
