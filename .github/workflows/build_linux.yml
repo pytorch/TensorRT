@@ -409,7 +409,7 @@ jobs:
           ${CONDA_RUN} python -m pip install --no-deps dist/torch_tensorrt*.whl
           ${CONDA_RUN} python -m pip install pyyaml \
             --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" \
-            "executorch==1.6.0.dev20260913"
+            "executorch==1.6.0.dev20260914"
           # Give the companion wheel the same channel/date and CUDA local-version
           # suffix as torch-tensorrt, while retaining its independent base version.
           main_version="$(sed 's/a0$//' version.txt)"

@@ -82,7 +82,7 @@ prerelease-mode = "allow"
 
 [manifest]
 constraints = [
-    { name = "executorch", specifier = "==1.6.0.dev20260913" },
+    { name = "executorch", specifier = "==1.6.0.dev20260914" },
     { name = "transformers", specifier = ">=5.14.1" },
 ]
 
@@ -1143,7 +1143,7 @@ wheels = [
 
 [[package]]
 name = "executorch"
-version = "1.6.0.dev20260913+cu130"
+version = "1.6.0.dev20260914+cu130"
 source = { registry = "https://download.pytorch.org/whl/nightly/cu130" }
 dependencies = [
     { name = "coremltools", marker = "(python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform != 'win32') or (python_full_version >= '3.14' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine != 'x86_64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
@@ -1176,16 +1176,16 @@ dependencies = [
     { name = "typing-extensions", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
 ]
 wheels = [
-    { url = "https://download.pytorch.org/whl/nightly/cu130/executorch-1.6.0.dev20260913%2Bcu130-cp310-cp310-manylinux_2_28_aarch64.whl", upload-time = "2026-09-13T12:10:45Z" },
-    { url = "https://download.pytorch.org/whl/nightly/cu130/executorch-1.6.0.dev20260913%2Bcu130-cp310-cp310-manylinux_2_28_x86_64.whl", upload-time = "2026-09-13T12:47:03Z" },
-    { url = "https://download.pytorch.org/whl/nightly/cu130/executorch-1.6.0.dev20260913%2Bcu130-cp311-cp311-manylinux_2_28_aarch64.whl", upload-time = "2026-09-13T12:10:42Z" },
-    { url = "https://download.pytorch.org/whl/nightly/cu130/executorch-1.6.0.dev20260913%2Bcu130-cp311-cp311-manylinux_2_28_x86_64.whl", upload-time = "2026-09-13T12:46:55Z" },
-    { url = "https://download.pytorch.org/whl/nightly/cu130/executorch-1.6.0.dev20260913%2Bcu130-cp312-cp312-manylinux_2_28_aarch64.whl", upload-time = "2026-09-13T12:10:46Z" },
-    { url = "https://download.pytorch.org/whl/nightly/cu130/executorch-1.6.0.dev20260913%2Bcu130-cp312-cp312-manylinux_2_28_x86_64.whl", upload-time = "2026-09-13T12:46:56Z" },
-    { url = "https://download.pytorch.org/whl/nightly/cu130/executorch-1.6.0.dev20260913%2Bcu130-cp313-cp313-manylinux_2_28_aarch64.whl", upload-time = "2026-09-13T12:10:44Z" },
-    { url = "https://download.pytorch.org/whl/nightly/cu130/executorch-1.6.0.dev20260913%2Bcu130-cp313-cp313-manylinux_2_28_x86_64.whl", upload-time = "2026-09-13T12:46:51Z" },
-    { url = "https://download.pytorch.org/whl/nightly/cu130/executorch-1.6.0.dev20260913%2Bcu130-cp314-cp314-manylinux_2_28_aarch64.whl", upload-time = "2026-09-13T12:10:42Z" },
-    { url = "https://download.pytorch.org/whl/nightly/cu130/executorch-1.6.0.dev20260913%2Bcu130-cp314-cp314-manylinux_2_28_x86_64.whl", upload-time = "2026-09-13T12:46:51Z" },
+    { url = "https://download.pytorch.org/whl/nightly/cu130/executorch-1.6.0.dev20260914%2Bcu130-cp310-cp310-manylinux_2_28_aarch64.whl", upload-time = "2026-09-14T12:12:48Z" },
+    { url = "https://download.pytorch.org/whl/nightly/cu130/executorch-1.6.0.dev20260914%2Bcu130-cp310-cp310-manylinux_2_28_x86_64.whl", upload-time = "2026-09-14T12:28:33Z" },
+    { url = "https://download.pytorch.org/whl/nightly/cu130/executorch-1.6.0.dev20260914%2Bcu130-cp311-cp311-manylinux_2_28_aarch64.whl", upload-time = "2026-09-14T12:12:43Z" },
+    { url = "https://download.pytorch.org/whl/nightly/cu130/executorch-1.6.0.dev20260914%2Bcu130-cp311-cp311-manylinux_2_28_x86_64.whl", upload-time = "2026-09-14T12:28:35Z" },
+    { url = "https://download.pytorch.org/whl/nightly/cu130/executorch-1.6.0.dev20260914%2Bcu130-cp312-cp312-manylinux_2_28_aarch64.whl", upload-time = "2026-09-14T12:13:01Z" },
+    { url = "https://download.pytorch.org/whl/nightly/cu130/executorch-1.6.0.dev20260914%2Bcu130-cp312-cp312-manylinux_2_28_x86_64.whl", upload-time = "2026-09-14T12:28:30Z" },
+    { url = "https://download.pytorch.org/whl/nightly/cu130/executorch-1.6.0.dev20260914%2Bcu130-cp313-cp313-manylinux_2_28_aarch64.whl", upload-time = "2026-09-14T12:12:49Z" },
+    { url = "https://download.pytorch.org/whl/nightly/cu130/executorch-1.6.0.dev20260914%2Bcu130-cp313-cp313-manylinux_2_28_x86_64.whl", upload-time = "2026-09-14T12:28:52Z" },
+    { url = "https://download.pytorch.org/whl/nightly/cu130/executorch-1.6.0.dev20260914%2Bcu130-cp314-cp314-manylinux_2_28_aarch64.whl", upload-time = "2026-09-14T12:12:44Z" },
+    { url = "https://download.pytorch.org/whl/nightly/cu130/executorch-1.6.0.dev20260914%2Bcu130-cp314-cp314-manylinux_2_28_x86_64.whl", upload-time = "2026-09-14T12:28:31Z" },
 ]
 
 [[package]]
@@ -5598,8 +5598,8 @@ test-ext = [
 [package.metadata]
 requires-dist = [
     { name = "dllist" },
-    { name = "executorch", marker = "sys_platform == 'linux' and extra == 'all'", specifier = ">=1.6.0.dev20260913,<1.7" },
-    { name = "executorch", marker = "sys_platform == 'linux' and extra == 'executorch'", specifier = ">=1.6.0.dev20260913,<1.7" },
+    { name = "executorch", marker = "sys_platform == 'linux' and extra == 'all'", specifier = ">=1.6.0.dev20260914,<1.7" },
+    { name = "executorch", marker = "sys_platform == 'linux' and extra == 'executorch'", specifier = ">=1.6.0.dev20260914,<1.7" },
     { name = "filelock" },
     { name = "numpy" },
     { name = "packaging", specifier = ">=23" },
