@@ -4,6 +4,7 @@ Discover requirements independently of the writer, and require known sites to re
 """
 
 import ast
+import importlib.abc
 import json
 import os
 import re
@@ -724,7 +725,7 @@ def test_the_runner_follows_the_row_s_cuda_version(monkeypatch) -> None:
     monkeypatch.syspath_prepend(str(REPO_ROOT / "tests"))
     from ci import runner
 
-    def channel_for(cu_version: str | None) -> str:
+    def channel_for(cu_version: str | None) -> str | None:
         if cu_version is None:
             monkeypatch.delenv("CU_VERSION", raising=False)
         else:
@@ -736,8 +737,8 @@ def test_the_runner_follows_the_row_s_cuda_version(monkeypatch) -> None:
             for argument in command
             if "download.pytorch.org" in argument
         ]
-        assert len(urls) == 1, f"expected one index URL, got {urls}"
-        return urls[0]
+        assert len(urls) <= 1, f"expected at most one index URL, got {urls}"
+        return urls[0] if urls else None
 
     assert channel_for("cu132").endswith("/nightly/cu132")
     assert channel_for("cu130").endswith("/nightly/cu130")
@@ -745,9 +746,54 @@ def test_the_runner_follows_the_row_s_cuda_version(monkeypatch) -> None:
     # from a channel that does not match the torch the job was built with.
     declared = _declared_cuda_channel()
     assert channel_for(declared).endswith(f"/nightly/{declared}")
-    # Unset is a local run, and matches the index pyproject.toml resolves against by default.
-    assert channel_for(None).endswith("/nightly/cu130")
-    assert channel_for("").endswith("/nightly/cu130")
+    # Rows ExecuTorch publishes no CUDA build for resolve without an index rather than failing:
+    # CUDA 12, Jetson and CPU jobs installed and ran before this pin existed.
+    assert channel_for("cu126") is None
+    assert channel_for("cu118") is None
+    assert channel_for(None) is None
+    assert channel_for("") is None
+
+
+@pytest.mark.unit
+def test_the_executorch_setup_step_builds_without_pyyaml_installed(monkeypatch) -> None:
+    """The step installs pyyaml, so building its argv must not need pyyaml.
+
+    Reading the pin with yaml made the command that fixes a missing PyYAML impossible to build,
+    which fails the run with a traceback before the install it needs can happen.
+    """
+    monkeypatch.syspath_prepend(str(REPO_ROOT / "tests"))
+    from ci import runner
+
+    class _Blocked(importlib.abc.MetaPathFinder):
+        def find_spec(self, name, path=None, target=None):
+            if name == "yaml" or name.startswith("yaml."):
+                raise ModuleNotFoundError("No module named 'yaml'")
+            return None
+
+    for module in [name for name in sys.modules if name.split(".")[0] == "yaml"]:
+        monkeypatch.delitem(sys.modules, module, raising=False)
+    monkeypatch.setattr(sys, "meta_path", [_Blocked(), *sys.meta_path])
+
+    commands = runner._setup_commands("executorch")
+    arguments = [argument for command, _ in commands for argument in command]
+    assert "pyyaml" in arguments, arguments
+    assert any(a.startswith("executorch==") for a in arguments), arguments
+
+
+@pytest.mark.unit
+def test_only_the_executorch_setup_step_fails_its_suite(monkeypatch) -> None:
+    """A failed ExecuTorch install must fail the suite; other steps keep warning.
+
+    The ExecuTorch files gate on importorskip, so a failed install would report success with the
+    thing under test absent. The other steps fail visibly on their own, so a flaky download there
+    should not fail a suite that would otherwise report honestly.
+    """
+    source = (REPO_ROOT / "tests/ci/runner.py").read_text(encoding="utf-8")
+    body = source[source.index('    for step in v["setup"]:') :]
+    body = body[: body.index('\n    print(f"==>')]
+    assert 'if step == "executorch":' in body, body
+    assert body.count("return rc") == 1, body
+    assert "::warning::setup step" in body, body
 
 
 @pytest.mark.unit
@@ -815,30 +861,42 @@ def test_the_supported_cuda_major_is_declared_once_per_place_that_needs_it():
 @pytest.mark.parametrize(
     "channel", ["cpu", "13.2", "cu126", "cu128", "cu14", "CU132", " cu132"]
 )
-def test_runner_rejects_unsupported_cuda_channels(monkeypatch, channel):
+def test_runner_omits_the_index_for_channels_executorch_does_not_publish(
+    monkeypatch, channel
+):
+    """Anything that is not a CUDA 13 channel installs without an index rather than failing.
+
+    Raising here broke rows that installed and ran before this pin existed, including CUDA 12,
+    Jetson and CPU. A malformed value gets the same treatment: it names no channel, so there is
+    no channel to add.
+    """
     from tests.ci import runner
 
     monkeypatch.setenv("CU_VERSION", channel)
-    with pytest.raises(ValueError, match="CU_VERSION") as error:
-        runner._setup_commands("executorch")
-    assert repr(channel) in str(error.value)
-    assert f"cu{_executorch_cuda_major()}" in str(error.value)
+    commands = runner._setup_commands("executorch")
+    arguments = [argument for command, _ in commands for argument in command]
+    assert not [a for a in arguments if "download.pytorch.org" in a], arguments
+    assert "pyyaml" in arguments, arguments
 
 
 @pytest.mark.unit
 def test_runner_channel_check_detects_removed_validator(monkeypatch):
     import inspect
+
     from tests.ci import runner
 
     source = inspect.getsource(runner._setup_commands)
-    guard = 'if not re.fullmatch(rf"cu{EXECUTORCH_CUDA_MAJOR}\\d+", cuda):'
-    changed = source.replace(guard, "if False:")
+    guard = 'if re.fullmatch(rf"cu{EXECUTORCH_CUDA_MAJOR}\\d+", cuda)'
+    changed = source.replace(guard, "if True")
     assert changed != source, f"guard {guard!r} is gone, so this control checks nothing"
     namespace = vars(runner).copy()
     exec(compile(changed, runner.__file__, "exec"), namespace)
     monkeypatch.setattr(runner, "_setup_commands", namespace["_setup_commands"])
-    with pytest.raises(pytest.fail.Exception, match="DID NOT RAISE"):
-        test_runner_rejects_unsupported_cuda_channels(monkeypatch, "cpu")
+    # Without the guard a CUDA 12 row gets a cu126 index, which carries no ExecuTorch build.
+    with pytest.raises(AssertionError):
+        test_runner_omits_the_index_for_channels_executorch_does_not_publish(
+            monkeypatch, "cu126"
+        )
 
 
 def _load_utils_channel_helpers(fake_cuda: str | None):
@@ -2010,11 +2068,16 @@ def test_review_suite_rejects_unknown_values(field, value):
 
 @pytest.mark.unit
 def test_review_runner_empty_channel_uses_local_default(monkeypatch):
+    """An unset or empty CU_VERSION names no channel, so no index is added.
+
+    A local run resolves ExecuTorch the same way a plain pip install would, rather than being
+    pointed at a CUDA channel the machine may not match.
+    """
     from tests.ci.runner import _setup_commands
 
     monkeypatch.setenv("CU_VERSION", "")
     argv = _setup_commands("executorch")[0][0]
-    assert argv[argv.index("--extra-index-url") + 1].endswith("/cu130")
+    assert "--extra-index-url" not in argv, argv
 
 
 @pytest.mark.parametrize("cuda", [None, "", "12.6", "12.8", "14.0", "13", "13.x"])

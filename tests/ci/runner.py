@@ -28,12 +28,17 @@ EXECUTORCH_CUDA_MAJOR = "13"
 
 
 def _executorch_requirement() -> str:
-    # Import only for this suite; other runner operations do not need PyYAML.
-    import yaml
-
-    values = yaml.safe_load((REPO_ROOT / "dev_dep_versions.yml").read_text())
-    version = values["__executorch_version__"]
-    if not isinstance(version, str) or not version:
+    # Regex rather than yaml: this argv installs pyyaml, so importing yaml to build it would
+    # make the command that fixes a missing PyYAML impossible to construct. The pattern accepts
+    # the quoting styles YAML allows for a scalar, so it cannot silently miss a reformatted pin.
+    text = (REPO_ROOT / "dev_dep_versions.yml").read_text()
+    match = re.search(
+        r"""^__executorch_version__\s*:\s*(?:"([^"]+)"|'([^']+)'|([^\s#]+))""",
+        text,
+        re.MULTILINE,
+    )
+    version = next((g for g in match.groups() if g), "") if match else ""
+    if not version:
         raise ValueError("__executorch_version__ must be a nonempty YAML string")
     return f"executorch=={version}"
 
@@ -134,14 +139,19 @@ def _setup_commands(step: str) -> list[tuple[list[str], Path]]:
     if step == "hub":
         return [(launcher + ["hub.py"], REPO_ROOT / "tests/modules")]
     if step == "executorch":
-        # Follows CU_VERSION rather than a fixed channel, or a job built against one CUDA
-        # runtime installs another. The default matches the index pyproject.toml resolves to.
-        cuda = os.environ.get("CU_VERSION") or f"cu{EXECUTORCH_CUDA_MAJOR}0"
-        if not re.fullmatch(rf"cu{EXECUTORCH_CUDA_MAJOR}\d+", cuda):
-            raise ValueError(
-                f"Unsupported CU_VERSION {cuda!r}; ExecuTorch needs a CUDA "
-                f"{EXECUTORCH_CUDA_MAJOR} channel such as cu{EXECUTORCH_CUDA_MAJOR}0"
-            )
+        # ExecuTorch publishes CUDA builds only on the nightly channel matching the row's CUDA,
+        # so a CUDA 13 row installs from its own channel. Anything else, including CUDA 12,
+        # Jetson and CPU, resolves without an index rather than failing: those rows ran before
+        # this pin existed and the suite's own importorskip decides what it can test.
+        cuda = os.environ.get("CU_VERSION") or ""
+        index_args = (
+            [
+                "--extra-index-url",
+                f"https://download.pytorch.org/whl/nightly/{cuda}",
+            ]
+            if re.fullmatch(rf"cu{EXECUTORCH_CUDA_MAJOR}\d+", cuda)
+            else []
+        )
         return [
             (
                 launcher
@@ -150,8 +160,7 @@ def _setup_commands(step: str) -> list[tuple[list[str], Path]]:
                     "pip",
                     "install",
                     "pyyaml",
-                    "--extra-index-url",
-                    f"https://download.pytorch.org/whl/nightly/{cuda}",
+                    *index_args,
                     _executorch_requirement(),
                 ],
                 REPO_ROOT,
@@ -221,20 +230,21 @@ def run_suite(
             print(f"==> setup[{step}]: {shlex.join(argv)}", flush=True)
             rc = subprocess.run(argv, cwd=scwd, env=env).returncode
             if rc != 0:
-                # Fail rather than warn and continue, for every setup step and not just the
-                # executorch one: a suite whose dependencies did not install cannot test what it
-                # was asked to test, whichever step failed. Most of the executorch suite gates on
-                # pytest.importorskip, so a failed install skips those files, leaves the rest
-                # passing, and reports success with a populated junit xml -- the run looks green
-                # precisely when the thing it exists to test is absent. This matters more now
-                # that the ExecuTorch pin names a nightly build, which is pruned from the
-                # channel eventually; when that happens this has to be loud.
-                print(
-                    f"::error::setup step {step!r} exited {rc}, so the suite cannot test what "
-                    "it was asked to test",
-                    flush=True,
-                )
-                return rc
+                # The executorch suite gates on pytest.importorskip, so a failed install skips
+                # those files, leaves the rest passing, and reports success with a populated
+                # junit xml: the run looks green precisely when the thing it exists to test is
+                # absent. The pin names a nightly build, which the channel prunes eventually, so
+                # that has to be loud. Other steps keep warning and continuing, because their
+                # suites fail visibly on a missing dependency and a flaky checkpoint download
+                # should not fail a suite that would otherwise report honestly.
+                if step == "executorch":
+                    print(
+                        f"::error::setup step {step!r} exited {rc}, so the suite cannot test "
+                        "what it was asked to test",
+                        flush=True,
+                    )
+                    return rc
+                print(f"::warning::setup step {step!r} exited {rc}", flush=True)
 
     print(f"==> {suite.name} [{variant}]: {shlex.join(pytest_cmd)}", flush=True)
     rc = subprocess.run(pytest_cmd, cwd=cwd, env=env).returncode

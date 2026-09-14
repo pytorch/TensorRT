@@ -396,7 +396,8 @@ jobs:
       # its packaging, manylinux repair, GitHub artifact, and PyTorch-index
       # upload follow the exact same path as torch-tensorrt itself.
       - name: Build the ExecuTorch runtime wheel
-        if: ${{ inputs.build-executorch-runtime }}
+        id: executorch-runtime
+        if: ${{ inputs.build-executorch-runtime && startsWith(matrix.desired_cuda, 'cu13') }}
         working-directory: ${{ inputs.repository }}
         shell: bash -l {0}
         run: |
