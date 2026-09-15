@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """Every ExecuTorch pin in the repository must agree with dev_dep_versions.yml.
 
 Sites are discovered by search, not listed here. A list of paths would drift the same way

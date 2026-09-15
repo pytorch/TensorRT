@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 import numpy as np
 
 # @manual=//deeplearning/trt/python:py_tensorrt
@@ -5,7 +8,6 @@ import tensorrt as trt
 import torch
 
 from ..converter_registry import tensorrt_converter
-
 from .converter_utils import get_dyn_range, mark_as_int8_layer, to_numpy
 
 

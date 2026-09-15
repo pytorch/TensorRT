@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 import argparse
 import copy
 import gc
@@ -7,20 +10,23 @@ from functools import partial
 import numpy as np
 import pandas as pd
 import torch
-from transformers import AutoConfig
+import torch._dynamo as torchdynamo
+from torch._dynamo.optimizations import backends
+from torch._dynamo.optimizations.training import (
+    aot_autograd_debug_strategy1,
+    aot_autograd_speedup_strategy,
+)
+from torch._dynamo.testing import collect_results, same
 from transformers import (
+    AutoConfig,
     AutoModelForCausalLM,
     AutoModelForMaskedLM,
     AutoModelForSeq2SeqLM,
+    BertConfig,
+    ReformerConfig,
+    XLNetConfig,
+    XLNetModel,
 )
-from transformers import BertConfig, ReformerConfig, XLNetModel, XLNetConfig
-
-import torch._dynamo as torchdynamo
-from torch._dynamo.optimizations import backends
-from torch._dynamo.optimizations.training import aot_autograd_debug_strategy1
-from torch._dynamo.optimizations.training import aot_autograd_speedup_strategy
-from torch._dynamo.testing import collect_results
-from torch._dynamo.testing import same
 
 torch.backends.cuda.matmul.allow_tf32 = True
 

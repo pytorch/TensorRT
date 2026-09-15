@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """Unit tests for the complex_decomposition_adapter lowering pass (issue #4390).
 
 These tests exercise the TRT-specific glue around PyTorch's upstream complex

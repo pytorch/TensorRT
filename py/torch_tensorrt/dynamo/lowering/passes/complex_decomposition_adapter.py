@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """Adopt PyTorch's upstream complex decomposition (pytorch/pytorch#169832).
 
 This is the "augment, not replace" path proposed in issue #4390.  Instead of the

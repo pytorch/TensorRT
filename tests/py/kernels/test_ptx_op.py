@@ -1,7 +1,9 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """Tests for ptx_op (pre-compiled PTX registration path)."""
 
 import torch
-
 import torch_tensorrt
 import torch_tensorrt.kernels as ttk
 

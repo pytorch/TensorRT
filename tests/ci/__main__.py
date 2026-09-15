@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """CLI for the test-suite manifest:  python -m tests.ci {list,show,run,matrix,doctor}
 
 list                       all suites, tiers, lanes, variants

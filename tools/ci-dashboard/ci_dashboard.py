@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """Torch-TensorRT CI dashboard — a local, pleasant view of GitHub Actions.
 
 Run:  uv run tools/ci-dashboard/ci_dashboard.py            # current branch

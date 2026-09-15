@@ -1,10 +1,14 @@
-import os
-import sys
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 import glob
-import subprocess
-import utils
+import os
 import pwd
+import subprocess
+import sys
+
 import clang_format
+import utils
 
 
 def lint(user, target_files, change_file=True):

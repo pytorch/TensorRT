@@ -1,7 +1,9 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 import unittest
 
 import torch
-
 import torch._dynamo.config
 import torchvision
 from torch_tensorrt.fx.lower import compile

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 # Owner(s): ["oncall: fx"]
 import logging
 import operator
@@ -7,7 +10,6 @@ from typing import Callable, Dict, List, NamedTuple, Optional, Tuple
 import numpy as np
 import torch
 import torch.nn as nn
-
 import torch_tensorrt.fx.tracer.acc_tracer.acc_normalizer as acc_normalizer
 import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 import torch_tensorrt.fx.tracer.acc_tracer.acc_tracer as acc_tracer

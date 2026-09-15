@@ -1,10 +1,12 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 import logging
 import unittest
 
 import torch
 import torch_tensorrt.fx.tracer.acc_tracer.acc_tracer as acc_tracer
 from torch_tensorrt.fx.passes.lower_basic_pass import fix_clamp_numerical_limits_to_fp16
-
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 

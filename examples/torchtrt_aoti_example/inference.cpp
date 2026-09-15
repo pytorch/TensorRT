@@ -1,8 +1,13 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+
 #include <iostream>
 #include <vector>
 
-#include "torch/torch.h"
 #include "torch/csrc/inductor/aoti_package/model_package_loader.h"
+#include "torch/torch.h"
 
 int main(int argc, const char* argv[]) {
   // Check for correct number of command-line arguments
@@ -21,12 +26,12 @@ int main(int argc, const char* argv[]) {
   // Assume running on CUDA
   std::vector<torch::Tensor> inputs = {torch::randn({8, 10}, at::kCUDA)};
   std::vector<torch::Tensor> outputs = loader.run(inputs);
-  std::cout << "Result from the first inference:"<< std::endl;
+  std::cout << "Result from the first inference:" << std::endl;
   std::cout << outputs << std::endl;
 
   // The second inference uses a different batch size and it works because we
   // specified that dimension as dynamic when compiling model.pt2.
-  std::cout << "Result from the second inference:"<< std::endl;
+  std::cout << "Result from the second inference:" << std::endl;
   // Assume running on CUDA
   std::cout << loader.run({torch::randn({1, 10}, at::kCUDA)}) << std::endl;
 

@@ -1,7 +1,11 @@
-import os
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 import json
-from github import Github
+import os
 import subprocess
+
+from github import Github
 
 token = os.environ["GITHUB_TOKEN"]
 gh = Github(token)

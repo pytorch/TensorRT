@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """
 Tests for user-supplied I/O binding names on the engine-converter API.
 
@@ -17,6 +20,7 @@ indexes positionally.
 
 import unittest
 
+import tensorrt as trt
 import torch
 import torch_tensorrt
 from torch.testing._internal.common_utils import TestCase, run_tests
@@ -26,8 +30,6 @@ from torch_tensorrt.dynamo._compiler import (
     _resolve_pytree_binding_names,
     convert_exported_program_to_serialized_trt_engine,
 )
-
-import tensorrt as trt
 
 DEVICE = torch.device("cuda", 0)
 

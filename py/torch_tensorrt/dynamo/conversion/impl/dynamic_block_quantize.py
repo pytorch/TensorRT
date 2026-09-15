@@ -1,7 +1,12 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 from typing import Optional, Union
 
 import numpy as np
+import tensorrt as trt
 import torch
+from tensorrt import ITensor as TRTTensor
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.fx.node import Target
 from torch_tensorrt._utils import is_tensorrt_version_supported
@@ -11,9 +16,6 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_trt_tensor,
     set_layer_name,
 )
-
-import tensorrt as trt
-from tensorrt import ITensor as TRTTensor
 
 if is_tensorrt_version_supported("10.8.0"):
 

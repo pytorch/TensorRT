@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 import logging
 import typing
 import uuid
@@ -7,7 +10,6 @@ import numpy as np
 import tensorrt as trt
 import torch
 from torch.fx.node import Argument, Node, Target
-
 from torch_tensorrt._features import needs_qdp_plugin
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext

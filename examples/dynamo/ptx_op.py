@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """
 .. _ptx_op:
 
@@ -31,14 +34,13 @@ This example walks through ``gelu`` (approximate-tanh GELU activation):
 import cuda.core  # noqa: F401
 import tensorrt.plugin as trtp
 import torch
+import torch_tensorrt
+import torch_tensorrt.kernels as ttk
 from cuda.core import Device as _Device
 from cuda.core import LaunchConfig as _LaunchConfig
 from cuda.core import Program as _Program
 from cuda.core import ProgramOptions as _ProgramOptions
 from cuda.core import launch as _cuda_launch
-
-import torch_tensorrt
-import torch_tensorrt.kernels as ttk
 
 # ---------------------------------------------------------------------------
 # Step 1: obtain PTX

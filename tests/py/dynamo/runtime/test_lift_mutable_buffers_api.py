@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 # type: ignore
 """Integration tests for the ``lift_mutable_buffers`` flag on
 ``convert_exported_program_to_serialized_trt_engine``.

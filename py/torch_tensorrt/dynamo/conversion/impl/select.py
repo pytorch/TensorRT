@@ -1,8 +1,13 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 import logging
 from typing import List, Optional, Sequence, Union
 
 import numpy as np
+import tensorrt as trt
 import torch
+from tensorrt import ITensor
 from torch.fx.node import Target
 from torch_tensorrt._enums import dtype
 from torch_tensorrt.dynamo._SourceIR import SourceIR
@@ -20,9 +25,6 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
 from torch_tensorrt.dynamo.conversion.impl.elementwise import convert_binary_elementwise
 from torch_tensorrt.dynamo.conversion.impl.shape import shape as get_shape
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
-
-import tensorrt as trt
-from tensorrt import ITensor
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 

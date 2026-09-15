@@ -1,13 +1,14 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 import copy
 import unittest
 
 import torch
 import torch._dynamo as torchdynamo
-
 import torch._dynamo.config
 import torchvision
 from functorch.experimental import functionalize
-
 from torch.library import Library
 from torch_tensorrt.fx.lower import compile
 from torch_tensorrt.fx.tracer.dispatch_tracer.tracer import make_fx

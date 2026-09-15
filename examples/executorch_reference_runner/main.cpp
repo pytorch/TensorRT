@@ -1,4 +1,9 @@
 /*
+ * SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+
+/*
  * Copyright (c) 2025, NVIDIA CORPORATION. All rights reserved.
  *
  * This source code is licensed under the BSD-style license found in the
@@ -55,8 +60,8 @@ using executorch::runtime::MethodMeta;
 using executorch::runtime::Program;
 using executorch::runtime::Result;
 using executorch::runtime::Span;
-using executorch::runtime::etensor::Device;
 using executorch::runtime::TensorInfo;
+using executorch::runtime::etensor::Device;
 
 static uint8_t method_allocator_pool[4 * 1024U * 1024U];
 static uint8_t temp_allocator_pool[1 * 1024U * 1024U];
@@ -71,7 +76,6 @@ static const char* get_flag(int argc, char** argv, const char* flag, const char*
   return def;
 }
 
-
 // The CUDA driver API is resolved at runtime rather than linked. The release build
 // image ships neither libcuda nor a stub, so linking it would break the build for
 // everyone to serve one optional flag, and it would have to be wired into both this
@@ -84,7 +88,12 @@ struct CudaDriverApi {
   CUresult (*DeviceGet)(CUdevice*, int) = nullptr;
   CUresult (*DeviceGetDevResource)(CUdevice, CUdevResource*, CUdevResourceType) = nullptr;
   CUresult (*DevSmResourceSplitByCount)(
-      CUdevResource*, unsigned int*, const CUdevResource*, CUdevResource*, unsigned int, unsigned int) = nullptr;
+      CUdevResource*,
+      unsigned int*,
+      const CUdevResource*,
+      CUdevResource*,
+      unsigned int,
+      unsigned int) = nullptr;
   CUresult (*DevResourceGenerateDesc)(CUdevResourceDesc*, CUdevResource*, unsigned int) = nullptr;
   CUresult (*GreenCtxCreate)(CUgreenCtx*, CUdevResourceDesc, CUdevice, unsigned int) = nullptr;
   CUresult (*GreenCtxStreamCreate)(CUstream*, CUgreenCtx, unsigned int, int) = nullptr;
@@ -119,10 +128,8 @@ const CudaDriverApi* load_cuda_driver_api() {
   const bool ok = bind(api.Init, "cuInit") && bind(api.DeviceGet, "cuDeviceGet") &&
       bind(api.DeviceGetDevResource, "cuDeviceGetDevResource") &&
       bind(api.DevSmResourceSplitByCount, "cuDevSmResourceSplitByCount") &&
-      bind(api.DevResourceGenerateDesc, "cuDevResourceGenerateDesc") &&
-      bind(api.GreenCtxCreate, "cuGreenCtxCreate") &&
-      bind(api.GreenCtxStreamCreate, "cuGreenCtxStreamCreate") &&
-      bind(api.GreenCtxDestroy, "cuGreenCtxDestroy") &&
+      bind(api.DevResourceGenerateDesc, "cuDevResourceGenerateDesc") && bind(api.GreenCtxCreate, "cuGreenCtxCreate") &&
+      bind(api.GreenCtxStreamCreate, "cuGreenCtxStreamCreate") && bind(api.GreenCtxDestroy, "cuGreenCtxDestroy") &&
       bind(api.GetErrorString, "cuGetErrorString");
   loaded = ok;
   return ok ? &api : nullptr;
@@ -281,11 +288,7 @@ int main(int argc, char** argv) {
           static_cast<int>(buffer_device->type()),
           static_cast<uint32_t>(device_buffer.error()));
       ET_LOG(
-          Info,
-          "  planned buffer[%zu] = %zu bytes on device_type %d",
-          i,
-          sz,
-          static_cast<int>(buffer_device->type()));
+          Info, "  planned buffer[%zu] = %zu bytes on device_type %d", i, sz, static_cast<int>(buffer_device->type()));
       planned_spans.push_back(device_buffer->as_span());
       planned_device_buffers.push_back(std::move(device_buffer.get()));
     }

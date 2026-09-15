@@ -1,11 +1,13 @@
-import torch
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
 
 # @manual=//deeplearning/trt/python:py_tensorrt
 import logging
 
+import torch
 from torch_tensorrt.fx.converter_registry import tensorrt_converter
-from torch_tensorrt.fx.converters.impl import activation, convolution
 from torch_tensorrt.fx.converters.converter_utils import SourceIR
+from torch_tensorrt.fx.converters.impl import activation, convolution
 
 logger = logging.getLogger(__name__)
 

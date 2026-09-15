@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """
 .. _engine_converter_binding_names:
 
@@ -52,12 +55,11 @@ names maps 1:1 to FX's flattened placeholder / output order — no runtime
 queue, no in-band validation, just an up-front structural check.
 """
 
+# %%
+import tensorrt as trt
 import torch
 import torch_tensorrt
 from torch_tensorrt.dynamo._compiler import BindingNameMismatchError
-
-# %%
-import tensorrt as trt
 
 DEVICE = torch.device("cuda", 0)
 

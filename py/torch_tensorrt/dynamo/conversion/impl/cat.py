@@ -1,11 +1,13 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 from typing import List, Optional, Sequence, Union
 
 import numpy as np
 import tensorrt as trt
-from tensorrt import ITensor as TRTTensor
 import torch
+from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Target
-
 from torch_tensorrt import _enums
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext

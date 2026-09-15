@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 # Owner(s): ["oncall: gpu_enablement"]
 
 import io
@@ -5,9 +8,8 @@ import os
 
 import torch
 import torch.fx
-
 import torch_tensorrt.fx.tracer.acc_tracer.acc_tracer as acc_tracer
-from torch.testing._internal.common_utils import run_tests, TestCase
+from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.fx import InputTensorSpec, TRTInterpreter, TRTModule
 
 # from torch_tensorrt.dynamo._TorchTensorRTModule import TorchTensorRTModule

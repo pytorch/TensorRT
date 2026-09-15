@@ -1,7 +1,11 @@
-import os
-import sys
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 import glob
+import os
 import subprocess
+import sys
+
 import utils
 
 

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 # Owner(s): ["oncall: gpu_enablement"]
 import functools
 from unittest import TestCase
@@ -18,7 +21,6 @@ class ObserverGPUTests(TestCase):
 
         import torch
         import torch.nn as nn
-
         import torch_tensorrt.fx.lower as lower
         from torch_tensorrt.fx.lower_setting import LowerSetting
 

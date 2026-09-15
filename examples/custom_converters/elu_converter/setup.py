@@ -1,7 +1,10 @@
-import os
-from setuptools import setup, Extension
-from torch.utils import cpp_extension
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
 
+import os
+
+from setuptools import Extension, setup
+from torch.utils import cpp_extension
 
 # library_dirs should point to the libtrtorch.so, include_dirs should point to the dir that include the headers
 # 1) download the latest package from https://github.com/pytorch/TensorRT/releases/

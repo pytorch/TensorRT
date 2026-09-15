@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 # type: ignore
 """Tests for ``user_symbol_bounds`` plumbed from ``compile_module`` through
 the partitioner into ``extract_var_range_info``."""

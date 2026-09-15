@@ -1,8 +1,11 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt.fx.utils import LowerPrecision
 from torch_tensorrt.fx.tools.common_fx2trt import DispatchTestCase, InputTensorSpec
+from torch_tensorrt.fx.utils import LowerPrecision
 
 
 class TestSigmoidConverter(DispatchTestCase):

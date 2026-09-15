@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 from __future__ import annotations
 
 import inspect
@@ -5,7 +8,6 @@ import logging
 from typing import Any, Callable, Dict, List, Optional, get_type_hints
 
 import torch
-
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import ConverterPriority
 from torch_tensorrt.dynamo.conversion.plugins import custom_op
 from torch_tensorrt.kernels._cuda_python_spec import CudaPythonSpec
@@ -148,7 +150,6 @@ def _register_aot_impl(op_name: str, ptx: bytes, spec: CudaPythonSpec) -> None:
 
     import numpy as np
     import tensorrt.plugin as trtp
-
     from torch_tensorrt.dynamo.conversion.plugins._generate_plugin import (
         np_scalar_attr_annotation,
     )
