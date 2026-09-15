@@ -230,11 +230,12 @@ class BazelBuild(build_py):
             in ("1", "true", "yes", "on")
             else "opt"
         )
+        build_config = "driveos" if TARGET_PLATFORM == "driveos" else "linux"
         command = [
             bazel,
             "build",
             BAZEL_TARGET,
-            "--config=linux",
+            f"--config={build_config}",
             "--config=python",
             f"--compilation_mode={compilation_mode}",
             f"--action_env=PYTHON_BIN_PATH={sys.executable}",
