@@ -61,11 +61,15 @@ struct EngineHandle {
   size_t num_outputs = 0;
   // Per output binding [0..num_outputs): index into input_binding_names of the
   // input it aliases (in-place KV-cache / user alias), or -1 for a normal output.
-  // Built at init from the blob's aliased_io. The KV buffers are threaded by
-  // ExecuTorch as caller-owned mutable-buffer delegate args (input AND aliased
-  // output): execute() binds each aliased TRT output binding to its aliased
-  // input's caller-provided pointer (in-place) and reflects the result into the
-  // delegate output EValue, which ExecuTorch's write-back copy_ then reads.
+  // Built at init from the blob's aliased_io. Either way execute() binds the
+  // aliased TRT output binding to its aliased input's caller-provided pointer,
+  // so the engine's write lands in the caller's buffer; what differs is how the
+  // .pte carries the buffer. Threaded: the buffer is both a delegate input arg
+  // and a delegate output arg (the caller-owned mutable buffer's mutation slot),
+  // and execute() reflects the result into that output EValue for ExecuTorch's
+  // write-back copy_ to read. Elided -- zero-copy KV -- the buffer is an input
+  // arg only, the delegate has no output for it, and execute() skips the
+  // reflect: the in-place write already is the update.
   std::vector<int> output_aliased_input_idx;
   // Per input binding [0..num_inputs): true if any output aliases this input, so
   // its in-place (KV/user) update must land in the caller-owned storage. Built at

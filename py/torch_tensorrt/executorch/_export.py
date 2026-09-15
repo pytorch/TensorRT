@@ -296,6 +296,47 @@ def _apply_weight_streaming_budget(
         specs.append(CompileSpec(WEIGHT_STREAMING_BUDGET_COMPILE_SPEC_KEY, spec_value))
 
 
+def _apply_zero_copy_kv(
+    program_map: dict[str, ExportedProgram],
+) -> dict[str, list[str]]:
+    """Hand each method's aliased buffers to the engine to update in place.
+
+    Runs immediately after the mutations are declared and before anything
+    partitions the program: the rewiring works from those declarations and has to
+    land before the partition boundary fixes the delegate's outputs. It operates
+    on the staged programs, never the caller's, so a reused ExportedProgram is
+    left intact.
+
+    Returns, per method that actually lost an output, the engine output binding
+    names it elided -- narrower than the methods the caller asked about, and
+    narrower than the engine's full aliased_io. Only these names may be exempted
+    from the backend's output-binding check, so a method that dropped an output
+    for some other reason, or an aliased output export never rewired, is still
+    caught.
+    """
+    from torch_tensorrt.executorch._zero_copy import (
+        rewire_aliased_mutations_to_buffers,
+    )
+
+    elided = {
+        name: rewire_aliased_mutations_to_buffers(program)
+        for name, program in program_map.items()
+    }
+    if not any(elided.values()):
+        logger.warning(
+            "zero_copy_kv=True, but no aliased buffer mutation was found in %s, "
+            "so zero-copy KV was not applied. Finalizing this program gives an "
+            "ordinary staged .pte; the only thing that reports that is "
+            "torch_tensorrt.executorch.check_zero_copy_kv, which refuses this "
+            "model and which save(..., zero_copy_kv=True) runs for you. Export "
+            "without zero_copy_kv to ask for a staged program deliberately.",
+            ", ".join(sorted(program_map)),
+        )
+        return {}
+    logger.debug("zero-copy KV: elided outputs per method: %s", elided)
+    return {name: names for name, names in elided.items() if names}
+
+
 def _per_method_values(
     value: Sequence[Any] | Mapping[str, Sequence[Any] | None] | None,
     method_names: tuple[str, ...],
@@ -328,6 +369,42 @@ def _per_method_values(
     return {name: list(shared) for name in method_names}
 
 
+def _reject_caller_set_zero_copy_spec(
+    method_compile_specs: dict[str, list[Any]],
+) -> None:
+    """Reject a caller who sets the reserved zero-copy key by hand.
+
+    export() sets this key itself, and only for the aliased outputs it actually
+    elided. A hand-set value would tell the backend that outputs were taken out
+    of the delegate that were not, so the backend would stop rejecting a delegate
+    that is genuinely short an output -- dropping a real KV update silently.
+
+    Written for this one key rather than parametrized over a reserved key: the
+    wording is the safety property this key carries, which no other key shares.
+    ``_apply_weight_streaming_budget`` rejects its own reserved key inline rather
+    than through this function: it also *writes* a spec, so its rejection is one
+    branch of a larger operation, and the two keys fail for different reasons --
+    that one has a supported argument to point the caller at, this one has a
+    safety property that no argument can restore.
+
+    The message names the method whose specs carry the key, as
+    ``_apply_weight_streaming_budget`` does. A caller who gave one shared list
+    gets it fanned out to every method, so the name is then whichever method came
+    first; that imprecision is the sibling's too.
+    """
+    from torch_tensorrt.executorch.backend import ZERO_COPY_KV_COMPILE_SPEC_KEY
+
+    for name, specs in method_compile_specs.items():
+        for spec in specs:
+            if getattr(spec, "key", None) == ZERO_COPY_KV_COMPILE_SPEC_KEY:
+                raise ValueError(
+                    f"compile_specs for {name!r} may not set the reserved key "
+                    f"'{ZERO_COPY_KV_COMPILE_SPEC_KEY}'; export() sets it "
+                    "itself when zero_copy_kv=True elides a method's aliased "
+                    "outputs. Setting it by hand could drop a real KV update silently."
+                )
+
+
 def export(
     source: ExportedProgram | torch.fx.GraphModule | Mapping[str, ExportedProgram],
     *,
@@ -345,6 +422,7 @@ def export(
     ) = None,
     compile_config: "EdgeCompileConfig | None" = None,
     constant_methods: Mapping[str, Any] | None = None,
+    zero_copy_kv: bool = False,
     generate_etrecord: bool = False,
     weight_streaming_budget_per_engine: int | None = None,
 ) -> "EdgeProgramManager":
@@ -371,6 +449,34 @@ def export(
     every method sharing it would be tagged with the same name. Sharing an instance whose
     specs name no method is not rejected here, but a backend that reads its own method
     name from its specs, such as the CUDA backend, then raises during lowering.
+
+    ``zero_copy_kv=True`` lets a TensorRT engine update an aliased mutable buffer
+    -- a KV cache -- in place, instead of ExecuTorch handing the delegate a
+    staging copy and copying the engine's result back afterwards. It is opt-in
+    rather than automatic for two reasons: the resulting ``.pte`` needs a
+    runtime that understands a delegate with its aliased outputs elided, so
+    producing one silently would break an older runner; and it is only half the
+    change. Finalize such a program with
+    ``to_executorch(torch_tensorrt.executorch.zero_copy_backend_config(config))``
+    -- without it the buffer is still staged and its updates would be discarded.
+
+    **Nothing here enforces that pairing.** The manager returned is ExecuTorch's
+    own, and its ``to_executorch`` finalizes whatever config it is given: with
+    an ordinary one it succeeds and writes a ``.pte`` whose caches never update
+    -- for a KV cache, wrong output rather than a crash. Finalizing a
+    ``zero_copy_kv=True`` export yourself therefore owes two calls that nothing
+    checks: pass
+    :func:`torch_tensorrt.executorch.zero_copy_backend_config` as the config,
+    and hand the program it returns to
+    :func:`torch_tensorrt.executorch.check_zero_copy_kv`, which reads back what
+    the config alone cannot say. ``torch_tensorrt.save(output_format="executorch",
+    zero_copy_kv=True)`` owns both ends and does both for you.
+
+    Only a buffer the engine declares aliased is affected. A method may hold both
+    kinds at once: a mutable buffer with no aliasing available -- a convolution
+    state, say -- keeps its staging copy and the copy-back that writes it, while
+    the aliased caches beside it go zero-copy. The two are told apart by the
+    engine's own ``aliased_io``, not by the graph, in which they look identical.
 
     ``generate_etrecord=True`` is outside the payload sharing described above. It makes
     ExecuTorch deep copy the whole program, so peak memory grows by roughly the size of
@@ -419,6 +525,15 @@ def export(
         constant_methods (Dict[str, Any]): Methods returning a constant, such as a vocab
             size. Keys must be valid Python identifiers and must not name a method of
             ``source``.
+        zero_copy_kv (bool): Let a TensorRT engine write its aliased mutable buffer --
+            a KV cache -- in place, instead of receiving a staging copy that ExecuTorch
+            copies back. Requires finalizing the returned program with
+            :func:`torch_tensorrt.executorch.zero_copy_backend_config`, and checking
+            the result with
+            :func:`torch_tensorrt.executorch.check_zero_copy_kv`; neither is enforced,
+            and finalizing without the config leaves the buffer staged and every
+            update discarded. ``torch_tensorrt.save(output_format="executorch",
+            zero_copy_kv=True)`` owns both steps and needs only the one flag.
         generate_etrecord (bool): Ask ExecuTorch for an ETRecord for later debugging.
             This copies the whole program, engines included.
         weight_streaming_budget_per_engine (Optional[int]): Bytes of engine weights that
@@ -456,12 +571,18 @@ def export(
 
     import torch_tensorrt.dynamo.runtime.meta_ops.register_meta_ops  # noqa: F401
     from executorch.exir import to_edge_transform_and_lower
+    from executorch.exir.backend.compile_spec_schema import CompileSpec as _CompileSpec
     from torch_tensorrt.dynamo._exporter import _declare_aliased_kv_mutations_on_ep
     from torch_tensorrt.executorch import TensorRTPartitioner, get_edge_compile_config
     from torch_tensorrt.executorch._export_utils import (
         replace_execute_engine,
         stage_exported_program,
         validate_engine_program,
+    )
+    from torch_tensorrt.executorch._zero_copy import order_copyback_mutations_first
+    from torch_tensorrt.executorch.backend import (
+        ZERO_COPY_KV_COMPILE_SPEC_KEY,
+        _serialize_elided_output_names,
     )
 
     programs, method_names = _prepare_programs(
@@ -501,6 +622,7 @@ def export(
     method_compile_specs = _per_method_values(
         compile_specs, method_names, "compile_specs"
     )
+    _reject_caller_set_zero_copy_spec(method_compile_specs)
     _apply_weight_streaming_budget(
         method_compile_specs, weight_streaming_budget_per_engine
     )
@@ -568,6 +690,8 @@ def export(
         )
         for name, program in program_map.items()
     }
+    zero_copy_methods = _apply_zero_copy_kv(staged_programs) if zero_copy_kv else {}
+
     rewritten: dict[str, ExportedProgram] = {}
     method_partitioners: dict[str, list[Partitioner]] = {}
     for name, program in staged_programs.items():
@@ -589,8 +713,29 @@ def export(
                 )
         # Drop this method's engine payloads as soon as they are in the graph.
         rewritten[name] = replace_execute_engine(program, resolved_engines.pop(name))
+        trt_compile_specs = list(method_compile_specs[name])
+        if name in zero_copy_methods:
+            # Signal to TensorRTPartitioner that this method elided aliased
+            # outputs. Only the presence of the key is read: the partitioner
+            # drops this spec from the list it applies to every partition and
+            # re-derives, per engine, exactly which of a delegate's aliased
+            # outputs were elided, stamping only those onto only that delegate
+            # (see TensorRTPartitioner._partition_elided_output_names). So a
+            # method that lowers to several TensorRT delegates marks only the KV
+            # one and a plain-compute delegate beside it carries no zero-copy
+            # spec. Without any spec the backend rejects a delegate short of its
+            # bindings, which keeps an accidentally dropped output an error.
+            # The method-wide names go in the value so this spec reads like the
+            # per-partition one the partitioner writes, but nothing decodes this
+            # one: changing which names are listed here changes no delegate.
+            trt_compile_specs.append(
+                _CompileSpec(
+                    ZERO_COPY_KV_COMPILE_SPEC_KEY,
+                    _serialize_elided_output_names(zero_copy_methods[name]),
+                )
+            )
         method_partitioners[name] = [
-            TensorRTPartitioner(compile_specs=method_compile_specs[name]),
+            TensorRTPartitioner(compile_specs=trt_compile_specs),
             *extra_partitioners[name],
         ]
 
@@ -603,7 +748,7 @@ def export(
         edge_programs = rewritten["forward"]
         partitioner_pipeline = method_partitioners["forward"]
 
-    return to_edge_transform_and_lower(
+    edge_manager = to_edge_transform_and_lower(
         edge_programs,
         transform_passes=transform_passes,
         partitioner=partitioner_pipeline,
@@ -613,3 +758,18 @@ def export(
         ),
         generate_etrecord=generate_etrecord,
     )
+    # After lowering, not beside the rewiring: to_edge re-derives the graph
+    # signature, so an order set earlier does not reach the finalizer. See
+    # order_copyback_mutations_first.
+    #
+    # Every method, not only the ones zero-copy rewired, because the crossing
+    # this repairs is not zero-copy's. A plain nn.Module writing one buffer from
+    # another buffer and a second buffer from a user input -- no TensorRT, no
+    # zero_copy_kv -- comes out of stock to_edge().to_executorch() with the first
+    # buffer's mutation spec naming the copy that writes the second. Gating this
+    # on zero_copy_methods would make a general repair depend on an unrelated
+    # opt-in, and would leave a sibling method repaired or not according to
+    # whether some other method asked for zero-copy.
+    for name in edge_manager.methods:
+        order_copyback_mutations_first(edge_manager.exported_program(name))
+    return edge_manager

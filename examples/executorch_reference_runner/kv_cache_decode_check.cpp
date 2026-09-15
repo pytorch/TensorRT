@@ -22,6 +22,14 @@
  * position-0 slot is still zero). Equal logits mean the update did not persist
  * (cache reset per call, or the aliased output bound to scratch), so we fail.
  *
+ * Both scenarios are run twice, once with no caller stream and once with a
+ * CallerStreamGuard scoped over the decode loop on a stream this runner owns.
+ * The backend takes a different path in each: with no caller stream it
+ * synchronizes at the end of every execute(), and with one -- and nothing to
+ * stage or reflect, which is what a zero-copy .pte leaves -- it may return with
+ * the enqueue still in flight. Only the second exercises that skip, and only
+ * there does the runner owe the synchronization before it reads the logits.
+ *
  * Usage:
  *   kv_cache_decode_check --model_path=kv_cache_decode.pte [--tol=1e-3]
  */
@@ -33,10 +41,12 @@
 #include <cstdlib>
 #include <cstring>
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include <cuda_runtime.h>
 
+#include <executorch/extension/cuda/caller_stream.h>
 #include <executorch/extension/data_loader/file_data_loader.h>
 #include <executorch/runtime/core/error.h>
 #include <executorch/runtime/core/evalue.h>
@@ -72,8 +82,14 @@ static const char* get_flag(int argc, char** argv, const char* flag, const char*
 
 // Load a FRESH method (zeroed caller-owned buffers), run one decode step per
 // entry in `positions` (token id fixed to 1, input_pos = the position), and
-// return the final step's first output as host floats.
-static std::vector<float> run_decode(Program& program, const char* method_name, const std::vector<int64_t>& positions) {
+// return the final step's first output as host floats. With `use_caller_stream`
+// the decode loop runs under a CallerStreamGuard on a stream owned here, the way
+// the main runner scopes one; without it the backend sees no caller stream.
+static std::vector<float> run_decode(
+    Program& program,
+    const char* method_name,
+    const std::vector<int64_t>& positions,
+    bool use_caller_stream) {
   Result<MethodMeta> method_meta = program.method_meta(method_name);
   ET_CHECK_MSG(method_meta.ok(), "method_meta failed: 0x%" PRIx32, static_cast<uint32_t>(method_meta.error()));
 
@@ -148,6 +164,17 @@ static std::vector<float> run_decode(Program& program, const char* method_name, 
         exec_aten::ScalarType::Long, nd, sizes[i].data(), data[i].data(), dim_order[i].data(), strides[i].data());
   }
 
+  cudaStream_t caller_stream = nullptr;
+  // Optional, not a guard over a null stream: an explicitly null selection is
+  // still a selection, so constructing one unconditionally would leave both
+  // modes with a caller stream set and cover the same branch twice. The guard
+  // scopes the whole loop rather than each step, so consecutive decodes order on
+  // one stream instead of on an end-of-execute sync.
+  std::optional<executorch::extension::cuda::CallerStreamGuard> caller_stream_guard;
+  if (use_caller_stream) {
+    ET_CHECK_MSG(cudaStreamCreate(&caller_stream) == cudaSuccess, "cudaStreamCreate failed");
+    caller_stream_guard.emplace(caller_stream);
+  }
   for (int64_t pos : positions) {
     for (size_t i = 1; i < num_inputs; ++i) {
       std::fill(data[i].begin(), data[i].end(), pos);
@@ -157,6 +184,20 @@ static std::vector<float> run_decode(Program& program, const char* method_name, 
     }
     ET_CHECK_MSG(method->execute() == Error::Ok, "execute() failed at pos %" PRId64, pos);
   }
+  caller_stream_guard.reset();
+  if (use_caller_stream) {
+    // The last execute() may have returned with the enqueue still running, so a
+    // runner owning the stream owes it this before reading an output. It is what
+    // the contract asks for rather than what makes the read correct here:
+    // cudaStreamCreate returns a blocking stream, and the synchronous cudaMemcpy
+    // below runs on the legacy default stream, which waits for every blocking
+    // stream in the context. So this exercises the branch but cannot detect a
+    // missing synchronization -- deleting it leaves the check passing.
+    ET_CHECK_MSG(cudaStreamSynchronize(caller_stream) == cudaSuccess, "cudaStreamSynchronize failed");
+    if (cudaStreamDestroy(caller_stream) != cudaSuccess) {
+      ET_LOG(Error, "cudaStreamDestroy failed");
+    }
+  }
 
   EValue out;
   ET_CHECK_MSG(method->get_outputs(&out, 1) == Error::Ok, "get_outputs failed");
@@ -164,7 +205,9 @@ static std::vector<float> run_decode(Program& program, const char* method_name, 
   exec_aten::Tensor t = out.toTensor();
   ET_CHECK_MSG(t.scalar_type() == exec_aten::ScalarType::Float, "expected float logits output");
   // The output may be device-resident; cudaMemcpyDefault copies from host or
-  // device. execute() synchronized (no caller stream) so the result is ready.
+  // device. The work is finished either way: with no caller stream the backend
+  // synchronized at the end of execute(), and with one the stream was
+  // synchronized above.
   std::vector<float> result(static_cast<size_t>(t.numel()));
   ET_CHECK_MSG(
       cudaMemcpy(result.data(), t.const_data_ptr(), result.size() * sizeof(float), cudaMemcpyDefault) == cudaSuccess,
@@ -191,37 +234,59 @@ int main(int argc, char** argv) {
   const char* method_name = *name;
   ET_LOG(Info, "Loaded '%s' method '%s'", model_path, method_name);
 
-  // A: pos=1 from a zeroed cache. B: pos=0 then pos=1 (second step sees pos 0).
-  std::vector<float> a = run_decode(*program, method_name, {1});
-  std::vector<float> b = run_decode(*program, method_name, {0, 1});
+  // Both modes have to hold. Without a caller stream the backend synchronizes at
+  // the end of every execute(); with one it may skip that, which is the branch
+  // zero-copy KV depends on and the one a wrong result shows up in only
+  // sometimes.
+  struct Mode {
+    const char* label;
+    bool use_caller_stream;
+  };
+  for (const Mode& mode : {Mode{"none", false}, Mode{"own", true}}) {
+    // A: pos=1 from a zeroed cache. B: pos=0 then pos=1 (second step sees pos 0).
+    std::vector<float> a = run_decode(*program, method_name, {1}, mode.use_caller_stream);
+    std::vector<float> b = run_decode(*program, method_name, {0, 1}, mode.use_caller_stream);
 
-  ET_CHECK_MSG(a.size() == b.size() && !a.empty(), "output size mismatch (%zu vs %zu)", a.size(), b.size());
-  double max_abs_diff = 0.0;
-  bool saw_nan = false;
-  for (size_t i = 0; i < a.size(); ++i) {
-    // std::max(0.0, fabs(NaN)) is 0.0 (NaN compares false), so a NaN logit would
-    // otherwise leave max_abs_diff at 0.0 and be misreported as "identical".
-    // Track NaNs explicitly and fail on them below.
-    if (std::isnan(a[i]) || std::isnan(b[i])) {
-      saw_nan = true;
+    ET_CHECK_MSG(a.size() == b.size() && !a.empty(), "output size mismatch (%zu vs %zu)", a.size(), b.size());
+    double max_abs_diff = 0.0;
+    bool saw_nan = false;
+    for (size_t i = 0; i < a.size(); ++i) {
+      // std::max(0.0, fabs(NaN)) is 0.0 (NaN compares false), so a NaN logit would
+      // otherwise leave max_abs_diff at 0.0 and be misreported as "identical".
+      // Track NaNs explicitly and fail on them below.
+      if (std::isnan(a[i]) || std::isnan(b[i])) {
+        saw_nan = true;
+      }
+      max_abs_diff = std::max(max_abs_diff, std::fabs(static_cast<double>(a[i]) - static_cast<double>(b[i])));
     }
-    max_abs_diff = std::max(max_abs_diff, std::fabs(static_cast<double>(a[i]) - static_cast<double>(b[i])));
-  }
 
-  fprintf(
-      stderr,
-      "[kv-check] logits numel=%zu  max|A(no-history) - B(with-history)| = %.6g  (tol=%.3g)\n",
-      a.size(),
-      max_abs_diff,
-      tol);
-  if (saw_nan) {
-    fprintf(stderr, "[kv-check] FAIL: logits contain NaN -> the decode produced invalid output.\n");
-    return 1;
+    fprintf(
+        stderr,
+        "[kv-check] caller stream: %s  logits numel=%zu  max|A(no-history) - B(with-history)| = %.6g  (tol=%.3g)\n",
+        mode.label,
+        a.size(),
+        max_abs_diff,
+        tol);
+    if (saw_nan) {
+      fprintf(
+          stderr,
+          "[kv-check] FAIL: logits contain NaN -> the decode produced invalid output (caller stream: %s).\n",
+          mode.label);
+      return 1;
+    }
+    if (max_abs_diff <= tol) {
+      fprintf(
+          stderr,
+          "[kv-check] FAIL: outputs are identical -> the KV write did not persist across execute() calls "
+          "(caller stream: %s).\n",
+          mode.label);
+      return 1;
+    }
+    fprintf(
+        stderr,
+        "[kv-check] PASS: decode at pos=1 observed the KV written at pos=0 across execute() calls "
+        "(caller stream: %s).\n",
+        mode.label);
   }
-  if (max_abs_diff > tol) {
-    fprintf(stderr, "[kv-check] PASS: decode at pos=1 observed the KV written at pos=0 across execute() calls.\n");
-    return 0;
-  }
-  fprintf(stderr, "[kv-check] FAIL: outputs are identical -> the KV write did not persist across execute() calls.\n");
-  return 1;
+  return 0;
 }
