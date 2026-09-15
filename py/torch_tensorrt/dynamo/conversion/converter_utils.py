@@ -94,8 +94,12 @@ def get_node_io(
     for arg in node.args:
         if isinstance(arg, torch.fx.Node):
             if arg.op == "get_attr":
-                shape, dtype = constant_mapping[str(arg)]
-                arg_repr = f"{shape}@{dtype}"
+                mapped = constant_mapping.get(str(arg))
+                arg_repr = (
+                    f"{mapped[0]}@{mapped[1]}"
+                    if mapped is not None
+                    else f"attr:{arg.target}"
+                )
             elif arg.meta.get("tensor_meta") is not None:
                 arg_repr = format_tensor_metadata(arg.meta["tensor_meta"])
             elif arg.meta.get("val") is not None:
@@ -114,8 +118,10 @@ def get_node_io(
     # Format output tensors and arguments
     metadata_string += " | Outputs: ("
     if node.op == "get_attr":
-        shape, dtype = constant_mapping[str(node)]
-        node_repr = f"{shape}@{dtype}"
+        mapped = constant_mapping.get(str(node))
+        node_repr = (
+            f"{mapped[0]}@{mapped[1]}" if mapped is not None else f"attr:{node.target}"
+        )
     elif node.meta.get("tensor_meta") is not None:
         node_repr = format_tensor_metadata(node.meta["tensor_meta"])
     elif node.meta.get("val") is not None:

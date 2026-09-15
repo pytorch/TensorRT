@@ -1,6 +1,7 @@
 from . import (
     aten_ops_converters,
     custom_ops_converters,
+    higher_order_ops_converters,
     ops_evaluators,
     plugins,
     prims_ops_converters,

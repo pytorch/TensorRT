@@ -14,6 +14,35 @@ def clean_up_graph_after_modifications(
     return gm
 
 
+def iter_cond_subgraphs(gm: torch.fx.GraphModule) -> List[torch.fx.GraphModule]:
+    """Return GraphModules used as torch.cond true/false branches.
+
+    Nested cond subgraphs are not flattened here; callers that recurse (e.g.
+    post_lowering) will visit them when processing each returned module.
+    """
+    cond_op = getattr(getattr(torch.ops, "higher_order", None), "cond", None)
+    if cond_op is None:
+        return []
+    subgraphs: List[torch.fx.GraphModule] = []
+    for node in gm.graph.nodes:
+        if node.op != "call_function" or node.target is not cond_op:
+            continue
+        if len(node.args) < 3:
+            continue
+        for arg in node.args[1:3]:
+            if not isinstance(arg, torch.fx.Node) or arg.op != "get_attr":
+                continue
+            attr: Any = gm
+            try:
+                for atom in str(arg.target).split("."):
+                    attr = getattr(attr, atom)
+            except AttributeError:
+                continue
+            if isinstance(attr, torch.fx.GraphModule):
+                subgraphs.append(attr)
+    return subgraphs
+
+
 def get_tensor_placeholders(
     gm: torch.fx.GraphModule,
 ) -> List[torch.fx.Node]:
@@ -32,16 +61,16 @@ def get_tensor_placeholders(
     return placeholders
 
 
-def find_complex_nodes(gm: torch.fx.GraphModule):
-    complex_nodes = []
-    complexNodes = {}
+def find_complex_nodes(gm: torch.fx.GraphModule) -> List[torch.fx.Node]:
+    complex_nodes: List[torch.fx.Node] = []
+    complexNodes: Dict[str, bool] = {}
     for node in gm.graph.nodes:
         if is_node_complex(node, complexNodes):
             complex_nodes.append(node)
     return complex_nodes
 
 
-def is_node_complex(node: torch.fx.Node, complexNodes):
+def is_node_complex(node: Any, complexNodes: Dict[str, bool]) -> bool:
     if not isinstance(node, torch.fx.Node):
         return False
     if node.name in complexNodes:
