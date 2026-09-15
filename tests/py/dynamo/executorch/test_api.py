@@ -310,7 +310,7 @@ _RUNTIME_INIT_PY = (
     / "py/torch-tensorrt-executorch-runtime/torch_tensorrt_executorch_runtime/__init__.py"
 )
 _TENSORRT_CMAKE_FINDER = _REPO_ROOT / "cmake/Modules/FindTensorRT.cmake"
-_LOCAL_CUDA_RULE = _REPO_ROOT / "toolchains/local_cuda.bzl"
+_CUDA_REPOSITORY_RULE = _REPO_ROOT / "toolchains/cuda_repository.bzl"
 
 
 @pytest.mark.unit
@@ -402,6 +402,10 @@ def _setup_tree():
     return ast.parse(_SETUP_PY.read_text(encoding="utf-8"))
 
 
+def _runtime_setup_tree():
+    return ast.parse(_RUNTIME_SETUP_PY.read_text(encoding="utf-8"))
+
+
 def _assignment_value(tree, name):
     for node in tree.body:
         if isinstance(node, ast.Assign) and any(
@@ -417,6 +421,15 @@ def _function_def(tree, name):
         if isinstance(node, ast.FunctionDef) and node.name == name:
             return node
     raise AssertionError(f"Could not find function {name}")
+
+
+def _class_method_def(tree, class_name, method_name):
+    for node in tree.body:
+        if isinstance(node, ast.ClassDef) and node.name == class_name:
+            for member in node.body:
+                if isinstance(member, ast.FunctionDef) and member.name == method_name:
+                    return member
+    raise AssertionError(f"Could not find {class_name}.{method_name}")
 
 
 @pytest.mark.unit
@@ -499,7 +512,7 @@ def test_driveos_packaging_requires_tensorrt_10_16():
 
 @pytest.mark.unit
 def test_runtime_wheel_uses_platform_tensorrt_on_driveos():
-    function = _function_def(_runtime_setup_tree(), "tensorrt_distribution")
+    function = _function_def(_runtime_setup_tree(), "get_tensorrt_requirement")
     namespace = {
         "TARGET_PLATFORM": "driveos",
         "torch": types.SimpleNamespace(version=types.SimpleNamespace(cuda="13.2")),
@@ -509,7 +522,7 @@ def test_runtime_wheel_uses_platform_tensorrt_on_driveos():
         namespace,
     )
 
-    assert namespace["tensorrt_distribution"]() == "tensorrt"
+    assert namespace["get_tensorrt_requirement"]() == "tensorrt>=10.16.1,<10.17.0"
 
 
 @pytest.mark.unit
@@ -520,16 +533,25 @@ def test_driveos_packaging_selects_driveos_bazel_config():
 
 @pytest.mark.unit
 def test_driveos_sdk_discovery_has_no_absolute_path_dependency():
-    cuda_rule = _LOCAL_CUDA_RULE.read_text()
-    assert 'ctx.os.environ.get("CUDA_HOME"' in cuda_rule
-    assert 'ctx.os.environ.get("CUDA_PATH"' in cuda_rule
-    assert 'ctx.which("nvcc")' in cuda_rule
+    cuda_rule = _CUDA_REPOSITORY_RULE.read_text()
+    assert 'target_platform == "driveos"' in cuda_rule
+    assert 'ctx.os.environ.get("TORCHTRT_DRIVE_CUDA_ROOT"' in cuda_rule
+    assert 'ctx.os.environ.get("TORCHTRT_DRIVE_CUDA_LIB_DIR"' in cuda_rule
     assert "/usr/local/cuda" not in cuda_rule
+    assert "_mirror_conventional_cuda(ctx)" in cuda_rule
 
     tensorrt_finder = _TENSORRT_CMAKE_FINDER.read_text()
     assert "ENV{TORCHTRT_TENSORRT_ROOT}" in tensorrt_finder
     assert "${CMAKE_LIBRARY_ARCHITECTURE}" in tensorrt_finder
     assert 'PATHS "/usr"' not in tensorrt_finder
+
+
+@pytest.mark.unit
+def test_runtime_wheel_selects_driveos_bazel_config():
+    source = ast.unparse(
+        _class_method_def(_runtime_setup_tree(), "BazelBuild", "build_extension")
+    )
+    assert "build_config = 'driveos' if TARGET_PLATFORM == 'driveos' else 'linux'" in source
 
 
 @pytest.mark.unit

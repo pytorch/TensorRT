@@ -80,11 +80,12 @@ class BazelBuild(build_ext):
             raise RuntimeError("Could not find bazelisk or bazel in PATH")
 
         compilation_mode = "dbg" if self.debug else "opt"
+        build_config = "driveos" if TARGET_PLATFORM == "driveos" else "linux"
         command = [
             bazel,
             "build",
             BAZEL_TARGET,
-            "--config=linux",
+            f"--config={build_config}",
             "--config=python",
             f"--compilation_mode={compilation_mode}",
             f"--action_env=PYTHON_BIN_PATH={sys.executable}",

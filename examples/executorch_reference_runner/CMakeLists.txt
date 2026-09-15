@@ -40,6 +40,11 @@ option(
   TORCHTRT_ENABLE_DRIVE_OS_COMPAT
   "Enable DRIVE OS compatibility for the ExecuTorch CUDA backend"
   OFF)
+set(
+  TORCHTRT_DRIVE_CUDA_ROOT
+  "$ENV{TORCHTRT_DRIVE_CUDA_ROOT}"
+  CACHE PATH
+  "CUDA root injected into the DRIVE build container")
 
 if(NOT EXECUTORCH_SOURCE_DIR)
   message(FATAL_ERROR "EXECUTORCH_SOURCE_DIR is empty. Set it to an ExecuTorch source checkout, for example -DEXECUTORCH_SOURCE_DIR=/path/to/executorch")
@@ -57,6 +62,11 @@ if(NOT EXISTS "${TORCHTRT_EXECUTORCH_SOURCE_DIR}/CMakeLists.txt")
   message(FATAL_ERROR "TORCHTRT_EXECUTORCH_SOURCE_DIR must point to the Torch-TensorRT ExecuTorch backend source directory with a CMakeLists.txt: ${TORCHTRT_EXECUTORCH_SOURCE_DIR}")
 endif()
 
+if(TORCHTRT_ENABLE_DRIVE_OS_COMPAT
+   AND TORCHTRT_DRIVE_CUDA_ROOT
+   AND NOT CUDAToolkit_ROOT)
+  set(CUDAToolkit_ROOT "${TORCHTRT_DRIVE_CUDA_ROOT}" CACHE PATH "" FORCE)
+endif()
 find_package(CUDAToolkit REQUIRED)
 
 add_subdirectory("${EXECUTORCH_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/executorch")
@@ -65,11 +75,32 @@ add_subdirectory("${TORCHTRT_EXECUTORCH_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/torch_
 if(TORCHTRT_ENABLE_DRIVE_OS_COMPAT)
   message(STATUS "Torch-TensorRT DRIVE OS compatibility: enabled")
 
+  if(NOT TORCHTRT_DRIVE_CUDA_ROOT)
+    message(FATAL_ERROR
+      "Set TORCHTRT_DRIVE_CUDA_ROOT to the CUDA root injected into the DRIVE build container")
+  endif()
+
+  set(_torchtrt_drive_common_include
+      "${TORCHTRT_DRIVE_CUDA_ROOT}/targets/aarch64-linux/include")
+  set(_torchtrt_drive_thor_include
+      "${TORCHTRT_DRIVE_CUDA_ROOT}/thor/targets/aarch64-linux/include")
+  if(NOT EXISTS "${_torchtrt_drive_common_include}/cuda_runtime_api.h")
+    message(FATAL_ERROR
+      "DRIVE common CUDA headers not found under ${_torchtrt_drive_common_include}")
+  endif()
+  if(NOT EXISTS "${_torchtrt_drive_thor_include}/curand_kernel.h")
+    message(FATAL_ERROR
+      "Thor CUDA headers not found under ${_torchtrt_drive_thor_include}")
+  endif()
+
   # ExecuTorch's CUDA shim target is defined in the source tree added above.
-  # Give it every include directory discovered by FindCUDAToolkit; DRIVE exposes
-  # some toolkit headers (including curand_kernel.h) outside CUDA's injected
-  # default include directory.
-  target_include_directories(aoti_cuda_shims PRIVATE ${CUDAToolkit_INCLUDE_DIRS})
+  # DRIVE exposes common and Thor-specific headers as separate target trees.
+  target_include_directories(
+    aoti_cuda_shims
+    PRIVATE
+      ${CUDAToolkit_INCLUDE_DIRS}
+      "${_torchtrt_drive_common_include}"
+      "${_torchtrt_drive_thor_include}")
 
   # The pinned ExecuTorch release links the cuRAND host library even though its
   # CUDA shims use only the device-side API from curand_kernel.h. DRIVE does not

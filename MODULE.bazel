@@ -71,12 +71,20 @@ new_local_repository(
     path = "/usr/local/lib/python3.12/site-packages/torch_tensorrt/",
 )
 
-# CUDA should be installed on the system locally for linux x86_64 and aarch64.
-# CUDA_HOME can select a non-default toolkit, including the conventional merged
-# toolkit view constructed from DRIVE OS and container development files.
-local_cuda = use_repo_rule("//toolchains:local_cuda.bzl", "local_cuda")
+# Preserve the conventional CUDA layout unless TORCHTRT_TARGET_PLATFORM=driveos.
+# In DRIVE build containers, NVIDIA runtime injection supplies split common and
+# Thor header trees while the container supplies target libraries separately.
+cuda_repository = use_repo_rule(
+    "//toolchains:cuda_repository.bzl",
+    "cuda_repository",
+)
 
-local_cuda(name = "cuda")
+cuda_repository(
+    name = "cuda",
+    conventional_build_file = "@//third_party/cuda:BUILD",
+    conventional_path = "/usr/local/cuda-13.4/",
+    drive_build_file = "@//third_party/cuda/driveos:BUILD",
+)
 
 # for Jetson
 # These versions can be selected using the flag `--//toolchains/dep_collection:compute_libs="jetpack"`
