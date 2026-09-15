@@ -2,6 +2,8 @@ from copy import deepcopy
 
 import numpy as np
 import torch
+import torch_tensorrt
+from parameterized import parameterized
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo import partitioning
 
@@ -177,6 +179,43 @@ class TestFastPartitioning(TestCase):
             1,
             "Certain operators are set to run in Torch, expected 1 segment",
         )
+
+    @parameterized.expand(
+        [
+            (["torch.nn.modules.conv.Conv2d"], 2),
+            ([], 1),
+            (["torch.nn.modules.container.Sequential"], 0),
+        ]
+    )
+    def test_end2end_fast_partition_torch_executed_modules(
+        self, torch_executed_modules, trt_mod_cnt
+    ):
+        mod = (
+            torch.nn.Sequential(
+                torch.nn.Conv2d(3, 8, 3, padding=1),
+                torch.nn.ReLU(),
+                torch.nn.BatchNorm2d(8),
+                torch.nn.Conv2d(8, 8, 3, padding=1),
+                torch.nn.ReLU(),
+            )
+            .eval()
+            .to("cuda")
+        )
+        with torch.no_grad():
+            inputs = torch.rand((1, 3, 4, 4)).to("cuda")
+            trt_mod = torch_tensorrt.compile(
+                mod,
+                ir="dynamo",
+                inputs=[inputs],
+                min_block_size=1,
+                torch_executed_modules=torch_executed_modules,
+                use_fast_partitioner=True,
+            )
+            cnt = 0
+            for name, _ in trt_mod.named_children():
+                if "_run_on_acc" in name:
+                    cnt += 1
+            self.assertEqual(cnt, trt_mod_cnt)
 
 
 if __name__ == "__main__":
