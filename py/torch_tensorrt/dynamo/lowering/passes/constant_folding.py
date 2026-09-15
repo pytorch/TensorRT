@@ -108,8 +108,9 @@ class _TorchTensorRTConstantFolder(ConstantFolder):  # type: ignore[misc]
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         # Quantization ops excluded from constant folding so TRT sees QDQ
-        # (ModelOpt tensorrt.quantize_op, TorchAO dequantize_affine, and
-        # TorchAO NVFP4 dequantize_nvfp4 when that custom op is registered).
+        # (ModelOpt tensorrt.quantize_op, TorchAO dequantize_affine, TorchAO
+        # NVFP4 dequantize_nvfp4, and TorchAO MXFP4 dequantize_mxfp4 when
+        # those custom ops are registered).
         self.quantization_ops: Set[torch._ops.OpOverload] = set()
         try:
             # modelopt import ensures torch.ops.tensorrt.quantize_op.default is registered
@@ -152,6 +153,14 @@ class _TorchTensorRTConstantFolder(ConstantFolder):  # type: ignore[misc]
 
             assert torch.ops.torchao_trt.dequantize_nvfp4.default
             self.quantization_ops.add(torch.ops.torchao_trt.dequantize_nvfp4.default)
+        except Exception:
+            pass
+
+        try:
+            from torch_tensorrt.dynamo.conversion import mxfp4_custom_op  # noqa: F401
+
+            assert torch.ops.torchao_trt.dequantize_mxfp4.default
+            self.quantization_ops.add(torch.ops.torchao_trt.dequantize_mxfp4.default)
         except Exception:
             pass
 

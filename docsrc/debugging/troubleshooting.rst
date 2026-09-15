@@ -233,6 +233,11 @@ Accuracy / Performance Issues
     Export must keep ``dequantize_nvfp4`` so the engine can keep
     ``Datatype: FP4E2M1``.
 
+    For **MXFP4** with TorchAO (``MXDynamicActivationMXWeightConfig``; there is
+    no MXFP4 weight-only config), see :ref:`quantize_linear_mxfp4` and
+    :ref:`torch_export_flux_mxfp4`. Export must keep ``dequantize_mxfp4`` so
+    the engine can keep ``Datatype: FP4E2M1`` with E8M0 block scales.
+
 ----
 
 Distributed / Tensor-Parallel Issues
