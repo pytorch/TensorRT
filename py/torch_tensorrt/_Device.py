@@ -145,7 +145,7 @@ class Device(object):
 
     @classmethod
     def _current_device(cls) -> Device:
-        dev_id = torch.cuda.current_device()
+        dev_id = torch.cuda.current_device() if torch.cuda.is_available() else 0
         return cls(gpu_id=dev_id)
 
     @staticmethod
