@@ -191,6 +191,36 @@ TEST(Converters, ATenSelectEmptyTensorConvertsCorrectly) {
   ASSERT_TRUE(torch_tensorrt::tests::util::sameShape(jit_results[0], trt_results[0]));
 }
 
+// Regression test: an empty (0-element) select result built at a non-default
+// precision. Exercises the dtype-preservation path taken when the squeeze is
+// skipped in favor of directly emitting an empty constant of the target
+// shape (see aten::select.int in select.cpp).
+TEST(Converters, ATenSelectEmptyTensorHalfConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor):
+        %2 : int = prim::Constant[value=1]()
+        %3 : int = prim::Constant[value=0]()
+        %4 : Tensor = aten::select(%0, %3, %2)
+        return (%4))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+
+  torch::jit::parseIR(graph, g.get());
+
+  auto in = torch::ones({2, 20, 0, 768}).to(at::kCUDA).to(at::kHalf);
+
+  auto jit_in = at::clone(in);
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
+
+  auto trt_in = at::clone(in);
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in}, {nvinfer1::DataType::kHALF});
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::sameShape(jit_results[0], trt_results[0]));
+  ASSERT_EQ(trt_results[0].scalar_type(), at::kHalf);
+}
+
 TEST(Converters, ATenNarrowStartScalarConvertsCorrectly) {
   const auto graph = R"IR(
       graph(%x.1 : Tensor):

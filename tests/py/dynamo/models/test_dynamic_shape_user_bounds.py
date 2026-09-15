@@ -3,6 +3,7 @@
 the partitioner into ``extract_var_range_info``."""
 
 import os
+import sys
 import unittest
 
 import pytest
@@ -11,6 +12,7 @@ import torch
 import torch_tensorrt as torchtrt
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo._compiler import _build_user_symbol_bounds
+from torch_tensorrt.dynamo.partitioning.common import construct_dynamic_input
 from torch_tensorrt.dynamo.utils import extract_var_range_info
 
 assertions = unittest.TestCase()
@@ -37,6 +39,41 @@ class _SmallLinear(torch.nn.Module):
 
     def forward(self, x):
         return self.linear(x).relu()
+
+
+@torch.library.custom_op("torchtrt_profile_test::dynamic_rows", mutates_args=())
+def _profile_dynamic_rows(x: torch.Tensor) -> torch.Tensor:
+    return x.clone()
+
+
+@_profile_dynamic_rows.register_fake
+def _profile_dynamic_rows_fake(x: torch.Tensor) -> torch.Tensor:
+    return x.new_empty(torch.library.get_ctx().new_dynamic_size(), x.shape[1])
+
+
+class _ConstrainedDynamicRows(torch.nn.Module):
+    def __init__(self, lower: int, upper: int) -> None:
+        super().__init__()
+        self.lower = lower
+        self.upper = upper
+
+    def forward(self, x):
+        rows = torch.ops.torchtrt_profile_test.dynamic_rows(x)
+        torch._check(rows.shape[0] >= self.lower)
+        torch._check(rows.shape[0] <= self.upper)
+        return rows
+
+
+def _constrained_dynamic_shape(lower: int, upper: int) -> torch.Size:
+    exported = torch.export.export(
+        _ConstrainedDynamicRows(lower, upper), (torch.ones(1100, 4),)
+    )
+    dynamic_rows = next(
+        node
+        for node in exported.graph.nodes
+        if node.target == torch.ops.torchtrt_profile_test.dynamic_rows.default
+    )
+    return dynamic_rows.meta["val"].shape
 
 
 @pytest.mark.unit
@@ -558,6 +595,59 @@ def test_dim_dynamic_save_preserves_range_constraints(tmpdir):
     too_big = torch.randn(16, 8, device="cuda")
     with assertions.assertRaises(Exception):
         trt_module(too_big)
+
+
+@pytest.mark.unit
+def test_construct_dynamic_input_uses_profile_midpoint():
+    symbolic_shape = _constrained_dynamic_shape(1000, 1200)
+    input_spec = construct_dynamic_input(
+        symbolic_shape, torch.float32, name="dynamic_rows"
+    )
+
+    assert input_spec.shape["min_shape"] == (1000, 4)
+    assert input_spec.shape["opt_shape"] == (1100, 4)
+    assert input_spec.shape["max_shape"] == (1200, 4)
+
+
+@pytest.mark.unit
+def test_largest_size_symbol_bound_is_treated_as_unbounded():
+    symbolic_shape = _constrained_dynamic_shape(1, sys.maxsize - 1)
+    range_info = extract_var_range_info(symbolic_shape[0])
+    input_spec = construct_dynamic_input(
+        symbolic_shape, torch.float32, name="dynamic_rows"
+    )
+
+    assert range_info["max"] is None
+    assert input_spec.shape["min_shape"] == (1, 4)
+    assert input_spec.shape["opt_shape"] == (2048, 4)
+    assert input_spec.shape["max_shape"] == (4096, 4)
+
+
+@pytest.mark.unit
+def test_construct_dynamic_input_preserves_zero_minimum():
+    """Data-dependent extents retain their legal zero profile minimum."""
+
+    class Nonzero(torch.nn.Module):
+        def forward(self, x):
+            return torch.nonzero(x)
+
+    exported = torch.export.export(
+        Nonzero(), (torch.tensor([True, False, True, False]),)
+    )
+    nonzero = next(
+        node
+        for node in exported.graph.nodes
+        if node.target == torch.ops.aten.nonzero.default
+    )
+    fake_value = nonzero.meta["val"]
+    assert isinstance(fake_value.shape[0], torch.SymInt)
+
+    input_spec = construct_dynamic_input(
+        fake_value.shape, fake_value.dtype, name="nonzero_output"
+    )
+    assert input_spec.shape["min_shape"] == (0, 1)
+    assert input_spec.shape["opt_shape"] == (2, 1)
+    assert input_spec.shape["max_shape"] == (4, 1)
 
 
 if __name__ == "__main__":

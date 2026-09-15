@@ -1,4 +1,6 @@
 bazel
+/node_modules/
+/package.json
 bazel-bazel-test
 bazel-bin
 bazel-genfiles

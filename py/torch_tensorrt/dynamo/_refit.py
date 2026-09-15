@@ -25,6 +25,7 @@ from torch_tensorrt.dynamo.conversion._TRTInterpreter import TRTInterpreter
 from torch_tensorrt.dynamo.conversion.truncate_double import repair_double_inputs
 from torch_tensorrt.dynamo.lowering import (
     clean_up_graph_after_modifications,
+    filter_decomposition_table,
     get_decompositions,
     post_lowering,
     pre_export_lowering,
@@ -257,11 +258,14 @@ def refit_module_weights(
         )
     new_weight_module = pre_export_lowering(new_weight_module, settings)
     new_weight_module = new_weight_module.run_decompositions(
-        get_decompositions(
-            settings.enable_experimental_decompositions,
-            settings.decompose_attention,
-            settings.use_distributed_mode_trace,
-            use_fp32_acc=settings.use_fp32_acc,
+        filter_decomposition_table(
+            get_decompositions(
+                settings.enable_experimental_decompositions,
+                settings.decompose_attention,
+                settings.use_distributed_mode_trace,
+                use_fp32_acc=settings.use_fp32_acc,
+            ),
+            new_weight_module.graph_module,
         )
     )
     new_gm = new_weight_module.module()

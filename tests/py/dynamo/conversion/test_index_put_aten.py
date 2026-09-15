@@ -509,6 +509,80 @@ class TestIndexPutConverter(DispatchTestCase):
 
         torch.allclose(result, torch_output, atol=1e-4, rtol=1e-4)
 
+    def test_updates_are_cast_to_int64_destination_dtype(self):
+        class IndexPutArgmax(torch.nn.Module):
+            def forward(self, data, idx, scores):
+                values = torch.ops.aten.argmax.default(scores, 1)
+                return torch.ops.aten.index_put.default(data, [idx], values)
+
+        data = torch.zeros(8, dtype=torch.int64, device="cuda")
+        idx = torch.tensor([1, 3], dtype=torch.int64, device="cuda")
+        scores = torch.randn((2, 5), device="cuda")
+        model = IndexPutArgmax().eval().cuda()
+        expected = model(data, idx, scores)
+
+        exported = torch.export.export(model, (data, idx, scores))
+        compiled = torchtrt.dynamo.compile(
+            exported,
+            arg_inputs=[data, idx, scores],
+            min_block_size=1,
+            pass_through_build_failures=True,
+        )
+
+        self.assertEqual(compiled(data, idx, scores), expected)
+
+    def test_dynamic_index_broadcasts_1d_values_across_free_dim(self):
+        class IndexPutFreeDim(torch.nn.Module):
+            def forward(self, data, idx):
+                values = idx.to(torch.float32)
+                return torch.ops.aten.index_put.default(data, [None, idx], values)
+
+        data = torch.zeros((32, 64), device="cuda")
+        idx = torch.tensor([1, 3, 5, 7], dtype=torch.int64, device="cuda")
+        index_length = torch.export.Dim("index_length", min=1, max=16)
+        model = IndexPutFreeDim().eval().cuda()
+
+        exported = torch.export.export(
+            model,
+            (data, idx),
+            dynamic_shapes={"data": {}, "idx": {0: index_length}},
+        )
+        compiled = torchtrt.dynamo.compile(
+            exported,
+            arg_inputs=[
+                torchtrt.Input(shape=(32, 64), dtype=torch.float32),
+                torchtrt.Input(
+                    min_shape=(1,),
+                    opt_shape=(4,),
+                    max_shape=(16,),
+                    dtype=torch.int64,
+                ),
+            ],
+            min_block_size=1,
+            pass_through_build_failures=True,
+        )
+
+        for runtime_idx in (
+            idx,
+            torch.tensor([2, 6], dtype=torch.int64, device="cuda"),
+        ):
+            self.assertEqual(
+                compiled(data, runtime_idx),
+                model(data, runtime_idx),
+            )
+        torch._dynamo.reset()
+        compile_idx = idx.clone()
+        torch._dynamo.mark_dynamic(compile_idx, 0)
+        compiled_backend = torch.compile(
+            model,
+            backend="tensorrt",
+            options={"pass_through_build_failures": True, "min_block_size": 1},
+        )
+        self.assertEqual(
+            compiled_backend(data, compile_idx),
+            model(data, compile_idx),
+        )
+
     def test_index_put_dynamic_index_length(self):
         """index_put where the index tensor itself has a dynamic length (N dynamic).
 

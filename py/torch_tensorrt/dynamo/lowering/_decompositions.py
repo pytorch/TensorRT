@@ -749,7 +749,7 @@ def get_decompositions(
             for decomp in _core_aten_decompositions
             if decomp not in discard_decompositions
         }
-        return {**CORE_ATEN_DECOMPOSITIONS_FILTERED, **trt_decomps}
+        decompositions = {**CORE_ATEN_DECOMPOSITIONS_FILTERED, **trt_decomps}
     else:
         # changes made here due to torch2.6 changes https://github.com/pytorch/pytorch/pull/135080
         decomp_table = {}
@@ -763,8 +763,10 @@ def get_decompositions(
             and decomp not in ATTENTION_DECOMPOSITION_OPS
         }
 
-        return {
+        decompositions = {
             **ENABLED_TORCH_DECOMPOSITIONS,
             **DECOMP_TABLE_FILTERED,
             **trt_decomps,
         }
+
+    return decompositions

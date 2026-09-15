@@ -20,7 +20,6 @@ import torch
 from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Argument, Node, Target
 from torch_tensorrt import ENABLED_FEATURES
-from torch_tensorrt._features import needs_not_tensorrt_rtx
 from torch_tensorrt._utils import (
     is_tensorrt_rtx_version_supported,
     is_tensorrt_version_supported,
@@ -1721,6 +1720,27 @@ def to_copy_dtype_validator(
 
         Based on data type being casted to
         """
+        requested_device = to_copy_node.kwargs.get("device")
+        if requested_device is not None:
+            input_node = to_copy_node.args[0]
+            input_meta = (
+                input_node.meta.get("val") if isinstance(input_node, Node) else None
+            )
+            output_meta = to_copy_node.meta.get("val")
+            if (
+                not isinstance(input_meta, torch.Tensor)
+                or not isinstance(output_meta, torch.Tensor)
+                or input_meta.device != output_meta.device
+            ):
+                _LOGGER.debug(
+                    "_to_copy converter rejected node %s because TensorRT cannot "
+                    "represent a device transfer from %s to %s",
+                    to_copy_node,
+                    getattr(input_meta, "device", None),
+                    getattr(output_meta, "device", requested_device),
+                )
+                return False
+
         allowed_casts = {
             torch.float,
             torch.int32,
@@ -4350,14 +4370,26 @@ def aten_ops_full(
     )
 
 
-# currently nonzero is not supported for tensorrt_rtx
-# TODO: lan to add the nonzero support once tensorrt_rtx team has added the support
+def nonzero_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    """Reject nonzero on TensorRT-RTX, which has no non-zero layer."""
+    if not ENABLED_FEATURES.tensorrt_rtx:
+        return True
+
+    _LOGGER.debug(
+        "nonzero '%s' is not supported on TensorRT-RTX. Falling back to PyTorch.",
+        node.name,
+    )
+    return False
+
+
 @dynamo_tensorrt_converter(
     torch.ops.aten.nonzero.default,
+    capability_validator=nonzero_validator,
     supports_dynamic_shapes=True,
     requires_output_allocator=True,
 )
-@needs_not_tensorrt_rtx
 def aten_ops_nonzero(
     ctx: ConversionContext,
     target: Target,

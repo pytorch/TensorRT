@@ -6,8 +6,8 @@ from unittest import mock
 import torch
 import torch_tensorrt as torchtrt
 import torch_tensorrt._enums as torchtrt_enums
-from torch_tensorrt.dynamo.runtime._TRTEngine import _current_serialized_platform
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
+from torch_tensorrt.dynamo.runtime._TRTEngine import _current_serialized_platform
 
 
 class TestDevice(unittest.TestCase):
@@ -137,4 +137,32 @@ class TestPlatform(unittest.TestCase):
         self.assertEqual(
             torchtrt.Platform.UNKNOWN._to_serialized_rt_platform(),
             torch.ops.tensorrt._platform_unknown(),
+        )
+
+
+class TestPlatformSerialization(unittest.TestCase):
+    def test_current_serialized_platform_uses_canonical_name_without_cpp_runtime(self):
+        with mock.patch.object(
+            torchtrt.Platform,
+            "current_platform",
+            return_value=torchtrt.Platform.WIN_X86_64,
+        ):
+            self.assertEqual(_current_serialized_platform(), "windows_x86_64")
+
+    def test_python_only_platform_tokens_use_cpp_canonical_names(self):
+        self.assertEqual(
+            torchtrt.Platform.WIN_X86_64._to_serialized_platform(), "windows_x86_64"
+        )
+        self.assertEqual(
+            torchtrt.Platform.WIN_ARM64._to_serialized_platform(), "windows_arm64"
+        )
+
+    def test_legacy_python_only_windows_platform_tokens_are_accepted(self):
+        self.assertEqual(
+            torchtrt.Platform._normalize_serialized_platform("win_x86_64"),
+            "windows_x86_64",
+        )
+        self.assertEqual(
+            torchtrt.Platform._normalize_serialized_platform("win_arm64"),
+            "windows_arm64",
         )

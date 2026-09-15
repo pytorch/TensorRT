@@ -18,7 +18,7 @@ Both build types require:
 * Visual Studio 2022 Build Tools with the C++ build tools and ARM64 compiler
   components;
 * Bazelisk via choco;
-* CUDA Toolkit 13.4 Preview. The Windows x86 installation contains the
+* CUDA Toolkit 13.4. The Windows x86 installation contains the
   headers and ARM64 libraries required to cross-compile for Windows ARM64.
   Native Windows ARM64 builds also use CUDA 13.4;
 * a compatible Windows ARM64 PyTorch 2.14 package containing the C++ headers

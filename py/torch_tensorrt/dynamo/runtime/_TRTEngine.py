@@ -72,12 +72,7 @@ logger = logging.getLogger(__name__)
 
 def _current_serialized_platform() -> str:
     """Return the current platform using the engine-metadata representation."""
-    platform = Platform.current_platform()
-    return (
-        platform._to_serialized_rt_platform()
-        if ENABLED_FEATURES.torch_tensorrt_runtime
-        else str(platform)
-    )
+    return Platform.current_platform()._to_serialized_platform()
 
 
 class _InputBindingInfo(NamedTuple):
@@ -467,7 +462,9 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         )
         self.hardware_compatible = bool(int(self.serialized_info[HW_COMPATIBLE_IDX]))
         self.serialized_metadata = str(self.serialized_info[SERIALIZED_METADATA_IDX])
-        self.serialized_target_platform = str(self.serialized_info[TARGET_PLATFORM_IDX])
+        self.serialized_target_platform = Platform._normalize_serialized_platform(
+            str(self.serialized_info[TARGET_PLATFORM_IDX])
+        )
         self.requires_output_allocator = bool(
             int(self.serialized_info[REQUIRES_OUTPUT_ALLOCATOR_IDX])
         )

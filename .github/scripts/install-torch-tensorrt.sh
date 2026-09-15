@@ -1,5 +1,4 @@
-#set -exou pipefail
-set -x
+set -ex
 
 TORCH=$(grep "^torch>" ${PWD}/py/requirements.txt)
 INDEX_URL=https://download.pytorch.org/whl/${CHANNEL}/${CU_VERSION}
@@ -44,10 +43,14 @@ python -m pip uninstall -y torch torchvision
 python -m pip install --force-reinstall --pre ${TORCHVISION} --index-url ${INDEX_URL} --extra-index-url https://pypi.org/simple
 python -m pip install --force-reinstall --pre ${TORCH} --index-url ${INDEX_URL} --extra-index-url https://pypi.org/simple
 
-# If CUDA 13 (cu13), prepend venv's NVIDIA CUDA 13 libs to LD_LIBRARY_PATH
-if [[ "${CU_VERSION}" == cu13* ]]; then
-    SITE_PACKAGES="$(python -c 'import sysconfig; print(sysconfig.get_path("platlib"))')"
-    export LD_LIBRARY_PATH="${SITE_PACKAGES}/nvidia/cu13/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+# Prepend the venv's NVIDIA CUDA runtime libs to LD_LIBRARY_PATH.
+SITE_PACKAGES="$(python -c 'import sysconfig; print(sysconfig.get_path("platlib"))')"
+case "${CU_VERSION}" in
+cu13*) CUDA_RUNTIME_LIB_DIR="${SITE_PACKAGES}/nvidia/cu13/lib" ;;
+*) CUDA_RUNTIME_LIB_DIR="" ;;
+esac
+if [[ -n "${CUDA_RUNTIME_LIB_DIR}" ]]; then
+    export LD_LIBRARY_PATH="${CUDA_RUNTIME_LIB_DIR}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
 fi
 
 # Install Torch-TensorRT

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -x
+set -ex
 
 # Install dependencies
 python3 -m pip install pyyaml packaging
@@ -71,6 +71,23 @@ if [[ ! -d "${TORCH_INSTALL_PATH}/include/c10" ]]; then
     echo "Install a full PyTorch wheel (pip install torch) that includes dev headers."
     exit 1
 fi
+
+# TensorRT archives have different CUDA compatibility ceilings. CI provides
+# CU_VERSION in the PyTorch wheel format (for example, cu134).
+case "${CU_VERSION}" in
+    cu12*)
+        export TENSORRT_CUDA_VERSION_UPPER_BOUND="12.9"
+        export TENSORRT_RTX_CUDA_VERSION_UPPER_BOUND="12.9"
+        ;;
+    cu13*)
+        export TENSORRT_CUDA_VERSION_UPPER_BOUND="13.4"
+        export TENSORRT_RTX_CUDA_VERSION_UPPER_BOUND="13.4"
+        ;;
+    *)
+        echo "ERROR: Unsupported CUDA version '${CU_VERSION}' for TensorRT archive selection."
+        exit 1
+        ;;
+esac
 
 cat toolchains/ci_workspaces/MODULE.bazel.tmpl | envsubst > MODULE.bazel
 

@@ -1,11 +1,17 @@
 import pytest
 import torch
 import torch_tensorrt
+from torch_tensorrt import ENABLED_FEATURES
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion import DYNAMO_CONVERTERS as CONVERTERS
 from torch_tensorrt.dynamo.partitioning._global_partitioner import (
     TorchTensorRTOperatorSupport,
 )
+
+# TensorRT-RTX has no non-zero layer, so nonzero_validator rejects the node and no
+# converter is ever selected for it. Both the output-allocator predicate and node
+# support follow from whether a converter exists.
+NONZERO_HAS_TRT_CONVERTER = not ENABLED_FEATURES.tensorrt_rtx
 
 
 def test_fallback_data_dependent_ops_setting_default():
@@ -48,7 +54,10 @@ def test_requires_output_allocator_is_setting_independent():
     # converter selected for the node needs a TRT output allocator (decided per node
     # via the selected converter, not by op target), independent of any setting.
     node = _nonzero_node()
-    assert TorchTensorRTOperatorSupport._requires_output_allocator(node) is True
+    assert (
+        TorchTensorRTOperatorSupport._requires_output_allocator(node)
+        is NONZERO_HAS_TRT_CONVERTER
+    )
 
 
 def test_output_allocator_node_falls_back_only_when_enabled():
@@ -61,7 +70,7 @@ def test_output_allocator_node_falls_back_only_when_enabled():
         CONVERTERS.set_compilation_settings(
             CompilationSettings(fallback_data_dependent_ops=False)
         )
-        assert support.is_node_supported({}, node) is True
+        assert support.is_node_supported({}, node) is NONZERO_HAS_TRT_CONVERTER
         CONVERTERS.set_compilation_settings(
             CompilationSettings(fallback_data_dependent_ops=True)
         )
@@ -109,3 +118,42 @@ def test_fallback_data_dependent_ops_routes_output_allocator_op_to_torch():
     )
     targets = {n.target for n in gm.graph.nodes if n.op == "call_function"}
     assert torch.ops.aten.nonzero.default in targets
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA required")
+def test_zero_length_nonzero_boundary_executes_in_tensorrt():
+    """A TRT consumer accepts an empty boundary through a profile with min=0."""
+
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            indices = torch.nonzero(x)
+            return torch.sin(indices.to(torch.float32))
+
+    model = Model().eval().cuda()
+    compile_input = torch.tensor([0, 3, 0, 5, 7], dtype=torch.int32, device="cuda")
+    exported = torch.export.export(model, (compile_input,))
+    compiled = torch_tensorrt.dynamo.compile(
+        exported,
+        arg_inputs=[compile_input],
+        min_block_size=1,
+        fallback_data_dependent_ops=True,
+    )
+
+    nonzero_fallback_name = next(
+        name
+        for name, submodule in compiled.named_children()
+        if isinstance(submodule, torch.fx.GraphModule)
+        and any(
+            node.target == torch.ops.aten.nonzero.default
+            for node in submodule.graph.nodes
+        )
+    )
+    assert "_run_on_gpu" in nonzero_fallback_name
+    assert any("_run_on_acc" in name for name, _ in compiled.named_children())
+
+    for runtime_input in (compile_input, torch.zeros_like(compile_input)):
+        expected = model(runtime_input)
+        actual = compiled(runtime_input)
+
+        assert actual.shape == expected.shape
+        torch.testing.assert_close(actual, expected)

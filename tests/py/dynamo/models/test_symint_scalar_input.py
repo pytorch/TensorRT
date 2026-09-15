@@ -14,6 +14,7 @@ import unittest
 import pytest
 import torch
 import torch_tensorrt as torchtrt
+from torch_tensorrt.dynamo._exporter import transform
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 
 assertions = unittest.TestCase()
@@ -194,3 +195,55 @@ def test_symint_with_different_batch_sizes(runtime_backend):
         )
 
     torch._dynamo.reset()
+
+
+@pytest.mark.unit
+def test_symfloat_scalar_input():
+    """
+    A data-dependent Python float (e.g. weights.sum().item()) crossing a TRT
+    partition boundary as a SymFloat must be materialized with the engine's
+    actual binding dtype (float32), not a guessed one.
+    """
+    torch._dynamo.config.capture_scalar_outputs = True
+    try:
+
+        class ScaleByDataDependentFloat(torch.nn.Module):
+            def forward(self, x, weights):
+                scale = weights.sum().item()
+                return x * scale
+
+        model = ScaleByDataDependentFloat().eval().cuda()
+        x = torch.randn(8).cuda()
+        weights = torch.randn(4).cuda()
+        expected = model(x, weights)
+
+        exported = torch.export.export(model, (x, weights))
+        compiled = torchtrt.dynamo.compile(
+            exported,
+            inputs=(x, weights),
+            min_block_size=1,
+            pass_through_build_failures=True,
+        )
+
+        # The inserted scalar tensor must carry the engine binding's dtype.
+        inlined = transform(compiled)
+        inlined.recompile()
+        scalar_tensor_nodes = [
+            node
+            for node in inlined.graph.nodes
+            if node.target == torch.ops.aten.scalar_tensor.default
+        ]
+        assertions.assertEqual(len(scalar_tensor_nodes), 1)
+        assertions.assertEqual(
+            scalar_tensor_nodes[0].kwargs["dtype"],
+            torch.float32,
+            msg="scalar_tensor inserted for the SymFloat input must match the "
+            "float32 engine binding dtype, not the Python-type-based default",
+        )
+
+        # And the exported module must actually execute successfully.
+        actual = compiled(x, weights)
+        torch.testing.assert_close(actual, expected)
+    finally:
+        torch._dynamo.config.capture_scalar_outputs = False
+        torch._dynamo.reset()

@@ -9,7 +9,10 @@ from torch.testing._internal.common_cuda import (
 )
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo._settings import CompilationSettings
-from torch_tensorrt.dynamo.lowering import get_decompositions
+from torch_tensorrt.dynamo.lowering import (
+    filter_decomposition_table,
+    get_decompositions,
+)
 from torch_tensorrt.dynamo.lowering.passes._aten_lowering_pass import post_lowering
 from torch_tensorrt.dynamo.utils import ATOL, RTOL
 
@@ -1235,6 +1238,61 @@ class TestLowering(TestCase):
             torch_model_results.shape,
             f"The optimized model results shape and torch model results shape should be equal in empty_stride",
         )
+
+    def test_scatter_add_symbolic_extent_filters_unrolled_decomposition(self):
+        class ScatterAdd(torch.nn.Module):
+            def forward(self, base, index, src):
+                return torch.ops.aten.scatter_add.default(base, 0, index, src)
+
+        model = ScatterAdd().eval()
+        base = torch.zeros((16, 8))
+        index = torch.zeros((4, 8), dtype=torch.int64)
+        src = torch.ones((4, 8))
+        src_rows = torch.export.Dim("src_rows", min=1, max=16)
+
+        dynamic_export = torch.export.export(
+            model,
+            (base, index, src),
+            dynamic_shapes={
+                "base": {},
+                "index": {0: src_rows},
+                "src": {0: src_rows},
+            },
+        )
+        base_decompositions = get_decompositions()
+        dynamic_decompositions = filter_decomposition_table(
+            base_decompositions, dynamic_export.graph_module
+        )
+        self.assertNotIn(torch.ops.aten.scatter_add.default, dynamic_decompositions)
+        self.assertIn(torch.ops.aten.scatter_add.default, base_decompositions)
+
+        dynamic_lowered = dynamic_export.run_decompositions(dynamic_decompositions)
+        self.assertTrue(
+            any(
+                node.target == torch.ops.aten.scatter_add.default
+                for node in dynamic_lowered.graph_module.graph.nodes
+            )
+        )
+
+        # Dynamo records fake tensor metadata under example_value, rather than val.
+        dynamic_scatter = next(
+            node
+            for node in dynamic_export.graph_module.graph.nodes
+            if node.target == torch.ops.aten.scatter_add.default
+        )
+        dynamic_src = dynamic_scatter.args[3]
+        self.assertIsInstance(dynamic_src, torch.fx.Node)
+        dynamic_src.meta["example_value"] = dynamic_src.meta.pop("val")
+        dynamo_decompositions = filter_decomposition_table(
+            get_decompositions(), dynamic_export.graph_module
+        )
+        self.assertNotIn(torch.ops.aten.scatter_add.default, dynamo_decompositions)
+
+        static_export = torch.export.export(model, (base, index, src))
+        static_decompositions = filter_decomposition_table(
+            get_decompositions(), static_export.graph_module
+        )
+        self.assertIn(torch.ops.aten.scatter_add.default, static_decompositions)
 
     @parameterized.expand(
         [

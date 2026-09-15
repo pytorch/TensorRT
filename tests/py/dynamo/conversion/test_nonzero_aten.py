@@ -6,6 +6,7 @@ import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
+from torch_tensorrt.dynamo.conversion.aten_ops_converters import nonzero_validator
 
 from .harness import DispatchTestCase
 
@@ -145,6 +146,41 @@ class TestNonZeroConverter(DispatchTestCase):
         ]
 
         self.run_test_with_dynamic_shape(NonZero(), input_specs)
+
+
+class TestNonZeroValidator(unittest.TestCase):
+    """nonzero_validator decides, at partition time, whether nonzero reaches TensorRT.
+
+    It has to reject on TensorRT-RTX so the partitioner leaves the node in a
+    PyTorch block; a converter-side raise would fail the build instead.
+    """
+
+    @staticmethod
+    def _nonzero_node() -> torch.fx.Node:
+        class NonZero(nn.Module):
+            def forward(self, x):
+                return torch.nonzero(x)
+
+        gm = torch.export.export(NonZero(), (torch.tensor([0, 3, 0, 5]),)).module()
+        return next(
+            n
+            for n in gm.graph.nodes
+            if n.op == "call_function" and n.target == torch.ops.aten.nonzero.default
+        )
+
+    @unittest.skipUnless(
+        torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
+        "nonzero_validator only rejects on tensorrt_rtx",
+    )
+    def test_nonzero_validator_false_on_rtx(self):
+        self.assertFalse(nonzero_validator(self._nonzero_node()))
+
+    @unittest.skipIf(
+        torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
+        "On non-RTX, nonzero_validator always passes",
+    )
+    def test_nonzero_validator_true_on_non_rtx(self):
+        self.assertTrue(nonzero_validator(self._nonzero_node()))
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
 param(
-    [string] $PyTorchArtifact = "https://pypi.nvidia.com/nvtorch_oot_nightly/torch/torch-2.14.0.dev20260728%2Bcu134-cp313-cp313-win_arm64.whl",
+    [string] $PyTorchArtifact = "https://pypi.nvidia.com/nvtorch_oot_nightly/torch/torch-2.15.0.dev20260902%2Bcu134-cp313-cp313-win_arm64.whl",
     [string] $PythonArtifact = "https://api.nuget.org/v3-flatcontainer/pythonarm64/3.13.0/pythonarm64.3.13.0.nupkg",
     [Parameter(Mandatory = $true)] [string] $TargetRoot,
     [Parameter(Mandatory = $true)] [string] $CudaRoot,
@@ -8,7 +8,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$PyTorchArtifactSha256 = "23862a93476cb038ffd26f7141cd476717d97b69b50074f2ab14036eb6093200"
+$PyTorchArtifactSha256 = "e72f2b05d062651d0ba1d44e189979f70c2faf7e879e925849f3c5716ab4319e"
 $PythonArtifactSha256 = "f44428dc94e6f9c72cd69ad6436280784e6f9eed46a149641fee71866d3081f3"
 
 $ArtifactTempRoot = $env:RUNNER_TEMP
@@ -72,7 +72,7 @@ if (-not (Test-Path -LiteralPath $cudaVersionFile -PathType Leaf)) {
 }
 $cudaVersion = (Get-Content -LiteralPath $cudaVersionFile -Raw | ConvertFrom-Json).cuda.version
 if ($cudaVersion -notlike '13.4*') {
-    throw "Windows ARM64 builds require CUDA 13.4 Preview; got '$cudaVersion'"
+    throw "Windows ARM64 builds require CUDA 13.4; got '$cudaVersion'"
 }
 $pythonHeader = Join-Path $pythonRoot "include\Python.h"
 $pythonImportLibrary = Join-Path $pythonRoot "libs\python313.lib"

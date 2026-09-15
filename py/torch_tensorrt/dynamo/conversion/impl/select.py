@@ -772,6 +772,13 @@ def index_put_converter(
     else:
         N = 1
 
+    if isinstance(N, int) and N == 0:
+        # Empty index -> no-op. Building the scatter path anyway trips a
+        # TensorRT squeezeDims assertion on DGX Spark (GB10, SM 12.1).
+        identity_layer = ctx.net.add_identity(input_tensor)
+        set_layer_name(identity_layer, target, f"{name}_empty_index_noop", source_ir)
+        return identity_layer.get_output(0)
+
     # Compute shapes and volume for the free dimensions.
     # F_shapes: static ints (-1 for dynamic dims), used where static ints are required.
     # F_shape_values: per-free-dim size as int (static) or ITensor (dynamic).
@@ -1005,6 +1012,29 @@ def index_put_converter(
                 values_permuted,
                 expected_shape,
             )
+        elif K == 1 and len(values.shape) == 1 and F and I[0] > max(F):
+            # For data[..., idx] = values, a 1-D values tensor carries the
+            # index extent and broadcasts across the preceding free dims.
+            # The converter's internal layout is (N, *F), so make that
+            # index axis explicit before expanding. This is essential when N
+            # is dynamic: using -1 for both axes would keep the original N
+            # extent instead of broadcasting the free dimensions.
+            values_reshaped = impl.shuffle.reshape(
+                ctx,
+                target,
+                source_ir,
+                f"{name}_reshape_index_values",
+                values,
+                (N,) + (1,) * len(F),
+            )
+            values_expanded = impl.slice.expand(
+                ctx,
+                target,
+                source_ir,
+                f"{name}_expand_values",
+                values_reshaped,
+                expected_shape,
+            )
         elif (
             K > 0
             and N in values_shape
@@ -1089,6 +1119,13 @@ def index_put_converter(
         values_expanded,
         (-1,),
     )
+    if flattened_values.dtype != input_tensor.dtype:
+        flattened_values = cast_trt_tensor(
+            ctx,
+            flattened_values,
+            input_tensor.dtype,
+            f"{name}_values_cast",
+        )
     indices_cat = cast_trt_tensor(ctx, indices_cat, trt.int32, f"{name}_idx_int32")
     scatter_layer = ctx.net.add_scatter(
         input_tensor,

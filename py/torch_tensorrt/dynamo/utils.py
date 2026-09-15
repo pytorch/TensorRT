@@ -6,6 +6,7 @@ import importlib.util
 import logging
 import os
 import platform
+import sys
 import warnings
 from dataclasses import fields, replace
 from enum import Enum
@@ -458,9 +459,14 @@ def extract_var_range_info(
         if value == sympy.oo or value == -sympy.oo:
             return None
         try:
-            return int(value)
+            bound = int(value)
         except (TypeError, OverflowError, AttributeError):
             return None
+        # PyTorch uses the largest representable size as a finite-looking
+        # sentinel for an effectively unbounded symbolic dimension.
+        if abs(bound) >= sys.maxsize - 1:
+            return None
+        return bound
 
     min_val_opt = _bound_to_int_or_none(var_range.lower)
     max_val = _bound_to_int_or_none(var_range.upper)

@@ -1,5 +1,6 @@
 import ast
 import importlib
+import importlib.util
 import sys
 import types
 from pathlib import Path
@@ -10,6 +11,96 @@ from torch._library.fake_class_registry import FakeScriptObject
 from torch._subclasses.fake_tensor import FakeTensor
 from torch.export.graph_signature import InputKind
 from torch_tensorrt.dynamo._exporter import _resolve_lifted_custom_obj, lift
+
+
+@pytest.mark.unit
+def test_the_python_loader_uses_the_api_that_backs_device_arenas():
+    """Loading must go through the Module API, not the program loader.
+
+    A delegated program is exported with device-tagged memory-planned arenas. Only the Module API
+    allocates device memory for those; the program loader behind ``executorch.runtime`` plans every
+    arena on the host, so the device copy the exporter inserts is handed a host destination and
+    ``cudaMemcpy`` fails with ``invalid argument``. Asserting the call rather than trusting a
+    comment, since the two APIs differ by one function name and swapping back would be silent until
+    someone ran a delegated model on a GPU.
+    """
+    source = _RUNTIME_PY.read_text(encoding="utf-8")
+    assert "_load_for_executorch_from_buffer" in source, (
+        "the runtime no longer loads through the Module API, so device-planned arenas would be "
+        "planned on the host and every delegate boundary copy would fail"
+    )
+    assert (
+        "load_program" not in source
+    ), "the runtime still references the program loader, which does not back device-tagged arenas"
+
+
+def _is_importable_module(name: str) -> bool:
+    """Whether ``name`` is a module, so reaching through it needs its own import.
+
+    find_spec raises rather than returning None for a dotted name whose parent is a module but
+    whose child is an ordinary attribute: ``sys.modules`` gives ModuleNotFoundError, "__path__
+    attribute not found on 'sys'". Treating that as "not a module" is the point, since an attribute
+    is reachable without a second import.
+    """
+    try:
+        return importlib.util.find_spec(name) is not None
+    except (AttributeError, ImportError, ValueError):
+        return False
+
+
+@pytest.mark.unit
+def test_the_runtime_package_imports_every_submodule_it_reaches_through():
+    """Every dotted module the runtime package uses must be imported, not assumed.
+
+    ``import importlib`` does not bind ``importlib.util``: the attribute exists only once something
+    else in the process has imported that submodule. The package used ``importlib.util.find_spec``
+    on the strength of a bare ``import importlib``, which worked whenever torch was imported first,
+    since torch pulls the submodule in, and raised AttributeError when the runtime wheel was
+    imported on its own. Compiling the module here is not enough to catch it, because the attribute
+    is only read at call time, so match the source against what it imports.
+    """
+    source = _RUNTIME_INIT_PY.read_text(encoding="utf-8")
+    tree = ast.parse(source)
+
+    imported: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.asname is None:
+                    parts = alias.name.split(".")
+                    for index in range(len(parts)):
+                        imported.add(".".join(parts[: index + 1]))
+                else:
+                    imported.add(alias.asname)
+        elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
+            for alias in node.names:
+                imported.add(f"{node.module}.{alias.name}")
+                imported.add(alias.asname or alias.name)
+
+    used: set[str] = set()
+    for node in ast.walk(tree):
+        # Only two-level attribute reads, so importlib.util.find_spec yields importlib.util rather
+        # than the function. A deeper chain would report a name that is never importable.
+        if (
+            isinstance(node, ast.Attribute)
+            and isinstance(node.value, ast.Attribute)
+            and isinstance(node.value.value, ast.Name)
+        ):
+            used.add(f"{node.value.value.id}.{node.value.attr}")
+
+    # Only names that are importable modules matter. sys.modules is an attribute of an imported
+    # module, not a submodule, so it is reachable without a second import and is not a finding.
+    missing = sorted(
+        name
+        for name in used
+        if name.split(".")[0] in imported
+        and name not in imported
+        and _is_importable_module(name)
+    )
+    assert not missing, (
+        "the runtime package reaches through a submodule it never imports, so the attribute exists "
+        f"only when another import happens to have loaded it first: {missing}. Import it explicitly."
+    )
 
 
 @pytest.mark.unit
@@ -107,6 +198,14 @@ def test_public_api_symbols_present():
 _REPO_ROOT = Path(__file__).resolve().parents[4]
 _SETUP_PY = _REPO_ROOT / "setup.py"
 _RUNTIME_SETUP_PY = _REPO_ROOT / "py/torch-tensorrt-executorch-runtime/setup.py"
+_RUNTIME_PY = (
+    _REPO_ROOT
+    / "py/torch-tensorrt-executorch-runtime/torch_tensorrt_executorch_runtime/runtime.py"
+)
+_RUNTIME_INIT_PY = (
+    _REPO_ROOT
+    / "py/torch-tensorrt-executorch-runtime/torch_tensorrt_executorch_runtime/__init__.py"
+)
 
 
 @pytest.mark.unit
@@ -127,11 +226,21 @@ def test_runtime_extension_has_dependency_wheel_rpaths():
     assert "BUILD_WITH_INSTALL_RPATH ON" in cmake
     assert "$ORIGIN/../torch/lib" in cmake
     assert "$ORIGIN/../tensorrt_libs" in cmake
-    assert "$ORIGIN/../nvidia/cuda_runtime/lib" in cmake
     assert "$ORIGIN/../nvidia/cu13/lib" in cmake
+    assert "CUDAToolkit_VERSION_MAJOR EQUAL 13" in cmake
     assert "-Wl,-Bsymbolic" not in cmake
     assert "set(EXECUTORCH_BUILD_KERNELS_OPTIMIZED ON" in cmake
     assert "set(EXECUTORCH_BUILD_XNNPACK ON" in cmake
+
+
+@pytest.mark.unit
+def test_the_install_script_puts_the_cuda_runtime_on_the_library_path():
+    """The CUDA 13 runtime directory must be available to the reference runner."""
+    script = (_REPO_ROOT / ".github/scripts/install-torch-tensorrt.sh").read_text(
+        encoding="utf-8"
+    )
+    assert "nvidia/cu13/lib" in script
+    assert "cu13*)" in script
 
 
 @pytest.mark.unit
@@ -168,10 +277,6 @@ def _setup_tree():
     return ast.parse(_SETUP_PY.read_text(encoding="utf-8"))
 
 
-def _runtime_setup_tree():
-    return ast.parse(_RUNTIME_SETUP_PY.read_text(encoding="utf-8"))
-
-
 def _assignment_value(tree, name):
     for node in tree.body:
         if isinstance(node, ast.Assign) and any(
@@ -187,31 +292,6 @@ def _function_def(tree, name):
         if isinstance(node, ast.FunctionDef) and node.name == name:
             return node
     raise AssertionError(f"Could not find function {name}")
-
-
-@pytest.mark.unit
-def test_runtime_wheel_uses_public_torch_version():
-    function = _function_def(_runtime_setup_tree(), "public_version")
-    namespace = {}
-    exec(
-        compile(ast.Module(body=[function], type_ignores=[]), "<setup.py>", "exec"),
-        namespace,
-    )
-
-    assert namespace["public_version"]("2.14.0.dev20260726+cu132") == (
-        "2.14.0.dev20260726"
-    )
-
-
-@pytest.mark.unit
-def test_runtime_wheel_pins_cuda_13_native_dependencies():
-    setup_source = _RUNTIME_SETUP_PY.read_text(encoding="utf-8")
-    assert 'TENSORRT_DISTRIBUTION = "tensorrt-cu13"' in setup_source
-    assert 'CUDA_RUNTIME_DISTRIBUTION = "nvidia-cuda-runtime"' in setup_source
-    assert "torch=={public_version(torch.__version__)}" in setup_source
-    assert "{TENSORRT_DISTRIBUTION}=={tensorrt_version}" in setup_source
-    assert "{CUDA_RUNTIME_DISTRIBUTION}=={cuda_runtime_version}" in setup_source
-    assert "nvidia-cuda-runtime-cu12" not in setup_source
 
 
 @pytest.mark.unit

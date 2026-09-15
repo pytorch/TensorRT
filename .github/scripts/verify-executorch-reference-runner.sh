@@ -18,6 +18,13 @@ set +x
 #   examples/torchtrt_executorch_example/export_kv_cache_decode.py). When given,
 #   kv_cache_decode_check is built and run against it as well.
 #
+# Optional third argument: path to a coalesced TensorRT + CUDA .pte (see
+#   examples/torchtrt_executorch_example/export_coalesced.py). When given, the
+#   runner built from source here is run against it and its output is compared to
+#   the eager reference that export script wrote next to the model. Only that
+#   runner: the packaged binary links the TensorRT delegate alone, so it has no
+#   CUDA backend for the partition a coalesced program hands to one.
+#
 # Optional:
 #   TensorRT_ROOT=/path/to/extracted/TensorRT
 #     If unset, the script reuses Bazel's fetched TensorRT SDK when available
@@ -33,8 +40,8 @@ set +x
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${repo_root}"
 
-if [[ $# -lt 1 || $# -gt 2 ]]; then
-  echo "Usage: $0 PATH_TO_MODEL.pte [PATH_TO_KV_CACHE_DECODE.pte]" >&2
+if [[ $# -lt 1 || $# -gt 3 ]]; then
+  echo "Usage: $0 PATH_TO_MODEL.pte [PATH_TO_KV_CACHE_DECODE.pte [PATH_TO_COALESCED.pte]]" >&2
   exit 1
 fi
 model_path="$1"
@@ -45,6 +52,11 @@ fi
 kv_model_path="${2:-}"
 if [[ -n "${kv_model_path}" && ! -f "${kv_model_path}" ]]; then
   echo "KV-cache decode model not found: ${kv_model_path}" >&2
+  exit 1
+fi
+coalesced_model_path="${3:-}"
+if [[ -n "${coalesced_model_path}" && ! -f "${coalesced_model_path}" ]]; then
+  echo "Coalesced model not found: ${coalesced_model_path}" >&2
   exit 1
 fi
 
@@ -467,25 +479,35 @@ packaged_runner_log="${verify_root}/packaged_runner.log"
   --model_path="${model_path}" \
   --num_runs=1 2>&1 | tee "${packaged_runner_log}"
 
-# The sample model is x + 1 on a (2,3,4,4) input and both runners fill inputs with
-# 1.0f, so the shape is exactly [2,3,4,4] and every printed value is exactly 2.0000.
-# Assert both precisely. Matching only "shape=" accepts any shape, and matching one
-# 2.0000 anywhere on the values line accepts a line of wrong numbers that happens to
-# contain one right one, so neither catches a stream-ordering regression returning
-# stale or partial output. Both lines come from fprintf in the runner, so these
-# assertions hold whatever ET_LOG_ENABLED is set to.
-for _log in "${runner_log}" "${packaged_runner_log}"; do
-  # A right answer produced entirely on the host would not prove much here: the
-  # program is delegated to TensorRT, so at least one planned buffer has to be
-  # served by a registered CUDA DeviceAllocator. Pin that, otherwise a model or
-  # a planning change could quietly turn this into a CPU-only test.
+# Assert the printed shape, and that EVERY value on the "first N values:" line is
+# the expected one. Matching only "shape=" accepts any shape, and matching one
+# right value anywhere on the values line accepts a line of wrong numbers that
+# happens to contain one, so neither on its own catches a stream-ordering
+# regression returning stale or partial output. Both lines come from fprintf in
+# the runner, so these assertions hold whatever ET_LOG_ENABLED is set to. The
+# models used here are elementwise on an all-ones input, so one number describes
+# the whole expected output.
+assert_runner_output() {
+  local _log="$1"
+  local _shape="$2"
+  local _expected="$3"
+  local _tolerance="$4"
+  local _values
+  local _value
+
+  # A right answer produced entirely on the host would not prove much: the
+  # programs here are delegated, so at least one planned buffer has to be served
+  # by a registered CUDA DeviceAllocator. Pin that, otherwise a model or a
+  # planning change could quietly turn this into a CPU-only test.
   if ! grep -q 'planned buffer\[[0-9]*\] = [0-9]* bytes on device_type 1' "${_log}"; then
     echo "No CUDA planned buffer was allocated in ${_log}:" >&2
     grep 'planned buffer' "${_log}" >&2 || echo "  no planned buffer line at all" >&2
     exit 1
   fi
 
-  if ! grep -q 'output\[0\] shape=\[2,3,4,4\]' "${_log}"; then
+  # -F: the shape is bracketed, and an unescaped [2,3,4,4] is a regex character
+  # class that would match any single one of those characters.
+  if ! grep -qF "output[0] shape=${_shape}" "${_log}"; then
     echo "Unexpected output shape in ${_log}:" >&2
     grep 'output\[0\] shape=' "${_log}" >&2 || echo "  no shape line at all" >&2
     exit 1
@@ -498,11 +520,35 @@ for _log in "${runner_log}" "${packaged_runner_log}"; do
     exit 1
   fi
   for _value in ${_values}; do
-    if [[ "${_value}" != "2.0000" ]]; then
-      echo "Unexpected output value '${_value}' in ${_log}: ${_values}" >&2
+    # Validated as a number before it is compared. awk coerces a leading numeric
+    # prefix and drops the rest, so "2.0000oops" reads as 2.0000 and passed a
+    # zero-tolerance check that the exact string comparison this replaced rejected.
+    if [[ ! "${_value}" =~ ^-?[0-9]+(\.[0-9]+)?([eE][-+]?[0-9]+)?$ ]]; then
+      echo "Unparsable output value '${_value}' in ${_log}: ${_values}" >&2
+      exit 1
+    fi
+    # At zero tolerance the printed text is also pinned, which is what the exact
+    # comparison this replaced did. A numeric check alone would accept 2, 2.0 and
+    # 2e0 where that one required 2.0000, losing the runner's print format. The
+    # coalesced model cannot use this, since its value is not exact in float32
+    # across the two delegates and eager, which is why a tolerance exists at all.
+    if [[ "${_tolerance}" == "0" && "${_value}" != "${_expected}" ]]; then
+      echo "Output value '${_value}' in ${_log} is not printed as '${_expected}'" >&2
+      exit 1
+    fi
+    if ! awk -v got="${_value}" -v want="${_expected}" -v tol="${_tolerance}" \
+        'BEGIN { d = got - want; if (d < 0) d = -d; exit !(d <= tol) }'; then
+      echo "Unexpected output value '${_value}' in ${_log}" \
+        "(expected ${_expected} within ${_tolerance}): ${_values}" >&2
       exit 1
     fi
   done
+}
+
+# The sample model is x + 1 on a (2,3,4,4) input, so every output value is exactly
+# 2. That is exact in float32, hence a zero tolerance.
+for _log in "${runner_log}" "${packaged_runner_log}"; do
+  assert_runner_output "${_log}" "[2,3,4,4]" "2.0000" 0
 done
 
 if [[ -n "${kv_model_path}" ]]; then
@@ -520,4 +566,53 @@ if [[ -n "${kv_model_path}" ]]; then
 
   "${kv_check_path}" --model_path="${kv_model_path}" 2>&1 | tee "${kv_check_log}"
   grep -q "PASS: decode at pos=1 observed the KV written at pos=0" "${kv_check_log}"
+fi
+
+if [[ -n "${coalesced_model_path}" ]]; then
+  # A coalesced program splits one graph across the TensorRT delegate and
+  # ExecuTorch's CUDA delegate, so a value produced by one delegate is consumed by
+  # the other on the device, inside one method. The checks above use a program with
+  # a single delegate, so they exercise neither the second backend nor the handover
+  # between the two.
+  # Appended to the whole path, matching what the export script writes. Stripping a
+  # literal .pte instead agreed only for a .pte path: for m.v2 the export wrote
+  # m.expected while this looked for m.v2.expected.
+  coalesced_expected_path="${coalesced_model_path}.expected"
+  if [[ ! -f "${coalesced_expected_path}" ]]; then
+    echo "Coalesced reference output not found: ${coalesced_expected_path}" >&2
+    echo "It is written by examples/torchtrt_executorch_example/export_coalesced.py" >&2
+    exit 1
+  fi
+  coalesced_shape="$(sed -n '1p' "${coalesced_expected_path}")"
+  coalesced_value="$(sed -n '2p' "${coalesced_expected_path}")"
+  # Validated by shape, not merely non-empty. This file is what the whole check
+  # rests on, and a non-empty line is not enough for either half: the shape is
+  # matched as a substring, so a truncated "[" matches any shape the runner
+  # prints, and the value goes into awk arithmetic, which reads a non-numeric
+  # line such as "nan" as zero and then accepts a run of zeros.
+  if [[ ! "${coalesced_shape}" =~ ^\[-?[0-9]+(,[0-9]+)*\]$ ]]; then
+    echo "Malformed shape in ${coalesced_expected_path}: '${coalesced_shape}'" >&2
+    echo "Expected a bracketed list of integers, for example [64,64]" >&2
+    exit 1
+  fi
+  if [[ ! "${coalesced_value}" =~ ^-?[0-9]+(\.[0-9]+)?([eE][-+]?[0-9]+)?$ ]]; then
+    echo "Malformed value in ${coalesced_expected_path}: '${coalesced_value}'" >&2
+    echo "Expected a finite decimal number, for example 0.6722" >&2
+    exit 1
+  fi
+
+  # Only the from-source runner runs the coalesced program. It links every
+  # ExecuTorch delegate, including the CUDA/AOTI backend that the CUDA partition
+  # of a coalesced .pte is handed to. The packaged runner unpacked from the release
+  # tarball above links the TensorRT delegate alone, so it has no CudaBackend to run
+  # that partition and cannot execute this model. That says nothing about the runtime
+  # wheel, which does register a CUDA backend and is checked separately in this job.
+  coalesced_runner_log="${verify_root}/coalesced_my_runner.log"
+  "${runner_path}" \
+    --model_path="${coalesced_model_path}" \
+    --num_runs=1 2>&1 | tee "${coalesced_runner_log}"
+
+  # TensorRT, AOTInductor and eager PyTorch compute the same math with different
+  # kernels, so compare within a tolerance instead of on the printed digits.
+  assert_runner_output "${coalesced_runner_log}" "${coalesced_shape}" "${coalesced_value}" 0.001
 fi

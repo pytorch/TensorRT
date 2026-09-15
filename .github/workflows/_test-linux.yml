@@ -106,6 +106,9 @@ jobs:
       trigger-event: ${{ github.event_name }}
       architecture: ${{ inputs.architecture }}
       use-rtx: ${{ inputs.use-rtx }}
+      # The runtime is a companion of the standard wheel, so ship it in the
+      # same artifact bundle. RTX and PYTHON_ONLY wheels intentionally omit it.
+      build-executorch-runtime: ${{ !inputs.python-only && !inputs.use-rtx }}
       pip-install-torch-extra-args: "--extra-index-url https://pypi.org/simple"
 
   # Suite list from the manifest. Skipped for build-only channels (SBSA).

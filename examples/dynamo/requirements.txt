@@ -1,7 +1,7 @@
 cupy==13.1.0
 triton==2.3.0
-diffusers==0.30.3
-transformers>=5.4.0
+diffusers==0.40.0
+transformers>=5.14.1
 matplotlib
 pandas
 huggingface_hub
