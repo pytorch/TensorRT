@@ -20,7 +20,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
 )
 from torch_tensorrt.dynamo.conversion.impl.elementwise import convert_binary_elementwise
 from torch_tensorrt.dynamo.conversion.impl.shape import shape as get_shape
-from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
+from torch_tensorrt.dynamo.utils import DYNAMIC_DIM, Frameworks, unified_dtype_converter
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -516,16 +516,21 @@ def scatter(
                 input.dtype,
             )
         else:
-            # Static shape: use numpy to create the filled tensor
+            # Static shape: use numpy to create the filled tensor.
+            input_np_dtype = unified_dtype_converter(input.dtype, Frameworks.NUMPY)
             src_tensor = get_trt_tensor(
-                ctx, src * np.ones(index_shape_list), name + "_value_tensor"
-            )
-            src_tensor = cast_trt_tensor(
-                ctx, src_tensor, input.dtype, name + "_cast_value_tensor"
+                ctx,
+                np.full(index_shape_list, src, dtype=input_np_dtype),
+                name + "_value_tensor",
             )
     # scatter.src
     elif not (isinstance(src, TRTTensor)):
         src_tensor = get_trt_tensor(ctx, src, name + "_src_tensor")
+
+    if isinstance(src_tensor, TRTTensor) and src_tensor.dtype != input.dtype:
+        src_tensor = cast_trt_tensor(
+            ctx, src_tensor, input.dtype, name + "_cast_src_tensor"
+        )
 
     scatter_layer = ctx.net.add_scatter(
         input, index, src_tensor, trt.ScatterMode.ELEMENT

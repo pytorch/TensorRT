@@ -123,13 +123,19 @@ def convert_binary_elementwise(
     # into [], meaning that the result will have shape [], which is what we
     # expect.
     #
-    # Note that the dtype here is supposed to be the same as the scalar
-    # dtype but we don't have a way to detect whether it makes sense for the
-    # scalar to be float or half. Hence we go with the lhs dtype.
+    # Use torch.result_type to determine the scalar's dtype per PyTorch's promotion rules
     if is_lhs_trt_tensor and isinstance(rhs_val, (float, int, bool)):
-        rhs_val = to_torch(rhs_val, dtype=lhs_dtype)
+        lhs_torch_dtype = _enums.dtype._from(lhs_dtype).to(torch.dtype)
+        _rhs_dtype = _enums.dtype._from(
+            torch.result_type(torch.empty(0, dtype=lhs_torch_dtype), rhs_val)
+        ).to(trt.DataType)
+        rhs_val = to_torch(rhs_val, dtype=_rhs_dtype)
     if is_rhs_trt_tensor and isinstance(lhs_val, (float, int, bool)):
-        lhs_val = to_torch(lhs_val, dtype=rhs_dtype)
+        rhs_torch_dtype = _enums.dtype._from(rhs_dtype).to(torch.dtype)
+        _lhs_dtype = _enums.dtype._from(
+            torch.result_type(torch.empty(0, dtype=rhs_torch_dtype), lhs_val)
+        ).to(trt.DataType)
+        lhs_val = to_torch(lhs_val, dtype=_lhs_dtype)
     lhs_val = get_trt_tensor(ctx, lhs_val, f"{name}_lhs", lhs_dtype)
     rhs_val = get_trt_tensor(ctx, rhs_val, f"{name}_rhs", rhs_dtype)
 
