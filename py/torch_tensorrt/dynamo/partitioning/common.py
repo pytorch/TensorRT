@@ -2,7 +2,17 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import logging
-from typing import TYPE_CHECKING, Any, Collection, Dict, List, Optional, Sequence, Set, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Collection,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+)
 
 import sympy
 import torch
