@@ -1,7 +1,6 @@
 import unittest
 from typing import Dict
 
-import pytest
 import torch
 import torch_tensorrt as torchtrt
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
@@ -316,7 +315,6 @@ class TestTorchTensorRTModule(unittest.TestCase):
         torchtrt.ENABLED_FEATURES.tensorrt_rtx,
         "layer info is different for tensorrt_rtx",
     )
-    @pytest.mark.trt_api
     def test_get_layer_info(self):
         """
         {

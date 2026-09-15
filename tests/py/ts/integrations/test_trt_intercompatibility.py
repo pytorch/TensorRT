@@ -1,12 +1,9 @@
 import importlib.util
 import unittest
 
-import pytest
 import torch
 import torch_tensorrt as torchtrt
 from utils import COSINE_THRESHOLD, cosine_similarity
-
-pytestmark = [pytest.mark.trt_api]
 
 if importlib.util.find_spec("torchvision"):
     import torchvision.models as models

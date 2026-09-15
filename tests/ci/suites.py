@@ -157,8 +157,8 @@ _L0: list[Suite] = [
     Suite(
         # Manual umbrella for the TensorRT / TensorRT-RTX API contracts used by
         # Torch-TensorRT: network conversion, engine build/inspection, runtime,
-        # refit, plugins, and TorchScript interoperability. Keep paths explicit
-        # so unrelated model-zoo tests are not collected.
+        # refit, and plugins. Keep paths explicit so unrelated model-zoo tests
+        # are not collected.
         "trt-api",
         tier="l0",
         lanes=(),
@@ -172,8 +172,6 @@ _L0: list[Suite] = [
             "dynamo/models/test_models_export.py",
             "dynamo/models/test_weight_stripped_engine.py",
             "kernels/test_cuda_kernel_op.py",
-            "ts/api/",
-            "ts/integrations/test_trt_intercompatibility.py",
         ),
         markers="trt_api",
         jobs=_HEAVY,
