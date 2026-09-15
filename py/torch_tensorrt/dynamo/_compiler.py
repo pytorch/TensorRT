@@ -1289,7 +1289,7 @@ def compile_module(
     # Check the number of supported operations in the graph
     num_supported_ops, total_ops, op_support = (
         partitioning.get_graph_converter_support_overview(
-            gm, settings.torch_executed_ops
+            gm, settings.torch_executed_ops, settings.torch_executed_modules
         )
     )
 
