@@ -448,6 +448,7 @@ def run_shape_analysis(
 def get_graph_converter_support(
     graph_module: torch.fx.GraphModule,
     torch_executed_ops: Optional[Set[str]] = None,
+    torch_executed_modules: Optional[Collection[str]] = None,
 ) -> Tuple[int, int]:
     """Helper function to get converter support overview pre-partitioning
 
@@ -455,6 +456,7 @@ def get_graph_converter_support(
         graph_module: FX GraphModule to determine support for
         verbose: Bool representing whether to print operator support
         torch_executed_ops: Collection of operations to run in Torch, regardless of converter coverage
+        torch_executed_modules: Collection of module class names to run in Torch
     Returns:
         The number of supported call_function nodes in the graph
     """
@@ -472,7 +474,10 @@ def get_graph_converter_support(
         if node.op == "call_function":
             total_functional_nodes += 1
 
-            if op_support.is_node_supported(module_dict, node):
+            if op_support.is_node_supported(module_dict, node) and not (
+                torch_executed_modules
+                and node_in_torch_executed_module(node, torch_executed_modules)
+            ):
                 number_of_supported_nodes += 1
 
     # Print node support overview prior to partitioning

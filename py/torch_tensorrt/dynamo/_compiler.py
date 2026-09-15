@@ -1272,7 +1272,7 @@ def compile_module(
 
     # Check the number of supported operations in the graph
     num_supported_ops, total_ops = partitioning.get_graph_converter_support(
-        gm, settings.torch_executed_ops
+        gm, settings.torch_executed_ops, settings.torch_executed_modules
     )
 
     dryrun_tracker.total_ops_in_graph = total_ops
