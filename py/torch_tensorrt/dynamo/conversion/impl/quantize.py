@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import Optional, Sequence, Union
 
 import numpy as np
 import tensorrt as trt
@@ -6,6 +6,7 @@ import torch
 from tensorrt import ITensor as TRTTensor
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.fx.node import Target
+from torch_tensorrt import _enums
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -138,3 +139,125 @@ def quantize(
         dq_output = dequantize_layer.get_output(0)
 
         return dq_output
+
+
+def _block_size_as_ints(block_size: Sequence[object]) -> list[int]:
+    dims: list[int] = []
+    for bs in block_size:
+        if isinstance(bs, torch.Tensor):
+            dims.append(int(bs.item()))
+        elif isinstance(bs, (int, float)):
+            dims.append(int(bs))
+        else:
+            raise TypeError(f"Unsupported block_size dim type {type(bs)}: {bs!r}")
+    return dims
+
+
+def dequantize_affine(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    qdata: Union[torch.Tensor, TRTTensor],
+    block_size: Sequence[object],
+    scale: Union[np.ndarray, torch.Tensor, TRTTensor],
+    output_dtype: torch.dtype,
+    input_dtype: Optional[torch.dtype] = None,
+) -> TRTTensor:
+    """Map ``torchao.dequantize_affine`` to TensorRT ``IDequantizeLayer``.
+
+    Used by TorchAO weight-only quantization (FP8/INT8/INT4). The quantized
+    weight stays a low-precision constant and is dequantized at the GEMM
+    boundary so Myelin can fuse DQ into the matmul prologue instead of
+    folding it into a dense high-precision weight.
+    """
+    qdata_trt = get_trt_tensor(ctx, qdata, f"{name}_qdata", dtype=input_dtype)
+
+    axis = None
+    if isinstance(scale, torch.Tensor):
+        scale_for_trt = scale.squeeze()
+        if scale_for_trt.numel() != 1:
+            # Per-channel axis is the dimension whose block size is 1
+            # (quantized independently per slice). Example: weight (3072, 64)
+            # with block_size [3072, 1] → axis 1.
+            bs = _block_size_as_ints(block_size)
+            try:
+                axis = next(i for i, dim in enumerate(bs) if dim == 1)
+            except StopIteration as exc:
+                raise ValueError(
+                    f"Unable to derive IDequantizeLayer axis from block_size={bs} "
+                    f"and scale shape {tuple(scale.shape)}"
+                ) from exc
+    else:
+        scale_for_trt = scale
+
+    scale_trt = get_trt_tensor(ctx, scale_for_trt, f"{name}_scale", dtype=torch.float32)
+    trt_output_dtype = _enums.dtype._from(output_dtype).to(trt.DataType)
+
+    dequantize_layer = ctx.net.add_dequantize(
+        qdata_trt,
+        scale_trt,
+        output_type=trt_output_dtype,
+    )
+    if axis is not None:
+        dequantize_layer.axis = axis
+    set_layer_name(dequantize_layer, target, f"{name}_dequantize", source_ir)
+    return dequantize_layer.get_output(0)
+
+
+def _fp8_scale_and_axis(
+    ctx: ConversionContext,
+    scale: Union[np.ndarray, torch.Tensor, TRTTensor],
+    name: str,
+) -> tuple[TRTTensor, Optional[int]]:
+    axis = None
+    if isinstance(scale, torch.Tensor):
+        scale_for_trt = scale.squeeze()
+        if scale_for_trt.numel() != 1:
+            axis = 0
+    else:
+        scale_for_trt = scale
+    scale_trt = get_trt_tensor(ctx, scale_for_trt, f"{name}_scale", dtype=torch.float32)
+    return scale_trt, axis
+
+
+def quantize_affine_float8(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_tensor: Union[torch.Tensor, TRTTensor],
+    scale: Union[np.ndarray, torch.Tensor, TRTTensor],
+) -> TRTTensor:
+    """Map TorchAO ``quantize_affine_float8_non_decomposed`` to ``IQuantizeLayer``."""
+    input_trt = get_trt_tensor(ctx, input_tensor, f"{name}_input")
+    scale_trt, axis = _fp8_scale_and_axis(ctx, scale, name)
+    quantize_layer = ctx.net.add_quantize(input_trt, scale_trt, trt.DataType.FP8)
+    if axis is not None:
+        quantize_layer.axis = axis
+    set_layer_name(quantize_layer, target, f"{name}_quantize", source_ir)
+    return quantize_layer.get_output(0)
+
+
+def dequantize_affine_float8(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_tensor: Union[torch.Tensor, TRTTensor],
+    scale: Union[np.ndarray, torch.Tensor, TRTTensor],
+    output_dtype: torch.dtype = torch.bfloat16,
+) -> TRTTensor:
+    """Map TorchAO ``dequantize_affine_float8_non_decomposed`` to ``IDequantizeLayer``."""
+    input_trt = get_trt_tensor(ctx, input_tensor, f"{name}_input")
+    scale_trt, axis = _fp8_scale_and_axis(ctx, scale, name)
+    trt_output_dtype = _enums.dtype._from(output_dtype).to(trt.DataType)
+    dequantize_layer = ctx.net.add_dequantize(
+        input_trt,
+        scale_trt,
+        output_type=trt_output_dtype,
+    )
+    if axis is not None:
+        dequantize_layer.axis = axis
+    set_layer_name(dequantize_layer, target, f"{name}_dequantize", source_ir)
+    return dequantize_layer.get_output(0)
