@@ -2,6 +2,7 @@
 
 def _find_nccl_include(repository_ctx, torch_path):
     """Find nccl.h from the pip nvidia-nccl package co-installed with torch."""
+
     # pip's nvidia-nccl package installs nccl.h at <site-packages>/nvidia/nccl/include/
     candidate = torch_path + "/../nvidia/nccl/include"
     result = repository_ctx.execute(["test", "-f", candidate + "/nccl.h"])
@@ -9,16 +10,23 @@ def _find_nccl_include(repository_ctx, torch_path):
         return candidate
     return None
 
+def _has_process_group_nccl2(repository_ctx, torch_path):
+    """Check that the installed PyTorch exposes the NCCL2 backend."""
+    header = torch_path + "/include/torch/csrc/distributed/c10d/nccl2/ProcessGroupNCCL.hpp"
+    return repository_ctx.execute(["test", "-f", header]).return_code == 0
+
 def _torch_nccl_detect_impl(repository_ctx):
     """Detect if PyTorch was built with NCCL support."""
 
     # Skip detection on non-Linux (NCCL not available)
     os_name = repository_ctx.os.name.lower()
     nccl_include_dir = ""
+    has_process_group_nccl2 = False
     if "linux" not in os_name:
         has_nccl = False
     else:
         # Find libtorch path using the venv python if available, else system python3
+        result = None
         for python_bin in ["python3", "python"]:
             result = repository_ctx.execute([
                 python_bin,
@@ -28,7 +36,7 @@ def _torch_nccl_detect_impl(repository_ctx):
             if result.return_code == 0:
                 break
 
-        if result.return_code != 0:
+        if result == None or result.return_code != 0:
             has_nccl = False
         else:
             torch_path = result.stdout.strip()
@@ -47,6 +55,7 @@ def _torch_nccl_detect_impl(repository_ctx):
                 found = _find_nccl_include(repository_ctx, torch_path)
                 if found:
                     nccl_include_dir = found
+                    has_process_group_nccl2 = _has_process_group_nccl2(repository_ctx, torch_path)
                 else:
                     # Cannot find nccl.h — disable to avoid build errors
                     has_nccl = False
@@ -86,8 +95,22 @@ config_setting(
     name = "nccl_enabled",
     flag_values = {{":use_nccl": "True"}},
 )
+
+bool_flag(
+    name = "use_process_group_nccl2",
+    build_setting_default = {has_process_group_nccl2},
+)
+
+config_setting(
+    name = "process_group_nccl2_enabled",
+    flag_values = {{":use_process_group_nccl2": "True"}},
+)
 {nccl_headers_target}
-""".format(has_nccl = has_nccl, nccl_headers_target = nccl_headers_target))
+""".format(
+        has_nccl = has_nccl,
+        has_process_group_nccl2 = has_process_group_nccl2,
+        nccl_headers_target = nccl_headers_target,
+    ))
 
 torch_nccl_detect = repository_rule(
     implementation = _torch_nccl_detect_impl,
@@ -98,5 +121,12 @@ def if_torch_nccl(if_true, if_false = []):
     """Returns if_true if PyTorch has NCCL, else if_false."""
     return select({
         "@torch_nccl//:nccl_enabled": if_true,
+        "//conditions:default": if_false,
+    })
+
+def if_torch_nccl2(if_true, if_false = []):
+    """Returns if_true if PyTorch exposes ProcessGroupNCCL2."""
+    return select({
+        "@torch_nccl//:process_group_nccl2_enabled": if_true,
         "//conditions:default": if_false,
     })
