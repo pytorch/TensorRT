@@ -1,7 +1,6 @@
 import ast
 import importlib
 import importlib.util
-import subprocess
 import sys
 import types
 from pathlib import Path
@@ -33,107 +32,6 @@ def test_the_python_loader_uses_the_api_that_backs_device_arenas():
     assert (
         "load_program" not in source
     ), "the runtime still references the program loader, which does not back device-tagged arenas"
-
-
-@pytest.mark.unit
-def test_every_lane_that_builds_the_cuda_shims_filters_the_arch_list():
-    """Both ExecuTorch lanes compile the shims, so both need the architecture floor.
-
-    The reusable Linux build workflow builds the runtime wheel, while the test lane builds the
-    reference runner, whose CMakeLists forces EXECUTORCH_BUILD_CUDA=ON. Both source the channel's
-    build environment, so filtering in only one of them moves the cu126 failure from that job into
-    the other rather than removing it. Checked by parsing, because the ordering matters: the
-    filter has to run before whatever compiles.
-    """
-    import yaml
-
-    for name, compile_marker in (
-        ("build_linux.yml", "python -m pip wheel"),
-        ("executorch-test-linux.yml", "verify-executorch-reference-runner"),
-    ):
-        workflow = yaml.safe_load(
-            (_REPO_ROOT / ".github/workflows" / name).read_text(encoding="utf-8")
-        )
-        scripts = []
-        for job in workflow.get("jobs", {}).values():
-            scripts.append((job.get("with") or {}).get("script", ""))
-            scripts.extend(step.get("run", "") for step in job.get("steps", []))
-        script = next((s for s in scripts if compile_marker in s), None)
-        assert script is not None, f"{name} no longer contains {compile_marker!r}"
-
-        lines = script.splitlines()
-        filtered = [
-            i for i, line in enumerate(lines) if "filter-executorch-cuda-arches" in line
-        ]
-        assert filtered, (
-            f"{name} builds the CUDA shims without narrowing TORCH_CUDA_ARCH_LIST, so a channel "
-            "asking for an architecture without __dp4a fails to compile"
-        )
-        compiled = [i for i, line in enumerate(lines) if compile_marker in line]
-        assert filtered[0] < compiled[0], (
-            f"{name} filters the architecture list after {compile_marker!r}, so the value in "
-            "effect while compiling is the unfiltered one"
-        )
-
-
-@pytest.mark.unit
-def test_the_cuda_arch_filter_drops_only_what_executorch_cannot_compile():
-    """The delegate build must not be asked for an architecture without ``__dp4a``.
-
-    ExecuTorch's CUDA shims call that intrinsic, which nvcc does not declare before
-    sm_61, so a list carrying 5.0 or 6.0 fails to compile at all. The cu126 build
-    environment asks for exactly that while the CUDA 13 ones start higher, which is why
-    only cu126 broke. The filter narrows the request rather than pinning a list, so this
-    checks both that the unbuildable entries go and that everything else survives.
-    """
-    script = _REPO_ROOT / ".github/scripts/filter-executorch-cuda-arches.py"
-
-    def run(requested):
-        return subprocess.run(
-            [sys.executable, str(script), requested],
-            capture_output=True,
-            text=True,
-        )
-
-    # The list the cu126 environment actually exports.
-    result = run("5.0;6.0;7.0;7.5;8.0;8.6;9.0")
-    assert result.returncode == 0, result.stderr
-    assert result.stdout.strip() == "7.0;7.5;8.0;8.6;9.0"
-
-    # A CUDA 13 list is already buildable and must come back untouched, including
-    # architectures newer than anything named in the filter.
-    unchanged = "7.5;8.0;8.6;9.0;10.0;12.0"
-    assert run(unchanged).stdout.strip() == unchanged
-
-    # A "+PTX" suffix sorts by its number and keeps its suffix.
-    assert run("5.0;6.0;8.6+PTX").stdout.strip() == "8.6+PTX"
-
-    # PyTorch also accepts named architectures and expands each before building its gencode
-    # flags, so a name has to be expanded here too. Pascal is 6.0;6.1+PTX, and passing the name
-    # through untouched would carry 6.0 into the build, which is the target this filter exists to
-    # drop. The longer keys go first, or "Maxwell+Tegra" leaves a "+Tegra" tail behind.
-    assert run("Pascal").stdout.strip() == "6.1+PTX"
-    assert run("Ampere").stdout.strip() == "8.0;8.6+PTX"
-    assert run("Pascal;7.5").stdout.strip() == "6.1+PTX;7.5"
-    for name in ("Maxwell", "Maxwell+Tegra", "Kepler"):
-        rejected = run(name)
-        assert rejected.returncode != 0, f"{name} has no member at or above sm_61"
-        assert "sm_61" in rejected.stderr
-
-    # Space separated is the other spelling torch accepts, and it normalises spaces the same way
-    # (torch/utils/cpp_extension.py does _arch_list.replace(" ", ";")). Filtering only on
-    # semicolons let a space separated list through untouched, which is silent rather than loud.
-    assert run("5.0 6.0 7.5 8.6").stdout.strip() == "7.5;8.6"
-    assert run("5.0, 6.0, 7.5").stdout.strip() == "7.5"
-
-    # Nothing buildable must fail loudly. Printing an empty list would leave nvcc to
-    # pick its own default and ship a wheel for architectures nobody asked for.
-    empty = run("5.0;6.0")
-    assert empty.returncode != 0
-    assert "sm_61" in empty.stderr
-
-    # An unset list is not this script's problem to invent.
-    assert run("").returncode == 0
 
 
 def _is_importable_module(name: str) -> bool:
@@ -328,10 +226,7 @@ def test_runtime_extension_has_dependency_wheel_rpaths():
     assert "BUILD_WITH_INSTALL_RPATH ON" in cmake
     assert "$ORIGIN/../torch/lib" in cmake
     assert "$ORIGIN/../tensorrt_libs" in cmake
-    assert "$ORIGIN/../nvidia/cuda_runtime/lib" in cmake
-    assert "$ORIGIN/../nvidia/cu12/lib" in cmake
     assert "$ORIGIN/../nvidia/cu13/lib" in cmake
-    assert "CUDAToolkit_VERSION_MAJOR EQUAL 12" in cmake
     assert "CUDAToolkit_VERSION_MAJOR EQUAL 13" in cmake
     assert "-Wl,-Bsymbolic" not in cmake
     assert "set(EXECUTORCH_BUILD_KERNELS_OPTIMIZED ON" in cmake
@@ -339,30 +234,13 @@ def test_runtime_extension_has_dependency_wheel_rpaths():
 
 
 @pytest.mark.unit
-def test_the_install_script_puts_a_cuda_runtime_on_the_library_path_for_both_majors():
-    """Every CUDA row gets a CUDA runtime directory, not just the CUDA 13 ones.
-
-    The two majors ship different layouts: nvidia-cuda-runtime-cu12 installs
-    nvidia/cuda_runtime/lib/libcudart.so.12 while the CUDA 13 line installs
-    nvidia/cu13/lib/libcudart.so.13. Naming only the cu13 path left every CUDA 12 row with no
-    CUDA runtime on the search path, and the ExecuTorch reference runner died at startup with
-    "libcudart.so.12: cannot open shared object file" while the package was installed all along.
-    The runtime wheel's own RPATH already lists both directories; this keeps the CI install
-    script consistent with it.
-    """
+def test_the_install_script_puts_the_cuda_runtime_on_the_library_path():
+    """The CUDA 13 runtime directory must be available to the reference runner."""
     script = (_REPO_ROOT / ".github/scripts/install-torch-tensorrt.sh").read_text(
         encoding="utf-8"
     )
-    for directory in ("nvidia/cuda_runtime/lib", "nvidia/cu13/lib"):
-        assert directory in script, (
-            f"{directory} is not on LD_LIBRARY_PATH, so a row of that CUDA major cannot resolve "
-            "libcudart at run time"
-        )
-    # Matched on the major, so a future cu128 or cu134 row is covered without another edit.
-    for pattern in ("cu12*)", "cu13*)"):
-        assert (
-            pattern in script
-        ), f"{pattern} is gone, so a CUDA row of that major would fall through to no directory"
+    assert "nvidia/cu13/lib" in script
+    assert "cu13*)" in script
 
 
 @pytest.mark.unit

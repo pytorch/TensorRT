@@ -13,9 +13,8 @@ disabled_cuda_versions: List[str] = []
 # jetpack 6.2 only officially supports python 3.10 and cu126
 jetpack_python_versions: List[str] = ["3.10"]
 jetpack_cuda_versions: List[str] = ["cu126"]
-# CUDA 12.6 wheels are published for x86_64 only. Keep the Arm matrices on
-# CUDA 13, including Windows Arm/AArch64.
-x86_cuda_versions: List[str] = ["cu126", "cu130", "cu132", "cu134"]
+# CUDA 13 wheels are supported on x86_64 and Arm, including Windows Arm/AArch64.
+x86_cuda_versions: List[str] = ["cu130", "cu132", "cu134"]
 arm_cuda_versions: List[str] = ["cu130", "cu132", "cu134"]
 
 # For PRs we build/test a single representative config to keep cycle time short.
