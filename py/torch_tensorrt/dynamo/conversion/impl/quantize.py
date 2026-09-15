@@ -14,6 +14,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_trt_tensor,
     set_layer_name,
     to_torch,
+    to_trt_weights,
 )
 
 
@@ -153,6 +154,71 @@ def _block_size_as_ints(block_size: Sequence[object]) -> list[int]:
     return dims
 
 
+def _pack_int4_nibbles(qdata: torch.Tensor) -> torch.Tensor:
+    """Pack adjacent INT4 values into bytes (mslk / TensorRT nibble order).
+
+    Even columns go in the low nibble, odd columns in the high nibble.
+    """
+    if qdata.dtype != torch.int8:
+        raise ValueError(f"expected int8 qdata for INT4 packing, got {qdata.dtype}")
+    if qdata.shape[-1] % 2 != 0:
+        raise ValueError(
+            f"K dim must be even for INT4 packing, got {tuple(qdata.shape)}"
+        )
+    low = torch.bitwise_and(qdata[..., ::2], 0x0F)
+    high = torch.bitwise_left_shift(qdata[..., 1::2], 4)
+    return torch.bitwise_or(low, high).contiguous()
+
+
+def _is_groupwise_int4(
+    qdata: Union[torch.Tensor, TRTTensor],
+    block_size: Sequence[object],
+) -> bool:
+    """True when DQ is group-wise INT4 (blocked scale along the last dim).
+
+    Per-row INT8 uses block_size=[1, K] with K == qdata.shape[-1], which
+    also has block_size[-1] > 1. That is *not* INT4 groupwise.
+    """
+    if not isinstance(qdata, torch.Tensor) or qdata.dtype != torch.int8:
+        return False
+    try:
+        bs = _block_size_as_ints(block_size)
+    except TypeError:
+        return False
+    if not bs or bs[-1] <= 1:
+        return False
+    if bs[-1] >= qdata.shape[-1]:
+        return False
+    return True
+
+
+def _add_int4_constant(
+    ctx: ConversionContext, qdata: torch.Tensor, name: str
+) -> TRTTensor:
+    """Create a TRT constant with logical shape (N, K) and packed INT4 weights."""
+    packed = _pack_int4_nibbles(qdata.contiguous().cpu())
+    weights = to_trt_weights(
+        ctx,
+        packed,
+        name,
+        "CONSTANT",
+        "CONSTANT",
+        dtype=trt.DataType.INT4,
+        count=qdata.numel(),
+    )
+    constant = ctx.net.add_constant(list(qdata.shape), weights)
+    constant.name = name
+    return constant.get_output(0)
+
+
+def _zero_point_is_nonzero(zero_point: object) -> bool:
+    if zero_point is None:
+        return False
+    if isinstance(zero_point, torch.Tensor):
+        return bool(torch.any(zero_point != 0).item())
+    return True
+
+
 def dequantize_affine(
     ctx: ConversionContext,
     target: Target,
@@ -163,36 +229,60 @@ def dequantize_affine(
     scale: Union[np.ndarray, torch.Tensor, TRTTensor],
     output_dtype: torch.dtype,
     input_dtype: Optional[torch.dtype] = None,
+    zero_point: Optional[object] = None,
 ) -> TRTTensor:
-    """Map ``torchao.dequantize_affine`` to TensorRT ``IDequantizeLayer``.
+    """Map torchao.dequantize_affine to TensorRT IDequantizeLayer.
 
     Used by TorchAO weight-only quantization (FP8/INT8/INT4). The quantized
     weight stays a low-precision constant and is dequantized at the GEMM
     boundary so Myelin can fuse DQ into the matmul prologue instead of
     folding it into a dense high-precision weight.
-    """
-    qdata_trt = get_trt_tensor(ctx, qdata, f"{name}_qdata", dtype=input_dtype)
 
-    axis = None
-    if isinstance(scale, torch.Tensor):
-        scale_for_trt = scale.squeeze()
-        if scale_for_trt.numel() != 1:
-            # Per-channel axis is the dimension whose block size is 1
-            # (quantized independently per slice). Example: weight (3072, 64)
-            # with block_size [3072, 1] → axis 1.
-            bs = _block_size_as_ints(block_size)
-            try:
-                axis = next(i for i, dim in enumerate(bs) if dim == 1)
-            except StopIteration as exc:
-                raise ValueError(
-                    f"Unable to derive IDequantizeLayer axis from block_size={bs} "
-                    f"and scale shape {tuple(scale.shape)}"
-                ) from exc
-    else:
+    Group-wise INT4 WOQ unpacks to int8 in the PyTorch graph; this converter
+    re-packs those nibbles into a trt.DataType.INT4 constant. TensorRT
+    blocked INT4 DQ currently wants an FP32 DQ output (cast back to BF16
+    after). Nonzero zero-points are rejected for that path.
+    """
+    use_int4 = _is_groupwise_int4(qdata, block_size)
+
+    if use_int4:
+        if _zero_point_is_nonzero(zero_point):
+            raise RuntimeError(
+                "TensorRT IDequantizeLayer rejects nonzero zero_point; "
+                "group-wise INT4 WOQ must use symmetric quantization "
+                f"(got nonzero zero_point for '{name}')"
+            )
+        assert isinstance(qdata, torch.Tensor)
+        qdata_trt = _add_int4_constant(ctx, qdata, f"{name}_qdata_int4")
+        # Blocked along the group dimension (last dim of block_size > 1).
+        axis: Optional[int] = len(_block_size_as_ints(block_size)) - 1
         scale_for_trt = scale
+        # Myelin currently matches INT4 blocked DQ -> FP32, not BF16.
+        trt_output_dtype = trt.DataType.FLOAT
+    else:
+        qdata_trt = get_trt_tensor(ctx, qdata, f"{name}_qdata", dtype=input_dtype)
+
+        axis = None
+        if isinstance(scale, torch.Tensor):
+            scale_for_trt = scale.squeeze()
+            if scale_for_trt.numel() != 1:
+                # Per-channel axis is the dimension whose block size is 1
+                # (quantized independently per slice). Example: weight (3072, 64)
+                # with block_size [3072, 1] → axis 1.
+                bs = _block_size_as_ints(block_size)
+                try:
+                    axis = next(i for i, dim in enumerate(bs) if dim == 1)
+                except StopIteration as exc:
+                    raise ValueError(
+                        f"Unable to derive IDequantizeLayer axis from block_size={bs} "
+                        f"and scale shape {tuple(scale.shape)}"
+                    ) from exc
+        else:
+            scale_for_trt = scale
+
+        trt_output_dtype = _enums.dtype._from(output_dtype).to(trt.DataType)
 
     scale_trt = get_trt_tensor(ctx, scale_for_trt, f"{name}_scale", dtype=torch.float32)
-    trt_output_dtype = _enums.dtype._from(output_dtype).to(trt.DataType)
 
     dequantize_layer = ctx.net.add_dequantize(
         qdata_trt,
@@ -229,7 +319,7 @@ def quantize_affine_float8(
     input_tensor: Union[torch.Tensor, TRTTensor],
     scale: Union[np.ndarray, torch.Tensor, TRTTensor],
 ) -> TRTTensor:
-    """Map TorchAO ``quantize_affine_float8_non_decomposed`` to ``IQuantizeLayer``."""
+    """Map TorchAO quantize_affine_float8_non_decomposed to IQuantizeLayer."""
     input_trt = get_trt_tensor(ctx, input_tensor, f"{name}_input")
     scale_trt, axis = _fp8_scale_and_axis(ctx, scale, name)
     quantize_layer = ctx.net.add_quantize(input_trt, scale_trt, trt.DataType.FP8)
@@ -248,7 +338,7 @@ def dequantize_affine_float8(
     scale: Union[np.ndarray, torch.Tensor, TRTTensor],
     output_dtype: torch.dtype = torch.bfloat16,
 ) -> TRTTensor:
-    """Map TorchAO ``dequantize_affine_float8_non_decomposed`` to ``IDequantizeLayer``."""
+    """Map TorchAO dequantize_affine_float8_non_decomposed to IDequantizeLayer."""
     input_trt = get_trt_tensor(ctx, input_tensor, f"{name}_input")
     scale_trt, axis = _fp8_scale_and_axis(ctx, scale, name)
     trt_output_dtype = _enums.dtype._from(output_dtype).to(trt.DataType)
