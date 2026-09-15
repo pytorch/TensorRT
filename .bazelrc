@@ -39,12 +39,13 @@ build:cxx11_abi --define=abi=cxx11_abi
 
 build:jetpack --//toolchains/dep_collection:compute_libs=jetpack
 
-# Native DRIVE OS / Thor build. CUDA_HOME must identify a conventional toolkit
-# root and TORCHTRT_TENSORRT_ROOT must identify the target TensorRT SDK root.
+# Native DRIVE OS / Thor build. The NVIDIA runtime provides the compiler and
+# split header trees; the container provides the visible SBSA target libraries.
 build:driveos --config=linux
 build:driveos --platforms=//toolchains:aarch64_linux
-build:driveos --repo_env=CUDA_HOME
-build:driveos --repo_env=CUDA_PATH
+build:driveos --repo_env=TORCHTRT_TARGET_PLATFORM=driveos
+build:driveos --repo_env=TORCHTRT_DRIVE_CUDA_ROOT
+build:driveos --repo_env=TORCHTRT_DRIVE_CUDA_LIB_DIR
 build:driveos --repo_env=TORCHTRT_TENSORRT_ROOT
 
 build:rtx --//toolchains/dep_collection:compute_libs=rtx
