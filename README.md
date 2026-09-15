@@ -119,12 +119,15 @@ auto results = trt_mod.forward({input_tensor});
 
 ### Building on DRIVE OS
 
-DRIVE OS builds use the platform TensorRT 10.16 installation and a conventional
-CUDA 13.2 toolkit root. Select the DRIVE dependency metadata and native Bazel
-configuration with `TORCHTRT_TARGET_PLATFORM=driveos`:
+DRIVE OS builds use the platform TensorRT 10.16 installation. In an NVIDIA
+runtime-enabled build container, provide the injected DRIVE CUDA root and the
+visible SBSA CUDA target-library directory separately. The build consumes the
+common and Thor-specific header trees directly; it does not require a merged
+CUDA toolkit directory.
 
 ```bash
-CUDA_HOME=/path/to/cuda-13.2-build \
+TORCHTRT_DRIVE_CUDA_ROOT=/path/to/injected/drive-cuda \
+TORCHTRT_DRIVE_CUDA_LIB_DIR=/path/to/sbsa-cuda-target-libraries \
 TORCHTRT_TENSORRT_ROOT=/path/to/tensorrt-10.16-sdk-root \
 TORCHTRT_TARGET_PLATFORM=driveos \
 python -m pip install --pre --editable '.[executorch]' \
@@ -132,9 +135,14 @@ python -m pip install --pre --editable '.[executorch]' \
   --extra-index-url https://pypi.org/simple
 ```
 
-The resulting package requires PyTorch 2.15 nightly and TensorRT 10.16. It does
-not change the default Linux SBSA build, which continues to target the TensorRT
-version recorded in `dev_dep_versions.yml`.
+`TORCHTRT_DRIVE_CUDA_ROOT` must contain
+`targets/aarch64-linux/include`, `thor/targets/aarch64-linux/include`, and
+`bin/nvcc`. `TORCHTRT_DRIVE_CUDA_LIB_DIR` must contain `libcudart.so`. Preserve
+container CUDA libraries outside any path that NVIDIA runtime injection masks.
+
+The resulting package requires PyTorch 2.15 nightly and TensorRT 10.16. The
+DRIVE configuration is opt-in and does not change the conventional CUDA
+repository used by default Linux and SBSA builds.
 
 ### Dependencies
 
