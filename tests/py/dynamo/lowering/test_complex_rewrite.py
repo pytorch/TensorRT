@@ -595,6 +595,74 @@ def test_reshape():
 
 
 @pytest.mark.unit
+def test_reshape_copy():
+    class M(nn.Module):
+        def forward(self, z):
+            return torch.ops.aten._reshape_copy.default(z, [12])
+
+    gm = _export_and_lower(M(), (_z(),))
+    targets = {n.target for n in gm.graph.nodes if n.op == "call_function"}
+    assert torch.ops.aten.view_as_complex.default not in targets
+    assert torch.ops.aten.view_as_real.default not in targets
+    _check_op(M(), (_z(),), "reshape_copy")
+
+
+@pytest.mark.unit
+def test_to_copy_complex_dtype():
+    class M(nn.Module):
+        def forward(self, z):
+            return torch.ops.aten._to_copy.default(z, dtype=torch.complex64)
+
+    # complex64's real counterpart (float32) is TRT-convertible; float64 is not
+    z = torch.randn(3, 4, dtype=torch.complex128)
+    gm = _export_and_lower(M(), (z,))
+    targets = {n.target for n in gm.graph.nodes if n.op == "call_function"}
+    assert torch.ops.aten.view_as_complex.default not in targets
+    assert torch.ops.aten.view_as_real.default not in targets
+    assert any(
+        node.target == torch.ops.aten._to_copy.default
+        and node.kwargs.get("dtype") == torch.float32
+        for node in gm.graph.nodes
+    ), "a complex target must be remapped to its real counterpart"
+    _check_op(M(), (z,), "to_copy_complex_dtype")
+
+
+@pytest.mark.unit
+def test_to_copy_complex_to_real():
+    """z.to(float) discards the imaginary part and the trailing real/imag dim."""
+
+    class M(nn.Module):
+        def forward(self, z):
+            return torch.ops.aten._to_copy.default(z, dtype=torch.float32)
+
+    _check_op(M(), (_z(3, 5),), "to_copy_complex_to_real")  # shape (3,5) so last dim≠2
+
+
+@pytest.mark.unit
+def test_to_copy_complex_to_bool():
+    """bool(0+1j) is True, so the imaginary half alone has to set the result."""
+
+    class M(nn.Module):
+        def forward(self, z):
+            return torch.ops.aten._to_copy.default(z, dtype=torch.bool)
+
+    # len 3 so a surviving [..., 2] layout is a shape mismatch, not a silent pass
+    z = torch.tensor([0 + 1j, 0 + 0j, 2 - 3j], dtype=torch.complex64)
+    _check_op(M(), (z,), "to_copy_complex_to_bool")
+
+
+@pytest.mark.unit
+def test_to_copy_real_to_complex():
+    """x.to(complex) pairs each element with a zero imaginary half."""
+
+    class M(nn.Module):
+        def forward(self, x):
+            return torch.ops.aten._to_copy.default(x, dtype=torch.complex64)
+
+    _check_op(M(), (torch.tensor([1.0, 2.0, 3.0]),), "to_copy_real_to_complex")
+
+
+@pytest.mark.unit
 def test_reshape_batch():
     class M(nn.Module):
         def forward(self, z):
