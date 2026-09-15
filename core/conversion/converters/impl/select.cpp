@@ -162,9 +162,14 @@ auto select_registrations TORCHTRT_UNUSED =
                    // TensorRT-internal squeezeDims assertion at build time on some
                    // platforms (e.g. DGX Spark). Emit an empty constant of the target
                    // shape directly instead, since it has zero elements either way.
-                   auto scalar_type = util::TRTDataTypeToScalarType(in->getType());
-                   auto empty_out = at::empty(util::toVec(squeezed_dims), at::TensorOptions().dtype(scalar_type));
-                   out = tensor_to_const(ctx, empty_out);
+                   // addConstant requires (count > 0) == (values != nullptr), so the
+                   // weights must be null here rather than routed through
+                   // tensor_to_const (whose malloc(0) buffer is non-null).
+                   nvinfer1::Weights empty_weights{in->getType(), nullptr, 0};
+                   auto const_layer = ctx->net->addConstant(squeezed_dims, empty_weights);
+                   TORCHTRT_CHECK(const_layer, "Unable to create empty constant layer from node: " << *n);
+                   const_layer->setName(util::node_info(n).c_str());
+                   out = const_layer->getOutput(0);
                  } else {
                    // IShuffleLayer removes redundant dimensions
                    auto shuffle_layer = ctx->net->addShuffle(*out);
