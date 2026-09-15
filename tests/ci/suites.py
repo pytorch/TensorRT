@@ -237,8 +237,16 @@ _L2: list[Suite] = [
         tier="l2",
         lanes=("full", "nightly"),
         paths=("models/",),
-        markers="not critical",
+        # TorchAO compile tests live in dynamo-torchao.
+        markers="not critical and not torchao",
         jobs=_MODEL,
+    ),
+    Suite(
+        "dynamo-torchao",
+        tier="l2",
+        lanes=("full", "nightly"),
+        paths=("models/test_torchao*.py",),
+        jobs=_HEAVY,
     ),
     Suite(
         "dynamo-llm",
