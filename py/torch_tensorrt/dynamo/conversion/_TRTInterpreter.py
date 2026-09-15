@@ -15,6 +15,7 @@ from typing import (
 )
 
 import numpy as np
+import tensorrt as trt
 import torch
 import torch.fx
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
@@ -52,8 +53,6 @@ from torch_tensorrt.dynamo.utils import (
     validate_optimization_profiles,
 )
 from torch_tensorrt.logging import TRT_LOGGER
-
-import tensorrt as trt
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -675,11 +674,14 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         assert isinstance(target, str)
         submod = self.fetch_attr(target)
         submod_type = getattr(submod, "_base_class_origin", type(submod))
-        if self.compilation_settings.torch_executed_modules and node_in_torch_executed_module(
-            self._cur_node, self.compilation_settings.torch_executed_modules
+        if self._cur_node is not None and (
+            self.compilation_settings.torch_executed_modules
+            and node_in_torch_executed_module(
+                self._cur_node, self.compilation_settings.torch_executed_modules
+            )
         ):
             raise UnsupportedOperatorException(
-                f"Node {self._cur_node.name} is in a torch_executed_modules module and cannot be "
+                f"Node {self._cur_node_name} is in a torch_executed_modules module and cannot be "
                 "converted to TRT. Use torch_tensorrt.compile() to partition and run selected "
                 "modules in PyTorch."
             )
@@ -700,11 +702,14 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             return converter(self.ctx, submod, args, kwargs, self._cur_node_name)
 
     def call_function(self, target: str, args: Any, kwargs: Any) -> Any:
-        if self.compilation_settings.torch_executed_modules and node_in_torch_executed_module(
-            self._cur_node, self.compilation_settings.torch_executed_modules
+        if self._cur_node is not None and (
+            self.compilation_settings.torch_executed_modules
+            and node_in_torch_executed_module(
+                self._cur_node, self.compilation_settings.torch_executed_modules
+            )
         ):
             raise UnsupportedOperatorException(
-                f"Node {self._cur_node.name} is in a torch_executed_modules module and cannot be "
+                f"Node {self._cur_node_name} is in a torch_executed_modules module and cannot be "
                 "converted to TRT. Use torch_tensorrt.compile() to partition and run selected "
                 "modules in PyTorch."
             )
