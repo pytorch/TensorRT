@@ -374,6 +374,11 @@ def gen_version_file():
 
     with open(dir_path + "/torch_tensorrt/_version.py", "w") as f:
         print("creating version file")
+        f.write(
+            "# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & "
+            "AFFILIATES. All rights reserved.\n"
+        )
+        f.write("# SPDX-License-Identifier: BSD-3-Clause\n\n")
         f.write('__version__ = "' + __version__ + '"\n')
         f.write('__cuda_version__ = "' + __cuda_version__ + '"\n')
         f.write('__tensorrt_version__ = "' + __tensorrt_version__ + '"\n')
