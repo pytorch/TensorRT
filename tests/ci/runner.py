@@ -12,7 +12,6 @@ import os
 import re
 import shlex
 import subprocess
-import sys
 from pathlib import Path
 
 from .suites import SUITES, Suite, Variant, by_name
@@ -312,6 +311,8 @@ def select(
         if aff is not None:  # None → a broad change → do not narrow
             pool = [s for s in pool if s.name in aff]
     for s in pool:
+        if s.manual and not names:
+            continue
         if lane is not None and lane not in s.lanes:
             continue
         if tier is not None and s.tier != tier:
@@ -325,7 +326,15 @@ def select(
     return jobs
 
 
-def matrix(**filters: str | None) -> list[dict[str, str]]:
+def matrix(
+    *,
+    lane: str | None = None,
+    tier: str | None = None,
+    variant: str | None = None,
+    platform: str | None = None,
+    names: list[str] | None = None,
+    changed: list[str] | None = None,
+) -> list[dict[str, str]]:
     """GitHub-Actions matrix ``include`` entries for the selected jobs."""
     return [
         {
@@ -338,5 +347,12 @@ def matrix(**filters: str | None) -> list[dict[str, str]]:
             # hardware (e.g. multi-GPU for distributed).
             "runner": s.for_variant(var)["runner"] or "",
         }
-        for s, var in select(**filters)
+        for s, var in select(
+            lane=lane,
+            tier=tier,
+            variant=variant,
+            platform=platform,
+            names=names,
+            changed=changed,
+        )
     ]

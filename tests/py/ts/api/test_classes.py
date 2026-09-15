@@ -1,4 +1,3 @@
-import copy
 import unittest
 from typing import Dict
 
@@ -15,7 +14,7 @@ class TestInput(unittest.TestCase):
     def _verify_correctness(self, struct: torchtrt.Input, target: Dict) -> bool:
         internal = struct._to_internal()
 
-        list_eq = lambda al, bl: all([a == b for (a, b) in zip(al, bl)])
+        list_eq = lambda al, bl: all(a == b for (a, b) in zip(al, bl))
 
         eq = lambda a, b: a == b
 
