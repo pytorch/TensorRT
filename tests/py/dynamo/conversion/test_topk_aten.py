@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt import Input
 
 from .harness import DispatchTestCase
 
@@ -31,6 +32,33 @@ class TestSortConverter(DispatchTestCase):
             Topk(),
             inputs,
             enable_passes=True,
+        )
+
+
+class TestTopk1DConverter(DispatchTestCase):
+    def test_topk_1d_values_and_indices_match_eager(self):
+        class Topk(nn.Module):
+            def forward(self, x):
+                return torch.ops.aten.topk.default(x, 3)
+
+        inputs = [torch.tensor([4.0, 1.0, 7.0, 2.0, 9.0, 3.0])]
+        self.run_test(Topk(), inputs, enable_passes=True)
+
+    def test_topk_1d_dynamic_values_and_indices_match_eager(self):
+        class Topk(nn.Module):
+            def forward(self, x):
+                return torch.ops.aten.topk.default(x, 3)
+
+        input_specs = [
+            Input(
+                min_shape=(3,),
+                opt_shape=(6,),
+                max_shape=(9,),
+                dtype=torch.float32,
+            )
+        ]
+        self.run_test_with_dynamic_shape(
+            Topk(), input_specs, enable_passes=True, use_dynamo_tracer=True
         )
 
 
