@@ -3,7 +3,6 @@
 
 from copy import deepcopy
 
-import numpy as np
 import pytest
 import torch
 import torch.nn.functional as F
@@ -11,8 +10,6 @@ import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo import partitioning
-
-from ..testing_utilities import lower_graph_testing
 
 
 class TestGlobalPartitioning(TestCase):
