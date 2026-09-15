@@ -461,6 +461,7 @@ def run_shape_analysis(
 def get_graph_converter_support(
     graph_module: torch.fx.GraphModule,
     torch_executed_ops: Optional[Set[str]] = None,
+    torch_executed_modules: Optional[Collection[str]] = None,
 ) -> Tuple[int, int]:
     """Helper function to get converter support overview pre-partitioning
 
@@ -468,11 +469,14 @@ def get_graph_converter_support(
         graph_module: FX GraphModule to determine support for
         verbose: Bool representing whether to print operator support
         torch_executed_ops: Collection of operations to run in Torch, regardless of converter coverage
+        torch_executed_modules: Collection of module class names to run in Torch
     Returns:
         The number of supported call_function nodes in the graph
     """
     number_of_supported_nodes, total_functional_nodes, _ = (
-        get_graph_converter_support_overview(graph_module, torch_executed_ops)
+        get_graph_converter_support_overview(
+            graph_module, torch_executed_ops, torch_executed_modules
+        )
     )
     return number_of_supported_nodes, total_functional_nodes
 
@@ -480,6 +484,7 @@ def get_graph_converter_support(
 def get_graph_converter_support_overview(
     graph_module: torch.fx.GraphModule,
     torch_executed_ops: Optional[Set[str]] = None,
+    torch_executed_modules: Optional[Collection[str]] = None,
 ) -> Tuple[int, int, "TorchTensorRTOperatorSupport"]:
     """As get_graph_converter_support, but also returns the operator support object,
     which holds *which* operators are unsupported rather than just how many
@@ -487,7 +492,10 @@ def get_graph_converter_support_overview(
     from ._global_partitioner import TorchTensorRTOperatorSupport
 
     # Instantiate operator support object and module dictionary
-    op_support = TorchTensorRTOperatorSupport(torch_executed_ops=torch_executed_ops)
+    op_support = TorchTensorRTOperatorSupport(
+        torch_executed_ops=torch_executed_ops,
+        torch_executed_modules=torch_executed_modules,
+    )
     module_dict = dict(graph_module.named_modules())
 
     number_of_supported_nodes = 0
