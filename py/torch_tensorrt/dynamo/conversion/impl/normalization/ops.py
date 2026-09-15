@@ -643,6 +643,31 @@ def tri_upper_indices(
     return indices_tensor.get_output(0)
 
 
+#: Above this many rows in either operand, cdist_forward computes p == 2 with a
+#: matrix-multiply layer instead of a broadcast subtract.
+CDIST_MATMUL_ROW_THRESHOLD = 25
+
+
+def cdist_emits_matmul(
+    p: float,
+    compute_mode: Optional[int],
+    rows: Sequence[Optional[int]],
+) -> bool:
+    """Would :func:`cdist_forward` emit a matrix-multiply layer for these arguments?
+
+    ``rows`` is ``shape[-2]`` of each operand, or ``None`` where it is not statically
+    known; an unknown row count is treated as below the threshold, so callers that
+    cannot see shapes fail open.
+    """
+    if p != 2:
+        return False
+    if compute_mode == 1:
+        return True
+    if compute_mode in (0, None):
+        return any(r is not None and r > CDIST_MATMUL_ROW_THRESHOLD for r in rows)
+    return False
+
+
 def cdist_forward(
     ctx: ConversionContext,
     target: Target,
@@ -669,7 +694,8 @@ def cdist_forward(
         p (float): p value for the p-norm distance to calculate between each vector pair
         compute_mode (int): Controls the computation method based on the size of the input sets:
             - None ('use_mm_for_euclid_dist_if_necessary'): Default mode. Uses matrix multiplication to calculate
-              Euclidean distance (p=2) if either the number of vectors in x1 or x2 exceeds 25 (P > 25 or R > 25).
+              Euclidean distance (p=2) if the number of vectors in x1 or x2 exceeds
+              CDIST_MATMUL_ROW_THRESHOLD.
             - 1 ('use_mm_for_euclid_dist'): Always use matrix multiplication approach to calculate
             euclidean distance (p = 2)
             - 2 ('donot_use_mm_for_euclid_dist'): Never use matrix multiplication approach to calculate
@@ -725,9 +751,7 @@ def cdist_forward(
             ctx, target, source_ir, f"{name}_sum", abs_val, dim=-1, keepdim=False
         )
     elif p == 2:
-        if (
-            compute_mode == 0 and (x1.shape[-2] > 25 or x2.shape[-2] > 25)
-        ) or compute_mode == 1:
+        if cdist_emits_matmul(p, compute_mode, (x1.shape[-2], x2.shape[-2])):
             # Compute squared elements
             x1_squared = impl.elementwise.pow(
                 ctx, target, source_ir, f"{name}_x1_squared", x1, 2

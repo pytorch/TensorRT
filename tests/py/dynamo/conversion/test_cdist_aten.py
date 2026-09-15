@@ -2,8 +2,11 @@ import torch
 import torch.nn as nn
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt.dynamo.conversion.impl.normalization.ops import (
+    cdist_emits_matmul,
+)
 
-from .harness import DispatchTestCase
+from .harness import DispatchTestCase, skip_if_trt_rtx_turing
 
 
 class TestCdistConverter(DispatchTestCase):
@@ -21,6 +24,9 @@ class TestCdistConverter(DispatchTestCase):
         ]
     )
     def test_cdist_float_same_shape(self, name, shape, p, compute_mode):
+        if cdist_emits_matmul(p, compute_mode, (shape[-2], shape[-2])):
+            skip_if_trt_rtx_turing(self, "cdist whose converter emits a GEMM")
+
         class Cdist(nn.Module):
             def forward(self, x1, x2):
                 return torch.ops.aten._cdist_forward.default(x1, x2, p, compute_mode)
@@ -47,6 +53,9 @@ class TestCdistConverter(DispatchTestCase):
     def test_cdist_float_broadcast_and_diff_shape(
         self, name, shape_1, shape_2, p, compute_mode
     ):
+        if cdist_emits_matmul(p, compute_mode, (shape_1[-2], shape_2[-2])):
+            skip_if_trt_rtx_turing(self, "cdist whose converter emits a GEMM")
+
         class Cdist(nn.Module):
             def forward(self, x1, x2):
                 return torch.ops.aten._cdist_forward.default(x1, x2, p, compute_mode)
@@ -59,16 +68,19 @@ class TestCdistConverter(DispatchTestCase):
 
     @parameterized.expand(
         [
-            ("compute_mode_0", (15, 10, 5), (15, 35, 5), 2.0, 0),
-            ("compute_mode_1", (35, 35, 5), (35, 45, 5), 2.0, 0),
-            ("compute_mode_2", (15, 10, 5), (15, 35, 5), 2.0, 1),
-            ("compute_mode_3", (35, 35, 5), (35, 45, 5), 2.0, 2),
+            ("mode_0_one_operand_above_threshold", (15, 10, 5), (15, 35, 5), 2.0, 0),
+            ("mode_0_both_operands_above_threshold", (35, 35, 5), (35, 45, 5), 2.0, 0),
+            ("mode_1_always_matmul", (15, 10, 5), (15, 35, 5), 2.0, 1),
+            ("mode_2_never_matmul", (35, 35, 5), (35, 45, 5), 2.0, 2),
             ("p_2_mm_shape_1", (2, 2, 14, 5), (3, 5), 2, 1),
             ("p_2_mm_shape_2", (2, 2, 14, 5), (2, 3, 5), 2, 1),
             ("p_2_mm_shape_3", (2, 2, 14, 5), (2, 2, 3, 5), 2, 1),
         ]
     )
     def test_cdist_p_2_compute_mode(self, name, shape_1, shape_2, p, compute_mode):
+        if cdist_emits_matmul(p, compute_mode, (shape_1[-2], shape_2[-2])):
+            skip_if_trt_rtx_turing(self, "cdist whose converter emits a GEMM")
+
         class Cdist(nn.Module):
             def forward(self, x1, x2):
                 return torch.ops.aten._cdist_forward.default(x1, x2, p, compute_mode)
@@ -85,6 +97,9 @@ class TestCdistConverter(DispatchTestCase):
     def test_cdist_efficiency_p_2_compute_mode(
         self, name, shape_1, shape_2, p, compute_mode
     ):
+        if cdist_emits_matmul(p, compute_mode, (shape_1[-2], shape_2[-2])):
+            skip_if_trt_rtx_turing(self, "cdist whose converter emits a GEMM")
+
         class Cdist(nn.Module):
             def forward(self, x1, x2):
                 return torch.ops.aten._cdist_forward.default(x1, x2, p, compute_mode)
