@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 from dataclasses import dataclass
 
 from torch_tensorrt.dynamo._defaults import DEBUG_LOGGING_DIR

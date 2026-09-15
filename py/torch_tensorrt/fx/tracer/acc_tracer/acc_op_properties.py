@@ -1,5 +1,8 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 from collections import defaultdict
-from enum import auto, Flag
+from enum import Flag, auto
 from typing import Callable, DefaultDict, Set
 
 import torch

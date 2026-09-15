@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """Drop CUDA architectures ExecuTorch's shims cannot compile for.
 
 The shims call ``__dp4a``, which nvcc does not declare before sm_61, so a list carrying

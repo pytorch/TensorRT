@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """Tests for the bool/int index.Tensor converter split (commit b91168b).
 
 Verifies that:
@@ -16,7 +19,6 @@ import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import ENABLED_FEATURES
-
 from torch_tensorrt.dynamo.conversion.aten_ops_converters import (
     index_has_bool_indices,
     index_nonbool_validator,

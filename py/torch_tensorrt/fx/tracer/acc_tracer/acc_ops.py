@@ -1,13 +1,15 @@
 # encoding: utf-8
+
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 import logging
 import operator
 import warnings
-
-import torch  # isort:skip
-from typing import cast, Iterable, List, Optional, Sequence
+from typing import Iterable, List, Optional, Sequence, cast
 
 import torch.nn as nn
-from torch.fx.passes.shape_prop import _extract_tensor_metadata, TensorMetadata
+from torch.fx.passes.shape_prop import TensorMetadata, _extract_tensor_metadata
 
 from . import acc_utils
 from .acc_normalizer import (
@@ -16,6 +18,10 @@ from .acc_normalizer import (
     register_custom_acc_mapper_fn,
 )
 from .acc_op_properties import AccOpProperty, register_acc_op_properties
+
+import torch  # isort:skip
+
+
 
 logger: logging.Logger = logging.getLogger(__name__)
 

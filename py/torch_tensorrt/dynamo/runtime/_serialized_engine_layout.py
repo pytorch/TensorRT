@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """Serialized TensorRT engine blob layout shared by C++ and Python runtimes.
 
 Field order and indices must stay aligned with ``core/runtime/runtime.h`` and

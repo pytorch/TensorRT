@@ -1,8 +1,10 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """End-to-end tests for torch_tensorrt.kernels.cuda_kernel_op."""
 
 import pytest
 import torch
-
 import torch_tensorrt
 import torch_tensorrt.kernels as ttk
 from torch_tensorrt.kernels._derive import _torch_output_shape_dtype

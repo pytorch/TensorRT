@@ -1,7 +1,11 @@
-import torch
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 import copy
-import torchvision
+
+import torch
 import torch_tensorrt
+import torchvision
 from torch_tensorrt.fx import InputTensorSpec
 
 

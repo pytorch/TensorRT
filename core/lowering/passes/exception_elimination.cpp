@@ -1,3 +1,8 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+
 #include "torch/csrc/jit/ir/alias_analysis.h"
 #include "torch/csrc/jit/jit_log.h"
 #include "torch/csrc/jit/passes/constant_pooling.h"

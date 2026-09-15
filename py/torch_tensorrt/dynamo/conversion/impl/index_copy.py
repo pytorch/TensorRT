@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """TensorRT conversion for ``aten.index_copy.default``.
 
 Mirrors the structure of ``slice_scatter`` but the eligibility check is
@@ -26,6 +29,8 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
+import tensorrt as trt
+from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -34,9 +39,6 @@ from torch_tensorrt.dynamo.conversion.impl import select
 from torch_tensorrt.dynamo.conversion.impl.slice_scatter import (
     emit_kv_cache_update_layer,
 )
-
-import tensorrt as trt
-from tensorrt import ITensor as TRTTensor
 
 logger = logging.getLogger(__name__)
 

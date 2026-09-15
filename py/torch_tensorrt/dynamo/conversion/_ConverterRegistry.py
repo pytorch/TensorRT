@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 from __future__ import annotations
 
 import functools
@@ -18,14 +21,13 @@ from typing import (
     cast,
 )
 
+import tensorrt as trt
 import torch
 from torch import SymBool, SymFloat, SymInt
 from torch._ops import OpOverloadPacket
 from torch.fx.node import Argument, Node, Target, _get_qualified_name
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
-
-import tensorrt as trt
 
 logger = logging.getLogger(__name__)
 

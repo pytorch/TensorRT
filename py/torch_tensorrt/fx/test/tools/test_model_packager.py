@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 import io
 import unittest
 
@@ -6,8 +9,8 @@ import torch.fx
 from torch import nn
 from torch.package import PackageImporter
 from torch_tensorrt.fx.tools.model_packager import (
-    generate_standalone_repro,
     ModelPackager,
+    generate_standalone_repro,
 )
 
 

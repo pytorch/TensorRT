@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 import inspect
 import itertools
 import logging
@@ -12,7 +15,6 @@ from sympy import lambdify
 from torch._dynamo.source import LocalSource
 from torch._subclasses.fake_tensor import FakeTensorMode
 from torch.fx.experimental.symbolic_shapes import DimDynamic, ShapeEnv
-
 from torch_tensorrt._features import needs_qdp_plugin
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """Tests for cross-runtime save/load of .pt2 TRT artifacts.
 
 Verifies that an ExportedProgram saved with the C++ Torch-TensorRT runtime can

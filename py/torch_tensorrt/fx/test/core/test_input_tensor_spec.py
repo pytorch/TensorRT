@@ -1,10 +1,13 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 # Owner(s): ["oncall: gpu_enablement"]
 
 from typing import List, Optional
 
 import torch
-from torch.testing._internal.common_utils import run_tests, TestCase
-from torch_tensorrt.fx import generate_input_specs, InputTensorSpec, LowerSetting
+from torch.testing._internal.common_utils import TestCase, run_tests
+from torch_tensorrt.fx import InputTensorSpec, LowerSetting, generate_input_specs
 
 
 class TestTRTModule(TestCase):

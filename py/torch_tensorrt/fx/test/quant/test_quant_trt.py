@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 # Owner(s): ["oncall: quantization"]
 
 import copy
@@ -9,12 +12,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.quantized._reference as nnqr
-
 import torch_tensorrt.fx.tracer.acc_tracer.acc_tracer as acc_tracer
 from torch.ao.quantization import default_qconfig
 from torch.ao.quantization.backend_config import (
-    get_tensorrt_backend_config_dict,
     ObservationType,
+    get_tensorrt_backend_config_dict,
 )
 from torch.ao.quantization.fx.match_utils import MatchAllNode
 from torch.ao.quantization.quantize_fx import (
@@ -23,8 +25,8 @@ from torch.ao.quantization.quantize_fx import (
     prepare_qat_fx,
 )
 from torch.testing._internal.common_cuda import TEST_CUDA
+from torch.testing._internal.common_quantization import NodeSpec as ns
 from torch.testing._internal.common_quantization import (
-    NodeSpec as ns,
     QuantizationTestCase,
 )
 from torch.testing._internal.common_utils import run_tests

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 import typing as t
 from copy import deepcopy
 from dataclasses import dataclass, field, replace
@@ -5,9 +8,9 @@ from dataclasses import dataclass, field, replace
 import torch
 import torch._dynamo as torchdynamo
 import torchvision
+from torch._dynamo.optimizations import backends
 from torch_tensorrt.fx.lower import compile
 from torch_tensorrt.fx.utils import LowerPrecision
-from torch._dynamo.optimizations import backends
 
 """
 The purpose of this example is to demostrate the lowering flow to TRT and Torchdynamo

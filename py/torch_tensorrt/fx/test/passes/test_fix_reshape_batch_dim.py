@@ -1,17 +1,20 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 # Owner(s): ["oncall: gpu_enablement"]
 
 import logging
 from copy import deepcopy
-from packaging import version
 
 import torch
 import torch.fx as fx
 import torch.nn as nn
-
-from torch.testing._internal.common_utils import run_tests, TestCase
+from torch.testing._internal.common_utils import TestCase, run_tests
+from torch_tensorrt._utils import sanitized_torch_version
 from torch_tensorrt.fx.passes.lower_basic_pass import fix_reshape_batch_dim
 from torch_tensorrt.fx.tracer.acc_tracer import acc_tracer
-from torch_tensorrt._utils import sanitized_torch_version
+
+from packaging import version
 
 _LOGGER = logging.getLogger(__name__)
 

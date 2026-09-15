@@ -1,10 +1,12 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 import operator
 from typing import Optional, cast
 
-from torch_tensorrt.dynamo.lowering._SubgraphBuilder import SubgraphBuilder
-
 import torch
 from torch.fx import GraphModule, Node
+from torch_tensorrt.dynamo.lowering._SubgraphBuilder import SubgraphBuilder
 
 from .pass_utils import clean_up_graph_after_modifications
 

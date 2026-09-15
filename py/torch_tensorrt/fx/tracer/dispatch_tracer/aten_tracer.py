@@ -1,17 +1,20 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 import copy
 import sys
 from contextlib import contextmanager
 from typing import Any, Callable, Dict, Generator, List, Optional, Set, Tuple, Union
-from packaging import version
-from torch_tensorrt._utils import sanitized_torch_version
 
 import torch
+from torch_tensorrt._utils import sanitized_torch_version
+
+from packaging import version
 
 if version.parse(sanitized_torch_version()) >= version.parse("2.dev"):
     import torch._dynamo as torchdynamo
 
 from torch.fx.passes.infra.pass_base import PassResult
-from torch_tensorrt.fx.utils import req_torch_version
 from torch_tensorrt.fx.passes.lower_basic_pass_aten import (
     compose_bmm,
     compose_chunk,
@@ -25,6 +28,7 @@ from torch_tensorrt.fx.passes.lower_basic_pass_aten import (
     replace_transpose_mm_op_with_linear,
     run_const_fold,
 )
+from torch_tensorrt.fx.utils import req_torch_version
 from typing_extensions import TypeAlias
 
 Value: TypeAlias = Union[

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 from __future__ import annotations
 
 import logging
@@ -273,8 +276,8 @@ def _apply_weight_streaming_budget(
     """
     from executorch.exir.backend.compile_spec_schema import CompileSpec
     from torch_tensorrt.executorch.partitioner import (
-        normalize_weight_streaming_budget_per_engine,
         WEIGHT_STREAMING_BUDGET_COMPILE_SPEC_KEY,
+        normalize_weight_streaming_budget_per_engine,
     )
 
     for name, specs in method_compile_specs.items():

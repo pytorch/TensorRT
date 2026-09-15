@@ -1,9 +1,11 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 import unittest
 
 import tensorrt as trt
 import torch
 import torch.nn as nn
-
 import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests

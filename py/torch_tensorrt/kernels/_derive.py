@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """Derivation engine behind :func:`cuda_kernel_op`.
 
 Given a :class:`KernelSpec`, this module builds the runtime artifacts that
@@ -17,7 +20,6 @@ import textwrap
 from typing import Any, Callable, Dict, List, Sequence, Tuple
 
 import torch
-
 from torch_tensorrt.kernels._cuda_python_spec import _default_cuda_include_paths
 from torch_tensorrt.kernels._dsl import (
     Custom,

@@ -1,9 +1,11 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 import os
 import sys
 from typing import Any
 
 import torch.fx
-
 import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from torch.fx.passes import shape_prop
 

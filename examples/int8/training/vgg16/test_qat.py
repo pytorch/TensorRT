@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 import argparse
 import os
 
@@ -5,13 +8,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.data as data
-import torchvision.transforms as transforms
 import torchvision.datasets as datasets
-
-from vgg16 import vgg16
-
-from pytorch_quantization import quant_modules
+import torchvision.transforms as transforms
 from pytorch_quantization import nn as quant_nn
+from pytorch_quantization import quant_modules
+from vgg16 import vgg16
 
 
 def test(model, dataloader, crit):

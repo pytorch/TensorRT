@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 # Owner(s): ["oncall: gpu_enablement"]
 import functools
 import glob
@@ -9,7 +12,6 @@ from typing import Union
 from unittest import TestCase
 
 import torch_tensorrt.fx.diagnostics as diag
-
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 

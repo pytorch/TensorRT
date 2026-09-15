@@ -1,7 +1,9 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 from typing import Callable, Optional
 
 from torch.fx.node import Node
-
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import ConverterPriority
 from torch_tensorrt.dynamo.conversion.plugins._generate_plugin import generate_plugin

@@ -1,10 +1,12 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 # Owner(s): ["oncall: fx"]
 
 import operator
 import unittest
 
 import torch
-
 import torch_tensorrt.fx.tracer.acc_tracer.acc_shape_prop as acc_shape_prop
 import torch_tensorrt.fx.tracer.acc_tracer.acc_tracer as acc_tracer
 from parameterized import param, parameterized

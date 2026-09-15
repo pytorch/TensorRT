@@ -1,21 +1,25 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 # Owner(s): ["oncall: gpu_enablement"]
 
 import operator
-
-import torch  # isort:skip
-import torch.fx  # isort:skip
 
 import torch.fx.passes.operator_support as op_support
 import torch.fx.passes.shape_prop as shape_prop
 import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from torch.fx.passes import splitter_base
-from torch.testing._internal.common_utils import run_tests, TestCase
+from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.fx.tools.trt_splitter import (
-    create_trt_operator_support,
     TRTSplitter,
     TRTSplitterSetting,
+    create_trt_operator_support,
 )
 from torch_tensorrt.fx.tracer.acc_tracer import acc_tracer
+
+import torch  # isort:skip
+import torch.fx  # isort:skip
+
 
 ERROR_MSG_NO_ACC_MODULE = "FX split failed: Did not find any ACC submodule!"
 ERROR_MSG_MULTI_ACC_MODULES = "FX split failed: Found more than one ACC submodules!"

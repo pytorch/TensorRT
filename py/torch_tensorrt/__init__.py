@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 import ctypes
 import logging
 import os
@@ -96,14 +99,14 @@ if ENABLED_FEATURES.fx_frontend:
     from torch_tensorrt import fx
 
 if ENABLED_FEATURES.dynamo_frontend:
-    from torch_tensorrt.dynamo import backend  # noqa: F401
     from torch_tensorrt import dynamo  # noqa: F401
+    from torch_tensorrt.dynamo import backend  # noqa: F401
 
 if ENABLED_FEATURES.qdp_plugin:
     from torch_tensorrt import kernels  # noqa: F401
 
-from torch_tensorrt._compile import *  # noqa: F403
 from torch_tensorrt import distributed  # noqa: F401
+from torch_tensorrt._compile import *  # noqa: F403
 from torch_tensorrt.dynamo.runtime._MutableTorchTensorRTModule import (
     MutableTorchTensorRTModule,
 )
