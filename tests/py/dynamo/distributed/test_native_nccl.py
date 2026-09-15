@@ -2143,9 +2143,10 @@ def _multirank_compute_collective_single_engine(
     break, no second engine, no fallback to the PyTorch collective -- and produce the
     same values as eager.
 
-    This also covers the converter setting ``num_ranks`` before the output is
-    requested: without it the build fails in Myelin shape inference rather than
-    producing a wrong answer, so a green result here means that ordering held.
+    Built in fp32 rather than bf16: the distributed CI lane runs on T4 (``linux.g4dn``),
+    where a bf16 network fails to build outright with "Networks with BF16 precision
+    require hardware with BF16 support". Nothing here is precision-specific -- the point
+    is that the collective stays inside the single engine and the numbers match eager.
     """
     import torch_tensorrt
     from torch_tensorrt.distributed._distributed import distributed_context
@@ -2175,9 +2176,9 @@ def _multirank_compute_collective_single_engine(
             return self.fc_out(x * self.gain - self.bias + residual)
 
     torch.manual_seed(42)
-    model = ComputeCollective().to(device=device, dtype=torch.bfloat16).eval()
+    model = ComputeCollective().to(device=device, dtype=torch.float32).eval()
     torch.manual_seed(1234 + rank)
-    inp = torch.randn(batch, sequence, hidden, device=device, dtype=torch.bfloat16)
+    inp = torch.randn(batch, sequence, hidden, device=device, dtype=torch.float32)
     residual = torch.randn_like(inp)
 
     with torch.no_grad():
@@ -2205,7 +2206,7 @@ def _multirank_compute_collective_single_engine(
 
             trt_out = trt_model(inp, residual)
 
-    torch.testing.assert_close(trt_out, eager_out, atol=2e-2, rtol=2e-2)
+    torch.testing.assert_close(trt_out, eager_out, atol=1e-3, rtol=1e-3)
     print(
         f"[Rank {rank}] PASS compute+collective single-engine regression",
         flush=True,
