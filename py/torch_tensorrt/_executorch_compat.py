@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """Compatibility for the deprecated torch_tensorrt.load(format='executorch') API."""
 
 from __future__ import annotations

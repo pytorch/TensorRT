@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """Run a device-resident .pte and prove the method boundary did not copy.
 
 The program this loads was exported with ``skip_h2d_for_method_inputs`` and
