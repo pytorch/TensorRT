@@ -2434,9 +2434,12 @@ def test_suite_validation_check_detects_removed_validator(monkeypatch, field, va
     [
         ("schedule", "refs/heads/main", "", "nightly", "false"),
         # An open release branch follows ExecuTorch's own releases until it is tagged.
-        ("schedule", "refs/heads/release/2.14", "", "stable", "false"),
+        # A schedule reaches only the default branch, so a release branch is dispatch-only.
+        ("schedule", "refs/heads/release/2.14", "", "", "false"),
         # Once the release is tagged its pin is history and must not move.
         ("schedule", "refs/heads/release/2.14", "", "", "true"),
+        # The shipped-release guard now sits where it can actually fire.
+        ("workflow_dispatch", "refs/heads/release/2.14", "stable", None, "true"),
         # A branch that only looks like a release must not be treated as one.
         (
             "schedule",
@@ -2507,3 +2510,4 @@ def test_the_stable_track_may_repin_below_an_inherited_nightly() -> None:
     )
     assert '"$TRACK" = "stable"' in step["run"], step["run"]
     assert "--allow-downgrade" in step["run"], step["run"]
+

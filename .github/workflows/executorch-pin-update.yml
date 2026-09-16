@@ -7,9 +7,9 @@ name: Update ExecuTorch pin
 # guards and the executorch end-to-end lane decide whether the new wheel is usable before
 # it reaches main.
 #
-# On a release branch the schedule is a no-op: a release pins a stable ExecuTorch and does
-# not drift. Re-pinning there is a manual dispatch with track=stable, which is the only way
-# the pin moves once a branch is cut.
+# A schedule reaches only the default branch, so this never fires on a release branch at all.
+# Re-pinning a cut release is a manual dispatch with track=stable, and it refuses once that
+# release has a final tag, because a shipped pin is history.
 
 on:
   schedule:
@@ -65,29 +65,31 @@ jobs:
         run: |
           set -euo pipefail
           # A release branch may only take a stable line: a nightly would drift a cut release onto
-          # an unreleased ExecuTorch. The schedule takes nightly on main and stable on a release
-          # branch that has not shipped, so an open release follows ExecuTorch's own releases.
+          # an unreleased ExecuTorch. A schedule reaches only the default branch, so re-pinning a
+          # release branch is always a manual dispatch and that is where its guards belong.
           # Trigger values arrive through env, so a crafted ref is shell data, not shell source.
           if [ "$EVENT" = "workflow_dispatch" ]; then
             if [ "$TRACK" = "nightly" ] && [ "$REF" != "refs/heads/main" ]; then
               echo "refusing to pin $REF to a nightly; re-run with track=stable" >&2
               exit 1
             fi
+            case "${REF#refs/heads/}" in
+              release/*)
+                # Once a release ships its pin is history. A candidate tag is not a release, so
+                # match a final tag only, or a dispatch during a release candidate would refuse.
+                version="${REF#refs/heads/release/}"
+                if [ "${RELEASE_TAGGED:-}" = "true" ] ||
+                   { [ -z "${RELEASE_TAGGED:-}" ] &&
+                     git ls-remote --tags origin "v${version}.*" 2>/dev/null |
+                       grep -qE "refs/tags/v${version}\.[0-9]+$"; }; then
+                  echo "release $version already has a tag; its pin stays as shipped" >&2
+                  exit 1
+                fi
+                ;;
+            esac
             echo "track=$TRACK" >> "$GITHUB_OUTPUT"
           elif [ "$REF" = "refs/heads/main" ]; then
             echo "track=nightly" >> "$GITHUB_OUTPUT"
-          elif [ "${REF#refs/heads/}" != "$REF" ] &&
-               printf '%s' "${REF#refs/heads/}" | grep -qE '^release/[0-9]+\.[0-9]+$'; then
-            # Only while the release is still open. Once it is tagged the pin is history.
-            version="${REF#refs/heads/release/}"
-            if [ "${RELEASE_TAGGED:-}" = "true" ] ||
-               { [ -z "${RELEASE_TAGGED:-}" ] &&
-                 git ls-remote --exit-code --tags origin "v${version}.*" >/dev/null 2>&1; }; then
-              echo "release $version already has a tag; its pin stays as shipped"
-              echo "track=" >> "$GITHUB_OUTPUT"
-            else
-              echo "track=stable" >> "$GITHUB_OUTPUT"
-            fi
           else
             echo "no scheduled pin update on $REF"
             echo "track=" >> "$GITHUB_OUTPUT"
