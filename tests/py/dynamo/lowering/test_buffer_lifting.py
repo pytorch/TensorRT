@@ -39,6 +39,7 @@ from torch_tensorrt.dynamo.lowering._buffer_lifting import (
     aliased_input_bindings,
     assert_no_kv_alias_markers_survived,
     assert_predicted_kv_aliased,
+    erase_export_guards,
     hide_copyback_outputs,
     inline_lifted_buffers_into_gm,
     lift_mutated_buffers,
@@ -1749,6 +1750,28 @@ class TestCompileSeam(TestCase):
         model, args = self._kv_model(1)
 
         self._compile(model, args, dryrun=True, min_block_size=1)
+
+
+class TestEraseExportGuards(TestCase):
+    def test_erase_guards_fn_from_exported_module(self):
+        class Add(torch.nn.Module):
+            def forward(self, x):
+                return x + x
+
+        gm = export(Add(), (torch.ones(2, 2),)).module()
+        had_guard = any(
+            n.op == "call_module" and n.target == "_guards_fn" for n in gm.graph.nodes
+        )
+        if not had_guard:
+            self.skipTest("this PyTorch export did not emit _guards_fn")
+        gm = erase_export_guards(gm)
+        self.assertFalse(
+            any(
+                n.op == "call_module" and n.target == "_guards_fn"
+                for n in gm.graph.nodes
+            )
+        )
+        self.assertNotIn("_guards_fn", dict(gm.named_children()))
 
 
 if __name__ == "__main__":
