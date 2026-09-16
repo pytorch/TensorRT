@@ -412,6 +412,7 @@ def cross_compile_for_windows(
         decompose_attention=decompose_attention,
         use_distributed_mode_trace=use_distributed_mode_trace,
         use_fp32_acc=use_fp32_acc,
+        enable_autocast=settings.enable_autocast,
     )
 
     gm = exported_program.module()
@@ -861,6 +862,7 @@ def compile(
         decompose_attention=decompose_attention,
         use_distributed_mode_trace=use_distributed_mode_trace,
         use_fp32_acc=use_fp32_acc,
+        enable_autocast=enable_autocast,
     )
 
     gm = exported_program.module()
@@ -2261,6 +2263,7 @@ def convert_exported_program_to_serialized_trt_engine(
         decompose_attention=decompose_attention,
         use_distributed_mode_trace=use_distributed_mode_trace,
         use_fp32_acc=use_fp32_acc,
+        enable_autocast=settings.enable_autocast,
     )
 
     gm = exported_program.module()
