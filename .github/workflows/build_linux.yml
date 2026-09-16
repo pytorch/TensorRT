@@ -397,7 +397,7 @@ jobs:
       # upload follow the exact same path as torch-tensorrt itself.
       - name: Build the ExecuTorch runtime wheel
         id: executorch-runtime
-        if: ${{ inputs.build-executorch-runtime && startsWith(matrix.desired_cuda, 'cu13') }}
+        if: ${{ inputs.build-executorch-runtime }}
         working-directory: ${{ inputs.repository }}
         shell: bash -l {0}
         run: |
