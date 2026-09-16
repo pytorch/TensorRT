@@ -492,3 +492,23 @@ def test_an_old_companion_gets_advice_it_can_act_on(
     program.write_bytes(b"unused")
     with pytest.raises(ImportError, match="too old to register"):
         compiler.load(str(program), format="executorch")
+
+
+@pytest.mark.unit
+def test_the_loader_calls_activate_on_a_companion_that_has_no_register(
+    compiler, monkeypatch, tmp_path
+) -> None:
+    """Upgrading the main wheel alone leaves an older companion installed, and that one exposes
+    activate() rather than register(). Checking the source for the word proves nothing: the
+    fallback can be commented out and the word stays. So drive it and see which one is called.
+    """
+    called = []
+    module = types.ModuleType("torch_tensorrt_executorch_runtime")
+    module.activate = lambda: called.append("activate")
+    monkeypatch.setitem(sys.modules, "torch_tensorrt_executorch_runtime", module)
+    program = tmp_path / "m.pte"
+    program.write_bytes(b"unused")
+    # The load itself cannot finish without a real runtime; reaching it is the point.
+    with pytest.raises(Exception):
+        compiler.load(str(program), format="executorch")
+    assert called == ["activate"], called

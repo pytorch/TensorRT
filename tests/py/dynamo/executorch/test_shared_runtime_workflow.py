@@ -4,6 +4,8 @@
 """CPU-only command-boundary tests for the shared companion workflows."""
 
 import ast
+import importlib
+import warnings
 import json
 import os
 import shutil
@@ -471,24 +473,6 @@ def test_the_delegate_lane_narrows_the_matrix_to_cuda_13_rows() -> None:
 
 
 @pytest.mark.unit
-def test_the_loader_accepts_a_companion_that_only_exposes_activate() -> None:
-    """A companion published before registration became one call exposes activate().
-
-    The main wheel does not require a matching companion, so upgrading Torch-TensorRT alone
-    leaves that older companion installed. Importing `register` unconditionally raised
-    ImportError, which the loader's ModuleNotFoundError handler does not catch, so the failure
-    surfaced as a traceback rather than the guidance the same function exists to give.
-    """
-    source = (ROOT / "py/torch_tensorrt/_executorch_compat.py").read_text(
-        encoding="utf-8"
-    )
-    assert '"activate"' in source, source
-    assert (
-        "from torch_tensorrt_executorch_runtime import register" not in source
-    ), source
-
-
-@pytest.mark.unit
 def test_the_removed_entry_points_still_exist_as_shims() -> None:
     """activate() and get_runtime() were public, so removing them outright breaks callers."""
     package = ROOT / "py/torch-tensorrt-executorch-runtime"
@@ -514,3 +498,37 @@ def test_a_failed_native_build_cannot_report_success() -> None:
     )
     assert 'raise SystemExit(f"ExecuTorch delegate build failed' in source, source
     assert "except BaseException as error:" in source, source
+
+
+@pytest.mark.unit
+def test_the_kept_entry_points_actually_warn_and_forward(monkeypatch) -> None:
+    """activate() and get_runtime() were public, so they stay as deprecated shims.
+
+    Checking the source for "def activate(" proves only that the text is present: the bodies can be
+    emptied, or their warnings removed, and the check still passes. So import the package and call
+    them. Registration is skipped through the package's own escape hatch, because the native library
+    is not built here, and each shim's own call to register is replaced so the forwarding is visible.
+    """
+    monkeypatch.setenv("TORCH_TENSORRT_SKIP_DELEGATE_REGISTRATION", "1")
+    monkeypatch.syspath_prepend(str(ROOT / "py/torch-tensorrt-executorch-runtime"))
+    for name in [
+        n for n in sys.modules if n.startswith("torch_tensorrt_executorch_runtime")
+    ]:
+        monkeypatch.delitem(sys.modules, name)
+    delegate = importlib.import_module("torch_tensorrt_executorch_runtime")
+
+    registered = []
+    monkeypatch.setattr(delegate, "register", lambda: registered.append("register"))
+    for shim, forwarded in (("activate", "portable_lib"), ("get_runtime", "Runtime")):
+        registered.clear()
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            try:
+                getattr(delegate, shim)()
+            except ImportError:
+                # ExecuTorch is not installed here, so the forwarding import is as far as it goes.
+                pass
+        assert registered == ["register"], f"{shim} did not register: {registered}"
+        assert any(
+            issubclass(w.category, DeprecationWarning) for w in caught
+        ), f"{shim} raised no DeprecationWarning: {[w.category for w in caught]}"
