@@ -17,6 +17,8 @@ import sys
 from collections import Counter
 from pathlib import Path
 
+import types
+
 import pytest
 import yaml
 from packaging.requirements import Requirement
@@ -1553,18 +1555,28 @@ def test_the_no_nightly_marker_only_exempts_a_win32_install():
             # nearest control-flow keyword above it. Requiring that keyword to be the win32 guard
             # ties the exemption to the one platform it describes: a marker pasted onto a Linux
             # "else" install resolves to that "else", not to "if ... win32", and is rejected.
-            branch = next(
-                (lines[j] for j in range(index - 1, -1, -1) if control.match(lines[j])),
+            # The exemption is only honest when the install below it cannot pull the companion in,
+            # since the companion is what needs the ExecuTorch channel. An unanchored
+            # torch_tensorrt* glob also matches torch_tensorrt_executorch_runtime, so requiring the
+            # hyphen ties the exemption to installing the main wheel alone rather than to a platform
+            # that merely happens to do so.
+            install = next(
+                (
+                    lines[j]
+                    for j in range(index + 1, min(index + 5, len(lines)))
+                    if "pip install" in lines[j]
+                ),
                 "",
             )
-            if "win32" not in branch:
+            if "torch_tensorrt*" in install or "torch_tensorrt-*" not in install:
                 misplaced.append(
-                    f"{name}:{index + 1} carries {NO_NIGHTLY_MARKER!r} outside a win32 branch, "
-                    "so it would exempt a Linux install that simply lost its index"
+                    f"{name}:{index + 1} carries {NO_NIGHTLY_MARKER!r} above an install that can "
+                    f"match the companion wheel, which does need the channel: {install.strip()!r}"
                 )
 
     assert not misplaced, (
-        "the no-nightly exemption is only valid inside a win32 branch: " f"{misplaced}"
+        "the no-nightly exemption is only valid above a main-wheel-only install: "
+        f"{misplaced}"
     )
 
 
@@ -2445,6 +2457,10 @@ def test_suite_validation_check_detects_removed_validator(monkeypatch, field, va
         ("schedule", "refs/heads/release/2.14", "", "", "true"),
         # The shipped-release guard now sits where it can actually fire.
         ("workflow_dispatch", "refs/heads/release/2.14", "stable", None, "true"),
+        # Anything other than an explicit false counts as tagged, so a typo closes the guard.
+        ("workflow_dispatch", "refs/heads/release/2.14", "stable", None, "yes"),
+        ("workflow_dispatch", "refs/heads/release/2.14", "stable", None, "1"),
+        ("workflow_dispatch", "refs/heads/release/2.14", "stable", "stable", "false"),
         # A branch that only looks like a release must not be treated as one.
         (
             "schedule",
@@ -2527,3 +2543,31 @@ def test_the_install_message_does_not_hand_a_no_op_command_to_other_platforms(
     message = command()
     assert "pip install" not in message, message
     assert "Linux" in message, message
+
+
+@pytest.mark.parametrize("agree", [True, False])
+@pytest.mark.unit
+def test_the_pairing_check_fails_when_the_two_pins_disagree(
+    agree: bool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The pairing check is the only guard on the two pins naming one ExecuTorch.
+
+    It skips whenever the pinned wheel is not installed, which is every pull request lane, so
+    without this it could stop working and nothing would say so. A stand-in wheel is injected
+    reporting the pinned version and either the pinned commit or a different one, which is the
+    only difference the check exists to notice.
+    """
+    versions = _versions()
+    pinned_commit = versions["__executorch_commit__"]
+    module = types.ModuleType("executorch.version")
+    module.__version__ = versions["__executorch_version__"] + "+cu134"
+    module.git_version = pinned_commit if agree else "f" * 40
+    package = types.ModuleType("executorch")
+    package.version = module
+    monkeypatch.setitem(sys.modules, "executorch", package)
+    monkeypatch.setitem(sys.modules, "executorch.version", module)
+    if agree:
+        test_the_pinned_commit_is_the_pinned_wheels_own_source()
+    else:
+        with pytest.raises(AssertionError):
+            test_the_pinned_commit_is_the_pinned_wheels_own_source()

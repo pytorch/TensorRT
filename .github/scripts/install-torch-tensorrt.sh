@@ -56,12 +56,14 @@ fi
 # Install Torch-TensorRT
 if [[ ${PLATFORM} == win32 ]]; then
     # pin-check: no-nightly -- Windows installs only the main wheel, without the Linux companion.
-    python -m pip install ${RUNNER_ARTIFACT_DIR}/torch_tensorrt*.whl || exit 1
+    python -m pip install ${RUNNER_ARTIFACT_DIR}/torch_tensorrt-*.whl || exit 1
 else
-    # The companion requires the nightly ExecuTorch channel even on test/release jobs.
+    # The hyphen matters: torch_tensorrt* also matches the companion, and installing it here is
+    # what forced a nightly index onto release jobs. The ExecuTorch workflow installs it instead.
     # Exit explicitly: the caller appends its test script and this file does not use set -e.
-    python -m pip install /opt/torch-tensorrt-builds/torch_tensorrt*.whl --use-deprecated=legacy-resolver \
-        --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" || exit 1
+    # pin-check: no-nightly -- the main wheel alone, which needs no ExecuTorch channel.
+    python -m pip install /opt/torch-tensorrt-builds/torch_tensorrt-*.whl \
+        --use-deprecated=legacy-resolver || exit 1
 fi
 
 echo -e "Running test script";
