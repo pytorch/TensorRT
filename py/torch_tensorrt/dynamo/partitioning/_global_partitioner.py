@@ -1,5 +1,5 @@
 import logging
-from typing import Collection, Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import Collection, Dict, List, Mapping, Optional, Sequence, Set, Tuple
 
 import tensorrt as trt
 import torch
@@ -7,6 +7,7 @@ from torch.fx.graph_module import GraphModule
 from torch.fx.node import Target
 from torch.fx.passes.infra.partitioner import CapabilityBasedPartitioner, Partition
 from torch.fx.passes.operator_support import OperatorSupport, SupportDict
+from torch.fx.passes.tools_common import CALLABLE_NODE_OPS
 from torch.utils._pytree import tree_flatten
 from torch_tensorrt.dynamo._defaults import (
     MIN_BLOCK_SIZE,
@@ -145,6 +146,9 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
         # Initialize sets of supported/unsupported operators
         self.supported_operators: Dict[str, int] = {}
         self.unsupported_operators: Dict[str, int] = {}
+        # Keep impure refusals out of the counters used to decide full support.
+        self.fallback_operators: Dict[str, int] = {}
+        self.fallback_reasons: Dict[str, Set[str]] = {}
         self.torch_executed_ops: Collection[Target] = torch_executed_ops
         self._non_target_device_cache: Dict[torch.fx.Node, bool] = {}
 
@@ -254,6 +258,16 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
             "requires_output_allocator", False
         )
 
+    def _record_fallback(
+        self, node: torch.fx.Node, node_name: str, reason: str
+    ) -> None:
+        # Structural nodes must not make a fully supported graph report fallback.
+        if node.op in CALLABLE_NODE_OPS:
+            self.fallback_operators[node_name] = (
+                self.fallback_operators.get(node_name, 0) + 1
+            )
+            self.fallback_reasons.setdefault(node_name, set()).add(reason)
+
     def is_node_supported(
         self, submodules: Mapping[str, torch.nn.Module], node: torch.fx.Node
     ) -> bool:
@@ -274,6 +288,7 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
                 "non-target device region",
                 node_name,
             )
+            self._record_fallback(node, node_name, "explicit non-target device region")
             return False
 
         if self._exceeds_max_tensor_rank(node):
@@ -282,6 +297,7 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
                 self.unsupported_operators[node_name] = (
                     self.unsupported_operators.get(node_name, 0) + 1
                 )
+            self._record_fallback(node, node_name, "tensor rank exceeds TensorRT limit")
             return False
 
         if self._has_complex_dtype(node):
@@ -291,6 +307,7 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
                 self.unsupported_operators[node_name] = (
                     self.unsupported_operators.get(node_name, 0) + 1
                 )
+            self._record_fallback(node, node_name, "complex tensor dtype")
             return False
 
         if (
@@ -304,6 +321,11 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
                 self.unsupported_operators[node_name] = (
                     self.unsupported_operators.get(node_name, 0) + 1
                 )
+            self._record_fallback(
+                node,
+                node_name,
+                "data-dependent output shape (fallback_data_dependent_ops=True)",
+            )
             return False
 
         if (
@@ -326,6 +348,16 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
                 else:
                     self.unsupported_operators[node_name] += 1
 
+            self._record_fallback(
+                node,
+                node_name,
+                (
+                    "excluded by torch_executed_ops"
+                    if node_name in self.torch_executed_ops
+                    or node.target in self.torch_executed_ops
+                    else "no validated TensorRT converter"
+                ),
+            )
             return False
 
     def print_support_overview(
