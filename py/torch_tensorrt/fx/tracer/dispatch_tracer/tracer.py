@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 import functools
 from contextlib import contextmanager
 from typing import Any, Callable, Dict, Optional, Set, Tuple

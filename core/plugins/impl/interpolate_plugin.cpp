@@ -1,3 +1,8 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+
 #include "core/plugins/impl/interpolate_plugin.h"
 #include "core/plugins/plugins.h"
 #include "core/util/prelude.h"

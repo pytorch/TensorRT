@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """Export-side coverage for caller-owned KV-cache buffer mutations.
 
 Both retrace modes must surface an engine's aliased KV outputs as graph-level

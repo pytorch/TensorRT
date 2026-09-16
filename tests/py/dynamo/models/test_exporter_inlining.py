@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """Unit tests for the legacy dynamo exporter's submodule inlining
 (torch_tensorrt.dynamo._exporter). These run on plain fx graphs and need neither a
 GPU nor a TensorRT build."""

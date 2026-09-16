@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """Lift mutated module buffers back to engine input bindings.
 
 PyTorch's ``ExportedProgram.module()`` converts BUFFER placeholders into

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """Check exact build pins, compatible authoring ranges and installed-wheel provenance.
 
 Discover requirements independently of the writer, and require known sites to remain present.

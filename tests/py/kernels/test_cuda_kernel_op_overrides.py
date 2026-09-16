@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """Tests for cuda_kernel_op's override path and shared internal helpers.
 
 The override path is what replaces the old ``custom_cuda_kernel_op`` /

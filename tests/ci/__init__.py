@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """Torch-TensorRT test-suite manifest + runner (the Layer-0 "brain").
 
 This package is the single source of truth for *what each CI/local test job runs*.

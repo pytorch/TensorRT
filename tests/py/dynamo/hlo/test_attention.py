@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """Comprehensive attention subgraph tests for TRT converter bug discovery.
 
 Covers all SDPA kernel variants, MHA/GQA/MQA attention patterns, causal vs
