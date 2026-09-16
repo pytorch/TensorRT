@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=3babd77e"></script>
+    <script src="../../../_static/documentation_options.js?v=05b7514e"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -474,8 +474,11 @@ document.write(`
                 <article class="bd-article">
                   
   <h1>Source code for torch_tensorrt.dynamo._settings</h1><div class="highlight"><pre>
-<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Collection</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
+<span></span><span class="c1"># SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION &amp; AFFILIATES. All rights reserved.</span>
+<span class="c1"># SPDX-License-Identifier: BSD-3-Clause</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Collection</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">tensorrt</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">trt</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
@@ -523,6 +526,7 @@ document.write(`
     <span class="n">REUSE_CACHED_ENGINES</span><span class="p">,</span>
     <span class="n">SPARSE_WEIGHTS</span><span class="p">,</span>
     <span class="n">STRIP_ENGINE_WEIGHTS</span><span class="p">,</span>
+    <span class="n">TARGET_COMPUTE_CAPABILITIES</span><span class="p">,</span>
     <span class="n">TILING_OPTIMIZATION_LEVEL</span><span class="p">,</span>
     <span class="n">TIMING_CACHE_PATH</span><span class="p">,</span>
     <span class="n">TRUNCATE_DOUBLE</span><span class="p">,</span>
@@ -547,7 +551,9 @@ document.write(`
         <span class="n">validate_disabled_constant_fold_exclusions</span><span class="p">,</span>
     <span class="p">)</span>
 
-    <span class="k">return</span> <span class="n">validate_disabled_constant_fold_exclusions</span><span class="p">(</span><span class="n">rule_ids</span><span class="p">)</span>
+    <span class="c1"># Typed local: --strict mypy rejects returning the untyped helper directly.</span>
+    <span class="n">normalized</span><span class="p">:</span> <span class="n">Set</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">validate_disabled_constant_fold_exclusions</span><span class="p">(</span><span class="n">rule_ids</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">normalized</span>
 
 
 <div class="viewcode-block" id="CompilationSettings">
@@ -584,6 +590,7 @@ document.write(`
 <span class="sd">            TRT Engines. Prints detailed logs of the graph structure and nature of partitioning. Optionally saves the</span>
 <span class="sd">            output to a file if a string path is specified</span>
 <span class="sd">        hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)</span>
+<span class="sd">        target_compute_capabilities (Optional[List[Tuple[int, int]]]): Compute capabilities to build for, e.g. ``[(7, 5)]`` for Turing. Defaults to ``None``. The compilation then targets the current device, from ``torch.cuda.get_device_capability()``. TensorRT-RTX only -- raises on standard TensorRT. Drives both engine targeting and op partitioning: a compiled artifact carries a single partitioning, so an op unsupported on any listed target falls back to PyTorch for all of them.</span>
 <span class="sd">        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX (no autotuning).</span>
 <span class="sd">        cache_built_engines (bool): Whether to save the compiled TRT engines to storage</span>
 <span class="sd">        reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage</span>
@@ -659,6 +666,9 @@ document.write(`
     <span class="n">enable_cross_compile_for_windows</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">ENABLE_CROSS_COMPILE_FOR_WINDOWS</span>
     <span class="n">tiling_optimization_level</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">TILING_OPTIMIZATION_LEVEL</span>
     <span class="n">l2_limit_for_tiling</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">L2_LIMIT_FOR_TILING</span>
+    <span class="n">target_compute_capabilities</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">TARGET_COMPUTE_CAPABILITIES</span>
+    <span class="p">)</span>
     <span class="n">use_distributed_mode_trace</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">USE_DISTRIBUTED_MODE_TRACE</span>
     <span class="n">offload_module_to_cpu</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">OFFLOAD_MODULE_TO_CPU</span>
     <span class="n">enable_autocast</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">ENABLE_AUTOCAST</span>
@@ -690,6 +700,14 @@ document.write(`
                 <span class="bp">self</span><span class="o">.</span><span class="n">disabled_constant_fold_exclusions</span>
             <span class="p">)</span>
         <span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">target_compute_capabilities</span><span class="p">:</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._features</span><span class="w"> </span><span class="kn">import</span> <span class="n">ENABLED_FEATURES</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">tensorrt_rtx</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">"target_compute_capabilities is only supported on TensorRT-RTX. "</span>
+                    <span class="s2">"Standard TensorRT always builds for the current device."</span>
+                <span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">__getstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
         <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.conversion._ConverterRegistry</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
@@ -724,6 +742,7 @@ document.write(`
     <span class="s2">"sparse_weights"</span><span class="p">,</span>
     <span class="s2">"engine_capability"</span><span class="p">,</span>
     <span class="s2">"hardware_compatible"</span><span class="p">,</span>
+    <span class="s2">"target_compute_capabilities"</span><span class="p">,</span>
     <span class="s2">"refit_identical_engine_weights"</span><span class="p">,</span>
     <span class="s2">"immutable_weights"</span><span class="p">,</span>
     <span class="s2">"enable_weight_streaming"</span><span class="p">,</span>
