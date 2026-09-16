@@ -485,19 +485,55 @@ def test_the_removed_entry_points_still_exist_as_shims() -> None:
         assert f'"{name}"' in source.split("__all__")[-1], name
 
 
+@pytest.mark.parametrize(
+    "raised",
+    [
+        RuntimeError("no bazel here"),
+        OSError("toolchain gone"),
+        ValueError("bad config"),
+    ],
+)
 @pytest.mark.unit
-def test_a_failed_native_build_cannot_report_success() -> None:
-    """setuptools swallows a customized build_py during editable installs.
+def test_a_failed_native_build_cannot_report_success(raised) -> None:
+    """During an editable install setuptools routes a customized build_py through its own
+    _safely_run, which catches Exception and downgrades it to a warning pip hides, so a failed
+    delegate build would leave pip printing that it installed successfully. SystemExit is not an
+    Exception, so converting to it is what escapes.
 
-    It wraps the command in a broad `except Exception` and downgrades the failure to a warning
-    pip hides, so a failed delegate build would leave pip printing "Successfully installed".
-    SystemExit derives from BaseException and escapes that catch.
+    Driven rather than read: the wrapper is applied to a build that raises, and the result is passed
+    through a stand-in for setuptools' catch. A version that re-raised RuntimeError unchanged, which
+    is what a missing bazel raises, passed a source check while still being swallowed here.
     """
     source = (ROOT / "py/torch-tensorrt-executorch-runtime/setup.py").read_text(
         encoding="utf-8"
     )
-    assert 'raise SystemExit(f"ExecuTorch delegate build failed' in source, source
-    assert "except BaseException as error:" in source, source
+    tree = ast.parse(source)
+    build_class = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.ClassDef) and node.name == "BazelBuild"
+    )
+    run = next(
+        node
+        for node in build_class.body
+        if isinstance(node, ast.FunctionDef) and node.name == "run"
+    )
+
+    class Fake:
+        def _build(self):
+            raise raised
+
+    namespace: dict[str, object] = {}
+    exec(compile(ast.Module(body=[run], type_ignores=[]), "<run>", "exec"), namespace)
+    # setuptools' own shape: Exception becomes a warning, anything else propagates.
+    try:
+        namespace["run"](Fake())
+    except Exception as error:  # noqa: BLE001
+        pytest.fail(f"a {type(raised).__name__} would be swallowed as {error!r}")
+    except SystemExit as exit_error:
+        assert "ExecuTorch delegate build failed" in str(exit_error), exit_error
+    else:
+        pytest.fail("the wrapper let a failing build return normally")
 
 
 @pytest.mark.unit

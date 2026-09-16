@@ -186,19 +186,21 @@ class BazelBuild(build_py):
         return mapping
 
     def run(self) -> None:
-        # setuptools runs a customized build_py through a broad try/except during editable
-        # installs and downgrades any failure to a warning pip hides, so a failed native build
-        # would report "Successfully installed" with no delegate. SystemExit escapes that catch.
-        # A misconfiguration this file raises itself is left alone: it already stops the build,
-        # and rewriting it would hide which of the two went wrong.
+        # During an editable install setuptools routes a customized build_py through its own
+        # _safely_run, which catches Exception and turns it into a warning pip hides, so a failed
+        # native build reports "Successfully installed" with no delegate. SystemExit is not an
+        # Exception, so it is the one thing that escapes. Everything this build raises has to become
+        # one, including the RuntimeError from a missing bazel, which is the case that motivated
+        # this: re-raising it unchanged left it inside the class setuptools swallows.
         try:
             self._build()
-        except (SystemExit, RuntimeError):
+        except SystemExit:
             raise
         except BaseException as error:
             raise SystemExit(f"ExecuTorch delegate build failed: {error}") from error
 
     def _build(self) -> None:
+        require_supported_cuda()
         super().run()
 
         if sys.platform != "linux":
@@ -382,7 +384,9 @@ class PlatformDistribution(Distribution):
         return True
 
 
-require_supported_cuda()
+# The three lookups below cannot move: they produce install_requires, and dependency metadata is
+# what a metadata-only build asks for, so deriving pins from the build environment means that
+# environment has to be present. The CUDA check can move, and does, into the build itself.
 executorch_version = installed_version("executorch")
 tensorrt_version = installed_version(TENSORRT_DISTRIBUTION)
 cuda_runtime_version = installed_version(CUDA_RUNTIME_DISTRIBUTION)

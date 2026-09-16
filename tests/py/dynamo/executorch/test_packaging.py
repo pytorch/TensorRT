@@ -178,7 +178,10 @@ def test_setup_boolean_flags(packaging_build, monkeypatch, flag, value, enabled)
     if flag == "unpinned":
         state.versions["executorch"] = "1.4.0"
     if flag == "unpinned" and not enabled:
-        with pytest.raises(RuntimeError, match="pins"):
+        # SystemExit, not RuntimeError: the build converts every failure to the one class
+        # setuptools does not swallow during an editable install, so this refusal reaches the user
+        # instead of becoming a warning pip hides.
+        with pytest.raises(SystemExit, match="pins"):
             runpy.run_path(str(state.project / "setup.py"), run_name="__main__")
         assert state.calls == []
     else:
