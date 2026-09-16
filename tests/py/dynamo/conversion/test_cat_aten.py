@@ -4,7 +4,7 @@ from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
 
-from .harness import DispatchTestCase
+from .harness import DispatchTestCase, skip_if_trt_rtx_turing
 
 
 class TestCatConverter(DispatchTestCase):
@@ -177,6 +177,10 @@ class TestCatConverter(DispatchTestCase):
 
     def test_cat_three_different_dtypes(self):
         """Test cat with three different dtypes - bfloat16, float16, float32"""
+        # The cat promotes bf16 away, but TensorRT-RTX still rejects the network for
+        # naming the type: "Cannot compile for target(s) sm75 ... HW-specific
+        # datatypes: b16". That only surfaces once the capability is declared.
+        skip_if_trt_rtx_turing(self, "bfloat16")
 
         class ThreeDtypeCat(nn.Module):
             def __init__(self):
@@ -344,6 +348,9 @@ class TestCatConverter(DispatchTestCase):
 
     def test_cat_bf16_dtype_preservation(self):
         """Test that bfloat16 dtype is preserved in constant layers (not converted to fp32)"""
+        # The engine's input and output are both bf16 here, so bf16 really does reach
+        # TensorRT.
+        skip_if_trt_rtx_turing(self, "bfloat16")
 
         class CatBF16Constants(nn.Module):
             def __init__(self):

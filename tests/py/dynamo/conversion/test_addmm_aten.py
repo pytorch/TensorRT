@@ -3,7 +3,7 @@ import torch.nn as nn
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 
-from .harness import DispatchTestCase
+from .harness import DispatchTestCase, skip_if_trt_rtx_turing
 
 
 class TestAddmmConverter(DispatchTestCase):
@@ -17,6 +17,8 @@ class TestAddmmConverter(DispatchTestCase):
         ]
     )
     def test_addmm(self, input_shape, mat1_shape, mat2_shape):
+        skip_if_trt_rtx_turing(self, "aten.addmm (an FP32 GEMM)")
+
         class Addmm(nn.Module):
             def forward(self, input, mat1, mat2):
                 return torch.ops.aten.addmm.default(input, mat1, mat2)
@@ -43,6 +45,8 @@ class TestAddmmConverter(DispatchTestCase):
         ]
     )
     def test_addmm_scale(self, input_shape, mat1_shape, mat2_shape, beta, alpha):
+        skip_if_trt_rtx_turing(self, "aten.addmm (an FP32 GEMM)")
+
         class Addmm(nn.Module):
             def forward(self, input, mat1, mat2):
                 return torch.ops.aten.addmm.default(
