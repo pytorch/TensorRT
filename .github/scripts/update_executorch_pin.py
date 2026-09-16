@@ -199,7 +199,11 @@ def _rewrite_versions(text: str, version: str, commit: str) -> str:
 
 
 def write_pins(new_version: str, new_commit: str) -> bool:
-    """Preflight every input and proposed replacement before writing any pin site."""
+    """Rewrite every pin site, accepting sites already carrying the target.
+
+    Converges rather than diffing: a site already at the target counts as satisfied, so an
+    interrupted earlier run is repaired by the next one instead of wedging every run after it.
+    """
     old_version = read_pin("__executorch_version__")
     old_commit = read_pin("__executorch_commit__")
     for version in (old_version, new_version):
@@ -247,9 +251,13 @@ def write_pins(new_version: str, new_commit: str) -> bool:
                 updated = _rewrite_versions(text, new_version, new_commit)
             else:
                 updated, count = _REQUIREMENT.subn(rewrite_requirement, text)
-                if not count and old_commit not in text:
-                    raise ValueError("no current version or source pin found")
                 updated = updated.replace(old_commit, new_commit)
+                # Either coordinate may legitimately be the only one a site carries, and a
+                # site already at the target is satisfied rather than broken, which is what
+                # lets a later run finish an interrupted one.
+                if not count and old_commit not in text:
+                    if new_version not in text and new_commit not in text:
+                        raise ValueError("no current version or source pin found")
             pending.append((path, text, updated))
         except (
             OSError,

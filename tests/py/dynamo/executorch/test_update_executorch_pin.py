@@ -600,3 +600,24 @@ def test_delegate_channels_fails_loudly_when_the_matrix_moves(tmp_path, monkeypa
     )
     with pytest.raises(AttributeError):
         updater.delegate_channels()
+
+
+@pytest.mark.unit
+def test_write_pins_finishes_an_interrupted_run(pin_repo, monkeypatch):
+    """A site already carrying the target is satisfied, not a reason to refuse forever.
+
+    Writing is per file, so a disk or signal failure can leave some sites moved and some not.
+    Refusing on the moved ones would wedge every later run, including one for a newer target.
+    """
+    target_version = "9.9.9"
+    target_commit = "b" * 40
+    already = pin_repo / "already.txt"
+    already.write_text(
+        f'executorch=="{target_version}"\n{target_commit}\n', encoding="utf-8"
+    )
+    monkeypatch.setattr(
+        updater,
+        "_pin_site_paths",
+        lambda: [updater._VERSIONS_FILE, already],
+    )
+    assert updater.write_pins(target_version, target_commit) is True
