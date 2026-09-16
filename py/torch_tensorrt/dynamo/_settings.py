@@ -109,7 +109,7 @@ class CompilationSettings:
             TRT Engines. Prints detailed logs of the graph structure and nature of partitioning. Optionally saves the
             output to a file if a string path is specified
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
-        target_compute_capabilities (Optional[List[Tuple[int, int]]]): Compute capabilities to build for, e.g. ``[(7, 5)]`` for Turing. Defaults to None, meaning the current device. TensorRT-RTX only -- raises on standard TensorRT. Drives both engine targeting and op partitioning: a compiled artifact carries a single partitioning, so an op unsupported on any listed target falls back to PyTorch for all of them.
+        target_compute_capabilities (Optional[List[Tuple[int, int]]]): Compute capabilities to build for, e.g. ``[(7, 5)]`` for Turing. Defaults to ``None``. The compilation then targets the current device, from ``torch.cuda.get_device_capability()``. TensorRT-RTX only -- raises on standard TensorRT. Drives both engine targeting and op partitioning: a compiled artifact carries a single partitioning, so an op unsupported on any listed target falls back to PyTorch for all of them.
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX (no autotuning).
         cache_built_engines (bool): Whether to save the compiled TRT engines to storage
         reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage

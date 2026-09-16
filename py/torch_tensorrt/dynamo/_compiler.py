@@ -571,7 +571,7 @@ def compile(
         enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
         dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
-        target_compute_capabilities (Optional[List[Tuple[int, int]]]): Compute capabilities to build for, e.g. ``[(7, 5)]`` for Turing. Defaults to None, meaning the current device. TensorRT-RTX only. Drives both engine targeting and op partitioning, so ops unsupported on any listed target fall back to PyTorch.
+        target_compute_capabilities (Optional[List[Tuple[int, int]]]): Compute capabilities to build for, e.g. ``[(7, 5)]`` for Turing. Defaults to ``None``. The compilation then targets the current device, from ``torch.cuda.get_device_capability()``. TensorRT-RTX only. Drives both engine targeting and op partitioning, so ops unsupported on any listed target fall back to PyTorch.
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX.
         lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.
         cache_built_engines (bool): Whether to save the compiled TRT engines to storage
@@ -1916,7 +1916,7 @@ def convert_exported_program_to_serialized_trt_engine(
         enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
         dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
-        target_compute_capabilities (Optional[List[Tuple[int, int]]]): Compute capabilities to build for, e.g. ``[(7, 5)]`` for Turing. Defaults to None, meaning the current device. TensorRT-RTX only. Drives both engine targeting and op partitioning, so ops unsupported on any listed target fall back to PyTorch.
+        target_compute_capabilities (Optional[List[Tuple[int, int]]]): Compute capabilities to build for, e.g. ``[(7, 5)]`` for Turing. Defaults to ``None``. The compilation then targets the current device, from ``torch.cuda.get_device_capability()``. TensorRT-RTX only. Drives both engine targeting and op partitioning, so ops unsupported on any listed target fall back to PyTorch.
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX.
         lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.
         cache_built_engines (bool): Whether to save the compiled TRT engines to storage
