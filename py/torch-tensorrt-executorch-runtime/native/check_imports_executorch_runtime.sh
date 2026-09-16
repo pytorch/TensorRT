@@ -126,8 +126,11 @@ fi
 # Unversioned C++ helpers evade the version-node check and must come from libstdc++_nonshared.a.
 dyn_syms=$("${readelf_bin}" --dyn-syms -W "${target}") ||
     fail "could not read the dynamic symbols of ${target} with ${readelf_bin}"
+# Undefined and unversioned is the whole condition; the symbol's type is not part of it. Selecting
+# FUNC and OBJECT dropped the TLS entries that real libraries do carry, and would drop NOTYPE from
+# any toolchain that emits it, which are exactly the symbols being hunted.
 unversioned_cxx=$(printf '%s\n' "${dyn_syms}" |
-    awk '($4 == "FUNC" || $4 == "OBJECT") && ($7 == "UND" || $7 == "UNDEF") && $8 !~ /@/ && $8 ~ /^(_ZNSt|_ZNKSt|_ZSt|_ZTVNSt|_ZTINSt|_ZN9__gnu_cxx|_ZTVN9__gnu_cxx|_ZTIN9__gnu_cxx)/ { print $8 }')
+    awk '($7 == "UND" || $7 == "UNDEF") && $8 !~ /@/ && $8 ~ /^(_ZNSt|_ZNKSt|_ZSt|_ZTVNSt|_ZTINSt|_ZN9__gnu_cxx|_ZTVN9__gnu_cxx|_ZTIN9__gnu_cxx)/ { print $8 }')
 if [ -n "${unversioned_cxx}" ]; then
     fail "${target} has unversioned undefined C++ runtime symbols:
 ${unversioned_cxx}"
