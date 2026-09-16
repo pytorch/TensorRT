@@ -13,7 +13,11 @@ from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.dynamo._defaults import TIMING_CACHE_PATH
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
-from torch_tensorrt.runtime import RuntimeSettings, runtime_cache
+from torch_tensorrt.runtime import (
+    RuntimeSettings,
+    apply_runtime_settings,
+    runtime_cache,
+)
 
 
 class SimpleModel(torch.nn.Module):
@@ -35,21 +39,6 @@ def _fresh_conv_model_and_inputs(seed=0):
     return ConvModel().eval().cuda(), [torch.randn(2, 3, 16, 16).cuda()]
 
 
-def _apply_runtime_settings(compiled, rs):
-    """Apply ``RuntimeSettings`` to every ``TorchTensorRTModule`` under ``compiled``.
-
-    Mirrors what user code would do: ``mod.runtime_settings = rs`` after
-    compile. The compile-time hint (``torchtrt.compile(runtime_settings=...)``)
-    was dropped now that lazy ``IExecutionContext`` creation absorbs the
-    one-create benefit it used to provide.
-    """
-    from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
-
-    for _, mod in compiled.named_modules():
-        if isinstance(mod, TorchTensorRTModule):
-            mod.runtime_settings = rs
-
-
 def _compile(model, inputs, *, runtime_cache_path=None):
     """Compile ``model`` through whichever runtime the build selects.
 
@@ -65,7 +54,7 @@ def _compile(model, inputs, *, runtime_cache_path=None):
     )
     torch._dynamo.reset()
     if runtime_cache_path is not None:
-        _apply_runtime_settings(
+        apply_runtime_settings(
             compiled, RuntimeSettings(runtime_cache=runtime_cache_path)
         )
     return compiled
@@ -865,7 +854,7 @@ class TestModuleStillOwnsImplicitCache(TestCase):
             path = os.path.join(tmp, "rc.bin")
             model, inputs = _fresh_conv_model_and_inputs()
             compiled = _compile(model, inputs)
-            _apply_runtime_settings(compiled, RuntimeSettings(runtime_cache=path))
+            apply_runtime_settings(compiled, RuntimeSettings(runtime_cache=path))
             compiled(*inputs)
             del compiled
             gc.collect()
@@ -880,7 +869,7 @@ class TestModuleStillOwnsImplicitCache(TestCase):
 
         model, inputs = _fresh_conv_model_and_inputs()
         compiled = _compile(model, inputs)
-        _apply_runtime_settings(compiled, RuntimeSettings(runtime_cache=""))
+        apply_runtime_settings(compiled, RuntimeSettings(runtime_cache=""))
 
         # Engine-flavor agnostic: the module's resolved settings are what gets
         # dispatched, on both the Python and cpp runtimes.

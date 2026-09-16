@@ -524,24 +524,27 @@ class _RuntimeCacheContextManager:
     def __enter__(self) -> RuntimeCache:
         # Defer imports to avoid a circular dependency:
         # _runtime_cache -> _runtime_config -> _TorchTensorRTModule -> (indirect) _runtime_cache.
-        from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
-            TorchTensorRTModule,
+        from torch_tensorrt.runtime._runtime_config import (
+            _iter_trt_engines,
+            runtime_config,
         )
-        from torch_tensorrt.runtime._runtime_config import runtime_config
 
-        # 1. Find any TorchTensorRTModule under the targets; first one wins.
-        bootstrap_module = None
-        for target in self._targets:
-            for _, mod in target.named_modules():
-                if isinstance(mod, TorchTensorRTModule):
-                    bootstrap_module = mod
-                    break
-            if bootstrap_module is not None:
-                break
-        if bootstrap_module is None:
+        # 1. Discover all TRT engines under the targets, validate before mutating.
+        engines = list(_iter_trt_engines(self._targets))
+
+        if any(owner is None for owner, _ in engines):
+            raise TypeError(
+                "runtime_cache() encountered module-less TRT engine(s) that it "
+                "cannot snapshot and restore on exit. "
+                "Use apply_runtime_settings() for engines loaded without a "
+                "TorchTensorRTModule (e.g. via torch_tensorrt.load())."
+            )
+
+        if not engines:
             raise RuntimeError(
-                "runtime_cache() requires at least one TorchTensorRTModule "
-                "under the target(s)."
+                "runtime_cache() requires at least one TRT engine under the "
+                "target(s). The target may have fallen back entirely to PyTorch "
+                "or may not contain any compiled TRT subgraphs."
             )
 
         # 2. Build the handle in its pending state on both runtimes. The

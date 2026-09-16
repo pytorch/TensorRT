@@ -13,11 +13,14 @@ This module groups three closely related concepts together:
 * :func:`runtime_config` -- the runtime-mode context manager that toggles
   settings on every TRT submodule under a target for the duration of a
   ``with`` block.
+* :func:`apply_runtime_settings` -- permanent apply to every TRT engine under a
+  target, including engines loaded without a :class:`TorchTensorRTModule`.
 
-Three ways to use ``RuntimeSettings``:
+Two ways to use ``RuntimeSettings``:
 
 1. **Runtime context manager** -- toggle settings inside a ``with`` block.
-2. **Programmatic** -- assign ``module.runtime_settings = rs`` directly.
+2. **Permanent apply** -- call :func:`apply_runtime_settings` on any compiled
+   module, :class:`ExportedProgram`, or AOT-loaded ``GraphModule``.
 
 ``RuntimeSettings`` is intentionally NOT part of ``CompilationSettings`` and is
 NOT serialized into the engine tuple. It's purely an in-memory initialization
@@ -30,7 +33,17 @@ import dataclasses
 import logging
 import warnings
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Tuple, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Iterable,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Union,
+)
 
 import torch
 from torch_tensorrt._features import ENABLED_FEATURES
@@ -57,6 +70,7 @@ _CUDA_GRAPH_STRATEGY_MAP: Dict[str, int] = {
     "disabled": 0,
     "whole_graph_capture": 1,
 }
+_TORCHBIND_ENGINE_FQN = "__torch__.torch.classes.tensorrt.Engine"
 
 
 @dataclass(frozen=True)
@@ -75,6 +89,10 @@ class RuntimeSettings:
             handle. A handle is the shared-cache form, typically obtained from
             :func:`torch_tensorrt.runtime.runtime_cache` -- multiple engines
             attaching the same handle share one ``IRuntimeCache``.
+            For engines without a :class:`TorchTensorRTModule` (e.g. loaded
+            via :func:`torch_tensorrt.load`), only ``None`` or a
+            :class:`RuntimeCache` is accepted; a path string raises
+            ``TypeError`` at the :func:`apply_runtime_settings` call site.
 
     Equality compares all fields; for ``runtime_cache``, handle equality is
     by identity (same handle ⇒ same cache).
@@ -354,22 +372,28 @@ class _RuntimeConfigContextManager:
         self._saved: Dict[Any, RuntimeSettings] = {}
 
     def __enter__(self) -> Union["torch.nn.Module", Tuple["torch.nn.Module", ...]]:
-        # Deferred import to avoid a circular dependency at module-load time.
-        from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
-            TorchTensorRTModule,
-        )
+        # Drain the traversal before mutating; raise on unsupported engines
+        # before any settings are changed.
+        engines = list(_iter_trt_engines(self._targets))
 
-        for target in self._targets:
-            for _, mod in target.named_modules():
-                if isinstance(mod, TorchTensorRTModule) and mod.engine is not None:
-                    current = mod.runtime_settings
-                    if mod in self._saved:
-                        # The same TRTModule appears under multiple targets in the
-                        # list (or the tree contains a cycle). Don't snapshot twice.
-                        continue
-                    self._saved[mod] = current
-                    merged = current.merge(**self._overrides)
-                    mod.runtime_settings = merged
+        if any(owner is None for owner, _ in engines):
+            raise TypeError(
+                "runtime_config() encountered module-less TRT engine(s) that it "
+                "cannot snapshot and restore on exit. "
+                "Use apply_runtime_settings() for engines loaded without a "
+                "TorchTensorRTModule (e.g. via torch_tensorrt.load())."
+            )
+
+        for owner, _ in engines:
+            if owner in self._saved:
+                # The same TRTModule appears under multiple targets in the
+                # list (or the tree contains a cycle). Don't snapshot twice.
+                continue
+            current = owner.runtime_settings
+            self._saved[owner] = current
+            merged = current.merge(**self._overrides)
+            owner.runtime_settings = merged
+
         return self._targets if self._yield_tuple else self._targets[0]
 
     def __exit__(self, *args: Any) -> None:
@@ -414,3 +438,193 @@ def set_dynamic_shapes_kernel_strategy(
     return runtime_config(
         target_or_targets, dynamic_shapes_kernel_specialization_strategy=strategy
     )
+
+
+def _send_settings_to_engine(engine: Any, rs: RuntimeSettings) -> None:
+    """Push ``rs`` to whichever TRT engine flavor is attached.
+
+    Dispatches on engine flavor: Python ``TRTEngine`` uses the native
+    ``update_runtime_settings`` method; torchbind engines expect int-valued
+    strategies and a torchbind handle rather than the Python facade.
+    """
+    from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
+    from torch_tensorrt.runtime._runtime_cache import _to_torchbind_handle
+
+    if isinstance(engine, TRTEngine):
+        engine.update_runtime_settings(rs)
+    else:
+        engine.update_runtime_settings(
+            _DYNAMIC_SHAPES_KERNEL_STRATEGY_MAP[
+                rs.dynamic_shapes_kernel_specialization_strategy
+            ],
+            _CUDA_GRAPH_STRATEGY_MAP[rs.cuda_graph_strategy],
+            _to_torchbind_handle(rs.runtime_cache),
+        )
+
+
+def _is_trt_engine(obj: Any) -> bool:
+    """True iff ``obj`` is a TRT engine on either runtime.
+
+    ``isinstance(obj, torch.classes.tensorrt.Engine)`` is unusable -- it raises
+    ``TypeError`` on cpp rt and ``RuntimeError`` on python-only rt.  Compare
+    ``_type().qualified_name()`` on the torchbind flavor, guarded against the
+    ``AttributeError`` the Python engine raises on that method.
+    """
+    from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
+
+    if isinstance(obj, TRTEngine):
+        return True
+    if isinstance(obj, torch.ScriptObject):
+        try:
+            return bool(obj._type().qualified_name() == _TORCHBIND_ENGINE_FQN)
+        except AttributeError:
+            pass
+    return False
+
+
+def _iter_trt_engines(
+    target_or_targets: Any,
+) -> Any:
+    """Yield ``(owner_or_None, engine)`` for every TRT engine reachable from ``target_or_targets``.
+
+    ``owner_or_None`` is the :class:`TorchTensorRTModule` that holds the
+    engine, or ``None`` for a bare engine constant (e.g. in an AOT-loaded
+    ``GraphModule``).
+
+    Accepts an ``nn.Module``, a ``torch.export.ExportedProgram``, or a
+    sequence of those.  Results are deduped by ``id(engine)``.
+    """
+    from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
+
+    seen: Set[int] = set()
+
+    def _visit_ep(ep: Any) -> Any:
+        for obj in ep.constants.values():
+            if _is_trt_engine(obj) and id(obj) not in seen:
+                seen.add(id(obj))
+                yield (None, obj)
+
+    def _visit_module(root: torch.nn.Module) -> Any:
+        for _, mod in root.named_modules():
+            if isinstance(mod, TorchTensorRTModule) and mod.engine is not None:
+                if id(mod.engine) not in seen:
+                    seen.add(id(mod.engine))
+                    yield (mod, mod.engine)
+            if hasattr(mod, "graph"):
+                for node in mod.graph.nodes:
+                    if node.op == "get_attr":
+                        parts = node.target.split(".")
+                        obj: Any = mod
+                        try:
+                            for part in parts:
+                                obj = getattr(obj, part)
+                        except AttributeError:
+                            continue
+                        if _is_trt_engine(obj) and id(obj) not in seen:
+                            seen.add(id(obj))
+                            yield (None, obj)
+
+    def _visit_one(t: Any) -> Any:
+        if isinstance(t, torch.export.ExportedProgram):
+            yield from _visit_ep(t)
+        elif isinstance(t, torch.nn.Module):
+            yield from _visit_module(t)
+        else:
+            raise TypeError(
+                f"_iter_trt_engines(): each target must be an nn.Module or "
+                f"ExportedProgram; got {type(t).__name__}. "
+                "For a torch_tensorrt.load() result, pass the ExportedProgram "
+                "directly or call .module() on it."
+            )
+
+    if isinstance(target_or_targets, (torch.nn.Module, torch.export.ExportedProgram)):
+        yield from _visit_one(target_or_targets)
+    elif isinstance(target_or_targets, Iterable):
+        for t in target_or_targets:
+            yield from _visit_one(t)
+    else:
+        raise TypeError(
+            f"_iter_trt_engines(): target must be an nn.Module, an "
+            f"ExportedProgram, or a sequence of those; got "
+            f"{type(target_or_targets).__name__}."
+        )
+
+
+def apply_runtime_settings(
+    target_or_targets: Any,
+    settings: "RuntimeSettings",
+) -> int:
+    """Apply ``settings`` permanently to every TRT engine reachable from ``target_or_targets``.
+
+    Returns the number of engines updated.  Raises :exc:`RuntimeError` if no
+    TRT engines are found (the shape of the silent-no-op bug this function
+    removes) and :exc:`TypeError` if ``settings.runtime_cache`` is a path
+    string and any reachable engine has no :class:`TorchTensorRTModule` to own
+    the resulting handle.
+
+    Accepted targets:
+
+    * :class:`torch.nn.Module` -- compiled result of
+      :func:`torch_tensorrt.compile`.
+    * :class:`torch.export.ExportedProgram` -- loaded result of
+      :func:`torch_tensorrt.load`.
+    * A sequence (list / tuple) of the above.
+
+    **Ownership rule for module-less engines** (e.g. an AOT-loaded artifact):
+    ``settings.runtime_cache`` must be ``None`` or a :class:`RuntimeCache` you
+    own.  A path string is accepted only where a :class:`TorchTensorRTModule`
+    can own the result and save it on ``__del__``.  If you pass
+    ``RuntimeSettings()`` (whose default ``runtime_cache`` is a path string),
+    you will get a :exc:`TypeError`.  Pass
+    ``RuntimeSettings(runtime_cache=None)`` or supply a
+    :class:`RuntimeCache` explicitly.
+
+    **Warm-load is also the caller's responsibility.**  When a
+    :class:`TorchTensorRTModule` is present it calls :meth:`RuntimeCache.load`
+    automatically (via ``_resolve_runtime_cache``), so cached kernels are
+    available from the first execute without any caller action.  For module-less
+    engines there is no equivalent hook — the caller must call
+    :meth:`RuntimeCache.load` (or :meth:`RuntimeCache.load_from_stream`) before
+    passing the handle to :func:`apply_runtime_settings`, or the engine will
+    start with an empty cache regardless of what is on disk.
+
+    Settings are never serialized; they do not survive
+    :func:`torch_tensorrt.save`.  Re-apply after each :func:`torch_tensorrt.load`.
+    """
+    if not isinstance(settings, RuntimeSettings):
+        raise TypeError(
+            f"apply_runtime_settings(): 'settings' must be a RuntimeSettings; "
+            f"got {type(settings).__name__}."
+        )
+
+    # Drain traversal before mutating (validate-then-apply).
+    engines = list(_iter_trt_engines(target_or_targets))
+
+    if not engines:
+        raise RuntimeError(
+            "apply_runtime_settings(): no TRT engines found under the target(s). "
+            "If the model fell back entirely to PyTorch (no TRT subgraphs were "
+            "compiled), no engines exist to configure."
+        )
+
+    # A path string needs a module to own the resulting RuntimeCache and save
+    # it on __del__.  Module-less engines have no such owner.
+    if isinstance(settings.runtime_cache, str):
+        module_less_count = sum(1 for owner, _ in engines if owner is None)
+        if module_less_count:
+            raise TypeError(
+                f"apply_runtime_settings(): settings.runtime_cache is a path "
+                f"string ({settings.runtime_cache!r}), but {module_less_count} "
+                "engine(s) in the target have no TorchTensorRTModule to own the "
+                "resulting RuntimeCache and persist it on __del__. "
+                "Pass runtime_cache=None (no JIT cache) or a RuntimeCache "
+                "you own and save explicitly."
+            )
+
+    for owner, engine in engines:
+        if owner is not None:
+            owner.runtime_settings = settings
+        else:
+            _send_settings_to_engine(engine, settings)
+
+    return len(engines)
