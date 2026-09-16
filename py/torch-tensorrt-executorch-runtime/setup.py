@@ -12,6 +12,7 @@ import sys
 import uuid
 
 import torch
+import yaml
 from setuptools import Extension, find_packages, setup
 from setuptools.command.build_ext import build_ext
 
@@ -40,7 +41,7 @@ def get_runtime_version() -> str:
 RUNTIME_VERSION = get_runtime_version()
 
 TORCH_REQUIREMENT = "torch>=2.15.0.dev0,<2.16.0"
-EXECUTORCH_REQUIREMENT = "executorch==1.4.1"
+EXECUTORCH_REQUIREMENT = f'executorch=={yaml.safe_load((REPO_ROOT / "dev_dep_versions.yml").read_text())["__executorch_version__"]}'
 TORCH_TENSORRT_REQUIREMENT = "torch-tensorrt>=2.15.0.dev0,<2.16.0"
 
 

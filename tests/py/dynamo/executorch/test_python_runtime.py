@@ -114,8 +114,10 @@ def test_missing_model():
         load_runtime_module().load("does-not-exist.pte")
 
 
-def test_activate_twice_is_safe(monkeypatch):
+def test_activate_claims_both_extension_names_and_is_idempotent(monkeypatch):
     delegate = load_delegate_module()
+    modules = {}
+    monkeypatch.setattr(delegate, "sys", types.SimpleNamespace(modules=modules))
     monkeypatch.setattr(delegate, "_probe_portable_lib_dependencies", lambda: None)
     data_loader = types.ModuleType(delegate.__name__ + ".data_loader")
     native = types.ModuleType(delegate.__name__ + "._portable_lib")
@@ -133,12 +135,28 @@ def test_activate_twice_is_safe(monkeypatch):
     )
     assert delegate.activate() is native
     wrapper = types.ModuleType(delegate._WRAPPER_NAME)
-    monkeypatch.setitem(sys.modules, delegate._WRAPPER_NAME, wrapper)
+    modules[delegate._WRAPPER_NAME] = wrapper
     assert delegate.activate() is native
     assert imported == [data_loader.__name__, native.__name__]
-    assert sys.modules[delegate._NATIVE_NAME] is native
-    assert sys.modules[delegate._DATA_LOADER_NAME] is data_loader
-    assert sys.modules[delegate._WRAPPER_NAME] is wrapper
+    assert modules.get("executorch.extension.pybindings._C") is native
+    assert modules.get("executorch.extension.pybindings._portable_lib") is native
+    assert modules[delegate._DATA_LOADER_NAME] is data_loader
+    assert modules[delegate._WRAPPER_NAME] is wrapper
+
+
+@pytest.mark.parametrize("alias", ["_NATIVE_NAME", "_LEGACY_NATIVE_NAME"])
+def test_activation_check_detects_missing_alias(monkeypatch, alias):
+    source = DELEGATE_PATH.read_text()
+    assignment = f"    sys.modules[{alias}] = native\n"
+    assert assignment in source
+    delegate = types.ModuleType("torchtrt_et_delegate_test")
+    exec(
+        compile(source.replace(assignment, ""), str(DELEGATE_PATH), "exec"),
+        delegate.__dict__,
+    )
+    monkeypatch.setattr(sys.modules[__name__], "load_delegate_module", lambda: delegate)
+    with pytest.raises(AssertionError):
+        test_activate_claims_both_extension_names_and_is_idempotent(monkeypatch)
 
 
 def test_activate_rejects_preloaded_stock_runtime(monkeypatch):
@@ -154,6 +172,7 @@ def test_activate_rejects_preloaded_stock_wrapper(monkeypatch):
     delegate = load_delegate_module()
     stock_wrapper = types.ModuleType(delegate._WRAPPER_NAME)
     monkeypatch.delitem(sys.modules, delegate._NATIVE_NAME, raising=False)
+    monkeypatch.delitem(sys.modules, delegate._LEGACY_NATIVE_NAME, raising=False)
     monkeypatch.setitem(sys.modules, delegate._WRAPPER_NAME, stock_wrapper)
 
     with pytest.raises(
@@ -178,6 +197,7 @@ def test_activate_cleans_up_data_loader_when_native_import_fails(monkeypatch):
         delegate, "importlib", types.SimpleNamespace(import_module=fake_import)
     )
     monkeypatch.delitem(sys.modules, delegate._NATIVE_NAME, raising=False)
+    monkeypatch.delitem(sys.modules, delegate._LEGACY_NATIVE_NAME, raising=False)
     monkeypatch.delitem(sys.modules, delegate._DATA_LOADER_NAME, raising=False)
 
     with pytest.raises(delegate.DelegateCompatibilityError):
@@ -193,6 +213,7 @@ def test_activate_checks_native_dependencies_before_importing_data_loader(monkey
     calls = []
 
     monkeypatch.delitem(sys.modules, delegate._NATIVE_NAME, raising=False)
+    monkeypatch.delitem(sys.modules, delegate._LEGACY_NATIVE_NAME, raising=False)
     monkeypatch.delitem(sys.modules, delegate._WRAPPER_NAME, raising=False)
     monkeypatch.delitem(sys.modules, delegate._DATA_LOADER_NAME, raising=False)
 
@@ -216,6 +237,7 @@ def test_activate_dependency_probe_fails_before_data_loader_import(monkeypatch):
     imports = []
 
     monkeypatch.delitem(sys.modules, delegate._NATIVE_NAME, raising=False)
+    monkeypatch.delitem(sys.modules, delegate._LEGACY_NATIVE_NAME, raising=False)
     monkeypatch.delitem(sys.modules, delegate._WRAPPER_NAME, raising=False)
 
     def fail_probe():
