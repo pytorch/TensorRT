@@ -40,13 +40,16 @@ jobs:
     environment: pytorchbot-env
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          token: ${{ secrets.GH_PYTORCHBOT_TOKEN }}
+          # No token and no stored credentials. Only the step that opens the pull request needs to
+          # act as the bot, and it takes its own token, so leaving the bot's credentials in the git
+          # config would hand push rights to every later step and to the actions they run.
+          persist-credentials: false
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.11"
 
@@ -54,7 +57,12 @@ jobs:
         run: python -m pip install packaging pyyaml
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
+        with:
+          # Pinned rather than latest. A newer resolver rejects this project outright, because the
+          # declared Python range has no ceiling while the dependency chain stops short of the newest
+          # interpreter, so an unpinned upgrade breaks the lock refresh with no change on our side.
+          version: "0.12.5"
 
       - name: Choose the track
         id: track
@@ -78,7 +86,9 @@ jobs:
                 # Once a release ships its pin is history. A candidate tag is not a release, so
                 # match a final tag only, or a dispatch during a release candidate would refuse.
                 version="${REF#refs/heads/release/}"
-                if [ "${RELEASE_TAGGED:-}" = "true" ] ||
+                # Any value other than an explicit false counts as tagged, so a typo closes the
+                # guard rather than skipping it. Only an empty value asks for the real lookup.
+                if { [ -n "${RELEASE_TAGGED:-}" ] && [ "${RELEASE_TAGGED}" != "false" ]; } ||
                    { [ -z "${RELEASE_TAGGED:-}" ] &&
                      git ls-remote --tags origin "v${version}.*" 2>/dev/null |
                        grep -qE "refs/tags/v${version}\.[0-9]+$"; }; then

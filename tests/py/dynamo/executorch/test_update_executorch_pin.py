@@ -624,3 +624,4 @@ def test_write_pins_finishes_an_interrupted_run(pin_repo, monkeypatch):
         lambda: [updater._VERSIONS_FILE, already],
     )
     assert updater.write_pins(target_version, target_commit) is True
+

@@ -180,7 +180,11 @@ required-environments = [
     "sys_platform == 'linux' and python_version >= '3.10' and python_version <= '3.13' and platform_machine == 'aarch64'",
     "sys_platform == 'win32' and python_version >= '3.10' and python_version <= '3.13' and platform_machine == 'AMD64'"
 ]
-prerelease = "if-necessary-or-explicit"
+# The committed lock records "allow", because every workflow that refreshes it passes that
+# explicitly: this project depends on nightly builds of torch and ExecuTorch, which are prereleases.
+# Declaring it here means a plain `uv lock` reproduces the committed lock instead of seeing it as
+# stale, so a lock check and a refresh agree.
+prerelease = "allow"
 index-strategy = "unsafe-best-match"
 conflicts = [
     [
