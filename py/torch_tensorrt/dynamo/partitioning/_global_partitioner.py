@@ -22,6 +22,7 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     ConverterRegistry,
 )
+from torch_tensorrt.dynamo.partitioning.common import node_in_torch_executed_module
 from torch_tensorrt.dynamo.utils import COMPLEX_DTYPES, to_torch_device
 
 logger = logging.getLogger(__name__)
@@ -143,6 +144,7 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
         self,
         support_dict: Optional[SupportDict] = None,
         torch_executed_ops: Collection[Target] = set(),
+        torch_executed_modules: Collection[str] = set(),
     ):
         super().__init__(support_dict)
 
@@ -150,6 +152,7 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
         self.supported_operators: Dict[str, int] = {}
         self.unsupported_operators: Dict[str, int] = {}
         self.torch_executed_ops: Collection[Target] = torch_executed_ops
+        self.torch_executed_modules: Collection[str] = torch_executed_modules
         self._non_target_device_cache: Dict[torch.fx.Node, bool] = {}
 
     @staticmethod
@@ -344,6 +347,7 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
             (node in CONVERTERS or node.op == "get_attr")
             and node_name not in self.torch_executed_ops
             and node.target not in self.torch_executed_ops
+            and not node_in_torch_executed_module(node, self.torch_executed_modules)
         ):
             # If node is a proper, supported computational node, store the operator
             if not node.is_impure() and node.op != "get_attr":
@@ -394,6 +398,7 @@ def partition(
     gm: torch.fx.GraphModule,
     min_block_size: int = MIN_BLOCK_SIZE,
     torch_executed_ops: Collection[Target] = set(),
+    torch_executed_modules: Collection[str] = set(),
     require_full_compilation: bool = REQUIRE_FULL_COMPILATION,
 ) -> Tuple[torch.fx.GraphModule, TorchTensorRTOperatorSupport]:
     """Partition an FX GraphModule with aten ops into TRT engines
@@ -403,11 +408,28 @@ def partition(
         gm: FX GraphModule to partition
         min_block_size: Minimum number of operators per TRT-Engine Block
         torch_executed_ops: Collection of operations to run in Torch, regardless of converter coverage
+        torch_executed_modules: Collection of modules to run in Torch
         require_full_compilation: Whether to require that all operators be run in TRT
     Returns:
         torch.fx.GraphModule, TorchTensorRTOperatorSupport
     """
-    supported_ops = TorchTensorRTOperatorSupport(torch_executed_ops=torch_executed_ops)
+    if torch_executed_modules:
+        all_module_types = {
+            module_type
+            for node in gm.graph.nodes
+            for _, module_type in (node.meta.get("nn_module_stack") or {}).values()
+        }
+        unmatched = set(torch_executed_modules) - all_module_types
+        if unmatched:
+            logger.warning(
+                f"The following torch_executed_modules were not found in the graph: "
+                f"{unmatched}. Ensure the module names are fully-qualified class names."
+            )
+
+    supported_ops = TorchTensorRTOperatorSupport(
+        torch_executed_ops=torch_executed_ops,
+        torch_executed_modules=torch_executed_modules,
+    )
     partitioner = TRTPartitioner(
         gm,
         supported_ops,
