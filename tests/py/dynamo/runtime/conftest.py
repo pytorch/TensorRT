@@ -1,6 +1,18 @@
 # type: ignore
 
+from pathlib import Path
+
 import pytest
+
+_RUNTIME_TEST_DIR = Path(__file__).parent
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_collection_modifyitems(items):
+    """Include runtime tests that exercise TensorRT runtime APIs in trt-api."""
+    for item in items:
+        if _RUNTIME_TEST_DIR in Path(item.path).parents:
+            item.add_marker(pytest.mark.trt_api)
 
 
 def pytest_addoption(parser):

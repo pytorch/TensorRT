@@ -2,7 +2,6 @@
 
 import pytest
 import torch
-
 import torch_tensorrt
 import torch_tensorrt.kernels as ttk
 from torch_tensorrt.kernels._derive import _torch_output_shape_dtype
@@ -19,6 +18,8 @@ from .conftest import (
     skip_no_cuda,
     skip_no_qdp,
 )
+
+pytestmark = [pytest.mark.trt_api]
 
 # ---- No-GPU: validation & shape inference ----
 

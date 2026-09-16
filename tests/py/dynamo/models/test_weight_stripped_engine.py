@@ -4,6 +4,7 @@ import pickle
 import shutil
 import unittest
 
+import pytest
 import torch
 import torch_tensorrt as torch_trt
 from torch.testing._internal.common_utils import TestCase
@@ -13,6 +14,8 @@ from torch_tensorrt.dynamo._refit import refit_module_weights
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 
 import tensorrt as trt  # isort: skip  # must import after torch_tensorrt to resolve tensorrt_rtx alias
+
+pytestmark = [pytest.mark.trt_api]
 
 assertions = unittest.TestCase()
 
