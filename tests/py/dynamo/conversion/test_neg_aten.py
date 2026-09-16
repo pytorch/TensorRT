@@ -21,8 +21,8 @@ class TestNegConverter(DispatchTestCase):
             def forward(self, input):
                 return torch.ops.aten.neg.default(input)
 
-        inputs = [torch.randn(x, dtype=type)]
-        self.run_test(neg(), inputs, precision=type)
+        inputs = [torch.randn(x, dtype=type).cuda()]
+        self.run_test(neg(), inputs)
 
     @parameterized.expand(
         [

@@ -51,11 +51,10 @@ class TestHardSigmoidConverter(DispatchTestCase):
             def forward(self, x):
                 return torch.ops.aten.hardsigmoid.default(x)
 
-        inputs = [torch.randn(1, 10)]
+        inputs = [torch.randn(1, 10, dtype=torch.float16)]
         self.run_test(
             TestModule(),
             inputs,
-            precision=torch.half,
             check_dtype=False,
         )
 
