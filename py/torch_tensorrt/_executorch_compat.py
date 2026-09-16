@@ -67,7 +67,18 @@ def load(path: Union[str, Path]) -> Program:
     if not model_path.is_file():
         raise FileNotFoundError(f"ExecuTorch model not found: {model_path}")
     data = model_path.read_bytes()
-    register()
+    try:
+        register()
+    except ImportError as error:
+        # A companion published before registration became a single call swapped in its own copy of
+        # ExecuTorch's bindings, and refuses once ExecuTorch's own copy is already loaded. Its advice
+        # is to import it earlier, which a caller of this function cannot do: the import it collides
+        # with happens inside this library. Say the thing that does work instead.
+        raise ImportError(
+            "The installed torch_tensorrt_executorch_runtime is too old to register alongside "
+            "ExecuTorch's own bindings. Upgrade it to a build that registers on import, from the "
+            f"same release matrix as Torch-TensorRT. Underlying error: {error}"
+        ) from error
     # The Module API honors device-tagged arenas; the host Program loader does not.
     from executorch.extension.pybindings.portable_lib import (
         _load_for_executorch_from_buffer,

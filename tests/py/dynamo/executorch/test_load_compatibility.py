@@ -472,3 +472,23 @@ def test_the_published_main_wheel_can_still_reach_the_loader_it_imports() -> Non
     assert [a.arg for a in load.args.args] == ["file_path"], [
         a.arg for a in load.args.args
     ]
+
+
+@pytest.mark.unit
+def test_an_old_companion_gets_advice_it_can_act_on(
+    compiler, monkeypatch, tmp_path
+) -> None:
+    """An older companion refuses once ExecuTorch's own bindings are loaded, and says to import it
+    earlier. A caller cannot do that: the colliding import happens inside this library. So the
+    message has to name the thing that does work, which is upgrading the companion."""
+    module = types.ModuleType("torch_tensorrt_executorch_runtime")
+
+    def activate():
+        raise ImportError("import torch_tensorrt_executorch_runtime before executorch")
+
+    module.activate = activate
+    monkeypatch.setitem(sys.modules, "torch_tensorrt_executorch_runtime", module)
+    program = tmp_path / "m.pte"
+    program.write_bytes(b"unused")
+    with pytest.raises(ImportError, match="too old to register"):
+        compiler.load(str(program), format="executorch")
