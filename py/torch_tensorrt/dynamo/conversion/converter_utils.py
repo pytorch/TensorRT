@@ -760,14 +760,14 @@ def to_numpy(
 
             output = value.cpu().detach().contiguous().numpy()
 
+        elif isinstance(value, bool):
+            output = np.array([value], dtype=np.bool_)
+
         elif isinstance(value, int):
             output = np.array([value], dtype=np.int32)
 
         elif isinstance(value, float):
             output = np.array([value], dtype=np.float32)
-
-        elif isinstance(value, bool):
-            output = np.array([value], dtype=np.bool_)
 
         if isinstance(output, np.ndarray) or output is None:
             return (
@@ -813,14 +813,14 @@ def to_torch(
         elif isinstance(value, np.ndarray):
             output = torch.from_numpy(value).to(cpu_device).contiguous()
 
+        elif isinstance(value, bool):
+            output = torch.tensor([value], device=cpu_device, dtype=torch.bool)
+
         elif isinstance(value, int):
             output = torch.tensor([value], device=cpu_device, dtype=torch.int32)
 
         elif isinstance(value, float):
             output = torch.tensor([value], device=cpu_device, dtype=torch.float32)
-
-        elif isinstance(value, bool):
-            output = torch.tensor([value], device=cpu_device, dtype=torch.bool)
 
         else:
             raise AssertionError(
