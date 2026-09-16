@@ -33,6 +33,33 @@ def _is_modelopt_quantized(model: torch.nn.Module) -> bool:
         return False
 
 
+def _pin_torch_executed_state(gm: torch.fx.GraphModule, device: torch.device) -> None:
+    """Place the state the compiled module still executes in PyTorch on ``device``.
+
+    Only the TensorRT submodules can spare their weights -- those live inside the engine.
+    Everything the partitioner left in PyTorch still reads its parameters from the graph
+    module, and ``compile_module`` puts those submodules on the target device the same way.
+    """
+    for name, submodule in gm.named_children():
+        if not isinstance(submodule, torch.fx.GraphModule):
+            continue
+        if "_run_on_acc" in name:
+            continue
+        submodule.to(device)
+
+
+def _offload_original_model(module: "MutableTorchTensorRTModule") -> None:
+    """Offload the source PyTorch module without breaking the compiled one.
+
+    The compiled graph module holds the very same ``torch.nn.Parameter`` objects as the
+    module it was compiled from, and ``deallocate_module`` moves them in place, so any
+    weight a PyTorch-executed node still needs has to be put back afterwards.
+    """
+    deallocate_module(module.original_model)
+    if module.gm is not None:
+        _pin_torch_executed_state(module.gm, to_torch_device(module.trt_device))
+
+
 class RefitFlag(Enum):
     UNKNOWN = auto()
     NEEDS_REFIT = auto()
@@ -262,7 +289,8 @@ class MutableTorchTensorRTModule(object):
             args, kwargs, result = self.run_info
             self.original_model.to(to_torch_device(self.trt_device))
             new_result = self.original_model(*args, **kwargs)
-            deallocate_module(self.original_model)
+            if self.additional_settings.get("offload_module_to_cpu", False):
+                _offload_original_model(self)
             if check_output_equal(result, new_result):
                 self.refit_state.set_state(RefitFlag.LIVE)
                 return
@@ -310,7 +338,8 @@ class MutableTorchTensorRTModule(object):
             in_place=True,
         )
 
-        deallocate_module(self.original_model)
+        if self.additional_settings.get("offload_module_to_cpu", False):
+            _offload_original_model(self)
 
     def get_exported_program(self) -> torch.export.ExportedProgram:
 
@@ -366,7 +395,7 @@ class MutableTorchTensorRTModule(object):
             **self.additional_settings,
         )
         if self.additional_settings.get("offload_module_to_cpu", False):
-            deallocate_module(self.original_model)
+            _offload_original_model(self)
         if self.enable_weight_streaming:
             self.set_weight_streaming_ctx(self.weight_streaming_budget)
 
@@ -729,7 +758,8 @@ class MutableTorchTensorRTModule(object):
         module.exp_program = torch.export.export(
             module.original_model, module.arg_inputs, kwargs=module.kwarg_inputs
         )
-        deallocate_module(module.original_model)
+        if module.additional_settings.get("offload_module_to_cpu", False):
+            _offload_original_model(module)
         cls = module.__class__
         module.__class__ = type(
             module.original_model.__class__.__name__,
