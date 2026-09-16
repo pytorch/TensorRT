@@ -386,6 +386,41 @@ def copy_submodule_attributes(
         _assign_attr(value, gm, key, _AttrKind.BUFFER)
 
 
+def _order_placeholders_first(gm: torch.fx.GraphModule) -> None:
+    """Hoist every placeholder to the front of the node list, keeping their
+    relative order.
+
+    ``make_constraints()`` indexes ``flat_dynamic_shapes`` by *node* position while
+    walking ``enumerate(gm.graph.nodes)``, so it silently requires placeholders to lead
+    the graph. For ``nn.Linear(10, 5)`` with one dynamic input::
+
+        converted (placeholders lead)     fully fallen back to PyTorch
+        [0] placeholder    x              [0] get_attr       linear_weight
+        [1] get_attr       engine_0       [1] get_attr       linear_bias
+        [2] call_function  ...            [2] placeholder    x
+        [3] output                        [3] call_function  linear
+                                          [4] output
+
+    Unlifting puts the parameters ahead of the user input, so on the right the lone
+    input sits at node index 2 and the lookup becomes ``flat_dynamic_shapes[2]`` on a
+    one-element list: ``save()`` dies with a bare ``IndexError`` while its own length
+    check passes. Placeholders take no arguments, so hoisting cannot break topological
+    order, and preserving their relative order leaves the forward signature,
+    ``input_nodes``, ``in_spec`` and InputSpec ordering unchanged.
+    """
+    nodes = list(gm.graph.nodes)
+    placeholders = [node for node in nodes if node.op == "placeholder"]
+    if not placeholders or nodes[: len(placeholders)] == placeholders:
+        return
+
+    for node in reversed(placeholders):
+        first = next(iter(gm.graph.nodes))
+        if node is not first:
+            first.prepend(node)
+
+    gm.graph.lint()
+
+
 def create_trt_exp_program(
     gm: torch.fx.GraphModule,
     *,
@@ -396,6 +431,8 @@ def create_trt_exp_program(
     """Creates a new Exported Program. This function takes an torch.fx.GraphModule which has TRT engines
     and constructs an Exported Program object with the new IO node names and state_dict
     """
+
+    _order_placeholders_first(gm)
 
     input_nodes = [node for node in gm.graph.nodes if node.op == "placeholder"]
     output_nodes = [node for node in gm.graph.nodes if node.op == "output"]

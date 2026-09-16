@@ -74,7 +74,7 @@ def test_inline_torch_modules_wires_inputs_by_position():
 @pytest.mark.unit
 def test_inline_torch_modules_preserves_all_submodule_outputs():
     """A multi-output _run_on_gpu submodule must keep every output wired to its
-    consumer after inlining. Regression: a mis-wired input orphaned one submodule
+    consumer after inlining. Regression: a miswired input orphaned one submodule
     output, which dead-code elimination then pruned, leaving a downstream consumer
     (or, in the hybrid case, a TensorRT engine) short an output at runtime.
 
@@ -322,6 +322,64 @@ def test_create_trt_exp_program_reorders_kwargs_to_placeholder_order():
     out = ep.module()(a=torch.tensor(10.0), b=torch.tensor(3.0))
     out = out[0] if isinstance(out, (tuple, list)) else out
     assert torch.allclose(out, torch.tensor(7.0))
+
+
+@pytest.mark.unit
+def test_create_trt_exp_program_handles_get_attrs_before_placeholders():
+    """create_trt_exp_program must build range_constraints on a graph whose
+    get_attr nodes precede its user input.
+
+    Regression: when the partitioner sends ops back to PyTorch the parameters
+    come back as get_attr nodes AHEAD of the user inputs. torch's
+    make_constraints() indexes flat_dynamic_shapes by NODE position, not by
+    placeholder ordinal, so the lone input sitting at node index 2 made it read
+    flat_dynamic_shapes[2] on a one-element list and torch_tensorrt.save() died
+    with a bare "IndexError: list index out of range". Its own length check
+    passes, so nothing pointed at the real problem. An exported module reproduces
+    the node order exactly.
+    """
+
+    class Linear(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear = torch.nn.Linear(10, 5)
+
+        def forward(self, x):
+            return self.linear(x)
+
+    batch = torch.export.Dim("batch", min=2, max=8)
+    gm = torch.export.export(
+        Linear().eval(), (torch.randn(4, 10),), dynamic_shapes={"x": {0: batch}}
+    ).module()
+    # A compiled TRT GraphModule carries no _guards_fn; drop it so the graph
+    # matches what create_trt_exp_program is handed in the normal flow.
+    for node in list(gm.graph.nodes):
+        if node.op == "call_module" and node.target == "_guards_fn":
+            gm.graph.erase_node(node)
+            break
+    gm.graph.lint()
+    gm.recompile()
+
+    nodes = list(gm.graph.nodes)
+    assert nodes[0].op == "get_attr"
+    assert [n.op for n in nodes].index("placeholder") > 0
+
+    ep = create_trt_exp_program(
+        gm, arg_inputs=(torch.randn(4, 10),), dynamic_shapes={"x": {0: batch}}
+    )
+
+    # The user-specified Dim bound survived, so path 1 (make_constraints) ran.
+    assert [str(vr) for vr in ep.range_constraints.values()] == ["VR[2, 8]"]
+    assert [s.kind.name for s in ep.graph_signature.input_specs] == [
+        "PARAMETER",
+        "PARAMETER",
+        "USER_INPUT",
+    ]
+
+    # And the program still runs at another batch size within the range.
+    out = ep.module()(torch.randn(3, 10))
+    out = out[0] if isinstance(out, (tuple, list)) else out
+    assert out.shape == (3, 5)
 
 
 @pytest.mark.unit
