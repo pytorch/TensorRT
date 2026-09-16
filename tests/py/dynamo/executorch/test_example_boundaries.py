@@ -17,7 +17,9 @@ _ROOT = Path(__file__).resolve().parents[4]
 _EXPORT = _ROOT / "examples/torchtrt_executorch_example/export_device_resident.py"
 
 
-def _export(monkeypatch, path, remove_guard=False):
+def _export(
+    monkeypatch, path, remove_guard=False, delegates=None, operators=(), copy_ops=None
+):
     tree = ast.parse(_EXPORT.read_text())
     main = next(
         node
@@ -56,7 +58,11 @@ def _export(monkeypatch, path, remove_guard=False):
         "sys": sys,
         "CoalescedModel": Model,
         "SHAPE": (64, 64),
-        "BOUNDARY_COPY_OPS": (),
+        # Default to the real names, so a program carrying a boundary copy is rejected. An empty
+        # tuple made the check vacuous: nothing could ever match it.
+        "BOUNDARY_COPY_OPS": (
+            ("_h2d_copy", "_d2h_copy") if copy_ops is None else copy_ops
+        ),
         "torch": SimpleNamespace(
             no_grad=nullcontext,
             randn=lambda _: tensor,
@@ -79,9 +85,13 @@ def _export(monkeypatch, path, remove_guard=False):
                     SimpleNamespace(
                         delegates=[
                             SimpleNamespace(id=name)
-                            for name in ("TensorRTBackend", "CudaBackend")
+                            for name in (
+                                ("TensorRTBackend", "CudaBackend")
+                                if delegates is None
+                                else delegates
+                            )
                         ],
-                        operators=[],
+                        operators=[SimpleNamespace(name=n, overload="") for n in operators],
                         inputs=[],
                         outputs=[],
                     )
@@ -155,7 +165,12 @@ def test_device_input_check_precedes_load(monkeypatch, optimize, is_cuda, remove
         "torch": SimpleNamespace(
             float32=object(),
             cuda=SimpleNamespace(is_available=lambda: True),
-            ones=lambda *args, **kwargs: SimpleNamespace(is_cuda=is_cuda),
+            # Honour the device the script asks for, rather than answering from the parameter
+            # alone. A stub that ignores it reports a CUDA tensor even when the script forgot to
+            # request one, so the guard below would pass while the example was broken.
+            ones=lambda *args, device=None, **kwargs: SimpleNamespace(
+                is_cuda=is_cuda and str(device) == "cuda"
+            ),
         ),
         "_load_for_executorch": load,
     }
@@ -166,3 +181,33 @@ def test_device_input_check_precedes_load(monkeypatch, optimize, is_cuda, remove
     with pytest.raises(error, match=message):
         exec(compile(tree, str(path), "exec", optimize=optimize), namespace)
     assert calls == (["unused.pte"] if reaches_load else [])
+
+
+@pytest.mark.parametrize(
+    "delegates,expected",
+    [
+        (("CudaBackend",), "missing"),
+        (("TensorRTBackend",), "missing"),
+        ((), "missing"),
+    ],
+)
+def test_export_rejects_a_program_that_is_not_coalesced(
+    monkeypatch, tmp_path, delegates, expected
+):
+    """The coalescing check never ran, because the stub program always carried both delegates."""
+    with pytest.raises(SystemExit, match=expected):
+        _export(monkeypatch, tmp_path / "m.pte", delegates=delegates)
+
+
+def test_export_rejects_a_program_that_still_copies_at_the_boundary(
+    monkeypatch, tmp_path
+):
+    """The copy check never ran either: the operator table was empty and the names it looks for
+    were an empty tuple, so nothing could match and the rejection path was unreachable.
+    """
+    with pytest.raises(SystemExit, match="still copies across the method boundary"):
+        _export(
+            monkeypatch,
+            tmp_path / "m.pte",
+            operators=("aten::_h2d_copy_default",),
+        )
