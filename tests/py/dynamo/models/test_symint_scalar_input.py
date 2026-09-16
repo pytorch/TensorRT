@@ -14,7 +14,10 @@ import unittest
 import pytest
 import torch
 import torch_tensorrt as torchtrt
+from torch_tensorrt import ENABLED_FEATURES
 from torch_tensorrt.dynamo._exporter import transform
+from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
+from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 
 assertions = unittest.TestCase()
@@ -247,3 +250,49 @@ def test_symfloat_scalar_input():
     finally:
         torch._dynamo.config.capture_scalar_outputs = False
         torch._dynamo.reset()
+
+
+@pytest.mark.unit
+def test_select_with_scalar_index_across_partition():
+    """A computed index crossing the partition boundary must give eager's shape.
+
+    The index is produced by a Torch subgraph and arrives at the engine as a runtime value.
+    TensorRT's gather keeps the axis it gathers along unless the index is rank 0, so without
+    the squeeze this returns (1, 4) where eager returns (4,), silently.
+
+    This also covers the runtime half of that path, which a converter test cannot reach: a
+    converter test builds one engine and hands it real tensors, so it never sends a host
+    scalar into a binding.
+    """
+
+    class SelectComputedIndex(torch.nn.Module):
+        def forward(self, values, positions):
+            return torch.ops.aten.select.int(values, 0, positions.sum().item())
+
+    model = SelectComputedIndex().eval().cuda()
+    values = torch.randn(8, 4, device="cuda")
+    positions = torch.tensor([1, 2], dtype=torch.int64, device="cuda")
+
+    exported = torch.export.export(model, (values, positions))
+    compiled = torchtrt.dynamo.compile(
+        exported,
+        inputs=[values, positions],
+        min_block_size=1,
+        enabled_precisions={torch.float32},
+        truncate_double=True,
+    )
+    engines = [
+        m.engine for m in compiled.modules() if isinstance(m, TorchTensorRTModule)
+    ]
+    assertions.assertTrue(engines, "expected a TensorRT engine")
+    backend = (
+        torch.ScriptObject if ENABLED_FEATURES.torch_tensorrt_runtime else TRTEngine
+    )
+    for engine in engines:
+        assertions.assertIsInstance(engine, backend)
+
+    for indices in ([1, 2], [2, 3], [0, 0]):
+        positions = torch.tensor(indices, dtype=torch.int64, device="cuda")
+        torch.testing.assert_close(
+            compiled(values, positions), model(values, positions)
+        )

@@ -101,12 +101,18 @@ def extract_symbolic_shape_expressions(
             scalar_dtype = input_dtypes_by_name.get(
                 input_node.name, default_scalar_dtype
             )
+            # A SymInt binding is declared as a rank 1 shape tensor and a SymFloat binding
+            # as rank 0, so record which one this is. Both ends that materialize the scalar
+            # read this, and they have to agree with what the binding declares.
             input_info.append(
                 {
                     "shape_exprs": [],
                     "dtype": scalar_dtype,
                     "name": input_node.name,
                     "is_scalar": True,
+                    "binding_rank": (
+                        1 if isinstance(input_val, (torch.SymInt, int)) else 0
+                    ),
                 }
             )
         else:
