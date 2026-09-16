@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=05b7514e"></script>
+    <script src="../../../_static/documentation_options.js?v=fa5c35e5"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -528,6 +528,7 @@ document.write(`
     <span class="n">aliased_input_bindings</span><span class="p">,</span>
     <span class="n">assert_no_kv_alias_markers_survived</span><span class="p">,</span>
     <span class="n">assert_predicted_kv_aliased</span><span class="p">,</span>
+    <span class="n">erase_export_guards</span><span class="p">,</span>
     <span class="n">hide_copyback_outputs</span><span class="p">,</span>
     <span class="n">inline_lifted_buffers_into_gm</span><span class="p">,</span>
     <span class="n">lift_mutated_buffers</span><span class="p">,</span>
@@ -1816,6 +1817,37 @@ document.write(`
             <span class="s2">"Some nodes do not have metadata (shape and dtype information). This could lead to problems sometimes if the graph has PyTorch and TensorRT segments."</span>
         <span class="p">)</span>
 
+    <span class="c1"># Every computational op is TRT-legal: skip AccNodesFinder / tag / split and</span>
+    <span class="c1"># convert the lowered graph as a single engine. Mixed graphs still partition.</span>
+    <span class="k">if</span> <span class="p">(</span>
+        <span class="n">settings</span><span class="o">.</span><span class="n">require_full_compilation</span>
+        <span class="ow">and</span> <span class="n">num_supported_ops</span> <span class="o">==</span> <span class="n">total_ops</span>
+        <span class="ow">and</span> <span class="ow">not</span> <span class="n">settings</span><span class="o">.</span><span class="n">enable_resource_partitioning</span>
+    <span class="p">):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">"require_full_compilation + full operator support: "</span>
+            <span class="s2">"skipping partitioner, converting whole graph"</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">dryrun</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">gm</span>
+        <span class="n">gm</span> <span class="o">=</span> <span class="n">erase_export_guards</span><span class="p">(</span><span class="n">gm</span><span class="p">)</span>
+        <span class="c1"># Do not delete `_frozen_param*` here. Stock compile_module only drops</span>
+        <span class="c1"># them on the parent after split; convert still needs them on the</span>
+        <span class="c1"># graph being interpreted. Use placeholder meta for engine I/O — a</span>
+        <span class="c1"># flattened copy of compile() sample args can wrap kwargs dicts and</span>
+        <span class="c1"># non-tensor flags (Flux `return_dict`) that are not TRT bindings.</span>
+        <span class="n">convert_inputs</span> <span class="o">=</span> <span class="n">partitioning</span><span class="o">.</span><span class="n">construct_submodule_inputs</span><span class="p">(</span>
+            <span class="n">gm</span><span class="p">,</span>
+            <span class="n">user_symbol_bounds</span><span class="o">=</span><span class="n">user_symbol_bounds</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">convert_module</span><span class="p">(</span>
+            <span class="n">gm</span><span class="p">,</span>
+            <span class="n">convert_inputs</span><span class="p">,</span>
+            <span class="n">settings</span><span class="o">=</span><span class="n">settings</span><span class="p">,</span>
+            <span class="n">name</span><span class="o">=</span><span class="s2">"_run_on_acc_0"</span><span class="p">,</span>
+            <span class="n">engine_cache</span><span class="o">=</span><span class="n">engine_cache</span><span class="p">,</span>
+        <span class="p">)</span>
+
     <span class="c1"># Store the original input spec for later use</span>
     <span class="n">original_in_spec</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="s2">"_in_spec"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
     <span class="n">original_out_spec</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="s2">"_out_spec"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
@@ -1850,6 +1882,9 @@ document.write(`
                 <span class="n">torch_executed_ops</span><span class="o">=</span><span class="n">settings</span><span class="o">.</span><span class="n">torch_executed_ops</span><span class="p">,</span>
                 <span class="n">require_full_compilation</span><span class="o">=</span><span class="n">settings</span><span class="o">.</span><span class="n">require_full_compilation</span><span class="p">,</span>
                 <span class="n">skip_fusion</span><span class="o">=</span><span class="p">(</span><span class="n">num_supported_ops</span> <span class="o">==</span> <span class="n">total_ops</span><span class="p">),</span>
+                <span class="n">assume_full_support</span><span class="o">=</span><span class="p">(</span>
+                    <span class="n">settings</span><span class="o">.</span><span class="n">require_full_compilation</span> <span class="ow">and</span> <span class="n">num_supported_ops</span> <span class="o">==</span> <span class="n">total_ops</span>
+                <span class="p">),</span>
             <span class="p">)</span>
 
         <span class="k">except</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">passes</span><span class="o">.</span><span class="n">splitter_base</span><span class="o">.</span><span class="n">FxNetSplitterInternalError</span><span class="p">:</span>
