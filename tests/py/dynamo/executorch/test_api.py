@@ -878,10 +878,29 @@ def test_the_runtime_package_ships_no_runtime_api():
         "the delegate package exports something beyond its registration surface and the "
         f"entry points it has to keep: {sorted(exported)}"
     )
-    # Both forward to ExecuTorch rather than returning None, so a caller that used the return
-    # value of the published API still gets something usable.
-    assert "return portable_lib" in delegate_init.split("def activate")[1]
-    assert "return Runtime.get()" in delegate_init.split("def get_runtime")[1]
+    # Both forward to ExecuTorch rather than returning None, so a caller that used the return value
+    # of the published API still gets something usable. Read the parsed function rather than the
+    # text: a substring is satisfied by a commented-out line, which is the shape of the change this
+    # is meant to catch. What the forwarding actually does at run time is covered where the shims
+    # are called, in test_shared_runtime_workflow.
+    forwards = {"activate": "portable_lib", "get_runtime": "Runtime"}
+    functions = {
+        node.name: node
+        for node in ast.parse(delegate_init).body
+        if isinstance(node, ast.FunctionDef)
+    }
+    for name, expected in forwards.items():
+        returns = [
+            ast.unparse(node.value)
+            for node in ast.walk(functions[name])
+            if isinstance(node, ast.Return) and node.value is not None
+        ]
+        assert (
+            returns
+        ), f"{name} returns nothing, so a caller of the published API gets None"
+        assert any(
+            expected in returned for returned in returns
+        ), f"{name} does not forward to {expected}: {returns}"
 
 
 @pytest.mark.unit
