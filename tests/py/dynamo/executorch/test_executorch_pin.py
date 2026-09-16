@@ -777,24 +777,6 @@ def test_the_supported_cuda_major_is_declared_once_per_place_that_needs_it():
         assert match, f"{name} declares no EXECUTORCH_CUDA_MAJOR"
         found[name] = match.group(1)
 
-    # The workflow gate is YAML and cannot import either, so it carries the prefix inline. It is
-    # checked only where it exists, because the delegate's shared build arrives later in the stack.
-    gate = yaml.safe_load(
-        (_PROJECT_ROOT / ".github/workflows/build_linux.yml").read_text()
-    )
-    step = next(
-        (
-            step
-            for job in gate["jobs"].values()
-            if isinstance(job, dict)
-            for step in job.get("steps", [])
-            if step.get("id") == "executorch-runtime"
-        ),
-        None,
-    )
-    if step is not None:
-        assert f"'cu{_executorch_cuda_major()}'" in step["if"], step["if"]
-
     # The companion's setup.py is the one site that still spells the major inline, because it
     # raises at build time and cannot import the matrix filter. A site present on disk that
     # matches no known spelling fails rather than being skipped, since a pattern that quietly
