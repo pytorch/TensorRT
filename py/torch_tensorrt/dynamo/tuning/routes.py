@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import itertools
 import json
+import math
 import re
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Sequence, Tuple
@@ -335,7 +336,7 @@ def identify_positive_knobs(
     db: BuildRouteKnobDatabase,
 ) -> List[int]:
     """Return indices of knobs whose one-off variants beat the baseline."""
-    if not gpu_times or gpu_times[0] is None:
+    if not gpu_times or gpu_times[0] is None or not math.isfinite(gpu_times[0]):
         return []
     baseline = gpu_times[0]
     defaults: List[str] = []
@@ -360,7 +361,12 @@ def identify_positive_knobs(
             if idx >= len(gpu_times):
                 return positive
             t = gpu_times[idx]
-            if t is not None and t < baseline and i not in positive:
+            if (
+                t is not None
+                and math.isfinite(t)
+                and t < baseline
+                and i not in positive
+            ):
                 positive.append(i)
             idx += 1
     return positive

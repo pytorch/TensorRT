@@ -1,11 +1,11 @@
-"""TensorRT Global Performance Tuner support for Torch-TensorRT Dynamo."""
+"""TensorRT Global Performance Tuning support for Torch-TensorRT Dynamo."""
 
 from torch_tensorrt.dynamo.tuning._capability import (
     get_all_build_routes,
     get_all_build_routes_raw,
     gpt_settings_requested,
-    is_global_perf_tuner_available,
-    require_global_perf_tuner,
+    is_global_perf_tuning_available,
+    require_global_perf_tuning,
 )
 from torch_tensorrt.dynamo.tuning.accuracy import (
     compute_output_losses,
@@ -46,13 +46,13 @@ __all__ = [
     "get_all_build_routes",
     "get_all_build_routes_raw",
     "gpt_settings_requested",
-    "is_global_perf_tuner_available",
+    "is_global_perf_tuning_available",
     "loss_cos",
     "loss_l0",
     "loss_l1",
     "loss_l2",
     "loss_linf",
-    "require_global_perf_tuner",
+    "require_global_perf_tuning",
     "resolve_partition_tuning_cache_path",
     "should_run_tuning",
     "subgraph_partition_key",

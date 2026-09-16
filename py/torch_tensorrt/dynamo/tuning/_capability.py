@@ -1,4 +1,4 @@
-"""Global Performance Tuner helpers for Torch-TensorRT Dynamo."""
+"""Global Performance Tuning helpers for Torch-TensorRT Dynamo."""
 
 from __future__ import annotations
 
@@ -11,8 +11,8 @@ import tensorrt as trt
 _LOGGER = logging.getLogger(__name__)
 
 
-def is_global_perf_tuner_available() -> bool:
-    """Return True if TensorRT exposes Global Performance Tuner build-route APIs."""
+def is_global_perf_tuning_available() -> bool:
+    """Return True if TensorRT exposes Global Performance Tuning build-route APIs."""
     if not hasattr(trt.IBuilderConfig, "build_route") or not hasattr(
         trt.IBuilderConfig, "all_build_routes"
     ):
@@ -23,15 +23,15 @@ def is_global_perf_tuner_available() -> bool:
         routes = getattr(config, "all_build_routes", "") or ""
         return bool(routes.strip())
     except Exception as exc:  # pragma: no cover - depends on local TRT/CUDA
-        _LOGGER.debug(f"Global Performance Tuner probe failed: {exc}")
+        _LOGGER.debug(f"Global Performance Tuning probe failed: {exc}")
         return False
 
 
-def require_global_perf_tuner(reason: str) -> None:
+def require_global_perf_tuning(reason: str) -> None:
     """Raise if GPT is unavailable when the user requested a GPT feature."""
-    if not is_global_perf_tuner_available():
+    if not is_global_perf_tuning_available():
         raise RuntimeError(
-            f"{reason} requires TensorRT Global Performance Tuner "
+            f"{reason} requires TensorRT Global Performance Tuning "
             "(IBuilderConfig.build_route / all_build_routes). "
             "This feature is available since TensorRT 11.1 and is currently not available in TensorRT-RTX or Windows."
         )
@@ -39,7 +39,7 @@ def require_global_perf_tuner(reason: str) -> None:
 
 def get_all_build_routes_raw() -> str:
     """Return the raw JSON string from ``IBuilderConfig.all_build_routes``."""
-    require_global_perf_tuner("Querying build routes")
+    require_global_perf_tuning("Querying build routes")
     builder = trt.Builder(trt.Logger(trt.Logger.WARNING))
     config = builder.create_builder_config()
     return config.all_build_routes or ""
@@ -76,7 +76,7 @@ def get_all_build_routes(knob: Optional[str] = None) -> Dict[str, Any]:
 
     if not filtered:
         raise ValueError(
-            f"No such knob in the Global Performance Tuner database: {knob}. "
+            f"No such knob in the Global Performance Tuning database: {knob}. "
             "Call get_all_build_routes() without a filter to list knobs."
         )
 

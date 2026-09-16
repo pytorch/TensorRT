@@ -84,7 +84,7 @@ DISABLED_CONSTANT_FOLD_EXCLUSIONS = frozenset[str]()
 ATTN_BIAS_IS_CAUSAL = True
 FALLBACK_DATA_DEPENDENT_OPS = False
 
-# Global Performance Tuner (TensorRT build-route knobs)
+# Global Performance Tuning (TensorRT build-route knobs)
 BUILD_ROUTE = ""
 TUNE_BUILD_ROUTES = ""
 TUNE_BUILD_ROUTE_FILE = None

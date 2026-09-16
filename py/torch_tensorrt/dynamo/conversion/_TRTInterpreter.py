@@ -465,7 +465,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 raise RuntimeError(
                     f"build_route={build_route} was requested, but this TensorRT "
                     "build does not expose IBuilderConfig.build_route "
-                    "(Global Performance Tuner unavailable). This feature is available "
+                    "(Global Performance Tuning unavailable). This feature is available "
                     "since TensorRT 11.1 and is currently not available in TensorRT-RTX or Windows."
                 )
             all_routes = getattr(builder_config, "all_build_routes", "") or ""
@@ -473,7 +473,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 raise RuntimeError(
                     f"build_route={build_route} was requested, but "
                     "IBuilderConfig.all_build_routes is empty "
-                    "(Global Performance Tuner disabled on this platform/build). "
+                    "(Global Performance Tuning disabled on this platform/build). "
                     "This feature is available since TensorRT 11.1 and is currently "
                     "not available in TensorRT-RTX or Windows."
                 )
@@ -583,7 +583,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             runtime = trt.Runtime(TRT_LOGGER)
             cuda_engine = runtime.deserialize_cuda_engine(serialized_engine)
         else:
-
             cuda_engine = self.builder.build_engine_with_config(
                 self.ctx.net, builder_config
             )

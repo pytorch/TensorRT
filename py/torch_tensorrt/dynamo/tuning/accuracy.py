@@ -1,7 +1,8 @@
-"""Accuracy loss metrics matching trtexec Global Performance Tuner validators."""
+"""Accuracy loss metrics matching trtexec Global Performance Tuning validators."""
 
 from __future__ import annotations
 
+import math
 from typing import Dict, List, Optional, Sequence, Tuple, Union
 
 import torch
@@ -14,6 +15,18 @@ def _as_float_tensor(t: torch.Tensor) -> torch.Tensor:
     return t.detach().float().flatten()
 
 
+def _validated_float_tensors(
+    actual: torch.Tensor, reference: torch.Tensor
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    if actual.shape != reference.shape:
+        raise ValueError(
+            f"Shape mismatch: {tuple(actual.shape)} vs {tuple(reference.shape)}"
+        )
+    if actual.numel() == 0:
+        raise ValueError("Cannot compute accuracy on empty tensors")
+    return _as_float_tensor(actual), _as_float_tensor(reference)
+
+
 def loss_l0(
     actual: torch.Tensor,
     reference: torch.Tensor,
@@ -21,42 +34,29 @@ def loss_l0(
     rtol: float = 1e-5,
 ) -> float:
     """Fraction of elements outside ``atol + rtol * abs(ref)`` (PyTorch allclose)."""
-    a = _as_float_tensor(actual)
-    b = _as_float_tensor(reference)
-    if a.numel() == 0:
-        raise ValueError("Cannot compute L0 accuracy on empty tensors")
-    if a.shape != b.shape:
-        raise ValueError(f"Shape mismatch for L0: {tuple(a.shape)} vs {tuple(b.shape)}")
+    a, b = _validated_float_tensors(actual, reference)
     outside = torch.abs(a - b) > (atol + rtol * torch.abs(b))
     return float(outside.float().mean().item())
 
 
 def loss_l1(actual: torch.Tensor, reference: torch.Tensor) -> float:
-    a = _as_float_tensor(actual)
-    b = _as_float_tensor(reference)
-    if a.numel() == 0:
-        raise ValueError("Cannot compute L1 accuracy on empty tensors")
+    a, b = _validated_float_tensors(actual, reference)
     return float(torch.mean(torch.abs(a - b)).item())
 
 
 def loss_l2(actual: torch.Tensor, reference: torch.Tensor) -> float:
-    a = _as_float_tensor(actual)
-    b = _as_float_tensor(reference)
-    if a.numel() == 0:
-        raise ValueError("Cannot compute L2 accuracy on empty tensors")
+    a, b = _validated_float_tensors(actual, reference)
     return float(torch.mean((a - b) ** 2).item())
 
 
 def loss_linf(actual: torch.Tensor, reference: torch.Tensor) -> float:
-    a = _as_float_tensor(actual)
-    b = _as_float_tensor(reference)
-    if a.numel() == 0:
-        raise ValueError("Cannot compute LInf accuracy on empty tensors")
+    a, b = _validated_float_tensors(actual, reference)
     return float(torch.max(torch.abs(a - b)).item())
 
 
 def loss_cos(actual: torch.Tensor, reference: torch.Tensor) -> float:
     """``1 - cosine_similarity`` (lower is better; 0 = perfect match)."""
+    _validated_float_tensors(actual, reference)
     return 1.0 - float(cosine_similarity(reference, actual))
 
 
@@ -130,7 +130,9 @@ def accuracy_failed(
     losses: Dict[str, float],
     threshold: Optional[float],
 ) -> bool:
-    """Return True if any tensor accuracy loss exceeds the threshold."""
+    """Return True if any loss is non-finite or exceeds the threshold."""
+    if any(not math.isfinite(v) for v in losses.values()):
+        return True
     if threshold is None:
         return False
     return any(v > threshold for v in losses.values())

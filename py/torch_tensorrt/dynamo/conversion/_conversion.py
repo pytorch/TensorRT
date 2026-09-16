@@ -224,14 +224,14 @@ def interpret_module_to_result(
     """
     from torch_tensorrt.dynamo.tuning import (
         gpt_settings_requested,
-        require_global_perf_tuner,
+        require_global_perf_tuning,
         should_run_tuning,
         tune_subgraph,
         validate_tuning_options,
     )
 
     if gpt_settings_requested(settings) or should_run_tuning(settings):
-        require_global_perf_tuner("Requested Global Performance Tuner settings")
+        require_global_perf_tuning("Requested Global Performance Tuning settings")
         validate_tuning_options(settings)
 
     if should_run_tuning(settings):
