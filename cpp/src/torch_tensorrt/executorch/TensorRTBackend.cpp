@@ -6,10 +6,13 @@
  */
 
 #include "torch_tensorrt/executorch/TensorRTBackend.h"
+#include "torch_tensorrt/executorch/PooledScratchInstall.h"
+#include "torch_tensorrt/executorch/SharedScratchPool.h"
 #include "torch_tensorrt/executorch/TensorRTBindingNames.h"
 #include "torch_tensorrt/executorch/TensorRTBlobHeader.h"
 #include "torch_tensorrt/executorch/WeightStreamingBudget.h"
 
+#include <atomic>
 #include <cstdint>
 #include <cstring>
 #include <memory>
@@ -17,6 +20,7 @@
 #include <string>
 #include <tuple>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <NvInfer.h>
@@ -34,6 +38,8 @@ using ::executorch::aten::SizesType;
 using ::executorch::runtime::ArrayRef;
 using ::executorch::runtime::BackendExecutionContext;
 using ::executorch::runtime::BackendInitContext;
+using ::executorch::runtime::BackendOption;
+using ::executorch::runtime::BackendOptionContext;
 using ::executorch::runtime::CompileSpec;
 using ::executorch::runtime::DelegateHandle;
 using ::executorch::runtime::Error;
@@ -85,7 +91,9 @@ EngineHandle::~EngineHandle() {
       cudaError_t err = cudaEventSynchronize(inflight_event);
       if (err != cudaSuccess) {
         ET_LOG(Error, "EngineHandle::~EngineHandle: cudaEventSynchronize failed: %s", cudaGetErrorString(err));
-        cudaGetLastError(); // clear sticky error; tear down regardless
+        // Clears a non-sticky error so it does not resurface under the name of the
+        // next call here; a sticky one survives the clear. Tear down regardless.
+        cudaGetLastError();
       }
       inflight_pending = false;
     }
@@ -151,6 +159,16 @@ bool infer_binding_names(
   return true;
 }
 
+// The setting behind kSharedActivationScratchKey: whether an execution context
+// created subsequently draws its activation scratch from the shared per-device
+// pool rather than allocating its own.
+//
+// execute() must read EngineHandle::claims_pooled_scratch, never this. This can
+// have moved since the engine was loaded, and what the engine can do about it
+// cannot: its context's allocation strategy was fixed when the context was
+// created. initialize_engine_io below is the one place this is read.
+std::atomic<bool> scratch_enabled{false};
+
 Error initialize_engine_io(EngineHandle& handle) {
   if (handle.input_binding_names.empty() && handle.output_binding_names.empty() &&
       !infer_binding_names(handle.engine.get(), handle.input_binding_names, handle.output_binding_names)) {
@@ -161,9 +179,24 @@ Error initialize_engine_io(EngineHandle& handle) {
   handle.num_inputs = handle.input_binding_names.size();
   handle.num_outputs = handle.output_binding_names.size();
 
-  handle.exec_ctx.reset(handle.engine->createExecutionContext());
+  // kSTATIC gives the context its own activation scratch; kUSER_MANAGED makes it
+  // allocate none and take a buffer from execute() instead. The strategy is fixed
+  // at creation, so it is captured on the handle here rather than read per call.
+  handle.shared_scratch = scratch_enabled.load(std::memory_order_relaxed);
+  const auto strategy = handle.shared_scratch ? nvinfer1::ExecutionContextAllocationStrategy::kUSER_MANAGED
+                                              : nvinfer1::ExecutionContextAllocationStrategy::kSTATIC;
+  handle.exec_ctx.reset(handle.engine->createExecutionContext(strategy));
   TORCHTRT_ET_CHECK_NOT_NULL(
       handle.exec_ctx, Error::InvalidProgram, "TensorRTBackend::init: failed to create TensorRT execution context");
+
+  if (handle.shared_scratch) {
+    // Gated so an engine loaded with the option off pays no TensorRT call for a
+    // pool it will never claim from. Read after the weight streaming budget is
+    // applied, which the caller does before this runs because TensorRT forbids
+    // moving the budget once a context exists -- and the budget is the one thing
+    // that moves this figure.
+    handle.claims_pooled_scratch = handle.engine->getDeviceMemorySizeV2() > 0;
+  }
 
   return Error::Ok;
 }
@@ -202,6 +235,427 @@ bool is_cuda_accessible_ptr(const void* ptr) {
     return false;
   }
   return attrs.type == cudaMemoryTypeDevice || attrs.type == cudaMemoryTypeManaged;
+}
+
+// A caller's hold on one device's shared scratch: the device lock, plus the
+// buffer a growth displaced, freed once that lock is dropped.
+//
+// The lock spans the enqueue, not just the choice of buffer. A claimant that
+// released it as soon as it had a buffer would leave its enqueue live for a
+// window the marker's event does not yet cover, and a second claimant entering
+// that window is handed the same buffer and told to wait for the enqueue before
+// it -- so nothing orders the two and both write the same scratch. The failure
+// is silent: wrong output, no CUDA error, no TensorRT error.
+//
+// This lock nests inside the per-handle EngineHandle::mu, which already spans
+// the enqueue, and is never taken in the other order.
+class SharedScratchClaim {
+ public:
+  SharedScratchClaim() = default;
+  SharedScratchClaim(const SharedScratchClaim&) = delete;
+  SharedScratchClaim& operator=(const SharedScratchClaim&) = delete;
+  ~SharedScratchClaim() {
+    // A claim that still holds a retired buffer here was never released, so
+    // execute() returned between the claim and the release below -- a refused
+    // install, a refused enqueue, or a failed record of one already submitted.
+    // The disposal it makes is the one every other path makes, and it has the
+    // bytes back before it returns, so a bail-out after a growth costs the
+    // retired buffer and not the whole pool.
+    //
+    // The return is the caller's to report, and on this path there is no caller
+    // left to report it to: an execute() that returned early has already failed.
+    (void)release();
+  }
+
+  SharedScratchDevice& hold(int device_id) {
+    dev_ = &scratch_pool().get(device_id);
+    device_id_ = device_id;
+    lock_ = std::unique_lock<std::mutex>(dev_->mu);
+    return *dev_;
+  }
+
+  // Null until hold() runs and null again after release(): non-null exactly while
+  // this claim holds the device's lock.
+  SharedScratchDevice* device() const {
+    return dev_;
+  }
+
+  // Takes ownership of a buffer a growth displaced, to be freed by release().
+  // `wait_for` is the marker event the enqueues that used it were recorded on, or
+  // null if none were; `disposal_stream` is the pool's own stream for this device,
+  // or null if one could not be created.
+  void retire(void* buffer, cudaEvent_t wait_for, cudaStream_t disposal_stream) {
+    retired_ = buffer;
+    retired_wait_ = wait_for;
+    disposal_stream_ = disposal_stream;
+  }
+
+  // Drops the lock, and the device pointer with it so device() cannot hand out a
+  // pointer this claim no longer holds the lock for. Then disposes of whatever a
+  // growth displaced, after the unlock, because that disposal waits for an enqueue
+  // another pooled engine on this device has nothing to do with.
+  //
+  // The disposal reads nothing the caller supplies and asks nothing about it: wait
+  // on the host for the enqueue the marker names, queue the free on the pool's own
+  // stream for this device, and synchronize that stream, which is what has the
+  // bytes back before this returns. It is the same three steps on every path,
+  // including the destructor's, so a return added between the claim and the
+  // release cannot change what the disposal does. Deciding instead from what the
+  // calling execute() has still to do is a claim about the caller, and three
+  // defects on this path in a row were a disposal getting that claim wrong.
+  //
+  // The free is stream-ordered, and on the pool's own stream, for two reasons. A
+  // device-wide cudaFree waits for everything queued on the device rather than for
+  // the work that touched the buffer, and that wait has no upper bound. And a
+  // cudaFreeAsync of a cudaMalloc'd pointer, which is what the pool holds, hands
+  // the bytes back at the next synchronize of the stream it was queued on and at
+  // no point before it, so whoever queues the free has to be able to promise that
+  // synchronize -- which a caller on the path this pool exists for cannot, since it
+  // never synchronizes its stream and is free to destroy it the moment execute()
+  // returns. The README's shared activation scratch section has the measurements
+  // behind both.
+  //
+  // cudaFreeAsync needs the device's stream-ordered allocator, which not every
+  // platform has. Where it is missing, or the pool's stream could not be created,
+  // the free is device-wide instead and blocks until the device is idle.
+  //
+  // Returns false when the wait for the enqueue failed, which leaves the buffer
+  // leaked rather than freed under a live enqueue; the caller reports it. Frees on
+  // the current device, which must still be the buffer's.
+  bool release() {
+    void* const retired = retired_;
+    const cudaEvent_t wait_for = retired_wait_;
+    const cudaStream_t disposal_stream = disposal_stream_;
+    // Clearing the pointer is what stops the destructor's release from disposing
+    // of the same buffer twice.
+    retired_ = nullptr;
+    if (lock_.owns_lock()) {
+      lock_.unlock();
+    }
+    dev_ = nullptr;
+    if (retired == nullptr) {
+      return true;
+    }
+    if (!wait_for_the_enqueue_that_used_it(wait_for)) {
+      return false;
+    }
+    if (disposal_stream == nullptr || !free_on_the_pools_stream(retired, disposal_stream)) {
+      free_device_wide(retired);
+    }
+    return true;
+  }
+
+ private:
+  // Waits for the enqueue that last used the retired buffer, so the free below is
+  // not made under one still reading it. `wait_for` is the device's handoff marker,
+  // so where the calling execute() has already recorded its own enqueue there, the
+  // wait covers that one as well. Unbounded either way -- it is a whole inference,
+  // and the execute() contract says as much.
+  bool wait_for_the_enqueue_that_used_it(cudaEvent_t wait_for) {
+    if (wait_for == nullptr) {
+      return true;
+    }
+    const cudaError_t wait_err = cudaEventSynchronize(wait_for);
+    if (wait_err != cudaSuccess) {
+      // This wait is the only thing keeping the free off a buffer an enqueue may
+      // still be reading, so a failed wait leaks it instead. What it reports is
+      // usually an asynchronous fault raised by earlier work on this device.
+      ET_LOG(
+          Error,
+          "TensorRTBackend::execute: waiting for the enqueue on the replaced shared activation scratch on device %d failed (%s), which for a wait on device work is usually an earlier asynchronous fault on this device surfacing here; leaking that buffer rather than freeing it under a live enqueue",
+          device_id_,
+          cudaGetErrorString(wait_err));
+      cudaGetLastError();
+      return false;
+    }
+    return true;
+  }
+
+  // Queues the free on the pool's stream for this device and synchronizes it,
+  // which is what returns the bytes. Reports whether the buffer was freed, so a
+  // refusal falls back to the device-wide free; a synchronize that fails after the
+  // free was accepted is not one, and freeing again would be freeing twice.
+  bool free_on_the_pools_stream(void* retired, cudaStream_t disposal_stream) {
+    const cudaError_t free_err = cudaFreeAsync(retired, disposal_stream);
+    if (free_err != cudaSuccess) {
+      // The error is this call's own, so it is cleared here rather than left for
+      // the next CUDA call in execute() to report under its own name.
+      cudaGetLastError();
+      if (free_err == cudaErrorNotSupported) {
+        ET_LOG(
+            Info,
+            "TensorRTBackend::execute: device %d has no stream-ordered allocator, so the free of the shared activation scratch buffer a pool growth replaced falls back to a device-wide free, which blocks this call until the device is idle",
+            device_id_);
+      } else {
+        // Any other code is a fault on a device that does have the allocator, so
+        // this does not say the platform lacks one.
+        ET_LOG(
+            Info,
+            "TensorRTBackend::execute: the stream-ordered free of the shared activation scratch buffer a pool growth replaced on device %d returned %s, so it falls back to a device-wide free, which blocks this call until the device is idle",
+            device_id_,
+            cudaGetErrorString(free_err));
+      }
+      return false;
+    }
+
+    const cudaError_t sync_err = cudaStreamSynchronize(disposal_stream);
+    if (sync_err != cudaSuccess) {
+      // Nothing was on this stream but the free, and the enqueue it had to follow
+      // was already waited for, so a failure here is a fault this device was
+      // already in. Whether the bytes came back is not knowable from it.
+      ET_LOG(
+          Error,
+          "TensorRTBackend::execute: synchronizing the shared activation scratch pool's disposal stream on device %d reported %s, so the free of the buffer a growth replaced may not have returned its bytes",
+          device_id_,
+          cudaGetErrorString(sync_err));
+      cudaGetLastError();
+    }
+    return true;
+  }
+
+  void free_device_wide(void* retired) {
+    const cudaError_t err = cudaFree(retired);
+    if (err != cudaSuccess) {
+      // cudaFree synchronizes, so what it reports is more often an earlier
+      // asynchronous fault on this device than a fault in the free -- which is
+      // why the message does not call it one.
+      ET_LOG(
+          Error,
+          "TensorRTBackend::execute: freeing the shared activation scratch buffer that a pool growth replaced on device %d reported %s; a device-wide free reports whatever fault this device is already in, so this need not be the pool's",
+          device_id_,
+          cudaGetErrorString(err));
+      // Clears a non-sticky error so it does not resurface under the name of the
+      // next CUDA call in execute(). A sticky one survives the clear and will
+      // resurface anyway; the caller learns of it from that call.
+      cudaGetLastError();
+    }
+  }
+
+  SharedScratchDevice* dev_ = nullptr;
+  int device_id_ = -1;
+  std::unique_lock<std::mutex> lock_;
+  void* retired_ = nullptr;
+  cudaEvent_t retired_wait_ = nullptr;
+  cudaStream_t disposal_stream_ = nullptr;
+};
+
+// What a call needing no activation scratch is given when the pool holds nothing
+// yet. It cannot be given nothing: enqueueV3 refuses a kUSER_MANAGED context with
+// no device memory installed as soon as the engine reports needing any under some
+// shape, whatever the shapes actually bound need. So the pool starts at the
+// smallest allocation that satisfies that check and the first call with a real
+// requirement grows it -- as against standing the engine's profile-wide figure in
+// for the zero, which would pin the pool at the largest shape the engine admits
+// on the strength of a call that uses none of it.
+constexpr size_t kMinPooledScratchBytes = 1;
+
+// Refuses a pooled call whose stream is capturing a CUDA graph.
+//
+// The handoff's event wait is on an event recorded outside the capture:
+// cudaStreamWaitEvent fails it with cudaErrorStreamCaptureIsolation and
+// invalidates the capture under every capture mode. A growth's cudaMalloc and its
+// disposal of the buffer it replaces invalidate it under every mode but
+// cudaStreamCaptureModeRelaxed, and under Relaxed run uncaptured, leaving a replay
+// pointed at a buffer the pool may since have freed. None of that fails cleanly:
+// the caller learns of it only when cudaStreamEndCapture hands back an error and a
+// null graph. Refusing names the cause instead.
+//
+// execute() calls this ahead of every CUDA call it makes that a capture cannot
+// take, not just the pool's own: the cudaEventSynchronize on a previous enqueue,
+// the cudaMalloc that grows a host-input staging buffer, and the
+// cudaStreamSynchronize that ends a call this backend does not let return early.
+// Any of them leaves a refusal made after it nothing to save. Only the device
+// query and the device switch run earlier, and a capture takes both.
+//
+// It sees only `stream`, and there is no query for "is any capture live in this
+// process": a capture on another stream under Global, or under ThreadLocal from
+// this thread, is invalidated by the pool's calls just the same and is not caught.
+// The header and the README say so.
+//
+// The query fails in two ways, and they are not the same answer.
+// cudaErrorStreamCaptureImplicit -- `stream` is the legacy stream and some other
+// stream is capturing -- is a capture, so it is refused with the rest. Any other
+// code is not a capture at all: cudaStreamIsCapturing also hands back a sticky
+// fault left by earlier work on this device, measured on an A100 with CUDA 12.8
+// after an illegal memory access, returning that fault with the status still
+// cudaStreamCaptureStatusNone. Answering that with the capture refusal names a
+// cause that is not there and buries the one that is, so it is reported as itself.
+Error refuse_pooled_call_on_a_capturing_stream(cudaStream_t stream, int device_id) {
+  cudaStreamCaptureStatus capture = cudaStreamCaptureStatusNone;
+  const cudaError_t capture_err = cudaStreamIsCapturing(stream, &capture);
+  if (capture_err != cudaSuccess && capture_err != cudaErrorStreamCaptureImplicit) {
+    ET_LOG(
+        Error,
+        "TensorRTBackend::execute: could not tell whether the selected stream is capturing a CUDA graph, because cudaStreamIsCapturing on device %d reported %s. That code is not a capture, and it need not be this call's doing: cudaStreamIsCapturing also hands back a sticky fault left by earlier work on this device. The shared activation scratch pool reports it because it is the first thing here to ask the device a question.",
+        device_id,
+        cudaGetErrorString(capture_err));
+    // The query's own failure is this call's, not the next one's; a sticky fault
+    // survives the clear and resurfaces on whatever this thread calls next, which
+    // is where an unpooled call would have reported it.
+    cudaGetLastError();
+    return Error::InvalidProgram;
+  }
+  if (capture_err == cudaSuccess && capture == cudaStreamCaptureStatusNone) {
+    return Error::Ok;
+  }
+  ET_LOG(
+      Error,
+      "TensorRTBackend::execute: the selected stream is capturing a CUDA graph (%s), which the shared activation scratch pool on device %d does not support. Loading the engine with '%s' off removes this refusal, but this delegate does not support capture that way either. The capture section of the backend README has the detail.",
+      capture_err == cudaSuccess ? "capture in progress" : cudaGetErrorString(capture_err),
+      device_id,
+      kSharedActivationScratchKey);
+  if (capture_err != cudaSuccess) {
+    // cudaErrorStreamCaptureImplicit, the one failure that still reports a
+    // capture. Its error is the query's own, so it is cleared here rather than
+    // left for the next CUDA call to report under its own name. Not on the
+    // ordinary refusal: there the query succeeded, so anything pending on this
+    // thread was left by earlier work and belongs to whoever calls CUDA next.
+    cudaGetLastError();
+  }
+  return Error::NotSupported;
+}
+
+// Sets out_ptr to a buffer of at least `need` bytes on `device_id`, with `stream`
+// ordered after the enqueue that last used the buffer. Returns with `claim`
+// holding the device's lock: the caller must submit its enqueue, call
+// record_shared_scratch_enqueue, and only then release the claim.
+//
+// The buffer's capacity is not reported, because no caller has any use for it:
+// what a call installs on its context is its own requirement, not whatever the
+// pool grew to for someone else.
+//
+// `need` is a real request and never zero -- execute() substitutes
+// kMinPooledScratchBytes for a zero before calling, so that the size the pool
+// guarantees and the size the context is told it owns are one figure and not two.
+//
+// The caller must already have refused a capturing `stream`: the handoff's wait
+// invalidates a capture under every mode, a growth's allocation under every mode
+// but Relaxed, and a growth's disposal of the buffer it replaces under every mode
+// but Relaxed as well.
+//
+// Must be called with `device_id` already current: cudaEventCreateWithFlags and
+// cudaMalloc both act on the *current* device and nothing in here sets it.
+Error claim_shared_scratch(SharedScratchClaim& claim, int device_id, size_t need, cudaStream_t stream, void*& out_ptr) {
+  SharedScratchDevice& dev = claim.hold(device_id);
+
+  const SharedScratchHandoff handoff = shared_scratch_claim_event(dev, []() -> cudaEvent_t {
+    cudaEvent_t event = nullptr;
+    // Blocking-sync so the host yields instead of busy-spinning. The only host
+    // wait ever made on this event is the one a growth's disposal makes in
+    // SharedScratchClaim::release(), and it waits for a whole inference; spinning
+    // would burn a core for that time and be no faster. Nothing on a call that
+    // does not grow the pool waits on it from the host, and the flag costs
+    // nothing there.
+    if (cudaEventCreateWithFlags(&event, cudaEventDisableTiming | cudaEventBlockingSync) != cudaSuccess) {
+      // The pool's own failure, cleared where it is made: the caller is told by
+      // the return, and leaving it pending would surface it under the name of
+      // whatever this thread calls next.
+      cudaGetLastError();
+      return nullptr;
+    }
+    return event;
+  });
+  if (handoff.event == nullptr) {
+    ET_LOG(
+        Error,
+        "TensorRTBackend::execute: failed to create the shared activation scratch handoff event on device %d",
+        device_id);
+    return Error::Internal;
+  }
+  if (handoff.needs_wait) {
+    const cudaError_t err = cudaStreamWaitEvent(stream, handoff.event, 0);
+    if (err != cudaSuccess) {
+      ET_LOG(
+          Error,
+          "TensorRTBackend::execute: waiting for the enqueue that last used the shared activation scratch failed: %s",
+          cudaGetErrorString(err));
+      cudaGetLastError();
+      return Error::InvalidState;
+    }
+  }
+
+  const bool first_buffer = dev.buffer == nullptr;
+  RetiredScratch retired;
+  void* const buffer = shared_scratch_get_or_grow(
+      dev,
+      need,
+      [device_id, first_buffer](size_t bytes) -> void* {
+        void* p = nullptr;
+        if (cudaMalloc(&p, bytes) != cudaSuccess) {
+          cudaGetLastError();
+          return nullptr;
+        }
+        ET_LOG(
+            Info,
+            "TensorRTBackend::execute: shared scratch pool (device %d) %s %zu bytes",
+            device_id,
+            first_buffer ? "allocated" : "grew to",
+            bytes);
+        return p;
+      },
+      retired);
+  if (buffer == nullptr) {
+    ET_LOG(
+        Error,
+        "TensorRTBackend::execute: failed to allocate %zu bytes of shared activation scratch on device %d",
+        need,
+        device_id);
+    return Error::MemoryAllocationFailed;
+  }
+
+  // The retired buffer is disposed of at release(), with the device's lock
+  // dropped; see SharedScratchClaim::release() for what that costs. Nothing here
+  // makes a CUDA call that blocks on device work under that lock -- the stream is
+  // created and not waited on, and only a growth that displaced a buffer creates
+  // one at all.
+  if (retired.buffer != nullptr) {
+    const cudaStream_t disposal_stream = shared_scratch_disposal_stream(dev, [device_id]() -> cudaStream_t {
+      cudaStream_t stream_for_disposals = nullptr;
+      // Non-blocking, so a free queued here is not ordered against the legacy
+      // default stream: the disposal waits for the enqueue that used the buffer
+      // and for nothing else, and the legacy stream would add whatever any other
+      // library on this device happens to have queued on it.
+      if (cudaStreamCreateWithFlags(&stream_for_disposals, cudaStreamNonBlocking) != cudaSuccess) {
+        // The pool's own failure, cleared where it is made: the disposal falls
+        // back to a device-wide free and says so, and leaving this pending would
+        // surface it under the name of whatever this thread calls next.
+        cudaGetLastError();
+        ET_LOG(
+            Info,
+            "TensorRTBackend::execute: could not create the shared activation scratch pool's disposal stream on device %d, so this growth's free of the buffer it replaced is device-wide",
+            device_id);
+        return nullptr;
+      }
+      return stream_for_disposals;
+    });
+    claim.retire(retired.buffer, retired.wait_for, disposal_stream);
+  }
+
+  out_ptr = buffer;
+  return Error::Ok;
+}
+
+// Records the enqueue now in flight on `stream` against the claimed device's
+// shared scratch, so the next call to claim_shared_scratch waits for it.
+//
+// Call on a `claim` that claim_shared_scratch returned Error::Ok on and that
+// still holds the device's lock. Both halves matter, and together they are why
+// neither the device nor the event below is checked: a claim's device is non-null
+// exactly while it holds the lock, and claim_shared_scratch has already failed the
+// call with Error::Internal if the marker had no event, which only the test-only
+// reset clears again and that needs the lock this claim is holding.
+Error record_shared_scratch_enqueue(SharedScratchClaim& claim, cudaStream_t stream) {
+  const cudaEvent_t event = shared_scratch_mark_in_flight(*claim.device());
+  const cudaError_t err = cudaEventRecord(event, stream);
+  if (err != cudaSuccess) {
+    ET_LOG(
+        Error,
+        "TensorRTBackend::execute: recording the completion event for the shared activation scratch enqueue failed: %s",
+        cudaGetErrorString(err));
+    cudaGetLastError();
+    return Error::InvalidState;
+  }
+  return Error::Ok;
 }
 
 } // namespace
@@ -611,6 +1065,30 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   nvinfer1::IExecutionContext* ctx = engine->exec_ctx.get();
   TORCHTRT_ET_CHECK_NOT_NULL(ctx, Error::InvalidState, "TensorRTBackend::execute: backend is not initialized");
 
+  const auto caller_stream = ::executorch::extension::cuda::getCallerStream();
+  const bool caller_stream_set = caller_stream.has_value();
+  cudaStream_t stream = caller_stream.value_or(cudaStreamPerThread);
+
+  // Settled at init: the option was on at this engine's load and the engine needs
+  // scratch under some shape. An engine that needs none is left out of the pool
+  // entirely -- enqueueV3 accepts it with no device memory installed, so it need
+  // not claim the device and does not serialize against the engines that do.
+  const bool pooled_scratch = engine->claims_pooled_scratch;
+
+  // Refused here, ahead of every call this function makes that a capture cannot
+  // take. The pool's own are not the only ones: the wait on a previous enqueue just
+  // below, and the cudaMalloc that grows a host-input staging buffer further down,
+  // are prohibited under every mode but cudaStreamCaptureModeRelaxed, so outside
+  // that mode they would invalidate the capture before the pooled path was ever
+  // reached and a refusal any later would arrive after the thing it exists to
+  // protect was gone.
+  if (pooled_scratch) {
+    const Error capture_err = refuse_pooled_call_on_a_capturing_stream(stream, engine->device_id);
+    if (capture_err != Error::Ok) {
+      return capture_err;
+    }
+  }
+
   // A prior fast-path execute() may have returned with its enqueue still in flight
   // on the shared exec_ctx. Wait for it before reconfiguring the context below:
   // TensorRT forbids mutating a context while one of its enqueues is in flight, and
@@ -623,11 +1101,43 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       return Error::InvalidProgram;
     }
   }
-  const auto caller_stream = ::executorch::extension::cuda::getCallerStream();
-  const bool caller_stream_set = caller_stream.has_value();
-  cudaStream_t stream = caller_stream.value_or(cudaStreamPerThread);
   bool output_staged_to_host = false;
   bool input_staged_from_host = false;
+
+  // A host-resident input is staged with an asynchronous copy that reads the
+  // caller's own memory, and that copy must not still be running when execute()
+  // returns: the caller is free to write that buffer again, and a copy from
+  // pinned memory has not read it yet -- measured, every byte the device
+  // received was the value written after the return. The success path already
+  // synchronizes whenever anything was staged (must_sync below); this covers the
+  // returns between the copy and that point, which would otherwise leave it live.
+  //
+  // Scoped to the pooled path, by the call rather than by the return: on a pooled
+  // call it covers every error return past the copy, and on an unpooled one it
+  // covers none, so an engine loaded with the option off waits nowhere it did not
+  // already wait. The hazard is reachable on an unpooled call too, and closing it
+  // there is a fix of its own rather than this option's to make: it would change
+  // what a default-off call does on every error return it makes after that copy.
+  // The capture refusal sits inside the pooled path for the same reason.
+  //
+  // The wait it makes is a whole-stream one and not a wait on the copy alone, so
+  // an error return that staged a host input can block on work the caller queued
+  // before calling. Waiting for the copy alone would mean recording an event after
+  // the last staging copy of every call that makes one, which costs a per-call
+  // event record on the success path to narrow a wait only error returns make.
+  // Staging already implies must_sync, so no successful call reaches the
+  // destructor with this pending.
+  struct StagedInputDrain {
+    cudaStream_t stream;
+    bool pooled;
+    const bool& staged;
+    bool done = false;
+    ~StagedInputDrain() {
+      if (pooled && staged && !done) {
+        (void)cudaStreamSynchronize(stream);
+      }
+    }
+  } staged_input_drain{stream, pooled_scratch, input_staged_from_host};
 
   if (engine->cached_input_ptrs.empty()) {
     engine->cached_input_ptrs.resize(num_inputs, nullptr);
@@ -905,8 +1415,80 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     }
   }
 
+  // Whether this call ends by waiting for its own enqueue. Settled here, the first
+  // point everything it reads is final: the two staging flags and the aliased
+  // reflects are set while the bindings are built above, and whether a caller
+  // stream is active was read at the top.
+  //
+  //   must_sync = an output is staged to host (the caller reads the D2H result on
+  //   return), an input was staged from host (its async H2D read the caller's host
+  //   buffer, which the caller may reuse once we return), an aliased reflect is
+  //   queued (ExecuTorch's buffer-mutation copy_ reads that EValue after execute()
+  //   returns, so the reflect must complete first), or no caller stream is active
+  //   (preserve the historical "results ready on return" behavior).
+  //
+  // Otherwise -- caller stream, all I/O device-resident, no alias -- the engine
+  // work is left enqueued so it composes with the caller's later GPU work, and a
+  // completion event is recorded instead so the next execute() and the destructor
+  // wait before reusing or freeing exec_ctx.
+  const bool aliased_reflect_pending = !aliased_reflects.empty();
+  const bool must_sync =
+      output_staged_to_host || input_staged_from_host || aliased_reflect_pending || !caller_stream_set;
+
   // ------------------------------------------------------------------
-  // 4. Enqueue inference on the current CUDA stream
+  // 4. Back activation scratch with the shared per-device pool
+  // ------------------------------------------------------------------
+  // The query requires every input shape to be bound, which they are by here, and
+  // whatever it answers is binding rather than advisory: an engine backed by less
+  // than it asked for writes past the end. The buffer is installed on every call,
+  // not once, because any call needing more than the pool holds -- this engine on
+  // other shapes, or another one -- grows it and moves it. A kSTATIC context owns
+  // its private scratch, so the install must not be made on one.
+  //
+  // A reported zero has two causes that reach here and nothing distinguishes them:
+  // bound shapes that genuinely need none -- an empty input inside a profile that
+  // admits one -- and a query that failed. Neither sizes the pool: a zero asks for
+  // kMinPooledScratchBytes, which any live buffer already covers. The install is
+  // what tells the two apart, because setDeviceMemoryV2 refuses a buffer smaller
+  // than the bound shapes need, so a call whose query failed ends here rather than
+  // enqueueing against whatever pointer the context was last given, which a growth
+  // may since have freed. The README's shared activation scratch section says why
+  // the minimum rather than the engine's profile-wide figure.
+  //
+  // What is installed is this call's own requirement and not the capacity the pool
+  // holds, which is larger whenever an earlier call asked for more. The larger
+  // figure would tell TensorRT it owns bytes holding another engine's activations
+  // -- the pool never clears the buffer -- and would blunt the refusal above,
+  // since after a growth the capacity may well cover what a failed query
+  // concealed.
+  //
+  // The claim holds the device's pool lock from here through the record of the
+  // enqueue below; see SharedScratchClaim for why it spans that far. Every return
+  // in between drops it through the destructor, which runs ahead of the device
+  // restore above, so its free lands on the right device.
+  SharedScratchClaim scratch_claim;
+  if (pooled_scratch) {
+    const size_t need = ctx->updateDeviceMemorySizeForShapes();
+    // The substitution for a zero is made here and once: the same figure has to
+    // be the size the pool guarantees and the size the context is told it owns,
+    // and nothing downstream checks that two copies of it still agree --
+    // setDeviceMemoryV2 refuses an install smaller than the bound shapes need and
+    // says nothing about one that is larger. A context whose engine needs scratch
+    // under some shape has to be given a buffer whatever this call's shapes need,
+    // or enqueueV3 refuses it.
+    const size_t scratch_bytes = need == 0 ? kMinPooledScratchBytes : need;
+    void* pool = nullptr;
+    const Error scratch_err = claim_shared_scratch(scratch_claim, engine->device_id, scratch_bytes, stream, pool);
+    if (scratch_err != Error::Ok) {
+      return scratch_err;
+    }
+    if (!install_pooled_scratch(*ctx, pool, scratch_bytes, engine->device_id)) {
+      return Error::InvalidState;
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // 5. Enqueue inference on the current CUDA stream
   // ------------------------------------------------------------------
   if (!ctx->enqueueV3(stream)) {
     ET_LOG(
@@ -918,6 +1500,52 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     return Error::InvalidState;
   }
 
+  // What every early return past this point owes. The enqueue is submitted and
+  // this handle's completion marker is not armed -- it is armed at the end of
+  // execute(), below every one of the lambda's call sites -- so a return that left
+  // the enqueue running would have a later execute() or ~EngineHandle reconfigure
+  // or free exec_ctx underneath it, which TensorRT forbids. That is also why the
+  // lambda clears no marker: wherever it is called there is none to clear. Where
+  // the pool is in play the same wait is what keeps the next claimant from
+  // overwriting scratch this enqueue is still using. The drain guard's flag is
+  // cleared, since this wait covers a staged input's copy as well.
+  const auto drain_the_enqueue = [&]() {
+    (void)cudaStreamSynchronize(stream);
+    staged_input_drain.done = true;
+  };
+
+  // Pairs with claim_shared_scratch: the next claimant waits on this event.
+  if (pooled_scratch) {
+    const Error mark_err = record_shared_scratch_enqueue(scratch_claim, stream);
+    if (mark_err != Error::Ok) {
+      // Nothing will wait for this enqueue otherwise: the record that would have
+      // put it on the marker is the call that just failed.
+      //
+      // The wait is made with the device's pool lock still held -- the claim is
+      // released below -- which is the one place a pooled call holds it across a
+      // host wait, so another pooled engine on this device waits out this
+      // inference. Releasing first would be worse: it would hand the buffer to a
+      // claimant with nothing ordering it against the enqueue this call just
+      // submitted, which is the silent-corruption case the lock exists for.
+      drain_the_enqueue();
+      return mark_err;
+    }
+  }
+  // The enqueue is now on the marker's event, so the device's pool is safe to
+  // hand to the next claimant. Released here rather than at the end of the
+  // function so the rest of execute() -- the aliased reflects, the D2H copies and
+  // their synchronizations -- does not hold up another engine on this device.
+  // The release is also where a growth disposes of the buffer it replaced, with
+  // the lock dropped; this is the only place that release is made rather than
+  // left to the claim's destructor.
+  if (!scratch_claim.release()) {
+    // The only failure it reports is its wait for the enqueue on the buffer a
+    // growth retired, which for a wait on device work means this device is
+    // already in a faulted state.
+    drain_the_enqueue();
+    return Error::InvalidProgram;
+  }
+
   // Caller-owned KV: reflect each engine in-place update into its delegate output
   // EValue (D2D on the same stream, after the engine work).
   for (const auto& r : aliased_reflects) {
@@ -925,34 +1553,19 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     if (cuda_err != cudaSuccess) {
       ET_LOG(
           Error, "TensorRTBackend::execute: aliased-output reflect D2D copy failed: %s", cudaGetErrorString(cuda_err));
-      // enqueueV3 already submitted engine work to `stream`, and inflight_pending
-      // is not armed until the end of the happy path -- drain now so a later
-      // execute() or the destructor never reconfigures/frees exec_ctx while this
-      // enqueue is still running.
-      (void)cudaStreamSynchronize(stream);
-      engine->inflight_pending = false;
+      drain_the_enqueue();
       return Error::InvalidProgram;
     }
   }
 
-  // The engine work is now in flight on `stream`. Decide whether to wait for it:
-  //   must_sync = an output is staged to host (the caller reads the D2H result on
-  //   return), an input was staged from host (its async H2D read the caller's host
-  //   buffer, which the caller may reuse once we return), or no caller stream is
-  //   active (preserve the historical "results ready on return" behavior).
-  // Otherwise (caller stream + all I/O device-resident) leave the work enqueued so
-  // it composes with the caller's later GPU work, and record inflight_event so the
-  // next execute() and the destructor wait before reusing/freeing exec_ctx. The D2H
-  // copies live in the must_sync branch: an output staged to host always sets
+  // The engine work is on `stream` -- still in flight, unless a growth's disposal
+  // above waited out the enqueue -- and must_sync says whether to wait for it. The
+  // D2H copies live in this branch: an output staged to host always sets
   // output_staged_to_host, so outputs_needing_copy is empty on the skip path.
-  // An aliased reflect enqueues the engine's in-place update into the delegate
-  // output EValue on `stream`; ExecuTorch's buffer-mutation copy_ reads that EValue
-  // after execute() returns, so the reflect must complete first. A model with
-  // aliased outputs therefore always syncs here.
-  const bool aliased_reflect_pending = !aliased_reflects.empty();
-  const bool must_sync =
-      output_staged_to_host || input_staged_from_host || aliased_reflect_pending || !caller_stream_set;
   if (must_sync) {
+    // Every return from here on is behind the cudaStreamSynchronize below, so
+    // the staging drain has nothing left to do.
+    staged_input_drain.done = true;
     Error copy_err = Error::Ok;
     for (auto& output : outputs_needing_copy) {
       exec_aten::Tensor et_out = args[output.first]->toTensor();
@@ -964,7 +1577,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
             "TensorRTBackend::execute: D2H copy failed for output %zu: %s",
             output.first,
             cudaGetErrorString(cuda_err));
-        // The enqueue already succeeded, so the engine is still running on the
+        // The enqueue already succeeded, so the engine may still be running on the
         // stream. Drain below before returning, or the next call mutates a live
         // execution context, which TensorRT forbids.
         copy_err = Error::InvalidProgram;
@@ -983,14 +1596,43 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   } else {
     cuda_err = cudaEventRecord(engine->inflight_event, stream);
     if (cuda_err != cudaSuccess) {
-      // Could not arm the completion marker; drain now so a later execute() or the
-      // destructor never reconfigures or frees exec_ctx while this enqueue runs.
+      // Could not arm the completion marker, so nothing downstream would wait.
       ET_LOG(Error, "TensorRTBackend::execute: cudaEventRecord failed: %s", cudaGetErrorString(cuda_err));
-      (void)cudaStreamSynchronize(stream);
-      engine->inflight_pending = false;
+      drain_the_enqueue();
       return Error::InvalidProgram;
     }
     engine->inflight_pending = true;
+  }
+  return Error::Ok;
+}
+
+// ---------------------------------------------------------------------------
+// set_option
+// ---------------------------------------------------------------------------
+Error TensorRTBackend::set_option(ET_UNUSED BackendOptionContext& context, const Span<BackendOption>& backend_options) {
+  // The whole span is read before anything is stored. A span is one request, so a
+  // caller told it was refused must not find part of it applied -- and the part
+  // that would be applied here is process-wide and governs every engine loaded
+  // after it. Where a span names this key more than once the last one wins, which
+  // is what applying each in turn did.
+  bool requested = false;
+  bool have_request = false;
+  for (const auto& option : backend_options) {
+    // A caller may address one option span to several backends, so a key this
+    // backend does not read is skipped rather than refused.
+    if (std::strcmp(option.key, kSharedActivationScratchKey) == 0) {
+      const bool* const val = std::get_if<bool>(&option.value);
+      if (val == nullptr) {
+        ET_LOG(Error, "TensorRTBackend::set_option: option '%s' must be a boolean", kSharedActivationScratchKey);
+        return Error::InvalidArgument;
+      }
+      requested = *val;
+      have_request = true;
+    }
+  }
+
+  if (have_request) {
+    scratch_enabled.store(requested, std::memory_order_relaxed);
   }
   return Error::Ok;
 }

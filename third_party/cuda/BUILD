@@ -17,6 +17,17 @@ config_setting(
     ],
 )
 
+# Every header in the toolkit, and the only place the glob is written: the library
+# targets below take their headers from here. One catch-all pattern rather than a
+# list of extensions, because `include/**/*` already matches every .h, .hpp and
+# .inl under it. Keeping the headers in a target of their own is the shape
+# third_party/cublas and third_party/cudnn/archive already use.
+cc_library(
+    name = "cuda_headers",
+    hdrs = glob(["include/**/*"]),
+    includes = ["include/"],
+)
+
 cc_library(
     name = "cudart",
     srcs = select({
@@ -30,13 +41,7 @@ cc_library(
             "lib64/libcudart.so",
         ],
     }),
-    hdrs = glob([
-        "include/**/*.h",
-        "include/**/*.hpp",
-        "include/**/*.inl",
-        "include/**/*",
-    ]),
-    includes = ["include/"],
+    deps = [":cuda_headers"],
 )
 
 cc_library(
@@ -71,14 +76,8 @@ cc_library(
             allow_empty = True,
         ),
     }),
-    hdrs = glob([
-        "include/**/*.h",
-        "include/**/*.hpp",
-        "include/**/*.inl",
-        "include/**/*",
-    ]),
-    includes = ["include/"],
     linkopts = ["-Wl,-rpath,lib/"],
+    deps = [":cuda_headers"],
 )
 
 cc_library(
@@ -97,12 +96,6 @@ cc_library(
             allow_empty = True,
         ),
     }),
-    hdrs = glob([
-        "include/**/*cublas*.h",
-        "include/**/*.hpp",
-        "include/**/*.inl",
-        "include/**/*",
-    ]),
-    includes = ["include/"],
     linkopts = ["-Wl,-rpath,lib/"],
+    deps = [":cuda_headers"],
 )
