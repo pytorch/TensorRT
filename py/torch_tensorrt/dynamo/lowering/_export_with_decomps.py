@@ -5,7 +5,9 @@ Stock ``torch.export`` captures without Torch-TRT's decomp table;
 re-traces. ``dynamo.trace`` uses this helper so the default
 ``torch_tensorrt.compile(nn.Module)`` path is one trace. ``compile`` skips
 ``run_decompositions`` when the exported program already carries a matching
-table fingerprint — no user-facing flag.
+table fingerprint — no user-facing flag. Autocast is the exception: it inserts
+cast nodes in ``pre_export_lowering`` after export, so that path does not stamp
+during ``trace`` and always runs ``run_decompositions`` once after lowering.
 """
 
 from __future__ import annotations
@@ -168,15 +170,25 @@ def maybe_run_decompositions(
     decompose_attention: bool = False,
     use_distributed_mode_trace: bool = False,
     use_fp32_acc: bool = False,
+    enable_autocast: bool = False,
 ) -> ExportedProgram:
-    """Run ``run_decompositions`` unless ``trace`` already applied the same table."""
+    """Run ``run_decompositions`` unless ``trace`` already applied the same table.
+
+    Always runs when ``enable_autocast`` is set. ``pre_export_lowering`` inserts
+    cast nodes after export, so a stamp from ``dynamo.trace`` is stale.
+    """
     fingerprint = decomp_fingerprint(
         enable_experimental_decompositions,
         decompose_attention,
         use_distributed_mode_trace,
         use_fp32_acc,
     )
-    if matching_decomp_stamp(exported_program, fingerprint):
+    if enable_autocast:
+        logger.info(
+            "Running run_decompositions after autocast: pre_export_lowering may have "
+            "inserted ops that were not present during dynamo.trace"
+        )
+    elif matching_decomp_stamp(exported_program, fingerprint):
         logger.info(
             "Skipping run_decompositions: exported program already has the matching "
             "Torch-TRT decomp table from dynamo.trace"

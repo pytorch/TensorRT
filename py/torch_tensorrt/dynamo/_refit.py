@@ -267,6 +267,7 @@ def refit_module_weights(
         decompose_attention=settings.decompose_attention,
         use_distributed_mode_trace=settings.use_distributed_mode_trace,
         use_fp32_acc=settings.use_fp32_acc,
+        enable_autocast=settings.enable_autocast,
     )
     new_gm = new_weight_module.module()
 
