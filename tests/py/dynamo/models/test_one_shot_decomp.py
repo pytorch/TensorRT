@@ -83,6 +83,22 @@ class TestOneShotDecomp(unittest.TestCase):
         exported_program = trace(self.model, self.inputs)
         self.assertTrue(matching_decomp_stamp(exported_program, decomp_fingerprint()))
 
+    def test_maybe_run_decompositions_runs_when_autocast_enabled(self) -> None:
+        exported_program = export_with_tensorrt_decomps(
+            self.model, args=self.inputs, strict=False
+        )
+        with patch.object(
+            type(exported_program),
+            "run_decompositions",
+            wraps=exported_program.run_decompositions,
+        ) as mocked:
+            maybe_run_decompositions(exported_program, enable_autocast=True)
+            mocked.assert_called_once()
+
+    def test_trace_does_not_stamp_when_autocast_enabled(self) -> None:
+        exported_program = trace(self.model, self.inputs, enable_autocast=True)
+        self.assertFalse(matching_decomp_stamp(exported_program, decomp_fingerprint()))
+
 
 if __name__ == "__main__":
     unittest.main()

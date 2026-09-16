@@ -14,6 +14,7 @@ from torch.export import Dim
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo._defaults import (
     DECOMPOSE_ATTENTION,
+    ENABLE_AUTOCAST,
     ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     USE_DISTRIBUTED_MODE_TRACE,
     USE_FP32_ACC,
@@ -43,6 +44,8 @@ def trace(
 
     Exports a ``torch.export.ExportedProgram`` from either a ``torch.nn.Module`` or torch.fx.GraphModule``. Applies Torch-TensorRT operator decompositions during
     that export so ``dynamo.compile`` can skip a second AOT retrace when the decomp table matches.
+    When ``enable_autocast=True``, skips one-shot decomps so ``compile`` can insert autocast
+    casts in ``pre_export_lowering`` and then decompose once.
 
     Arguments:
         mod (torch.nn.Module | torch.fx.GraphModule): Source module to later be compiled by Torch-TensorRT's dynamo fronted
@@ -112,23 +115,39 @@ def trace(
 
         export_context = export_torch_mode()
 
+    enable_autocast = bool(kwargs.get("enable_autocast", ENABLE_AUTOCAST))
     with export_context:
-        exp_program = export_with_tensorrt_decomps(
-            mod,
-            args=tuple(torch_arg_inputs),
-            kwargs=torch_kwarg_inputs,
-            dynamic_shapes=dynamic_shapes,
-            strict=kwargs.get("strict", False),
-            enable_experimental_decompositions=kwargs.get(
-                "enable_experimental_decompositions",
-                ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
-            ),
-            decompose_attention=kwargs.get("decompose_attention", DECOMPOSE_ATTENTION),
-            use_distributed_mode_trace=kwargs.get(
-                "use_distributed_mode_trace", USE_DISTRIBUTED_MODE_TRACE
-            ),
-            use_fp32_acc=kwargs.get("use_fp32_acc", USE_FP32_ACC),
-        )
+        if enable_autocast:
+            logger.info(
+                "Skipping Torch-TRT decomps during export because enable_autocast=True; "
+                "compile() will run_decompositions after pre_export_lowering inserts casts."
+            )
+            exp_program = torch.export.export(
+                mod,
+                args=tuple(torch_arg_inputs),
+                kwargs=torch_kwarg_inputs,
+                dynamic_shapes=dynamic_shapes,
+                strict=kwargs.get("strict", False),
+            )
+        else:
+            exp_program = export_with_tensorrt_decomps(
+                mod,
+                args=tuple(torch_arg_inputs),
+                kwargs=torch_kwarg_inputs,
+                dynamic_shapes=dynamic_shapes,
+                strict=kwargs.get("strict", False),
+                enable_experimental_decompositions=kwargs.get(
+                    "enable_experimental_decompositions",
+                    ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
+                ),
+                decompose_attention=kwargs.get(
+                    "decompose_attention", DECOMPOSE_ATTENTION
+                ),
+                use_distributed_mode_trace=kwargs.get(
+                    "use_distributed_mode_trace", USE_DISTRIBUTED_MODE_TRACE
+                ),
+                use_fp32_acc=kwargs.get("use_fp32_acc", USE_FP32_ACC),
+            )
 
     return exp_program
 
