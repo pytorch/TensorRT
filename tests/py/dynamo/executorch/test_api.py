@@ -831,15 +831,31 @@ def test_the_runtime_package_ships_no_runtime_api():
 
     It used to carry a ``runtime.py`` wrapping ExecuTorch's ``Runtime``/``Program``, which duplicated
     what ExecuTorch already exports and put a second inference API in a wheel whose only job is
-    registration. Both files are asserted so a reintroduction anywhere is caught: neither the old
-    location under torch_tensorrt nor one inside the delegate package.
+    registration. The old location under torch_tensorrt is gone outright. The submodule inside the
+    delegate package survives only because the published main wheel imports ``load`` from it by name,
+    so deleting it would turn torch_tensorrt.load(format="executorch") into a ModuleNotFoundError for
+    anyone who upgrades this package alone. It must be a forwarder and nothing more.
     """
     assert not (_REPO_ROOT / "py/torch_tensorrt/executorch/runtime.py").exists()
-    assert not (
+    legacy_loader = (
         _REPO_ROOT
         / "py/torch-tensorrt-executorch-runtime"
         / "torch_tensorrt_executorch_runtime/runtime.py"
-    ).exists()
+    )
+    assert (
+        legacy_loader.exists()
+    ), "the published main wheel imports load from this submodule"
+    loader_source = legacy_loader.read_text(encoding="utf-8")
+    assert "DeprecationWarning" in loader_source, loader_source
+    assert "_load_for_executorch" in loader_source, loader_source
+    # A forwarder, not a second inference API: no runtime or program wrapper may come back.
+    for reintroduced in (
+        "class Program",
+        "class Runtime",
+        "def run_method",
+        "class Module",
+    ):
+        assert reintroduced not in loader_source, reintroduced
 
     # The registration surface, plus the two names the published wheel already exported. Removing
     # those outright breaks code written against it, so they stay as a deprecated alias and as an

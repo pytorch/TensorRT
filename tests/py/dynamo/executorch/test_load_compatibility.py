@@ -3,6 +3,7 @@
 
 """Exercise the real loader and compatibility wrapper with a controlled native boundary."""
 
+import ast
 import importlib.util
 import inspect
 import sys
@@ -443,3 +444,31 @@ def test_format_remains_keyword_only(compiler, boundary):
     with pytest.raises(TypeError):
         compiler.load(boundary.path, None, "executorch")
     assert boundary.events == []
+
+
+@pytest.mark.unit
+def test_the_published_main_wheel_can_still_reach_the_loader_it_imports() -> None:
+    """The released main wheel does ``from ...runtime import load``, by name.
+
+    Upgrading this package on its own must not break that call, so the submodule and the name both
+    have to survive as long as a released main wheel reaches for them. Asserting the import path the
+    way the published wheel writes it is what makes a deletion visible here rather than in a user's
+    traceback.
+    """
+    package = (
+        Path(__file__).resolve().parents[4]
+        / "py/torch-tensorrt-executorch-runtime"
+        / "torch_tensorrt_executorch_runtime"
+    )
+    module_path = package / "runtime.py"
+    assert module_path.exists(), "the published main wheel imports this submodule"
+    tree = ast.parse(module_path.read_text(encoding="utf-8"))
+    exported = {node.name for node in tree.body if isinstance(node, ast.FunctionDef)}
+    assert "load" in exported, sorted(exported)
+    # Its one argument is the path, which is how the main wheel calls it.
+    load = next(
+        n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "load"
+    )
+    assert [a.arg for a in load.args.args] == ["file_path"], [
+        a.arg for a in load.args.args
+    ]
