@@ -339,7 +339,9 @@ class TestScatterDtypeFixConverter(DispatchTestCase):
     def test_scatter_src_dtype_mismatch_after_argmax(self):
         class TestModule(torch.nn.Module):
             def forward(self, x):
-                index = torch.tensor([[0, 1], [1, 0]], dtype=torch.int64, device=x.device)
+                index = torch.tensor(
+                    [[0, 1], [1, 0]], dtype=torch.int64, device=x.device
+                )
                 src = torch.argmax(x, dim=1, keepdim=True).expand(2, 2)
                 return torch.ops.aten.scatter.src(x, 1, index, src)
 
