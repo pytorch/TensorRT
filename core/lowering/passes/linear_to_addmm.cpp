@@ -3,7 +3,6 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-
 #include <torch/csrc/jit/runtime/operator.h>
 #include "core/util/prelude.h"
 #include "torch/csrc/jit/api/function_impl.h"

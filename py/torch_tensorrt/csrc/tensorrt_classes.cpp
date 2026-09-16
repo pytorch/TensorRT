@@ -3,7 +3,6 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-
 #include "tensorrt_classes.h"
 
 namespace torch_tensorrt {
