@@ -29,7 +29,7 @@ for argument in "$@"; do
 done
 if [ "$#" -ge 5 ]; then
     case "${manylinux_tag}" in
-        manylinux_2_28_x86_64|manylinux_2_28_aarch64) ;;
+        manylinux_2_28_x86_64|manylinux_2_35_aarch64) ;;
         *) fail "unsupported manylinux tag: ${manylinux_tag}" ;;
     esac
 else
@@ -51,12 +51,12 @@ CXXABI 1.3 1.3.1 1.3.2 1.3.3 1.3.4 1.3.5 1.3.6 1.3.7 1.3.8 1.3.9 1.3.10 1.3.11 F
 GCC 3.0 3.3 3.3.1 3.4 3.4.2 3.4.4 4.0.0 4.2.0 4.3.0 4.7.0 4.8.0 7.0.0
 POLICY
             ;;
-        manylinux_2_28_aarch64)
+        manylinux_2_35_aarch64)
             cat <<'POLICY'
-GLIBC 2.0 2.17 2.18 2.22 2.23 2.24 2.25 2.26 2.27 2.28
-GLIBCXX 3.4 3.4.1 3.4.2 3.4.3 3.4.4 3.4.5 3.4.6 3.4.7 3.4.8 3.4.9 3.4.10 3.4.11 3.4.12 3.4.13 3.4.14 3.4.15 3.4.16 3.4.17 3.4.18 3.4.19 3.4.20 3.4.21 3.4.22 3.4.23 3.4.24
-CXXABI 1.3 1.3.1 1.3.2 1.3.3 1.3.4 1.3.5 1.3.6 1.3.7 1.3.8 1.3.9 1.3.10 1.3.11 TM_1
-GCC 3.0 3.3 3.3.1 3.4 3.4.2 3.4.4 4.0.0 4.2.0 4.3.0 4.5.0 4.7.0 7.0.0
+GLIBC 2.0 2.17 2.18 2.22 2.23 2.24 2.25 2.26 2.27 2.28 2.29 2.30 2.31 2.32 2.33 2.34 2.35
+GLIBCXX 3.4 3.4.1 3.4.2 3.4.3 3.4.4 3.4.5 3.4.6 3.4.7 3.4.8 3.4.9 3.4.10 3.4.11 3.4.12 3.4.13 3.4.14 3.4.15 3.4.16 3.4.17 3.4.18 3.4.19 3.4.20 3.4.21 3.4.22 3.4.23 3.4.24 3.4.25 3.4.26 3.4.27 3.4.28 3.4.29 3.4.30
+CXXABI 1.3 1.3.1 1.3.2 1.3.3 1.3.4 1.3.5 1.3.6 1.3.7 1.3.8 1.3.9 1.3.10 1.3.11 1.3.12 1.3.13 TM_1
+GCC 3.0 3.3 3.3.1 3.4 3.4.2 3.4.4 4.0.0 4.2.0 4.3.0 4.5.0 4.7.0 7.0.0 11.0
 POLICY
             ;;
     esac | awk '{ for (i = 2; i <= NF; i++) print $1 "_" $i }'
@@ -198,10 +198,26 @@ ${sibling_versions}"
 
     if [ -n "${manylinux_tag}" ]; then
         allowed=$(policy_versions)
+        # Collect every violation before failing, and sort them by version rather than as text, so the
+        # message names the highest one. Failing on whichever happened to sort first left the worst
+        # requirement hidden behind a lesser one and sent a reader after the wrong cause.
+        disallowed=""
         for node in $(versions "${target_versions}"); do
             printf '%s\n' "${allowed}" | grep -Fxq "${node}" ||
-                fail "${target} requires ${node}, which ${manylinux_tag} does not allow (auditwheel 6.8.2)"
+                disallowed="${disallowed}${node}
+"
         done
+        if printf '%s' "${disallowed}" | grep -q '[^[:space:]]'; then
+            worst=$(printf '%s\n' "${disallowed}" | grep '[^[:space:]]' | sort -t_ -k2 -V | tail -1)
+            # Name the symbols that need it. Without this the message says a version is too new but
+            # not which code reached for it, which is the only part a reader can act on.
+            culprits=$("${readelf_bin}" -sW "${target}" 2>/dev/null |
+                awk -v v="@${worst}" '$0 ~ v { print $8 }' |
+                sed "s/@@*${worst}//" | sort -u | head -3 | tr '\n' ' ')
+            fail "${target} requires ${worst}, which ${manylinux_tag} does not allow (auditwheel 6.8.2).
+Symbols needing it: ${culprits:-unknown}.
+All disallowed: $(printf '%s' "${disallowed}" | grep '[^[:space:]]' | sort -t_ -k2 -V | tr '\n' ' ')"
+        fi
     else
         # Without a platform tag, retain the conservative named-node comparison only.
         for node in $(versions "${target_versions}" | grep -E '_[A-Z][A-Z0-9_]*$'); do

@@ -711,7 +711,7 @@ def test_the_guard_is_given_the_platform_it_must_compare_against():
     assigned = set(
         re.findall(r"set\(TORCH_TENSORRT_MANYLINUX_TAG \"([^\"]+)\"\)", cmake)
     )
-    assert assigned == {"manylinux_2_28_x86_64", "manylinux_2_28_aarch64"}, (
+    assert assigned == {"manylinux_2_28_x86_64", "manylinux_2_35_aarch64"}, (
         "the build assigns "
         f"{sorted(assigned)} as its manylinux tag, but the two architectures ship under different "
         "platforms and using one for both rejects the aarch64 row for requiring exactly what its "
@@ -996,7 +996,7 @@ def test_the_delegate_checks_the_runtime_and_platform_policy():
         assert family in guard, f"the guard does not look at {family} versions"
     assert "policy_versions" in guard
     assert "manylinux_2_28_x86_64" in guard
-    assert "manylinux_2_28_aarch64" in guard
+    assert "manylinux_2_35_aarch64" in guard
 
 
 @pytest.mark.unit
@@ -2766,7 +2766,7 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
     purelib, tag, arch = "false", "manylinux_2_28_x86_64", "x86_64"
 
     if case == "aarch64_tag":
-        tag, arch = "manylinux_2_28_aarch64", "aarch64"
+        tag, arch = "manylinux_2_35_aarch64", "aarch64"
     elif case == "unrepaired_tag":
         tag = "linux_x86_64"
     elif case == "wrong_architecture_floor":

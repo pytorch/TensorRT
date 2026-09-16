@@ -24,7 +24,7 @@ _RUNPATH = (
 )
 _REGISTER = "_ZN10executorch7runtime16register_backendERKNS0_7BackendE"
 _X86 = "manylinux_2_28_x86_64"
-_ARM = "manylinux_2_28_aarch64"
+_ARM = "manylinux_2_35_aarch64"
 _BASE_VERSIONS = "CXXABI_1.3 GLIBCXX_3.4.21 GLIBC_2.17 GCC_3.0"
 
 
@@ -188,19 +188,19 @@ def test_omitted_optional_arguments_are_explicit(artifact):
         (_X86, "GLIBCXX_3.4.24", True),
         (_X86, "GLIBCXX_3.4.25", False),
         (_ARM, "GLIBCXX_3.4.24", True),
-        (_ARM, "GLIBCXX_3.4.25", False),
+        (_ARM, "GLIBCXX_3.4.25", True),
         (_ARM, "GLIBCXX_3.4.34", False),
         (_X86, "CXXABI_1.3.10", True),
         (_X86, "CXXABI_1.3.11", True),
         (_X86, "CXXABI_1.3.12", False),
         (_ARM, "CXXABI_1.3.11", True),
-        (_ARM, "CXXABI_1.3.12", False),
+        (_ARM, "CXXABI_1.3.12", True),
         (_ARM, "CXXABI_1.3.16", False),
         (_X86, "GLIBC_2.27", True),
         (_X86, "GLIBC_2.28", True),
         (_X86, "GLIBC_2.29", False),
         (_ARM, "GLIBC_2.28", True),
-        (_ARM, "GLIBC_2.29", False),
+        (_ARM, "GLIBC_2.29", True),
         (_ARM, "GLIBC_2.39", False),
         (_X86, "GCC_4.8.0", True),
         (_X86, "GCC_7.0.0", True),
