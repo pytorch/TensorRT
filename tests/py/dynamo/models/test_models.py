@@ -361,6 +361,31 @@ def test_bert_base_uncased(ir, dtype):
     torch._dynamo.reset()
 
 
+def _torch_executed_state(gm):
+    """The parameters and buffers the compiled module still executes in PyTorch.
+
+    These are the same tensor objects the source model holds -- torch.export keeps the
+    source module's Parameters rather than copying them and the partitioners share
+    attributes by setattr -- so offloading the source model moves them too, and
+    compile_module puts them back on the target device afterwards.
+    """
+    state = []
+    for name, submodule in gm.named_children():
+        if not isinstance(submodule, torch.fx.GraphModule) or "_run_on_acc" in name:
+            continue
+        state += list(submodule.named_parameters()) + list(submodule.named_buffers())
+    return state
+
+
+def _assert_state_on(named_tensors, device_type, label):
+    for name, tensor in named_tensors:
+        assertions.assertEqual(
+            tensor.device.type,
+            device_type,
+            msg=f"{label} {name} is on {tensor.device}, expected {device_type}.",
+        )
+
+
 @unittest.skipIf(
     not importlib.util.find_spec("transformers"), "torchvision not installed"
 )
@@ -398,10 +423,22 @@ def test_bert_base_uncased_cpu_offload(ir):
     }
     trt_mod = torchtrt.compile(model, **compile_spec)
     if ir == "dynamo":
-        assertions.assertTrue(
-            get_model_device(model).type == "cpu",
-            msg="Model should be offloaded to CPU",
-        )
+        # offload_module_to_cpu releases the weights TensorRT absorbed, but not the ones
+        # the compiled module still executes in PyTorch: those are the same Parameter
+        # objects, and compile_module deliberately puts them back on the target device so
+        # a partially converted model stays runnable. Parameters only, not buffers --
+        # position_ids and token_type_ids are persistent=False, so they never enter the
+        # exported program and compile() cannot offload them. Every parameter lands in
+        # exactly one of the two sets below, so neither assertion can go vacuous.
+        torch_executed = _torch_executed_state(trt_mod)
+        _assert_state_on(torch_executed, "cuda", "PyTorch-executed state")
+        resident = {id(tensor) for _, tensor in torch_executed}
+        released = [
+            (name, parameter)
+            for name, parameter in model.named_parameters()
+            if id(parameter) not in resident
+        ]
+        _assert_state_on(released, "cpu", "Offloaded parameter")
         model.cuda()
 
     model_outputs = model(input, input2)
