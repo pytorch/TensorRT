@@ -625,3 +625,40 @@ def test_write_pins_finishes_an_interrupted_run(pin_repo, monkeypatch):
     )
     assert updater.write_pins(target_version, target_commit) is True
 
+
+@pytest.mark.unit
+def test_a_site_that_loses_its_version_requirement_is_not_excused_by_its_commit(
+    pin_repo, monkeypatch
+):
+    """Four sites carry both coordinates, and the old check accepted either one.
+
+    So a requirement the pattern stopped matching, after a reformat say, would leave the version
+    stale while the commit moved on. That is precisely the drift the two pins exist to prevent, so
+    each declared coordinate has to be satisfied on its own.
+    """
+    both = sorted(
+        name for name, kinds in updater._SITE_COORDINATES.items() if len(kinds) == 2
+    )
+    assert both, "expected sites declaring both coordinates"
+    victim = pin_repo / both[0]
+    current = updater.read_pin("__executorch_version__")
+    # Keep the commit, break only the version requirement's spelling. The site writes it as a bare
+    # `executorch==<version>` comment, so dropping the operator is enough to defeat the pattern.
+    body = victim.read_text(encoding="utf-8")
+    assert f"executorch=={current}" in body, body[:200]
+    victim.write_text(
+        body.replace(f"executorch=={current}", f"executorch at {current}"),
+        encoding="utf-8",
+    )
+    with pytest.raises(SystemExit, match="no ExecuTorch version requirement"):
+        updater.write_pins("9.9.9", "b" * 40)
+
+
+@pytest.mark.unit
+def test_every_declared_site_coordinate_matches_the_tree(pin_repo):
+    """The declaration is only useful while it describes the files, so check it rather than trust it."""
+    commit = updater.read_pin("__executorch_commit__")
+    for name, kinds in updater._SITE_COORDINATES.items():
+        text = (pin_repo / name).read_text(encoding="utf-8")
+        assert ("version" in kinds) == bool(updater._REQUIREMENT.search(text)), name
+        assert ("commit" in kinds) == (commit in text), name

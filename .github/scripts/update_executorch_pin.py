@@ -30,19 +30,24 @@ _PROVENANCE_LIMIT = 64 * 1024
 
 # This allowlist prevents a release version from rewriting unrelated dependencies
 # or content-addressed wheel URLs. The repository guard inventories sites separately.
-_PIN_SITES = (
-    ".github/workflows/build_linux.yml",
-    ".github/workflows/executorch-test-linux.yml",
-    "MODULE.bazel",
-    "docker/MODULE.bazel.docker",
-    "docker/MODULE.bazel.ngc",
-    "justfile",
-    "pyproject.toml",
-    "py/torch-tensorrt-executorch-runtime/README.md",
-    "py/torch-tensorrt-executorch-runtime/pyproject.toml",
-    "toolchains/ci_workspaces/MODULE.bazel.tmpl",
-    "examples/executorch_reference_runner/README.md",
-)
+# Which coordinate each site carries. Checking "a version or a commit was found" lets a file that
+# carries both satisfy the check on the commit alone, so a requirement the pattern stops matching
+# would leave the version stale while the commit moves. That split is the whole thing these two pins
+# exist to prevent, so each site declares what it must contain and each is verified on its own.
+_SITE_COORDINATES: dict[str, frozenset[str]] = {
+    ".github/workflows/build_linux.yml": frozenset({"version"}),
+    ".github/workflows/executorch-test-linux.yml": frozenset({"version"}),
+    "MODULE.bazel": frozenset({"version", "commit"}),
+    "docker/MODULE.bazel.docker": frozenset({"version", "commit"}),
+    "docker/MODULE.bazel.ngc": frozenset({"version", "commit"}),
+    "justfile": frozenset({"version"}),
+    "pyproject.toml": frozenset({"version"}),
+    "py/torch-tensorrt-executorch-runtime/README.md": frozenset({"version"}),
+    "py/torch-tensorrt-executorch-runtime/pyproject.toml": frozenset({"version"}),
+    "toolchains/ci_workspaces/MODULE.bazel.tmpl": frozenset({"version", "commit"}),
+    "examples/executorch_reference_runner/README.md": frozenset({"commit"}),
+}
+_PIN_SITES = tuple(_SITE_COORDINATES)
 _CLAUSE = r"(?:===|==|>=|<=|~=|!=|<|>)\s*[^\s\"'`,;()]+"
 _MARKER_VALUE = r"""(?:[a-z_]+|"[^"\n]*"|'[^'\n]*')"""
 _MARKER_ATOM = rf"(?:\([ \t]*)*{_MARKER_VALUE}[ \t]*(?:===|==|>=|<=|~=|!=|<|>|not[ \t]+in|in)[ \t]*{_MARKER_VALUE}(?:[ \t]*\))*"
@@ -258,12 +263,32 @@ def write_pins(new_version: str, new_commit: str) -> bool:
             else:
                 updated, count = _REQUIREMENT.subn(rewrite_requirement, text)
                 updated = updated.replace(old_commit, new_commit)
-                # Either coordinate may legitimately be the only one a site carries, and a
-                # site already at the target is satisfied rather than broken, which is what
-                # lets a later run finish an interrupted one.
-                if not count and old_commit not in text:
-                    if new_version not in text and new_commit not in text:
-                        raise ValueError("no current version or source pin found")
+                try:
+                    name = str(path.relative_to(_REPO_ROOT)).replace("\\", "/")
+                except ValueError:
+                    name = str(path)
+                # A site outside the declaration, which only a caller substituting its own list
+                # produces, keeps the older rule of needing at least one coordinate.
+                expected = _SITE_COORDINATES.get(
+                    name,
+                    (
+                        frozenset({"version"})
+                        if _REQUIREMENT.search(text)
+                        else frozenset({"commit"})
+                    ),
+                )
+                # Each declared coordinate on its own. A site already carrying the target counts as
+                # satisfied, which is what lets a later run finish an interrupted one.
+                if "version" in expected and not count and new_version not in text:
+                    raise ValueError(
+                        "carries no ExecuTorch version requirement to move"
+                    )
+                if (
+                    "commit" in expected
+                    and old_commit not in text
+                    and new_commit not in text
+                ):
+                    raise ValueError("carries no ExecuTorch source commit to move")
             pending.append((path, text, updated))
         except (
             OSError,
