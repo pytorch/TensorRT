@@ -844,7 +844,7 @@ def test_runner_channel_check_detects_removed_validator(monkeypatch):
         )
 
 
-def _load_utils_channel_helpers(fake_cuda: str | None):
+def _load_utils_channel_helpers(fake_cuda: str | None, platform: str = "linux"):
     """Execute the real helpers without importing their torch and TensorRT dependencies."""
     source = (REPO_ROOT / "py/torch_tensorrt/_utils.py").read_text(encoding="utf-8")
     tree = ast.parse(source)
@@ -873,6 +873,8 @@ def _load_utils_channel_helpers(fake_cuda: str | None):
     }
     namespace: dict[str, object] = {
         "torch": type("torch", (), {"version": _Version}),
+        # The helpers consult the platform, because the extra carries a Linux marker.
+        "sys": type("sys", (), {"platform": platform}),
         **constants,
     }
     module = ast.Module(body=functions, type_ignores=[])
@@ -2511,3 +2513,14 @@ def test_the_stable_track_may_repin_below_an_inherited_nightly() -> None:
     assert '"$TRACK" = "stable"' in step["run"], step["run"]
     assert "--allow-downgrade" in step["run"], step["run"]
 
+
+@pytest.mark.parametrize("platform", ["win32", "darwin"])
+@pytest.mark.unit
+def test_the_install_message_does_not_hand_a_no_op_command_to_other_platforms(
+    platform: str,
+) -> None:
+    """The extra is Linux only, so that command would resolve to nothing and still succeed."""
+    _, command = _load_utils_channel_helpers("13.2", platform=platform)
+    message = command()
+    assert "pip install" not in message, message
+    assert "Linux" in message, message

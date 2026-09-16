@@ -632,9 +632,9 @@ def load(
         if not _has_executorch_runtime():
             raise ImportError(
                 "Loading an ExecuTorch program requires the Torch-TensorRT "
-                "ExecuTorch delegate runtime (torch_tensorrt_executorch_runtime), "
-                "which is not yet published to any package index. Build and install "
-                "it from source following py/torch-tensorrt-executorch-runtime/README.md."
+                "ExecuTorch delegate runtime (torch_tensorrt_executorch_runtime). "
+                "Install it from the PyTorch nightly index for the CUDA version this "
+                "build targets."
             )
         from torch_tensorrt_executorch_runtime.runtime import load as load_executorch
 

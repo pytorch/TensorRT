@@ -54,7 +54,9 @@ def executorch_install_command() -> str:
     may still change dependencies to satisfy it. --pre permits prerelease candidates.
     """
     channel = executorch_install_channel()
-    if channel is None:
+    # The extra carries a Linux marker, so off Linux that pip command resolves to nothing,
+    # installs nothing and still succeeds, sending the user back to the same error.
+    if channel is None or not sys.platform.startswith("linux"):
         return (
             f"This ExecuTorch integration requires Linux with a PyTorch CUDA "
             f"{EXECUTORCH_CUDA_MAJOR} build. Use matching PyTorch, ExecuTorch and "
