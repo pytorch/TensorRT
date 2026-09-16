@@ -548,8 +548,15 @@ _RUNTIME_SETUP_PY = "py/torch-tensorrt-executorch-runtime/setup.py"
 
 
 @pytest.mark.unit
-def test_the_runtime_wheel_pins_executorch_to_the_public_pin(monkeypatch) -> None:
-    """Evaluate the metadata without invoking a native build."""
+def test_the_runtime_wheel_pins_the_executorch_build_it_linked(monkeypatch) -> None:
+    """The label naming the CUDA build is part of the pin, not noise to strip.
+
+    The delegate links one specific ExecuTorch build. A requirement carrying only the public version
+    is satisfied by a processor-only build, or another CUDA build of the same date, so the pin would
+    look exact while permitting the pairings it exists to refuse.
+
+    Evaluated without invoking a native build.
+    """
     import importlib.metadata
     import runpy
     import types
@@ -582,7 +589,7 @@ def test_the_runtime_wheel_pins_executorch_to_the_public_pin(monkeypatch) -> Non
     requirements = [
         r for r in metadata["install_requires"] if r.startswith("executorch")
     ]
-    assert requirements == [f"executorch=={pin}"]
+    assert requirements == [f"executorch=={pin}+cu132"], requirements
 
 
 def _declared_cuda_versions(name: str) -> set[str]:
@@ -1568,7 +1575,11 @@ def test_the_no_nightly_marker_only_exempts_a_win32_install():
                 ),
                 "",
             )
-            if "torch_tensorrt*" in install or "torch_tensorrt-*" not in install:
+            # Either the install names an explicitly filtered list, or it globs with the hyphen
+            # anchor. What it may not do is pass a bare torch_tensorrt* glob, which also matches
+            # the companion, and the companion is what needs the channel.
+            unfiltered = "torch_tensorrt*" in install
+            if unfiltered and "${wheels}" not in install:
                 misplaced.append(
                     f"{name}:{index + 1} carries {NO_NIGHTLY_MARKER!r} above an install that can "
                     f"match the companion wheel, which does need the channel: {install.strip()!r}"

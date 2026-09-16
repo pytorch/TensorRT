@@ -144,7 +144,9 @@ string(JOIN ":" TORCH_TENSORRT_DELEGATE_RUNPATH_COLONS ${TORCH_TENSORRT_DELEGATE
 
 # Match the architecture-specific tags applied by the shared wheel build.
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
-  set(TORCH_TENSORRT_MANYLINUX_TAG "manylinux_2_28_aarch64")
+  # Arm needs the newer baseline: its build container has no devtoolset, so the C++
+  # runtime symbols the delegate references are not absorbed statically as on x86.
+  set(TORCH_TENSORRT_MANYLINUX_TAG "manylinux_2_35_aarch64")
 elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$")
   set(TORCH_TENSORRT_MANYLINUX_TAG "manylinux_2_28_x86_64")
 else()

@@ -599,3 +599,29 @@ def test_guard_removal_controls(artifact, tmp_path, mutation):
         assert "unsupported manylinux tag" in result.stderr
     else:
         _ok(result)
+
+
+@pytest.mark.unit
+def test_every_site_naming_the_platform_tag_agrees() -> None:
+    """Three files name the tag, and they have to say the same thing.
+
+    The workflow tags the wheel, the native build passes a tag to the guard, and the guard decides
+    which tags it accepts. When one moved and another did not, the build failed with an unsupported
+    tag well after the code was otherwise correct.
+    """
+    cmake = (_NATIVE / "CMakeLists.txt").read_text(encoding="utf-8")
+    guard = _GUARD.read_text(encoding="utf-8")
+    workflow = (_ROOT / ".github/workflows/build_linux.yml").read_text(encoding="utf-8")
+    for arch, tag in (("aarch64", _ARM), ("x86_64", _X86)):
+        assert f'"{tag}"' in cmake, f"the native build does not name {tag}: {arch}"
+        assert tag in guard, f"the guard does not accept {tag}"
+        assert f"platform_tag={tag}" in workflow, f"the workflow does not apply {tag}"
+        other = (
+            tag.replace("2_35", "2_28")
+            if "2_35" in tag
+            else tag.replace("2_28", "2_35")
+        )
+        assert other not in cmake, f"the native build still names {other}"
+        assert (
+            f"platform_tag={other}" not in workflow
+        ), f"the workflow still applies {other}"

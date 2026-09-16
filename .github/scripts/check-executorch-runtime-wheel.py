@@ -103,11 +103,23 @@ def main():
             "tensorrt-cu13",
             "nvidia-cuda-runtime",
         ):
-            expected_version = (
-                pinned
-                if distribution == "executorch"
-                else Version(importlib.metadata.version(distribution)).public
-            )
+            if distribution == "executorch":
+                # The delegate links one specific ExecuTorch build, so its requirement carries the
+                # label naming that build. Without it the requirement is satisfied by a
+                # processor-only build, or another CUDA build of the same date. Compare against the
+                # installed wheel, whose label is the one the delegate actually linked, and check
+                # the public part still matches the repository pin.
+                installed = Version(importlib.metadata.version(distribution))
+                if installed.public != pinned:
+                    reject(
+                        f"the repository pins executorch=={pinned}, but the build environment has "
+                        f"{installed}"
+                    )
+                expected_version = str(installed)
+            else:
+                expected_version = Version(
+                    importlib.metadata.version(distribution)
+                ).public
             matched = [
                 r for r in requirements if canonicalize_name(r.name) == distribution
             ]
@@ -126,8 +138,20 @@ def main():
                 reject(
                     f"{reason} {distribution}=={expected_version}, but the wheel requires {matched}"
                 )
-        if any("+" in str(requirement.specifier) for requirement in requirements):
-            reject("a requirement carries a local version label")
+        # ExecuTorch is the exception, and deliberately so: the delegate links one specific build,
+        # and without the label naming it the requirement is satisfied by a processor-only build or
+        # another CUDA build of the same date. It resolves from the CUDA channel this wheel already
+        # requires. Every other requirement stays label-free, so it resolves anywhere.
+        labelled = [
+            requirement
+            for requirement in requirements
+            if "+" in str(requirement.specifier)
+            and canonicalize_name(requirement.name) != "executorch"
+        ]
+        if labelled:
+            reject(
+                f"a requirement other than executorch carries a local label: {labelled}"
+            )
         # Reading every member verifies its RECORD hash, including the delegate payload.
         for filename in names:
             if not filename.endswith("/"):
