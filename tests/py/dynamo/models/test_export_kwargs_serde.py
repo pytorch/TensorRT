@@ -7,6 +7,7 @@ import torch
 import torch.nn.functional as F
 import torch_tensorrt as torchtrt
 from torch import nn
+from torch_tensorrt._utils import trt_rtx_targets_turing
 from torch_tensorrt.dynamo._compiler import (
     convert_exported_program_to_serialized_trt_engine,
 )
@@ -17,6 +18,25 @@ from torch_tensorrt.dynamo.utils import (
 )
 
 assertions = unittest.TestCase()
+
+
+def _no_fallback_gemm_dtype() -> torch.dtype:
+    """Model dtype for the tests that convert a whole program with no partitioner.
+
+    TensorRT-RTX cannot serve an FP32 GEMM on Turing (SM 7.5), so
+    ``gemm_capability_validator`` rejects the models' trailing ``nn.Linear`` there. In a
+    normal ``torchtrt.dynamo.compile`` the partitioner turns that rejection into a
+    PyTorch block, but ``convert_exported_program_to_serialized_trt_engine`` emits one
+    engine for the whole program by design and has nothing to fall back to, so the
+    rejection raises ``UnsupportedOperatorException`` instead.
+
+    These tests are about kwarg plumbing, not about FP32, so follow the capability
+    rather than switching them off: the guard keys on operand dtype only and Turing has
+    FP16 GEMM hardware. Keyed off the same predicate the validator uses so the two
+    cannot drift, and no ``enabled_precisions`` change is needed because the network is
+    strongly typed.
+    """
+    return torch.float16 if trt_rtx_targets_turing() else torch.float32
 
 
 @pytest.mark.unit
@@ -496,8 +516,9 @@ def test_custom_model_compile_engine():
                 x = x - d["value"]
             return self.fc1(x)
 
-    model = net().eval().to("cuda")
-    args = [torch.rand((1, 3, 224, 224)).to("cuda")]
+    dtype = _no_fallback_gemm_dtype()
+    model = net().eval().to("cuda").to(dtype)
+    args = [torch.rand((1, 3, 224, 224), dtype=dtype).to("cuda")]
     kwargs = {
         "b": torch.tensor(6).to("cuda"),
         "d": {"value": torch.tensor(8).to("cuda")},
@@ -1090,9 +1111,10 @@ def test_custom_model_compile_engine_with_pure_kwarg_inputs():
                 x = x - d["value"]
             return self.fc1(x)
 
-    model = net().eval().to("cuda")
+    dtype = _no_fallback_gemm_dtype()
+    model = net().eval().to("cuda").to(dtype)
     kwargs = {
-        "x": torch.rand((1, 3, 224, 224)).to("cuda"),
+        "x": torch.rand((1, 3, 224, 224), dtype=dtype).to("cuda"),
         "b": torch.tensor(6).to("cuda"),
         "d": {"value": torch.tensor(8).to("cuda")},
     }
