@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 from ._core import (
     CONSTANT_FOLD_EXCLUSION_META_KEY,
     ConstantFoldExclusionRule,

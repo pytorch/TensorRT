@@ -1,3 +1,8 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+
 #include <executorch/backends/cuda/runtime/cuda_allocator.h>
 #include <executorch/runtime/core/device_allocator.h>
 

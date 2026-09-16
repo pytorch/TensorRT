@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """Runtime optimization-profile selection for multi-profile TensorRT engines.
 
 Profile selection is **manual by default**: pin a profile by its integer index

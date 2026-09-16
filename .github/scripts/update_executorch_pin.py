@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """Propose the newest ExecuTorch wheel and its recorded source commit as one pin.
 
 The update workflow opens a pull request. Pin checks and delegate build/test jobs

@@ -1,3 +1,8 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+
 #include "cpp_api_test.h"
 
 std::vector<torch_tensorrt::Input> toInputRangesDynamic(std::vector<std::vector<int64_t>> opts) {

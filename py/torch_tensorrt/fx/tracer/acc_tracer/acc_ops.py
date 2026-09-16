@@ -1,4 +1,7 @@
 # encoding: utf-8
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 import logging
 import operator
 import warnings

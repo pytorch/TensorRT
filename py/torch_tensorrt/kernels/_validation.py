@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """Fail-fast validation for :class:`KernelSpec`.
 
 Runs before any compilation or registration so authoring mistakes surface

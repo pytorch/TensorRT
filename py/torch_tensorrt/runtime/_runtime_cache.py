@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """Runtime cache facade + per-runtime handle + ``runtime_cache()`` CM.
 
 User-facing :class:`RuntimeCache` is a thin facade that wraps an inner

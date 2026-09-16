@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """Subprocess helper: run TRT operations in a Python-only environment.
 
 This script temporarily hides the Torch-TensorRT C++ shared libraries so that

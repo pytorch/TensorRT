@@ -1,3 +1,8 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+
 #include "core/conversion/evaluators/eval_util.h"
 #include <ATen/ATen.h>
 #include "ATen/InitialTensorOptions.h"

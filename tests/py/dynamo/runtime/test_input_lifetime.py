@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """Regression coverage for C++ runtime input buffer lifetimes.
 
 The C++ runtime binds TensorRT inputs to raw data pointers. If input setup
