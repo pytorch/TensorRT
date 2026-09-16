@@ -1299,10 +1299,24 @@ def compile_module(
         )
 
     # If the number of supported operations is 0 or less than the block size, skip the subgraph
-    # TODO: Add condition to second expression below when require_full_compilation is added
     if num_supported_ops == 0 or (
         num_supported_ops < settings.min_block_size and not settings.dryrun
     ):
+        # Only refuse when an operator genuinely has no converter. A graph whose every
+        # operator converts is fully supported however few of them there are, and all
+        # three partitioners deliberately disregard min_block_size in that case, so
+        # raising here would contradict them. dryrun is documented as the way to inspect
+        # what would fall back, so it stays non fatal.
+        if (
+            settings.require_full_compilation
+            and num_supported_ops < total_ops
+            and not settings.dryrun
+        ):
+            raise AssertionError(
+                f"require_full_compilation=True was specified, but "
+                f"{total_ops - num_supported_ops} of {total_ops} operations in this "
+                f"subgraph have no TensorRT converter"
+            )
         logger.warning(
             f"{num_supported_ops} supported operations detected in subgraph containing {total_ops} computational nodes. "
             f"Skipping this subgraph, since min_block_size was detected to be {settings.min_block_size}"
