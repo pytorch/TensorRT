@@ -133,9 +133,7 @@ def convert_binary_elementwise(
         tensor_dtype: TRTDataType, scalar: Union[float, int, bool]
     ) -> TRTDataType:
         torch_tensor_dtype = _enums.dtype._from(tensor_dtype).to(torch.dtype)
-        promoted = torch.result_type(
-            torch.empty([1], dtype=torch_tensor_dtype), scalar
-        )
+        promoted = torch.result_type(torch.empty([1], dtype=torch_tensor_dtype), scalar)
         return _enums.dtype._from(promoted).to(trt.DataType)
 
     if is_lhs_trt_tensor and isinstance(rhs_val, (float, int, bool)):
