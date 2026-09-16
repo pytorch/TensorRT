@@ -188,7 +188,7 @@ class Test64BitSupport(TestCase):
     torch.cuda.get_device_properties(torch.cuda.current_device()).major < 8
     or (
         torch.cuda.get_device_properties(torch.cuda.current_device()).major == 8
-        and torch.cuda.get_device_properties(torch.cuda.current_device()).major == 7
+        and torch.cuda.get_device_properties(torch.cuda.current_device()).minor == 7
     ),
     "Platform does not have BF16 support",
 )
