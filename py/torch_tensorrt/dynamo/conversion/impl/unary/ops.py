@@ -130,6 +130,17 @@ def log1p(
     """
     Computes log(1 + x) for each element of the input tensor.
     """
+    # Cast before the add, not after. TensorRT's log accepts no integer type, and an
+    # integer add would also wrap: 1 + INT32_MAX goes negative and log returns NaN.
+    if isinstance(input_val, TRTTensor) and input_val.dtype not in (
+        trt.float32,
+        trt.float16,
+        trt.bfloat16,
+    ):
+        input_val = cast_trt_tensor(
+            ctx, input_val, trt.float32, f"{name}_input_cast", target, source_ir
+        )
+
     one_plus_x = impl.elementwise.add(
         ctx, target, source_ir, f"{name}_add", input_val, 1
     )

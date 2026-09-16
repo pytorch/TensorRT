@@ -2126,7 +2126,26 @@ def aten_ops_log10(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.log1p.default)
+def log1p_validator(node: Node, settings: Optional[CompilationSettings] = None) -> bool:
+    input_node = node.args[0]
+    input_meta = input_node.meta.get("tensor_meta")
+    if input_meta is None:
+        input_meta = input_node.meta.get("val")
+    if input_meta is None:
+        return True
+    # Casting inside the engine cannot repair an unsupported input binding.
+    if input_meta.dtype in (torch.int8, torch.uint8):
+        return False
+    return input_meta.dtype != torch.float64 or (
+        settings is not None and settings.truncate_double
+    )
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.log1p.default,
+    capability_validator=log1p_validator,
+    supports_dynamic_shapes=True,
+)
 def aten_ops_log1p(
     ctx: ConversionContext,
     target: Target,
