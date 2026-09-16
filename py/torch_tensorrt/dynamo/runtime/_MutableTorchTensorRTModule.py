@@ -16,6 +16,9 @@ from torch_tensorrt._Device import Device
 from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._compiler import compile as dynamo_compile
 from torch_tensorrt.dynamo._refit import refit_module_weights
+from torch_tensorrt.dynamo.lowering._export_with_decomps import (
+    export_with_tensorrt_decomps,
+)
 from torch_tensorrt.dynamo.utils import (
     check_output_equal,
     deallocate_module,
@@ -316,8 +319,11 @@ class MutableTorchTensorRTModule(object):
         deallocate_module(self.original_model)
 
     def get_exported_program(self) -> torch.export.ExportedProgram:
+        enable_autocast = self.additional_settings.get(
+            "enable_autocast", _defaults.ENABLE_AUTOCAST
+        )
 
-        def export_fn() -> torch.export.ExportedProgram:
+        def stock_export() -> torch.export.ExportedProgram:
             if self.prefer_deferred_runtime_asserts_over_guards:
                 return _export(
                     self.original_model,
@@ -327,14 +333,40 @@ class MutableTorchTensorRTModule(object):
                     strict=self.strict,
                     prefer_deferred_runtime_asserts_over_guards=self.prefer_deferred_runtime_asserts_over_guards,
                 )
-            else:
-                return torch.export.export(
-                    self.original_model,
-                    self.arg_inputs,
-                    kwargs=self.kwarg_inputs,
-                    dynamic_shapes=self._get_total_dynamic_shapes(),
-                    strict=self.strict,
-                )
+            return torch.export.export(
+                self.original_model,
+                self.arg_inputs,
+                kwargs=self.kwarg_inputs,
+                dynamic_shapes=self._get_total_dynamic_shapes(),
+                strict=self.strict,
+            )
+
+        def export_fn() -> torch.export.ExportedProgram:
+            # Autocast inserts casts in pre_export_lowering after export, so skip
+            # one-shot decomps and let compile() run_decompositions once.
+            if enable_autocast:
+                return stock_export()
+            return export_with_tensorrt_decomps(
+                self.original_model,
+                args=tuple(self.arg_inputs),
+                kwargs=self.kwarg_inputs,
+                dynamic_shapes=self._get_total_dynamic_shapes(),
+                strict=self.strict,
+                prefer_deferred_runtime_asserts_over_guards=self.prefer_deferred_runtime_asserts_over_guards,
+                enable_experimental_decompositions=self.additional_settings.get(
+                    "enable_experimental_decompositions",
+                    _defaults.ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
+                ),
+                decompose_attention=self.additional_settings.get(
+                    "decompose_attention", _defaults.DECOMPOSE_ATTENTION
+                ),
+                use_distributed_mode_trace=self.additional_settings.get(
+                    "use_distributed_mode_trace", _defaults.USE_DISTRIBUTED_MODE_TRACE
+                ),
+                use_fp32_acc=self.additional_settings.get(
+                    "use_fp32_acc", _defaults.USE_FP32_ACC
+                ),
+            )
 
         # Check if the model has been quantized with modelopt
         if _is_modelopt_quantized(self.original_model):
