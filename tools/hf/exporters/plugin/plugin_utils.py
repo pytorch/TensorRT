@@ -340,6 +340,7 @@ def load_plugin():
 
 
 def load_plugins_for_trt():
+    from .kimi_kda import register_kimi_kda_plugin_op
     from .mamba import register_mamba_plugin_ops
     from .moe import register_moe_plugin_ops
 
@@ -347,6 +348,7 @@ def load_plugins_for_trt():
     _register_vit_attention_plugin_op()
     register_mamba_plugin_ops()
     register_moe_plugin_ops()
+    register_kimi_kda_plugin_op()
     from . import attn_patches as _attn_patches  # noqa: F401,E402
 
     load_plugin()
