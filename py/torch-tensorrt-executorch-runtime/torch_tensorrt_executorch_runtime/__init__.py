@@ -243,9 +243,19 @@ def _delegate_already_loaded(path: str) -> ctypes.CDLL | None:
 
 
 def _registered_backend_names() -> list[str]:
-    from executorch.extension.pybindings.portable_lib import (
-        _get_registered_backend_names,
-    )
+    # A private ExecuTorch name, and registration runs at import, so an ExecuTorch that does not
+    # export it would turn a plain import of this package into a bare ImportError traceback. Say
+    # what is wrong and what to do instead.
+    try:
+        from executorch.extension.pybindings.portable_lib import (
+            _get_registered_backend_names,
+        )
+    except ImportError as error:
+        raise DelegateCompatibilityError(
+            "The installed ExecuTorch does not expose its registered backend names, so this "
+            "delegate cannot confirm it owns its registration. Install the ExecuTorch build this "
+            f"package pins. Underlying error: {error}"
+        ) from error
 
     return _get_registered_backend_names()
 

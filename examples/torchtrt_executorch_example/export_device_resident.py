@@ -98,9 +98,13 @@ def main() -> None:
             min_block_size=1,
             truncate_double=True,
         )
+        # Write beside the target and move it into place only after the checks below pass. Saving
+        # straight over the target would let a rejected export replace a good program, and leave
+        # the reference file describing something the program no longer is.
+        staged_path = model_path.with_name(model_path.name + ".staged")
         torch_tensorrt.save(
             trt_gm,
-            str(model_path),
+            str(staged_path),
             output_format="executorch",
             arg_inputs=example_input,
             retrace=False,
@@ -124,7 +128,7 @@ def main() -> None:
             ),
         )
 
-        program = deserialize_pte_binary(model_path.read_bytes()).program
+        program = deserialize_pte_binary(staged_path.read_bytes()).program
 
         # Still coalesced. A partitioner or config change that routed the whole
         # graph to one backend would otherwise leave this example passing while
@@ -134,6 +138,7 @@ def main() -> None:
             name for name in ("TensorRTBackend", "CudaBackend") if name not in delegates
         ]
         if missing:
+            staged_path.unlink(missing_ok=True)
             sys.exit(
                 f"{model_path} is not coalesced: missing {missing}, found {delegates}"
             )
@@ -149,6 +154,7 @@ def main() -> None:
             }
         )
         if found:
+            staged_path.unlink(missing_ok=True)
             sys.exit(
                 f"FATAL: {model_path} still copies across the method boundary: {found}. "
                 "The skip flags did not take, so this program would not keep a CUDA "
@@ -172,10 +178,14 @@ def main() -> None:
                             f"{kind}[{index}]={DeviceType(device).name}"
                         )
         if host_tensors:
+            staged_path.unlink(missing_ok=True)
             sys.exit(
                 f"FATAL: {model_path} has non-CUDA method boundary tensors: "
                 f"{host_tensors}"
             )
+
+        # Every check passed, so this program may take the target's place.
+        staged_path.replace(model_path)
 
         reference = model(torch.ones(SHAPE).cuda())
         expected_path.write_text(

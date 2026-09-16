@@ -91,7 +91,9 @@ def _export(
                                 else delegates
                             )
                         ],
-                        operators=[SimpleNamespace(name=n, overload="") for n in operators],
+                        operators=[
+                            SimpleNamespace(name=n, overload="") for n in operators
+                        ],
                         inputs=[],
                         outputs=[],
                     )
@@ -211,3 +213,17 @@ def test_export_rejects_a_program_that_still_copies_at_the_boundary(
             tmp_path / "m.pte",
             operators=("aten::_h2d_copy_default",),
         )
+
+
+def test_a_rejected_export_leaves_the_previous_program_alone(monkeypatch, tmp_path):
+    """Saving straight over the target let a rejected export destroy a good program.
+
+    The reference file beside it then described something the program no longer was, which is worse
+    than no output at all because it looks like a successful export.
+    """
+    model_path = tmp_path / "m.pte"
+    model_path.write_bytes(b"the good program")
+    with pytest.raises(SystemExit, match="missing"):
+        _export(monkeypatch, model_path, delegates=("CudaBackend",))
+    assert model_path.read_bytes() == b"the good program"
+    assert not list(tmp_path.glob("*.staged")), "the staging file was left behind"
