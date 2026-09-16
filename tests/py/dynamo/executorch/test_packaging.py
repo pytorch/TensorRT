@@ -492,3 +492,27 @@ def test_ordinary_wheel_payload_is_unchanged(
     print(
         f"Ordinary wheel has identical bytes for {len(expected)} members with editable fix removed"
     )
+
+
+@pytest.mark.unit
+def test_the_executorch_requirement_keeps_its_cuda_label() -> None:
+    """A requirement without the local label is satisfied by a build the delegate cannot use.
+
+    The delegate links one specific ExecuTorch build, so pinning the version while dropping the
+    part that names the CUDA variant leaves a pin that a CPU build, or another CUDA build of the
+    same date, resolves against happily.
+    """
+    source = (COMPANION / "setup.py").read_text(encoding="utf-8")
+    assert 'f"executorch=={executorch_version}"' in source, source[-400:]
+    assert (
+        'f"executorch=={public_version(executorch_version)}"' not in source
+    ), "the local label is being stripped again"
+
+
+@pytest.mark.unit
+def test_a_missing_pin_file_fails_rather_than_disabling_the_check() -> None:
+    """Returning an empty version switched the pin check off instead of failing it."""
+    source = (COMPANION / "setup.py").read_text(encoding="utf-8")
+    reader = source.split("def pinned_executorch_version")[1].split("\ndef ")[0]
+    assert "raise RuntimeError" in reader, reader
+    assert 'return ""' not in reader, reader

@@ -42,10 +42,17 @@ _CMAKE_CONFIG_SOURCE = HERE / "cmake" / "torchtrt_executorch-config.cmake"
 
 
 def pinned_executorch_version() -> str:
-    """Read the ExecuTorch version the repository pins, or "" if the pin file is unavailable."""
+    """Read the ExecuTorch version the repository pins.
+
+    An empty return would switch the check below off rather than fail it, and a build with no pin
+    to compare against is exactly the case that check exists for.
+    """
     pin_file = REPO_ROOT / "dev_dep_versions.yml"
     if not pin_file.is_file():
-        return ""
+        raise RuntimeError(
+            f"{pin_file} is missing, so the ExecuTorch pin cannot be checked. Build this wheel "
+            "from a repository checkout."
+        )
     return yaml.safe_load(pin_file.read_text(encoding="utf-8"))[
         "__executorch_version__"
     ]
@@ -83,12 +90,9 @@ def executorch_cmake_prefix_path() -> str:
     # exempt via the escape hatch, because contributors legitimately test against other trees.
     pinned = pinned_executorch_version()
     installed = public_version(distribution.version)
-    if (
-        pinned
-        and public_version(pinned) != installed
-        and os.getenv("TORCH_TENSORRT_ALLOW_UNPINNED_EXECUTORCH", "").lower()
-        not in ("1", "true", "yes", "on")
-    ):
+    if public_version(pinned) != installed and os.getenv(
+        "TORCH_TENSORRT_ALLOW_UNPINNED_EXECUTORCH", ""
+    ).lower() not in ("1", "true", "yes", "on"):
         raise RuntimeError(
             f"The installed ExecuTorch is {installed} but dev_dep_versions.yml pins "
             f"{pinned}. The delegate links this wheel's runtime and declares a dependency on "
@@ -398,7 +402,10 @@ setup(
     python_requires=">=3.10",
     install_requires=[
         f"torch=={public_version(torch.__version__)}",
-        f"executorch=={public_version(executorch_version)}",
+        # The full version, local label included. Dropping it leaves a requirement that a CPU
+        # build, or another CUDA build of the same date, satisfies. This delegate links the
+        # runtime out of one specific build, so those are exactly the pairings to refuse.
+        f"executorch=={executorch_version}",
         f"torch-tensorrt=={public_version(installed_version('torch-tensorrt'))}",
         f"{TENSORRT_DISTRIBUTION}=={public_version(tensorrt_version)}",
         f"{CUDA_RUNTIME_DISTRIBUTION}=={public_version(cuda_runtime_version)}",
