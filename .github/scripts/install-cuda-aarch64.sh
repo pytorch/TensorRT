@@ -12,15 +12,7 @@ install_cuda_aarch64() {
     dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/sbsa/cuda-rhel8.repo
 
     # nccl version must match libtorch_cuda.so was built with
-    if [[ ${CU_VERSION:0:4} == "cu12" ]]; then
-        # cu12: https://github.com/pytorch/pytorch/blob/main/.ci/docker/ci_commit_pins/nccl-cu12.txt
-        if [[ ${CU_VERSION} == "cu126" ]]; then
-            nccl_version="2.24.3-1"
-        else
-            echo "Unsupported CUDA version: ${CU_VERSION}"
-            exit 1
-        fi
-    elif [[ ${CU_VERSION:0:4} == "cu13" ]]; then
+    if [[ ${CU_VERSION:0:4} == "cu13" ]]; then
         # cu13: https://github.com/pytorch/pytorch/blob/main/.ci/docker/ci_commit_pins/nccl.txt
         # NVIDIA RHEL/SBSA NCCL RPMs are published per CUDA minor.
         if [[ ${CU_VERSION} == "cu134" ]]; then
@@ -40,9 +32,11 @@ install_cuda_aarch64() {
             echo "Unsupported CUDA version: ${CU_VERSION}"
             exit 1
         fi
+    else
+        echo "Unsupported CUDA version: ${CU_VERSION}"
+        exit 1
     fi
 
-    # CUDA 12 NCCL packages use the same minor version as the toolkit.
     nccl_cuda_version=${nccl_cuda_version:-${CU_DOT_VER}}
 
     # Keep these transactions separate so an invalid NCCL pin cannot silently

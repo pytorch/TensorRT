@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """
 .. _executorch_export_coalesced:
 
@@ -30,7 +33,8 @@ Prerequisites
 -------------
 Install Torch-TensorRT with the ExecuTorch extra before running this example::
 
-    pip install -e ".[executorch]"
+    pip install -e ".[executorch]" \
+        --extra-index-url https://download.pytorch.org/whl/nightly/cu130
 
 ExecuTorch's CUDA backend also needs a CUDA toolkit (``nvcc``) at export time,
 for the AOTInductor compile.

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """CPU-only tests for the ExecuTorch weight streaming budget option.
 
 These exercise the export-time plumbing: budget validation and the compile spec

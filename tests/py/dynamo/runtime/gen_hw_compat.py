@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 # This script is used to generate hw_compat.ts file that's used in test_hw_compat.py
 # Generate the model on a different hardware compared to the one you're testing on to
 # verify HW compatibility feature.

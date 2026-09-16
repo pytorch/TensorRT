@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """Declarative kernel descriptor used by :func:`torch_tensorrt.kernels.cuda_kernel_op`.
 
 This module intentionally contains no runtime logic beyond dataclass

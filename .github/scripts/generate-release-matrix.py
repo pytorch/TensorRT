@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
 
 import argparse
 import json
 import sys
 
 RELEASE_CUDA_VERSION = {
-    "wheel": ["cu126", "cu130", "cu132", "cu134"],
-    "tarball": ["cu126", "cu130", "cu132", "cu134"],
+    "wheel": ["cu130", "cu132", "cu134"],
+    "tarball": ["cu130", "cu132", "cu134"],
 }
 RELEASE_PYTHON_VERSION = {
     "wheel": ["3.10", "3.11", "3.12", "3.13", "3.14"],
@@ -49,13 +51,6 @@ def main(args: list[str]) -> None:
     includes = matrix_dict["include"]
     filtered_includes = []
     for item in includes:
-        # CUDA 12.6 release artifacts are available only for x86_64. This
-        # excludes both Linux AArch64 and Windows Arm/AArch64 matrix entries.
-        if item["desired_cuda"] == "cu126" and item["gpu_arch_type"] in {
-            "cuda-aarch64",
-            "cuda-arm64",
-        }:
-            continue
         if (
             item["desired_cuda"] in cuda_versions
             and item["python_version"] in python_versions

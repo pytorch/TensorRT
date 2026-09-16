@@ -396,6 +396,7 @@ jobs:
       # its packaging, manylinux repair, GitHub artifact, and PyTorch-index
       # upload follow the exact same path as torch-tensorrt itself.
       - name: Build the ExecuTorch runtime wheel
+        id: executorch-runtime
         if: ${{ inputs.build-executorch-runtime }}
         working-directory: ${{ inputs.repository }}
         shell: bash -l {0}
@@ -406,10 +407,9 @@ jobs:
           # without resolving dependencies so it cannot replace the matrix's
           # pinned torch/TensorRT packages.
           ${CONDA_RUN} python -m pip install --no-deps dist/torch_tensorrt*.whl
-          ${CONDA_RUN} python -m pip install pyyaml "executorch==1.4.1"
-          TORCH_CUDA_ARCH_LIST="$(${CONDA_RUN} python .github/scripts/filter-executorch-cuda-arches.py "${TORCH_CUDA_ARCH_LIST:-}")"
-          export TORCH_CUDA_ARCH_LIST
-          echo "TORCH_CUDA_ARCH_LIST=${TORCH_CUDA_ARCH_LIST}"
+          ${CONDA_RUN} python -m pip install pyyaml \
+            --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" \
+            "executorch==1.6.0.dev20260915"
           # Give the companion wheel the same channel/date and CUDA local-version
           # suffix as torch-tensorrt, while retaining its independent base version.
           main_version="$(sed 's/a0$//' version.txt)"

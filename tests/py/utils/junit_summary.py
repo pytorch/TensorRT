@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """Aggregate JUnit XML results from a directory into one consolidated report.
 
 The local test tiers (``just tests-report ...``) and CI both write one JUnit

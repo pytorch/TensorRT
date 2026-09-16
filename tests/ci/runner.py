@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """The one engine that turns a ``Suite`` into a ``pytest`` command and runs it.
 
 This is the *only* place that knows pytest mechanics (xdist workers, junit paths,
@@ -22,17 +25,25 @@ REPO_ROOT = Path(
     os.environ.get("TRT_REPO_ROOT", str(Path(__file__).resolve().parents[2]))
 )
 
+# Duplicated, not imported: this module runs as a plain script and must not require
+# torch_tensorrt to be importable. A test asserts the two agree.
+EXECUTORCH_CUDA_MAJOR = "13"
+
 
 def _executorch_requirement() -> str:
-    # Read the pin the way the drift test does, so this file is not a second
-    # place to edit when it moves. Regex rather than yaml: the runner declares
-    # no runtime dependencies of its own and importing it should not add one.
+    # Regex rather than yaml: this argv installs pyyaml, so importing yaml to build it would
+    # make the command that fixes a missing PyYAML impossible to construct. The pattern accepts
+    # the quoting styles YAML allows for a scalar, so it cannot silently miss a reformatted pin.
     text = (REPO_ROOT / "dev_dep_versions.yml").read_text()
-    version = dict(re.findall(r'^(__\w+__): "([^"]+)"', text, re.MULTILINE))[
-        "__executorch_version__"
-    ]
-    major, minor = version.split(".")[:2]
-    return f"executorch>={version},<{major}.{int(minor) + 1}"
+    match = re.search(
+        r"""^__executorch_version__\s*:\s*(?:"([^"]+)"|'([^']+)'|([^\s#]+))""",
+        text,
+        re.MULTILINE,
+    )
+    version = next((g for g in match.groups() if g), "") if match else ""
+    if not version:
+        raise ValueError("__executorch_version__ must be a nonempty YAML string")
+    return f"executorch=={version}"
 
 
 # Known transient cudagraph/TRT-driver flake signatures. Expand ONLY with
@@ -131,10 +142,32 @@ def _setup_commands(step: str) -> list[tuple[list[str], Path]]:
     if step == "hub":
         return [(launcher + ["hub.py"], REPO_ROOT / "tests/modules")]
     if step == "executorch":
+        # ExecuTorch publishes CUDA builds only on the nightly channel matching the row's CUDA,
+        # so a CUDA 13 row installs from its own channel. Any other row gets no index, which
+        # leaves pip resolving the pinned dev build against PyPI, where no dev build exists.
+        # That install fails, and it is meant to: the suite runs only on CUDA 13 rows, so a
+        # failure here means the matrix sent it somewhere the delegate cannot work. Raising
+        # earlier was worse, because it also broke the CPU and Jetson rows that never install.
+        cuda = os.environ.get("CU_VERSION") or ""
+        index_args = (
+            [
+                "--extra-index-url",
+                f"https://download.pytorch.org/whl/nightly/{cuda}",
+            ]
+            if re.fullmatch(rf"cu{EXECUTORCH_CUDA_MAJOR}\d+", cuda)
+            else []
+        )
         return [
             (
                 launcher
-                + ["-m", "pip", "install", "pyyaml", _executorch_requirement()],
+                + [
+                    "-m",
+                    "pip",
+                    "install",
+                    "pyyaml",
+                    *index_args,
+                    _executorch_requirement(),
+                ],
                 REPO_ROOT,
             )
         ]
@@ -202,6 +235,20 @@ def run_suite(
             print(f"==> setup[{step}]: {shlex.join(argv)}", flush=True)
             rc = subprocess.run(argv, cwd=scwd, env=env).returncode
             if rc != 0:
+                # The executorch suite gates on pytest.importorskip, so a failed install skips
+                # those files, leaves the rest passing, and reports success with a populated
+                # junit xml: the run looks green precisely when the thing it exists to test is
+                # absent. The pin names a nightly build, which the channel prunes eventually, so
+                # that has to be loud. Other steps keep warning and continuing, because their
+                # suites fail visibly on a missing dependency and a flaky checkpoint download
+                # should not fail a suite that would otherwise report honestly.
+                if step == "executorch":
+                    print(
+                        f"::error::setup step {step!r} exited {rc}, so the suite cannot test "
+                        "what it was asked to test",
+                        flush=True,
+                    )
+                    return rc
                 print(f"::warning::setup step {step!r} exited {rc}", flush=True)
 
     print(f"==> {suite.name} [{variant}]: {shlex.join(pytest_cmd)}", flush=True)

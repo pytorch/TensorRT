@@ -1,3 +1,8 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+
 // Include cstdint for GCC 13+ or Clang 13+
 #if (defined(__GNUC__) && !defined(__clang__) && (__GNUC__ >= 13)) || (defined(__clang__) && (__clang_major__ >= 13))
 #include <cstdint>

@@ -56,6 +56,11 @@ dynamic = ["version", "dependencies", "optional-dependencies"]
 lint = [
     "black>=24.0.0",
     "clang-format==14.0.6",
+    "pytest>=9.0.3",
+    "pyyaml>=6.0",
+    "packaging>=23.1",
+    "setuptools>=77.0.0",
+    "wheel>=0.40.0",
 ]
 
 dev = [
@@ -163,6 +168,12 @@ norecursedirs = [
 
 [tool.uv]
 package = true
+cache-keys = [
+    { file = "pyproject.toml" },
+    { file = "setup.py" },
+    { file = "setup.cfg" },
+    { file = "dev_dep_versions.yml" },
+]
 environments = ["sys_platform == 'linux'", "sys_platform == 'win32'"]
 required-environments = [
     "sys_platform == 'linux' and python_version >= '3.10' and python_version <= '3.13' and platform_machine == 'x86_64'",
@@ -179,6 +190,7 @@ conflicts = [
 ]
 constraint-dependencies = [
     "transformers>=5.14.1",
+    "executorch==1.6.0.dev20260915",
 ]
 
 [tool.uv.sources]
@@ -200,11 +212,6 @@ url = "https://download.pytorch.org/whl/nightly/cu128"
 explicit = false
 
 [[tool.uv.index]]
-name = "pytorch-nightly-cu126"
-url = "https://download.pytorch.org/whl/nightly/cu126"
-explicit = false
-
-[[tool.uv.index]]
 name = "pytorch-test-cu130"
 url = "https://download.pytorch.org/whl/test/cu130"
 explicit = false
@@ -215,11 +222,6 @@ url = "https://download.pytorch.org/whl/test/cu128"
 explicit = false
 
 [[tool.uv.index]]
-name = "pytorch-test-cu126"
-url = "https://download.pytorch.org/whl/test/cu126"
-explicit = false
-
-[[tool.uv.index]]
 name = "pytorch-release-cu130"
 url = "https://download.pytorch.org/whl/release/cu130"
 explicit = false
@@ -227,11 +229,6 @@ explicit = false
 [[tool.uv.index]]
 name = "pytorch-release-cu128"
 url = "https://download.pytorch.org/whl/release/cu128"
-explicit = false
-
-[[tool.uv.index]]
-name = "pytorch-release-cu126"
-url = "https://download.pytorch.org/whl/release/cu126"
 explicit = false
 
 # [[tool.uv.index]]

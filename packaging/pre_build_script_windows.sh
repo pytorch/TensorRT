@@ -11,9 +11,6 @@ if [[ ${TENSORRT_VERSION} != "" ]]; then
   # For example, if the current testing TensorRT version is 10.7.0, but the pyproject.toml tensorrt>=10.8.0,<10.9.0, then the following sed command
   # will replace tensorrt>=10.8.0,<10.9.0 with tensorrt==10.7.0
   sed -i -e "s/tensorrt>=.*,<.*\"/tensorrt>=${TENSORRT_VERSION},<$(echo "${TENSORRT_VERSION}" | awk -F. '{print $1"."$2+1".0"}')\"/g" \
-         -e "s/tensorrt-cu12>=.*,<.*\"/tensorrt-cu12>=${TENSORRT_VERSION},<$(echo "${TENSORRT_VERSION}" | awk -F. '{print $1"."$2+1".0"}')\"/g" \
-         -e "s/tensorrt-cu12-bindings>=.*,<.*\"/tensorrt-cu12-bindings>=${TENSORRT_VERSION},<$(echo "${TENSORRT_VERSION}" | awk -F. '{print $1"."$2+1".0"}')\"/g" \
-         -e "s/tensorrt-cu12-libs>=.*,<.*\"/tensorrt-cu12-libs>=${TENSORRT_VERSION},<$(echo "${TENSORRT_VERSION}" | awk -F. '{print $1"."$2+1".0"}')\"/g" \
          pyproject.toml
 fi
 
@@ -48,10 +45,6 @@ ls -lart $TORCH_INSTALL_PATH/include/fmt/
 # TensorRT archives have different CUDA compatibility ceilings. CI provides
 # CU_VERSION in the PyTorch wheel format (for example, cu134).
 case "${CU_VERSION}" in
-    cu12*)
-        export TENSORRT_CUDA_VERSION_UPPER_BOUND="12.9"
-        export TENSORRT_RTX_CUDA_VERSION_UPPER_BOUND="12.9"
-        ;;
     cu13*)
         export TENSORRT_CUDA_VERSION_UPPER_BOUND="13.4"
         export TENSORRT_RTX_CUDA_VERSION_UPPER_BOUND="13.4"

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 import logging
 from typing import Collection, Dict, List, Optional, Tuple
 
@@ -77,6 +80,15 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
 
         if TorchTensorRTOperatorSupport._has_complex_dtype(node):
             # Complex-dtype tensors are not supported by TensorRT; force PyTorch fallback
+            if not node.is_impure():
+                self.unsupported_operators[node_name] = (
+                    self.unsupported_operators.get(node_name, 0) + 1
+                )
+            return False
+
+        if TorchTensorRTOperatorSupport._has_bf16_on_turing(node, settings):
+            # bfloat16 has no Turing hardware; compiling it for SM 7.5 crashes the
+            # process, so force the PyTorch fallback.
             if not node.is_impure():
                 self.unsupported_operators[node_name] = (
                     self.unsupported_operators.get(node_name, 0) + 1

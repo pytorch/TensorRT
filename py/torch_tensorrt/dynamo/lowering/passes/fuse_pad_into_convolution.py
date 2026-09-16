@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 # mypy: disallow-untyped-decorators=False
 
 """Fold constant_pad_nd -> convolution into a single asymmetric-padded conv.

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """
 Tests for TRTEngine.bind_nccl_comm() — probe loop (detection) and binding.
 
@@ -573,6 +576,24 @@ class TestBindNcclProbeBinding(MultiProcessTestCase):
         """Explicit pin to TP subgroup — subgroup comm bound, correct output."""
         device = self._init_dist()
         _bind_explicit_pin_subgroup(self.rank, self.world_size, device)
+
+    @unittest.skipUnless(
+        hasattr(dist, "ProcessGroupNCCL2"),
+        "ProcessGroupNCCL2 is unavailable in this PyTorch build",
+    )
+    @requires_nccl()
+    @skip_if_lt_x_gpu(2)
+    def test_nccl2_backend(self) -> None:
+        """Header-detected NCCL2 support binds the default NCCL communicator."""
+        device = self._init_dist()
+        backend = dist.get_backend_impl(dist.group.WORLD)
+        if not isinstance(backend, dist.ProcessGroupNCCL2):
+            self.skipTest("ProcessGroupNCCL2 is not the default NCCL backend")
+
+        # Do not force NCCL2 through TORCH_DIST_USE_NCCL2 here. Successful
+        # binding proves that build-time detection compiled support for the
+        # backend selected naturally by the installed PyTorch.
+        _bind_explicit_pin_world_group(self.rank, self.world_size, device)
 
 
 @unittest.skipIf(

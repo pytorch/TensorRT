@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """Engine-cache blob round-trip for ``aliased_io``.
 
 When TensorRT writes a buffer in place, the converter appends that buffer as an extra

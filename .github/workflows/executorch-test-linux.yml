@@ -63,7 +63,13 @@ jobs:
         chmod +x "${RUNNER_TEMP}/bin/bazel"
         export PATH="${RUNNER_TEMP}/bin:${PATH}"
 
-        python -m pip install pyyaml "executorch==1.4.1"
+        # ExecuTorch's CUDA wheels live only on the PyTorch nightly index, so the channel is
+        # needed. No --pre: a specifier naming a prerelease admits prereleases by itself, and
+        # --pre would apply to every other requirement in the same command too.
+        python -m pip install pyyaml \
+          --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" \
+          "executorch==1.6.0.dev20260915"
+
         # The standard wheel build packages the matching runtime wheel in its
         # artifact alongside torch_tensorrt*.whl; install it after the shared
         # core-wheel installer has selected the matrix-matched core wheel.
@@ -96,17 +102,13 @@ jobs:
           exit "${check_status}"
         fi
 
+        # Resolve the user-facing range without reusing the build's installed pin.
+        python -m venv "${RUNNER_TEMP}/range-check-venv"
+        # pin-check: range-ok
+        "${RUNNER_TEMP}/range-check-venv/bin/python" -m pip install --no-deps --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" "executorch>=1.6.0.dev20260915,<1.7"
+
         source tests/py/utils/ci_helpers.sh
         trt_tier_executorch
-
-        # This job builds the reference runner, whose CMakeLists forces
-        # EXECUTORCH_BUILD_CUDA=ON, so it compiles the same aoti_cuda_shims the build job
-        # does and needs the same architecture floor. It sources the channel's build env,
-        # which on cu126 asks for architectures without __dp4a, so filter here too rather
-        # than moving that failure from the build job into this one.
-        TORCH_CUDA_ARCH_LIST="$(python .github/scripts/filter-executorch-cuda-arches.py "${TORCH_CUDA_ARCH_LIST:-}")"
-        export TORCH_CUDA_ARCH_LIST
-        echo "TORCH_CUDA_ARCH_LIST=${TORCH_CUDA_ARCH_LIST}"
 
         bazel build //:libtorchtrt --compilation_mode opt --config=linux
         # Execute the delegate C++ unit tests as well as building the Python

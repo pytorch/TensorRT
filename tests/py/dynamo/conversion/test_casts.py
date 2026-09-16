@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 # type: ignore
 
 import torch
@@ -7,7 +10,7 @@ from torch_tensorrt.dynamo.conversion.aten_ops_converters import (
     to_copy_dtype_validator,
 )
 
-from .harness import DispatchTestCase
+from .harness import DispatchTestCase, skip_if_trt_rtx_turing
 
 
 class TestCloneConverter(DispatchTestCase):
@@ -66,6 +69,8 @@ class TestToCopyConverter(DispatchTestCase):
         )
 
     def test_to_copy_bfloat16(self):
+        skip_if_trt_rtx_turing(self, "bfloat16")
+
         class ToCopyBFloat16(nn.Module):
             def forward(self, x):
                 y = torch.ops.aten._to_copy.default(x, dtype=torch.bfloat16)

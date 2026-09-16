@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """Python-side TensorRT engine: deserialize and execute TRT engines without the C++ runtime.
 
 Serialization layout lives in :mod:`torch_tensorrt.dynamo.runtime._serialized_engine_layout`.

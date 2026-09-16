@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 import unittest
 
 import torch
@@ -5,7 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from parameterized import parameterized
 
-from ..conversion.harness import DispatchTestCase
+from ..conversion.harness import DispatchTestCase, skip_if_trt_rtx_turing
 
 
 def _node_targets(gm: torch.fx.GraphModule) -> list:
@@ -230,6 +233,11 @@ class TestFusePadIntoConvolutionConverter(DispatchTestCase):
         ]
     )
     def test_padded_conv3d(self, _, pad, stride, dilation, groups, bias):
+        # The fusion turns this into tensorrt::conv_asym_pad, whose validator rejects
+        # 3D on Turing. DispatchTestCase has no PyTorch-fallback path, so without this
+        # the rejection surfaces as UnsupportedOperatorException.
+        skip_if_trt_rtx_turing(self, "3D convolution")
+
         class PaddedConv3d(nn.Module):
             def __init__(self) -> None:
                 super().__init__()

@@ -43,16 +43,10 @@ python -m pip uninstall -y torch torchvision
 python -m pip install --force-reinstall --pre ${TORCHVISION} --index-url ${INDEX_URL} --extra-index-url https://pypi.org/simple
 python -m pip install --force-reinstall --pre ${TORCH} --index-url ${INDEX_URL} --extra-index-url https://pypi.org/simple
 
-# Prepend the venv's NVIDIA CUDA runtime libs to LD_LIBRARY_PATH. The two majors ship
-# different layouts: nvidia-cuda-runtime-cu12 installs nvidia/cuda_runtime/lib/libcudart.so.12
-# while the CUDA 13 line installs nvidia/cu13/lib/libcudart.so.13. Naming only the cu13 path
-# left every CUDA 12 row without a CUDA runtime on the search path, so a binary linked against
-# libcudart died at startup with "libcudart.so.12: cannot open shared object file" even though
-# the package was installed.
+# Prepend the venv's NVIDIA CUDA runtime libs to LD_LIBRARY_PATH.
 SITE_PACKAGES="$(python -c 'import sysconfig; print(sysconfig.get_path("platlib"))')"
 case "${CU_VERSION}" in
 cu13*) CUDA_RUNTIME_LIB_DIR="${SITE_PACKAGES}/nvidia/cu13/lib" ;;
-cu12*) CUDA_RUNTIME_LIB_DIR="${SITE_PACKAGES}/nvidia/cuda_runtime/lib" ;;
 *) CUDA_RUNTIME_LIB_DIR="" ;;
 esac
 if [[ -n "${CUDA_RUNTIME_LIB_DIR}" ]]; then
@@ -61,9 +55,13 @@ fi
 
 # Install Torch-TensorRT
 if [[ ${PLATFORM} == win32 ]]; then
-    python -m pip install ${RUNNER_ARTIFACT_DIR}/torch_tensorrt*.whl
+    # pin-check: no-nightly -- Windows installs only the main wheel, without the Linux companion.
+    python -m pip install ${RUNNER_ARTIFACT_DIR}/torch_tensorrt*.whl || exit 1
 else
-    python -m pip install /opt/torch-tensorrt-builds/torch_tensorrt*.whl --use-deprecated=legacy-resolver
+    # The companion requires the nightly ExecuTorch channel even on test/release jobs.
+    # Exit explicitly: the caller appends its test script and this file does not use set -e.
+    python -m pip install /opt/torch-tensorrt-builds/torch_tensorrt*.whl --use-deprecated=legacy-resolver \
+        --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" || exit 1
 fi
 
 echo -e "Running test script";

@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
 
 import argparse
 import json
 import os
+import re
 import sys
 from typing import Any, Dict, List
 
@@ -13,15 +16,18 @@ disabled_cuda_versions: List[str] = []
 # jetpack 6.2 only officially supports python 3.10 and cu126
 jetpack_python_versions: List[str] = ["3.10"]
 jetpack_cuda_versions: List[str] = ["cu126"]
-# CUDA 12.6 wheels are published for x86_64 only. Keep the Arm matrices on
-# CUDA 13, including Windows Arm/AArch64.
-x86_cuda_versions: List[str] = ["cu126", "cu130", "cu132", "cu134"]
+# CUDA 13 wheels are supported on x86_64 and Arm, including Windows Arm/AArch64.
+x86_cuda_versions: List[str] = ["cu130", "cu132", "cu134"]
 arm_cuda_versions: List[str] = ["cu130", "cu132", "cu134"]
 
 # For PRs we build/test a single representative config to keep cycle time short.
 # Full matrix runs on main / nightly / release branches.
 PR_PYTHON_VERSION: str = "3.12"
 PR_CUDA_VERSION: str = "cu134"
+
+# The delegate links CUDA 13 libraries. This narrows the row lists above, it does not widen
+# them: a new minor still has to be added there first.
+EXECUTORCH_CUDA_MAJOR: str = "13"
 
 jetpack_container_image: str = "nvcr.io/nvidia/l4t-jetpack:r36.4.0"
 sbsa_container_image: str = "quay.io/pypa/manylinux_2_39_aarch64"
@@ -135,6 +141,12 @@ def main(args: list[str]) -> None:
         default="false",
     )
 
+    parser.add_argument(
+        "--executorch-runtime",
+        action="store_true",
+        help="keep only CUDA 13 rows supported by the ExecuTorch delegate wheel",
+    )
+
     options = parser.parse_args(args)
     if options.matrix == "":
         raise ValueError("--matrix needs to be provided")
@@ -151,6 +163,10 @@ def main(args: list[str]) -> None:
     filtered_includes = []
 
     for item in includes:
+        if options.executorch_runtime and not re.fullmatch(
+            rf"cu{EXECUTORCH_CUDA_MAJOR}\d+", item["desired_cuda"]
+        ):
+            continue
         if filter_matrix_item(
             item,
             options.jetpack == "true",

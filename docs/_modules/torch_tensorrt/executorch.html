@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=f1119406"></script>
+    <script src="../../_static/documentation_options.js?v=05b7514e"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -474,7 +474,10 @@ document.write(`
                 <article class="bd-article">
                   
   <h1>Source code for torch_tensorrt.executorch</h1><div class="highlight"><pre>
-<span></span><span class="sd">"""ExecuTorch compilation and export integration.</span>
+<span></span><span class="c1"># SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION &amp; AFFILIATES. All rights reserved.</span>
+<span class="c1"># SPDX-License-Identifier: BSD-3-Clause</span>
+
+<span class="sd">"""ExecuTorch compilation and export integration.</span>
 
 <span class="sd">Runtime loading is provided by the optional</span>
 <span class="sd">``torch-tensorrt-executorch-runtime`` distribution and dispatched through</span>
@@ -498,10 +501,12 @@ document.write(`
 <span class="k">if</span> <span class="ow">not</span> <span class="n">_has_executorch_exir</span><span class="p">():</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__getattr__</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NoReturn</span><span class="p">:</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">executorch_install_command</span>
+
         <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span>
             <span class="sa">f</span><span class="s2">"Cannot access torch_tensorrt.executorch.</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">: "</span>
-            <span class="s2">"ExecuTorch with executorch.exir is required. "</span>
-            <span class="s1">'Install with: pip install "torch_tensorrt[executorch]"'</span>
+            <span class="s2">"ExecuTorch with executorch.exir is required. This CUDA integration "</span>
+            <span class="s2">"supports Linux. Setup: "</span> <span class="o">+</span> <span class="n">executorch_install_command</span><span class="p">()</span>
         <span class="p">)</span>
 
     <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>

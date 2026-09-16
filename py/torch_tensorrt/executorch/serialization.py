@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """Self-contained TensorRT engine blob format for ExecuTorch.
 
 The ExecuTorch runtime path must not depend on libtorch, TorchScript custom

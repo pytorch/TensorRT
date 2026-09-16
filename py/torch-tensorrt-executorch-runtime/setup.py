@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """Build the precompiled Torch-TensorRT backend for ExecuTorch Python."""
 
 from __future__ import annotations
@@ -12,6 +15,7 @@ import sys
 import uuid
 
 import torch
+import yaml
 from setuptools import Extension, find_packages, setup
 from setuptools.command.build_ext import build_ext
 
@@ -40,7 +44,7 @@ def get_runtime_version() -> str:
 RUNTIME_VERSION = get_runtime_version()
 
 TORCH_REQUIREMENT = "torch>=2.15.0.dev0,<2.16.0"
-EXECUTORCH_REQUIREMENT = "executorch==1.4.1"
+EXECUTORCH_REQUIREMENT = f'executorch=={yaml.safe_load((REPO_ROOT / "dev_dep_versions.yml").read_text())["__executorch_version__"]}'
 TORCH_TENSORRT_REQUIREMENT = "torch-tensorrt>=2.15.0.dev0,<2.16.0"
 
 
@@ -50,8 +54,6 @@ def get_tensorrt_requirement() -> str:
         raise RuntimeError(
             "CUDA enabled PyTorch is required to build this wheel found None"
         )
-    if cuda_version.startswith("12."):
-        return "tensorrt-cu12>=11.3.0,<11.4"
     if cuda_version.startswith("13."):
         return "tensorrt-cu13>=11.3.0,<11.4"
     raise RuntimeError(f"Unsupported CUDA version: {cuda_version}")

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """Derivation engine behind :func:`cuda_kernel_op`.
 
 Given a :class:`KernelSpec`, this module builds the runtime artifacts that
