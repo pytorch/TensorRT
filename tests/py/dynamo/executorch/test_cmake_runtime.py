@@ -199,3 +199,30 @@ def test_documented_mixed_consumer(tmp_path, linker_tools, sample, removed):
     for name in ("backend_cuda", "kernels_optimized"):
         assert (f"libexecutorch_{name}.so" in needed) is (removed != name)
         assert (f"executorch_{name}" in output.splitlines()) is (removed != name)
+
+
+@pytest.mark.unit
+def test_the_config_refuses_a_target_it_did_not_create() -> None:
+    """The in-tree build defines the same target name, as an interface over a private static copy.
+
+    Reusing whatever is already there let a project that pulls in the in-tree target and then calls
+    find_package link the private copy and never touch the wheel's shared library, with only a
+    status message to say so. Only an imported shared library can be the target this config made.
+    """
+    config = _CONFIG.read_text(encoding="utf-8")
+    assert "get_target_property" in config, config
+    assert 'STREQUAL "SHARED_LIBRARY"' in config, config
+    assert "FATAL_ERROR" in config, config
+
+
+@pytest.mark.unit
+def test_the_embedded_run_path_can_be_turned_off() -> None:
+    """The run path is this machine's absolute path and it reaches every consumer binary.
+
+    That suits building against an installed wheel, which is what this package is for, and ruins
+    anything redistributable, so a consumer has to be able to decline it.
+    """
+    config = _CONFIG.read_text(encoding="utf-8")
+    assert "TORCHTRT_EXECUTORCH_EMBED_RUNPATH" in config, config
+    guarded = config.split("TORCHTRT_EXECUTORCH_EMBED_RUNPATH")[2]
+    assert "INTERFACE_LINK_OPTIONS" in guarded.split("else()")[0], guarded[:300]

@@ -35,7 +35,7 @@ namespace package, so `executorch.__file__` is `None` and has to be located
 through its distribution metadata instead:
 
 ```bash
-cmake -DCMAKE_PREFIX_PATH="$(python -c 'import importlib.metadata as m, torch_tensorrt_executorch_runtime as r, pathlib; print(str(m.distribution("executorch").locate_file("executorch")) + ";" + str(pathlib.Path(r.__file__).parent))')" ...
+cmake -DCMAKE_PREFIX_PATH="$(python -c 'import importlib.metadata as m, torch_tensorrt_executorch_runtime as r, pathlib; print(str(pathlib.Path(str(m.distribution("executorch").locate_file("executorch"))) / "share" / "cmake") + ";" + str(pathlib.Path(r.__file__).parent))')" ...
 ```
 
 CMake 3.28 or newer is required, not because of this package but because the

@@ -59,8 +59,18 @@ endif()
 set(TORCHTRT_EXECUTORCH_LIBRARIES torchtrt::executorch_backend)
 
 if(TARGET torchtrt::executorch_backend)
-  # Another subproject already called find_package in this configure. Redefining
-  # an imported target is an error, so keep the one that is there.
+  # Reusing is right when another subproject already ran this same config, and wrong when the name
+  # belongs to something else. The in-tree build defines it as an interface library over a private
+  # static copy, so a project that pulls that in and then calls find_package would silently link
+  # the private copy and never touch the shared library in the wheel. Only an imported shared
+  # library can be the one this config created.
+  get_target_property(_torchtrt_executorch_existing_type torchtrt::executorch_backend TYPE)
+  if(NOT _torchtrt_executorch_existing_type STREQUAL "SHARED_LIBRARY")
+    message(FATAL_ERROR
+      "torchtrt::executorch_backend already exists as a ${_torchtrt_executorch_existing_type}, "
+      "not as the imported shared library this package provides. The in-tree delegate target and "
+      "the installed one cannot both be used in a single configure: drop one of them.")
+  endif()
   message(STATUS "torchtrt_executorch: torchtrt::executorch_backend is already defined, reusing it")
   return()
 endif()
@@ -86,9 +96,20 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   # So the loader finds the library in the installed wheel at run time. The delegate is not a
   # dependency the consumer copies around: it lives in site-packages next to the executorch wheel
   # whose runtime it links, and both have to be found from the same place.
-  set_property(
-    TARGET torchtrt::executorch_backend
-    APPEND
-    PROPERTY INTERFACE_LINK_OPTIONS "LINKER:--enable-new-dtags,-rpath,${_torchtrt_executorch_root}/lib"
-  )
+  # This is the path on the machine that configured, and it lands in every consumer binary, so a
+  # binary built here does not run anywhere else. That is the right default for building against an
+  # installed wheel, which is what this package is for, and wrong for anything redistributable.
+  option(TORCHTRT_EXECUTORCH_EMBED_RUNPATH
+    "Bake this machine's delegate directory into consumers so the loader finds it" ON)
+  if(TORCHTRT_EXECUTORCH_EMBED_RUNPATH)
+    set_property(
+      TARGET torchtrt::executorch_backend
+      APPEND
+      PROPERTY INTERFACE_LINK_OPTIONS "LINKER:--enable-new-dtags,-rpath,${_torchtrt_executorch_root}/lib"
+    )
+  else()
+    message(STATUS
+      "torchtrt_executorch: not embedding a run path. Consumers must locate "
+      "${_torchtrt_executorch_root}/lib themselves at run time.")
+  endif()
 endif()
