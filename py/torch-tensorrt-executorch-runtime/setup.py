@@ -12,6 +12,7 @@ import platform
 import re
 import shlex
 import shutil
+import stat
 import subprocess
 import sys
 import uuid
@@ -297,9 +298,13 @@ class BazelBuild(build_py):
                 if stale.is_file():
                     stale.unlink()
         for stale in output.parent.glob("*.so*"):
-            if stale != output:
-                stale.unlink()
+            stale.unlink()
+        # The build system leaves its output read only, and copy2 carries the mode across, so a
+        # second build in the same tree used to fail with a permission error on its own previous
+        # output. Removing the destination first covers that, and the copy is made writable so
+        # anything downstream that rewrites it in place, such as the run path repair, still can.
         shutil.copy2(built, output)
+        output.chmod(output.stat().st_mode | stat.S_IWUSR)
         self._install_cmake_package(output.parent.parent)
 
     def _install_cmake_package(self, package_dir: pathlib.Path) -> None:

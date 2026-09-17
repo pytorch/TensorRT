@@ -11,6 +11,7 @@ import runpy
 import shlex
 import shutil
 import subprocess
+import stat
 import sys
 import tempfile
 import types
@@ -668,3 +669,30 @@ def test_a_missing_pin_file_stops_the_build(tmp_path):
         '__executorch_version__: "1.6.0.dev20260915+cu134"\n', encoding="utf-8"
     )
     assert namespace["pinned_executorch_version"]() == "1.6.0.dev20260915+cu134"
+
+
+@pytest.mark.unit
+def test_a_second_build_in_the_same_tree_succeeds(tmp_path):
+    """Building twice without cleaning failed on the first build's own output.
+
+    The build system leaves its output read only and copy2 carries the mode across, so the second
+    build could not overwrite what the first one left. The sweep before the copy also skipped the
+    destination, which is the one file that needed removing.
+    """
+    source = (COMPANION / "setup.py").read_text(encoding="utf-8")
+    copy_block = source.split("shutil.copy2(built, output)")[0]
+    # The sweep must not exempt the destination.
+    assert "if stale != output:" not in copy_block, copy_block[-400:]
+    assert "output.chmod(output.stat().st_mode | stat.S_IWUSR)" in source, source[-400:]
+    # And the behaviour, on real files, because the mode is what actually bites.
+    built = tmp_path / "built.so"
+    built.write_bytes(b"\x7fELF")
+    built.chmod(0o555)
+    out = tmp_path / "out" / "built.so"
+    out.parent.mkdir()
+    for _ in range(2):
+        for existing in out.parent.glob("*.so*"):
+            existing.unlink()
+        shutil.copy2(built, out)
+        out.chmod(out.stat().st_mode | stat.S_IWUSR)
+    assert out.stat().st_mode & stat.S_IWUSR, oct(out.stat().st_mode)
