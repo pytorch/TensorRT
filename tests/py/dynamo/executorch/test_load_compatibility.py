@@ -512,3 +512,42 @@ def test_the_loader_calls_activate_on_a_companion_that_has_no_register(
     with pytest.raises(Exception):
         compiler.load(str(program), format="executorch")
     assert called == ["activate"], called
+
+
+@pytest.mark.unit
+def test_the_forwarder_returns_the_shape_the_published_api_returned() -> None:
+    """Restoring the file was not enough; it has to return what callers already use.
+
+    The API this replaces returned an object carrying run() and forward(), and raised
+    FileNotFoundError for a missing path. Forwarding to ExecuTorch's own loader returns neither, so a
+    caller of the published API would fail on the return value rather than on the import, which is
+    the same breakage one step later.
+    """
+    source = (
+        ROOT
+        / "py/torch-tensorrt-executorch-runtime/torch_tensorrt_executorch_runtime/runtime.py"
+    ).read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    load = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "load"
+    )
+    returns = [
+        ast.unparse(node.value)
+        for node in ast.walk(load)
+        if isinstance(node, ast.Return) and node.value is not None
+    ]
+    assert returns, "the forwarder returns nothing"
+    assert any(
+        "_load" in returned for returned in returns
+    ), f"the forwarder does not delegate to the compatibility loader: {returns}"
+    assert (
+        "_load_for_executorch" not in source
+    ), "forwarding to ExecuTorch's loader returns the wrong object"
+    # The loader it forwards to is the one carrying the original interface.
+    compat = (ROOT / "py/torch_tensorrt/_executorch_compat.py").read_text(
+        encoding="utf-8"
+    )
+    for member in ("def run(", "def forward(", "FileNotFoundError"):
+        assert member in compat, f"the compatibility loader lost {member}"

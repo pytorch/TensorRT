@@ -413,8 +413,12 @@ def test_generated_cleanup_stays_in_the_output_location(
     (root / "lib").mkdir(parents=True, exist_ok=True)
     stale = root / "lib/libexecutorch.so"
     stale.write_bytes(b"obsolete private runtime")
-    legacy = [root / "runtime.py", root / "old_delegate.so"]
-    for path in legacy:
+    # A stale shared object from the old layout, which must go, and the forwarder the released main
+    # wheel imports by name, which must not. They used to be swept together, so the published wheel
+    # shipped without the forwarder and that import failed.
+    legacy = [root / "old_delegate.so"]
+    shipped = root / "runtime.py"
+    for path in [*legacy, shipped]:
         path.write_bytes(b"root output")
     bystanders = [
         state.project / "bystander.so",
@@ -432,6 +436,9 @@ def test_generated_cleanup_stays_in_the_output_location(
     assert source.read_bytes() == original
     assert all(path.read_bytes() == b"keep" for path in bystanders)
     assert all(path.exists() is editable for path in legacy)
+    assert (
+        shipped.exists()
+    ), "the forwarder the main wheel imports was removed from the wheel"
 
 
 def test_editable_cleanup_rejects_source_deletion_control(packaging_build, monkeypatch):
@@ -467,6 +474,9 @@ def test_ordinary_wheel_payload_is_unchanged(
     files = {name for name in expected if name.startswith(f"{PACKAGE}/")}
     assert files == {
         f"{PACKAGE}/__init__.py",
+        # The forwarder the released main wheel imports by name. This set omitting it is what let a
+        # published wheel ship without it, since this is the only check that reads the built archive.
+        f"{PACKAGE}/runtime.py",
         f"{PACKAGE}/lib/{LIBRARY}",
         f"{PACKAGE}/lib/cmake/torchtrt_executorch/torchtrt_executorch-config.cmake",
         f"{PACKAGE}/lib/cmake/torchtrt_executorch/torchtrt_executorch-config-version.cmake",

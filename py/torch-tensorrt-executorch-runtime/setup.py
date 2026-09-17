@@ -281,7 +281,12 @@ class BazelBuild(build_py):
         # removes were written to the root by the previous layout, so scanning only the new
         # directory leaves every one of them in place.
         if not self.editable_mode:
-            for stale in (*package_root.glob("*.so*"), package_root / "runtime.py"):
+            # Shared objects only. runtime.py used to be removed here too, from when this package
+            # stopped shipping a Python API, and it is shipped again now as the forwarder the
+            # released main wheel imports by name. Removing it from the build output published a
+            # wheel without it, so that import failed for anyone pairing an older main wheel with
+            # this companion.
+            for stale in package_root.glob("*.so*"):
                 if stale.is_file():
                     stale.unlink()
         for stale in output.parent.glob("*.so*"):
