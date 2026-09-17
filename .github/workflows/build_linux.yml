@@ -474,7 +474,12 @@ jobs:
             fi
             abs_pkg=$(realpath $pkg)
             if [[ "$(basename "${pkg}")" == torch_tensorrt_executorch_runtime-* ]]; then
-              # The shared repair script only handles CPython-tagged wheels.
+              # The companion is retagged, not repaired, and that is deliberate rather than a gap. The
+              # shared repair script handles CPython-tagged wheels only, and repairing would vendor the
+              # libraries this wheel exists to stop shipping. Its one shared object already resolves
+              # everything it needs through search paths relative to its own location, the same way
+              # ExecuTorch's backends do, so there is nothing for a repair to add. What it does need is a
+              # platform tag naming the floor the object really requires, which is what happens here.
               case "${ARCH}" in
                 x86_64) platform_tag=manylinux_2_28_x86_64 ;;
                 aarch64) platform_tag=manylinux_2_35_aarch64 ;;
