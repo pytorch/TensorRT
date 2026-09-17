@@ -589,3 +589,36 @@ def test_a_library_the_loader_cannot_find_is_not_reported_as_an_abi_mismatch(
     empty = search_path is not None and "" in search_path.split(os.pathsep)
     assert missing, "this case is meant to be a not-found error"
     assert empty == (expected == "empty entry"), (search_path, empty)
+
+
+@pytest.mark.unit
+def test_the_forwarder_says_which_side_is_too_old() -> None:
+    """The loader this forwards to belongs to the main wheel and is new in this change.
+
+    A main wheel old enough to import this submodule by name does not carry it, so the forward would
+    have raised a bare missing-module error naming something the reader never asked for. That pairing
+    should not arise, because this package requires the main wheel of its own build exactly, but an
+    install that skipped dependency resolution can produce it.
+    """
+    source = (
+        ROOT
+        / "py/torch-tensorrt-executorch-runtime"
+        / "torch_tensorrt_executorch_runtime/runtime.py"
+    ).read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    load = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "load"
+    )
+    guarded = [
+        node
+        for node in ast.walk(load)
+        if isinstance(node, ast.Try)
+        and any(
+            isinstance(h.type, ast.Name) and h.type.id == "ImportError"
+            for h in node.handlers
+        )
+    ]
+    assert guarded, "the forward into the main wheel is not guarded"
+    assert "older than the one this package was built against" in source, source[-600:]

@@ -33,6 +33,19 @@ def load(file_path: str) -> Any:
     # ExecuTorch's own loader returns neither, so a caller of the published API would break on the
     # return value instead of on the import. The main wheel is always present: this package declares
     # it as a dependency.
-    from torch_tensorrt._executorch_compat import load as _load
+    # The loader this forwards to is part of the main wheel, and a main wheel old enough to import
+    # this submodule by name does not carry it. That pairing should not arise, because this package
+    # requires the main wheel of its own build exactly, so installing it moves the main wheel too.
+    # If it does arise, through an install that skipped dependency resolution, say which of the two
+    # is too old rather than reporting a module nobody asked for.
+    try:
+        from torch_tensorrt._executorch_compat import load as _load
+    except ImportError as error:
+        raise ImportError(
+            "This deprecated loader forwards into torch_tensorrt, and the installed Torch-TensorRT "
+            "is older than the one this package was built against, so it does not carry the "
+            "receiving module. Install the Torch-TensorRT this package requires, or call "
+            f'torch_tensorrt.load(path, format="executorch") directly. Underlying error: {error}'
+        ) from error
 
     return _load(file_path)
