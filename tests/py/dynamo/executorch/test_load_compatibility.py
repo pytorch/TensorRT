@@ -660,3 +660,33 @@ def test_the_age_rewrite_follows_the_api_not_the_error_name(
         load_legacy(compiler, boundary.path)
     rewritten = "too old to register" in str(raised.value)
     assert rewritten is expect_rewrite, str(raised.value)
+
+
+@pytest.mark.unit
+def test_the_forwarder_actually_forwards_and_warns(monkeypatch) -> None:
+    """Reading the file cannot see a forwarder that forwards nowhere.
+
+    Four separate ways of breaking it left the suite green: dropping the import, dropping the
+    deprecation warning, naming the loader without calling it, and returning nothing at all. So it is
+    called here, against a stub standing in for the main wheel's loader.
+    """
+    sentinel = object()
+    calls: list[str] = []
+    compat = types.ModuleType("torch_tensorrt._executorch_compat")
+    compat.load = lambda path: calls.append(path) or sentinel
+    parent = types.ModuleType("torch_tensorrt")
+    parent._executorch_compat = compat
+    monkeypatch.setitem(sys.modules, "torch_tensorrt", parent)
+    monkeypatch.setitem(sys.modules, "torch_tensorrt._executorch_compat", compat)
+    namespace: dict[str, object] = {
+        "__name__": "torch_tensorrt_executorch_runtime.runtime"
+    }
+    source = (
+        ROOT
+        / "py/torch-tensorrt-executorch-runtime/torch_tensorrt_executorch_runtime/runtime.py"
+    ).read_text(encoding="utf-8")
+    exec(compile(source, "runtime.py", "exec"), namespace)
+    with pytest.warns(DeprecationWarning):
+        returned = namespace["load"]("some/model.pte")
+    assert returned is sentinel, returned
+    assert calls == ["some/model.pte"], calls

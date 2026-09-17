@@ -555,15 +555,17 @@ def test_the_kept_entry_points_actually_warn_and_forward(monkeypatch) -> None:
 
     registered = []
     monkeypatch.setattr(delegate, "register", lambda: registered.append("register"))
-    for shim, forwarded in (("activate", "portable_lib"), ("get_runtime", "Runtime")):
+    for shim in ("activate", "get_runtime"):
         registered.clear()
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
-            try:
+            # ExecuTorch is absent here, so the forwarding import is what fails, and requiring that
+            # failure is what proves the forwarding happened. Swallowing it let a shim that registers,
+            # warns, and forwards nowhere pass.
+            # Raising at all is the proof. Which module the chain fails on depends on what is
+            # installed, so the name is not asserted, only that the import was reached.
+            with pytest.raises(ImportError):
                 getattr(delegate, shim)()
-            except ImportError:
-                # ExecuTorch is not installed here, so the forwarding import is as far as it goes.
-                pass
         assert registered == ["register"], f"{shim} did not register: {registered}"
         assert any(
             issubclass(w.category, DeprecationWarning) for w in caught
