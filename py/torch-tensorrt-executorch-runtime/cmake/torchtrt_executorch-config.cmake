@@ -71,6 +71,17 @@ if(TARGET torchtrt::executorch_backend)
       "not as the imported shared library this package provides. The in-tree delegate target and "
       "the installed one cannot both be used in a single configure: drop one of them.")
   endif()
+  # Type alone does not identify it. A shared imported target of the same name pointing at another
+  # file would pass, and the consumer would link that file while believing it linked this one.
+  get_target_property(_torchtrt_executorch_existing_location
+    torchtrt::executorch_backend IMPORTED_LOCATION)
+  if(NOT _torchtrt_executorch_existing_location STREQUAL "${TORCHTRT_EXECUTORCH_BACKEND_LIBRARY}")
+    message(FATAL_ERROR
+      "torchtrt::executorch_backend already points at "
+      "${_torchtrt_executorch_existing_location}, not at the "
+      "${TORCHTRT_EXECUTORCH_BACKEND_LIBRARY} this package found. Two different delegates cannot "
+      "both be used in a single configure: drop one of them.")
+  endif()
   message(STATUS "torchtrt_executorch: torchtrt::executorch_backend is already defined, reusing it")
   return()
 endif()
@@ -99,8 +110,12 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   # This is the path on the machine that configured, and it lands in every consumer binary, so a
   # binary built here does not run anywhere else. That is the right default for building against an
   # installed wheel, which is what this package is for, and wrong for anything redistributable.
-  option(TORCHTRT_EXECUTORCH_EMBED_RUNPATH
-    "Bake this machine's delegate directory into consumers so the loader finds it" ON)
+  # Not option(): inside a package config that creates a cache entry in the consumer's project
+  # and, depending on the policy in force, overrides a plain variable the consumer already
+  # set, so the documented opt-out could be ignored. Honour what the consumer set.
+  if(NOT DEFINED TORCHTRT_EXECUTORCH_EMBED_RUNPATH)
+    set(TORCHTRT_EXECUTORCH_EMBED_RUNPATH ON)
+  endif()
   if(TORCHTRT_EXECUTORCH_EMBED_RUNPATH)
     set_property(
       TARGET torchtrt::executorch_backend

@@ -198,14 +198,14 @@ on the host and is not suitable for these delegated programs.
 
 A **CUDA** build of `executorch` is required at runtime, not just to build. The delegate carries a
 `DT_NEEDED` on `libexecutorch_extension_cuda.so`, which only ExecuTorch's CUDA wheels ship, and
-those live on the PyTorch nightly index. `install_requires` names the version without a local
-label, and a specifier written that way admits any label, so a `+cpu` wheel satisfies it and then
-fails to load at import. Adding a CUDA local label would rule that out, because PEP 440 only
-ignores labels when the specifier omits them. It would also bind this wheel to one CUDA train,
-so the requirement stays label-free and the import reports the mismatch instead.
+those live on the PyTorch nightly index. `install_requires` names the version including its local
+label, so only the CUDA build the delegate linked satisfies it. A label-free specifier admits any
+label, which let a `+cpu` wheel resolve and then fail to load at import. Carrying the label rules
+that out, because PEP 440 only ignores labels when the specifier omits them. It does bind the wheel
+to one CUDA train, which is correct: the delegate links that train's runtime.
 
 To install the wheel built above, use the same CUDA index as the build. Build it for the
-CUDA train you run on: the requirement is label-free, but the delegate links the CUDA 13 runtime.
+CUDA train you run on: the requirement names that train, because the delegate links its runtime.
 Its exact development-version requirements already permit the required prereleases.
 CUDA and TensorRT packages may resolve from PyPI or NVIDIA's index; the extra
 index applies to the whole dependency solve.

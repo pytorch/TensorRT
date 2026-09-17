@@ -70,6 +70,12 @@ def load(path: Union[str, Path]) -> Program:
     try:
         register()
     except ImportError as error:
+        # Only the older companion's failure gets rewritten. Current builds raise their own
+        # compatibility error, which derives from ImportError and already says precisely what is
+        # wrong, so catching every ImportError here replaced an accurate diagnostic with a guess
+        # about the companion's age.
+        if type(error).__name__ == "DelegateCompatibilityError":
+            raise
         # A companion published before registration became a single call swapped in its own copy of
         # ExecuTorch's bindings, and refuses once ExecuTorch's own copy is already loaded. Its advice
         # is to import it earlier, which a caller of this function cannot do: the import it collides

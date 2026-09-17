@@ -224,5 +224,28 @@ def test_the_embedded_run_path_can_be_turned_off() -> None:
     """
     config = _CONFIG.read_text(encoding="utf-8")
     assert "TORCHTRT_EXECUTORCH_EMBED_RUNPATH" in config, config
-    guarded = config.split("TORCHTRT_EXECUTORCH_EMBED_RUNPATH")[2]
-    assert "INTERFACE_LINK_OPTIONS" in guarded.split("else()")[0], guarded[:300]
+    # Honoured rather than declared with option(), which inside a package config creates a cache
+    # entry in the consumer's project and can override a plain variable they already set.
+    assert "if(NOT DEFINED TORCHTRT_EXECUTORCH_EMBED_RUNPATH)" in config, config
+    assert "option(TORCHTRT_EXECUTORCH_EMBED_RUNPATH" not in config, config
+    # The run path lives inside the branch the switch controls, so turning it off omits it.
+    branch = config.split("if(TORCHTRT_EXECUTORCH_EMBED_RUNPATH)", 1)[1].split(
+        "else()", 1
+    )[0]
+    assert "INTERFACE_LINK_OPTIONS" in branch, branch[:300]
+
+
+@pytest.mark.unit
+def test_the_collision_guard_checks_which_library_the_target_points_at() -> None:
+    """Matching the type is not identifying the target.
+
+    A shared imported target of the same name pointing at a different file passes a type check, and
+    the consumer then links that file while believing it linked the one this package found.
+    """
+    config = _CONFIG.read_text(encoding="utf-8")
+    assert "IMPORTED_LOCATION" in config, config
+    assert (
+        'STREQUAL "${TORCHTRT_EXECUTORCH_BACKEND_LIBRARY}"' in config
+    ), "the guard does not compare against the library this package found"
+    # Both guards, so a same-type impostor is still refused.
+    assert config.count("FATAL_ERROR") >= 2, config
