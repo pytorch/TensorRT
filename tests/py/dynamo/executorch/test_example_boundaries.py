@@ -227,3 +227,48 @@ def test_a_rejected_export_leaves_the_previous_program_alone(monkeypatch, tmp_pa
         _export(monkeypatch, model_path, delegates=("CudaBackend",))
     assert model_path.read_bytes() == b"the good program"
     assert not list(tmp_path.glob("*.staged")), "the staging file was left behind"
+
+
+@pytest.mark.parametrize("output_on_cuda", [True, False])
+def test_the_runner_rejects_an_output_that_came_back_on_the_host(
+    monkeypatch, tmp_path, output_on_cuda
+):
+    """The check the whole example exists for had nothing reaching it.
+
+    The other device test stops at the load, so the output guard never ran and removing it left the
+    suite green. This one lets the load succeed and controls only where the output claims to live.
+    """
+    path = _ROOT / "examples/executorch_reference_runner/load_model_device_resident.py"
+    tree = ast.parse(path.read_text())
+    tree.body = [
+        node for node in tree.body if not isinstance(node, (ast.Import, ast.ImportFrom))
+    ]
+    output = SimpleNamespace(
+        is_cuda=output_on_cuda, device="cuda:0" if output_on_cuda else "cpu"
+    )
+    program = SimpleNamespace(
+        method_names=lambda: ["forward"],
+        run_method=lambda name, inputs: [output],
+    )
+    namespace = {
+        "argparse": argparse,
+        "Path": Path,
+        "torch": SimpleNamespace(
+            float32=object(),
+            cuda=SimpleNamespace(is_available=lambda: True),
+            ones=lambda *args, device=None, **kwargs: SimpleNamespace(
+                is_cuda=str(device) == "cuda"
+            ),
+        ),
+        "_load_for_executorch": lambda _: program,
+    }
+    monkeypatch.setattr(sys, "argv", [str(path), "--model_path", "unused.pte"])
+    if output_on_cuda:
+        # It gets past the guard and fails later on something this stub does not provide. Anything
+        # except the guard's own complaint proves the guard let a device output through.
+        with pytest.raises(Exception) as caught:
+            exec(compile(tree, str(path), "exec"), namespace)
+        assert "output came back on" not in str(caught.value), caught.value
+    else:
+        with pytest.raises(AssertionError, match="output came back on"):
+            exec(compile(tree, str(path), "exec"), namespace)

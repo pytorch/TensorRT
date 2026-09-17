@@ -662,3 +662,27 @@ def test_every_declared_site_coordinate_matches_the_tree(pin_repo):
         text = (pin_repo / name).read_text(encoding="utf-8")
         assert ("version" in kinds) == bool(updater._REQUIREMENT.search(text)), name
         assert ("commit" in kinds) == (commit in text), name
+
+
+@pytest.mark.unit
+def test_an_unrelated_package_at_the_target_version_is_not_a_pin_site(pin_repo):
+    """The version check runs through the same pattern that does the rewriting.
+
+    Accepting a bare occurrence of the target version anywhere in the file let a different package
+    happening to sit at that version stand in for the ExecuTorch requirement, so a site whose
+    requirement had been reformatted away would report as satisfied.
+    """
+    both = sorted(
+        name for name, kinds in updater._SITE_COORDINATES.items() if "version" in kinds
+    )
+    victim = pin_repo / both[0]
+    current = updater.read_pin("__executorch_version__")
+    body = victim.read_text(encoding="utf-8")
+    # Break the requirement's spelling, and leave the target version behind on another package.
+    victim.write_text(
+        body.replace(f"executorch=={current}", "executorch at large")
+        + "\nsomething-else==9.9.9\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(SystemExit, match="no ExecuTorch version requirement"):
+        updater.write_pins("9.9.9", "c" * 40)

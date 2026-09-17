@@ -847,7 +847,23 @@ def test_the_runtime_package_ships_no_runtime_api():
     ), "the published main wheel imports load from this submodule"
     loader_source = legacy_loader.read_text(encoding="utf-8")
     assert "DeprecationWarning" in loader_source, loader_source
-    assert "_load_for_executorch" in loader_source, loader_source
+    # It forwards to the main wheel's loader, not to ExecuTorch's. That is what returns the object
+    # the published API returned, carrying run() and forward() and raising for a missing path.
+    # Where that forwarding leads is checked where the shape matters, in test_load_compatibility.
+    tree = ast.parse(loader_source)
+    load = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "load"
+    )
+    returns = [
+        ast.unparse(node.value)
+        for node in ast.walk(load)
+        if isinstance(node, ast.Return) and node.value is not None
+    ]
+    assert (
+        returns
+    ), "the forwarder returns nothing, so a caller of the published API gets None"
     # A forwarder, not a second inference API: no runtime or program wrapper may come back.
     for reintroduced in (
         "class Program",

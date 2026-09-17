@@ -277,9 +277,12 @@ def write_pins(new_version: str, new_commit: str) -> bool:
                         else frozenset({"commit"})
                     ),
                 )
-                # Each declared coordinate on its own. A site already carrying the target counts as
-                # satisfied, which is what lets a later run finish an interrupted one.
-                if "version" in expected and not count and new_version not in text:
+                # Each declared coordinate on its own, and by the same pattern that does the
+                # rewriting. Accepting a bare occurrence of the target version anywhere in the file
+                # let an unrelated package at that version stand in for the requirement, and it was
+                # never needed for convergence: a site a previous run already moved still matches
+                # the pattern, so it still counts.
+                if "version" in expected and not count:
                     raise ValueError(
                         "carries no ExecuTorch version requirement to move"
                     )
