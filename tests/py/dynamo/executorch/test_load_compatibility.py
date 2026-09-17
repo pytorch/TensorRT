@@ -690,3 +690,28 @@ def test_the_forwarder_actually_forwards_and_warns(monkeypatch) -> None:
         returned = namespace["load"]("some/model.pte")
     assert returned is sentinel, returned
     assert calls == ["some/model.pte"], calls
+
+
+@pytest.mark.unit
+def test_a_missing_file_is_reported_before_a_missing_delegate(
+    compiler, monkeypatch, tmp_path
+):
+    """Both wrong at once used to report the install, which is true but not what the caller got wrong.
+
+    Someone who mistyped a file name and happens not to have the delegate installed should hear about
+    the file name.
+    """
+    monkeypatch.delitem(sys.modules, "torch_tensorrt_executorch_runtime", raising=False)
+
+    class _Blocker:
+        def find_spec(self, name, path=None, target=None):
+            if name == "torch_tensorrt_executorch_runtime":
+                raise ModuleNotFoundError(
+                    "No module named 'torch_tensorrt_executorch_runtime'",
+                    name="torch_tensorrt_executorch_runtime",
+                )
+            return None
+
+    monkeypatch.setattr(sys, "meta_path", [_Blocker(), *sys.meta_path])
+    with pytest.raises(FileNotFoundError, match="not found"):
+        load_legacy(compiler, tmp_path / "typo.pte")

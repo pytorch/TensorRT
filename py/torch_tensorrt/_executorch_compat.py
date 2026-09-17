@@ -41,6 +41,11 @@ class Program:
 
 def load(path: Union[str, Path]) -> Program:
     """Load a program with embedded weights through ExecuTorch's Module API."""
+    # The path first. A caller who mistyped a file name and also has no delegate installed was told
+    # to install the delegate, which is true but is not what they got wrong.
+    model_path = Path(path)
+    if not model_path.is_file():
+        raise FileNotFoundError(f"ExecuTorch model not found: {model_path}")
     try:
         import torch_tensorrt_executorch_runtime as delegate
     except ModuleNotFoundError as error:
@@ -68,9 +73,6 @@ def load(path: Union[str, Path]) -> Program:
             "Torch-TensorRT."
         )
 
-    model_path = Path(path)
-    if not model_path.is_file():
-        raise FileNotFoundError(f"ExecuTorch model not found: {model_path}")
     data = model_path.read_bytes()
     try:
         register()

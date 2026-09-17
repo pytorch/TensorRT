@@ -103,8 +103,19 @@ jobs:
                     echo "could not list tags for release $version: ${remote_tags}" >&2
                     exit 1
                   fi
+                  # The version goes into a pattern, so a version that is not a plain number can make the
+                  # search fail rather than answer. Treat anything but a clean yes or no as a refusal,
+                  # because the alternative is re-pinning a release that is already tagged.
+                  case "${version}" in
+                    *[!0-9.]*) echo "release version ${version} is not numeric" >&2; exit 1 ;;
+                  esac
                   printf '%s\n' "${remote_tags}" |
-                    grep -qE "refs/tags/v${version}\.[0-9]+$" && tagged="yes"
+                    grep -qE "refs/tags/v${version}\.[0-9]+$"
+                  case "$?" in
+                    0) tagged="yes" ;;
+                    1) ;;
+                    *) echo "could not decide whether release ${version} is tagged" >&2; exit 1 ;;
+                  esac
                 fi
                 if [ -n "${tagged}" ]; then
                   echo "release $version already has a tag; its pin stays as shipped" >&2
