@@ -79,14 +79,13 @@ cc_library(
         "executorch/extension/cuda/device_guard.h",
         "executorch/extension/cuda/export.h",
     ],
+    include_prefix = "executorch",
+    linkstatic = True,
     local_defines = [
         "C10_USING_CUSTOM_GENERATED_MACROS",
         "EXECUTORCH_EXTENSION_CUDA_BUILDING",
     ],
-    include_prefix = "executorch",
     strip_include_prefix = "executorch",
-    alwayslink = True,
-    linkstatic = True,
     visibility = ["//visibility:private"],
     # device_guard.cpp returns an Error and logs, so it needs the runtime's headers,
     # which caller_stream.cpp beside it does not. Only the headers: the logging symbols
@@ -95,8 +94,11 @@ cc_library(
     # every registry it carries.
     deps = [
         ":executorch_headers",
-        "@cuda//:cudart",
-    ],
+    ] + select({
+        "@//toolchains/dep_collection:driveos": ["@cuda_driveos//:cudart"],
+        "//conditions:default": ["@cuda//:cudart"],
+    }),
+    alwayslink = True,
 )
 
 # The single shared object. The explicit -soname pins DT_SONAME to the bare
@@ -139,8 +141,10 @@ cc_library(
         # runtime always lands after that shared object on a link line, which is the
         # only order in which a static archive can satisfy it.
         ":executorch_core",
-        "@cuda//:cudart",
-    ],
+    ] + select({
+        "@//toolchains/dep_collection:driveos": ["@cuda_driveos//:cudart"],
+        "//conditions:default": ["@cuda//:cudart"],
+    }),
 )
 
 # The CUDA DeviceAllocator that serves device planned buffers. In the pinned
@@ -161,8 +165,10 @@ cc_library(
     deps = [
         ":executorch_headers",
         ":extension_cuda",
-        "@cuda//:cudart",
-    ],
+    ] + select({
+        "@//toolchains/dep_collection:driveos": ["@cuda_driveos//:cudart"],
+        "//conditions:default": ["@cuda//:cudart"],
+    }),
 )
 
 # The kernels behind the device copies that an exported program runs around the
@@ -194,10 +200,10 @@ cc_library(
         "C10_USING_CUSTOM_GENERATED_MACROS",
     ],
     include_prefix = "executorch",
-    strip_include_prefix = "executorch",
     includes = [
         "executorch/runtime/core/portable_type/c10",
     ],
+    strip_include_prefix = "executorch",
 )
 
 # ExecuTorch runtime carrier — provides register_backend and related symbols.

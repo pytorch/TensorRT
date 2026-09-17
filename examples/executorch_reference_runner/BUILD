@@ -66,12 +66,14 @@ cc_binary(
         "//cpp:tensorrt_executorch_backend",
         "//cpp:tensorrt_executorch_cuda_device_allocator",
         "//cpp:tensorrt_executorch_device_copy_kernels",
-        "@cuda//:cudart",
         "@executorch//:executorch_core",
         "@executorch//:executorch_file_data_loader",
         # Included and called directly (CallerStreamGuard), so declared directly
         # rather than reached through a transitive header, matching the sibling
         # runner above.
         "@executorch//:extension_cuda",
-    ],
+    ] + select({
+        "//toolchains/dep_collection:driveos": ["@cuda_driveos//:cudart"],
+        "//conditions:default": ["@cuda//:cudart"],
+    }),
 )
