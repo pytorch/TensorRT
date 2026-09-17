@@ -622,19 +622,22 @@ if [[ -n "${coalesced_model_path}" ]]; then
     # slice of the machine. A delegate that ignored the caller stream would still return the right
     # numbers on an idle GPU, so the value is asserted and not just the exit status.
     green_runner_log="${verify_root}/coalesced_green_context.log"
-    if "${runner_path}" \
+    green_status=0
+    "${runner_path}" \
       --model_path="${coalesced_model_path}" \
       --green_context_sms=8 \
-      --num_runs=2 2>&1 | tee "${green_runner_log}"; then
+      --num_runs=2 > "${green_runner_log}" 2>&1 || green_status=$?
+    cat "${green_runner_log}"
+    if [ "${green_status}" -eq 0 ]; then
       assert_runner_output "${green_runner_log}" "${coalesced_shape}" "${coalesced_value}" 0.001
     else
-      # A green context needs driver and hardware support, so a refusal is a skip. Anything else is
-      # the delegate breaking on a caller-provided stream, which is a failure.
-      if grep -qiE "green context|cuDevSmResource|not supported|CUDA_ERROR_NOT_SUPPORTED" \
-        "${green_runner_log}"; then
-        echo "green context unavailable on this runner, skipping that case" >&2
+      # The runner returns 2 when the device cannot provide the partition, which is a normal answer
+      # on a small GPU and a skip here. Any other status is the delegate breaking on a
+      # caller-provided stream, and a crash is never a skip however its message reads.
+      if [ "${green_status}" -eq 2 ]; then
+        echo "green context unavailable on this device, skipping that case" >&2
       else
-        echo "the coalesced program failed on a caller-provided stream" >&2
+        echo "the coalesced program failed on a caller-provided stream, status ${green_status}" >&2
         exit 1
       fi
     fi

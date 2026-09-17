@@ -368,9 +368,22 @@ int main(int argc, char** argv) {
     unsigned int partition_sms = 0;
     const bool ok = make_green_context_stream(
         static_cast<unsigned int>(green_context_sms), &green_ctx, &caller_stream, &partition_sms);
-    // Do not fall back to an ordinary stream: a test that asked for a green
-    // context and silently got a normal one would report a pass it did not earn.
-    ET_CHECK_MSG(ok, "--green_context_sms=%d was requested but no green context could be created", green_context_sms);
+    // Do not fall back to an ordinary stream: a run that asked for a green context and silently
+    // got an ordinary one would report a pass it did not earn. Refuse by returning rather than by
+    // aborting, because a device that cannot provide the partition is a normal answer and a caller
+    // has to tell it apart from a crash. Asking for more than the device has is the usual reason,
+    // so say how many it has.
+    if (!ok) {
+      int device_sms = 0;
+      cudaDeviceGetAttribute(&device_sms, cudaDevAttrMultiProcessorCount, 0);
+      ET_LOG(
+          Error,
+          "--green_context_sms=%d was requested and no green context could be created. This "
+          "device reports %d SMs in total, and a partition cannot exceed that.",
+          green_context_sms,
+          device_sms);
+      return 2;
+    }
     fprintf(stderr, "caller stream: green context with %u SM(s)\n", partition_sms);
   } else {
     cuda_status = cudaStreamCreate(&caller_stream);
