@@ -280,15 +280,22 @@ Result<DelegateHandle*> TensorRTBackend::init(
     return Error::InvalidProgram;
   }
 
-  int is_integrated = 0;
-  cuda_err = cudaDeviceGetAttribute(&is_integrated, cudaDevAttrIntegrated, handle->device_id);
+  // Whether this device can read pageable host memory, which is the question the three uses of this
+  // flag actually ask before handing a caller's pointer to TensorRT without a copy. Being an
+  // integrated part is a different question, and the answers differ on real devices: an H100 reports
+  // integrated 0 with pageable access 1, so asking the wrong one gave up a copy-free path there, and
+  // an integrated part is not obliged to report pageable access, where the wrong one would have bound
+  // ordinary host memory in as though the device could reach it.
+  int pageable_access = 0;
+  cuda_err =
+      cudaDeviceGetAttribute(&pageable_access, cudaDevAttrPageableMemoryAccess, handle->device_id);
   if (cuda_err != cudaSuccess) {
     ET_LOG(
         Info,
-        "TensorRTBackend::init: cudaDeviceGetAttribute(cudaDevAttrIntegrated) failed: %s",
+        "TensorRTBackend::init: cudaDeviceGetAttribute(cudaDevAttrPageableMemoryAccess) failed: %s",
         cudaGetErrorString(cuda_err));
   }
-  handle->unified_memory = is_integrated != 0;
+  handle->unified_memory = pageable_access != 0;
 
   handle->runtime.reset(nvinfer1::createInferRuntime(handle->logger));
   TORCHTRT_ET_CHECK_NOT_NULL(
