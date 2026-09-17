@@ -970,15 +970,26 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       cuda_err =
           cudaMemcpyAsync(et_out.mutable_data_ptr(), output.second, et_out.nbytes(), cudaMemcpyDeviceToHost, stream);
       if (cuda_err != cudaSuccess) {
+        // Name the output and number it the way the caller does. output.first indexes the whole
+        // argument list, so on a one-input engine the first output read as "output 1", and the
+        // index a caller passes to set_output_data_ptr counts outputs from zero.
+        const size_t output_index = output.first - engine->num_inputs;
+        const char* output_name = output_index < engine->output_binding_names.size()
+            ? engine->output_binding_names[output_index].c_str()
+            : "unknown";
         ET_LOG(
             Error,
-            "TensorRTBackend::execute: D2H copy failed for output %zu: %s",
-            output.first,
+            "TensorRTBackend::execute: D2H copy failed for output %zu ('%s'): %s. A program built "
+            "without runtime-allocated outputs needs the caller to supply that buffer, through "
+            "set_output_data_ptr with this index.",
+            output_index,
+            output_name,
             cudaGetErrorString(cuda_err));
         // The enqueue already succeeded, so the engine is still running on the
         // stream. Drain below before returning, or the next call mutates a live
         // execution context, which TensorRT forbids.
-        copy_err = Error::InvalidProgram;
+        // Not InvalidProgram: the program is fine and runs correctly once the buffer is supplied.
+        copy_err = Error::InvalidArgument;
         break;
       }
     }
