@@ -156,7 +156,9 @@ def _register_locked() -> None:
             raise DelegateCompatibilityError(
                 "ExecuTorch must be installed to load the Torch-TensorRT delegate. Install "
                 "executorch from the same release matrix as this package. The import failed "
-                f"with: {error}"
+                f"with: {error}. Importing this package registers the delegate, which is why it "
+                "raises here rather than later. Set "
+                "TORCH_TENSORRT_SKIP_DELEGATE_REGISTRATION=1 to import it without registering."
             ) from error
         # A library the loader could not FIND is a different problem from one it could not USE, and
         # only the second is an ABI mismatch. Blaming the ABI for the first sends the reader to
