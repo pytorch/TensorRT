@@ -71,8 +71,11 @@ def main():
         name, version, _, tags = parse_wheel_filename(args.wheel.name)
         if name != "torch-tensorrt-executorch-runtime":
             reject(f"unexpected distribution: {name}")
-        # One floor for both architectures, matching every wheel this ships beside on the index.
-        expected_tag = f"py3-none-manylinux_2_28_{args.architecture}"
+        # The floors differ by architecture. The Arm build container carries no devtoolset, so the
+        # C++ runtime symbols the delegate references are not absorbed statically the way they are
+        # on x86, and the wheel genuinely needs the newer baseline.
+        floor = {"x86_64": "2_28", "aarch64": "2_35"}[args.architecture]
+        expected_tag = f"py3-none-manylinux_{floor}_{args.architecture}"
         if {str(tag) for tag in tags} != {expected_tag}:
             reject(f"expected repaired tag {expected_tag}, got {tags}")
         wheel_metadata = BytesParser().parsebytes(

@@ -612,16 +612,25 @@ def test_every_site_naming_the_platform_tag_agrees() -> None:
     cmake = (_NATIVE / "CMakeLists.txt").read_text(encoding="utf-8")
     guard = _GUARD.read_text(encoding="utf-8")
     workflow = (_ROOT / ".github/workflows/build_linux.yml").read_text(encoding="utf-8")
+    checker = (_ROOT / ".github/scripts/check-executorch-runtime-wheel.py").read_text(
+        encoding="utf-8"
+    )
+    readme = (_ROOT / "py/torch-tensorrt-executorch-runtime/README.md").read_text(
+        encoding="utf-8"
+    )
     for arch, tag in (("aarch64", _ARM), ("x86_64", _X86)):
-        assert f'"{tag}"' in cmake, f"the native build does not name {tag}: {arch}"
+        floor = tag.removeprefix("manylinux_").removesuffix(f"_{arch}")
+        other = tag.replace(floor, "2_28" if floor != "2_28" else "2_35")
+        assert f'"{tag}"' in cmake, f"the native build does not name {tag}"
         assert tag in guard, f"the guard does not accept {tag}"
         assert f"platform_tag={tag}" in workflow, f"the workflow does not apply {tag}"
-        other = (
-            tag.replace("2_35", "2_28")
-            if "2_35" in tag
-            else tag.replace("2_28", "2_35")
-        )
+        # The checker derives the tag from a per-architecture floor rather than naming it whole.
+        assert (
+            f'"{arch}": "{floor}"' in checker
+        ), f"the checker's floor for {arch} is not {floor}"
+        assert tag in readme, f"the documentation does not name {tag}"
         assert other not in cmake, f"the native build still names {other}"
         assert (
             f"platform_tag={other}" not in workflow
         ), f"the workflow still applies {other}"
+        assert other not in readme, f"the documentation still names {other}"
