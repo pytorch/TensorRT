@@ -1,3 +1,4 @@
+load("@rules_cc//cc:defs.bzl", "cc_test")
 load("//tests/core/runtime:runtime_test.bzl", "runtime_test")
 
 package(default_visibility = ["//visibility:public"])
@@ -40,9 +41,19 @@ runtime_test(
     name = "test_multi_device_safe_mode",
 )
 
+cc_test(
+    name = "test_cudagraph_failure_cleanup",
+    srcs = ["test_cudagraph_failure_cleanup.cpp"],
+    deps = [
+        "//core/runtime:cudagraph_utils",
+        "@googletest//:gtest_main",
+    ],
+)
+
 test_suite(
     name = "runtime_tests",
     tests = [
+        ":test_cudagraph_failure_cleanup",
         ":test_multi_device_safe_mode",
     ],
 )

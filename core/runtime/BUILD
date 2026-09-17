@@ -83,6 +83,23 @@ config_setting(
     ],
 )
 
+cc_library(
+    name = "cudagraph_utils",
+    hdrs = ["CUDAGraphUtils.h"],
+    deps = select({
+        ":jetpack": ["@torch_l4t//:libtorch"],
+        ":rtx_win_arm64": ["@libtorch_win_arm64//:libtorch"],
+        ":rtx_win_x86_64": ["@libtorch_win//:libtorch"],
+        ":use_torch_whl": ["@torch_whl//:libtorch"],
+        ":windows": ["@libtorch_win//:libtorch"],
+        "//conditions:default": ["@libtorch"],
+    }) + select({
+        ":jetpack": ["@cuda_l4t//:cudart"],
+        ":windows": ["@cuda_win//:cudart"],
+        "//conditions:default": ["@cuda//:cudart"],
+    }),
+)
+
 # runtime_base: TRTEngine + device management + serialization utilities.
 # Does NOT include register_jit_hooks.cpp (TorchScript torch::class_ /
 # TORCH_LIBRARY registrations), so it can be linked into the static
@@ -147,6 +164,7 @@ cc_library(
         "-lstdc++fs",
     ],
     deps = [
+        ":cudagraph_utils",
         ":tensorrt_binding_names",
         "//core/plugins:torch_tensorrt_plugins",
         "//core/util:prelude",
