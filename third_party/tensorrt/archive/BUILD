@@ -68,6 +68,7 @@ cc_library(
             "nvinfer_static_lib",
             "@cuda_win//:cudart",
         ],
+        "@//toolchains/dep_collection:driveos": ["@cuda_driveos//:cudart"],
         "//conditions:default": ["@cuda//:cudart"],
     }),
 )
@@ -214,6 +215,7 @@ cc_library(
     ] + select({
         ":jetpack": ["@cuda_l4t//:cudart"],
         ":windows": ["@cuda_win//:cudart"],
+        "@//toolchains/dep_collection:driveos": ["@cuda_driveos//:cudart"],
         "//conditions:default": ["@cuda//:cudart"],
     }),
     alwayslink = True,

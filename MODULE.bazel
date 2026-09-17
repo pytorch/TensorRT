@@ -71,19 +71,28 @@ new_local_repository(
     path = "/usr/local/lib/python3.12/site-packages/torch_tensorrt/",
 )
 
-# Preserve the conventional CUDA layout unless TORCHTRT_TARGET_PLATFORM=driveos.
-# In DRIVE build containers, NVIDIA runtime injection supplies split common and
-# Thor header trees while the container supplies target libraries separately.
-cuda_repository = use_repo_rule(
-    "//toolchains:cuda_repository.bzl",
-    "cuda_repository",
+# CUDA should be installed on the system locally
+# for linux x86_64 and aarch64
+# Jobs that render MODULE.bazel from toolchains/ci_workspaces/MODULE.bazel.tmpl substitute
+# ${CUDA_HOME} here. Jobs that use this file directly need a container that actually provides
+# the path below as soon as anything they run resolves a target that depends on @cuda.
+new_local_repository(
+    name = "cuda",
+    build_file = "@//third_party/cuda:BUILD",
+    path = "/usr/local/cuda-13.4/",
 )
 
-cuda_repository(
-    name = "cuda",
-    conventional_build_file = "@//third_party/cuda:BUILD",
-    conventional_path = "/usr/local/cuda-13.4/",
-    drive_build_file = "@//third_party/cuda/driveos:BUILD",
+# DRIVE exposes common and Thor-specific headers under one injected CUDA root,
+# but does not necessarily ship an unversioned libcudart development symlink.
+# Keep that non-conventional layout isolated from the default @cuda repository.
+drive_cuda_repository = use_repo_rule(
+    "//toolchains:drive_cuda_repository.bzl",
+    "drive_cuda_repository",
+)
+
+drive_cuda_repository(
+    name = "cuda_driveos",
+    build_file = "@//third_party/cuda/driveos:BUILD",
 )
 
 # for Jetson

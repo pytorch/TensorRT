@@ -153,7 +153,6 @@ cc_library(
     srcs = [
         "src/torch_tensorrt/executorch/RegisterCudaDeviceAllocator.cpp",
     ],
-    alwayslink = True,
     target_compatible_with = select({
         ":linux_x86_64": [],
         ":sbsa": [],
@@ -170,6 +169,7 @@ cc_library(
         ],
         "//conditions:default": [],
     }),
+    alwayslink = True,
 )
 
 # Registration only, for the same reason as the allocator above: the kernel
@@ -184,11 +184,11 @@ cc_library(
     srcs = [
         "src/torch_tensorrt/executorch/RegisterDeviceCopyKernels.cpp",
     ],
-    alwayslink = True,
     deps = [
         "@executorch//:executorch_device_copy_kernels",
         "@executorch//:executorch_headers",
     ],
+    alwayslink = True,
 )
 
 cc_library(
@@ -216,16 +216,17 @@ cc_library(
         ":linux_x86_64": [
             "@executorch//:executorch_headers",
             "@executorch//:extension_cuda",
-            "@cuda//:cudart",
             "@tensorrt//:nvinfer",
         ],
         ":sbsa": [
             "@executorch//:executorch_headers",
             "@executorch//:extension_cuda",
-            "@cuda//:cudart",
             "@tensorrt_sbsa//:nvinfer",
         ],
         "//conditions:default": [],
+    }) + select({
+        "//toolchains/dep_collection:driveos": ["@cuda_driveos//:cudart"],
+        "//conditions:default": ["@cuda//:cudart"],
     }),
     alwayslink = True,
 )

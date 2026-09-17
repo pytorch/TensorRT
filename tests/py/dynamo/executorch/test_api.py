@@ -310,7 +310,9 @@ _RUNTIME_INIT_PY = (
     / "py/torch-tensorrt-executorch-runtime/torch_tensorrt_executorch_runtime/__init__.py"
 )
 _TENSORRT_CMAKE_FINDER = _REPO_ROOT / "cmake/Modules/FindTensorRT.cmake"
-_CUDA_REPOSITORY_RULE = _REPO_ROOT / "toolchains/cuda_repository.bzl"
+_DRIVE_CUDA_REPOSITORY_RULE = _REPO_ROOT / "toolchains/drive_cuda_repository.bzl"
+_MODULE_BAZEL = _REPO_ROOT / "MODULE.bazel"
+_BAZELRC = _REPO_ROOT / ".bazelrc"
 
 
 @pytest.mark.unit
@@ -533,12 +535,19 @@ def test_driveos_packaging_selects_driveos_bazel_config():
 
 @pytest.mark.unit
 def test_driveos_sdk_discovery_has_no_absolute_path_dependency():
-    cuda_rule = _CUDA_REPOSITORY_RULE.read_text()
-    assert 'target_platform == "driveos"' in cuda_rule
+    cuda_rule = _DRIVE_CUDA_REPOSITORY_RULE.read_text()
     assert 'ctx.os.environ.get("TORCHTRT_DRIVE_CUDA_ROOT"' in cuda_rule
     assert 'ctx.os.environ.get("TORCHTRT_DRIVE_CUDA_LIB_DIR"' in cuda_rule
     assert "/usr/local/cuda" not in cuda_rule
-    assert "_mirror_conventional_cuda(ctx)" in cuda_rule
+    assert '"libcudart.so.13"' in cuda_rule
+
+    module = _MODULE_BAZEL.read_text()
+    assert 'name = "cuda"' in module
+    assert 'name = "cuda_driveos"' in module
+    assert '"//toolchains:drive_cuda_repository.bzl"' in module
+
+    bazelrc = _BAZELRC.read_text()
+    assert "build:driveos --//toolchains/dep_collection:compute_libs=driveos" in bazelrc
 
     tensorrt_finder = _TENSORRT_CMAKE_FINDER.read_text()
     assert "ENV{TORCHTRT_TENSORRT_ROOT}" in tensorrt_finder

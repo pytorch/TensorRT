@@ -40,8 +40,10 @@ cc_binary(
         "//cpp:tensorrt_executorch_backend",
         "//cpp:tensorrt_executorch_cuda_device_allocator",
         "//cpp:tensorrt_executorch_device_copy_kernels",
-        "@cuda//:cudart",
         "@executorch//:executorch_core",
         "@executorch//:executorch_file_data_loader",
-    ],
+    ] + select({
+        "//toolchains/dep_collection:driveos": ["@cuda_driveos//:cudart"],
+        "//conditions:default": ["@cuda//:cudart"],
+    }),
 )
