@@ -55,8 +55,17 @@ fi
 
 # Install Torch-TensorRT
 if [[ ${PLATFORM} == win32 ]]; then
+    # Same exclusion as the Linux branch below, and for the same reason: the wheel's name varies by
+    # variant, so anchoring on a prefix leaves the pattern unexpanded and pip reads it literally.
+    wheels=""
+    for wheel in "${RUNNER_ARTIFACT_DIR}"/torch_tensorrt*.whl; do
+        case "${wheel}" in
+            *executorch_runtime*) continue ;;
+        esac
+        wheels="${wheels} ${wheel}"
+    done
     # pin-check: no-nightly -- Windows installs only the main wheel, without the Linux companion.
-    python -m pip install ${RUNNER_ARTIFACT_DIR}/torch_tensorrt-*.whl || exit 1
+    python -m pip install ${wheels} || exit 1
 else
     # Every built wheel except the companion. Installing the companion here is what forced a
     # nightly index onto release jobs; the ExecuTorch workflow installs it instead, naming the
