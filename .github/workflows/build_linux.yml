@@ -430,12 +430,16 @@ jobs:
               sys.exit("The main wheel declares no CUDA 13 TensorRT dependencies")
           subprocess.check_call([sys.executable, "-m", "pip", "install", *tensorrt])
           PY
-          # The nightly channel by name, not ${CHANNEL}, on release rows too. The pin is a dated
-          # development build and only that channel carries it: the test and release channels hold
-          # none of it, so resolving through ${CHANNEL} would fail every release build outright.
-          # It cannot admit a processor-only build either, since the version exists nowhere else.
-          ${CONDA_RUN} python -m pip install pyyaml patchelf "wheel>=0.40" \
-            --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" \
+          ${CONDA_RUN} python -m pip install pyyaml patchelf "wheel>=0.40"
+          # ExecuTorch on its own, through --index-url rather than --extra-index-url, so only the
+          # CUDA channel is consulted for it. With PyPI in the set, a pin naming a version PyPI
+          # also publishes resolves to the processor-only wheel from there, and the delegate build
+          # then fails at configure on the missing CUDA extension. That is reachable: moving the
+          # pin onto the stable track picks a version PyPI carries, and this file is a pin site so
+          # it is rewritten to match. Restricting the index makes a channel that cannot supply the
+          # pin fail loudly here instead of quietly installing a build the delegate cannot link.
+          ${CONDA_RUN} python -m pip install \
+            --index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" \
             "executorch==1.6.0.dev20260915"
           # Give the companion wheel the same channel/date and CUDA local-version
           # suffix as torch-tensorrt, while retaining its independent base version.
