@@ -59,9 +59,11 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
         with:
-          # Pinned rather than latest. A newer resolver rejects this project outright, because the
-          # declared Python range has no ceiling while the dependency chain stops short of the newest
-          # interpreter, so an unpinned upgrade breaks the lock refresh with no change on our side.
+          # Pinned rather than latest, and the pin is load-bearing. The project asks for python
+          # >=3.10 with no ceiling, so a resolver that splits by interpreter version tries to satisfy
+          # the newest one, and the dependency chain does not reach it: 0.12.15 fails the lock
+          # refresh on a tree that 0.12.5 resolves. Raise this only together with a ceiling on the
+          # declared range, or the refresh breaks with no change of ours behind it.
           version: "0.12.5"
 
       - name: Choose the track

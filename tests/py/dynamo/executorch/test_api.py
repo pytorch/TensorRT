@@ -874,8 +874,8 @@ def test_the_runtime_package_ships_no_runtime_api():
         assert reintroduced not in loader_source, reintroduced
 
     # The registration surface, plus the two names the published wheel already exported. Removing
-    # those outright breaks code written against it, so they stay as a deprecated alias and as an
-    # error that says what to use instead.
+    # those outright breaks code written against it, so both stay as deprecated forwarders that
+    # warn and hand back what ExecuTorch itself provides.
     delegate_init = (
         _REPO_ROOT
         / "py/torch-tensorrt-executorch-runtime"
@@ -1376,7 +1376,8 @@ def test_the_guard_actually_rejects_a_bad_artifact(tmp_path, case, expect_pass):
     # it and run on the 3-argument fallback.
     runpaths = {
         "no_runpath": None,
-        # Reached the required check as a basic regex, where the dots are wildcards.
+        # A run path entry at the wrong depth, so it names an executorch/lib that is not the one
+        # beside this wheel.
         "wrong_depth_runpath": "$ORIGIN:$ORIGIN/xy/executorch/lib",
         "runpath_missing_executorch": "$ORIGIN:$ORIGIN/../torch/lib",
         "absolute_runpath": "$ORIGIN:$ORIGIN/../../executorch/lib:/build/site-packages/lib",
@@ -2870,13 +2871,12 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
     elif case == "platform_independent_tag":
         tag = "any"
     elif case == "windows_compound_tag":
-        # The tag is split on "." and each part must match the linux-arch pattern alone, so a
-        # compound tag carrying a win_amd64 part is rejected even though a plain substring test
-        # would accept it for the "linux_x86_64" part beside it.
+        # The whole tag set has to equal the one expected tag, so a compound tag is rejected even
+        # though a substring test would accept it for the part that does match.
         tag = "win_amd64.linux_x86_64"
     elif case == "alien_architecture_tag":
-        # The architecture allowlist is the other half of the split-and-match rule: a linux tag for
-        # an architecture the wheel is not built for has to be rejected, not just non-linux tags.
+        # Same exact comparison, which is what rejects a Linux tag for an architecture this wheel
+        # is not built for, rather than only rejecting non-Linux tags.
         tag = "linux_ppc64le"
     elif case == "requires_an_unpinned_executorch":
         requires = [

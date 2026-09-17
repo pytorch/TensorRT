@@ -44,8 +44,9 @@ _CMAKE_CONFIG_SOURCE = HERE / "cmake" / "torchtrt_executorch-config.cmake"
 def pinned_executorch_version() -> str:
     """Read the ExecuTorch version the repository pins.
 
-    An empty return would switch the check below off rather than fail it, and a build with no pin
-    to compare against is exactly the case that check exists for.
+    Raises when the file is absent rather than returning an empty version, because the caller
+    compares against whatever comes back and a build with no pin to compare against is exactly the
+    case that comparison exists for.
     """
     pin_file = REPO_ROOT / "dev_dep_versions.yml"
     if not pin_file.is_file():

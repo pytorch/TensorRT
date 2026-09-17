@@ -74,8 +74,9 @@ def _extension_cuda_present() -> bool:
 
 
 def _delegate_path() -> str:
-    # Resolved next to this file rather than through the import system, so it also works
-    # before the package is importable. A fixed filename now: the delegate is shipped as
+    # Resolved next to this file rather than through the import system, so it does not depend on the
+    # package being on the path anywhere else. It still runs during this package's own import, and
+    # cannot run before it. A fixed filename now: the delegate is shipped as
     # package data under its real name, not renamed by setuptools.
     #
     # ``lib/`` rather than the package root, matching where ExecuTorch keeps its own backends

@@ -268,7 +268,8 @@ def write_pins(new_version: str, new_commit: str) -> bool:
                 except ValueError:
                     name = str(path)
                 # A site outside the declaration, which only a caller substituting its own list
-                # produces, keeps the older rule of needing at least one coordinate.
+                # produces. It is required to carry whichever single coordinate it appears to hold,
+                # rather than either of the two, since there is nothing declaring what it should.
                 expected = _SITE_COORDINATES.get(
                     name,
                     (

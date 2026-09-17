@@ -51,7 +51,7 @@ and leave the backend unregistered.
 
 The wheel must use the same Python, PyTorch, ExecuTorch, CUDA, TensorRT, and
 C++ ABI as its matching Torch-TensorRT wheel. This delegate requires CUDA 13;
-the build matrix currently covers `cu130` and `cu132`. Ordinary Torch-TensorRT
+the build matrix currently covers `cu130`, `cu132` and `cu134`, on both architectures. Ordinary Torch-TensorRT
 release and JetPack builds retain their separate CUDA 12 support.
 
 ## Runtime libraries

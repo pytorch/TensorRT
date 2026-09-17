@@ -115,8 +115,8 @@ def main():
                 installed = Version(importlib.metadata.version(distribution))
                 if installed.public != pinned:
                     reject(
-                        f"the repository pins executorch=={pinned}, but the build environment has "
-                        f"{installed}"
+                        f"the repository pins executorch=={pinned}, but this wheel was built "
+                        f"against {installed}, whose version differs from that pin"
                     )
                 expected_version = str(installed)
             else:
