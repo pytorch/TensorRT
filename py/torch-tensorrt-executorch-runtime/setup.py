@@ -200,7 +200,6 @@ class BazelBuild(build_py):
             raise SystemExit(f"ExecuTorch delegate build failed: {error}") from error
 
     def _build(self) -> None:
-        require_supported_cuda()
         super().run()
 
         if sys.platform != "linux":
@@ -384,9 +383,11 @@ class PlatformDistribution(Distribution):
         return True
 
 
-# The three lookups below cannot move: they produce install_requires, and dependency metadata is
-# what a metadata-only build asks for, so deriving pins from the build environment means that
-# environment has to be present. The CUDA check can move, and does, into the build itself.
+# These run while the file is read, and they have to. They produce install_requires, and dependency
+# metadata is exactly what a metadata-only build asks for, so deriving pins from the build
+# environment means that environment has to be present. The CUDA check leads, so an unsupported
+# CUDA says so before anything else is attempted rather than failing later and less clearly.
+require_supported_cuda()
 executorch_version = installed_version("executorch")
 tensorrt_version = installed_version(TENSORRT_DISTRIBUTION)
 cuda_runtime_version = installed_version(CUDA_RUNTIME_DISTRIBUTION)

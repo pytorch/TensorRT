@@ -2791,8 +2791,22 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
     ).group(1)
     package = "torch_tensorrt_executorch_runtime/"
     payload = [package + "lib/libexecutorch_backend_tensorrt.so"]
+    # The label naming the CUDA build is part of the ExecuTorch requirement, because the delegate
+    # links one specific build. The checker compares against the installed wheel, so read the same
+    # source it does rather than the label-free pin, or a correct wheel is rejected here.
+    try:
+        installed_executorch = importlib.metadata.version("executorch")
+    except importlib.metadata.PackageNotFoundError:
+        pytest.skip(
+            "ExecuTorch is not installed, so the requirement the checker expects cannot be built"
+        )
+    if installed_executorch.split("+")[0] != pin:
+        pytest.skip(
+            f"the installed ExecuTorch is {installed_executorch}, not the pinned {pin}, so this "
+            "cannot say whether the checker accepts a correct wheel"
+        )
     requires = [
-        f"executorch=={pin}",
+        f"executorch=={installed_executorch}",
         "torch==2.15.0.dev20260824",
         "torch-tensorrt==2.15.0.dev20260824",
         "tensorrt-cu13==11.2.1",
