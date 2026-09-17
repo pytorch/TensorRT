@@ -104,6 +104,9 @@ jobs:
       # The rest of the ExecuTorch suite that needs no GPU. Without this the only lane running these
       # is nightly, so a pull request could not fail on anything they cover, and they cover the
       # packaging, the wheel guard, the shipped CMake package and the shared workflow.
+      # Two files are deliberately absent: test_api and test_load_compatibility import torch at
+      # module level, and this job installs none, so adding them would mean installing a build
+      # here. They stay in the lane that has one.
       - name: Check the ExecuTorch packaging and workflow
         if: always()
         run: |
@@ -114,4 +117,5 @@ jobs:
             tests/py/dynamo/executorch/test_shared_runtime_workflow.py \
             tests/py/dynamo/executorch/test_example_boundaries.py \
             tests/py/dynamo/executorch/test_cmake_runtime.py \
+            tests/py/dynamo/executorch/test_python_runtime.py \
             -q --no-header -p no:cacheprovider --noconftest -o addopts=""

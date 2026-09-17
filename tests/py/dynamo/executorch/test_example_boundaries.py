@@ -192,7 +192,13 @@ def test_collision_guard_removal_overwrites_model(monkeypatch, tmp_path):
 @pytest.mark.parametrize(
     "is_cuda,remove_guard", [(False, False), (True, False), (False, True)]
 )
-def test_device_input_check_precedes_load(monkeypatch, optimize, is_cuda, remove_guard):
+def test_the_cuda_gate_precedes_the_load(monkeypatch, optimize, is_cuda, remove_guard):
+    """The gate has to stop the program before it loads anything, and survive optimized Python.
+
+    It used to be an assertion, which optimized Python strips, so the parameter covering that is not
+    incidental. The guard removed here is the availability gate, not a check on the tensor: a check on
+    the tensor cannot fire, because asking for the device has already failed by then.
+    """
     path = _ROOT / "examples/executorch_reference_runner/load_model_device_resident.py"
     tree = ast.parse(path.read_text())
     tree.body = [
@@ -202,7 +208,8 @@ def test_device_input_check_precedes_load(monkeypatch, optimize, is_cuda, remove
         guards = [
             node
             for node in tree.body
-            if isinstance(node, ast.If) and ast.unparse(node.test) == "not x.is_cuda"
+            if isinstance(node, ast.If)
+            and ast.unparse(node.test) == "not torch.cuda.is_available()"
         ]
         assert len(guards) == 1
         tree.body.remove(guards[0])
@@ -217,12 +224,12 @@ def test_device_input_check_precedes_load(monkeypatch, optimize, is_cuda, remove
         "Path": Path,
         "torch": SimpleNamespace(
             float32=object(),
-            cuda=SimpleNamespace(is_available=lambda: True),
-            # Honour the device the script asks for, rather than answering from the parameter
-            # alone. A stub that ignores it reports a CUDA tensor even when the script forgot to
-            # request one, so the guard below would pass while the example was broken.
+            # The parameter drives availability, which is the thing the gate asks about.
+            cuda=SimpleNamespace(is_available=lambda: is_cuda),
+            # Honour the device the script asks for, so a script that forgot to request one is
+            # visible here rather than reported as a device tensor.
             ones=lambda *args, device=None, **kwargs: SimpleNamespace(
-                is_cuda=is_cuda and str(device) == "cuda"
+                is_cuda=str(device) == "cuda"
             ),
         ),
         "_load_for_executorch": load,
@@ -230,7 +237,7 @@ def test_device_input_check_precedes_load(monkeypatch, optimize, is_cuda, remove
     monkeypatch.setattr(sys, "argv", [str(path), "--model_path", "unused.pte"])
     reaches_load = is_cuda or remove_guard
     error = LookupError if reaches_load else RuntimeError
-    message = "reached native load" if reaches_load else "requires a CUDA input"
+    message = "reached native load" if reaches_load else "cannot run"
     with pytest.raises(error, match=message):
         exec(compile(tree, str(path), "exec", optimize=optimize), namespace)
     assert calls == (["unused.pte"] if reaches_load else [])

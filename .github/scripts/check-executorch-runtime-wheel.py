@@ -157,19 +157,33 @@ def main():
                 reject(
                     f"{reason} {distribution}=={expected_version}, but the wheel requires {matched}"
                 )
-        # ExecuTorch is the exception, and deliberately so: the delegate links one specific build,
-        # and without the label naming it the requirement is satisfied by a processor-only build or
-        # another CUDA build of the same date. It resolves from the CUDA channel this wheel already
-        # requires. Every other requirement stays label-free, so it resolves anywhere.
+        # The three runtimes the delegate links carry the label naming the build, deliberately: it
+        # links one specific build of each, and without the label the requirement is satisfied by a
+        # processor-only build or another CUDA build of the same date. They resolve from the CUDA
+        # channel this wheel already requires. Everything else stays label-free so it resolves
+        # anywhere, and a label appearing there would narrow the wheel for no reason.
+        linked = {"executorch", "torch", "torch-tensorrt"}
         labelled = [
             requirement
             for requirement in requirements
             if "+" in str(requirement.specifier)
-            and canonicalize_name(requirement.name) != "executorch"
+            and canonicalize_name(requirement.name) not in linked
         ]
         if labelled:
             reject(
-                f"a requirement other than executorch carries a local label: {labelled}"
+                f"a requirement this delegate does not link carries a local label: {labelled}"
+            )
+        # And each of the three has to carry one, since that is the whole point.
+        unlabelled = [
+            requirement
+            for requirement in requirements
+            if canonicalize_name(requirement.name) in linked
+            and "+" not in str(requirement.specifier)
+        ]
+        if unlabelled:
+            reject(
+                "a runtime this delegate links is pinned without the label naming its build: "
+                f"{unlabelled}"
             )
         # Reading every member verifies its RECORD hash, including the delegate payload.
         for filename in names:

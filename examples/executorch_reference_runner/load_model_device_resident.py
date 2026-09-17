@@ -46,8 +46,9 @@ model_path = args.model_path
 # The shape export_device_resident.py used, and the value the .expected file
 # describes: the reference is cos(erfinv(tanh(1.0))) elementwise.
 x = torch.ones((64, 64), dtype=torch.float32, device="cuda")
-if not x.is_cuda:
-    raise RuntimeError("This program requires a CUDA input")
+# No check on the tensor's device here. Asking for the device is what can fail, and it has already
+# failed by the time a check would run, so testing the result was a guard that could not fire.
+# Whether CUDA is present at all is checked above, where the question can actually be answered.
 
 # The Module API backs device-tagged arenas with device memory.
 program = _load_for_executorch(str(model_path))
