@@ -50,9 +50,15 @@ instead of its targets:
 ```cmake
 find_package(executorch REQUIRED)
 find_package(torchtrt_executorch REQUIRED)
+target_include_directories(app PRIVATE ${EXECUTORCH_INCLUDE_DIRS})
+target_compile_definitions(app PRIVATE ${EXECUTORCH_COMPILE_DEFINITIONS})
 target_link_libraries(app PRIVATE
   ${EXECUTORCH_LIBRARIES} torchtrt::executorch_backend)
 ```
+
+Without an imported target to carry them, the include directories and the compile
+definitions have to be applied by hand as well, which is what the three variables
+above are for.
 
 There is nothing to include. The delegate has no public header: it registers
 itself with ExecuTorch's backend registry from a static initializer inside the
