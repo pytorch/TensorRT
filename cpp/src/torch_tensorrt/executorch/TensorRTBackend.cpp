@@ -287,8 +287,7 @@ Result<DelegateHandle*> TensorRTBackend::init(
   // an integrated part is not obliged to report pageable access, where the wrong one would have bound
   // ordinary host memory in as though the device could reach it.
   int pageable_access = 0;
-  cuda_err =
-      cudaDeviceGetAttribute(&pageable_access, cudaDevAttrPageableMemoryAccess, handle->device_id);
+  cuda_err = cudaDeviceGetAttribute(&pageable_access, cudaDevAttrPageableMemoryAccess, handle->device_id);
   if (cuda_err != cudaSuccess) {
     ET_LOG(
         Info,
