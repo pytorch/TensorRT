@@ -304,21 +304,18 @@ Result<DelegateHandle*> TensorRTBackend::init(
   }
   handle->unified_memory = pageable_access != 0;
 
-  // One runtime for the process, not one per program. TensorRT keeps state behind these objects
-  // that a second runtime collides with, and it says so out loud: creating another logs that the
-  // logger differs from one already registered and that the new one is ignored. Loading several
-  // programs at once on top of that crashed. Deserialization is serialized for the same reason,
-  // because a runtime is not safe to use from two threads at once.
-  static std::mutex deserialize_lock;
+  // One runtime for the process, not one per program. TensorRT documents a runtime as sharable
+  // across threads for nonmodifying use, and creating a second one logs that the logger passed in
+  // differs from one already registered and is ignored, so a per-program runtime bought nothing and
+  // produced that warning on every load after the first. No lock around the deserialize below:
+  // TensorRT lists deserializing an engine from a runtime as thread safe. What it does require
+  // serializing is the modifying setters, and this backend calls none of them.
   nvinfer1::IRuntime* runtime = shared_runtime();
   TORCHTRT_ET_CHECK_NOT_NULL(
       runtime, Error::InvalidProgram, "TensorRTBackend::init: failed to create TensorRT runtime");
 
   const void* engine_data = TensorRTBlobHeader::engine_data(processed->data(), header);
-  {
-    const std::lock_guard<std::mutex> guard(deserialize_lock);
-    handle->engine.reset(runtime->deserializeCudaEngine(engine_data, header.engine_size));
-  }
+  handle->engine.reset(runtime->deserializeCudaEngine(engine_data, header.engine_size));
   TORCHTRT_ET_CHECK_NOT_NULL(
       handle->engine, Error::InvalidProgram, "TensorRTBackend::init: failed to deserialize TensorRT engine");
 

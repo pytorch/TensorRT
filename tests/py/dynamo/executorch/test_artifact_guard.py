@@ -769,13 +769,12 @@ def test_the_native_build_runs_the_guard_after_linking() -> None:
 
 @pytest.mark.unit
 def test_the_backend_shares_one_tensorrt_runtime() -> None:
-    """Loading several delegated programs at once crashed, with TensorRT saying why.
+    """A runtime per program bought nothing and warned on every load after the first.
 
-    Each program used to build its own runtime, and TensorRT logged that the logger differed from one
-    already registered and was ignored, which is it telling us there is state behind these objects
-    that a second one collides with. Four threads each loading and running their own program then
-    died with a segmentation fault. One runtime for the process, and deserialization serialized,
-    because a runtime is not safe to use from two threads at once.
+    TensorRT documents a runtime as sharable across threads for nonmodifying use, and logs that a
+    second one's logger is ignored because it already has one. Deserializing from a runtime is on its
+    thread-safe list, so no lock is taken around it; what it says to serialize is the modifying
+    setters, and this backend calls none of them.
     """
     source = (
         _ROOT / "cpp/src/torch_tensorrt/executorch/TensorRTBackend.cpp"
@@ -790,7 +789,10 @@ def test_the_backend_shares_one_tensorrt_runtime() -> None:
         if "createInferRuntime" in line and not line.lstrip().startswith("//")
     ]
     assert len(builds) == 2, builds  # the shared accessor, and the separate blob reader
-    assert "std::lock_guard<std::mutex> guard(deserialize_lock)" in source, source[:200]
+    # And no lock around the deserialize, because TensorRT lists that call as thread safe.
+    assert (
+        "deserialize_lock" not in source
+    ), "a lock was added around a documented-safe call"
     # And the handle no longer carries one of its own.
     header = (
         _ROOT / "cpp/include/torch_tensorrt/executorch/TensorRTBackend.h"
