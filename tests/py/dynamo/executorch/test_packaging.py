@@ -591,3 +591,28 @@ def test_the_wheel_is_tagged_for_any_python_and_one_platform() -> None:
     )
     assert namespace["WheelTag"]().get_tag() == ("py3", "none", "manylinux_2_28_x86_64")
     assert namespace["PlatformDistribution"]().has_ext_modules() is True
+
+
+@pytest.mark.unit
+def test_the_three_linked_runtimes_are_pinned_with_their_build_labels() -> None:
+    """A version without its label admits a processor build and any other build of the same date.
+
+    The delegate is compiled against one specific build of each of these three, so a requirement that
+    a different build satisfies is not a pin at all. The label is the part that names the build.
+    """
+    source = (COMPANION / "setup.py").read_text(encoding="utf-8")
+    requires = source.split("install_requires=[", 1)[1].split("]", 1)[0]
+    for name, expression in (
+        ("torch", 'f"torch=={torch.__version__}"'),
+        ("executorch", 'f"executorch=={executorch_version}"'),
+        (
+            "torch-tensorrt",
+            "f\"torch-tensorrt=={installed_version('torch-tensorrt')}\"",
+        ),
+    ):
+        assert (
+            expression in requires
+        ), f"{name} is not pinned with its label: {requires}"
+    # And the two that legitimately have no label keep the public form.
+    assert "public_version(tensorrt_version)" in requires, requires
+    assert "public_version(cuda_runtime_version)" in requires, requires

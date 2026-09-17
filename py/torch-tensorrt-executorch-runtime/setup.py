@@ -418,12 +418,13 @@ setup(
     cmdclass={"build_py": BazelBuild, "bdist_wheel": WheelTag},
     python_requires=">=3.10",
     install_requires=[
-        f"torch=={public_version(torch.__version__)}",
-        # The full version, local label included. Dropping it leaves a requirement that a CPU
-        # build, or another CUDA build of the same date, satisfies. This delegate links the
-        # runtime out of one specific build, so those are exactly the pairings to refuse.
+        # Full versions, local label included, for the three the delegate is compiled against. The
+        # label is what names the CUDA build, and dropping it leaves a requirement that a processor
+        # build or a different CUDA build of the same date satisfies just as well. This delegate links
+        # those runtimes out of one specific build, so those are exactly the pairings to refuse.
+        f"torch=={torch.__version__}",
         f"executorch=={executorch_version}",
-        f"torch-tensorrt=={public_version(installed_version('torch-tensorrt'))}",
+        f"torch-tensorrt=={installed_version('torch-tensorrt')}",
         f"{TENSORRT_DISTRIBUTION}=={public_version(tensorrt_version)}",
         f"{CUDA_RUNTIME_DISTRIBUTION}=={public_version(cuda_runtime_version)}",
     ],

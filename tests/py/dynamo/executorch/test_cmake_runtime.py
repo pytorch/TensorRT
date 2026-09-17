@@ -333,3 +333,45 @@ def test_the_cuda_extension_alias_yields_to_a_consumers_own_target() -> None:
     assert "if(NOT TARGET extension_cuda)" in alias.rsplit("elseif", 1)[-1], alias[
         -400:
     ]
+
+
+@pytest.mark.parametrize("embed", [True, False])
+def test_the_run_path_opt_out_changes_what_the_consumer_links(
+    tmp_path, linker_tools, embed
+):
+    """The opt-out was checked by looking for words in the config, so forcing it on always passed.
+
+    A consumer that turns it off links differently, and that is the only thing worth asserting. Note
+    the option this adds is not the only run path on the link line: CMake adds its own for an imported
+    library at an absolute path, which the opt-out does not claim to remove.
+    """
+    prefix = tmp_path / "prefix"
+    config_dir = prefix / "lib/cmake/torchtrt_executorch"
+    config_dir.mkdir(parents=True)
+    (config_dir / _CONFIG.name).write_text(_CONFIG.read_text(encoding="utf-8"))
+    (prefix / "lib" / "libexecutorch_backend_tensorrt.so").write_bytes(b"")
+    project = tmp_path / "consumer"
+    project.mkdir()
+    (project / "main.cpp").write_text("int main() { return 0; }\n")
+    (project / "CMakeLists.txt").write_text(
+        "cmake_minimum_required(VERSION 3.20)\n"
+        "project(consumer CXX)\n"
+        f'list(APPEND CMAKE_PREFIX_PATH "{prefix}")\n'
+        "find_package(torchtrt_executorch REQUIRED)\n"
+        "add_executable(app main.cpp)\n"
+        "target_link_libraries(app PRIVATE torchtrt::executorch_backend)\n"
+    )
+    build = tmp_path / "build"
+    _run(
+        [
+            linker_tools["cmake"],
+            "-S",
+            str(project),
+            "-B",
+            str(build),
+            f"-DTORCHTRT_EXECUTORCH_EMBED_RUNPATH={'ON' if embed else 'OFF'}",
+        ]
+    )
+    link_line = (build / "CMakeFiles/app.dir/link.txt").read_text(encoding="utf-8")
+    # The tag this package asks for appears only when the option is left on.
+    assert ("--enable-new-dtags" in link_line) is embed, link_line
