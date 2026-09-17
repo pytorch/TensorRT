@@ -6,7 +6,7 @@ from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
 
-from .harness import DispatchTestCase
+from .harness import DispatchTestCase, skip_if_trt_rtx_turing
 
 
 class TestScatterValueConverter(DispatchTestCase):
@@ -327,6 +327,19 @@ class TestScatterSrcDynamicShapeConverter(DispatchTestCase):
 
 
 class TestScatterDtypeFixConverter(DispatchTestCase):
+    def test_scatter_value_bf16_static_index(self):
+        skip_if_trt_rtx_turing(self, "bfloat16")
+
+        class TestModule(torch.nn.Module):
+            def forward(self, x, index):
+                return torch.ops.aten.scatter.value(x, 1, index, 2.5)
+
+        inputs = [
+            torch.zeros(2, 4, dtype=torch.bfloat16),
+            torch.tensor([[0, 1], [1, 0]], dtype=torch.int64),
+        ]
+        self.run_test(TestModule(), inputs)
+
     def test_scatter_value_bool_scalar_no_float64_promotion(self):
         class TestModule(torch.nn.Module):
             def forward(self, x):
