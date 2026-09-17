@@ -394,6 +394,26 @@ def test_update_refit_condition_decides_from_weights():
         msg="Changed weight values must yield NEEDS_REFIT.",
     )
 
+    # In-place write through .data, which is how peft fuses a LoRA adapter into the
+    # base weights. It leaves data_ptr and _version untouched, so only the weight
+    # values themselves reveal it.
+    mutable_module = fresh_module()
+    weight = mutable_module.linear.weight
+    ptr, version = weight.data_ptr(), weight._version
+    with torch.no_grad():
+        weight.data.copy_(weight + 1.0)
+    assertions.assertEqual(
+        (weight.data_ptr(), weight._version),
+        (ptr, version),
+        msg="Precondition: .data writes are invisible to data_ptr and _version.",
+    )
+    mutable_module.update_refit_condition()
+    assertions.assertEqual(
+        mutable_module.refit_state.get_state(),
+        RefitFlag.NEEDS_REFIT,
+        msg="An in-place .data write must yield NEEDS_REFIT.",
+    )
+
     # Changed structure: recompile.
     mutable_module = fresh_module()
     mutable_module.original_model.linear = nn.Linear(4, 8).eval().to("cuda")
