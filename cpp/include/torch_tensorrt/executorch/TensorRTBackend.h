@@ -51,8 +51,6 @@ struct InputProfileBounds {
 };
 
 struct EngineHandle {
-  TRTLogger logger;
-  TRTUniquePtr<nvinfer1::IRuntime> runtime;
   TRTUniquePtr<nvinfer1::ICudaEngine> engine;
   TRTUniquePtr<nvinfer1::IExecutionContext> exec_ctx;
   std::vector<std::string> input_binding_names;

@@ -765,3 +765,34 @@ def test_the_native_build_runs_the_guard_after_linking() -> None:
     # It has to receive the reader and the built library, or it checks nothing useful.
     assert "TORCH_TENSORRT_READELF" in guard[0], guard[0][:300]
     assert "TARGET_FILE:executorch_backend_tensorrt" in guard[0], guard[0][:300]
+
+
+@pytest.mark.unit
+def test_the_backend_shares_one_tensorrt_runtime() -> None:
+    """Loading several delegated programs at once crashed, with TensorRT saying why.
+
+    Each program used to build its own runtime, and TensorRT logged that the logger differed from one
+    already registered and was ignored, which is it telling us there is state behind these objects
+    that a second one collides with. Four threads each loading and running their own program then
+    died with a segmentation fault. One runtime for the process, and deserialization serialized,
+    because a runtime is not safe to use from two threads at once.
+    """
+    source = (
+        _ROOT / "cpp/src/torch_tensorrt/executorch/TensorRTBackend.cpp"
+    ).read_text(encoding="utf-8")
+    assert (
+        "nvinfer1::IRuntime* shared_runtime()" in source
+    ), "no shared runtime accessor"
+    # Exactly one place builds it, and it is that accessor.
+    builds = [
+        line
+        for line in source.splitlines()
+        if "createInferRuntime" in line and not line.lstrip().startswith("//")
+    ]
+    assert len(builds) == 2, builds  # the shared accessor, and the separate blob reader
+    assert "std::lock_guard<std::mutex> guard(deserialize_lock)" in source, source[:200]
+    # And the handle no longer carries one of its own.
+    header = (
+        _ROOT / "cpp/include/torch_tensorrt/executorch/TensorRTBackend.h"
+    ).read_text(encoding="utf-8")
+    assert "IRuntime> runtime;" not in header, "the handle still owns a runtime"

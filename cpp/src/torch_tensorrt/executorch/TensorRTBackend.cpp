@@ -109,7 +109,7 @@ EngineHandle::~EngineHandle() {
   }
   exec_ctx.reset();
   engine.reset();
-  runtime.reset();
+  // The runtime is shared and outlives this handle, so there is nothing to release for it.
   if (inflight_event != nullptr) {
     cudaEventDestroy(inflight_event);
     inflight_event = nullptr;
@@ -117,6 +117,14 @@ EngineHandle::~EngineHandle() {
 }
 
 namespace {
+
+// The process-wide TensorRT runtime and its logger. Function-local statics, so it is constructed
+// once, thread safely, and outlives every engine deserialized from it as TensorRT requires.
+nvinfer1::IRuntime* shared_runtime() {
+  static TRTLogger logger;
+  static TRTUniquePtr<nvinfer1::IRuntime> runtime(nvinfer1::createInferRuntime(logger));
+  return runtime.get();
+}
 
 struct EngineHandleDeleter {
   void operator()(EngineHandle* handle) const {
@@ -296,12 +304,21 @@ Result<DelegateHandle*> TensorRTBackend::init(
   }
   handle->unified_memory = pageable_access != 0;
 
-  handle->runtime.reset(nvinfer1::createInferRuntime(handle->logger));
+  // One runtime for the process, not one per program. TensorRT keeps state behind these objects
+  // that a second runtime collides with, and it says so out loud: creating another logs that the
+  // logger differs from one already registered and that the new one is ignored. Loading several
+  // programs at once on top of that crashed. Deserialization is serialized for the same reason,
+  // because a runtime is not safe to use from two threads at once.
+  static std::mutex deserialize_lock;
+  nvinfer1::IRuntime* runtime = shared_runtime();
   TORCHTRT_ET_CHECK_NOT_NULL(
-      handle->runtime, Error::InvalidProgram, "TensorRTBackend::init: failed to create TensorRT runtime");
+      runtime, Error::InvalidProgram, "TensorRTBackend::init: failed to create TensorRT runtime");
 
   const void* engine_data = TensorRTBlobHeader::engine_data(processed->data(), header);
-  handle->engine.reset(handle->runtime->deserializeCudaEngine(engine_data, header.engine_size));
+  {
+    const std::lock_guard<std::mutex> guard(deserialize_lock);
+    handle->engine.reset(runtime->deserializeCudaEngine(engine_data, header.engine_size));
+  }
   TORCHTRT_ET_CHECK_NOT_NULL(
       handle->engine, Error::InvalidProgram, "TensorRTBackend::init: failed to deserialize TensorRT engine");
 
