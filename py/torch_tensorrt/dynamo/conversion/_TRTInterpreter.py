@@ -459,6 +459,27 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 builder_config, self.compilation_settings.target_compute_capabilities
             )
 
+        build_route = getattr(self.compilation_settings, "build_route", "") or ""
+        if build_route:
+            if not hasattr(builder_config, "build_route"):
+                raise RuntimeError(
+                    f"build_route={build_route} was requested, but this TensorRT "
+                    "build does not expose IBuilderConfig.build_route "
+                    "(Global Performance Tuning unavailable). This feature is available "
+                    "since TensorRT 11.1 and is currently not available in TensorRT-RTX or Windows."
+                )
+            all_routes = getattr(builder_config, "all_build_routes", "") or ""
+            if not all_routes.strip():
+                raise RuntimeError(
+                    f"build_route={build_route} was requested, but "
+                    "IBuilderConfig.all_build_routes is empty "
+                    "(Global Performance Tuning disabled on this platform/build). "
+                    "This feature is available since TensorRT 11.1 and is currently "
+                    "not available in TensorRT-RTX or Windows."
+                )
+            _LOGGER.info(f"Using TensorRT build route: {build_route}")
+            builder_config.build_route = build_route
+
         return builder_config
 
     def _create_timing_cache(
@@ -562,7 +583,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             runtime = trt.Runtime(TRT_LOGGER)
             cuda_engine = runtime.deserialize_cuda_engine(serialized_engine)
         else:
-
             cuda_engine = self.builder.build_engine_with_config(
                 self.ctx.net, builder_config
             )
