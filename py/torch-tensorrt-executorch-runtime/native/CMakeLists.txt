@@ -1,9 +1,8 @@
-# ExecuTorch's package config withholds every imported target below CMake 3.28, because it
-# exports "$ORIGIN"-relative runpaths as link options and CMake writes that token incorrectly
-# before then. It withholds them without failing: find_package still reports success and falls
-# back to plain path variables, so a lower floor here would configure cleanly and then fail on
-# the first executorch:: target with "the target was not found", which reads as a missing
-# component rather than a version problem. rules_foreign_cc 0.15.1 supplies 3.31.8.
+# ExecuTorch's package config withholds every imported target below CMake 3.28, because it exports
+# "$ORIGIN"-relative runpaths as link options and CMake writes that token incorrectly before then.
+# This build asks for components, and asked that way ExecuTorch fails outright below 3.28 rather than
+# falling back, so the floor here is not a courtesy. rules_foreign_cc 0.15.1 supplies 3.31.8, so
+# nobody installs it by hand.
 cmake_minimum_required(VERSION 3.28)
 
 project(torch_tensorrt_executorch_runtime LANGUAGES CXX)

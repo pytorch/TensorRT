@@ -38,9 +38,21 @@ through its distribution metadata instead:
 cmake -DCMAKE_PREFIX_PATH="$(python -c 'import importlib.metadata as m, torch_tensorrt_executorch_runtime as r, pathlib; print(str(pathlib.Path(str(m.distribution("executorch").locate_file("executorch"))) / "share" / "cmake") + ";" + str(pathlib.Path(r.__file__).parent))')" ...
 ```
 
-CMake 3.28 or newer is required, not because of this package but because the
-`backend_cuda` component it pairs with rejects anything older: earlier versions
-write the `$ORIGIN` token in a runtime search path incorrectly.
+CMake 3.28 or newer is required for the example above, not because of this
+package but because the `backend_cuda` component it pairs with rejects anything
+older: earlier versions write the `$ORIGIN` token in a runtime search path
+incorrectly.
+
+This package itself needs only 3.19. On 3.19 through 3.27 you can still use it,
+by asking ExecuTorch for no components and linking the variables it gives you
+instead of its targets:
+
+```cmake
+find_package(executorch REQUIRED)
+find_package(torchtrt_executorch REQUIRED)
+target_link_libraries(app PRIVATE
+  ${EXECUTORCH_LIBRARIES} torchtrt::executorch_backend)
+```
 
 There is nothing to include. The delegate has no public header: it registers
 itself with ExecuTorch's backend registry from a static initializer inside the
