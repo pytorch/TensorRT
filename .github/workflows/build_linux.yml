@@ -430,20 +430,16 @@ jobs:
               sys.exit("The main wheel declares no CUDA 13 TensorRT dependencies")
           subprocess.check_call([sys.executable, "-m", "pip", "install", *tensorrt])
           PY
-          ${CONDA_RUN} python -m pip install pyyaml patchelf "wheel>=0.40"
-          # Fetch the ExecuTorch wheel from the CUDA channel and nowhere else, then install that
-          # file. Naming the channel as an extra index leaves the default index in the set, and a
-          # pin naming a version the default index also publishes resolves to the processor-only
-          # wheel from there, which the delegate cannot link. Restricting the whole resolution
-          # instead is not an option: ExecuTorch declares thirty dependencies that the channel does
-          # not carry. So the artifact is pinned to the channel and its dependencies resolve as
-          # usual from the file.
-          ${CONDA_RUN} python -m pip download --no-deps --only-binary=:all: \
-            --index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" \
-            --dest "${RUNNER_TEMP}/executorch-wheel" "executorch==1.6.0.dev20260915"
-          ${CONDA_RUN} python -m pip install \
+          # The nightly channel is named directly rather than through the channel variable, on release
+          # rows too, because the pin is a dated development build that only that channel carries.
+          # The default index stays in the set for the other requirements, which means a pin naming a
+          # version the default index also publishes could resolve to the processor-only build from
+          # there. What refuses that is the delegate's own build, which reads the installed
+          # ExecuTorch's local label and stops unless it names a CUDA build, so the failure is a clear
+          # message rather than a configure error about a missing extension.
+          ${CONDA_RUN} python -m pip install pyyaml patchelf "wheel>=0.40" \
             --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" \
-            "${RUNNER_TEMP}"/executorch-wheel/executorch-*.whl
+            "executorch==1.6.0.dev20260915"
           # Give the companion wheel the same channel/date and CUDA local-version
           # suffix as torch-tensorrt, while retaining its independent base version.
           main_version="$(sed 's/a0$//' version.txt)"
