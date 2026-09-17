@@ -13,7 +13,21 @@ from __future__ import annotations
 import warnings
 from typing import Any
 
-__all__ = ["load"]
+__all__ = ["load", "Program"]
+
+
+def __getattr__(name: str) -> Any:
+    """Resolve Program from the main wheel on first use.
+
+    The published package exported this name alongside load, so code that imported it by name has to
+    keep working. Resolving it lazily rather than at module import keeps this module importable
+    against a main wheel that does not have it, which is the same reason load defers its own import.
+    """
+    if name == "Program":
+        from torch_tensorrt._executorch_compat import Program
+
+        return Program
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def load(file_path: str) -> Any:

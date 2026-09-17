@@ -21,7 +21,24 @@ import torch
 from torch._library.fake_class_registry import FakeScriptObject
 from torch._subclasses.fake_tensor import FakeTensor
 from torch.export.graph_signature import InputKind
-from torch_tensorrt.dynamo._exporter import _resolve_lifted_custom_obj, lift
+
+# Guarded, because this one import used to stop the whole file being collected wherever
+# Torch-TensorRT itself was not installed, which left every test in it unrun for the sake of the few
+# that need the exporter.
+try:
+    from torch_tensorrt.dynamo._exporter import _resolve_lifted_custom_obj, lift
+except ImportError:  # pragma: no cover
+    _resolve_lifted_custom_obj = None
+    lift = None
+
+_needs_exporter = pytest.mark.skipif(
+    _resolve_lifted_custom_obj is None,
+    reason="needs Torch-TensorRT installed for its exporter internals",
+)
+_needs_torch_tensorrt = pytest.mark.skipif(
+    importlib.util.find_spec("torch_tensorrt") is None,
+    reason="needs Torch-TensorRT installed",
+)
 
 # CMake command names are case-insensitive, so IF(FALSE) and If(FALSE) open the same block a
 # case-sensitive pattern misses. Every block command counts, not just if(): wrapping the guard in
@@ -142,6 +159,7 @@ def test_the_runtime_package_imports_every_submodule_it_reaches_through():
     )
 
 
+@_needs_torch_tensorrt
 @pytest.mark.unit
 def test_lazy_import_error_when_executorch_missing(monkeypatch):
     import torch_tensorrt
@@ -172,6 +190,7 @@ def test_lazy_import_error_when_executorch_missing(monkeypatch):
         delattr(torch_tensorrt, "executorch")
 
 
+@_needs_torch_tensorrt
 @pytest.mark.unit
 def test_save_executorch_error_when_executorch_missing(monkeypatch, tmp_path):
     original_find_spec = importlib.util.find_spec
@@ -193,6 +212,7 @@ def test_save_executorch_error_when_executorch_missing(monkeypatch, tmp_path):
         )
 
 
+@_needs_torch_tensorrt
 @pytest.mark.unit
 def test_public_api_symbols_present():
     module = importlib.import_module("torch_tensorrt.executorch")
@@ -2191,6 +2211,7 @@ def _stub_exported_program(constants, name_to_fqn=None):
     return types.SimpleNamespace(constants=constants, graph_signature=sig)
 
 
+@_needs_exporter
 @pytest.mark.unit
 def test_resolve_lifted_custom_obj_via_signature_fqn():
     # Modern torch.export: placeholder name differs from the constants FQN key.
@@ -2199,6 +2220,7 @@ def test_resolve_lifted_custom_obj_via_signature_fqn():
     assert _resolve_lifted_custom_obj(ep, _stub_node("obj_engine")) is sentinel
 
 
+@_needs_exporter
 @pytest.mark.unit
 def test_resolve_lifted_custom_obj_legacy_fallback():
     # No signature mapping: fall back to a direct name/target lookup.
@@ -2207,6 +2229,7 @@ def test_resolve_lifted_custom_obj_legacy_fallback():
     assert _resolve_lifted_custom_obj(ep, _stub_node("engine")) is sentinel
 
 
+@_needs_exporter
 @pytest.mark.unit
 def test_resolve_lifted_custom_obj_signature_present_name_absent_is_none():
     # A present-but-incomplete mapping must not bind a different object by name.
@@ -2214,12 +2237,14 @@ def test_resolve_lifted_custom_obj_signature_present_name_absent_is_none():
     assert _resolve_lifted_custom_obj(ep, _stub_node("engine")) is None
 
 
+@_needs_exporter
 @pytest.mark.unit
 def test_resolve_lifted_custom_obj_missing_is_none():
     ep = _stub_exported_program({}, name_to_fqn=None)
     assert _resolve_lifted_custom_obj(ep, _stub_node("missing")) is None
 
 
+@_needs_exporter
 @pytest.mark.unit
 def test_resolve_lifted_custom_obj_unwraps_fake_script_object():
     class _Real:
@@ -2362,6 +2387,7 @@ def _lifted_constant_meta(gm, sig):
         (torch.float32, "cuda"),
     ],
 )
+@_needs_exporter
 def test_lift_preserves_constant_dtype_device(dtype, device):
     # Runtime gate (not a module-level skipif, which resolves at collection time
     # and is fragile on remote-GPU runners): skip the CUDA case only when no GPU.
@@ -2380,6 +2406,7 @@ def test_lift_preserves_constant_dtype_device(dtype, device):
 # --- lift() preserves parameter kind and requires_grad -----------------------
 
 
+@_needs_exporter
 @pytest.mark.unit
 @pytest.mark.parametrize(
     "dtype, requires_grad",
