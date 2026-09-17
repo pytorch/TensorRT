@@ -49,6 +49,8 @@ GLIBC 2.2.5 2.2.6 2.3 2.3.2 2.3.3 2.3.4 2.4 2.5 2.6 2.7 2.8 2.9 2.10 2.11 2.12 2
 GLIBCXX 3.4 3.4.1 3.4.2 3.4.3 3.4.4 3.4.5 3.4.6 3.4.7 3.4.8 3.4.9 3.4.10 3.4.11 3.4.12 3.4.13 3.4.14 3.4.15 3.4.16 3.4.17 3.4.18 3.4.19 3.4.20 3.4.21 3.4.22 3.4.23 3.4.24
 CXXABI 1.3 1.3.1 1.3.2 1.3.3 1.3.4 1.3.5 1.3.6 1.3.7 1.3.8 1.3.9 1.3.10 1.3.11 FLOAT128 TM_1
 GCC 3.0 3.3 3.3.1 3.4 3.4.2 3.4.4 4.0.0 4.2.0 4.3.0 4.7.0 4.8.0 7.0.0
+LIBATOMIC 1.0 1.1 1.2
+ZLIB 1.2.0 1.2.0.2 1.2.0.8 1.2.2 1.2.3.3 1.2.3.4 1.2.3.5 1.2.5.1 1.2.5.2 1.2.7.1 1.2.9
 POLICY
             ;;
         manylinux_2_35_aarch64)
@@ -57,6 +59,8 @@ GLIBC 2.0 2.17 2.18 2.22 2.23 2.24 2.25 2.26 2.27 2.28 2.29 2.30 2.31 2.32 2.33 
 GLIBCXX 3.4 3.4.1 3.4.2 3.4.3 3.4.4 3.4.5 3.4.6 3.4.7 3.4.8 3.4.9 3.4.10 3.4.11 3.4.12 3.4.13 3.4.14 3.4.15 3.4.16 3.4.17 3.4.18 3.4.19 3.4.20 3.4.21 3.4.22 3.4.23 3.4.24 3.4.25 3.4.26 3.4.27 3.4.28 3.4.29 3.4.30
 CXXABI 1.3 1.3.1 1.3.2 1.3.3 1.3.4 1.3.5 1.3.6 1.3.7 1.3.8 1.3.9 1.3.10 1.3.11 1.3.12 1.3.13 TM_1
 GCC 3.0 3.3 3.3.1 3.4 3.4.2 3.4.4 4.0.0 4.2.0 4.3.0 4.5.0 4.7.0 7.0.0 11.0
+LIBATOMIC 1.0 1.1 1.2
+ZLIB 1.2.0 1.2.0.2 1.2.0.8 1.2.2 1.2.3.3 1.2.3.4 1.2.3.5 1.2.5.1 1.2.5.2 1.2.7.1 1.2.9
 POLICY
             ;;
     esac | awk '{ for (i = 2; i <= NF; i++) print $1 "_" $i }'
@@ -64,7 +68,7 @@ POLICY
 
 versions() {
     printf '%s\n' "$1" |
-        grep -oE '(GLIBCXX|CXXABI|GLIBC|GCC)_[A-Za-z0-9_.]+' | sort -u
+        grep -oE '(GLIBCXX|CXXABI|GLIBC|GCC|LIBATOMIC|ZLIB)_[A-Za-z0-9_.]+' | sort -u
 }
 
 needed_entries() {
@@ -85,6 +89,20 @@ fi
 if ! printf '%s\n' "${dyn}" | grep -qE 'NEEDED.*\[libexecutorch_extension_cuda\.so\]'; then
     fail "${target} has no DT_NEEDED on libexecutorch_extension_cuda.so, so it may carry a private CUDA stream implementation"
 fi
+# Every library this links, checked against the set it is allowed to link. Nothing enumerated these
+# before, so a link nobody intended passed in silence. libpython is the one that matters most: the
+# wheel is tagged for any Python 3 because the payload has no Python ABI, and linking libpython would
+# make that tag a lie while the wheel still installed everywhere.
+for entry in $(needed_entries "${dyn}"); do
+    case "${entry}" in
+        libexecutorch.so|libexecutorch_extension_cuda.so|libexecutorch_threadpool.so) ;;
+        libnvinfer.so.*|libcudart.so.*) ;;
+        libstdc++.so.*|libc.so.*|libm.so.*|libgcc_s.so.*|libdl.so.*|librt.so.*|libpthread.so.*) ;;
+        ld-linux-*.so.*|libatomic.so.*|libz.so.*) ;;
+        *) fail "${target} links ${entry}, which is not one of the libraries this wheel may depend on" ;;
+    esac
+done
+
 if ! printf '%s\n' "${dyn}" | grep -qE 'NEEDED.*\[libstdc\+\+\.so\.[0-9]+\]'; then
     fail "${target} has no DT_NEEDED on libstdc++, so it is not linked against the shared C++ runtime"
 fi

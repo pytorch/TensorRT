@@ -576,7 +576,10 @@ def test_guard_removal_controls(artifact, tmp_path, mutation):
         new = "for node in; do"
         data["versions"] += " GCC_7.1.0"
     elif mutation == "gcc":
-        old, new = "(GLIBCXX|CXXABI|GLIBC|GCC)", "(GLIBCXX|CXXABI|GLIBC)"
+        old, new = (
+            "(GLIBCXX|CXXABI|GLIBC|GCC|LIBATOMIC|ZLIB)",
+            "(GLIBCXX|CXXABI|GLIBC|LIBATOMIC|ZLIB)",
+        )
         data["versions"] += " GCC_7.1.0"
     elif mutation == "empty":
         old = '[ -n "${argument}" ] || fail "supplied arguments must not be empty"'
@@ -703,3 +706,35 @@ def test_each_linkage_check_rejects_what_it_is_for(artifact, break_it, expected)
     result = invoke()
     assert result.returncode != 0, result.stdout
     assert expected in result.stderr, result.stderr
+
+
+@pytest.mark.parametrize(
+    "symbol", ["ZLIB_1.2.13", "LIBATOMIC_1.3", "GLIBCXX_3.4.40", "GLIBC_2.99"]
+)
+@pytest.mark.unit
+def test_a_symbol_above_the_platform_ceiling_is_rejected(artifact, symbol):
+    """Two of the platform's six symbol families were missing from the tables and the collector.
+
+    A requirement above the ceiling in either of those two passed in silence, which is the one thing
+    the tag is a promise about.
+    """
+    data, invoke, runtime = artifact
+    data["versions"] = f"{_BASE_VERSIONS} {symbol}"
+    result = invoke()
+    assert result.returncode != 0, result.stdout
+    assert symbol in result.stderr, result.stderr
+
+
+@pytest.mark.unit
+def test_a_library_outside_the_allowed_set_is_rejected(artifact):
+    """Nothing enumerated what the delegate links, so an unintended link passed in silence.
+
+    libpython is the one that matters most. The wheel is tagged for any Python 3 because the payload
+    has no Python ABI, and linking libpython would make that tag wrong while the wheel still installed
+    everywhere.
+    """
+    data, invoke, runtime = artifact
+    data["needed"].append("libpython3.12.so.1.0")
+    result = invoke()
+    assert result.returncode != 0, result.stdout
+    assert "libpython3.12.so.1.0" in result.stderr, result.stderr
