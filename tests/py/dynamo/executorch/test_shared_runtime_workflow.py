@@ -445,7 +445,23 @@ def test_the_delegate_lane_narrows_the_matrix_to_cuda_13_rows() -> None:
     workflow = (ROOT / ".github/workflows/executorch-test-linux.yml").read_text(
         encoding="utf-8"
     )
-    assert "--executorch-runtime" in workflow, workflow
+    # Not a text search: the flag has to reach the filter. Leaving it only inside a comment, which is
+    # what commenting the whole invocation out does, passed a search of the file.
+    document = yaml.safe_load(workflow)
+    invocations = [
+        step["run"]
+        for job in document["jobs"].values()
+        for step in job.get("steps", [])
+        if isinstance(step, dict) and "filter-matrix.py" in (step.get("run") or "")
+    ]
+    assert invocations, "no step runs the matrix filter"
+    live = [
+        line
+        for run in invocations
+        for line in run.splitlines()
+        if "--executorch-runtime" in line and not line.lstrip().startswith("#")
+    ]
+    assert live, f"the flag reaches no live command line: {invocations}"
 
     script = ROOT / ".github/scripts/filter-matrix.py"
     rows = [

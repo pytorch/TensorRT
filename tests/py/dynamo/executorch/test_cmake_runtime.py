@@ -375,3 +375,44 @@ def test_the_run_path_opt_out_changes_what_the_consumer_links(
     link_line = (build / "CMakeFiles/app.dir/link.txt").read_text(encoding="utf-8")
     # The tag this package asks for appears only when the option is left on.
     assert ("--enable-new-dtags" in link_line) is embed, link_line
+
+
+@pytest.mark.parametrize("collision", ["wrong_type", "other_file"])
+def test_a_target_of_that_name_already_present_is_refused(
+    tmp_path, linker_tools, collision
+):
+    """Both guards were checked by looking for words, so disabling both conditions passed.
+
+    A consumer that already defines this target, as the wrong kind or pointing at a different file,
+    would otherwise link something other than this package's delegate while believing it had this one.
+    """
+    prefix = tmp_path / "prefix"
+    config_dir = prefix / "lib/cmake/torchtrt_executorch"
+    config_dir.mkdir(parents=True)
+    (config_dir / _CONFIG.name).write_text(_CONFIG.read_text(encoding="utf-8"))
+    (prefix / "lib" / "libexecutorch_backend_tensorrt.so").write_bytes(b"")
+    (prefix / "lib" / "someone_elses.so").write_bytes(b"")
+    if collision == "wrong_type":
+        preamble = "add_library(torchtrt::executorch_backend INTERFACE IMPORTED)\n"
+    else:
+        preamble = (
+            "add_library(torchtrt::executorch_backend SHARED IMPORTED)\n"
+            "set_target_properties(torchtrt::executorch_backend PROPERTIES\n"
+            f'  IMPORTED_LOCATION "{prefix}/lib/someone_elses.so")\n'
+        )
+    project = tmp_path / "consumer"
+    project.mkdir()
+    (project / "CMakeLists.txt").write_text(
+        "cmake_minimum_required(VERSION 3.20)\n"
+        "project(consumer NONE)\n"
+        + preamble
+        + f'list(APPEND CMAKE_PREFIX_PATH "{prefix}")\n'
+        "find_package(torchtrt_executorch REQUIRED)\n"
+    )
+    result = subprocess.run(
+        [linker_tools["cmake"], "-S", str(project), "-B", str(tmp_path / "build")],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode != 0, result.stdout
+    assert "CMake Error" in result.stdout + result.stderr, result.stdout

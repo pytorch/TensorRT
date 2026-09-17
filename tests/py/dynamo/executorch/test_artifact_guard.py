@@ -738,3 +738,30 @@ def test_a_library_outside_the_allowed_set_is_rejected(artifact):
     result = invoke()
     assert result.returncode != 0, result.stdout
     assert "libpython3.12.so.1.0" in result.stderr, result.stderr
+
+
+@pytest.mark.unit
+def test_the_native_build_runs_the_guard_after_linking() -> None:
+    """Deleting the step that runs the guard left this suite green wherever patchelf was missing.
+
+    The cases that build for real skip without it, so nothing noticed that the built library had
+    stopped being checked at all. This reads the build file instead, which is weaker than running it
+    but is the only check that holds where the toolchain is absent.
+    """
+    build = (
+        _ROOT / "py/torch-tensorrt-executorch-runtime/native/CMakeLists.txt"
+    ).read_text(encoding="utf-8")
+    commands = [
+        block
+        for block in build.split(
+            "add_custom_command(TARGET executorch_backend_tensorrt POST_BUILD"
+        )[1:]
+    ]
+    assert commands, "nothing runs after the delegate is linked"
+    guard = [b for b in commands if "check_imports_executorch_runtime.sh" in b]
+    assert (
+        guard
+    ), f"the guard is not run after linking: {len(commands)} post-build steps"
+    # It has to receive the reader and the built library, or it checks nothing useful.
+    assert "TORCH_TENSORRT_READELF" in guard[0], guard[0][:300]
+    assert "TARGET_FILE:executorch_backend_tensorrt" in guard[0], guard[0][:300]

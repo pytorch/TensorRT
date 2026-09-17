@@ -114,6 +114,7 @@ def packaging_build(tmp_path, monkeypatch):
         versions=versions,
         calls=[],
         builds=[],
+        requires=[],
         payload=b"controlled native output",
     )
     bazel_bin = tmp_path / "bazel-bin"
@@ -158,6 +159,10 @@ def packaging_build(tmp_path, monkeypatch):
         kwargs["cmdclass"]["build_py"].run.__globals__["sys"] = types.SimpleNamespace(
             platform="linux", executable=sys.executable
         )
+        # Keep what the file actually declares. Reading the source for the words cannot see a value
+        # rewritten between the read and the call, which is how the pin lost its build label
+        # unnoticed.
+        state.requires = list(kwargs.get("install_requires") or [])
         distribution = original_setup(**kwargs)
         state.builds.append(distribution.get_command_obj("build_py"))
         return distribution
@@ -616,3 +621,50 @@ def test_the_three_linked_runtimes_are_pinned_with_their_build_labels() -> None:
     # And the two that legitimately have no label keep the public form.
     assert "public_version(tensorrt_version)" in requires, requires
     assert "public_version(cuda_runtime_version)" in requires, requires
+
+
+@pytest.mark.unit
+def test_the_declared_pin_keeps_its_build_label(packaging_build, monkeypatch):
+    """Reading the file for the words cannot see a value rewritten before it is used.
+
+    Dropping the label from the ExecuTorch pin, while leaving every word the old checks looked for,
+    changed the requirement from one build to any build of that date and went unnoticed. So the
+    requirement the file actually declares is read back here.
+    """
+    state = packaging_build
+    monkeypatch.setattr(sys, "argv", [str(state.project / "setup.py"), "--name"])
+    runpy.run_path(str(state.project / "setup.py"), run_name="__main__")
+    executorch = [r for r in state.requires if r.startswith("executorch==")]
+    assert executorch, state.requires
+    assert "+cu" in executorch[0], executorch[0]
+
+
+@pytest.mark.unit
+def test_a_missing_pin_file_stops_the_build(tmp_path):
+    """The refusal was checked by looking for words, and its branch never ran.
+
+    Rewriting it to fall back to the installed version, and replacing its body with something that
+    would be obvious, both left the suite green. So the branch is executed here, with no pin file
+    present.
+    """
+    source = (COMPANION / "setup.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    reader = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef)
+        and node.name == "pinned_executorch_version"
+    )
+    namespace: dict[str, object] = {"REPO_ROOT": tmp_path, "yaml": yaml}
+    exec(
+        compile(ast.Module(body=[reader], type_ignores=[]), "<setup>", "exec"),
+        namespace,
+    )
+    # No pin file in tmp_path, which is the case the refusal exists for.
+    with pytest.raises(RuntimeError, match="is missing"):
+        namespace["pinned_executorch_version"]()
+    # And with one present it returns the pinned version rather than guessing.
+    (tmp_path / "dev_dep_versions.yml").write_text(
+        '__executorch_version__: "1.6.0.dev20260915+cu134"\n', encoding="utf-8"
+    )
+    assert namespace["pinned_executorch_version"]() == "1.6.0.dev20260915+cu134"
