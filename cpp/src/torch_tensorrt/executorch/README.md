@@ -63,6 +63,24 @@ so this removal is an API-simplification choice, not a correctness requirement.)
 This is a source-breaking C++ change; downstream callers must switch to the new
 type.
 
+### A device-resident output reaches Python tagged for the device but backed by host memory
+
+Measured on two GPUs. A program exported device resident runs, and its values are right, but the tensor
+the Python bindings hand back reports the device while its pointer is ordinary host memory. Asked
+through the driver, a genuine device tensor answers device memory on device zero, and this one answers
+unregistered host memory on device minus two.
+
+So from Python, `is_cuda` on that output proves nothing about residency, and neither does anything built
+on it. The same programs run correctly through a C++ consumer, where the caller supplies the output
+address, so the runtime and this backend are doing their part. The structural reason is that the type
+carrying output metadata has no device field, so a generic runner cannot learn where a non-planned
+output belongs, and a fix belongs upstream.
+
+Two consequences worth knowing. The default output clone in the bindings copies from that pointer, which
+is why an asynchronous run can return zeros. And ExecuTorch's own CUDA backend refuses such a buffer
+while this backend accepts it, so a coalesced program's behaviour depends on which backend owns the
+last partition.
+
 ### Running from several threads at once does not work today
 
 Measured on three GPUs, two architectures. Loading and running from more than one thread fails
