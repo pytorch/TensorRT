@@ -231,10 +231,17 @@ def write_pins(new_version: str, new_commit: str) -> bool:
 
     exact = SpecifierSet(f"=={old_version}")
     ranged = SpecifierSet(f">={old_version},<{_upper_bound(old_version)}")
+    # A site already at the target is accepted and left alone, so a run interrupted partway can be
+    # repeated. Writing twelve files is not atomic, and treating an already-moved site as stale meant
+    # the first interruption wedged every later attempt at the same version.
+    done_exact = SpecifierSet(f"=={new_version}")
+    done_ranged = SpecifierSet(f">={new_version},<{_upper_bound(new_version)}")
 
     def rewrite_requirement(match: re.Match[str]) -> str:
         original = match.group(0)
         parsed = Requirement(original)
+        if parsed.specifier in (done_exact, done_ranged):
+            return original
         if parsed.url or parsed.specifier not in (exact, ranged):
             raise ValueError(f"unsupported or stale ExecuTorch requirement: {original}")
         constraints = match["constraints"]

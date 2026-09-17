@@ -2582,3 +2582,43 @@ def test_the_pairing_check_fails_when_the_two_pins_disagree(
     else:
         with pytest.raises(AssertionError):
             test_the_pinned_commit_is_the_pinned_wheels_own_source()
+
+
+@pytest.mark.parametrize("branch", ["windows", "linux"])
+def test_the_install_script_leaves_the_companion_out(tmp_path, branch):
+    """Removing both exclusions left every pin test green, so nothing protected this.
+
+    Installing the companion from this script is what forced a nightly index onto release jobs. The
+    selection works by excluding the companion rather than by matching the main wheel, because the
+    main wheel's name varies by variant and a prefix guess leaves the pattern unexpanded for pip to
+    read literally. That is exactly what a test reading the script for the words cannot check.
+    """
+    source = (REPO_ROOT / ".github/scripts/install-torch-tensorrt.sh").read_text(
+        encoding="utf-8"
+    )
+    # Take the case block straight from the script, so the test cannot drift from what runs.
+    cases = re.findall(r"case \"\$\{wheel\}\" in.*?esac", source, re.S)
+    assert len(cases) == 2, len(cases)
+    case = cases[0 if branch == "windows" else 1]
+    directory = tmp_path / "artifacts"
+    directory.mkdir()
+    for name in (
+        "torch_tensorrt-2.15.0.dev1+cu134-cp310-cp310-linux_x86_64.whl",
+        "torch_tensorrt_rtx-2.15.0.dev1+cu134-cp310-cp310-linux_x86_64.whl",
+        "torch_tensorrt_executorch_runtime-0.2.0.dev1+cu134-py3-none-linux_x86_64.whl",
+    ):
+        (directory / name).write_bytes(b"")
+    script = (
+        'wheels=""\n'
+        f"for wheel in {directory}/torch_tensorrt*.whl; do\n"
+        f"{case}\n"
+        '    wheels="${wheels} ${wheel}"\n'
+        "done\n"
+        "echo ${wheels}\n"
+    )
+    result = subprocess.run(["sh", "-c", script], text=True, capture_output=True)
+    assert result.returncode == 0, result.stderr
+    selected = [Path(name).name for name in result.stdout.split()]
+    assert not any("executorch_runtime" in name for name in selected), selected
+    # Both of the others, including the variant a prefix match would have missed.
+    assert len(selected) == 2, selected
