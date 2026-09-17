@@ -111,6 +111,16 @@ The example below assumes Linux with a matching CUDA 13 PyTorch and
 Torch-TensorRT installation. Substitute the channel for your CUDA throughout, such
 as `cu134` for CUDA 13.4.
 
+The build reads the CUDA location out of the repository's `MODULE.bazel`, and the
+copy checked in names one specific version. On a machine with a different CUDA, the
+fetch fails saying that path does not exist. That file is generated, so render it for
+your machine before building. It takes seven values, so run the packaging script that
+already sets them rather than substituting by hand:
+
+```bash
+CUDA_HOME=/usr/local/cuda-13.2 bash packaging/pre_build_script.sh
+```
+
 ```bash
 python -m pip install pyyaml patchelf tensorrt-cu13 \
   --extra-index-url https://download.pytorch.org/whl/nightly/cu130 \
