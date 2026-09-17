@@ -662,3 +662,44 @@ def test_the_shipped_binaries_can_find_the_libraries_they_need() -> None:
             "$$ORIGIN/../../nvidia/cu13/lib",
         ):
             assert needed in block, f"{name} has no run path entry for {needed}"
+
+
+def _drop_needed(data, name):
+    data["needed"] = [lib for lib in data["needed"] if lib != name]
+
+
+@pytest.mark.parametrize(
+    "break_it,expected",
+    [
+        (
+            lambda d: _drop_needed(d, "libexecutorch.so"),
+            "no DT_NEEDED on libexecutorch.so",
+        ),
+        (
+            lambda d: _drop_needed(d, "libexecutorch_extension_cuda.so"),
+            "no DT_NEEDED on libexecutorch_extension_cuda.so",
+        ),
+        (
+            lambda d: _drop_needed(d, "libstdc++.so.6"),
+            "no DT_NEEDED on libstdc++",
+        ),
+        (
+            lambda d: d.update(path_tag="RPATH"),
+            "carries DT_RPATH rather than DT_RUNPATH",
+        ),
+        (lambda d: d.update(runpath=None), "carries no RUNPATH"),
+    ],
+)
+@pytest.mark.unit
+def test_each_linkage_check_rejects_what_it_is_for(artifact, break_it, expected):
+    """Each of these checks passed its own suite with the check deleted.
+
+    The guard is what stands between a wheel that cannot load and whoever installs it, so a check
+    nothing exercises is the same as no check. One case per rejection, each crafting the input that
+    rejection exists for.
+    """
+    data, invoke, runtime = artifact
+    break_it(data)
+    result = invoke()
+    assert result.returncode != 0, result.stdout
+    assert expected in result.stderr, result.stderr
