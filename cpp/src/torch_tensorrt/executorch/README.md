@@ -76,7 +76,7 @@ the removed `CudaStreamGuard`:
   its destruction; the backend serializes `execute()` calls with an internal
   mutex, but destruction is not mutex-guarded.
 - With a guard active and when no host staging is required (all inputs and
-  outputs are directly bindable — device, managed, or unified memory),
+  outputs are directly bindable, so device, managed, or unified memory),
   `execute()` may return with the TensorRT enqueue still in flight on the
   stream (no end-of-execute sync). The backend orders the next `execute()` and
   the handle's destruction after that work via an internal completion event, but
@@ -86,10 +86,13 @@ the removed `CudaStreamGuard`:
   and synchronize the stream before reading outputs on the host.
 - With no guard active, the backend falls back to `cudaStreamPerThread`.
 - The reference-runner smoke test runs inference inside a caller-stream guard on
-  the discrete-GPU CI configuration, where all inputs and outputs are host-backed
-  and therefore take the synchronized staging path. CI separately asserts that the
-  runner resolves one shared `libextension_cuda.so`. Device-resident asynchronous
-  return is not covered end to end.
+  the discrete-GPU CI configuration. Host-backed input and output do not imply the
+  synchronized staging path there: the backend takes the direct path whenever the
+  device reports that it can read pageable host memory, which a discrete H100 does,
+  so that configuration returns asynchronously and the runner synchronizes the
+  stream itself afterwards. The staging path is reached only on a device that
+  reports it cannot. CI separately asserts that the runner resolves one shared
+  `libextension_cuda.so`.
 - CUDA green-context streams work, and are the case this shared primitive exists
   for: one `cuGreenCtxStreamCreate` stream drives both the TensorRT delegate and
   ExecuTorch's CUDA/AOTI delegate, so both are confined to the same SM partition.
