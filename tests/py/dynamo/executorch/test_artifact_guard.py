@@ -634,3 +634,31 @@ def test_every_site_naming_the_platform_tag_agrees() -> None:
             f"platform_tag={other}" not in workflow
         ), f"the workflow still applies {other}"
         assert other not in readme, f"the documentation still names {other}"
+
+
+@pytest.mark.unit
+def test_the_shipped_binaries_can_find_the_libraries_they_need() -> None:
+    """A program in the wheel is not launched through Python, so nothing prepares its search path.
+
+    The example runner shipped without entries for TensorRT and the CUDA runtime, which live in their
+    own distributions beside this one, so it exited before main with a loader error naming a library
+    that was installed the whole time. The delegate library in the companion wheel already carried
+    the right entries, which is why it loaded and the binary did not.
+    """
+    build = (_ROOT / "examples/executorch_reference_runner/BUILD").read_text(
+        encoding="utf-8"
+    )
+    binaries = [
+        block
+        for block in build.split("cc_binary(")[1:]
+        if "kv_cache_decode_check" in block or "example_executorch_runner" in block
+    ]
+    assert len(binaries) == 2, f"expected two shipped binaries, found {len(binaries)}"
+    for block in binaries:
+        name = block.split('name = "', 1)[1].split('"', 1)[0]
+        for needed in (
+            "$$ORIGIN/../lib",
+            "$$ORIGIN/../../tensorrt_libs",
+            "$$ORIGIN/../../nvidia/cu13/lib",
+        ):
+            assert needed in block, f"{name} has no run path entry for {needed}"

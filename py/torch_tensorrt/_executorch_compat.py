@@ -90,4 +90,8 @@ def load(path: Union[str, Path]) -> Program:
         _load_for_executorch_from_buffer,
     )
 
+    # No eager validation here, deliberately. A truncated or altered program loads and fails only
+    # when something first asks it a question, which reads badly, but this function exists to behave
+    # exactly as the released one did and a test pins both the timing and the identity of that error.
+    # Improving it means a new entry point, not a change to this one.
     return Program(_load_for_executorch_from_buffer(data), data)
