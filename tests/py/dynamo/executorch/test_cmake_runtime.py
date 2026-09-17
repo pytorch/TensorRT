@@ -165,8 +165,12 @@ def _mixed_example(sample):
     if sample == "readme":
         text = (_CONFIG.parents[1] / "README.md").read_text()
         blocks = re.findall(r"```cmake\n(.*?)```", text, re.DOTALL)
-        assert len(blocks) == 1
-        return blocks[0]
+        # The one that asks for components, which is the recipe this test is about. A second block
+        # documents the component-free route for older CMake, and picking by position would silently
+        # start testing that one instead the next time the readme grows.
+        wanted = [block for block in blocks if "COMPONENTS" in block]
+        assert len(wanted) == 1, [block.splitlines()[:1] for block in blocks]
+        return wanted[0]
     lines = _CONFIG.read_text().splitlines()
     start = next(
         i
