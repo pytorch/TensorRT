@@ -23,11 +23,19 @@
 #   -Dtorchtrt_executorch_DIR=$(python -c "import torch_tensorrt_executorch_runtime as m, pathlib; print(pathlib.Path(m.__file__).parent / 'lib/cmake/torchtrt_executorch')")
 #   -DCMAKE_PREFIX_PATH=$(python -c "import torch_tensorrt_executorch_runtime as m, pathlib; print(pathlib.Path(m.__file__).parent)")
 
-# 3.28, not 3.24. This file alone would configure on 3.24, but its whole purpose is to be used
-# alongside find_package(executorch COMPONENTS backend_cuda), and that package rejects anything
-# below 3.28 because older versions write the $ORIGIN token in a runtime search path incorrectly.
-# Advertising a floor the documented usage cannot meet just moves the failure later.
-cmake_minimum_required(VERSION 3.28)
+# No cmake_minimum_required here. A package config that calls it raises the consumer's own recorded
+# minimum, and this one used to demand 3.28 on the grounds that ExecuTorch's package rejects anything
+# older. It does not: ExecuTorch declares 3.19 and drops to a documented variable-based path below
+# 3.28, because the token that misbehaves there is $ORIGIN, which appears in its link options and not
+# in ours. Ours are an absolute path, so nothing here needs 3.28, and demanding it stopped a consumer
+# who can build against ExecuTorch from building against this.
+#
+# 3.19 to match ExecuTorch, checked rather than declared so the consumer's minimum is left alone.
+if(CMAKE_VERSION VERSION_LESS 3.19)
+  message(FATAL_ERROR
+    "torchtrt_executorch needs CMake 3.19 or newer, the same floor ExecuTorch's own package "
+    "declares. This CMake is ${CMAKE_VERSION}.")
+endif()
 
 include(FindPackageHandleStandardArgs)
 

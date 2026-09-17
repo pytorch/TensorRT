@@ -256,3 +256,33 @@ def test_the_collision_guard_checks_which_library_the_target_points_at() -> None
     ), "the guard does not compare against the library this package found"
     # Both guards, so a same-type impostor is still refused.
     assert config.count("FATAL_ERROR") >= 2, config
+
+
+@pytest.mark.unit
+def test_the_config_does_not_raise_the_consumers_cmake_floor() -> None:
+    """A consumer who can build against ExecuTorch has to be able to build against this.
+
+    ExecuTorch's own package declares 3.19 and falls back to a variable-based path below 3.28,
+    because the token that misbehaves on older CMake is the origin token in its link options. Ours
+    are an absolute path and use nothing newer, so demanding 3.28 only shut out consumers ExecuTorch
+    itself supports. Declaring any floor here also overwrites the consumer's own recorded minimum,
+    since a config runs inside their project.
+    """
+    config = _CONFIG.read_text(encoding="utf-8")
+    lines = [
+        line
+        for line in config.splitlines()
+        if "cmake_minimum_required" in line and not line.lstrip().startswith("#")
+    ]
+    assert (
+        not lines
+    ), f"the config declares a floor, which overwrites the consumer's: {lines}"
+    assert "if(CMAKE_VERSION VERSION_LESS 3.19)" in config, config
+    # No version check above the ExecuTorch floor. Prose explaining why 3.28 was wrong is fine
+    # and worth keeping, so read the checks rather than the whole text.
+    checks = [
+        line.strip()
+        for line in config.splitlines()
+        if line.lstrip().startswith("if(CMAKE_VERSION")
+    ]
+    assert checks == ["if(CMAKE_VERSION VERSION_LESS 3.19)"], checks
