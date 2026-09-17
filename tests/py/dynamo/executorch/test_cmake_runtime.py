@@ -286,3 +286,18 @@ def test_the_config_does_not_raise_the_consumers_cmake_floor() -> None:
         if line.lstrip().startswith("if(CMAKE_VERSION")
     ]
     assert checks == ["if(CMAKE_VERSION VERSION_LESS 3.19)"], checks
+
+
+@pytest.mark.unit
+def test_the_config_looks_for_the_delegate_in_one_place_only() -> None:
+    """Discovery used to walk up until a delegate turned up under lib/.
+
+    That walk reached the directory above the package, so with this package's own lib/ empty it
+    accepted a same-named library belonging to something else and reported success. A consumer then
+    linked and loaded a stranger's library believing it was this one.
+    """
+    config = _CONFIG.read_text(encoding="utf-8")
+    assert "foreach" not in config, "discovery still walks parent directories"
+    assert "get_filename_component" in config, config
+    # One test for the library, at the fixed distance the wheel installs this file at.
+    assert config.count('EXISTS "${_torchtrt_executorch_root}/lib/') == 1, config

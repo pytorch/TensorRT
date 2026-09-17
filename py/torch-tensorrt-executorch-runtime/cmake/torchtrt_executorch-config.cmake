@@ -39,21 +39,18 @@ endif()
 
 include(FindPackageHandleStandardArgs)
 
-# The package root is found by walking up from this file until the delegate library turns up under
-# lib/, rather than by counting "../.." a fixed number of times. This file installs to
-# lib/cmake/torchtrt_executorch, the layout find_package searches under a prefix and the same one
-# ExecuTorch uses for its own package, so the walk passes through a lib/ directory on the way out.
-# Testing for the library rather than for a directory named lib is what keeps it from stopping there.
-set(_torchtrt_executorch_root "${CMAKE_CURRENT_LIST_DIR}")
+# The package root is a fixed distance from this file, because the wheel installs this file to
+# lib/cmake/torchtrt_executorch and nowhere else. It used to be found by walking up until a delegate
+# turned up under lib/, and that walk reached the directory above the package: with this package's own
+# lib/ empty, it accepted a same-named library belonging to something else and reported success. Only
+# this package's own copy is acceptable, so look in exactly one place and let the check below report a
+# missing one.
+get_filename_component(_torchtrt_executorch_root "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
 unset(TORCHTRT_EXECUTORCH_BACKEND_LIBRARY)
-foreach(_ RANGE 4)
-  if(EXISTS "${_torchtrt_executorch_root}/lib/libexecutorch_backend_tensorrt.so")
-    set(TORCHTRT_EXECUTORCH_BACKEND_LIBRARY
-      "${_torchtrt_executorch_root}/lib/libexecutorch_backend_tensorrt.so")
-    break()
-  endif()
-  get_filename_component(_torchtrt_executorch_root "${_torchtrt_executorch_root}" DIRECTORY)
-endforeach()
+if(EXISTS "${_torchtrt_executorch_root}/lib/libexecutorch_backend_tensorrt.so")
+  set(TORCHTRT_EXECUTORCH_BACKEND_LIBRARY
+    "${_torchtrt_executorch_root}/lib/libexecutorch_backend_tensorrt.so")
+endif()
 
 find_package_handle_standard_args(
   torchtrt_executorch
