@@ -158,6 +158,32 @@ def _register_locked() -> None:
                 "executorch from the same release matrix as this package. The import failed "
                 f"with: {error}"
             ) from error
+        # A library the loader could not FIND is a different problem from one it could not USE, and
+        # only the second is an ABI mismatch. Blaming the ABI for the first sends the reader to
+        # rebuild a matched stack when nothing is mismatched.
+        text = str(error)
+        missing_file = "cannot open shared object file" in text
+        if missing_file:
+            hint = (
+                "so the loader could not find it, not that it is incompatible. Check that the "
+                "ExecuTorch wheel is installed completely."
+            )
+            # An empty entry in the search path means the working directory, and it makes every
+            # origin-relative entry in this package's own search path resolve from there instead,
+            # so a correct installation fails to load from some directories and not others. A
+            # trailing separator is the usual way one appears.
+            search_path = os.environ.get("LD_LIBRARY_PATH")
+            if search_path is not None and "" in search_path.split(os.pathsep):
+                hint = (
+                    "so the loader could not find it. LD_LIBRARY_PATH has an empty entry, often "
+                    "from a trailing separator, which the loader reads as the working directory "
+                    "and which stops this package's own origin-relative search path resolving. "
+                    f"Remove it and retry. Current value: {search_path!r}"
+                )
+            raise DelegateCompatibilityError(
+                f"ExecuTorch is installed but a library it needs was not found, {hint} "
+                f"The import failed with: {error}"
+            ) from error
         raise DelegateCompatibilityError(
             "ExecuTorch is installed but its Python bindings could not be loaded, which "
             "usually means it was built against a different C++ or CUDA runtime than this "
