@@ -58,11 +58,10 @@ def _export(
         "sys": sys,
         "CoalescedModel": Model,
         "SHAPE": (64, 64),
-        # Default to the real names, so a program carrying a boundary copy is rejected. An empty
-        # tuple made the check vacuous: nothing could ever match it.
-        "BOUNDARY_COPY_OPS": (
-            ("_h2d_copy", "_d2h_copy") if copy_ops is None else copy_ops
-        ),
+        # No BOUNDARY_COPY_OPS here on purpose. Supplying it meant the script's own constant was
+        # never read, so emptying that constant, which is the exact failure the comment beside it
+        # warns about, changed nothing. The module-level assignments run below instead, and a case
+        # that wants a different value overrides it afterwards.
         "torch": SimpleNamespace(
             no_grad=nullcontext,
             randn=lambda _: tensor,
@@ -102,10 +101,25 @@ def _export(
         ),
     }
     monkeypatch.setattr(sys, "argv", [str(_EXPORT), "--model_path", str(path)])
+    # The module's own assignments, then main. Compiling main alone left every module-level constant
+    # to be supplied by this test, which is how the boundary names stopped being checked at all.
+    module = ast.parse(_EXPORT.read_text(encoding="utf-8"))
+    # The module's plain constant assignments, then main. Anything else at module level needs stubs
+    # this test has no reason to grow, and the constants are what was going unread.
+    body = [
+        node
+        for node in module.body
+        if isinstance(node, ast.Assign)
+        and all(isinstance(target, ast.Name) for target in node.targets)
+        and isinstance(node.value, (ast.Tuple, ast.List, ast.Constant))
+    ]
+    body.append(main)
     exec(
-        compile(ast.Module(body=[main], type_ignores=[]), str(_EXPORT), "exec"),
+        compile(ast.Module(body=body, type_ignores=[]), str(_EXPORT), "exec"),
         namespace,
     )
+    if copy_ops is not None:
+        namespace["BOUNDARY_COPY_OPS"] = copy_ops
     namespace["main"]()
 
 
