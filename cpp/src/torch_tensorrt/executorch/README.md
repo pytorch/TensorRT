@@ -63,6 +63,22 @@ so this removal is an API-simplification choice, not a correctness requirement.)
 This is a source-breaking C++ change; downstream callers must switch to the new
 type.
 
+### Running from several threads at once does not work today
+
+Measured on three GPUs, two architectures. Loading and running from more than one thread fails
+consistently: on one discrete card two threads failed twenty one times out of twenty one, and on an
+integrated part every variant failed five times out of five, including the variant where all threads
+share a single loaded program. A separate case hangs rather than crashing.
+
+Sharing one program fails as well, so this is not about several programs at once. The backtraces do
+not land in this backend or in TensorRT: they land in stream flushing during exit handlers, in
+program loading, and in an exception crossing the Python binding boundary. A standalone program that
+uses TensorRT the same way from several threads, with no ExecuTorch and no Python, runs eighty
+thousand cycles cleanly, so the TensorRT usage here is not what breaks.
+
+Use one thread per process until that is fixed upstream. The single-threaded path is what every test
+here covers.
+
 ### Caller-stream contract for the TensorRT backend
 
 The upstream `CallerStreamGuard` documents the generic contract (per-thread,
