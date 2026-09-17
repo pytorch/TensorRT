@@ -272,3 +272,33 @@ def test_the_runner_rejects_an_output_that_came_back_on_the_host(
     else:
         with pytest.raises(AssertionError, match="output came back on"):
             exec(compile(tree, str(path), "exec"), namespace)
+
+
+def test_the_runner_refuses_to_start_without_cuda(monkeypatch, tmp_path):
+    """The gate that stops the runner on a machine with no CUDA had nothing exercising it.
+
+    Every other case stubs CUDA as available, so deleting the gate left the whole suite green.
+    """
+    path = _ROOT / "examples/executorch_reference_runner/load_model_device_resident.py"
+    tree = ast.parse(path.read_text())
+    tree.body = [
+        node for node in tree.body if not isinstance(node, (ast.Import, ast.ImportFrom))
+    ]
+    namespace = {
+        "argparse": argparse,
+        "Path": Path,
+        "torch": SimpleNamespace(
+            float32=object(),
+            cuda=SimpleNamespace(is_available=lambda: False),
+            ones=lambda *args, device=None, **kwargs: SimpleNamespace(is_cuda=False),
+        ),
+        "_load_for_executorch": lambda _: None,
+    }
+    monkeypatch.setattr(sys, "argv", [str(path), "--model_path", "unused.pte"])
+    # The specific message, not just any mention of CUDA. With this gate deleted the input guard
+    # further down raises its own CUDA complaint, so a loose match passes either way and the check
+    # says nothing about the gate it is named for.
+    with pytest.raises(
+        RuntimeError, match="cannot run\nwithout CUDA|cannot run without CUDA"
+    ):
+        exec(compile(tree, str(path), "exec"), namespace)

@@ -473,6 +473,14 @@ def test_the_published_main_wheel_can_still_reach_the_loader_it_imports() -> Non
     assert [a.arg for a in load.args.args] == ["file_path"], [
         a.arg for a in load.args.args
     ]
+    # Parsing alone cannot see a module that raises while being imported, and the published wheel
+    # imports this one, so run its top level. Everything it needs at that point is standard library;
+    # the import of the main wheel's loader sits inside the function and is not reached here.
+    namespace: dict[str, object] = {
+        "__name__": "torch_tensorrt_executorch_runtime.runtime"
+    }
+    exec(compile(tree, str(module_path), "exec"), namespace)
+    assert callable(namespace.get("load")), sorted(namespace)
 
 
 @pytest.mark.unit
