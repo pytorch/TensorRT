@@ -91,7 +91,11 @@ if(TARGET torchtrt::executorch_backend)
   return()
 endif()
 
-add_library(torchtrt::executorch_backend SHARED IMPORTED)
+# GLOBAL, so the one target this package exists to publish is visible outside the directory that
+# called find_package. Without it a consumer who finds the package at the top level and links it from
+# a subdirectory gets a message about a target that plainly exists, which is the ordinary layout for
+# a project of more than one directory.
+add_library(torchtrt::executorch_backend SHARED IMPORTED GLOBAL)
 set_target_properties(
   torchtrt::executorch_backend
   PROPERTIES

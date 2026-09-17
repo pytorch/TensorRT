@@ -301,3 +301,35 @@ def test_the_config_looks_for_the_delegate_in_one_place_only() -> None:
     assert "get_filename_component" in config, config
     # One test for the library, at the fixed distance the wheel installs this file at.
     assert config.count('EXISTS "${_torchtrt_executorch_root}/lib/') == 1, config
+
+
+@pytest.mark.unit
+def test_the_published_target_is_visible_outside_the_finding_directory() -> None:
+    """A project of more than one directory could not use the one target this package publishes.
+
+    An imported target is scoped to the directory that created it. Descendants inherit it, so a
+    find_package at the top level looks fine, but the ordinary layout where one directory finds the
+    package and a sibling links it fails with a message about a target that plainly exists.
+    """
+    config = _CONFIG.read_text(encoding="utf-8")
+    assert (
+        "add_library(torchtrt::executorch_backend SHARED IMPORTED GLOBAL)" in config
+    ), config
+
+
+@pytest.mark.unit
+def test_the_cuda_extension_alias_yields_to_a_consumers_own_target() -> None:
+    """Adding the alias unconditionally broke a consumer that already had that name.
+
+    Bringing ExecuTorch in as a subdirectory defines a plain extension_cuda target, and creating an
+    alias of the same name on top of it is a hard error, so using both packages together stopped
+    working where it used to.
+    """
+    source = (
+        Path(__file__).resolve().parents[4]
+        / "cpp/src/torch_tensorrt/executorch/CMakeLists.txt"
+    ).read_text(encoding="utf-8")
+    alias = source.split("add_library(extension_cuda ALIAS")[0]
+    assert "if(NOT TARGET extension_cuda)" in alias.rsplit("elseif", 1)[-1], alias[
+        -400:
+    ]

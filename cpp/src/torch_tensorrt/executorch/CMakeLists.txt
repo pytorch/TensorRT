@@ -80,7 +80,12 @@ if(TARGET executorch::extension_cuda)
     # needs an add_subdirectory of ExecuTorch, an explicit prebuilt library, or a source
     # checkout, none of which a wheel-only consumer has. That case is diagnosed at the bottom of
     # this chain rather than left to fail as a missing target.
-    add_library(extension_cuda ALIAS executorch::extension_cuda)
+    # Only when the plain name is free. A consumer that already defines extension_cuda, which is
+    # what an add_subdirectory of ExecuTorch produces, would otherwise fail on a duplicate name
+    # while trying to use both packages together.
+    if(NOT TARGET extension_cuda)
+        add_library(extension_cuda ALIAS executorch::extension_cuda)
+    endif()
 elseif(TARGET extension_cuda)
     # Provided by ExecuTorch, e.g. add_subdirectory() with EXECUTORCH_BUILD_CUDA=ON.
     get_target_property(_extension_cuda_type extension_cuda TYPE)
