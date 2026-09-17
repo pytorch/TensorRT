@@ -393,6 +393,19 @@ def main(argv: list[str] | None = None) -> int:
             parser.error(
                 f"the delegate builds {', '.join(accepted)}, so the channel must be one of them"
             )
+    if args.track == "stable":
+        # Say this here rather than leaving it to be discovered from a failed build. The delegate
+        # links the ExecuTorch runtime, so its build accepts only a CUDA-labelled one, and no stable
+        # channel publishes such a build today: the release index carries processor-only wheels and
+        # the CUDA channels carry no stable ExecuTorch at all. So a stable pin lands as a pull
+        # request that cannot build, and the build says why. Not refused, because this becomes
+        # correct as soon as a stable CUDA build exists.
+        print(
+            "warning: the stable track selects from an index that publishes no CUDA build of "
+            "ExecuTorch, and the delegate build rejects anything else, so this pin is expected to "
+            "fail to build until a stable CUDA build exists",
+            file=sys.stderr,
+        )
     index_args = _index_args(args.track, args.channel)
     candidates = available_versions(index_args)
     if args.track == "nightly":
