@@ -556,3 +556,38 @@ def test_the_build_refuses_an_executorch_that_is_not_a_cuda_build(
     else:
         with pytest.raises(SystemExit, match="CUDA build"):
             runpy.run_path(str(state.project / "setup.py"), run_name="__main__")
+
+
+@pytest.mark.unit
+def test_the_wheel_is_tagged_for_any_python_and_one_platform() -> None:
+    """Neither of these two overrides had a test, so dropping either changed the built wheel.
+
+    The payload is one shared library loaded through ctypes, with no Python ABI, so it is identical
+    across CPython versions and only the platform matters. Losing the tag override would build one
+    identical copy per interpreter. Losing the platform marking would tag a compiled object as pure
+    Python and let it install on the wrong architecture.
+    """
+    source = (COMPANION / "setup.py").read_text(encoding="utf-8")
+    namespace: dict[str, object] = {}
+    tree = ast.parse(source)
+    wanted = [
+        node
+        for node in tree.body
+        if isinstance(node, ast.ClassDef)
+        and node.name in ("WheelTag", "PlatformDistribution")
+    ]
+    assert len(wanted) == 2, [n.name for n in wanted]
+    # Run the two class bodies against stub bases, so the behaviour is exercised rather than read.
+    namespace["bdist_wheel"] = type(
+        "StubBdist",
+        (),
+        {"get_tag": lambda self: ("cp312", "cp312", "manylinux_2_28_x86_64")},
+    )
+    namespace["Distribution"] = type(
+        "StubDistribution", (), {"has_ext_modules": lambda self: False}
+    )
+    exec(
+        compile(ast.Module(body=wanted, type_ignores=[]), "<setup>", "exec"), namespace
+    )
+    assert namespace["WheelTag"]().get_tag() == ("py3", "none", "manylinux_2_28_x86_64")
+    assert namespace["PlatformDistribution"]().has_ext_modules() is True
