@@ -123,8 +123,14 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
       PROPERTY INTERFACE_LINK_OPTIONS "LINKER:--enable-new-dtags,-rpath,${_torchtrt_executorch_root}/lib"
     )
   else()
+    # This removes the run path this package adds, not the one CMake adds by itself:
+    # linking an imported library records its directory as DT_RUNPATH regardless, which is
+    # still this machine absolute path. Only CMAKE_SKIP_BUILD_RPATH in the consumer own
+    # project removes that, and a package config has no business setting it there.
     message(STATUS
-      "torchtrt_executorch: not embedding a run path. Consumers must locate "
-      "${_torchtrt_executorch_root}/lib themselves at run time.")
+      "torchtrt_executorch: not adding a run path. CMake still records "
+      "${_torchtrt_executorch_root}/lib as a build run path when linking an imported "
+      "library, so a redistributable binary also needs CMAKE_SKIP_BUILD_RPATH, and then has "
+      "to locate the delegate itself at run time.")
   endif()
 endif()

@@ -2724,12 +2724,30 @@ def test_save_executorch_real_etrecord_is_inspector_consumable(tmp_path):
     assert getattr(record, "edge_dialect_program", None) is not None
 
 
+_ELF_MACHINES = {"x86_64": 0x3E, "aarch64": 0xB7}
+
+
+def _elf_object(architecture: str) -> bytes:
+    """The first twenty bytes of a 64-bit shared object, which is all the checker reads.
+
+    The platform tag is a claim about the payload, so a wheel has to be able to carry a payload that
+    contradicts it. Offsets are from the ELF specification: the machine sits at 18.
+    """
+    return (
+        b"\x7fELF\x02\x01\x01"
+        + bytes(9)
+        + (3).to_bytes(2, "little")
+        + _ELF_MACHINES[architecture].to_bytes(2, "little")
+    )
+
+
 @pytest.mark.unit
 @pytest.mark.parametrize(
     "case,should_pass",
     [
         ("well_formed", True),
         ("aarch64_tag", True),
+        ("payload_for_the_other_architecture", False),
         ("unrepaired_tag", False),
         ("wrong_architecture_floor", False),
         ("wheel_tag_mismatch", False),
@@ -2832,9 +2850,14 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
         "nvidia-cuda-runtime==13.2.0",
     ]
     purelib, tag, arch = "false", "manylinux_2_28_x86_64", "x86_64"
+    elf_machine = None
 
     if case == "aarch64_tag":
         tag, arch = "manylinux_2_35_aarch64", "aarch64"
+    elif case == "payload_for_the_other_architecture":
+        # The tag is a claim about the payload. Nothing read the payload to check it, so a wheel
+        # tagged for one architecture could carry a library built for the other and pass.
+        tag, arch, elf_machine = "manylinux_2_35_aarch64", "aarch64", "x86_64"
     elif case == "unrepaired_tag":
         tag = "linux_x86_64"
     elif case == "wrong_architecture_floor":
@@ -2956,7 +2979,7 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
     wheel = tmp_path / f"torch_tensorrt_executorch_runtime-0.1.0-py3-none-{tag}.whl"
     with WheelFile(wheel, "w") as archive:
         for name in payload:
-            archive.writestr(name, b"\x7fELF")
+            archive.writestr(name, _elf_object(elf_machine or arch))
         # The CMake package a C++ consumer links through. Present in every case except the one that
         # deliberately drops it, so the other cases fail for their own reason rather than this one.
         if case != "ships_no_cmake_package":

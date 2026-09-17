@@ -233,6 +233,13 @@ def test_the_embedded_run_path_can_be_turned_off() -> None:
         "else()", 1
     )[0]
     assert "INTERFACE_LINK_OPTIONS" in branch, branch[:300]
+    # Turning it off does not leave a binary free of this machine's paths: linking an imported
+    # library makes CMake record its directory as a run path anyway. Measured on Linux, a consumer
+    # with no link options from this package still carries DT_RUNPATH, and only
+    # CMAKE_SKIP_BUILD_RPATH drops it. The off branch has to say so, or the switch reads as doing
+    # more than it does.
+    off_branch = config.split("else()", 1)[1]
+    assert "CMAKE_SKIP_BUILD_RPATH" in off_branch, off_branch[:400]
 
 
 @pytest.mark.unit

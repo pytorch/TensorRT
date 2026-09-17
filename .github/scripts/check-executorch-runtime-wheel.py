@@ -43,6 +43,22 @@ def main():
         expected = f"torch_tensorrt_executorch_runtime/lib/{library}"
         if objects != [expected]:
             reject(f"expected {expected} and no other shared libraries, got {objects}")
+        else:
+            # The platform tag is a claim about the payload, and until now nothing read the payload
+            # to check it, so a wheel tagged for one architecture could carry a library built for
+            # the other and pass. The ELF header names the machine in two bytes at offset 18.
+            header = archive.read(expected)[:20]
+            if header[:4] != b"\x7fELF":
+                reject(f"{expected} is not an ELF object")
+            machine = int.from_bytes(header[18:20], "little")
+            wanted = {"x86_64": 0x3E, "aarch64": 0xB7}[args.architecture]
+            if machine != wanted:
+                names_by_machine = {0x3E: "x86_64", 0xB7: "aarch64"}
+                reject(
+                    f"{expected} is built for "
+                    f"{names_by_machine.get(machine, hex(machine))}, but this wheel is tagged for "
+                    f"{args.architecture}"
+                )
         for filename in (
             "torchtrt_executorch-config.cmake",
             "torchtrt_executorch-config-version.cmake",
