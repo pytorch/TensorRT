@@ -347,6 +347,9 @@ cc_library(
             "@tensorrt_sbsa//:nvinfer",
         ],
         "//conditions:default": [],
+    }) + select({
+        "//toolchains/dep_collection:driveos": ["@cuda_driveos//:cudart"],
+        "//conditions:default": ["@cuda//:cudart"],
     }),
     alwayslink = True,
 )

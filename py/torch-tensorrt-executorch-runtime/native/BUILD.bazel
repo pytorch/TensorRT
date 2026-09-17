@@ -41,9 +41,10 @@ cmake(
     lib_source = ":delegate_sources",
     out_include_dir = "",
     out_shared_libs = ["libexecutorch_backend_tensorrt.so"],
-    deps = [
-        "@cuda//:cudart",
-    ] + select({
+    deps = select({
+        "//toolchains/dep_collection:driveos": ["@cuda_driveos//:cudart"],
+        "//conditions:default": ["@cuda//:cudart"],
+    }) + select({
         ":aarch64_linux": ["@tensorrt_sbsa//:nvinfer"],
         "//conditions:default": ["@tensorrt//:nvinfer"],
     }),
