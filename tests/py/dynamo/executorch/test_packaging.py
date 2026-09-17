@@ -64,7 +64,9 @@ def packaging_build(tmp_path, monkeypatch):
         "__executorch_version__"
     ]
     versions = {
-        "executorch": pinned,
+        # With the label a real CUDA wheel carries. A bare version here is what a processor-only
+        # build looks like, and the build refuses that, correctly.
+        "executorch": f"{pinned}+cu130",
         "torch-tensorrt": "2.15.0.dev20200103+cu130",
         "tensorrt-cu13": "11.2.1",
         "nvidia-cuda-runtime": "13.0.0",
@@ -529,3 +531,28 @@ def test_a_missing_pin_file_fails_rather_than_disabling_the_check() -> None:
     reader = source.split("def pinned_executorch_version")[1].split("\ndef ")[0]
     assert "raise RuntimeError" in reader, reader
     assert 'return ""' not in reader, reader
+
+
+@pytest.mark.parametrize(
+    "installed,accepted",
+    [("+cu130", True), ("+cu134", True), ("+cpu", False), ("", False)],
+)
+def test_the_build_refuses_an_executorch_that_is_not_a_cuda_build(
+    packaging_build, monkeypatch, installed, accepted
+):
+    """Matching the version is not matching the build.
+
+    The delegate links the CUDA runtime out of the installed wheel, so a processor-only build of the
+    pinned date cannot supply it. Comparing only the public parts of the two versions accepted that,
+    and the wheel the build then published required a label the build had never checked.
+    """
+    state = packaging_build
+    pinned = updater_pin = yaml.safe_load(
+        (state.project.parents[1] / "dev_dep_versions.yml").read_text()
+    )["__executorch_version__"]
+    state.versions["executorch"] = f"{pinned}{installed}"
+    if accepted:
+        runpy.run_path(str(state.project / "setup.py"), run_name="__main__")
+    else:
+        with pytest.raises(SystemExit, match="CUDA build"):
+            runpy.run_path(str(state.project / "setup.py"), run_name="__main__")

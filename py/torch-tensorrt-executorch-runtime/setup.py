@@ -90,15 +90,21 @@ def executorch_cmake_prefix_path() -> str:
     # exempt via the escape hatch, because contributors legitimately test against other trees.
     pinned = pinned_executorch_version()
     installed = public_version(distribution.version)
-    if public_version(pinned) != installed and os.getenv(
+    # The label matters as much as the version. Comparing only the public parts accepted a
+    # processor-only build of the pinned date, which cannot supply the CUDA runtime the delegate
+    # links, and the wheel this build then publishes requires the label it did not check.
+    label = distribution.version.partition("+")[2]
+    wrong_version = public_version(pinned) != installed
+    wrong_build = not label.startswith("cu")
+    if (wrong_version or wrong_build) and os.getenv(
         "TORCH_TENSORRT_ALLOW_UNPINNED_EXECUTORCH", ""
     ).lower() not in ("1", "true", "yes", "on"):
         raise RuntimeError(
-            f"The installed ExecuTorch is {installed} but dev_dep_versions.yml pins "
-            f"{pinned}. The delegate links this wheel's runtime and declares a dependency on "
-            "it, so building against another version ships a wheel that requires the wrong "
-            "ExecuTorch. Install the pinned wheel, or set "
-            "TORCH_TENSORRT_ALLOW_UNPINNED_EXECUTORCH=1 to build anyway."
+            f"The installed ExecuTorch is {distribution.version} but dev_dep_versions.yml pins "
+            f"{pinned} and the delegate needs a CUDA build. The delegate links this wheel's "
+            "runtime and declares a dependency on it, so building against another version or "
+            "another build ships a wheel that requires the wrong ExecuTorch. Install the pinned "
+            "CUDA wheel, or set TORCH_TENSORRT_ALLOW_UNPINNED_EXECUTORCH=1 to build anyway."
         )
     return str(prefix)
 

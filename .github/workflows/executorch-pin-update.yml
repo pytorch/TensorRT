@@ -88,10 +88,23 @@ jobs:
                 version="${REF#refs/heads/release/}"
                 # Any value other than an explicit false counts as tagged, so a typo closes the
                 # guard rather than skipping it. Only an empty value asks for the real lookup.
-                if { [ -n "${RELEASE_TAGGED:-}" ] && [ "${RELEASE_TAGGED}" != "false" ]; } ||
-                   { [ -z "${RELEASE_TAGGED:-}" ] &&
-                     git ls-remote --tags origin "v${version}.*" 2>/dev/null |
-                       grep -qE "refs/tags/v${version}\.[0-9]+$"; }; then
+                tagged=""
+                if [ -n "${RELEASE_TAGGED:-}" ]; then
+                  # Any value other than an explicit false counts as tagged, so a typo closes the
+                  # guard rather than skipping it.
+                  [ "${RELEASE_TAGGED}" != "false" ] && tagged="yes"
+                else
+                  # Separate the lookup from its result. Piping straight into grep made a failed
+                  # lookup indistinguishable from a release with no tag, so a network or auth
+                  # problem let a shipped release be re-pinned.
+                  if ! remote_tags=$(git ls-remote --tags origin "v${version}.*" 2>&1); then
+                    echo "could not list tags for release $version: ${remote_tags}" >&2
+                    exit 1
+                  fi
+                  printf '%s\n' "${remote_tags}" |
+                    grep -qE "refs/tags/v${version}\.[0-9]+$" && tagged="yes"
+                fi
+                if [ -n "${tagged}" ]; then
                   echo "release $version already has a tag; its pin stays as shipped" >&2
                   exit 1
                 fi
