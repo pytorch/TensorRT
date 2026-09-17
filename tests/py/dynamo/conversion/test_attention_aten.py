@@ -145,7 +145,6 @@ class TestScaledDotProductAttention(DispatchTestCase):
             inputs,
             rtol=1e-2,
             atol=1e-2,
-            precision=dtype,
             enable_passes=True,
         )
 
@@ -283,7 +282,6 @@ class TestScaledDotProductAttention(DispatchTestCase):
             inputs,
             rtol=1e-2,
             atol=1e-2,
-            precision=dtype,
             enable_passes=True,
         )
 
@@ -531,7 +529,6 @@ class TestScaledDotProductEfficientAttention(DispatchTestCase):
             inputs,
             rtol=1e-2,
             atol=1e-2,
-            precision=dtype,
             enable_passes=True,
         )
 
@@ -651,7 +648,6 @@ class TestScaledDotProductEfficientAttention(DispatchTestCase):
             inputs,
             rtol=1e-2,
             atol=1e-2,
-            precision=dtype,
             enable_passes=True,
         )
 
