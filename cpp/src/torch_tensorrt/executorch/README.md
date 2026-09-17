@@ -88,14 +88,26 @@ consistently: on one discrete card two threads failed twenty one times out of tw
 integrated part every variant failed five times out of five, including the variant where all threads
 share a single loaded program. A separate case hangs rather than crashing.
 
-Sharing one program fails as well, so this is not about several programs at once. The backtraces do
-not land in this backend or in TensorRT: they land in stream flushing during exit handlers, in
-program loading, and in an exception crossing the Python binding boundary. A standalone program that
-uses TensorRT the same way from several threads, with no ExecuTorch and no Python, runs eighty
-thousand cycles cleanly, so the TensorRT usage here is not what breaks.
+The cause is a deadlock, and it has been narrowed to a stack. TensorRT calls this backend's logger from
+whichever thread it is initialising on, that logger writes through ExecuTorch's logging, and under the
+Python bindings that logging is redirected into a Python text stream, whose flush needs the interpreter
+lock. A thread that does not hold the lock waits for it there and never returns:
 
-Use one thread per process until that is fixed upstream. The single-threaded path is what every test
-here covers.
+    TRTLogger::log -> ET_LOG -> std::ostream -> the bindings' stream redirect
+                   -> TextIOWrapper flush -> acquire the interpreter lock
+
+Two measurements pin it down. Loading each program under a lock, so only one is ever initialising, fixes
+it: zero failures in five. Running a program once before any thread starts, so initialisation is already
+done, also fixes it: zero failures in five. Silencing standard error does not, in any of three ways,
+because the redirect is inside the process rather than at the file descriptor.
+
+So the practical workaround is to load and run each program once on one thread, and only then hand it to
+several. Sharing one program does not help on its own, which is why an earlier reading of this as a
+problem with several programs at once was wrong.
+
+A standalone program using TensorRT the same way from several threads, with no ExecuTorch and no Python,
+runs eighty thousand cycles cleanly. The fix belongs in the bindings, which should not take the
+interpreter lock on a thread the runtime owns.
 
 ### Caller-stream contract for the TensorRT backend
 
