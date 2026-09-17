@@ -75,16 +75,19 @@ cc_library(
         "executorch/extension/cuda/caller_stream.h",
         "executorch/extension/cuda/export.h",
     ],
+    include_prefix = "executorch",
+    linkstatic = True,
     local_defines = [
         "C10_USING_CUSTOM_GENERATED_MACROS",
         "EXECUTORCH_EXTENSION_CUDA_BUILDING",
     ],
-    include_prefix = "executorch",
     strip_include_prefix = "executorch",
-    alwayslink = True,
-    linkstatic = True,
     visibility = ["//visibility:private"],
-    deps = ["@cuda//:cudart"],
+    deps = select({
+        "@//toolchains/dep_collection:driveos": ["@cuda_driveos//:cudart"],
+        "//conditions:default": ["@cuda//:cudart"],
+    }),
+    alwayslink = True,
 )
 
 # The single shared object. The explicit -soname pins DT_SONAME to the bare
@@ -121,8 +124,10 @@ cc_library(
     strip_include_prefix = "executorch",
     deps = [
         ":extension_cuda_shared",
-        "@cuda//:cudart",
-    ],
+    ] + select({
+        "@//toolchains/dep_collection:driveos": ["@cuda_driveos//:cudart"],
+        "//conditions:default": ["@cuda//:cudart"],
+    }),
 )
 
 # The CUDA DeviceAllocator that serves device planned buffers. In the pinned
@@ -143,8 +148,10 @@ cc_library(
     deps = [
         ":executorch_headers",
         ":extension_cuda",
-        "@cuda//:cudart",
-    ],
+    ] + select({
+        "@//toolchains/dep_collection:driveos": ["@cuda_driveos//:cudart"],
+        "//conditions:default": ["@cuda//:cudart"],
+    }),
 )
 
 # The kernels behind the device copies that an exported program runs around the
@@ -176,10 +183,10 @@ cc_library(
         "C10_USING_CUSTOM_GENERATED_MACROS",
     ],
     include_prefix = "executorch",
-    strip_include_prefix = "executorch",
     includes = [
         "executorch/runtime/core/portable_type/c10",
     ],
+    strip_include_prefix = "executorch",
 )
 
 # ExecuTorch runtime carrier — provides register_backend and related symbols.
