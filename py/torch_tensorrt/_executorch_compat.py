@@ -53,9 +53,14 @@ def load(path: Union[str, Path]) -> Program:
         ) from error
     # A companion published before the delegate became a single registration call exposes
     # activate() instead. Accept it so upgrading this wheel alone keeps loading programs.
-    register = getattr(delegate, "register", None) or getattr(
-        delegate, "activate", None
-    )
+    register = getattr(delegate, "register", None)
+    # Whether this companion predates single-call registration, which is the only thing the rewrite
+    # below is about. Deciding that from the raised error's class name does not work: the older
+    # companion defines a class of the same name, so a name test matches both and the rewrite it
+    # guards never fires for the companion it exists for.
+    predates_register = register is None
+    if predates_register:
+        register = getattr(delegate, "activate", None)
     if register is None:
         raise ImportError(
             "The installed torch_tensorrt_executorch_runtime exposes neither register() "
@@ -70,11 +75,9 @@ def load(path: Union[str, Path]) -> Program:
     try:
         register()
     except ImportError as error:
-        # Only the older companion's failure gets rewritten. Current builds raise their own
-        # compatibility error, which derives from ImportError and already says precisely what is
-        # wrong, so catching every ImportError here replaced an accurate diagnostic with a guess
-        # about the companion's age.
-        if type(error).__name__ == "DelegateCompatibilityError":
+        # A current companion's own compatibility error already says precisely what is wrong, so
+        # let it through rather than replacing it with a guess about the companion's age.
+        if not predates_register:
             raise
         # A companion published before registration became a single call swapped in its own copy of
         # ExecuTorch's bindings, and refuses once ExecuTorch's own copy is already loaded. Its advice

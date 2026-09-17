@@ -630,3 +630,33 @@ def test_the_forwarder_says_which_side_is_too_old() -> None:
     ]
     assert guarded, "the forward into the main wheel is not guarded"
     assert "older than the one this package was built against" in source, source[-600:]
+
+
+@pytest.mark.parametrize(
+    "api,expect_rewrite", [("activate", True), ("register", False)]
+)
+@pytest.mark.unit
+def test_the_age_rewrite_follows_the_api_not_the_error_name(
+    compiler, boundary, monkeypatch, api, expect_rewrite
+):
+    """Both companions define a class of the same name, so the name cannot tell them apart.
+
+    The rewrite exists for a companion published before registration became a single call. Deciding
+    that from the raised error's class name matched the current companion too, so the rewrite never
+    fired for the one it was written for. Which registration function the companion exposes is the
+    thing that actually differs.
+    """
+
+    class DelegateCompatibilityError(ImportError):
+        pass
+
+    def refuse():
+        raise DelegateCompatibilityError("already loaded, import this package earlier")
+
+    module = types.ModuleType("torch_tensorrt_executorch_runtime")
+    setattr(module, api, refuse)
+    monkeypatch.setitem(sys.modules, "torch_tensorrt_executorch_runtime", module)
+    with pytest.raises(ImportError) as raised:
+        load_legacy(compiler, boundary.path)
+    rewritten = "too old to register" in str(raised.value)
+    assert rewritten is expect_rewrite, str(raised.value)
