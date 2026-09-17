@@ -2129,12 +2129,13 @@ def test_runtime_wheel_pins_its_cuda_13_dependencies(monkeypatch, cuda):
         runpy.run_path(str(_RUNTIME_SETUP_PY))
         assert queries == list(versions)
         assert metadata["version"] == "0.1.0.dev20200103+cu130"
+        # The three runtimes the delegate links keep the label naming the build, because it links one
+        # specific build of each. The other two have no label to keep.
+        labelled = {"executorch", "torch-tensorrt"}
         assert set(metadata["install_requires"]) == {
-            f"torch=={fake_torch.__version__.partition('+')[0]}",
+            f"torch=={fake_torch.__version__}",
             *(
-                # ExecuTorch keeps the label naming the CUDA build, because the delegate links one
-                # specific build. Every other requirement drops it so it resolves anywhere.
-                f"{name}=={version if name == 'executorch' else version.partition('+')[0]}"
+                f"{name}=={version if name in labelled else version.partition('+')[0]}"
                 for name, version in versions.items()
             ),
         }
@@ -3182,7 +3183,10 @@ def test_the_wheel_build_resolves_the_delegate_from_its_installed_location(
         "else:\n"
         "    assert args == ['-c', 'import torch_tensorrt_executorch_runtime']\n"
         "    assert 'LD_LIBRARY_PATH' not in os.environ\n"
-        "    assert delegate.read_bytes() == b'\\x7fELF'\n"
+        # The prefix, not the whole file. The fixture's payload grew a full header when the checker
+        # started reading the machine type, and comparing every byte made this fail for a reason that
+        # had nothing to do with what it was checking.
+        "    assert delegate.read_bytes().startswith(b'\\x7fELF')\n"
         "    event = 'imported'\n"
         "with open(os.environ['EVENTS'], 'a') as f: f.write(event + '\\n')\n"
         "if event == 'imported' and os.environ['FAILURE'] == 'import': sys.exit(1)\n"

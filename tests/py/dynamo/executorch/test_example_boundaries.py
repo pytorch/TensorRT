@@ -5,6 +5,7 @@
 
 import argparse
 import ast
+import enum
 import sys
 from contextlib import nullcontext
 from pathlib import Path
@@ -17,8 +18,26 @@ _ROOT = Path(__file__).resolve().parents[4]
 _EXPORT = _ROOT / "examples/torchtrt_executorch_example/export_device_resident.py"
 
 
+class _Tensor:
+    """Stands in for the schema's tensor, which the device check tests with isinstance."""
+
+    def __init__(self, extra_tensor_info=None):
+        self.extra_tensor_info = extra_tensor_info
+
+
+class _DeviceType(enum.IntEnum):
+    CPU = 0
+    CUDA = 1
+
+
 def _export(
-    monkeypatch, path, remove_guard=False, delegates=None, operators=(), copy_ops=None
+    monkeypatch,
+    path,
+    remove_guard=False,
+    delegates=None,
+    operators=(),
+    copy_ops=None,
+    boundary_devices=(),
 ):
     tree = ast.parse(_EXPORT.read_text())
     main = next(
@@ -75,6 +94,10 @@ def _export(
         "CudaBackend": SimpleNamespace(
             generate_method_name_compile_spec=lambda _: None
         ),
+        # The two schema names the device check needs. A real enum, so the example's own
+        # DeviceType(device).name works unchanged.
+        "Tensor": _Tensor,
+        "DeviceType": _DeviceType,
         "ExecutorchBackendConfig": config,
         "PropagateDeviceConfig": config,
         "MemoryPlanningPass": config,
@@ -93,8 +116,22 @@ def _export(
                         operators=[
                             SimpleNamespace(name=n, overload="") for n in operators
                         ],
-                        inputs=[],
+                        # A boundary carrying tensors, so the device check has something to
+                        # inspect. Empty lists meant the whole check could be deleted unnoticed.
+                        inputs=list(range(len(boundary_devices))),
                         outputs=[],
+                        values=[
+                            SimpleNamespace(
+                                val=_Tensor(
+                                    extra_tensor_info=(
+                                        None
+                                        if device is None
+                                        else SimpleNamespace(device_type=device)
+                                    )
+                                )
+                            )
+                            for device in boundary_devices
+                        ],
                     )
                 ]
             )
@@ -316,3 +353,32 @@ def test_the_runner_refuses_to_start_without_cuda(monkeypatch, tmp_path):
         RuntimeError, match="cannot run\nwithout CUDA|cannot run without CUDA"
     ):
         exec(compile(tree, str(path), "exec"), namespace)
+
+
+@pytest.mark.parametrize(
+    "devices,rejected",
+    [
+        ((_DeviceType.CUDA,), False),
+        ((_DeviceType.CUDA, _DeviceType.CUDA), False),
+        ((_DeviceType.CPU,), True),
+        ((_DeviceType.CUDA, _DeviceType.CPU), True),
+        ((None,), True),
+    ],
+)
+def test_export_rejects_a_boundary_tensor_that_is_not_on_the_device(
+    monkeypatch, tmp_path, devices, rejected
+):
+    """Deleting the whole device check kept the suite green, because no boundary carried tensors.
+
+    A program whose method boundary holds host memory defeats the point of a device-resident export,
+    and the caller would find out at run time instead. A tensor with no device information counts as
+    host, which is what the example's own default says.
+    """
+    path = tmp_path / "m.pte"
+    path.write_bytes(b"program")
+    if rejected:
+        with pytest.raises(SystemExit) as raised:
+            _export(monkeypatch, path, boundary_devices=devices)
+        assert "non-CUDA method boundary tensors" in str(raised.value), raised.value
+    else:
+        _export(monkeypatch, path, boundary_devices=devices)
