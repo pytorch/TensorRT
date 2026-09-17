@@ -80,11 +80,27 @@ def test_examples_use_the_module_loader(
         )
 
     portable._load_for_executorch = load
-    monkeypatch.setitem(
-        sys.modules,
-        "torch_tensorrt_executorch_runtime",
-        types.ModuleType("torch_tensorrt_executorch_runtime"),
-    )
+    # Record the import rather than pre-inserting a module. A module already in sys.modules makes
+    # "import x" a no-op with nothing to observe, so deleting that import from the example left every
+    # case green even though the delegate would never register.
+    imported: list[str] = []
+
+    class _Loader:
+        def create_module(self, spec):
+            return types.ModuleType(spec.name)
+
+        def exec_module(self, module):
+            return None
+
+    class _Recorder:
+        def find_spec(self, name, path=None, target=None):
+            if name == "torch_tensorrt_executorch_runtime":
+                imported.append(name)
+                return importlib.util.spec_from_loader(name, loader=_Loader())
+            return None
+
+    monkeypatch.delitem(sys.modules, "torch_tensorrt_executorch_runtime", raising=False)
+    monkeypatch.setattr(sys, "meta_path", [_Recorder(), *sys.meta_path])
     filename = "load_model_device_resident.py" if device_resident else "load_model.py"
     source = (
         Path(__file__).parents[4] / "examples/executorch_reference_runner" / filename
@@ -99,6 +115,9 @@ def test_examples_use_the_module_loader(
     else:
         runpy.run_path(str(source), run_name="__main__")
         assert calls == ["load", "run", "run", (tensor, expected)]
+    # The example has to import the delegate package, because that import is what registers the
+    # backend. Nothing here can run without it in a real process.
+    assert imported == ["torch_tensorrt_executorch_runtime"], imported
 
 
 def load_delegate_module(*, register_on_import: bool = False):
