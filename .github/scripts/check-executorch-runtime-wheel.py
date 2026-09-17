@@ -173,17 +173,20 @@ def main():
             reject(
                 f"a requirement this delegate does not link carries a local label: {labelled}"
             )
-        # And each of the three has to carry one, since that is the whole point.
+        # ExecuTorch has to carry one, because its pin comes from a file in the repository that
+        # always names a CUDA build. The other two take whatever the environment that built the
+        # wheel had installed, and an environment can legitimately hold a version with no label,
+        # so requiring one there would fail a wheel for something outside its control.
         unlabelled = [
             requirement
             for requirement in requirements
-            if canonicalize_name(requirement.name) in linked
+            if canonicalize_name(requirement.name) == "executorch"
             and "+" not in str(requirement.specifier)
         ]
         if unlabelled:
             reject(
-                "a runtime this delegate links is pinned without the label naming its build: "
-                f"{unlabelled}"
+                "the ExecuTorch pin carries no label naming its build, so a processor-only "
+                f"build would satisfy it: {unlabelled}"
             )
         # Reading every member verifies its RECORD hash, including the delegate payload.
         for filename in names:

@@ -615,4 +615,27 @@ if [[ -n "${coalesced_model_path}" ]]; then
   # TensorRT, AOTInductor and eager PyTorch compute the same math with different
   # kernels, so compare within a tolerance instead of on the printed digits.
   assert_runner_output "${coalesced_runner_log}" "${coalesced_shape}" "${coalesced_value}" 0.001
+
+    # The same program again, on a caller stream created inside a green context. This is the
+    # combination the delegate exists for and the one nothing else here covers: two backends in one
+    # program, every activation on the device, and both confined to the caller's stream and its
+    # slice of the machine. A delegate that ignored the caller stream would still return the right
+    # numbers on an idle GPU, so the value is asserted and not just the exit status.
+    green_runner_log="${verify_root}/coalesced_green_context.log"
+    if "${runner_path}" \
+      --model_path="${coalesced_model_path}" \
+      --green_context_sms=8 \
+      --num_runs=2 2>&1 | tee "${green_runner_log}"; then
+      assert_runner_output "${green_runner_log}" "${coalesced_shape}" "${coalesced_value}" 0.001
+    else
+      # A green context needs driver and hardware support, so a refusal is a skip. Anything else is
+      # the delegate breaking on a caller-provided stream, which is a failure.
+      if grep -qiE "green context|cuDevSmResource|not supported|CUDA_ERROR_NOT_SUPPORTED" \
+        "${green_runner_log}"; then
+        echo "green context unavailable on this runner, skipping that case" >&2
+      else
+        echo "the coalesced program failed on a caller-provided stream" >&2
+        exit 1
+      fi
+    fi
 fi

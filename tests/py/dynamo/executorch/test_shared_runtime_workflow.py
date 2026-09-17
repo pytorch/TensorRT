@@ -586,3 +586,28 @@ def test_the_kept_entry_points_actually_warn_and_forward(monkeypatch) -> None:
         assert any(
             issubclass(w.category, DeprecationWarning) for w in caught
         ), f"{shim} raised no DeprecationWarning: {[w.category for w in caught]}"
+
+
+@pytest.mark.unit
+def test_the_coalesced_program_is_run_on_a_caller_stream() -> None:
+    """Nothing exercised the caller stream, which is the path the delegate is built around.
+
+    The delegate takes the stream from the caller and a green context confines it to a slice of the
+    machine. Both were reachable only by hand: every automated run used the default stream, so a
+    delegate that stopped honouring the caller's stream would have kept passing.
+    """
+    script = (ROOT / ".github/scripts/verify-executorch-reference-runner.sh").read_text(
+        encoding="utf-8"
+    )
+    live = [
+        line
+        for line in script.splitlines()
+        if "--green_context_sms=" in line and not line.lstrip().startswith("#")
+    ]
+    assert (
+        live
+    ), "no run passes a green context, so the caller stream is never exercised"
+    # On the coalesced program, because that is the case with two backends sharing one stream.
+    assert "coalesced_green_context.log" in script, script[-400:]
+    # And the numbers are checked, not only the exit status.
+    assert 'assert_runner_output "${green_runner_log}"' in script, script[-400:]
