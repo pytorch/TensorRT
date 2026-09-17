@@ -213,6 +213,21 @@ static bool make_green_context_stream(
 int main(int argc, char** argv) {
   executorch::runtime::runtime_init();
 
+  // Reject anything unrecognised rather than ignoring it. Every option here is a --name=value flag,
+  // so a bare path silently fell through to the default and the program ran a different file than
+  // the one it was asked for, reporting success.
+  for (int i = 1; i < argc; ++i) {
+    if (strncmp(argv[i], "--model_path=", 13) != 0 &&
+        strncmp(argv[i], "--num_runs=", 11) != 0 &&
+        strncmp(argv[i], "--green_context_sms=", 20) != 0) {
+      ET_LOG(
+          Error,
+          "unrecognised argument '%s'. Usage: example_executorch_runner "
+          "--model_path=model.pte [--num_runs=1] [--green_context_sms=0]",
+          argv[i]);
+      return 1;
+    }
+  }
   const char* model_path = get_flag(argc, argv, "--model_path", "model.pte");
   const int num_runs = atoi(get_flag(argc, argv, "--num_runs", "1"));
   const int green_context_sms = atoi(get_flag(argc, argv, "--green_context_sms", "0"));
