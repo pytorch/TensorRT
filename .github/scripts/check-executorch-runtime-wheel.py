@@ -22,6 +22,9 @@ def reject(message):
     sys.exit(f"FATAL: {message}")
 
 
+_LINKED_AT_BUILD_TIME = frozenset({"torch", "torch-tensorrt"})
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("wheel", type=Path)
@@ -135,6 +138,14 @@ def main():
                         f"against {installed}, whose version differs from that pin"
                     )
                 expected_version = str(installed)
+            elif distribution in _LINKED_AT_BUILD_TIME:
+                # PyTorch and Torch-TensorRT are linked the same way ExecuTorch is, so the
+                # requirement names the whole installed version including any label. Comparing
+                # against the public part alone reported a mismatch between a requirement and the
+                # very version it was generated from.
+                expected_version = str(
+                    Version(importlib.metadata.version(distribution))
+                )
             else:
                 expected_version = Version(
                     importlib.metadata.version(distribution)
