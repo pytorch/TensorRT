@@ -512,7 +512,7 @@ def test_runtime_workflows_filter_cuda_12_without_changing_main_releases(
     } == _executorch_cuda_rows()
 
 
-@pytest.mark.parametrize("arch,floor", [("x86_64", "2_28"), ("aarch64", "2_28")])
+@pytest.mark.parametrize("arch,floor", [("x86_64", "2_28"), ("aarch64", "2_35")])
 @pytest.mark.unit
 def test_shared_repair_preserves_the_companion_payload(tmp_path, arch, floor):
     """Run the shared repair loop with real wheels and check tags, hashes, and routing."""
@@ -717,7 +717,7 @@ def test_the_guard_is_given_the_platform_it_must_compare_against():
         "platforms and using one for both rejects the aarch64 row for requiring exactly what its "
         "own builder image provides"
     )
-    for tag in ("_2_28_x86_64", "_2_28_aarch64"):
+    for tag in ("_2_28_x86_64", "_2_35_aarch64"):
         assert tag in guard, f"the guard has no floor entry for manylinux{tag}"
 
 
@@ -2095,7 +2095,9 @@ def test_runtime_wheel_pins_its_cuda_13_dependencies(monkeypatch, cuda):
         assert set(metadata["install_requires"]) == {
             f"torch=={fake_torch.__version__.partition('+')[0]}",
             *(
-                f"{name}=={version.partition('+')[0]}"
+                # ExecuTorch keeps the label naming the CUDA build, because the delegate links one
+                # specific build. Every other requirement drops it so it resolves anywhere.
+                f"{name}=={version if name == 'executorch' else version.partition('+')[0]}"
                 for name, version in versions.items()
             ),
         }

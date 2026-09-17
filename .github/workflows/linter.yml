@@ -101,3 +101,17 @@ jobs:
           cd $GITHUB_WORKSPACE
           python3 -m pytest tests/py/dynamo/executorch/test_update_executorch_pin.py \
             -q --no-header -p no:cacheprovider --noconftest -o addopts=""
+      # The rest of the ExecuTorch suite that needs no GPU. Without this the only lane running these
+      # is nightly, so a pull request could not fail on anything they cover, and they cover the
+      # packaging, the wheel guard, the shipped CMake package and the shared workflow.
+      - name: Check the ExecuTorch packaging and workflow
+        if: always()
+        run: |
+          cd $GITHUB_WORKSPACE
+          python3 -m pytest \
+            tests/py/dynamo/executorch/test_packaging.py \
+            tests/py/dynamo/executorch/test_artifact_guard.py \
+            tests/py/dynamo/executorch/test_shared_runtime_workflow.py \
+            tests/py/dynamo/executorch/test_example_boundaries.py \
+            tests/py/dynamo/executorch/test_cmake_runtime.py \
+            -q --no-header -p no:cacheprovider --noconftest -o addopts=""
