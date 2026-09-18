@@ -31,6 +31,25 @@ back. ``alloc_graph_input=False`` and ``alloc_graph_output=False`` are what stop
 that, and ``enable_non_cpu_memory_planning`` is required for planning to run over
 non-CPU tensors at all.
 
+Those two settings choose one of two valid arrangements, and it is worth knowing
+which. With them off, as here, nobody allocates the boundary buffers and the
+CALLER supplies their addresses, which is what a C++ consumer does and what
+ExecuTorch's own reference runner is built for. The other arrangement leaves
+planning on, so the program's own device arena owns them; ExecuTorch's own CUDA
+example takes that one, calling ``to_executorch()`` with no planning overrides at
+all.
+
+The first arrangement cannot work from Python as things stand, because the
+bindings do not supply an address for a non-planned output and there is no way to
+give them one. Measured: with ExecuTorch's CUDA backend owning the last partition
+a program exported this way fails every time, and the C++ error says why, that the
+data pointer cannot be null. It appears to work when the TensorRT delegate owns
+the last partition only because that delegate does not check, and the buffer it is
+handed is host memory.
+
+So run a program exported this way from C++, and export with planning left on if
+Python is the target.
+
 This script asserts on the serialized program rather than trusting the flags:
 the exported ``.pte`` must contain neither copy operator, and it must still carry
 both delegates. Checking ``tensor.is_cuda`` at runtime is not enough on its own,

@@ -231,6 +231,12 @@ int main(int argc, char** argv) {
   }
   const char* model_path = get_flag(argc, argv, "--model_path", "model.pte");
   const int num_runs = atoi(get_flag(argc, argv, "--num_runs", "1"));
+  // Zero would skip the loop and then print the output buffer as if it held a result, which is
+  // whatever was there before. Refuse instead, because a run count of zero has no meaning here.
+  if (num_runs < 1) {
+    ET_LOG(Error, "--num_runs must be at least 1, got %d", num_runs);
+    return 2;
+  }
   const int green_context_sms = atoi(get_flag(argc, argv, "--green_context_sms", "0"));
 
   Result<FileDataLoader> loader_result = FileDataLoader::from(model_path);
@@ -438,8 +444,25 @@ int main(int argc, char** argv) {
     fprintf(stderr, "] numel=%zu dtype=%d\n", static_cast<size_t>(t.numel()), static_cast<int>(t.scalar_type()));
 
     if (t.scalar_type() == exec_aten::ScalarType::Float) {
-      const float* data = t.const_data_ptr<float>();
+      const void* src = t.const_data_ptr<float>();
       const size_t print_n = t.numel() < 8 ? static_cast<size_t>(t.numel()) : 8;
+      // A device-resident program can leave its output in the program's own CUDA arena, and
+      // reading that as host memory is a segmentation fault rather than a wrong number. Ask the
+      // driver where the pointer lives and copy first when it is not ours to read directly. A
+      // pointer CUDA does not recognise is host memory, which is the ordinary case here.
+      std::vector<float> staged(print_n);
+      const float* data = static_cast<const float*>(src);
+      cudaPointerAttributes attrs{};
+      if (cudaPointerGetAttributes(&attrs, src) == cudaSuccess && attrs.type == cudaMemoryTypeDevice) {
+        const cudaError_t copied = cudaMemcpy(staged.data(), src, print_n * sizeof(float), cudaMemcpyDeviceToHost);
+        if (copied != cudaSuccess) {
+          fprintf(stderr, "  could not read the output: %s\\n", cudaGetErrorString(copied));
+          continue;
+        }
+        data = staged.data();
+      }
+      // A pointer CUDA does not know sets an error flag that would otherwise surface later.
+      cudaGetLastError();
       fprintf(stderr, "  first %zu values:", print_n);
       for (size_t j = 0; j < print_n; ++j) {
         fprintf(stderr, " %.4f", data[j]);
