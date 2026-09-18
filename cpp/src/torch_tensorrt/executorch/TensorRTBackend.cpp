@@ -20,6 +20,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -349,10 +350,30 @@ Result<DelegateHandle*> TensorRTBackend::init(
   const auto async_runtime = context.get_runtime_spec<const char*>(kAsyncReturnKey);
   if (async_runtime.ok()) {
     const char* const value = async_runtime.get();
-    // A non-empty value that is not "0" means yes. Empty means unset, the same as the budget option
-    // above, so that a caller clearing the option gets the safe behaviour rather than the fast one.
-    // The array need not be NUL terminated, so one byte is read rather than scanned.
-    handle->async_return_requested = value != nullptr && value[0] != '\0' && value[0] != '0';
+    // Whole words, not the first byte. Reading one byte made "false", "off" and "no" all turn the
+    // option ON, which is the opposite of what a caller writing them means, and the readme beside
+    // this documents that spelling for its own flags. The array need not be NUL terminated, so the
+    // scan is bounded.
+    constexpr std::size_t kAsyncReturnMaxScan = 16;
+    std::size_t len = 0;
+    if (value != nullptr) {
+      while (len < kAsyncReturnMaxScan && value[len] != '\0') {
+        ++len;
+      }
+    }
+    const std::string_view text(value == nullptr ? "" : value, len);
+    if (text.empty()) {
+      // Cleared, so leave the safe default rather than reading emptiness as a yes.
+    } else if (text == "1" || text == "true" || text == "on" || text == "yes") {
+      handle->async_return_requested = true;
+    } else if (text == "0" || text == "false" || text == "off" || text == "no") {
+      handle->async_return_requested = false;
+    } else {
+      // Refused rather than guessed, the way the budget option below refuses a value it cannot
+      // parse. Guessing here hands the caller the asynchronous path it did not ask for.
+      ET_LOG(Error, "TensorRTBackend::init: async_return must be one of 1, true, on, yes, 0, false, off or no");
+      return Error::InvalidArgument;
+    }
   }
 
   const auto ws_runtime = context.get_runtime_spec<const char*>(kWeightStreamingBudgetKey);

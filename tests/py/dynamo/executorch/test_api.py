@@ -619,7 +619,7 @@ def test_artifact_checks_run_after_the_shared_build():
     check = next(
         step
         for step in steps
-        if step.get("name") == "Check the repaired ExecuTorch runtime wheel"
+        if step.get("name") == "Check the retagged ExecuTorch runtime wheel"
     )
     assert check["if"] == "${{ steps.executorch-runtime.outcome == 'success' }}"
     assert "torch.cuda.is_available" not in check["run"]
@@ -3149,7 +3149,7 @@ def test_installed_check_rejects_disabled_resolution_guard(
     step = next(
         s
         for s in steps
-        if s.get("name") == "Check the repaired ExecuTorch runtime wheel"
+        if s.get("name") == "Check the retagged ExecuTorch runtime wheel"
     )
     guard = 'if grep -E "not found|undefined symbol" <<< "${resolution}"; then'
     assert step["run"].count(guard) == 1
@@ -3184,7 +3184,7 @@ def test_the_wheel_build_resolves_the_delegate_from_its_installed_location(
     step = next(
         step
         for step in _runtime_build_steps()
-        if step.get("name") == "Check the repaired ExecuTorch runtime wheel"
+        if step.get("name") == "Check the retagged ExecuTorch runtime wheel"
     )
     assert step["if"] == "${{ steps.executorch-runtime.outcome == 'success' }}"
     bin_dir = tmp_path / "bin"

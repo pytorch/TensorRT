@@ -364,13 +364,17 @@ bool TensorRTBlobHeader::parse(const void* data, std::size_t size, TensorRTBlobH
   if (out.engine_offset % ENGINE_ALIGNMENT != 0) {
     return false;
   }
-  if (static_cast<std::size_t>(out.metadata_offset) + out.metadata_size > size) {
+  // Compared against the space that is left, not by adding first. These sizes come from the file
+  // and are 64 bit, so a large one makes offset plus size wrap and slip past a check written that
+  // way, and the reader would then walk far past the end of the blob.
+  if (out.metadata_offset > size || out.metadata_size > size - out.metadata_offset) {
     return false;
   }
-  if (static_cast<std::size_t>(out.engine_offset) + out.engine_size > size) {
+  if (out.engine_offset > size || out.engine_size > size - out.engine_offset) {
     return false;
   }
-  if (static_cast<std::size_t>(out.metadata_offset) + out.metadata_size > out.engine_offset) {
+  if (out.metadata_offset > out.engine_offset ||
+      out.metadata_size > static_cast<std::size_t>(out.engine_offset) - out.metadata_offset) {
     return false;
   }
 
