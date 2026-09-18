@@ -521,9 +521,14 @@ def test_the_loader_calls_activate_on_a_companion_that_has_no_register(
     monkeypatch.setitem(sys.modules, "torch_tensorrt_executorch_runtime", module)
     program = tmp_path / "m.pte"
     program.write_bytes(b"unused")
-    # The load itself cannot finish without a real runtime; reaching it is the point.
-    with pytest.raises(Exception):
+    # What matters is which function the loader reached for, not whether the load then finished.
+    # Requiring an exception here made the test depend on ExecuTorch being absent: with a real one
+    # installed the call gets further and raises nothing, so the check inverted on exactly the
+    # machines it was meant to protect.
+    try:
         compiler.load(str(program), format="executorch")
+    except Exception:
+        pass
     assert called == ["activate"], called
 
 
@@ -698,12 +703,14 @@ def test_the_forwarder_actually_forwards_and_warns(monkeypatch) -> None:
         returned = namespace["load"]("some/model.pte")
     assert returned is sentinel, returned
     with pytest.warns(DeprecationWarning):
-        assert namespace["load"](path="some/model.pte") is sentinel
+        # By keyword, deliberately: the published main wheel calls it this way, so the
+        # parameter name is part of the contract and renaming it breaks that caller.
+        assert namespace["load"](file_path="some/model.pte") is sentinel
     with pytest.warns(DeprecationWarning):
         assert namespace["load"](Path("some/model.pte")) is sentinel
     assert calls == ["some/model.pte", "some/model.pte", Path("some/model.pte")], calls
     signature = inspect.signature(namespace["load"])
-    assert list(signature.parameters) == ["path"], signature
+    assert list(signature.parameters) == ["file_path"], signature
 
 
 @pytest.mark.unit

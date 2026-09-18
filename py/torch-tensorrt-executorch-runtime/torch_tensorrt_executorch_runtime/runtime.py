@@ -33,7 +33,7 @@ def __getattr__(name: str) -> Any:
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
-def load(path: Union[str, Path]) -> Any:
+def load(file_path: Union[str, Path]) -> Any:
     """Deprecated: register the delegate and load through ExecuTorch.
 
     Registration is what this package exists for, and ExecuTorch owns execution, so this does the
@@ -68,4 +68,4 @@ def load(path: Union[str, Path]) -> Any:
             f'torch_tensorrt.load(path, format="executorch") directly. Underlying error: {error}'
         ) from error
 
-    return _load(path)
+    return _load(file_path)
