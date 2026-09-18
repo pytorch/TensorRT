@@ -210,7 +210,7 @@ def test_the_cuda_gate_precedes_the_load(monkeypatch, optimize, is_cuda, remove_
                 is_cuda=str(device) == "cuda"
             ),
         ),
-        "_load_for_executorch": load,
+        "Runtime": SimpleNamespace(get=lambda: SimpleNamespace(load_program=load)),
     }
     monkeypatch.setattr(sys, "argv", [str(path), "--model_path", "unused.pte"])
     reaches_load = is_cuda or remove_guard
@@ -218,7 +218,8 @@ def test_the_cuda_gate_precedes_the_load(monkeypatch, optimize, is_cuda, remove_
     message = "reached native load" if reaches_load else "cannot run"
     with pytest.raises(error, match=message):
         exec(compile(tree, str(path), "exec", optimize=optimize), namespace)
-    assert calls == (["unused.pte"] if reaches_load else [])
+    # The public loader takes a path object, so compare as text rather than requiring a string.
+    assert [str(c) for c in calls] == (["unused.pte"] if reaches_load else [])
 
 
 @pytest.mark.parametrize(
@@ -282,9 +283,11 @@ def test_the_runner_rejects_an_output_that_came_back_on_the_host(
     output = SimpleNamespace(
         is_cuda=output_on_cuda, device="cuda:0" if output_on_cuda else "cpu"
     )
+    # Shaped like the public Program: method_names is an attribute, and a method is loaded first
+    # and then executed, rather than named on every call.
     program = SimpleNamespace(
-        method_names=lambda: ["forward"],
-        run_method=lambda name, inputs: [output],
+        method_names=["forward"],
+        load_method=lambda name: SimpleNamespace(execute=lambda inputs: [output]),
     )
     namespace = {
         "argparse": argparse,
@@ -296,7 +299,9 @@ def test_the_runner_rejects_an_output_that_came_back_on_the_host(
                 is_cuda=str(device) == "cuda"
             ),
         ),
-        "_load_for_executorch": lambda _: program,
+        "Runtime": SimpleNamespace(
+            get=lambda: SimpleNamespace(load_program=lambda _: program)
+        ),
     }
     monkeypatch.setattr(sys, "argv", [str(path), "--model_path", "unused.pte"])
     if output_on_cuda:
@@ -328,7 +333,9 @@ def test_the_runner_refuses_to_start_without_cuda(monkeypatch):
             cuda=SimpleNamespace(is_available=lambda: False),
             ones=lambda *args, device=None, **kwargs: SimpleNamespace(is_cuda=False),
         ),
-        "_load_for_executorch": lambda _: None,
+        "Runtime": SimpleNamespace(
+            get=lambda: SimpleNamespace(load_program=lambda _: None)
+        ),
     }
     monkeypatch.setattr(sys, "argv", [str(path), "--model_path", "unused.pte"])
     # The specific message, not just any mention of CUDA. With this gate deleted the input guard

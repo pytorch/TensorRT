@@ -314,10 +314,15 @@ direction is refused, so the leniency goes one way only. If the copies are why
 you exported this way, measure them rather than trusting the flag.
 
 Load programs through `executorch.runtime`, which is ExecuTorch's public Python
-runtime API. Some of the examples here still reach for the underscore-prefixed
-loader inside its pybindings extension. That is private, it can change without
-notice, and it should not appear in anything a reader is meant to copy, so those
-examples are being moved over.
+runtime API. Do not use the underscore-prefixed loader inside its pybindings
+extension: it is private and can change without notice. The two were measured
+against each other on every arrangement here, host and device, including a graph
+split with ExecuTorch's own CUDA backend, and they agree to the digit.
+
+The choice that does matter is who owns the output buffer. Leave allocation on for
+the graph outputs if Python will run the program, because a Python caller has no
+way to hand one in. Turn it off only for a C++ consumer that supplies the address
+itself.
 
 ## Use
 

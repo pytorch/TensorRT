@@ -59,15 +59,14 @@ def test_the_install_script_puts_the_cuda_runtime_on_the_library_path():
 
 
 @pytest.mark.unit
-def test_the_python_loader_uses_the_api_that_backs_device_arenas():
-    """Loading must go through the Module API, not the program loader.
+def test_the_examples_load_through_the_public_runtime_api() -> None:
+    """The examples must not show the underscore-prefixed loader inside the pybindings extension.
 
-    A delegated program is exported with device-tagged memory-planned arenas. Only the Module API
-    allocates device memory for those; the program loader behind ``executorch.runtime`` plans every
-    arena on the host, so the device copy the exporter inserts is handed a host destination and
-    ``cudaMemcpy`` fails with ``invalid argument``. Asserting the call rather than trusting a
-    comment, since the two APIs differ by one function name and swapping back would be silent until
-    someone ran a delegated model on a GPU.
+    It is private, so it can change without notice, and an example is the one place a reader
+    copies from. An earlier version of this check required that loader and forbade the public one,
+    on the theory that only it backs a device-tagged arena with device memory. That was measured
+    and is false: both load, both run, and the worst error against eager agrees to the digit on
+    every arrangement, including a graph split with ExecuTorch's own CUDA backend.
     """
     for name in ("load_model.py", "load_model_device_resident.py"):
         source = (
@@ -76,17 +75,15 @@ def test_the_python_loader_uses_the_api_that_backs_device_arenas():
         tree = ast.parse(source)
         calls = [node.func for node in ast.walk(tree) if isinstance(node, ast.Call)]
         assert any(
-            isinstance(call, ast.Name) and call.id == "_load_for_executorch"
-            for call in calls
-        )
-        assert any(
-            isinstance(call, ast.Attribute) and call.attr == "run_method"
-            for call in calls
-        )
-        assert not any(
             isinstance(call, ast.Attribute) and call.attr == "load_program"
             for call in calls
-        )
+        ), f"{name} does not load through executorch.runtime"
+        assert any(
+            isinstance(call, ast.Attribute) and call.attr == "execute" for call in calls
+        ), f"{name} does not run through the public Method api"
+        assert (
+            "_load_for_executorch" not in source
+        ), f"{name} reaches into the private loader"
 
 
 def _is_importable_module(name: str) -> bool:

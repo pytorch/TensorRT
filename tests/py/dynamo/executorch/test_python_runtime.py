@@ -69,20 +69,26 @@ def test_examples_use_the_module_loader(
     model = tmp_path / "model.pte"
     methods = ["forward"] if has_forward else []
 
-    def run_method(name, inputs):
-        assert name == "forward"
+    def execute(inputs):
         assert inputs == (tensor,)
         calls.append("run")
         return [tensor]
 
-    def load(path):
-        assert path == str(model)
-        calls.append("load")
-        return types.SimpleNamespace(
-            method_names=lambda: methods, run_method=run_method
-        )
+    def load_method(name):
+        assert name == "forward"
+        return types.SimpleNamespace(execute=execute)
 
-    portable._load_for_executorch = load
+    def load_program(path):
+        # The examples hand a Path, not a string, because that is what the public loader takes.
+        assert str(path) == str(model)
+        calls.append("load")
+        return types.SimpleNamespace(method_names=methods, load_method=load_method)
+
+    runtime_mod = types.ModuleType("executorch.runtime")
+    runtime_mod.Runtime = types.SimpleNamespace(
+        get=lambda: types.SimpleNamespace(load_program=load_program)
+    )
+    monkeypatch.setitem(sys.modules, "executorch.runtime", runtime_mod)
     # Record the import rather than pre-inserting a module. A module already in sys.modules makes
     # "import x" a no-op with nothing to observe, so deleting that import from the example left every
     # case green even though the delegate would never register.

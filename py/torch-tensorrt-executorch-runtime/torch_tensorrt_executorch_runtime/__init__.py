@@ -11,11 +11,13 @@ import time.
 There is deliberately no runtime API here. Once the backend is registered, everything else belongs
 to ExecuTorch:
 
-    import torch_tensorrt_executorch_runtime  # noqa: F401
-    from executorch.extension.pybindings.portable_lib import _load_for_executorch
+    from pathlib import Path
 
-    program = _load_for_executorch("model.pte")
-    outputs = program.run_method("forward", (tensor,))
+    import torch_tensorrt_executorch_runtime  # noqa: F401
+    from executorch.runtime import Runtime
+
+    program = Runtime.get().load_program(Path("model.pte"))
+    outputs = program.load_method("forward").execute((tensor,))
 
 Set ``TORCH_TENSORRT_SKIP_DELEGATE_REGISTRATION=1`` to import the module without loading the
 delegate. That is for tooling that wants the metadata only; a normal consumer never needs it.

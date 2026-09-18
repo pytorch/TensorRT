@@ -9,7 +9,7 @@ import torch
 # Registers TensorRTBackend with ExecuTorch's backend registry as an import side effect. Nothing
 # from this package is referenced below: loading and running a program is ExecuTorch's own API.
 import torch_tensorrt_executorch_runtime  # noqa: F401
-from executorch.extension.pybindings.portable_lib import _load_for_executorch
+from executorch.runtime import Runtime
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -27,17 +27,18 @@ model_path = args.model_path
 x = torch.ones((2, 3, 4, 4), dtype=torch.float32)
 
 # The Module API backs device-tagged arenas with device memory.
-program = _load_for_executorch(str(model_path))
-if "forward" not in program.method_names():
+program = Runtime.get().load_program(model_path)
+forward = program.load_method("forward")
+if "forward" not in program.method_names:
     raise RuntimeError(f"{model_path} has no 'forward' method")
 for _ in range(args.num_runs):
-    outputs = program.run_method("forward", (x,))
+    outputs = forward.execute((x,))
 y = outputs[0]
 
 expected = x + 1
 torch.testing.assert_close(y.cpu(), expected)
 
-print("methods:", sorted(program.method_names()))
+print("methods:", sorted(program.method_names))
 print("output shape:", tuple(y.shape))
 print("output device:", y.device)
 print("PASS: ExecuTorch TensorRT delegate output matches x + 1")
