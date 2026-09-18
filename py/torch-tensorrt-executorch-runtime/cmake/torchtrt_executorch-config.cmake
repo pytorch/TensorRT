@@ -19,9 +19,10 @@
 # inside the shared library, and everything a caller does afterwards is
 # ExecuTorch's own Runtime API.
 #
-# Point CMake at it with either of:
-#   -Dtorchtrt_executorch_DIR=$(python -c "import torch_tensorrt_executorch_runtime as m, pathlib; print(pathlib.Path(m.__file__).parent / 'lib/cmake/torchtrt_executorch')")
-#   -DCMAKE_PREFIX_PATH=$(python -c "import torch_tensorrt_executorch_runtime as m, pathlib; print(pathlib.Path(m.__file__).parent)")
+# Point CMake at it with either of. The variable matters: importing this package loads the delegate,
+# which raises where ExecuTorch is not installed yet, and asking for a path does not need it loaded.
+#   -Dtorchtrt_executorch_DIR=$(TORCH_TENSORRT_SKIP_DELEGATE_REGISTRATION=1 python -c "import torch_tensorrt_executorch_runtime as m, pathlib; print(pathlib.Path(m.__file__).parent / 'lib/cmake/torchtrt_executorch')")
+#   -DCMAKE_PREFIX_PATH=$(TORCH_TENSORRT_SKIP_DELEGATE_REGISTRATION=1 python -c "import torch_tensorrt_executorch_runtime as m, pathlib; print(pathlib.Path(m.__file__).parent)")
 
 # No cmake_minimum_required here. A package config that calls it raises the consumer's own recorded
 # minimum, and nothing in this file needs anything newer than 3.19: the token that misbehaves on older
@@ -125,7 +126,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   # installed wheel, which is what this package is for, and wrong for anything redistributable.
   # Not option(): inside a package config that creates a cache entry in the consumer's project
   # and, depending on the policy in force, overrides a plain variable the consumer already
-  # set, so the documented opt-out could be ignored. Honour what the consumer set.
+  # set, so an opt-out they set could be ignored. Honour what the consumer set.
   if(NOT DEFINED TORCHTRT_EXECUTORCH_EMBED_RUNPATH)
     set(TORCHTRT_EXECUTORCH_EMBED_RUNPATH ON)
   endif()

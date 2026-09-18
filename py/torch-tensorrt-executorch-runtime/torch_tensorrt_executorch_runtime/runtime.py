@@ -11,9 +11,12 @@ who upgrades this package on its own. It stays until that call is gone from a re
 from __future__ import annotations
 
 import warnings
-from typing import Any
+from pathlib import Path
+from typing import Any, Union
 
-__all__ = ["load", "Program"]
+# Program resolves through __getattr__ below rather than being bound here, so the linter cannot see
+# it and is told so. It stays exported because the published package exported it.
+__all__ = ["load", "Program"]  # noqa: F822
 
 
 def __getattr__(name: str) -> Any:
@@ -30,11 +33,14 @@ def __getattr__(name: str) -> Any:
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
-def load(file_path: str) -> Any:
+def load(path: Union[str, Path]) -> Any:
     """Deprecated: register the delegate and load through ExecuTorch.
 
     Registration is what this package exists for, and ExecuTorch owns execution, so this does the
     first and forwards the second rather than carrying a loader of its own.
+
+    The parameter is named and typed as the published wheel had it, because a caller passing the
+    path by keyword or as a Path is one of the callers this module exists to keep working.
     """
     warnings.warn(
         "torch_tensorrt_executorch_runtime.runtime.load() is deprecated; use "
@@ -62,4 +68,4 @@ def load(file_path: str) -> Any:
             f'torch_tensorrt.load(path, format="executorch") directly. Underlying error: {error}'
         ) from error
 
-    return _load(file_path)
+    return _load(path)

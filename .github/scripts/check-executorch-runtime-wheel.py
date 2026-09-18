@@ -12,10 +12,11 @@ from email.parser import BytesParser
 from pathlib import Path
 
 import yaml
+from wheel.wheelfile import WheelFile
+
 from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name, parse_wheel_filename
 from packaging.version import Version
-from wheel.wheelfile import WheelFile
 
 
 def reject(message):

@@ -199,8 +199,11 @@ Enabling `EXECUTORCH_BUILD_CUDA` does not make this runner depend on libtorch. I
 needs `EXECUTORCH_BUILD_EXTENSION_TENSOR=ON`, which is set automatically, and the
 result links no libtorch and no libc10.
 
-The green-context option is not exercised by CI. The reference-runner checks
-use the CUDA-enabled build with an ordinary stream and host-backed method inputs
+CI exercises the green-context option. The verification script runs the coalesced
+program twice, once on an ordinary stream and once with `--green_context_sms=8`, and
+treats the runner's distinct status for "no green context available" as a skip, so the
+green run happens only where the device has the SMs for one. The other reference-runner
+checks use the CUDA-enabled build with an ordinary stream and host-backed method inputs
 and outputs.
 
 ## Caller-Owned KV-Cache Persistence Check

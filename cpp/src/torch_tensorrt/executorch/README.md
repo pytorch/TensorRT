@@ -163,25 +163,36 @@ the removed `CudaStreamGuard`:
   only if the caller waits on the stream or on its own event before reading.
 - The reference-runner smoke test runs inference inside a caller-stream guard on
   the discrete-GPU CI configuration. Host-backed input and output do not imply the
-  synchronized staging path there: the backend takes the direct path whenever the
+  staging path there: the backend binds a host pointer straight through whenever the
   device reports that it can read pageable host memory, which a discrete H100 does,
-  so that configuration returns asynchronously and the runner synchronizes the
-  stream itself afterwards. The staging path is reached only on a device that
-  reports it cannot. CI separately asserts that the runner resolves one shared
+  and stages it only on a device that reports it cannot. Either way that
+  configuration returns with the work already finished, because binding a host buffer
+  straight through is itself one of the reasons to wait, and because the runner never
+  asks for `async_return`. CI separately asserts that the runner resolves one shared
   `libextension_cuda.so`.
 - CUDA green-context streams work, and are the case this shared primitive exists
   for: one `cuGreenCtxStreamCreate` stream drives both the TensorRT delegate and
   ExecuTorch's CUDA/AOTI delegate, so both are confined to the same SM partition.
-  Verified by hand on an A100 with 108 SMs, using a `.pte` whose graph splits
-  across both delegates and a green context holding 8 of them: the program runs
-  and matches its eager reference. To reproduce, build the reference runner with
-  `-DEXECUTORCH_BUILD_CUDA=ON` and run it with `--green_context_sms=8`.
+  That both honour it is a property of the code, not of a passing run: the CUDA
+  delegate takes the per-thread stream when it initialises, then reads the caller's
+  selection again on every execute and routes every kernel and boundary copy through
+  it. Reading only the initialisation suggests the opposite, and a program split over
+  two separate streams still returns the right numbers, so a matching result settles
+  nothing either way.
+  Exercised by hand on an A100 with 108 SMs, using a `.pte` whose graph splits across
+  both delegates and a green context holding 8 of them. To reproduce, build the
+  reference runner, whose CMake configuration always enables the CUDA delegate, and
+  run it with `--green_context_sms=8`.
 
-  Two limits on that result. It is not in CI, because the CI configuration builds
-  the runner without the CUDA delegate. And it took the synchronized path, since
-  the method inputs and outputs are host-backed, so the device-resident
-  asynchronous return described above is still uncovered and the interaction
-  between a green context and the internal completion event remains untested.
+  CI runs the same option on the coalesced program, so this rests on more than the
+  hand measurement. A device that cannot provide the partition makes the runner exit
+  with its distinct status, and that case is skipped rather than failed, so a green
+  context is only exercised where the device has the SMs for one.
+
+  One limit remains. The run takes the synchronized path, because the method inputs
+  and outputs are host-backed and the runner never asks for `async_return`, so the
+  asynchronous return described above is still uncovered and the interaction between
+  a green context and the internal completion event remains untested.
 
 ## Standalone Backend Archive
 

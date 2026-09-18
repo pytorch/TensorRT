@@ -32,10 +32,12 @@ must provide a CUDA output tensor with `Module::set_output` before execution.
 Point CMake at both wheels. The example above calls `find_package(executorch)`
 as well, and that package lives in its own distribution. ExecuTorch is a
 namespace package, so `executorch.__file__` is `None` and has to be located
-through its distribution metadata instead:
+through its distribution metadata instead. The variable in front is what keeps
+this a path query: importing this package loads the delegate, which raises when
+the delegate cannot be loaded, and a path does not need it loaded.
 
 ```bash
-cmake -DCMAKE_PREFIX_PATH="$(python -c 'import importlib.metadata as m, torch_tensorrt_executorch_runtime as r, pathlib; print(str(pathlib.Path(str(m.distribution("executorch").locate_file("executorch"))) / "share" / "cmake") + ";" + str(pathlib.Path(r.__file__).parent))')" ...
+cmake -DCMAKE_PREFIX_PATH="$(TORCH_TENSORRT_SKIP_DELEGATE_REGISTRATION=1 python -c 'import importlib.metadata as m, torch_tensorrt_executorch_runtime as r, pathlib; print(str(pathlib.Path(str(m.distribution("executorch").locate_file("executorch"))) / "share" / "cmake") + ";" + str(pathlib.Path(r.__file__).parent))')" ...
 ```
 
 CMake 3.28 or newer is required for the example above, not because of this
@@ -116,6 +118,15 @@ repository, so no local SDK path is needed.
 The example below assumes Linux with a matching CUDA 13 PyTorch and
 Torch-TensorRT installation. Substitute the channel for your CUDA throughout, such
 as `cu134` for CUDA 13.4.
+
+On x86 the build also needs a developer toolset, the kind the release containers
+carry. Without one, the C++ runtime helpers the delegate references are not
+absorbed into the library, so the check that runs after linking refuses the result
+and names the symbol version it found. That refusal is correct: the library would
+demand a newer C++ runtime than its own platform tag promises. An ordinary
+development machine usually has no such toolset, so build there through the same
+container the release uses, or take the wheel a continuous integration run already
+produced. Arm does not have this problem, and its tag is higher for that reason.
 
 The build reads the CUDA location out of the repository's `MODULE.bazel`, and the
 copy checked in names one specific version. On a machine with a different CUDA, the
@@ -215,7 +226,13 @@ extension, so loading that extension pulls them in. A delegate shipped in a
 separate wheel cannot join that link, and ExecuTorch has no discovery hook for
 out-of-tree backends, so this package performs the equivalent step at import
 time. Set `TORCH_TENSORRT_SKIP_DELEGATE_REGISTRATION=1` to import it without
-loading the delegate; that is for tooling that wants the metadata only.
+loading the delegate; that is for tooling that wants the metadata only, and the
+path recipe above is exactly that case.
+
+Because registering is the point, an import that cannot register raises
+`DelegateCompatibilityError` naming what to install, rather than returning a
+module that registered nothing and leaving the program to fail later with a
+backend it cannot find.
 
 Loading and running a program is ExecuTorch's API, not this package's. Tensor
 placement, method lookup and output devices are all documented by ExecuTorch. A

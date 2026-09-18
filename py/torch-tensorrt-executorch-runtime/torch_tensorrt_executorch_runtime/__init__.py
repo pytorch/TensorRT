@@ -19,6 +19,12 @@ to ExecuTorch:
 
 Set ``TORCH_TENSORRT_SKIP_DELEGATE_REGISTRATION=1`` to import the module without loading the
 delegate. That is for tooling that wants the metadata only; a normal consumer never needs it.
+
+Registering is what this package is for, so failing to register is an import failure: importing it
+without a usable ExecuTorch and delegate raises ``DelegateCompatibilityError`` and says what to
+install, rather than handing back a module that registered nothing and letting the program fail
+much later with a backend it cannot find. That is also why the recipes that ask this package only
+for a path, in its readme and in its CMake package, set the variable above first.
 """
 
 from __future__ import annotations
@@ -119,9 +125,7 @@ def register() -> None:
         return
 
     with _registration_lock:
-        # Re-checked under the lock: a caller that queued here while the winner was loading would
-        # otherwise redo the whole registration and then reject itself for the registration the
-        # winner just made.
+        # Re-checked under the lock so queued callers do not repeat the same registration work.
         if _delegate is not None:
             return
         _register_locked()

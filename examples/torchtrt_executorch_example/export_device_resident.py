@@ -102,9 +102,12 @@ def main() -> None:
     )
     args = parser.parse_args()
     model_path = Path(args.model_path)
-    expected_path = model_path.with_suffix(".expected")
-    if model_path == expected_path:
-        parser.error("--model_path must not end in .expected")
+    # Appended to the whole path, not substituted for the extension, so this agrees with
+    # export_coalesced.py and with any shell that reads it back. with_suffix() replaces whatever
+    # the last extension is, so a path like m.v2 wrote m.expected while a reader looking for
+    # m.v2.expected found nothing. Appending also cannot land on the model path itself, so the
+    # reference can never overwrite the program.
+    expected_path = model_path.with_name(model_path.name + ".expected")
 
     with torch.no_grad():
         model = CoalescedModel().eval().cuda()

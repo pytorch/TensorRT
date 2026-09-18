@@ -423,10 +423,12 @@ setup(
     cmdclass={"build_py": BazelBuild, "bdist_wheel": WheelTag},
     python_requires=">=3.10",
     install_requires=[
-        # Full versions, local label included, for the three the delegate is compiled against. The
-        # label is what names the CUDA build, and dropping it leaves a requirement that a processor
-        # build or a different CUDA build of the same date satisfies just as well. This delegate links
-        # those runtimes out of one specific build, so those are exactly the pairings to refuse.
+        # Full versions, local label included, for these three, but for two different reasons.
+        # ExecuTorch is the one this delegate is compiled and linked against, so another build of it
+        # is an ABI question. PyTorch and Torch-TensorRT are not linked here at all; they share a
+        # process with a delegate that links one CUDA runtime and one TensorRT, so what matters is
+        # that they come from the same CUDA row. A local label is the only part of a version that
+        # names the row, and there is no wildcard for one, so it is an exact pin or nothing.
         f"torch=={torch.__version__}",
         f"executorch=={executorch_version}",
         f"torch-tensorrt=={installed_version('torch-tensorrt')}",

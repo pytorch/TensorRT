@@ -496,7 +496,7 @@ jobs:
         with:
           repository: ${{ inputs.repository  }}
           script: ${{ inputs.post-script }}
-      - name: Check the repaired ExecuTorch runtime wheel
+      - name: Check the retagged ExecuTorch runtime wheel
         if: ${{ steps.executorch-runtime.outcome == 'success' }}
         shell: bash -l {0}
         working-directory: ${{ inputs.repository }}
@@ -506,7 +506,7 @@ jobs:
           shopt -s nullglob
           wheels=(dist/torch_tensorrt_executorch_runtime-*.whl)
           if [[ ${#wheels[@]} -ne 1 ]]; then
-            echo "Expected one repaired ExecuTorch companion, found ${#wheels[@]}" >&2
+            echo "Expected one retagged ExecuTorch companion, found ${#wheels[@]}" >&2
             exit 1
           fi
           ${CONDA_RUN} python .github/scripts/check-executorch-runtime-wheel.py "${wheels[0]}" --architecture "${ARCH}"

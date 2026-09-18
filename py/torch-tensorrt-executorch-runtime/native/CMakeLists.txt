@@ -184,7 +184,9 @@ if(TORCH_TENSORRT_PATCHELF)
 else()
   message(FATAL_ERROR
     "patchelf is required to strip the absolute build-machine RUNPATH that ExecuTorch's "
-    "imported targets add. Install patchelf, or set TORCH_TENSORRT_PATCHELF.")
+    "imported targets add. Install patchelf, or configure with "
+    "-DTORCH_TENSORRT_PATCHELF=/path/to/patchelf. find_program() reads a cache entry, not the "
+    "environment, so exporting that name has no effect.")
 endif()
 
 # The same spelling consumers use for ExecuTorch's own delegates, so a project that builds this
@@ -219,7 +221,8 @@ find_program(TORCH_TENSORRT_READELF NAMES readelf llvm-readelf eu-readelf)
 if(NOT TORCH_TENSORRT_READELF AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
   message(FATAL_ERROR
     "readelf is required to verify the delegate imports the ExecuTorch runtime. Install "
-    "binutils, or set TORCH_TENSORRT_READELF to a readelf.")
+    "binutils, or configure with -DTORCH_TENSORRT_READELF=/path/to/readelf. find_program() "
+    "reads a cache entry, not the environment, so exporting that name has no effect.")
 endif()
 if(TORCH_TENSORRT_READELF)
   add_custom_command(TARGET executorch_backend_tensorrt POST_BUILD
