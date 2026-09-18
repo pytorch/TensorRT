@@ -123,13 +123,45 @@ namespace {
 // synchronize the stream, or to wait on its own event, before reading an output.
 inline constexpr char kAsyncReturnKey[] = "async_return";
 
-// The process-wide TensorRT runtime and its logger. Function-local statics, so it is constructed
-// once, thread safely, and outlives every engine deserialized from it as TensorRT requires.
+// The process-wide TensorRT runtime and its logger, built once on first use and then never
+// destroyed. TensorRT requires the runtime to outlive every engine deserialized from it, and never
+// destroying it is the only way to promise that here. Destroying it at exit would not: statics are
+// torn down in reverse order of when their construction FINISHED, and an application holding a
+// program in a global finishes that global's constructor during static initialization, before
+// anything has called this. The runtime would then be destroyed first and the engine second, which
+// is the wrong way round. The cost is one runtime and one logger still allocated at exit.
 nvinfer1::IRuntime* shared_runtime() {
-  static TRTLogger logger;
-  static TRTUniquePtr<nvinfer1::IRuntime> runtime(nvinfer1::createInferRuntime(logger));
-  return runtime.get();
+  static TRTLogger* const logger = new TRTLogger();
+  static nvinfer1::IRuntime* const runtime = nvinfer1::createInferRuntime(*logger);
+  return runtime;
 }
+
+// Drains the stream when execute() leaves early with a copy still in flight. The staging buffers
+// belong to the handle and outlive the call, so a caller that retries after a failure, on another
+// stream, can have the failed call's copy land in the same buffer with nothing ordering the two.
+// The successful paths disarm this: one drains already and the other hands the work to the handle.
+class StreamDrainOnEarlyReturn {
+ public:
+  explicit StreamDrainOnEarlyReturn(cudaStream_t stream) : stream_(stream) {}
+  StreamDrainOnEarlyReturn(const StreamDrainOnEarlyReturn&) = delete;
+  StreamDrainOnEarlyReturn& operator=(const StreamDrainOnEarlyReturn&) = delete;
+  ~StreamDrainOnEarlyReturn() {
+    if (armed_) {
+      (void)cudaStreamSynchronize(stream_);
+      cudaGetLastError();
+    }
+  }
+  void arm() {
+    armed_ = true;
+  }
+  void disarm() {
+    armed_ = false;
+  }
+
+ private:
+  cudaStream_t stream_;
+  bool armed_ = false;
+};
 
 struct EngineHandleDeleter {
   void operator()(EngineHandle* handle) const {
@@ -689,6 +721,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   const auto caller_stream = ::executorch::extension::cuda::getCallerStream();
   const bool caller_stream_set = caller_stream.has_value();
   cudaStream_t stream = caller_stream.value_or(cudaStreamPerThread);
+  StreamDrainOnEarlyReturn drain_on_early_return(stream);
   bool output_staged_to_host = false;
   bool input_staged_from_host = false;
   // A host pointer bound straight through, which a device that reads pageable host memory
@@ -805,6 +838,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       bind_ptr = engine->cached_input_ptrs[i];
       input_staged_from_host = true;
       cuda_err = cudaMemcpyAsync(bind_ptr, et_in.const_data_ptr(), needed, cudaMemcpyHostToDevice, stream);
+      drain_on_early_return.arm();
       if (cuda_err != cudaSuccess) {
         ET_LOG(
             Error,
@@ -999,6 +1033,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // EValue (D2D on the same stream, after the engine work).
   for (const auto& r : aliased_reflects) {
     cuda_err = cudaMemcpyAsync(std::get<0>(r), std::get<1>(r), std::get<2>(r), cudaMemcpyDeviceToDevice, stream);
+    drain_on_early_return.arm();
     if (cuda_err != cudaSuccess) {
       ET_LOG(
           Error, "TensorRTBackend::execute: aliased-output reflect D2D copy failed: %s", cudaGetErrorString(cuda_err));
@@ -1085,6 +1120,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     }
     engine->inflight_pending = true;
   }
+  drain_on_early_return.disarm();
   return Error::Ok;
 }
 

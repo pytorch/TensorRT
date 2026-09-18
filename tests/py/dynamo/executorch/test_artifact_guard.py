@@ -909,7 +909,7 @@ def test_the_backend_shares_one_tensorrt_runtime(mutation) -> None:
         )
     else:
         # The text still says it, in a comment, and nothing builds a runtime.
-        original = "  static TRTUniquePtr<nvinfer1::IRuntime> runtime(nvinfer1::createInferRuntime(logger));"
+        original = "  static nvinfer1::IRuntime* const runtime = nvinfer1::createInferRuntime(*logger);"
         assert original in source
         source = source.replace(original, "//" + original)
     with pytest.raises(AssertionError):
