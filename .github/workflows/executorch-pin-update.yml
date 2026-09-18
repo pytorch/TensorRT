@@ -109,9 +109,13 @@ jobs:
                   case "${version}" in
                     *[!0-9.]*) echo "release version ${version} is not numeric" >&2; exit 1 ;;
                   esac
+                  # The status is captured in the same command because this step runs under set -e: a
+                  # bare pipeline whose grep finds nothing exits the step before the case can read it,
+                  # which turned the ordinary answer, that a release is not tagged yet, into a failure.
+                  tag_status=0
                   printf '%s\n' "${remote_tags}" |
-                    grep -qE "refs/tags/v${version}\.[0-9]+$"
-                  case "$?" in
+                    grep -qE "refs/tags/v${version}\.[0-9]+$" || tag_status=$?
+                  case "${tag_status}" in
                     0) tagged="yes" ;;
                     1) ;;
                     *) echo "could not decide whether release ${version} is tagged" >&2; exit 1 ;;
