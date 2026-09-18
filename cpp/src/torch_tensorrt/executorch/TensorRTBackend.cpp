@@ -19,6 +19,7 @@
 #include <cstring>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -151,6 +152,32 @@ struct EngineHandleDeleter {
     }
   }
 };
+
+// The element type TensorRT expects for a binding, as ExecuTorch spells it. Returned as an optional
+// because a type this does not know about should not be guessed at: an unknown one is let through
+// rather than refused, so a future TensorRT type does not break a program that works.
+std::optional<exec_aten::ScalarType> expected_scalar_type(nvinfer1::DataType type) {
+  switch (type) {
+    case nvinfer1::DataType::kFLOAT:
+      return exec_aten::ScalarType::Float;
+    case nvinfer1::DataType::kHALF:
+      return exec_aten::ScalarType::Half;
+    case nvinfer1::DataType::kBF16:
+      return exec_aten::ScalarType::BFloat16;
+    case nvinfer1::DataType::kINT32:
+      return exec_aten::ScalarType::Int;
+    case nvinfer1::DataType::kINT64:
+      return exec_aten::ScalarType::Long;
+    case nvinfer1::DataType::kINT8:
+      return exec_aten::ScalarType::Char;
+    case nvinfer1::DataType::kUINT8:
+      return exec_aten::ScalarType::Byte;
+    case nvinfer1::DataType::kBOOL:
+      return exec_aten::ScalarType::Bool;
+    default:
+      return std::nullopt;
+  }
+}
 
 nvinfer1::Dims to_trt_dims(const exec_aten::Tensor& t) {
   nvinfer1::Dims dims{};
@@ -710,6 +737,22 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
           name.c_str(),
           input_device,
           engine->device_id);
+      return Error::InvalidArgument;
+    }
+    // Checked because nothing downstream can catch it. Binding is by pointer and sizing is by byte
+    // count, so a four-byte integer tensor is indistinguishable from a four-byte float one of the
+    // same shape: the engine reads the bits as floats and returns a plausible wrong answer with no
+    // error anywhere. A silent wrong answer is worse than a refused run.
+    const std::optional<exec_aten::ScalarType> wanted =
+        expected_scalar_type(engine->engine->getTensorDataType(name.c_str()));
+    if (wanted.has_value() && et_in.scalar_type() != *wanted) {
+      ET_LOG(
+          Error,
+          "TensorRTBackend::execute: input '%s' has element type %hhd but this engine was built for "
+          "type %hhd. Convert the input, or export the program for the type you intend to feed it.",
+          name.c_str(),
+          static_cast<int8_t>(et_in.scalar_type()),
+          static_cast<int8_t>(*wanted));
       return Error::InvalidArgument;
     }
     nvinfer1::Dims dims = to_trt_dims(et_in);

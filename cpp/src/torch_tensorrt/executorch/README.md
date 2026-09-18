@@ -121,16 +121,17 @@ one does not, so the same program that works on a discrete card can fail on an i
 ### A split program runs only on the first GPU
 
 A program whose graph is split between this delegate and ExecuTorch's CUDA
-backend fails on any GPU but the first. Measured on a four-GPU machine: with the
-engine on the second device and every buffer also on that device, it fails ten
-times out of ten with an illegal memory access, from Python and from C++ alike.
-The same program on the first device works, and this delegate alone on the second
-device works, so the split is what makes the difference.
+backend appears to fail on any GPU but the first. On a four-GPU machine, with the
+engine moved to the second device and every buffer also there, it failed ten runs
+of ten with an illegal memory access, from Python and from C++ alike, while the
+same program on the first device worked and this delegate alone on the second
+device worked. The allocator was seen freeing on the first device while the engine
+ran on the second, so only one half of the program moved.
 
-The cause is on the CUDA backend's side, which selects its device when it
-initialises rather than following the one the program was loaded on. Until that
-changes, load a split program on the first GPU. A program carrying only this
-delegate has no such limit.
+Read that as a warning rather than a settled result. The engine was moved by
+rewriting the device recorded in the program, not by exporting for that device, so
+it has not been reproduced the way a user would reach it. If you have more than one
+GPU and a split program, prefer the first one until this is confirmed properly.
 
 ### Loading the same program many times grows host memory
 
