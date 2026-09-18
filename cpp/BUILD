@@ -3,6 +3,17 @@ load("@rules_cc//cc:defs.bzl", "cc_library")
 package(default_visibility = ["//visibility:public"])
 
 config_setting(
+    name = "driveos",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:linux",
+    ],
+    flag_values = {
+        "//toolchains/dep_collection:compute_libs": "driveos",
+    },
+)
+
+config_setting(
     name = "linux_x86_64",
     constraint_values = [
         "@platforms//cpu:x86_64",
@@ -156,6 +167,7 @@ cc_library(
     target_compatible_with = select({
         ":linux_x86_64": [],
         ":sbsa": [],
+        ":driveos": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = select({
@@ -164,6 +176,10 @@ cc_library(
             "@executorch//:executorch_headers",
         ],
         ":sbsa": [
+            "@executorch//:executorch_cuda_allocator",
+            "@executorch//:executorch_headers",
+        ],
+        ":driveos": [
             "@executorch//:executorch_cuda_allocator",
             "@executorch//:executorch_headers",
         ],
@@ -206,6 +222,7 @@ cc_library(
     target_compatible_with = select({
         ":linux_x86_64": [],
         ":sbsa": [],
+        ":driveos": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = [
@@ -223,9 +240,14 @@ cc_library(
             "@executorch//:extension_cuda",
             "@tensorrt_sbsa//:nvinfer",
         ],
+        ":driveos": [
+            "@executorch//:executorch_headers",
+            "@executorch//:extension_cuda",
+            "@tensorrt_sbsa//:nvinfer",
+        ],
         "//conditions:default": [],
     }) + select({
-        "//toolchains/dep_collection:driveos": ["@cuda_driveos//:cudart"],
+        ":driveos": ["@cuda_driveos//:cudart"],
         "//conditions:default": ["@cuda//:cudart"],
     }),
     alwayslink = True,

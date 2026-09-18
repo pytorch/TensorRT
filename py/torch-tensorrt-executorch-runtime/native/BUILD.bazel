@@ -3,6 +3,17 @@ load("@rules_foreign_cc//foreign_cc:defs.bzl", "cmake")
 package(default_visibility = ["//visibility:public"])
 
 config_setting(
+    name = "driveos",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:linux",
+    ],
+    flag_values = {
+        "//toolchains/dep_collection:compute_libs": "driveos",
+    },
+)
+
+config_setting(
     name = "aarch64_linux",
     constraint_values = [
         "@platforms//cpu:aarch64",
@@ -54,7 +65,7 @@ cmake(
     deps = [
         "@libtorch//:torch",
     ] + select({
-        "//toolchains/dep_collection:driveos": ["@cuda_driveos//:cudart"],
+        ":driveos": ["@cuda_driveos//:cudart"],
         "//conditions:default": ["@cuda//:cudart"],
     }) + select({
         ":aarch64_linux": ["@tensorrt_sbsa//:nvinfer"],

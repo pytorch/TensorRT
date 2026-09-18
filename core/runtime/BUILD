@@ -6,6 +6,17 @@ load("//toolchains/torch_nccl:defs.bzl", "if_torch_nccl")
 package(default_visibility = ["//visibility:public"])
 
 config_setting(
+    name = "driveos",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:linux",
+    ],
+    flag_values = {
+        "//toolchains/dep_collection:compute_libs": "driveos",
+    },
+)
+
+config_setting(
     name = "use_torch_whl",
     flag_values = {
         "//toolchains/dep_src:torch": "whl",
@@ -101,6 +112,7 @@ cc_library(
         ":rtx_x86_64": ["@tensorrt_rtx//:nvinfer"],
         ":sbsa": ["@tensorrt_sbsa//:nvinfer"],
         ":windows": ["@tensorrt_win//:nvinfer"],
+        ":driveos": ["@tensorrt_sbsa//:nvinfer"],
         "//conditions:default": ["@tensorrt//:nvinfer"],
     }),
 )
