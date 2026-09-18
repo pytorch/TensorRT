@@ -327,6 +327,14 @@ def native_tools():
 
 
 @pytest.mark.unit
+def _unquote(text: str) -> str:
+    """Strip one matching pair of quotes, the way a TOML string is delimited."""
+    for quote in ('"', "'"):
+        if len(text) >= 2 and text.startswith(quote) and text.endswith(quote):
+            return text[1:-1]
+    return text
+
+
 def test_the_lane_that_runs_this_file_installs_the_tools_it_needs() -> None:
     """A tool the job does not have skips the real-build tests, and a skip leaves the job green.
 
@@ -348,7 +356,9 @@ def test_the_lane_that_runs_this_file_installs_the_tools_it_needs() -> None:
         # a dependency list would be worse.
         body = text.split("[dependency-groups]", 1)[1].split("lint = [", 1)[1]
         entries = [
-            line.strip().strip(",").strip('"').strip("'")
+            # Only the outer delimiter comes off. Stripping both quote characters ate the closing
+            # quote of a marker like sys_platform == 'linux', leaving a requirement nothing can parse.
+            _unquote(line.strip().rstrip(","))
             for line in body.split("]", 1)[0].splitlines()
             if line.strip() and not line.strip().startswith("#")
         ]
