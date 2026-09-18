@@ -1,4 +1,7 @@
 #!/bin/bash
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 
 # Example usage: docker run -it -v$(pwd):/workspace/TensorRT build_torch_tensorrt_wheel /bin/bash /workspace/TensorRT/py/ci/build_whl.sh
 

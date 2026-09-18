@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 # Smoke test is intentionally disabled.
 # The issue was smoke test installs the built torch_tensorrt wheel file and checks `import torch_tensorrt; print(torch_tensorrt.__version__)`
 # Since tensorrt cannot be pip installable in CI, the smoke test will fail.

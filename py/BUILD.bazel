@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 load("@rules_python//python:defs.bzl", "py_library")
 load("@torch_tensorrt_py_deps//:requirements.bzl", "requirement")
 

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 # Shared test-tier library for Torch-TensorRT — the single source of truth for
 # "what does each CI tier run". Consumed by BOTH:
 #   * CI: .github/workflows/_linux-x86_64-core.yml sources this and calls a
