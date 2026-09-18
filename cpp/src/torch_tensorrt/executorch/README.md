@@ -91,8 +91,18 @@ output belongs, and a fix belongs upstream.
 
 Two consequences worth knowing. The default output clone in the bindings copies from that pointer, which
 is why an asynchronous run can return zeros. And ExecuTorch's own CUDA backend refuses such a buffer
-while this backend accepts it, so a coalesced program's behaviour depends on which backend owns the
-last partition.
+while this backend accepts it, so a coalesced program's behaviour depends on which backend owns the last
+partition. Measured with the same script, the same machine and the same three operators: with TensorRT
+last it passes five times out of five, and with the CUDA backend last it fails five times out of five.
+
+There is a workaround, and it is one export flag. Asking for the graph output to be planned, so the
+program's own CUDA arena owns it instead of the bindings, turns both of those into five passes out of
+five. That is also the evidence that the two backends do not really disagree: hand either of them real
+device memory and both accept it. Only one of them checks.
+
+Which is also why this backend's leniency is not something to rely on. It never reads the device tag at
+all, and the devices differ: three of the four tested report that they can read pageable host memory and
+one does not, so the same program that works on a discrete card can fail on an integrated one.
 
 ### Running from several threads at once does not work today
 
