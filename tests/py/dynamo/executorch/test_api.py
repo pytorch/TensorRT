@@ -2915,8 +2915,8 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
         )
     requires = [
         f"executorch=={installed_executorch}",
-        "torch==2.15.0.dev20260824",
-        "torch-tensorrt==2.15.0.dev20260824",
+        "torch==2.15.0.dev20260824+cu132",
+        "torch-tensorrt==2.15.0.dev20260824+cu132",
         "tensorrt-cu13==11.2.1",
         "nvidia-cuda-runtime==13.2.0",
     ]
@@ -2978,7 +2978,7 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
             for r in requires
         ]
     elif case == "requires_no_executorch":
-        requires = ["torch==2.15.0.dev20260824"]
+        requires = ["torch==2.15.0.dev20260824+cu132"]
     elif case == "requires_a_mismatched_executorch_pin":
         # Every requirement present and exactly pinned, but executorch names a different version
         # than the repository. The presence loop is satisfied, so only the pin comparison can
@@ -2989,8 +2989,8 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
         wrong_pin = pin.rsplit(".dev", 1)[0] + ".dev20200101"
         requires = [
             f"executorch=={wrong_pin}",
-            "torch==2.15.0.dev20260824",
-            "torch-tensorrt==2.15.0.dev20260824",
+            "torch==2.15.0.dev20260824+cu132",
+            "torch-tensorrt==2.15.0.dev20260824+cu132",
             "tensorrt-cu13==11.2.1",
             "nvidia-cuda-runtime==13.2.0",
         ]
@@ -3000,14 +3000,14 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
         # wheel that drops it ships with that binding missing and every content check still passes.
         requires = [
             f"executorch=={pin}",
-            "torch==2.15.0.dev20260824",
+            "torch==2.15.0.dev20260824+cu132",
             "tensorrt-cu13==11.2.1",
             "nvidia-cuda-runtime==13.2.0",
         ]
     elif case == "requires_no_torch":
         requires = [
             f"executorch=={pin}",
-            "torch-tensorrt==2.15.0.dev20260824",
+            "torch-tensorrt==2.15.0.dev20260824+cu132",
             "tensorrt-cu13==11.2.1",
             "nvidia-cuda-runtime==13.2.0",
         ]
@@ -3016,8 +3016,8 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
         # it ships with the dependency missing and every content check above still passes.
         requires = [
             f"executorch=={pin}",
-            "torch==2.15.0.dev20260824",
-            "torch-tensorrt==2.15.0.dev20260824",
+            "torch==2.15.0.dev20260824+cu132",
+            "torch-tensorrt==2.15.0.dev20260824+cu132",
             "nvidia-cuda-runtime==13.2.0",
         ]
     elif case == "requires_an_unpinned_torch_tensorrt":
@@ -3025,7 +3025,7 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
         # it was built beside, which is the whole reason the metadata is read.
         requires = [
             f"executorch=={pin}",
-            "torch==2.15.0.dev20260824",
+            "torch==2.15.0.dev20260824+cu132",
             "torch-tensorrt>=2.15.0.dev20260824",
             "tensorrt-cu13==11.2.1",
             "nvidia-cuda-runtime==13.2.0",
@@ -3035,8 +3035,8 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
         # built beside, which is the whole reason the metadata is read.
         requires = [
             f"executorch=={pin}",
-            "torch==2.15.0.dev20260824",
-            "torch-tensorrt==2.15.0.dev20260824",
+            "torch==2.15.0.dev20260824+cu132",
+            "torch-tensorrt==2.15.0.dev20260824+cu132",
             "tensorrt-cu13==11.2.1",
             "nvidia-cuda-runtime>=13.2.0",
         ]
