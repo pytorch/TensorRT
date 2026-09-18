@@ -28,14 +28,13 @@ separate backend build step.
 add_subdirectory("executorch")
 add_subdirectory("torch_tensorrt/src/torch_tensorrt/executorch")
 
-target_link_libraries(
-  my_runner
-  PRIVATE
-    executorch
-    executorch::backends
-    executorch::extensions
-    executorch::kernels
-    executorch::backend_tensorrt)
+target_link_libraries(my_runner PRIVATE
+  executorch
+  executorch::backends
+  executorch::extensions
+  executorch::kernels
+  executorch::backend_tensorrt
+)
 ```
 
 The backend archive is available as the `executorch_trt_backend` CMake target
