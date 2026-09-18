@@ -281,12 +281,29 @@ def _assert_device_commands(tmp_path, workflow, failure=""):
         "    elif args[:2] == ['-m', 'venv']:\n"
         "        p = Path(args[2]) / 'bin/python'; p.parent.mkdir(parents=True); p.symlink_to(os.environ['DISPATCH'])\n"
         "    elif args[:4] == ['-u', '-X', 'faulthandler', '-c']: pass\n"
+        # The step that builds the module consumer asks python where the two packages put their
+        # CMake files. Answer with a directory that exists, so the configure step it feeds is
+        # given something plausible rather than an empty string.
+        "    elif args[0] == '-c': print(os.environ['RUNNER_TEMP'])\n"
         "    elif args[0].startswith('examples/'):\n"
         "        model = Path(next(a.split('=', 1)[1] for a in args if a.startswith('--model_path=')))\n"
         "        if Path(args[0]).name.startswith('export_'): model.write_text('exported')\n"
         "        else: assert model.read_text() == 'exported'\n"
         "        if os.environ['FAILURE'] and os.environ['FAILURE'] == Path(args[0]).name: sys.exit(17)\n"
         "    else: raise AssertionError(args)\n"
+        # cmake configures and builds the module consumer. Neither call needs to do anything here:
+        # what this test checks is that the step runs in the right order and propagates a failure.
+        "elif tool == 'cmake':\n"
+        "    if os.environ['FAILURE'] == 'cmake': sys.exit(17)\n"
+        # The build call has to leave the binary the next command runs, or the step fails on a
+        # missing file rather than on whatever this case is actually about.
+        "    if args[0] == '--build':\n"
+        "        exe = Path(args[1]) / 'executorch_module_consumer'\n"
+        "        exe.parent.mkdir(parents=True, exist_ok=True)\n"
+        "        exe.symlink_to(os.environ['DISPATCH'])\n"
+        "elif tool == 'nproc': print('2')\n"
+        "elif tool == 'executorch_module_consumer':\n"
+        "    if os.environ['FAILURE'] == 'module_consumer': sys.exit(17)\n"
         "elif tool == 'bazel':\n"
         "    if args[0] == 'info': print(os.environ['RUNNER_TEMP'])\n"
         "    elif args[0] == 'query': print(os.environ['RUNNER_TEMP'] + '/executorch/CMakeLists.txt:1:1')\n"
@@ -298,7 +315,7 @@ def _assert_device_commands(tmp_path, workflow, failure=""):
         "else: raise AssertionError((tool, args))\n"
     )
     dispatcher.chmod(0o755)
-    for tool in ("python", "bazel", "curl", "find"):
+    for tool in ("python", "bazel", "curl", "find", "cmake", "nproc"):
         (bin_dir / tool).symlink_to(dispatcher)
     (runner / "bin/bazel").symlink_to(dispatcher)
     for tool in ("mkdir", "chmod", "sort", "head", "dirname"):

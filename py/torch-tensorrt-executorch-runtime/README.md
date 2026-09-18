@@ -70,6 +70,14 @@ package but because the `backend_cuda` component it pairs with rejects anything
 older: earlier versions write the `$ORIGIN` token in a runtime search path
 incorrectly.
 
+Bring your own CMake. It is not part of these wheels, and a freshly imaged Jetson
+has none at all, which is easy to miss because the Python side needs none.
+
+You do not need to find TensorRT. The delegate needs it, and your linker will look
+for it while linking the delegate, but the package above already points the linker
+at the sibling wheels where it lives. That is why the example links no TensorRT
+target: your application does not use its API, only the delegate's.
+
 This package itself needs only 3.19. On 3.19 through 3.27 you can still use it,
 by asking ExecuTorch for no components and linking the variables it gives you
 instead of its targets:

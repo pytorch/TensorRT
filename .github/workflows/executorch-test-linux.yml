@@ -155,3 +155,18 @@ jobs:
         # tensors and asserts the output never left the device.
         python examples/executorch_reference_runner/load_model_device_resident.py \
           --model_path="${RUNNER_TEMP}/torchtrt-device-resident.pte" --num_runs=2
+        # The only consumer that links the delegate the way an application does: out of the
+        # installed wheel, found by name, through ExecuTorch's module extension. The reference
+        # runner above drives the low level Method API and builds the delegate from source, so
+        # nothing else here exercises the CMake package the wheel ships, or that C++ API.
+        executorch_share="$(python -c 'import importlib.metadata as m, pathlib; print(pathlib.Path(str(m.distribution("executorch").locate_file("executorch"))) / "share" / "cmake")')"
+        delegate_cmake="$(TORCH_TENSORRT_SKIP_DELEGATE_REGISTRATION=1 python -c 'import pathlib, torch_tensorrt_executorch_runtime as r; print(pathlib.Path(r.__file__).parent / "lib" / "cmake" / "executorch_backend_tensorrt")')"
+        cmake -S examples/executorch_module_consumer -B "${RUNNER_TEMP}/module-consumer" \
+          -DCMAKE_PREFIX_PATH="${executorch_share};${delegate_cmake}"
+        cmake --build "${RUNNER_TEMP}/module-consumer" -j"$(nproc)"
+        # Host outputs: the program plans them, so forward() alone is enough.
+        "${RUNNER_TEMP}/module-consumer/executorch_module_consumer" \
+          --model_path="${RUNNER_TEMP}/torchtrt-coalesced.pte" --num_runs=2
+        # Device outputs: the program leaves them to the caller, so one is supplied first.
+        "${RUNNER_TEMP}/module-consumer/executorch_module_consumer" \
+          --model_path="${RUNNER_TEMP}/torchtrt-device-resident.pte" --device_outputs --num_runs=2

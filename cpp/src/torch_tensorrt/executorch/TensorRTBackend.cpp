@@ -235,6 +235,24 @@ bool is_cuda_accessible_ptr(const void* ptr) {
   return attrs.type == cudaMemoryTypeDevice || attrs.type == cudaMemoryTypeManaged;
 }
 
+// The GPU a pointer lives on, or -1 when it is not device memory. Separate from the check above
+// because that one answers whether a pointer can be bound at all, and this one answers whether it
+// can be bound to THIS engine, which is a different question with a different remedy.
+int cuda_device_of_ptr(const void* ptr) {
+  if (ptr == nullptr) {
+    return -1;
+  }
+  cudaPointerAttributes attrs{};
+  if (cudaPointerGetAttributes(&attrs, ptr) != cudaSuccess) {
+    cudaGetLastError();
+    return -1;
+  }
+  if (attrs.type != cudaMemoryTypeDevice && attrs.type != cudaMemoryTypeManaged) {
+    return -1;
+  }
+  return attrs.device;
+}
+
 } // namespace
 
 // ---------------------------------------------------------------------------
@@ -679,6 +697,21 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     }
 
     exec_aten::Tensor et_in = arg->toTensor();
+    // Caught here rather than at submission. Device memory on the wrong GPU binds without complaint
+    // and then fails inside TensorRT as an invalid program, which sends the reader to re-export a
+    // model that was never the problem.
+    const int input_device = cuda_device_of_ptr(et_in.const_data_ptr());
+    if (input_device >= 0 && input_device != engine->device_id) {
+      ET_LOG(
+          Error,
+          "TensorRTBackend::execute: input '%s' is on CUDA device %d but this engine runs on device "
+          "%d. Move the input to the engine's device, or load the program on the device the input is "
+          "already on. The program itself is fine.",
+          name.c_str(),
+          input_device,
+          engine->device_id);
+      return Error::InvalidArgument;
+    }
     nvinfer1::Dims dims = to_trt_dims(et_in);
     if (dims.nbDims > nvinfer1::Dims::MAX_DIMS) {
       ET_LOG(Error, "TensorRTBackend::execute: input '%s' rank exceeds TensorRT limit", name.c_str());
