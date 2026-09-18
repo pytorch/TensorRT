@@ -677,11 +677,14 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // setInputShape/setTensorAddress run on the host, so this must be a host-side wait.
   if (engine->inflight_pending) {
     cuda_err = cudaEventSynchronize(engine->inflight_event);
-    engine->inflight_pending = false;
     if (cuda_err != cudaSuccess) {
+      // Left set on purpose. The wait did not finish, so work may still be running, and the
+      // destructor's own wait is the only thing left that can catch it. Clearing here would make it
+      // free the execution context under a live enqueue.
       ET_LOG(Error, "TensorRTBackend::execute: cudaEventSynchronize failed: %s", cudaGetErrorString(cuda_err));
       return Error::InvalidProgram;
     }
+    engine->inflight_pending = false;
   }
   const auto caller_stream = ::executorch::extension::cuda::getCallerStream();
   const bool caller_stream_set = caller_stream.has_value();
@@ -1061,11 +1064,12 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       }
     }
     cuda_err = cudaStreamSynchronize(stream);
-    engine->inflight_pending = false;
     if (cuda_err != cudaSuccess) {
+      // Left set for the same reason as above: a failed drain means the work may still be live.
       ET_LOG(Error, "TensorRTBackend::execute: cudaStreamSynchronize failed: %s", cudaGetErrorString(cuda_err));
       return Error::InvalidProgram;
     }
+    engine->inflight_pending = false;
     if (copy_err != Error::Ok) {
       return copy_err;
     }
