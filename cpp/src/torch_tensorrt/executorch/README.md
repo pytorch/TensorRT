@@ -65,12 +65,15 @@ type.
 
 ### Coalesced programs with weights need one directory each
 
-A coalesced program's CUDA partition keeps its weights in a separate file written beside the program,
+A coalesced program's CUDA partition keeps its weights in a separate file written beside the
+program,
 under a fixed name. Exporting a second program into the same directory overwrites the first one's
-weights, and the keys inside that file describe the graph's shape rather than its values, so the first
+weights, and the keys inside that file describe the graph's shape rather than its values, so the
+first
 program still loads, still reports finding weights, and returns a wrong answer with no error.
 
-Measured on two GPUs: wrong by 0.85, and bit identical across five runs, which is what makes it read as
+Measured on two GPUs: wrong by 0.85, and bit identical across five runs, which is what makes it
+read as
 a working model rather than a broken one. Retraining and re-exporting the same architecture into one
 directory is the ordinary way to hit this.
 
@@ -78,31 +81,66 @@ Give each export its own directory.
 
 ### A device-resident output reaches Python tagged for the device but backed by host memory
 
-Measured on two GPUs. A program exported device resident runs, and its values are right, but the tensor
+Measured on two GPUs. A program exported device resident runs, and its values are right, but the
+tensor
 the Python bindings hand back reports the device while its pointer is ordinary host memory. Asked
-through the driver, a genuine device tensor answers device memory on device zero, and this one answers
+through the driver, a genuine device tensor answers device memory on device zero, and this one
+answers
 unregistered host memory on device minus two.
 
-So from Python, `is_cuda` on that output proves nothing about residency, and neither does anything built
+So from Python, `is_cuda` on that output proves nothing about residency, and neither does
+anything built
 on it. The same programs run correctly through a C++ consumer, where the caller supplies the output
-address, so the runtime and this backend are doing their part. The structural reason is that the type
+address, so the runtime and this backend are doing their part. The structural reason is that the
+type
 carrying output metadata has no device field, so a generic runner cannot learn where a non-planned
 output belongs, and a fix belongs upstream.
 
-Two consequences worth knowing. The default output clone in the bindings copies from that pointer, which
+Two consequences worth knowing. The default output clone in the bindings copies from that
+pointer, which
 is why an asynchronous run can return zeros. And ExecuTorch's own CUDA backend refuses such a buffer
-while this backend accepts it, so a coalesced program's behaviour depends on which backend owns the last
-partition. Measured with the same script, the same machine and the same three operators: with TensorRT
-last it passes five times out of five, and with the CUDA backend last it fails five times out of five.
+while this backend accepts it, so a coalesced program's behaviour depends on which backend owns
+the last
+partition. Measured with the same script, the same machine and the same three operators: with
+TensorRT
+last it passes five times out of five, and with the CUDA backend last it fails five times out of
+five.
 
 There is a workaround, and it is one export flag. Asking for the graph output to be planned, so the
-program's own CUDA arena owns it instead of the bindings, turns both of those into five passes out of
-five. That is also the evidence that the two backends do not really disagree: hand either of them real
+program's own CUDA arena owns it instead of the bindings, turns both of those into five passes
+out of
+five. That is also the evidence that the two backends do not really disagree: hand either of
+them real
 device memory and both accept it. Only one of them checks.
 
-Which is also why this backend's leniency is not something to rely on. It never reads the device tag at
-all, and the devices differ: three of the four tested report that they can read pageable host memory and
+Which is also why this backend's leniency is not something to rely on. It never reads the device
+tag at
+all, and the devices differ: three of the four tested report that they can read pageable host
+memory and
 one does not, so the same program that works on a discrete card can fail on an integrated one.
+
+### A corrupted engine can return a wrong answer instead of an error
+
+Nothing checks the serialized engine against a digest, because the blob format carries none. The
+header's
+own fields are validated, and a corruption that breaks them is refused, but a corruption inside
+the engine
+bytes themselves is not seen.
+
+Measured with 24 probes that change one value inside the engine: 12 were refused, 12 were
+accepted, and 8
+of those returned a wrong answer, one of them negative infinity. Each wrong value repeated
+identically
+across five runs, so this is deterministic rather than flaky. Corruption inside the delegate's own
+metadata was ignored in all four probes.
+
+That is a property of the format rather than of this backend, and closing it means adding a
+digest to the
+format and to everything that writes one, which would not be readable by programs exported
+before it. Until
+then, treat a program file as trusted input: check it in transit, and do not run one from a
+source you would
+not run code from.
 
 ### Running from several threads at once does not work today
 
@@ -111,24 +149,31 @@ consistently: on one discrete card two threads failed twenty one times out of tw
 integrated part every variant failed five times out of five, including the variant where all threads
 share a single loaded program. A separate case hangs rather than crashing.
 
-The cause is a deadlock, and it has been narrowed to a stack. TensorRT calls this backend's logger from
-whichever thread it is initialising on, that logger writes through ExecuTorch's logging, and under the
-Python bindings that logging is redirected into a Python text stream, whose flush needs the interpreter
+The cause is a deadlock, and it has been narrowed to a stack. TensorRT calls this backend's
+logger from
+whichever thread it is initialising on, that logger writes through ExecuTorch's logging, and
+under the
+Python bindings that logging is redirected into a Python text stream, whose flush needs the
+interpreter
 lock. A thread that does not hold the lock waits for it there and never returns:
 
     TRTLogger::log -> ET_LOG -> std::ostream -> the bindings' stream redirect
                    -> TextIOWrapper flush -> acquire the interpreter lock
 
-Two measurements pin it down. Loading each program under a lock, so only one is ever initialising, fixes
-it: zero failures in five. Running a program once before any thread starts, so initialisation is already
+Two measurements pin it down. Loading each program under a lock, so only one is ever
+initialising, fixes
+it: zero failures in five. Running a program once before any thread starts, so initialisation is
+already
 done, also fixes it: zero failures in five. Silencing standard error does not, in any of three ways,
 because the redirect is inside the process rather than at the file descriptor.
 
-So the practical workaround is to load and run each program once on one thread, and only then hand it to
+So the practical workaround is to load and run each program once on one thread, and only then
+hand it to
 several. Sharing one program does not help on its own, which is why an earlier reading of this as a
 problem with several programs at once was wrong.
 
-A standalone program using TensorRT the same way from several threads, with no ExecuTorch and no Python,
+A standalone program using TensorRT the same way from several threads, with no ExecuTorch and no
+Python,
 runs eighty thousand cycles cleanly. The fix belongs in the bindings, which should not take the
 interpreter lock on a thread the runtime owns.
 
@@ -159,7 +204,8 @@ the removed `CudaStreamGuard`:
   is usually about ordering rather than about wanting the result later, and a caller who did that
   would read the output before the engine writes it. Measured on two architectures, forty runs of
   forty came back entirely zero on an idle GPU, with the stream still unready for a median of 142
-  microseconds after the call returned, growing to 38 milliseconds on a larger graph. Pass the option
+  microseconds after the call returned, growing to 38 milliseconds on a larger graph. Pass the
+  option
   only if the caller waits on the stream or on its own event before reading.
 - The reference-runner smoke test runs inference inside a caller-stream guard on
   the discrete-GPU CI configuration. Host-backed input and output do not imply the
