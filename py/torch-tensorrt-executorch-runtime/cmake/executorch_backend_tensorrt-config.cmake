@@ -130,20 +130,6 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   if(NOT DEFINED EXECUTORCH_BACKEND_TENSORRT_EMBED_RUNPATH)
     set(EXECUTORCH_BACKEND_TENSORRT_EMBED_RUNPATH ON)
   endif()
-  # Linking an executable against this library makes the linker follow its recorded dependencies,
-  # and it does not consult the library's own run path to find them. Without this, a consumer that
-  # did everything right fails on a TensorRT symbol. These are the same directories the run path
-  # names, so the linker resolves them where the loader will. A directory that does not exist is
-  # not an error to the linker, so no check is needed and none is made: this looks for nothing.
-  set_property(
-    TARGET executorch::backend_tensorrt
-    APPEND
-    PROPERTY INTERFACE_LINK_OPTIONS
-             "LINKER:-rpath-link,${_executorch_backend_tensorrt_root}/../../executorch/lib"
-             "LINKER:-rpath-link,${_executorch_backend_tensorrt_root}/../../tensorrt_libs"
-             "LINKER:-rpath-link,${_executorch_backend_tensorrt_root}/../../nvidia/cu13/lib"
-  )
-
   if(EXECUTORCH_BACKEND_TENSORRT_EMBED_RUNPATH)
     set_property(
       TARGET executorch::backend_tensorrt
