@@ -28,6 +28,15 @@ target_link_libraries(my_app PRIVATE
 The optimized-kernel library supplies the `et_copy` host/device copy operators.
 For device-resident exports with `alloc_graph_output=False`, C++ Module callers
 must provide a CUDA output tensor with `Module::set_output` before execution.
+Python callers cannot, so that arrangement is C++ only.
+
+If you want one program that runs from both, turn off allocation for the inputs
+and leave it on for the outputs. The caller then supplies the input buffer, which
+is the copy worth avoiding, and the program's own device arena owns the output.
+Measured on two architectures, that arrangement runs from Python and from C++ with
+no boundary copies in the program and results identical to eager. Turning
+allocation off for both works only from C++, and turning it off for neither is
+refused from both.
 
 Point CMake at both wheels. The example above calls `find_package(executorch)`
 as well, and that package lives in its own distribution. ExecuTorch is a

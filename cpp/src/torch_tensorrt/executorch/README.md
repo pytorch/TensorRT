@@ -122,9 +122,11 @@ one does not, so the same program that works on a discrete card can fail on an i
 ### Loading the same program many times grows host memory
 
 A program whose graph is split across this delegate and ExecuTorch's CUDA backend grows the
-process by roughly 390 to 415 kilobytes for every load, run and drop cycle. Measured on three
-machines and two architectures, each time as a slope fitted over hundreds of cycles rather than
-as the difference between two readings, and the three agree within about six percent.
+process by roughly 390 to 440 kilobytes for every load, run and drop cycle. Measured on three
+machines and two architectures as a slope fitted over hundreds of cycles, and the clearest
+evidence is a count rather than a slope: one extra mapped shared object and four extra mapped
+regions per cycle, with no variance at all, on the split program and none on a program carrying
+only this delegate.
 
 The cause is on the CUDA backend's side: it opens a compiled library per load and never unmaps
 it. A program carrying only this delegate does not, and the same measurement puts that at a
