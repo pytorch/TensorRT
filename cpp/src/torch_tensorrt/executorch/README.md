@@ -118,6 +118,20 @@ all, and the devices differ: three of the four tested report that they can read 
 memory and
 one does not, so the same program that works on a discrete card can fail on an integrated one.
 
+### A split program runs only on the first GPU
+
+A program whose graph is split between this delegate and ExecuTorch's CUDA
+backend fails on any GPU but the first. Measured on a four-GPU machine: with the
+engine on the second device and every buffer also on that device, it fails ten
+times out of ten with an illegal memory access, from Python and from C++ alike.
+The same program on the first device works, and this delegate alone on the second
+device works, so the split is what makes the difference.
+
+The cause is on the CUDA backend's side, which selects its device when it
+initialises rather than following the one the program was loaded on. Until that
+changes, load a split program on the first GPU. A program carrying only this
+delegate has no such limit.
+
 ### Loading the same program many times grows host memory
 
 A program whose graph is split across this delegate and ExecuTorch's CUDA backend grows the

@@ -899,6 +899,22 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     }
 
     exec_aten::Tensor et_out = arg->toTensor();
+    // Same question as for the inputs, and it has to be asked separately, because an output is a
+    // buffer the caller hands over rather than one the engine allocated. Handing over one on the
+    // wrong GPU used to be accepted and then written to, which is an illegal access that leaves the
+    // process's CUDA context unusable rather than returning an error anyone can act on.
+    const int output_device = cuda_device_of_ptr(et_out.const_data_ptr());
+    if (output_device >= 0 && output_device != engine->device_id) {
+      ET_LOG(
+          Error,
+          "TensorRTBackend::execute: the buffer supplied for output '%s' is on CUDA device %d but "
+          "this engine runs on device %d. Supply a buffer on the engine's device. The program "
+          "itself is fine.",
+          name.c_str(),
+          output_device,
+          engine->device_id);
+      return Error::InvalidArgument;
+    }
 
     // Update the ExecuTorch tensor shape to the actual TRT output shape.
     // getTensorShape() is valid after inferShapes() has been called.
