@@ -81,10 +81,6 @@ struct EngineHandle {
   // ask. It is not whether the device is integrated: a discrete card answers no to that and yes to
   // this, and the two answers select different paths.
   bool pageable_host_access = false;
-  // Whether the caller asked to be handed work still in flight. Off unless asked, because a caller
-  // that merely set a stream, which is the ordinary reason to set one, cannot wait for the result
-  // from Python and would read the buffer before the engine writes it.
-  bool async_return_requested = false;
   std::mutex mu;
   // Makes the skip-sync fast path safe to reuse: TensorRT forbids reconfiguring or
   // destroying an execution context while one of its enqueues is in flight, so when

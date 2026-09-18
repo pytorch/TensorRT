@@ -121,7 +121,6 @@ namespace {
 
 // Opting in to being handed work that is still in flight. A caller that passes this promises to
 // synchronize the stream, or to wait on its own event, before reading an output.
-inline constexpr char kAsyncReturnKey[] = "async_return";
 
 // The process-wide TensorRT runtime and its logger, built once on first use and then never
 // destroyed. TensorRT requires the runtime to outlive every engine deserialized from it, and never
@@ -379,34 +378,6 @@ Result<DelegateHandle*> TensorRTBackend::init(
   // so a runtime option is never silently dropped. The const char* returned by
   // get_runtime_spec points into the caller's LoadBackendOptionsMap storage, which
   // outlives init(); we parse it immediately and keep only the int64 result.
-  const auto async_runtime = context.get_runtime_spec<const char*>(kAsyncReturnKey);
-  if (async_runtime.ok()) {
-    const char* const value = async_runtime.get();
-    // Whole words, not the first byte. Reading one byte made "false", "off" and "no" all turn the
-    // option ON, which is the opposite of what a caller writing them means, and the readme beside
-    // this documents that spelling for its own flags. The array need not be NUL terminated, so the
-    // scan is bounded.
-    constexpr std::size_t kAsyncReturnMaxScan = 16;
-    std::size_t len = 0;
-    if (value != nullptr) {
-      while (len < kAsyncReturnMaxScan && value[len] != '\0') {
-        ++len;
-      }
-    }
-    const std::string_view text(value == nullptr ? "" : value, len);
-    if (text.empty()) {
-      // Cleared, so leave the safe default rather than reading emptiness as a yes.
-    } else if (text == "1" || text == "true" || text == "on" || text == "yes") {
-      handle->async_return_requested = true;
-    } else if (text == "0" || text == "false" || text == "off" || text == "no") {
-      handle->async_return_requested = false;
-    } else {
-      // Refused rather than guessed, the way the budget option below refuses a value it cannot
-      // parse. Guessing here hands the caller the asynchronous path it did not ask for.
-      ET_LOG(Error, "TensorRTBackend::init: async_return must be one of 1, true, on, yes, 0, false, off or no");
-      return Error::InvalidArgument;
-    }
-  }
 
   const auto ws_runtime = context.get_runtime_spec<const char*>(kWeightStreamingBudgetKey);
   if (ws_runtime.ok()) {
@@ -719,15 +690,8 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     engine->inflight_pending = false;
   }
   const auto caller_stream = ::executorch::extension::cuda::getCallerStream();
-  const bool caller_stream_set = caller_stream.has_value();
   cudaStream_t stream = caller_stream.value_or(cudaStreamPerThread);
   StreamDrainOnEarlyReturn drain_on_early_return(stream);
-  bool output_staged_to_host = false;
-  bool input_staged_from_host = false;
-  // A host pointer bound straight through, which a device that reads pageable host memory
-  // allows. No copy happens, so neither staging flag is set, yet the engine reads or writes the
-  // caller's own host buffer while the work runs. Same hazard as staging, same wait.
-  bool host_memory_bound_directly = false;
 
   if (engine->cached_input_ptrs.empty()) {
     engine->cached_input_ptrs.resize(num_inputs, nullptr);
@@ -818,9 +782,6 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       bind_ptr = engine->cached_input_ptrs[i];
     } else if (engine->pageable_host_access || is_cuda_accessible_ptr(et_in.const_data_ptr())) {
       bind_ptr = et_in.mutable_data_ptr();
-      if (!is_cuda_accessible_ptr(et_in.const_data_ptr())) {
-        host_memory_bound_directly = true;
-      }
     } else {
       const size_t needed = et_in.nbytes();
       if (needed > engine->cached_input_sizes[i]) {
@@ -836,7 +797,6 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
         engine->cached_input_sizes[i] = needed;
       }
       bind_ptr = engine->cached_input_ptrs[i];
-      input_staged_from_host = true;
       cuda_err = cudaMemcpyAsync(bind_ptr, et_in.const_data_ptr(), needed, cudaMemcpyHostToDevice, stream);
       drain_on_early_return.arm();
       if (cuda_err != cudaSuccess) {
@@ -985,9 +945,6 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       bind_ptr = engine->cached_output_ptrs[o];
     } else if (engine->pageable_host_access || is_cuda_accessible_ptr(et_out.const_data_ptr())) {
       bind_ptr = et_out.mutable_data_ptr();
-      if (!is_cuda_accessible_ptr(et_out.const_data_ptr())) {
-        host_memory_bound_directly = true;
-      }
     } else {
       const size_t needed = et_out.nbytes();
       if (needed > engine->cached_output_sizes[o]) {
@@ -1003,7 +960,6 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
         engine->cached_output_sizes[o] = needed;
       }
       bind_ptr = engine->cached_output_ptrs[o];
-      output_staged_to_host = true;
       outputs_needing_copy.push_back({arg_i, bind_ptr});
     }
 
@@ -1047,78 +1003,48 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     }
   }
 
-  // The engine work is now in flight on `stream`. Decide whether to wait for it:
-  //   must_sync = an output is staged to host (the caller reads the D2H result on
-  //   return), an input was staged from host (its async H2D read the caller's host
-  //   buffer, which the caller may reuse once we return), or no caller stream is
-  //   active (preserve the historical "results ready on return" behavior).
-  // Otherwise (caller stream + all I/O device-resident) leave the work enqueued so
-  // it composes with the caller's later GPU work, and record inflight_event so the
-  // next execute() and the destructor wait before reusing/freeing exec_ctx. The D2H
-  // copies live in the must_sync branch: an output staged to host always sets
-  // output_staged_to_host, so outputs_needing_copy is empty on the skip path.
-  // An aliased reflect enqueues the engine's in-place update into the delegate
-  // output EValue on `stream`; ExecuTorch's buffer-mutation copy_ reads that EValue
-  // after execute() returns, so the reflect must complete first. A model with
-  // aliased outputs therefore always syncs here.
-  const bool aliased_reflect_pending = !aliased_reflects.empty();
-  // Returning with work in flight is opt in. Setting a caller stream is not on its own a request for
-  // it: the ordinary reason to set one is ordering, and a caller who did that gets a buffer the engine
-  // has not written yet. Measured on two architectures, forty runs of forty came back all zero on an
-  // idle GPU, because the only caller that can wait is a C++ one and Python has no way to.
-  const bool must_sync = output_staged_to_host || input_staged_from_host || host_memory_bound_directly ||
-      aliased_reflect_pending || !caller_stream_set || !engine->async_return_requested;
-  if (must_sync) {
-    Error copy_err = Error::Ok;
-    for (auto& output : outputs_needing_copy) {
-      exec_aten::Tensor et_out = args[output.first]->toTensor();
-      cuda_err =
-          cudaMemcpyAsync(et_out.mutable_data_ptr(), output.second, et_out.nbytes(), cudaMemcpyDeviceToHost, stream);
-      if (cuda_err != cudaSuccess) {
-        // Name the output and number it the way the caller does. output.first indexes the whole
-        // argument list, so on a one-input engine the first output read as "output 1", and the
-        // index a caller passes to set_output_data_ptr counts outputs from zero.
-        const size_t output_index = output.first - engine->num_inputs;
-        const char* output_name = output_index < engine->output_binding_names.size()
-            ? engine->output_binding_names[output_index].c_str()
-            : "unknown";
-        ET_LOG(
-            Error,
-            "TensorRTBackend::execute: D2H copy failed for output %zu ('%s'): %s. A program built "
-            "without runtime-allocated outputs needs the caller to supply that buffer, through "
-            "set_output_data_ptr with this index.",
-            output_index,
-            output_name,
-            cudaGetErrorString(cuda_err));
-        // The enqueue already succeeded, so the engine is still running on the
-        // stream. Drain below before returning, or the next call mutates a live
-        // execution context, which TensorRT forbids.
-        // Not InvalidProgram: the program is fine and runs correctly once the buffer is supplied.
-        copy_err = Error::InvalidArgument;
-        break;
-      }
-    }
-    cuda_err = cudaStreamSynchronize(stream);
+  // The engine work is in flight on `stream`, and we always wait for it. ExecuTorch's runtime
+  // has no asynchronous execute: its execute() returns Error::Ok to mean the work is finished,
+  // every caller reads the outputs straight after it returns, and the API hands back no event or
+  // future to wait on. So there is nobody a early return could be honest with.
+  Error copy_err = Error::Ok;
+  for (auto& output : outputs_needing_copy) {
+    exec_aten::Tensor et_out = args[output.first]->toTensor();
+    cuda_err =
+        cudaMemcpyAsync(et_out.mutable_data_ptr(), output.second, et_out.nbytes(), cudaMemcpyDeviceToHost, stream);
     if (cuda_err != cudaSuccess) {
-      // Left set for the same reason as above: a failed drain means the work may still be live.
-      ET_LOG(Error, "TensorRTBackend::execute: cudaStreamSynchronize failed: %s", cudaGetErrorString(cuda_err));
-      return Error::InvalidProgram;
+      // Name the output and number it the way the caller does. output.first indexes the whole
+      // argument list, so on a one-input engine the first output read as "output 1", and the
+      // index a caller passes to set_output_data_ptr counts outputs from zero.
+      const size_t output_index = output.first - engine->num_inputs;
+      const char* output_name = output_index < engine->output_binding_names.size()
+          ? engine->output_binding_names[output_index].c_str()
+          : "unknown";
+      ET_LOG(
+          Error,
+          "TensorRTBackend::execute: D2H copy failed for output %zu ('%s'): %s. A program built "
+          "without runtime-allocated outputs needs the caller to supply that buffer, through "
+          "set_output_data_ptr with this index.",
+          output_index,
+          output_name,
+          cudaGetErrorString(cuda_err));
+      // The enqueue already succeeded, so the engine is still running on the
+      // stream. Drain below before returning, or the next call mutates a live
+      // execution context, which TensorRT forbids.
+      // Not InvalidProgram: the program is fine and runs correctly once the buffer is supplied.
+      copy_err = Error::InvalidArgument;
+      break;
     }
-    engine->inflight_pending = false;
-    if (copy_err != Error::Ok) {
-      return copy_err;
-    }
-  } else {
-    cuda_err = cudaEventRecord(engine->inflight_event, stream);
-    if (cuda_err != cudaSuccess) {
-      // Could not arm the completion marker; drain now so a later execute() or the
-      // destructor never reconfigures or frees exec_ctx while this enqueue runs.
-      ET_LOG(Error, "TensorRTBackend::execute: cudaEventRecord failed: %s", cudaGetErrorString(cuda_err));
-      (void)cudaStreamSynchronize(stream);
-      engine->inflight_pending = false;
-      return Error::InvalidProgram;
-    }
-    engine->inflight_pending = true;
+  }
+  cuda_err = cudaStreamSynchronize(stream);
+  if (cuda_err != cudaSuccess) {
+    // Left set for the same reason as above: a failed drain means the work may still be live.
+    ET_LOG(Error, "TensorRTBackend::execute: cudaStreamSynchronize failed: %s", cudaGetErrorString(cuda_err));
+    return Error::InvalidProgram;
+  }
+  engine->inflight_pending = false;
+  if (copy_err != Error::Ok) {
+    return copy_err;
   }
   drain_on_early_return.disarm();
   return Error::Ok;

@@ -214,22 +214,20 @@ the removed `CudaStreamGuard`:
   complete, order any cross-stream producers/consumers with their own events,
   and synchronize the stream before reading outputs on the host.
 - With no guard active, the backend falls back to `cudaStreamPerThread`.
-- Returning before the work finishes is opt in, through the `async_return` load-time option that
-  `Module::load` accepts. Without it the backend waits, even under a guard, because setting a stream
-  is usually about ordering rather than about wanting the result later, and a caller who did that
-  would read the output before the engine writes it. Measured on two architectures, forty runs of
-  forty came back entirely zero on an idle GPU, with the stream still unready for a median of 142
-  microseconds after the call returned, growing to 38 milliseconds on a larger graph. Pass the
-  option
-  only if the caller waits on the stream or on its own event before reading.
+- The backend always waits for the engine before returning, whatever stream it ran on.
+  ExecuTorch's runtime has no asynchronous execute: its `execute()` returns success to mean the
+  work is finished, every caller reads the outputs straight after it returns, and the API hands
+  back no event or future to wait on. There is therefore nobody an early return could be honest
+  with, and no option to ask for one. An earlier revision of this backend had such an option and
+  it is gone: on an idle GPU it returned zeros forty times out of forty, with the stream still
+  unready for a median of 142 microseconds, growing to 38 milliseconds on a larger graph.
 - The reference-runner smoke test runs inference inside a caller-stream guard on
   the discrete-GPU CI configuration. Host-backed input and output do not imply the
   staging path there: the backend binds a host pointer straight through whenever the
   device reports that it can read pageable host memory, which a discrete H100 does,
   and stages it only on a device that reports it cannot. Either way that
-  configuration returns with the work already finished, because binding a host buffer
-  straight through is itself one of the reasons to wait, and because the runner never
-  asks for `async_return`. CI separately asserts that the runner resolves one shared
+  configuration returns with the work already finished, because the backend always
+  waits. CI separately asserts that the runner resolves one shared
   `libextension_cuda.so`.
 - CUDA green-context streams work, and are the case this shared primitive exists
   for: one `cuGreenCtxStreamCreate` stream drives both the TensorRT delegate and
@@ -250,10 +248,6 @@ the removed `CudaStreamGuard`:
   with its distinct status, and that case is skipped rather than failed, so a green
   context is only exercised where the device has the SMs for one.
 
-  One limit remains. The run takes the synchronized path, because the method inputs
-  and outputs are host-backed and the runner never asks for `async_return`, so the
-  asynchronous return described above is still uncovered and the interaction between
-  a green context and the internal completion event remains untested.
 
 ## Standalone Backend Archive
 
