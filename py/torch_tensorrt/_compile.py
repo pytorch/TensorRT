@@ -628,13 +628,16 @@ def load(
         kwargs are ignored for this format; external ``.ptd`` files are not supported.
         This compatibility path will remain for at least six months after the
         deprecation first ships. New code should import the TensorRT delegate and
-        use ExecuTorch's Module API directly::
+        use ExecuTorch's own runtime API directly::
+
+            from pathlib import Path
 
             import torch_tensorrt_executorch_runtime  # noqa: F401
-            from executorch.extension.pybindings.portable_lib import _load_for_executorch
+            from executorch.runtime import Runtime
 
-            program = _load_for_executorch("model.pte")
-            outputs = program.run_method("forward", (tensor,))
+            program = Runtime.get().load_program(Path("model.pte"))
+            forward = program.load_method("forward")
+            outputs = forward.execute((tensor,))
     """
 
     if format == "executorch":
@@ -642,8 +645,8 @@ def load(
             "torch_tensorrt.load(format='executorch') is deprecated and will remain "
             "supported for at least six months after this deprecation first ships. "
             "Import torch_tensorrt_executorch_runtime to register the TensorRT delegate, "
-            "then use executorch.extension.pybindings.portable_lib._load_for_executorch(path) "
-            "and module.run_method('forward', inputs).",
+            "then load it with executorch.runtime.Runtime.get().load_program(path) and run it "
+            "with program.load_method('forward').execute(inputs).",
             DeprecationWarning,
             stacklevel=2,
         )

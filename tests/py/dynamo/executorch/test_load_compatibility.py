@@ -165,7 +165,11 @@ def test_warning_identifies_caller_and_deprecation_period(compiler, boundary):
     assert warning.category is DeprecationWarning
     assert warning.filename == __file__ and warning.lineno == line
     assert "six months" in str(warning.message)
-    assert "_load_for_executorch" in str(warning.message)
+    # The replacement it points at has to be the public runtime API, not the underscore-prefixed
+    # loader in pybindings, because that one is private and can change without notice.
+    assert "executorch.runtime" in str(warning.message)
+    assert "load_program" in str(warning.message)
+    assert "_load_for_executorch" not in str(warning.message)
 
 
 def test_legacy_options_remain_ignored(compiler, boundary):

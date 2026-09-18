@@ -123,12 +123,15 @@ Import the package once, anywhere before you load a program. Importing is what
 registers the delegate, and nothing else about your code changes:
 
 ```python
+from pathlib import Path
+
 import torch
 import torch_tensorrt_executorch_runtime  # noqa: F401
-from executorch.extension.pybindings.portable_lib import _load_for_executorch
+from executorch.runtime import Runtime
 
-program = _load_for_executorch("model.pte")
-outputs = program.run_method("forward", (torch.ones((2, 3, 4, 4)),))
+program = Runtime.get().load_program(Path("model.pte"))
+forward = program.load_method("forward")
+outputs = forward.execute((torch.ones((2, 3, 4, 4)),))
 ```
 
 If the delegate cannot be loaded, that import raises, rather than letting the
@@ -279,10 +282,10 @@ that, and nothing else: there is no API to call.
 
 ```python
 import torch_tensorrt_executorch_runtime  # noqa: F401
-from executorch.extension.pybindings.portable_lib import _load_for_executorch
+from executorch.runtime import Runtime
 
-program = _load_for_executorch("model.pte")
-outputs = program.run_method("forward", (tensor,))
+program = Runtime.get().load_program(Path("model.pte"))
+outputs = program.load_method("forward").execute((tensor,))
 ```
 
 ExecuTorch's own delegates register because they are linked into its pybindings
@@ -310,11 +313,11 @@ nothing can be copying on every run with nothing to show it. The other
 direction is refused, so the leniency goes one way only. If the copies are why
 you exported this way, measure them rather than trusting the flag.
 
-The device copies around the delegate need the program's device-tagged
-memory-planned arenas backed by real device memory, which ExecuTorch does only
-through its Module API. The examples therefore use `_load_for_executorch`
-and `run_method`. The program loader in `executorch.runtime` plans these arenas
-on the host and is not suitable for these delegated programs.
+Load programs through `executorch.runtime`, which is ExecuTorch's public Python
+runtime API. Some of the examples here still reach for the underscore-prefixed
+loader inside its pybindings extension. That is private, it can change without
+notice, and it should not appear in anything a reader is meant to copy, so those
+examples are being moved over.
 
 ## Use
 
@@ -338,10 +341,13 @@ python -m pip install dist/torch_tensorrt_executorch_runtime-*.whl \
 ```
 
 ```python
+from pathlib import Path
+
 import torch
 import torch_tensorrt_executorch_runtime  # noqa: F401
-from executorch.extension.pybindings.portable_lib import _load_for_executorch
+from executorch.runtime import Runtime
 
-program = _load_for_executorch("model.pte")
-outputs = program.run_method("forward", (torch.ones((2, 3, 4, 4)),))
+program = Runtime.get().load_program(Path("model.pte"))
+forward = program.load_method("forward")
+outputs = forward.execute((torch.ones((2, 3, 4, 4)),))
 ```
