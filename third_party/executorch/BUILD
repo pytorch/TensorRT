@@ -3,6 +3,17 @@ load("@rules_foreign_cc//foreign_cc:defs.bzl", "cmake")
 
 package(default_visibility = ["//visibility:public"])
 
+config_setting(
+    name = "driveos",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:linux",
+    ],
+    flag_values = {
+        "@//toolchains/dep_collection:compute_libs": "driveos",
+    },
+)
+
 exports_files([
     "CMakeLists.txt",
     "executorch/CMakeLists.txt",
@@ -97,7 +108,7 @@ cc_library(
     deps = [
         ":executorch_headers",
     ] + select({
-        "@//toolchains/dep_collection:driveos": ["@cuda_driveos//:cudart"],
+        ":driveos": ["@cuda_driveos//:cudart"],
         "//conditions:default": ["@cuda//:cudart"],
     }),
     alwayslink = True,
@@ -145,7 +156,7 @@ cc_library(
         # only order in which a static archive can satisfy it.
         ":executorch_core",
     ] + select({
-        "@//toolchains/dep_collection:driveos": ["@cuda_driveos//:cudart"],
+        ":driveos": ["@cuda_driveos//:cudart"],
         "//conditions:default": ["@cuda//:cudart"],
     }),
 )
