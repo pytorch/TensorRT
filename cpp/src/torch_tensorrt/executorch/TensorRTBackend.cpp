@@ -227,9 +227,10 @@ bool TensorRTBackend::is_available() const {
     return false;
   }
 
-  TRTLogger logger;
-  TRTUniquePtr<nvinfer1::IRuntime> runtime(nvinfer1::createInferRuntime(logger));
-  return runtime != nullptr;
+  // The shared one, not a second runtime with its own logger. This is the earlier of the two
+  // callers: the runtime asks whether the backend is available before it initialises anything, so
+  // building one here is what produced the ignored-logger warning on every load.
+  return shared_runtime() != nullptr;
 }
 
 // ---------------------------------------------------------------------------

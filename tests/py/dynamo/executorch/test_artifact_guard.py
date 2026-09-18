@@ -788,7 +788,9 @@ def test_the_backend_shares_one_tensorrt_runtime() -> None:
         for line in source.splitlines()
         if "createInferRuntime" in line and not line.lstrip().startswith("//")
     ]
-    assert len(builds) == 2, builds  # the shared accessor, and the separate blob reader
+    # Exactly one, in the shared accessor. The availability check used to build a second one, which
+    # is what made TensorRT report an ignored logger on every load.
+    assert len(builds) == 1, builds
     # And no lock around the deserialize, because TensorRT lists that call as thread safe.
     assert (
         "deserialize_lock" not in source
