@@ -669,6 +669,10 @@ def test_the_forwarder_actually_forwards_and_warns(monkeypatch) -> None:
     Four separate ways of breaking it left the suite green: dropping the import, dropping the
     deprecation warning, naming the loader without calling it, and returning nothing at all. So it is
     called here, against a stub standing in for the main wheel's loader.
+
+    Called three ways, because the published signature is part of what this module preserves: a
+    positional string, the same path by keyword, and a Path object. Renaming the parameter or
+    narrowing it to str keeps the positional call working and breaks the other two.
     """
     sentinel = object()
     calls: list[str] = []
@@ -689,7 +693,13 @@ def test_the_forwarder_actually_forwards_and_warns(monkeypatch) -> None:
     with pytest.warns(DeprecationWarning):
         returned = namespace["load"]("some/model.pte")
     assert returned is sentinel, returned
-    assert calls == ["some/model.pte"], calls
+    with pytest.warns(DeprecationWarning):
+        assert namespace["load"](path="some/model.pte") is sentinel
+    with pytest.warns(DeprecationWarning):
+        assert namespace["load"](Path("some/model.pte")) is sentinel
+    assert calls == ["some/model.pte", "some/model.pte", Path("some/model.pte")], calls
+    signature = inspect.signature(namespace["load"])
+    assert list(signature.parameters) == ["path"], signature
 
 
 @pytest.mark.unit

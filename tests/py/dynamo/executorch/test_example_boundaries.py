@@ -33,10 +33,8 @@ class _DeviceType(enum.IntEnum):
 def _export(
     monkeypatch,
     path,
-    remove_guard=False,
     delegates=None,
     operators=(),
-    copy_ops=None,
     boundary_devices=(),
 ):
     tree = ast.parse(_EXPORT.read_text())
@@ -45,10 +43,6 @@ def _export(
         for node in tree.body
         if isinstance(node, ast.FunctionDef) and node.name == "main"
     )
-    if remove_guard:
-        guards = [node for node in main.body if isinstance(node, ast.If)]
-        assert len(guards) == 1
-        main.body.remove(guards[0])
     tensor = SimpleNamespace(
         shape=(64, 64),
         cuda=lambda: tensor,
@@ -79,8 +73,7 @@ def _export(
         "SHAPE": (64, 64),
         # No BOUNDARY_COPY_OPS here on purpose. Supplying it meant the script's own constant was
         # never read, so emptying that constant, which is the exact failure the comment beside it
-        # warns about, changed nothing. The module-level assignments run below instead, and a case
-        # that wants a different value overrides it afterwards.
+        # warns about, changed nothing. The module-level assignments run below instead.
         "torch": SimpleNamespace(
             no_grad=nullcontext,
             randn=lambda _: tensor,
@@ -155,37 +148,22 @@ def _export(
         compile(ast.Module(body=body, type_ignores=[]), str(_EXPORT), "exec"),
         namespace,
     )
-    if copy_ops is not None:
-        namespace["BOUNDARY_COPY_OPS"] = copy_ops
     namespace["main"]()
 
 
-@pytest.mark.parametrize("existing", [False, True])
-def test_export_rejects_reference_collision_before_writing(
-    monkeypatch, tmp_path, existing
+# m.v2 is the case that decides the naming form: with_suffix() would replace .v2 and write
+# m.expected, which is neither beside the program nor where a reader appending .expected looks.
+# model.expected is here because appending is also what keeps the reference off the program.
+@pytest.mark.parametrize("name", ["model.pte", "m.v2", "model.expected"])
+def test_export_names_the_reference_by_appending_to_the_model_path(
+    monkeypatch, tmp_path, name
 ):
-    path = tmp_path / "model.expected"
-    if existing:
-        path.write_bytes(b"keep existing output")
-    with pytest.raises(SystemExit) as error:
-        _export(monkeypatch, path)
-    assert error.value.code == 2
-    assert (
-        path.read_bytes() == b"keep existing output" if existing else not path.exists()
-    )
-
-
-def test_export_preserves_separate_model_and_reference(monkeypatch, tmp_path):
-    path = tmp_path / "model.pte"
+    path = tmp_path / name
     _export(monkeypatch, path)
     assert path.read_bytes() == b"exported program"
-    assert path.with_suffix(".expected").read_text() == "[64,64]\n0.5000\n"
-
-
-def test_collision_guard_removal_overwrites_model(monkeypatch, tmp_path):
-    path = tmp_path / "model.expected"
-    _export(monkeypatch, path, remove_guard=True)
-    assert path.read_text() == "[64,64]\n0.5000\n"
+    assert path.with_name(path.name + ".expected").read_text() == "[64,64]\n0.5000\n"
+    substituted = path.with_suffix(".expected")
+    assert substituted == path or not substituted.exists()
 
 
 @pytest.mark.parametrize("optimize", [0, 2])
@@ -332,7 +310,7 @@ def test_the_runner_rejects_an_output_that_came_back_on_the_host(
             exec(compile(tree, str(path), "exec"), namespace)
 
 
-def test_the_runner_refuses_to_start_without_cuda(monkeypatch, tmp_path):
+def test_the_runner_refuses_to_start_without_cuda(monkeypatch):
     """The gate that stops the runner on a machine with no CUDA had nothing exercising it.
 
     Every other case stubs CUDA as available, so deleting the gate left the whole suite green.

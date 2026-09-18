@@ -544,7 +544,7 @@ def test_a_missing_pin_file_fails_rather_than_disabling_the_check() -> None:
     [("+cu130", True), ("+cu134", True), ("+cpu", False), ("", False)],
 )
 def test_the_build_refuses_an_executorch_that_is_not_a_cuda_build(
-    packaging_build, monkeypatch, installed, accepted
+    packaging_build, installed, accepted
 ):
     """Matching the version is not matching the build.
 
@@ -553,7 +553,7 @@ def test_the_build_refuses_an_executorch_that_is_not_a_cuda_build(
     and the wheel the build then published required a label the build had never checked.
     """
     state = packaging_build
-    pinned = updater_pin = yaml.safe_load(
+    pinned = yaml.safe_load(
         (state.project.parents[1] / "dev_dep_versions.yml").read_text()
     )["__executorch_version__"]
     state.versions["executorch"] = f"{pinned}{installed}"
@@ -599,12 +599,75 @@ def test_the_wheel_is_tagged_for_any_python_and_one_platform() -> None:
     assert namespace["PlatformDistribution"]().has_ext_modules() is True
 
 
+def _built_wheel_tag(built: Path) -> tuple[str, dict[str, str]]:
+    """The tag in the filename, and the fields the archive's own WHEEL file records."""
+    _, _, python_tag, abi_tag, platform_tag = built.name.removesuffix(".whl").split("-")
+    with zipfile.ZipFile(built) as archive:
+        name = next(
+            member
+            for member in archive.namelist()
+            if member.endswith(".dist-info/WHEEL")
+        )
+        fields = dict(
+            line.split(": ", 1)
+            for line in archive.read(name).decode("utf-8").splitlines()
+            if ": " in line
+        )
+    return f"{python_tag}-{abi_tag}-{platform_tag}", fields
+
+
+def test_a_built_wheel_carries_the_tag_those_two_overrides_ask_for(
+    packaging_build, tmp_path
+):
+    """Exercising the two classes says nothing about whether the build uses them.
+
+    Both are wired in by one argument each to the setup call, and dropping either one left every
+    check green while the built wheel took setuptools' own tag: one copy per interpreter, or a
+    compiled object marked as pure Python. So this builds a wheel and reads the tag back off it.
+    """
+    wheels = tmp_path / "tagged-wheels"
+    wheels.mkdir()
+    built = wheels / build_meta.build_wheel(str(wheels))
+    tag, fields = _built_wheel_tag(built)
+    python_tag, abi_tag, platform_tag = tag.split("-")
+    assert (python_tag, abi_tag) == ("py3", "none"), built.name
+    # Whatever platform built it, but a platform: "any" is what a pure-Python wheel says.
+    assert platform_tag != "any", built.name
+    assert fields.get("Tag") == tag, fields
+    # The payload is a compiled object, so it belongs in the platform-specific location.
+    assert fields.get("Root-Is-Purelib") == "false", fields
+
+
+@pytest.mark.parametrize("dropped", ["distclass", "cmdclass"])
+def test_the_wheel_tag_read_back_notices_either_override_being_dropped(
+    packaging_build, tmp_path, dropped
+):
+    """The read-back is only worth having if losing the wiring fails it."""
+    setup_py = packaging_build.project / "setup.py"
+    source = setup_py.read_text(encoding="utf-8")
+    if dropped == "distclass":
+        wiring, without = "    distclass=PlatformDistribution,\n", ""
+    else:
+        wiring, without = (
+            '    cmdclass={"build_py": BazelBuild, "bdist_wheel": WheelTag},\n',
+            '    cmdclass={"build_py": BazelBuild},\n',
+        )
+    assert wiring in source, source[-600:]
+    setup_py.write_text(source.replace(wiring, without), encoding="utf-8")
+    with pytest.raises(AssertionError):
+        test_a_built_wheel_carries_the_tag_those_two_overrides_ask_for(
+            packaging_build, tmp_path
+        )
+
+
 @pytest.mark.unit
-def test_the_three_linked_runtimes_are_pinned_with_their_build_labels() -> None:
+def test_the_three_pinned_runtimes_keep_their_build_labels() -> None:
     """A version without its label admits a processor build and any other build of the same date.
 
-    The delegate is compiled against one specific build of each of these three, so a requirement that
-    a different build satisfies is not a pin at all. The label is the part that names the build.
+    ExecuTorch is the one the delegate is compiled and linked against, so a requirement another
+    build satisfies is not a pin at all. PyTorch and Torch-TensorRT are not linked here; they share
+    a process with a delegate that links one CUDA runtime and one TensorRT, and the label is the
+    only part of a version that names the row those came from.
     """
     source = (COMPANION / "setup.py").read_text(encoding="utf-8")
     requires = source.split("install_requires=[", 1)[1].split("]", 1)[0]
@@ -625,7 +688,7 @@ def test_the_three_linked_runtimes_are_pinned_with_their_build_labels() -> None:
 
 
 @pytest.mark.unit
-def test_the_declared_pin_keeps_its_build_label(packaging_build, monkeypatch):
+def test_the_declared_pins_keep_their_build_labels(packaging_build, monkeypatch):
     """Reading the file for the words cannot see a value rewritten before it is used.
 
     Dropping the label from the ExecuTorch pin, while leaving every word the old checks looked for,
@@ -635,9 +698,10 @@ def test_the_declared_pin_keeps_its_build_label(packaging_build, monkeypatch):
     state = packaging_build
     monkeypatch.setattr(sys, "argv", [str(state.project / "setup.py"), "--name"])
     runpy.run_path(str(state.project / "setup.py"), run_name="__main__")
-    executorch = [r for r in state.requires if r.startswith("executorch==")]
-    assert executorch, state.requires
-    assert "+cu" in executorch[0], executorch[0]
+    for name in ("torch", "executorch", "torch-tensorrt"):
+        requirement = [r for r in state.requires if r.startswith(f"{name}==")]
+        assert requirement, state.requires
+        assert "+cu" in requirement[0], requirement[0]
 
 
 @pytest.mark.unit

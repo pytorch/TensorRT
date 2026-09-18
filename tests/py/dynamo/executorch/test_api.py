@@ -1964,12 +1964,32 @@ def _co_names_and_consts(code) -> list[str]:
     return found
 
 
-@pytest.mark.unit
-def test_device_export_checks_the_serialized_boundary():
-    """Keep serialized boundary checks alongside the separate workflow execution tests."""
-    export = (
-        _REPO_ROOT / "examples/torchtrt_executorch_example/export_device_resident.py"
-    ).read_text(encoding="utf-8")
+def _executable_source(path: Path) -> str:
+    """The module's code with every docstring dropped, so prose cannot satisfy a check.
+
+    Comments go too, because ``ast`` never keeps them. A plain text search over this file was
+    satisfied by a copy reduced to a docstring and an empty ``main``, which is the whole reason the
+    check reads the parsed tree instead.
+    """
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if not isinstance(
+            node, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+        ):
+            continue
+        first = node.body[0] if node.body else None
+        if (
+            isinstance(first, ast.Expr)
+            and isinstance(first.value, ast.Constant)
+            and isinstance(first.value.value, str)
+        ):
+            node.body = node.body[1:] or [ast.Pass()]
+    ast.fix_missing_locations(tree)
+    return ast.unparse(tree)
+
+
+def _assert_the_device_export_checks_its_boundary(path: Path) -> None:
+    source = _executable_source(path)
     for fragment in (
         "skip_h2d_for_method_inputs=True",
         "skip_d2h_for_method_outputs=True",
@@ -1979,10 +1999,33 @@ def test_device_export_checks_the_serialized_boundary():
         "_d2h_copy",
         "plan.operators",
     ):
-        assert fragment in export, (
-            f"export_device_resident.py no longer contains {fragment!r}, so it does not "
+        assert fragment in source, (
+            f"{path.name} no longer contains {fragment!r} in its code, so it does not "
             "prove the boundary copies are absent"
         )
+
+
+@pytest.mark.parametrize("gutted", [False, True])
+@pytest.mark.unit
+def test_device_export_checks_the_serialized_boundary(tmp_path, gutted):
+    """Keep serialized boundary checks alongside the separate workflow execution tests.
+
+    Reading the example rather than running it, because running it needs a GPU and the whole export
+    stack, and this test lane has neither. What it can do is refuse to be satisfied by text that
+    never executes: the gutted case is the real file turned into one docstring with an empty
+    ``main`` under it, which the earlier search could not tell from the real thing.
+    """
+    path = _REPO_ROOT / "examples/torchtrt_executorch_example/export_device_resident.py"
+    if not gutted:
+        _assert_the_device_export_checks_its_boundary(path)
+        return
+    prose = path.read_text(encoding="utf-8").replace('"""', "'''")
+    gutted_path = tmp_path / path.name
+    gutted_path.write_text(
+        f'"""{prose}"""\n\n\ndef main() -> None:\n    pass\n', encoding="utf-8"
+    )
+    with pytest.raises(AssertionError):
+        _assert_the_device_export_checks_its_boundary(gutted_path)
 
 
 @pytest.mark.unit

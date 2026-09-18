@@ -1541,11 +1541,12 @@ def test_every_printed_install_instruction_names_the_nightly_channel():
 
 
 @pytest.mark.unit
-def test_the_no_nightly_marker_only_exempts_a_win32_install():
-    """Only the Windows main-wheel install may omit this Linux integration's nightly index."""
+def test_the_no_nightly_marker_only_exempts_main_wheel_installs():
+    """Only main-wheel-only installs may omit this integration's nightly index."""
     tracked = _tracked_files()
 
     misplaced = []
+    missing = []
     for name in tracked:
         if not name or _is_source_test(name):
             continue
@@ -1556,14 +1557,16 @@ def test_the_no_nightly_marker_only_exempts_a_win32_install():
         if NO_NIGHTLY_MARKER not in text:
             continue
         lines = text.splitlines()
-        control = re.compile(r"^\s*(?:if\b|elif\b|else\b|fi\b)")
+        if name == ".github/scripts/install-torch-tensorrt.sh":
+            for index, content in enumerate(lines):
+                if "pip install ${wheels}" not in content:
+                    continue
+                context = "\n".join(lines[max(0, index - 3) : index])
+                if NO_NIGHTLY_MARKER not in context:
+                    missing.append(f"{name}:{index + 1} installs main wheels without the marker")
         for index, content in enumerate(lines):
             if NO_NIGHTLY_MARKER not in content:
                 continue
-            # The exempted install sits just below the marker, so the branch it lives in is the
-            # nearest control-flow keyword above it. Requiring that keyword to be the win32 guard
-            # ties the exemption to the one platform it describes: a marker pasted onto a Linux
-            # "else" install resolves to that "else", not to "if ... win32", and is rejected.
             # The exemption is only honest when the install below it cannot pull the companion in,
             # since the companion is what needs the ExecuTorch channel. An unanchored
             # torch_tensorrt* glob also matches torch_tensorrt_executorch_runtime, so requiring the
@@ -1591,6 +1594,7 @@ def test_the_no_nightly_marker_only_exempts_a_win32_install():
         "the no-nightly exemption is only valid above a main-wheel-only install: "
         f"{misplaced}"
     )
+    assert not missing, f"main-wheel-only installs missing no-nightly markers: {missing}"
 
 
 @pytest.mark.unit

@@ -486,7 +486,7 @@ def test_the_delegate_lane_narrows_the_matrix_to_cuda_13_rows() -> None:
         check=True,
     )
     kept = {row["desired_cuda"] for row in json.loads(result.stdout)["include"]}
-    assert kept and all(row.startswith("cu13") for row in kept), kept
+    assert kept == {"cu130", "cu134"}, kept
 
 
 @pytest.mark.unit
@@ -592,25 +592,75 @@ def test_the_kept_entry_points_actually_warn_and_forward(monkeypatch) -> None:
 
 
 @pytest.mark.unit
-def test_the_coalesced_program_is_run_on_a_caller_stream() -> None:
+@pytest.mark.parametrize("green_returns_the_wrong_numbers", [False, True])
+def test_the_coalesced_program_is_run_on_a_caller_stream(
+    tmp_path, green_returns_the_wrong_numbers
+) -> None:
     """Nothing exercised the caller stream, which is the path the delegate is built around.
 
     The delegate takes the stream from the caller and a green context confines it to a slice of the
     machine. Both were reachable only by hand: every automated run used the default stream, so a
     delegate that stopped honouring the caller's stream would have kept passing.
+
+    Searching the script for the flag is not enough. Wrapping the green-context run in `if false`
+    leaves every string in place, so a text check stays green while CI stops exercising the caller
+    stream. So the script's own coalesced section is executed here, against a stub runner, and the
+    stub has to be handed the flag. The wrong-numbers case proves the output is still checked and
+    not only the exit status, since that check is the script's own function running for real.
     """
-    script = (ROOT / ".github/scripts/verify-executorch-reference-runner.sh").read_text(
-        encoding="utf-8"
+    lines = (
+        (ROOT / ".github/scripts/verify-executorch-reference-runner.sh")
+        .read_text(encoding="utf-8")
+        .splitlines()
     )
-    live = [
-        line
-        for line in script.splitlines()
-        if "--green_context_sms=" in line and not line.lstrip().startswith("#")
-    ]
+    # The script's own output check and its own coalesced section, taken whole rather than
+    # paraphrased. The section is the last block in the file.
+    check = lines.index("assert_runner_output() {")
+    harness = "\n".join(
+        lines[check : lines.index("}", check) + 1]
+        + lines[lines.index('if [[ -n "${coalesced_model_path}" ]]; then') :]
+    )
+    calls = tmp_path / "calls"
+    stub = tmp_path / "runner"
+    stub.write_text(
+        "#!/bin/sh\n"
+        'echo "$@" >> "$CALLS"\n'
+        'echo "planned buffer[0] = 16384 bytes on device_type 1"\n'
+        'echo "output[0] shape=[64,64]"\n'
+        'if [ -n "$WRONG_GREEN" ] && echo "$@" | grep -q green_context; then\n'
+        '  echo "first 3 values: 9.0000 9.0000 9.0000"\n'
+        "else\n"
+        '  echo "first 3 values: 0.5000 0.5000 0.5000"\n'
+        "fi\n"
+    )
+    stub.chmod(0o755)
+    model = tmp_path / "coalesced.pte"
+    model.write_bytes(b"pte")
+    (tmp_path / "coalesced.pte.expected").write_text("[64,64]\n0.5000\n")
+    work = tmp_path / "work"
+    work.mkdir()
+    result = subprocess.run(
+        ["bash", "-euo", "pipefail", "-c", harness],
+        env={
+            **os.environ,
+            "CALLS": str(calls),
+            "WRONG_GREEN": "1" if green_returns_the_wrong_numbers else "",
+            "runner_path": str(stub),
+            "verify_root": str(work),
+            "coalesced_model_path": str(model),
+        },
+        capture_output=True,
+        text=True,
+    )
+    invocations = (
+        calls.read_text(encoding="utf-8").splitlines() if calls.exists() else []
+    )
+    green = [call for call in invocations if "--green_context_sms=" in call]
+    assert green, f"the runner was never given a green context: {invocations}"
     assert (
-        live
-    ), "no run passes a green context, so the caller stream is never exercised"
-    # On the coalesced program, because that is the case with two backends sharing one stream.
-    assert "coalesced_green_context.log" in script, script[-400:]
-    # And the numbers are checked, not only the exit status.
-    assert 'assert_runner_output "${green_runner_log}"' in script, script[-400:]
+        work / "coalesced_green_context.log"
+    ).exists(), f"the green-context run produced no log: {list(work.iterdir())}"
+    if green_returns_the_wrong_numbers:
+        assert result.returncode != 0, result.stdout + result.stderr
+    else:
+        assert result.returncode == 0, result.stdout + result.stderr

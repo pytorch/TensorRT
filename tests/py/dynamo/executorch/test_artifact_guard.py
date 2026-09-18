@@ -5,6 +5,7 @@
 
 import json
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -12,6 +13,9 @@ import sys
 from pathlib import Path
 
 import pytest
+
+from packaging.requirements import Requirement
+from packaging.utils import canonicalize_name
 
 pytestmark = pytest.mark.unit
 
@@ -26,6 +30,10 @@ _REGISTER = "_ZN10executorch7runtime16register_backendERKNS0_7BackendE"
 _X86 = "manylinux_2_28_x86_64"
 _ARM = "manylinux_2_35_aarch64"
 _BASE_VERSIONS = "CXXABI_1.3 GLIBCXX_3.4.21 GLIBC_2.17 GCC_3.0"
+# What the tests that build for real need, and which of those a Linux CI image already carries. The
+# rest has to be installed by the job, or those tests skip and take the job's green with them.
+_NATIVE_TOOLS = ("cmake", "c++", "readelf", "patchelf")
+_IMAGE_TOOLS = ("cmake", "c++", "readelf")
 
 
 def _run(argv, **kwargs):
@@ -312,12 +320,38 @@ def test_missing_pybindings_is_fatal(artifact):
 
 @pytest.fixture
 def native_tools():
-    tools = {
-        name: shutil.which(name) for name in ("cmake", "c++", "readelf", "patchelf")
-    }
+    tools = {name: shutil.which(name) for name in _NATIVE_TOOLS}
     if sys.platform != "linux" or not all(tools.values()):
         pytest.skip("needs Linux, CMake >= 3.28, a C++ compiler, readelf and patchelf")
     return tools
+
+
+@pytest.mark.unit
+def test_the_lane_that_runs_this_file_installs_the_tools_it_needs() -> None:
+    """A tool the job does not have skips the real-build tests, and a skip leaves the job green.
+
+    They are the only tests here that configure the native project, build it and read the result
+    back with the platform's own tools. With patchelf absent from the lint job, eleven of them did
+    nothing on every pull request while the job reported success. Whatever the runner image does not
+    carry has to be installed by the job, and what the job installs is the lint dependency group.
+    """
+    import tomllib
+
+    declared = {
+        canonicalize_name(Requirement(dependency).name)
+        for dependency in tomllib.loads(
+            (_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+        )["dependency-groups"]["lint"]
+    }
+    missing = [
+        tool
+        for tool in _NATIVE_TOOLS
+        if tool not in _IMAGE_TOOLS and canonicalize_name(tool) not in declared
+    ]
+    assert not missing, (
+        f"the lint group installs none of {missing}, so the real-build tests in this file skip "
+        "there and nothing that can block a pull request exercises the guard"
+    )
 
 
 def _native_project(tmp_path, tools, *, mutation=None, static_cuda=False):
@@ -767,36 +801,104 @@ def test_the_native_build_runs_the_guard_after_linking() -> None:
     assert "TARGET_FILE:executorch_backend_tensorrt" in guard[0], guard[0][:300]
 
 
+_LITERAL_OR_COMMENT = re.compile(
+    r'"(?:\\.|[^"\\])*"' r"|'(?:\\.|[^'\\])*'" r"|//[^\n]*" r"|/\*.*?\*/", re.S
+)
+
+
+def _code_only(source: str) -> str:
+    """The source with its comments removed, so no check below can be satisfied by a comment.
+
+    String and character literals are matched first and kept, so a ``//`` inside one survives. The
+    delegate sources use no raw string literals, which this would not handle.
+    """
+    return _LITERAL_OR_COMMENT.sub(
+        lambda match: match.group(0) if match.group(0)[0] in "\"'" else " ", source
+    )
+
+
+def _definition_body(source: str, signature: str) -> str:
+    """The braced body of the definition introduced by ``signature``.
+
+    Reading one body rather than the whole file is what lets a check say where something happens
+    instead of only that the file mentions it somewhere.
+    """
+    start = source.index(signature)
+    depth = 0
+    for index in range(source.index("{", start), len(source)):
+        if source[index] == "{":
+            depth += 1
+        elif source[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return source[start : index + 1]
+    raise AssertionError(f"unbalanced braces after {signature!r}")
+
+
+def _assert_one_shared_runtime(source: str, header: str) -> None:
+    code = _code_only(source)
+    accessor = "nvinfer1::IRuntime* shared_runtime()"
+    assert accessor in code, "no shared runtime accessor"
+    # Exactly one place builds it, and it is that accessor. The availability check used to build a
+    # second one, which is what made TensorRT report an ignored logger on every load, and it ran
+    # first: the runtime asks whether the backend is available before it initialises anything, so
+    # the logger TensorRT kept for the process was that one's, on a stack frame already gone.
+    builds = [line for line in code.splitlines() if "createInferRuntime" in line]
+    assert len(builds) == 1, builds
+    assert builds[0] in _definition_body(code, accessor), builds[0]
+    availability = _definition_body(code, "bool TensorRTBackend::is_available() const")
+    assert "shared_runtime()" in availability, availability
+    assert "createInferRuntime" not in availability, availability
+    # And no lock around the deserialize, because TensorRT lists that call as thread safe.
+    assert (
+        "deserialize_lock" not in code
+    ), "a lock was added around a documented-safe call"
+    # And the handle no longer carries one of its own.
+    assert "IRuntime> runtime;" not in _code_only(
+        header
+    ), "the handle still owns a runtime"
+
+
+@pytest.mark.parametrize("mutation", [None, "availability-builds-one", "commented-out"])
 @pytest.mark.unit
-def test_the_backend_shares_one_tensorrt_runtime() -> None:
+def test_the_backend_shares_one_tensorrt_runtime(mutation) -> None:
     """A runtime per program bought nothing and warned on every load after the first.
 
     TensorRT documents a runtime as sharable across threads for nonmodifying use, and logs that a
     second one's logger is ignored because it already has one. Deserializing from a runtime is on its
     thread-safe list, so no lock is taken around it; what it says to serialize is the modifying
     setters, and this backend calls none of them.
+
+    This reads the arrangement of the code, not a running backend: TensorRT and the ExecuTorch
+    headers are absent from every lane that can run this file, so nothing here can compile or call
+    the delegate. What it does establish is where the runtime is built and who asks for it, with
+    comments stripped first and each definition read on its own, so neither a comment nor a mention
+    elsewhere in the file can stand in for the code. That the file compiles at all is established by
+    the lane that builds the wheel, and what TensorRT then does with one runtime by the device lanes.
     """
     source = (
         _ROOT / "cpp/src/torch_tensorrt/executorch/TensorRTBackend.cpp"
     ).read_text(encoding="utf-8")
-    assert (
-        "nvinfer1::IRuntime* shared_runtime()" in source
-    ), "no shared runtime accessor"
-    # Exactly one place builds it, and it is that accessor.
-    builds = [
-        line
-        for line in source.splitlines()
-        if "createInferRuntime" in line and not line.lstrip().startswith("//")
-    ]
-    # Exactly one, in the shared accessor. The availability check used to build a second one, which
-    # is what made TensorRT report an ignored logger on every load.
-    assert len(builds) == 1, builds
-    # And no lock around the deserialize, because TensorRT lists that call as thread safe.
-    assert (
-        "deserialize_lock" not in source
-    ), "a lock was added around a documented-safe call"
-    # And the handle no longer carries one of its own.
     header = (
         _ROOT / "cpp/include/torch_tensorrt/executorch/TensorRTBackend.h"
     ).read_text(encoding="utf-8")
-    assert "IRuntime> runtime;" not in header, "the handle still owns a runtime"
+    if mutation is None:
+        _assert_one_shared_runtime(source, header)
+        return
+    if mutation == "availability-builds-one":
+        # The arrangement this change replaced: its own runtime, from a logger on the stack.
+        original = "return shared_runtime() != nullptr;"
+        assert original in source
+        source = source.replace(
+            original,
+            "TRTLogger logger;\n"
+            "  TRTUniquePtr<nvinfer1::IRuntime> runtime(nvinfer1::createInferRuntime(logger));\n"
+            "  return runtime != nullptr;",
+        )
+    else:
+        # The text still says it, in a comment, and nothing builds a runtime.
+        original = "  static TRTUniquePtr<nvinfer1::IRuntime> runtime(nvinfer1::createInferRuntime(logger));"
+        assert original in source
+        source = source.replace(original, "//" + original)
+    with pytest.raises(AssertionError):
+        _assert_one_shared_runtime(source, header)

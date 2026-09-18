@@ -61,6 +61,11 @@ lint = [
     "packaging>=23.1",
     "setuptools>=77.0.0",
     "wheel>=0.40.0",
+    # The artifact guard's real-build tests configure the native project and read the run path back
+    # with this. Without it they skip and the job still passes, so the guard that is meant to block a
+    # pull request would be exercised by nothing. Linux only, because that is where those tests run
+    # and where the tool has a wheel.
+    "patchelf>=0.17; sys_platform == 'linux'",
 ]
 
 dev = [

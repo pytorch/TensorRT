@@ -5,6 +5,7 @@ import ast
 import ctypes
 import importlib.util
 import os
+import subprocess
 import sys
 import types
 from pathlib import Path
@@ -19,6 +20,8 @@ DELEGATE_PATH = (
 )
 SETUP_PATH = Path(__file__).parents[4] / "py/torch-tensorrt-executorch-runtime/setup.py"
 SKIP_ENV = "TORCH_TENSORRT_SKIP_DELEGATE_REGISTRATION"
+COMPANION_ROOT = Path(__file__).parents[4] / "py/torch-tensorrt-executorch-runtime"
+PACKAGE = "torch_tensorrt_executorch_runtime"
 
 
 @pytest.mark.parametrize("device_resident", [False, True])
@@ -797,3 +800,80 @@ def test_an_unloadable_executorch_is_not_reported_as_absent(
     assert (
         advises_install is expect_install_advice
     ), f"for {message!r} the diagnosis was: {raised.value}"
+
+
+def _documented_path_recipes() -> list[tuple[str, bool, str]]:
+    """Every documented command that imports this package only to print a path.
+
+    The recipes are what a consumer copies, and the import in them registers the delegate, so one
+    written without the opt-out fails wherever the delegate cannot load. Returns the file it came
+    from, whether it sets the opt-out, and the code it runs.
+    """
+    recipes = []
+    for relative in ("README.md", "cmake/torchtrt_executorch-config.cmake"):
+        text = (COMPANION_ROOT / relative).read_text(encoding="utf-8")
+        for line in text.splitlines():
+            if (
+                "python -c " not in line
+                or "torch_tensorrt_executorch_runtime" not in line
+            ):
+                continue
+            before, _, rest = line.partition("python -c ")
+            quote = rest[0]
+            recipes.append(
+                (
+                    relative,
+                    before.endswith(f"{SKIP_ENV}=1 "),
+                    rest[1 : rest.index(quote, 1)],
+                )
+            )
+    return recipes
+
+
+def test_the_documented_path_recipes_run_without_a_loadable_delegate(tmp_path):
+    """Run each documented path query where the delegate cannot load, which is where they are used.
+
+    A consumer runs these before anything is built, and CMake runs one of them from a configure
+    step. Nothing here is stubbed but the ExecuTorch distribution metadata one of them reads: the
+    package comes from the checkout, which carries no built delegate, so a plain import raises.
+    Each recipe is then run again with the opt-out removed, so the variable is shown to be what
+    makes the recipe work rather than decoration.
+    """
+    site = tmp_path / "site"
+    (site / "executorch").mkdir(parents=True)
+    (site / "executorch/__init__.py").touch()
+    metadata = site / "executorch-1.6.0.dist-info"
+    metadata.mkdir()
+    (metadata / "METADATA").write_text(
+        "Metadata-Version: 2.1\nName: executorch\nVersion: 1.6.0\n", encoding="utf-8"
+    )
+    recipes = _documented_path_recipes()
+    assert len(recipes) == 3, recipes
+    environment = {
+        key: value
+        for key, value in os.environ.items()
+        if key not in (SKIP_ENV, "PYTHONPATH")
+    }
+    environment["PYTHONPATH"] = os.pathsep.join([str(site), str(COMPANION_ROOT)])
+    for relative, sets_skip, code in recipes:
+        assert (
+            sets_skip
+        ), f"{relative} imports the package for a path without {SKIP_ENV}"
+        opted_out = subprocess.run(
+            [sys.executable, "-c", code],
+            capture_output=True,
+            text=True,
+            env={**environment, SKIP_ENV: "1"},
+            timeout=60,
+        )
+        assert opted_out.returncode == 0, opted_out.stderr
+        assert str(COMPANION_ROOT / PACKAGE) in opted_out.stdout, opted_out.stdout
+        plain = subprocess.run(
+            [sys.executable, "-c", code],
+            capture_output=True,
+            text=True,
+            env=environment,
+            timeout=60,
+        )
+        assert plain.returncode != 0, plain.stdout
+        assert "DelegateCompatibilityError" in plain.stderr, plain.stderr

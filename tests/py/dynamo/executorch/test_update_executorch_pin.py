@@ -630,7 +630,7 @@ def test_write_pins_finishes_an_interrupted_run(pin_repo, monkeypatch):
 
 @pytest.mark.unit
 def test_a_site_that_loses_its_version_requirement_is_not_excused_by_its_commit(
-    pin_repo, monkeypatch
+    pin_repo,
 ):
     """Four sites carry both coordinates, and the old check accepted either one.
 
