@@ -4,9 +4,12 @@
 """Run a device-resident .pte and prove the method boundary did not copy.
 
 The program this loads was exported with ``skip_h2d_for_method_inputs`` and
-``skip_d2h_for_method_outputs``, so it requires a CUDA input and returns a CUDA
-output. Feeding it a CPU tensor is a caller error, not something the runtime
-papers over: the delegate would read host memory as if it were device memory.
+``skip_d2h_for_method_outputs``, so its boundary carries no copy operators and it
+wants a CUDA input. A host input still gives the right answer, but it costs a
+staging copy that the export existed to remove, so it defeats the point rather
+than breaking the program. Where a host-backed buffer tagged for the device does
+fail is in the runtime rather than in this delegate, on a device that reports it
+cannot read pageable host memory.
 
 That contract is what this script checks. ``export_device_resident.py`` already
 asserts the serialized program contains no boundary copy operators; this asserts
