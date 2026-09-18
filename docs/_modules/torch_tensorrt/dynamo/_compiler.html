@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=fa5c35e5"></script>
+    <script src="../../../_static/documentation_options.js?v=9564b768"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -1772,8 +1772,10 @@ document.write(`
     <span class="n">CONVERTERS</span><span class="o">.</span><span class="n">set_compilation_settings</span><span class="p">(</span><span class="n">settings</span><span class="p">)</span>
 
     <span class="c1"># Check the number of supported operations in the graph</span>
-    <span class="n">num_supported_ops</span><span class="p">,</span> <span class="n">total_ops</span> <span class="o">=</span> <span class="n">partitioning</span><span class="o">.</span><span class="n">get_graph_converter_support</span><span class="p">(</span>
-        <span class="n">gm</span><span class="p">,</span> <span class="n">settings</span><span class="o">.</span><span class="n">torch_executed_ops</span>
+    <span class="n">num_supported_ops</span><span class="p">,</span> <span class="n">total_ops</span><span class="p">,</span> <span class="n">op_support</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">partitioning</span><span class="o">.</span><span class="n">get_graph_converter_support_overview</span><span class="p">(</span>
+            <span class="n">gm</span><span class="p">,</span> <span class="n">settings</span><span class="o">.</span><span class="n">torch_executed_ops</span>
+        <span class="p">)</span>
     <span class="p">)</span>
 
     <span class="n">dryrun_tracker</span><span class="o">.</span><span class="n">total_ops_in_graph</span> <span class="o">=</span> <span class="n">total_ops</span>
@@ -1795,6 +1797,11 @@ document.write(`
             <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">num_supported_ops</span><span class="si">}</span><span class="s2"> supported operations detected in subgraph containing </span><span class="si">{</span><span class="n">total_ops</span><span class="si">}</span><span class="s2"> computational nodes. "</span>
             <span class="sa">f</span><span class="s2">"Skipping this subgraph, since min_block_size was detected to be </span><span class="si">{</span><span class="n">settings</span><span class="o">.</span><span class="n">min_block_size</span><span class="si">}</span><span class="s2">"</span>
         <span class="p">)</span>
+
+        <span class="n">dryrun_tracker</span><span class="o">.</span><span class="n">unsupported_ops</span> <span class="o">=</span> <span class="n">op_support</span><span class="o">.</span><span class="n">unsupported_operators</span>
+        <span class="n">dryrun_tracker</span><span class="o">.</span><span class="n">to_run_in_torch</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">parse_non_trt_nodes</span><span class="p">(</span><span class="n">gm</span><span class="p">))</span>
+        <span class="n">parse_graph_io</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">dryrun_tracker</span><span class="p">)</span>
+        <span class="n">dryrun_stats_display</span><span class="p">(</span><span class="n">dryrun_tracker</span><span class="p">,</span> <span class="n">settings</span><span class="o">.</span><span class="n">dryrun</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">gm</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>

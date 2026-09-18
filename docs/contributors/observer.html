@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=fa5c35e5"></script>
+    <script src="../_static/documentation_options.js?v=9564b768"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -637,6 +637,18 @@ firing in another thread. This makes the system safe to use in multi-threaded
 compilation pipelines.</p>
 </section>
 <hr class="docutils" />
+<section id="built-in-observables">
+<h2>Built-in Observables<a class="headerlink" href="#built-in-observables" title="Link to this heading">#</a></h2>
+<p>Functions Torch-TensorRT already exposes as <code class="docutils literal notranslate"><span class="pre">&#64;observable</span></code>:</p>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo._DryRunTracker.dryrun_stats_display</span></code></dt><dd><p>Callbacks receive <code class="docutils literal notranslate"><span class="pre">ctx.args</span> <span class="pre">==</span> <span class="pre">(dryrun_tracker,</span> <span class="pre">dryrun_enabled)</span></code>, giving the
+dryrun report — operator coverage, unsupported ops, per-engine shapes — as
+structured data. Fires once per <code class="docutils literal notranslate"><span class="pre">compile_module</span></code> call, whether or not <code class="docutils literal notranslate"><span class="pre">dryrun</span></code>
+is set. See <a class="reference internal" href="../tutorials/compilation_analysis/dryrun.html#dryrun-programmatic"><span class="std std-ref">Capturing the Stats Programmatically</span></a>.</p>
+</dd>
+</dl>
+</section>
+<hr class="docutils" />
 <section id="observing-existing-compiler-functions">
 <h2>Observing Existing Compiler Functions<a class="headerlink" href="#observing-existing-compiler-functions" title="Link to this heading">#</a></h2>
 <p>To observe a function that you do not own (i.e., you cannot decorate it), wrap it with
@@ -718,6 +730,7 @@ available.</p>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#using-observable">Using <code class="docutils literal notranslate"><span class="pre">@observable</span></code></a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#error-handling">Error Handling</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#concurrency-and-context-isolation">Concurrency and Context Isolation</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#built-in-observables">Built-in Observables</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#observing-existing-compiler-functions">Observing Existing Compiler Functions</a></li>
 </ul>
   </nav></div>
