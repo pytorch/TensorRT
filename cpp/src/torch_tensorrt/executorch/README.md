@@ -63,6 +63,19 @@ so this removal is an API-simplification choice, not a correctness requirement.)
 This is a source-breaking C++ change; downstream callers must switch to the new
 type.
 
+### Coalesced programs with weights need one directory each
+
+A coalesced program's CUDA partition keeps its weights in a separate file written beside the program,
+under a fixed name. Exporting a second program into the same directory overwrites the first one's
+weights, and the keys inside that file describe the graph's shape rather than its values, so the first
+program still loads, still reports finding weights, and returns a wrong answer with no error.
+
+Measured on two GPUs: wrong by 0.85, and bit identical across five runs, which is what makes it read as
+a working model rather than a broken one. Retraining and re-exporting the same architecture into one
+directory is the ordinary way to hit this.
+
+Give each export its own directory.
+
 ### A device-resident output reaches Python tagged for the device but backed by host memory
 
 Measured on two GPUs. A program exported device resident runs, and its values are right, but the tensor
