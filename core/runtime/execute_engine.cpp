@@ -130,7 +130,9 @@ void setup_input_tensors(
       // https://github.com/NVIDIA/TensorRT/blob/d2f4ef789a9a6ffdf37b55c3f81b486225f6b380/samples/common/sampleInference.cpp#L435
       // A device tensor is copied back with .cpu(), which synchronizes the stream; a host tensor
       // is used as is, which does not, so passing shape inputs on the host avoids a per-call sync.
-      auto input_cpu = inputs[i].is_cuda() ? inputs[i].clone().contiguous().cpu().to(torch::kInt64)
+      // The values are deep-copied into active_shape_tensor_values below, so input_cpu is transient
+      // and no clone is needed.
+      auto input_cpu = inputs[i].is_cuda() ? inputs[i].contiguous().cpu().to(torch::kInt64)
                                            : inputs[i].contiguous().to(torch::kInt64);
       std::vector<int64_t> inputs_cpu_vec(
           input_cpu.data_ptr<int64_t>(), input_cpu.data_ptr<int64_t>() + input_cpu.numel());
@@ -260,15 +262,17 @@ void create_output_allocator(c10::intrusive_ptr<TRTEngine> compiled_engine) {
 }
 
 std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngine> compiled_engine) {
-  // All inputs are expected to be on CUDA. Warn and move any that are not. A shape-tensor input is
-  // an exception: TensorRT reads it from host memory, so a host tensor is left where it is rather
-  // than moved to the device only for setup_input_tensors to copy it back.
+  // All inputs are expected to be on CUDA. Warn and move any that are not. A host-resident
+  // shape-tensor input is an exception: TensorRT reads it from host memory, so it is left where it
+  // is rather than moved to the device only for setup_input_tensors to copy it back. A shape tensor
+  // on any other non-CUDA device still falls through to the move below.
   for (size_t i = 0; i < inputs.size(); i++) {
     auto& inp = inputs[i];
     if (!inp.defined() || inp.is_cuda()) {
       continue;
     }
-    if (i < compiled_engine->input_binding_infos.size() && compiled_engine->input_binding_infos[i].is_shape_tensor) {
+    if (inp.is_cpu() && i < compiled_engine->input_binding_infos.size() &&
+        compiled_engine->input_binding_infos[i].is_shape_tensor) {
       continue;
     }
     LOG_WARNING(
