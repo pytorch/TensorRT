@@ -335,13 +335,25 @@ def test_the_lane_that_runs_this_file_installs_the_tools_it_needs() -> None:
     nothing on every pull request while the job reported success. Whatever the runner image does not
     carry has to be installed by the job, and what the job installs is the lint dependency group.
     """
-    import tomllib
-
+    text = (_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    try:
+        import tomllib
+    except ImportError:  # no parser in the standard library before 3.11
+        tomllib = None
+    if tomllib is not None:
+        entries = tomllib.loads(text)["dependency-groups"]["lint"]
+    else:
+        # One table, read directly, so this test cannot be skipped for want of a parser.
+        # Skipping is the failure it exists to catch, and taking a dependency in order to read
+        # a dependency list would be worse.
+        body = text.split("[dependency-groups]", 1)[1].split("lint = [", 1)[1]
+        entries = [
+            line.strip().strip(",").strip('"').strip("'")
+            for line in body.split("]", 1)[0].splitlines()
+            if line.strip() and not line.strip().startswith("#")
+        ]
     declared = {
-        canonicalize_name(Requirement(dependency).name)
-        for dependency in tomllib.loads(
-            (_ROOT / "pyproject.toml").read_text(encoding="utf-8")
-        )["dependency-groups"]["lint"]
+        canonicalize_name(Requirement(entry).name) for entry in entries if entry
     }
     missing = [
         tool
