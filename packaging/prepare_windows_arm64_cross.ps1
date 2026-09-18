@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 param(
     [string] $PyTorchArtifact = "https://pypi.nvidia.com/nvtorch_oot/torch/torch-2.14.0%2Bcu134-cp313-cp313-win_arm64.whl",
     [string] $PythonArtifact = "https://api.nuget.org/v3-flatcontainer/pythonarm64/3.13.0/pythonarm64.3.13.0.nupkg",

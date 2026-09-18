@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 __cuda_version__: "13.2"
 __tensorrt_version__: "11.1.0"
 __tensorrt_rtx_version__: "1.6.1"

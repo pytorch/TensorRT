@@ -1,4 +1,7 @@
 @echo off
+REM SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+REM SPDX-License-Identifier: BSD-3-Clause
+
 setlocal enabledelayedexpansion
 
 set TARGET_DRIVER_VN=580.88
