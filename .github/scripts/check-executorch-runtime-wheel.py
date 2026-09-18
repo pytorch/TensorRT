@@ -64,11 +64,11 @@ def main():
                     f"{args.architecture}"
                 )
         for filename in (
-            "torchtrt_executorch-config.cmake",
-            "torchtrt_executorch-config-version.cmake",
+            "executorch_backend_tensorrt-config.cmake",
+            "executorch_backend_tensorrt-config-version.cmake",
         ):
             if (
-                f"torch_tensorrt_executorch_runtime/lib/cmake/torchtrt_executorch/{filename}"
+                f"torch_tensorrt_executorch_runtime/lib/cmake/executorch_backend_tensorrt/{filename}"
                 not in names
             ):
                 reject(f"the wheel ships no CMake package: {filename} is missing")

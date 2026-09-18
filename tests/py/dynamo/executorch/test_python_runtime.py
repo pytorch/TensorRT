@@ -810,7 +810,7 @@ def _documented_path_recipes() -> list[tuple[str, bool, str]]:
     from, whether it sets the opt-out, and the code it runs.
     """
     recipes = []
-    for relative in ("README.md", "cmake/torchtrt_executorch-config.cmake"):
+    for relative in ("README.md", "cmake/executorch_backend_tensorrt-config.cmake"):
         text = (COMPANION_ROOT / relative).read_text(encoding="utf-8")
         for line in text.splitlines():
             if (

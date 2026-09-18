@@ -82,13 +82,6 @@ struct EngineHandle {
   // this, and the two answers select different paths.
   bool pageable_host_access = false;
   std::mutex mu;
-  // Makes the skip-sync fast path safe to reuse: TensorRT forbids reconfiguring or
-  // destroying an execution context while one of its enqueues is in flight, so when
-  // execute() returns without an end sync it records this event; the next execute()
-  // and the destructor wait on it before touching exec_ctx. One event/flag pair
-  // suffices because a handle runs on a single thread at a time.
-  cudaEvent_t inflight_event = nullptr;
-  bool inflight_pending = false;
 
   ~EngineHandle();
 };

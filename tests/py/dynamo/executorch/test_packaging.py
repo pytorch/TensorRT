@@ -202,7 +202,7 @@ def test_setup_boolean_flags(packaging_build, monkeypatch, flag, value, enabled)
         assert output.read_bytes() == state.payload
         assert (
             output.parent
-            / "cmake/torchtrt_executorch/torchtrt_executorch-config-version.cmake"
+            / "cmake/executorch_backend_tensorrt/executorch_backend_tensorrt-config-version.cmake"
         ).is_file()
 
 
@@ -283,12 +283,12 @@ root = Path(runtime.__file__).absolute().parent
 library = Path(runtime._delegate_path())
 handle = ctypes.CDLL(str(library))
 assert handle.packaging_probe() == 42
-cmake = root / "lib/cmake/torchtrt_executorch"
-config = cmake / "torchtrt_executorch-config.cmake"
-version = cmake / "torchtrt_executorch-config-version.cmake"
+cmake = root / "lib/cmake/executorch_backend_tensorrt"
+config = cmake / "executorch_backend_tensorrt-config.cmake"
+version = cmake / "executorch_backend_tensorrt-config-version.cmake"
 assert config.is_file()
 assert 'set(PACKAGE_VERSION "0.2.0")' in version.read_text()
-assert 'set(TORCHTRT_EXECUTORCH_FULL_VERSION "0.2.0.dev20200103+cu130")' in version.read_text()
+assert 'set(EXECUTORCH_BACKEND_TENSORRT_FULL_VERSION "0.2.0.dev20200103+cu130")' in version.read_text()
 print(json.dumps({"module": str(root), "library": str(library),
                   "sha256": hashlib.sha256(library.read_bytes()).hexdigest(),
                   "config": str(config), "version": str(version)}))
@@ -330,8 +330,8 @@ def test_editable_outputs_survive_backend_cleanup(
     _install_and_probe(state, wheel, tmp_path / "installed", tmp_path, mode)
     generated = {
         f"lib/{LIBRARY}",
-        "lib/cmake/torchtrt_executorch/torchtrt_executorch-config.cmake",
-        "lib/cmake/torchtrt_executorch/torchtrt_executorch-config-version.cmake",
+        "lib/cmake/executorch_backend_tensorrt/executorch_backend_tensorrt-config.cmake",
+        "lib/cmake/executorch_backend_tensorrt/executorch_backend_tensorrt-config-version.cmake",
     }
     mapping = build.get_output_mapping()
     outputs = build.get_outputs()
@@ -393,8 +393,8 @@ def test_generated_outputs_are_reported_before_build(
         str(Path(command.build_lib) / PACKAGE / filename)
         for filename in (
             f"lib/{LIBRARY}",
-            "lib/cmake/torchtrt_executorch/torchtrt_executorch-config.cmake",
-            "lib/cmake/torchtrt_executorch/torchtrt_executorch-config-version.cmake",
+            "lib/cmake/executorch_backend_tensorrt/executorch_backend_tensorrt-config.cmake",
+            "lib/cmake/executorch_backend_tensorrt/executorch_backend_tensorrt-config-version.cmake",
         )
     }
     outputs = command.get_outputs(include_bytecode=False)
@@ -486,8 +486,8 @@ def test_ordinary_wheel_payload_is_unchanged(
         # published wheel ship without it, since this is the only check that reads the built archive.
         f"{PACKAGE}/runtime.py",
         f"{PACKAGE}/lib/{LIBRARY}",
-        f"{PACKAGE}/lib/cmake/torchtrt_executorch/torchtrt_executorch-config.cmake",
-        f"{PACKAGE}/lib/cmake/torchtrt_executorch/torchtrt_executorch-config-version.cmake",
+        f"{PACKAGE}/lib/cmake/executorch_backend_tensorrt/executorch_backend_tensorrt-config.cmake",
+        f"{PACKAGE}/lib/cmake/executorch_backend_tensorrt/executorch_backend_tensorrt-config-version.cmake",
     }
     assert expected[f"{PACKAGE}/lib/{LIBRARY}"] == state.payload
     _install_and_probe(state, built, tmp_path / "installed", tmp_path, "wheel")

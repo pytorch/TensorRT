@@ -20,13 +20,13 @@ find_package(TensorRT REQUIRED)
 find_package(CUDAToolkit REQUIRED)
 find_package(Threads REQUIRED)
 
-set(_torchtrt_executorch_sources
+set(_executorch_backend_tensorrt_sources
     "${CMAKE_CURRENT_LIST_DIR}/TensorRTBackend.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/TensorRTBlobHeader.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/WeightStreamingBudget.cpp"
 )
 
-add_library(executorch_trt_backend STATIC ${_torchtrt_executorch_sources})
+add_library(executorch_trt_backend STATIC ${_executorch_backend_tensorrt_sources})
 set_target_properties(executorch_trt_backend
     PROPERTIES
         OUTPUT_NAME "executorch_trt_backend"
@@ -51,10 +51,10 @@ target_compile_definitions(executorch_trt_backend
         C10_USING_CUSTOM_GENERATED_MACROS
 )
 
-set(_torchtrt_executorch_source_root "")
+set(_executorch_backend_tensorrt_source_root "")
 foreach(_executorch_root_candidate IN ITEMS "${EXECUTORCH_SOURCE_DIR}" "${EXECUTORCH_ROOT}")
     if(_executorch_root_candidate AND EXISTS "${_executorch_root_candidate}/runtime/core/portable_type/c10")
-        set(_torchtrt_executorch_source_root "${_executorch_root_candidate}")
+        set(_executorch_backend_tensorrt_source_root "${_executorch_root_candidate}")
         get_filename_component(_executorch_include_parent "${_executorch_root_candidate}" DIRECTORY)
         target_include_directories(executorch_trt_backend
             PUBLIC
@@ -129,8 +129,8 @@ elseif(EXECUTORCH_EXTENSION_CUDA_LIBRARY)
     set_target_properties(extension_cuda PROPERTIES
         IMPORTED_LOCATION "${EXECUTORCH_EXTENSION_CUDA_LIBRARY}"
     )
-elseif(_torchtrt_executorch_source_root AND
-       EXISTS "${_torchtrt_executorch_source_root}/extension/cuda/CMakeLists.txt")
+elseif(_executorch_backend_tensorrt_source_root AND
+       EXISTS "${_executorch_backend_tensorrt_source_root}/extension/cuda/CMakeLists.txt")
     # Build the single shared library from ExecuTorch's own definition rather
     # than a copy of it, so this stays correct if ExecuTorch changes the target
     # and so a duplicate definition is a hard error instead of two libraries.
@@ -138,7 +138,7 @@ elseif(_torchtrt_executorch_source_root AND
         set(_common_include_directories "${_executorch_include_parent}")
     endif()
     add_subdirectory(
-        "${_torchtrt_executorch_source_root}/extension/cuda"
+        "${_executorch_backend_tensorrt_source_root}/extension/cuda"
         "${CMAKE_CURRENT_BINARY_DIR}/executorch_extension_cuda"
     )
 else()
@@ -161,7 +161,7 @@ else()
     )
 endif()
 
-set(_torchtrt_executorch_link_libraries
+set(_executorch_backend_tensorrt_link_libraries
     CUDA::cudart
     TensorRT::nvinfer
     Threads::Threads
@@ -171,11 +171,11 @@ set(_torchtrt_executorch_link_libraries
 if(TARGET executorch::runtime)
     # The installed wheel's prebuilt runtime, which also carries the include directories,
     # compile definitions and C++ standard it was built with.
-    list(APPEND _torchtrt_executorch_link_libraries executorch::runtime)
+    list(APPEND _executorch_backend_tensorrt_link_libraries executorch::runtime)
 elseif(TARGET executorch_core)
-    list(APPEND _torchtrt_executorch_link_libraries executorch_core)
+    list(APPEND _executorch_backend_tensorrt_link_libraries executorch_core)
 elseif(TARGET executorch)
-    list(APPEND _torchtrt_executorch_link_libraries executorch)
+    list(APPEND _executorch_backend_tensorrt_link_libraries executorch)
 elseif(DEFINED EXECUTORCH_ROOT AND EXISTS "${EXECUTORCH_ROOT}/runtime")
     if(NOT DEFINED EXECUTORCH_CORE_LIBRARY)
         set(
@@ -188,33 +188,33 @@ elseif(DEFINED EXECUTORCH_ROOT AND EXISTS "${EXECUTORCH_ROOT}/runtime")
     if(NOT EXISTS "${EXECUTORCH_CORE_LIBRARY}")
         message(FATAL_ERROR "EXECUTORCH_CORE_LIBRARY='${EXECUTORCH_CORE_LIBRARY}' does not exist")
     endif()
-    list(APPEND _torchtrt_executorch_link_libraries "${EXECUTORCH_CORE_LIBRARY}")
+    list(APPEND _executorch_backend_tensorrt_link_libraries "${EXECUTORCH_CORE_LIBRARY}")
 else()
     message(FATAL_ERROR "Add ExecuTorch before torch_tensorrt_executorch or set EXECUTORCH_ROOT to an ExecuTorch source tree")
 endif()
 
 target_link_libraries(executorch_trt_backend
     PUBLIC
-        ${_torchtrt_executorch_link_libraries}
+        ${_executorch_backend_tensorrt_link_libraries}
 )
 
-add_library(torchtrt_executorch_backend INTERFACE)
-add_library(torchtrt::executorch_backend ALIAS torchtrt_executorch_backend)
-add_dependencies(torchtrt_executorch_backend executorch_trt_backend)
+add_library(executorch_backend_tensorrt_backend INTERFACE)
+add_library(executorch::backend_tensorrt ALIAS executorch_backend_tensorrt_backend)
+add_dependencies(executorch_backend_tensorrt_backend executorch_trt_backend)
 
 if(MSVC)
-    target_link_libraries(torchtrt_executorch_backend
+    target_link_libraries(executorch_backend_tensorrt_backend
         INTERFACE
             executorch_trt_backend
-            ${_torchtrt_executorch_link_libraries}
+            ${_executorch_backend_tensorrt_link_libraries}
     )
 else()
-    target_link_libraries(torchtrt_executorch_backend
+    target_link_libraries(executorch_backend_tensorrt_backend
         INTERFACE
             "-Wl,--whole-archive"
             "$<TARGET_FILE:executorch_trt_backend>"
             "-Wl,--no-whole-archive"
-            ${_torchtrt_executorch_link_libraries}
+            ${_executorch_backend_tensorrt_link_libraries}
     )
 endif()
 

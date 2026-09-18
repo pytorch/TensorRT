@@ -295,9 +295,9 @@ def test_the_cmake_package_defines_a_linkable_target(tmp_path, case):
     cmake = shutil.which("cmake")
     if cmake is None:
         pytest.skip("cmake is not installed")
-    config = _RUNTIME_SETUP_PY.parent / "cmake/torchtrt_executorch-config.cmake"
+    config = _RUNTIME_SETUP_PY.parent / "cmake/executorch_backend_tensorrt-config.cmake"
     prefix = tmp_path / "prefix"
-    cmake_dir = prefix / "lib/cmake/torchtrt_executorch"
+    cmake_dir = prefix / "lib/cmake/executorch_backend_tensorrt"
     cmake_dir.mkdir(parents=True)
     shutil.copy2(config, cmake_dir / config.name)
     library = prefix / "lib/libexecutorch_backend_tensorrt.so"
@@ -306,11 +306,11 @@ def test_the_cmake_package_defines_a_linkable_target(tmp_path, case):
     if case == "versioned":
         library.with_suffix(".so.9").write_bytes(b"decoy")
 
-    discovery = "find_package(torchtrt_executorch REQUIRED)\n"
+    discovery = "find_package(executorch_backend_tensorrt REQUIRED)\n"
     if case == "repeat":
         discovery += (
-            "unset(TORCHTRT_EXECUTORCH_LIBRARIES)\n"
-            "find_package(torchtrt_executorch REQUIRED)\n"
+            "unset(EXECUTORCH_BACKEND_TENSORRT_LIBRARIES)\n"
+            "find_package(executorch_backend_tensorrt REQUIRED)\n"
         )
     elif case == "function":
         discovery = (
@@ -320,20 +320,20 @@ def test_the_cmake_package_defines_a_linkable_target(tmp_path, case):
             + discovery
         )
     elif case == "optional":
-        discovery = "find_package(torchtrt_executorch QUIET)\n"
+        discovery = "find_package(executorch_backend_tensorrt QUIET)\n"
     if case in {"absent", "optional"}:
         checks = (
-            "if(torchtrt_executorch_FOUND OR TARGET torchtrt::executorch_backend)\n"
+            "if(executorch_backend_tensorrt_FOUND OR TARGET executorch::backend_tensorrt)\n"
             '  message(FATAL_ERROR "missing delegate accepted")\nendif()\n'
         )
     else:
         checks = (
-            'if(NOT TORCHTRT_EXECUTORCH_LIBRARIES STREQUAL "torchtrt::executorch_backend")\n'
+            'if(NOT EXECUTORCH_BACKEND_TENSORRT_LIBRARIES STREQUAL "executorch::backend_tensorrt")\n'
             '  message(FATAL_ERROR "missing library list")\nendif()\n'
-            "get_target_property(location torchtrt::executorch_backend IMPORTED_LOCATION)\n"
+            "get_target_property(location executorch::backend_tensorrt IMPORTED_LOCATION)\n"
             f'if(NOT location STREQUAL "{library}")\n'
             '  message(FATAL_ERROR "wrong delegate selected: ${location}")\nendif()\n'
-            "get_target_property(options torchtrt::executorch_backend INTERFACE_LINK_OPTIONS)\n"
+            "get_target_property(options executorch::backend_tensorrt INTERFACE_LINK_OPTIONS)\n"
             'if(NOT options MATCHES "no-as-needed")\n'
             '  message(FATAL_ERROR "missing retention options")\nendif()\n'
         )
@@ -360,7 +360,7 @@ def test_the_cmake_package_defines_a_linkable_target(tmp_path, case):
     output = result.stdout + result.stderr
     if case == "absent":
         assert result.returncode != 0, output
-        assert "TORCHTRT_EXECUTORCH_BACKEND_LIBRARY" in output, output
+        assert "EXECUTORCH_BACKEND_TENSORRT_BACKEND_LIBRARY" in output, output
     else:
         assert result.returncode == 0, output
 
@@ -368,24 +368,26 @@ def test_the_cmake_package_defines_a_linkable_target(tmp_path, case):
 @pytest.mark.unit
 @pytest.mark.parametrize("removed", ["required", "not_found", "outputs", "fixed_name"])
 def test_cmake_discovery_rejects_removed_guards(monkeypatch, tmp_path, removed):
-    config = _RUNTIME_SETUP_PY.parent / "cmake/torchtrt_executorch-config.cmake"
+    config = _RUNTIME_SETUP_PY.parent / "cmake/executorch_backend_tensorrt-config.cmake"
     text = config.read_text()
     if removed == "required":
         text, count = re.subn(
-            r"find_package_handle_standard_args\(\s*torchtrt_executorch\s*"
-            r"REQUIRED_VARS TORCHTRT_EXECUTORCH_BACKEND_LIBRARY\s*\)",
+            r"find_package_handle_standard_args\(\s*executorch_backend_tensorrt\s*"
+            r"REQUIRED_VARS EXECUTORCH_BACKEND_TENSORRT_BACKEND_LIBRARY\s*\)",
             "",
             text,
         )
         assert count == 1
         case = "absent"
     elif removed == "not_found":
-        original = "if(NOT torchtrt_executorch_FOUND)\n  return()\nendif()"
+        original = "if(NOT executorch_backend_tensorrt_FOUND)\n  return()\nendif()"
         assert text.count(original) == 1
         text = text.replace(original, "")
         case = "optional"
     elif removed == "outputs":
-        original = "set(TORCHTRT_EXECUTORCH_LIBRARIES torchtrt::executorch_backend)"
+        original = (
+            "set(EXECUTORCH_BACKEND_TENSORRT_LIBRARIES executorch::backend_tensorrt)"
+        )
         assert text.count(original) == 1
         text = text.replace(original, "") + "\n" + original + "\n"
         case = "repeat"
@@ -757,7 +759,7 @@ def test_the_wheel_ships_a_cmake_package_for_cpp_consumers():
     it fails at run time with an unregistered backend rather than at build time.
     """
     package_dir = _REPO_ROOT / "py/torch-tensorrt-executorch-runtime"
-    config = package_dir / "cmake/torchtrt_executorch-config.cmake"
+    config = package_dir / "cmake/executorch_backend_tensorrt-config.cmake"
     assert (
         config.is_file()
     ), "no CMake package config, so a C++ app cannot link the delegate out of the wheel"
@@ -790,7 +792,7 @@ def test_the_wheel_ships_a_cmake_package_for_cpp_consumers():
     # setup.py has to actually ship both files, and put the library where the config looks.
     setup_text = (package_dir / "setup.py").read_text(encoding="utf-8")
     for fragment in (
-        "lib/cmake/torchtrt_executorch/*.cmake",
+        "lib/cmake/executorch_backend_tensorrt/*.cmake",
         "lib/{DELEGATE_LIBRARY}",
     ):
         assert (
@@ -802,15 +804,15 @@ def test_the_wheel_ships_a_cmake_package_for_cpp_consumers():
     # consumer fails at find_package. Asserting the path components rather than a joined string,
     # since setup.py builds it with pathlib.
     assert re.search(
-        r'cmake_dir\s*=\s*package_dir\s*/\s*"lib"\s*/\s*"cmake"\s*/\s*"torchtrt_executorch"',
+        r'cmake_dir\s*=\s*package_dir\s*/\s*"lib"\s*/\s*"cmake"\s*/\s*"executorch_backend_tensorrt"',
         setup_text,
     ), (
-        "setup.py writes the CMake package somewhere other than lib/cmake/torchtrt_executorch, so "
+        "setup.py writes the CMake package somewhere other than lib/cmake/executorch_backend_tensorrt, so "
         "it no longer agrees with the path package_data collects and the wheel would ship no "
         "CMake package"
     )
-    assert "torchtrt_executorch-config-version.cmake" in setup_text, (
-        "setup.py writes no version file, so find_package(torchtrt_executorch 2.15) would match "
+    assert "executorch_backend_tensorrt-config-version.cmake" in setup_text, (
+        "setup.py writes no version file, so find_package(executorch_backend_tensorrt 2.15) would match "
         "any version at all"
     )
     # The package has to REFUSE a prefix with no library, rather than export a target pointing
@@ -821,11 +823,11 @@ def test_the_wheel_ships_a_cmake_package_for_cpp_consumers():
         "the config never calls find_package_handle_standard_args, so a prefix with no delegate "
         "still reports success"
     )
-    assert "REQUIRED_VARS TORCHTRT_EXECUTORCH_BACKEND_LIBRARY" in config_text, (
+    assert "REQUIRED_VARS EXECUTORCH_BACKEND_TENSORRT_BACKEND_LIBRARY" in config_text, (
         "the library is not listed in REQUIRED_VARS, so find_package succeeds when the delegate is "
         "absent and exports a target with an empty IMPORTED_LOCATION"
     )
-    assert "if(NOT torchtrt_executorch_FOUND)" in config_text, (
+    assert "if(NOT executorch_backend_tensorrt_FOUND)" in config_text, (
         "the config does not return early when the library is missing, so it goes on to define an "
         "imported target from an empty path"
     )
@@ -1826,7 +1828,7 @@ def test_cmake_version_uses_the_companion_distribution(tmp_path, requested):
         "shutil": shutil,
         "re": re,
         "_CMAKE_CONFIG_SOURCE": _RUNTIME_SETUP_PY.parent
-        / "cmake/torchtrt_executorch-config.cmake",
+        / "cmake/executorch_backend_tensorrt-config.cmake",
     }
     exec(
         compile(
@@ -1841,11 +1843,14 @@ def test_cmake_version_uses_the_companion_distribution(tmp_path, requested):
     command._install_cmake_package(tmp_path)
     version_file = (
         tmp_path
-        / "lib/cmake/torchtrt_executorch/torchtrt_executorch-config-version.cmake"
+        / "lib/cmake/executorch_backend_tensorrt/executorch_backend_tensorrt-config-version.cmake"
     )
     text = version_file.read_text()
     assert 'set(PACKAGE_VERSION "0.2.0")' in text
-    assert 'set(TORCHTRT_EXECUTORCH_FULL_VERSION "0.2.0.dev20200103+cu132")' in text
+    assert (
+        'set(EXECUTORCH_BACKEND_TENSORRT_FULL_VERSION "0.2.0.dev20200103+cu132")'
+        in text
+    )
     standard = tmp_path / "standard.cmake"
     generator = tmp_path / "generate.cmake"
     generator.write_text(
@@ -1892,7 +1897,7 @@ def test_cmake_version_rejects_missing_range_major_guard(
 
     def without_range_major_guard(source, destination, **kwargs):
         result = copyfile(source, destination, **kwargs)
-        if source.name == "torchtrt_executorch-config-version.cmake":
+        if source.name == "executorch_backend_tensorrt-config-version.cmake":
             text, count = re.subn(
                 r'  if\(PACKAGE_FIND_VERSION_RANGE_MAX STREQUAL "INCLUDE"\n'
                 r".*?  elseif\(PACKAGE_VERSION VERSION_LESS PACKAGE_FIND_VERSION_MIN\)",
@@ -3055,11 +3060,12 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
         # deliberately drops it, so the other cases fail for their own reason rather than this one.
         if case != "ships_no_cmake_package":
             for cmake_name in (
-                "torchtrt_executorch-config.cmake",
-                "torchtrt_executorch-config-version.cmake",
+                "executorch_backend_tensorrt-config.cmake",
+                "executorch_backend_tensorrt-config-version.cmake",
             ):
                 archive.writestr(
-                    f"{package}lib/cmake/torchtrt_executorch/{cmake_name}", "# stub\n"
+                    f"{package}lib/cmake/executorch_backend_tensorrt/{cmake_name}",
+                    "# stub\n",
                 )
         info = "torch_tensorrt_executorch_runtime-0.1.0.dist-info"
         metadata_tag = "any" if case == "wheel_tag_mismatch" else tag

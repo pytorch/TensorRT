@@ -20,7 +20,7 @@ only the minimal shared `extension_cuda` caller-stream library from the ExecuTor
 source checkout. Consumers on ELF platforms may instead set
 `EXECUTORCH_EXTENSION_CUDA_LIBRARY` to a prebuilt shared library; the value is
 checked to be a shared object, because a static copy would give each delegate its
-own caller-stream state. Linking `torchtrt::executorch_backend`
+own caller-stream state. Linking `executorch::backend_tensorrt`
 makes the backend archive a dependency of your runner target, so you do not need a
 separate backend build step.
 
@@ -35,7 +35,7 @@ target_link_libraries(
     executorch::backends
     executorch::extensions
     executorch::kernels
-    torchtrt::executorch_backend)
+    executorch::backend_tensorrt)
 ```
 
 The backend archive is available as the `executorch_trt_backend` CMake target

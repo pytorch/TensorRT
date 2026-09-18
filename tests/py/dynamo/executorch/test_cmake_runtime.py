@@ -15,7 +15,7 @@ import pytest
 pytestmark = pytest.mark.unit
 _CONFIG = (
     Path(__file__).resolve().parents[4]
-    / "py/torch-tensorrt-executorch-runtime/cmake/torchtrt_executorch-config.cmake"
+    / "py/torch-tensorrt-executorch-runtime/cmake/executorch_backend_tensorrt-config.cmake"
 )
 
 
@@ -35,7 +35,7 @@ def _run(command, **kwargs):
 
 def _installed_consumer(tmp_path, tools, config, old_dtags, example=None):
     prefix = tmp_path / "prefix"
-    config_dir = prefix / "lib/cmake/torchtrt_executorch"
+    config_dir = prefix / "lib/cmake/executorch_backend_tensorrt"
     config_dir.mkdir(parents=True)
     (config_dir / _CONFIG.name).write_text(config)
     libraries = ["executorch_backend_tensorrt", "unrelated"]
@@ -83,8 +83,8 @@ def _installed_consumer(tmp_path, tools, config, old_dtags, example=None):
         + (
             example
             if example is not None
-            else "find_package(torchtrt_executorch REQUIRED)\n"
-            "target_link_libraries(my_app PRIVATE torchtrt::executorch_backend)\n"
+            else "find_package(executorch_backend_tensorrt REQUIRED)\n"
+            "target_link_libraries(my_app PRIVATE executorch::backend_tensorrt)\n"
         )
         + f'\ntarget_link_libraries(my_app PRIVATE "{prefix}/lib/libunrelated.so")\n'
     )
@@ -136,7 +136,7 @@ def test_installed_cmake_consumer_rejects_removed_guards(
     config = _CONFIG.read_text()
     retention = (
         '"LINKER:--push-state,--no-as-needed,'
-        '${TORCHTRT_EXECUTORCH_BACKEND_LIBRARY},--pop-state"'
+        '${EXECUTORCH_BACKEND_TENSORRT_BACKEND_LIBRARY},--pop-state"'
     )
     assert config.count(retention) == 1
     if removed == "retention":
@@ -146,7 +146,7 @@ def test_installed_cmake_consumer_rejects_removed_guards(
         config = config.replace(
             retention,
             '"LINKER:--push-state,--no-as-needed,--pop-state,'
-            '${TORCHTRT_EXECUTORCH_BACKEND_LIBRARY}"',
+            '${EXECUTORCH_BACKEND_TENSORRT_BACKEND_LIBRARY}"',
         )
         message = "missing delegate dependency"
     elif removed == "pop_state":
@@ -227,13 +227,13 @@ def test_the_embedded_run_path_can_be_turned_off() -> None:
     anything redistributable, so a consumer has to be able to decline it.
     """
     config = _CONFIG.read_text(encoding="utf-8")
-    assert "TORCHTRT_EXECUTORCH_EMBED_RUNPATH" in config, config
+    assert "EXECUTORCH_BACKEND_TENSORRT_EMBED_RUNPATH" in config, config
     # Honoured rather than declared with option(), which inside a package config creates a cache
     # entry in the consumer's project and can override a plain variable they already set.
-    assert "if(NOT DEFINED TORCHTRT_EXECUTORCH_EMBED_RUNPATH)" in config, config
-    assert "option(TORCHTRT_EXECUTORCH_EMBED_RUNPATH" not in config, config
+    assert "if(NOT DEFINED EXECUTORCH_BACKEND_TENSORRT_EMBED_RUNPATH)" in config, config
+    assert "option(EXECUTORCH_BACKEND_TENSORRT_EMBED_RUNPATH" not in config, config
     # The run path lives inside the branch the switch controls, so turning it off omits it.
-    branch = config.split("if(TORCHTRT_EXECUTORCH_EMBED_RUNPATH)", 1)[1].split(
+    branch = config.split("if(EXECUTORCH_BACKEND_TENSORRT_EMBED_RUNPATH)", 1)[1].split(
         "else()", 1
     )[0]
     assert "INTERFACE_LINK_OPTIONS" in branch, branch[:300]
@@ -256,7 +256,7 @@ def test_the_collision_guard_checks_which_library_the_target_points_at() -> None
     config = _CONFIG.read_text(encoding="utf-8")
     assert "IMPORTED_LOCATION" in config, config
     assert (
-        'STREQUAL "${TORCHTRT_EXECUTORCH_BACKEND_LIBRARY}"' in config
+        'STREQUAL "${EXECUTORCH_BACKEND_TENSORRT_BACKEND_LIBRARY}"' in config
     ), "the guard does not compare against the library this package found"
     # Both guards, so a same-type impostor is still refused.
     assert config.count("FATAL_ERROR") >= 2, config
@@ -304,7 +304,9 @@ def test_the_config_looks_for_the_delegate_in_one_place_only() -> None:
     assert "foreach" not in config, "discovery still walks parent directories"
     assert "get_filename_component" in config, config
     # One test for the library, at the fixed distance the wheel installs this file at.
-    assert config.count('EXISTS "${_torchtrt_executorch_root}/lib/') == 1, config
+    assert (
+        config.count('EXISTS "${_executorch_backend_tensorrt_root}/lib/') == 1
+    ), config
 
 
 @pytest.mark.unit
@@ -317,7 +319,7 @@ def test_the_published_target_is_visible_outside_the_finding_directory() -> None
     """
     config = _CONFIG.read_text(encoding="utf-8")
     assert (
-        "add_library(torchtrt::executorch_backend SHARED IMPORTED GLOBAL)" in config
+        "add_library(executorch::backend_tensorrt SHARED IMPORTED GLOBAL)" in config
     ), config
 
 
@@ -350,7 +352,7 @@ def test_the_run_path_opt_out_changes_what_the_consumer_links(
     library at an absolute path, which the opt-out does not claim to remove.
     """
     prefix = tmp_path / "prefix"
-    config_dir = prefix / "lib/cmake/torchtrt_executorch"
+    config_dir = prefix / "lib/cmake/executorch_backend_tensorrt"
     config_dir.mkdir(parents=True)
     (config_dir / _CONFIG.name).write_text(_CONFIG.read_text(encoding="utf-8"))
     (prefix / "lib" / "libexecutorch_backend_tensorrt.so").write_bytes(b"")
@@ -361,9 +363,9 @@ def test_the_run_path_opt_out_changes_what_the_consumer_links(
         "cmake_minimum_required(VERSION 3.20)\n"
         "project(consumer CXX)\n"
         f'list(APPEND CMAKE_PREFIX_PATH "{prefix}")\n'
-        "find_package(torchtrt_executorch REQUIRED)\n"
+        "find_package(executorch_backend_tensorrt REQUIRED)\n"
         "add_executable(app main.cpp)\n"
-        "target_link_libraries(app PRIVATE torchtrt::executorch_backend)\n"
+        "target_link_libraries(app PRIVATE executorch::backend_tensorrt)\n"
     )
     build = tmp_path / "build"
     _run(
@@ -373,7 +375,7 @@ def test_the_run_path_opt_out_changes_what_the_consumer_links(
             str(project),
             "-B",
             str(build),
-            f"-DTORCHTRT_EXECUTORCH_EMBED_RUNPATH={'ON' if embed else 'OFF'}",
+            f"-DEXECUTORCH_BACKEND_TENSORRT_EMBED_RUNPATH={'ON' if embed else 'OFF'}",
         ]
     )
     link_line = (build / "CMakeFiles/app.dir/link.txt").read_text(encoding="utf-8")
@@ -391,17 +393,17 @@ def test_a_target_of_that_name_already_present_is_refused(
     would otherwise link something other than this package's delegate while believing it had this one.
     """
     prefix = tmp_path / "prefix"
-    config_dir = prefix / "lib/cmake/torchtrt_executorch"
+    config_dir = prefix / "lib/cmake/executorch_backend_tensorrt"
     config_dir.mkdir(parents=True)
     (config_dir / _CONFIG.name).write_text(_CONFIG.read_text(encoding="utf-8"))
     (prefix / "lib" / "libexecutorch_backend_tensorrt.so").write_bytes(b"")
     (prefix / "lib" / "someone_elses.so").write_bytes(b"")
     if collision == "wrong_type":
-        preamble = "add_library(torchtrt::executorch_backend INTERFACE IMPORTED)\n"
+        preamble = "add_library(executorch::backend_tensorrt INTERFACE IMPORTED)\n"
     else:
         preamble = (
-            "add_library(torchtrt::executorch_backend SHARED IMPORTED)\n"
-            "set_target_properties(torchtrt::executorch_backend PROPERTIES\n"
+            "add_library(executorch::backend_tensorrt SHARED IMPORTED)\n"
+            "set_target_properties(executorch::backend_tensorrt PROPERTIES\n"
             f'  IMPORTED_LOCATION "{prefix}/lib/someone_elses.so")\n'
         )
     project = tmp_path / "consumer"
@@ -411,7 +413,7 @@ def test_a_target_of_that_name_already_present_is_refused(
         "project(consumer NONE)\n"
         + preamble
         + f'list(APPEND CMAKE_PREFIX_PATH "{prefix}")\n'
-        "find_package(torchtrt_executorch REQUIRED)\n"
+        "find_package(executorch_backend_tensorrt REQUIRED)\n"
     )
     result = subprocess.run(
         [linker_tools["cmake"], "-S", str(project), "-B", str(tmp_path / "build")],

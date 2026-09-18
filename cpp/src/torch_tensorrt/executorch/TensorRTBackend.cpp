@@ -80,24 +80,10 @@ void TRTLogger::log(Severity severity, const char* msg) noexcept {
 
 EngineHandle::~EngineHandle() {
   cudaSetDevice(device_id);
-  // A fast-path execute() may have returned with its enqueue still in flight on the
-  // caller's stream, still using exec_ctx and the cached staging buffers. Wait on
-  // the recorded completion event before destroying the context or freeing the
-  // buffers. We wait on the event, not the stream, so this stays valid even if the
-  // caller already destroyed the stream. Non-skip executes synchronized inline, so
-  // inflight_pending is false there. Fall back to a device sync if no event exists.
-  if (inflight_event != nullptr) {
-    if (inflight_pending) {
-      cudaError_t err = cudaEventSynchronize(inflight_event);
-      if (err != cudaSuccess) {
-        ET_LOG(Error, "EngineHandle::~EngineHandle: cudaEventSynchronize failed: %s", cudaGetErrorString(err));
-        cudaGetLastError(); // clear sticky error; tear down regardless
-      }
-      inflight_pending = false;
-    }
-  } else {
-    cudaDeviceSynchronize();
-  }
+  // execute() always waits for its own work before returning, so nothing of this handle's can
+  // still be running here. The device sync costs nothing then and is the correct thing to do if a
+  // later change ever submits work this destructor does not know about.
+  cudaDeviceSynchronize();
   for (void* p : cached_input_ptrs) {
     if (p != nullptr) {
       cudaFree(p);
@@ -111,10 +97,6 @@ EngineHandle::~EngineHandle() {
   exec_ctx.reset();
   engine.reset();
   // The runtime is shared and outlives this handle, so there is nothing to release for it.
-  if (inflight_event != nullptr) {
-    cudaEventDestroy(inflight_event);
-    inflight_event = nullptr;
-  }
 }
 
 namespace {
@@ -313,15 +295,6 @@ Result<DelegateHandle*> TensorRTBackend::init(
   if (cuda_err != cudaSuccess) {
     ET_LOG(
         Error, "TensorRTBackend::init: cudaSetDevice(%d) failed: %s", handle->device_id, cudaGetErrorString(cuda_err));
-    return Error::InvalidProgram;
-  }
-
-  // Created while device_id is current so the event belongs to the engine's device.
-  // It orders a later execute()/teardown after a skip-sync enqueue (see execute()
-  // and ~EngineHandle). Blocking-sync so the host yields instead of busy-spinning.
-  cuda_err = cudaEventCreateWithFlags(&handle->inflight_event, cudaEventDisableTiming | cudaEventBlockingSync);
-  if (cuda_err != cudaSuccess) {
-    ET_LOG(Error, "TensorRTBackend::init: cudaEventCreateWithFlags failed: %s", cudaGetErrorString(cuda_err));
     return Error::InvalidProgram;
   }
 
@@ -674,21 +647,6 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   nvinfer1::IExecutionContext* ctx = engine->exec_ctx.get();
   TORCHTRT_ET_CHECK_NOT_NULL(ctx, Error::InvalidState, "TensorRTBackend::execute: backend is not initialized");
 
-  // A prior fast-path execute() may have returned with its enqueue still in flight
-  // on the shared exec_ctx. Wait for it before reconfiguring the context below:
-  // TensorRT forbids mutating a context while one of its enqueues is in flight, and
-  // setInputShape/setTensorAddress run on the host, so this must be a host-side wait.
-  if (engine->inflight_pending) {
-    cuda_err = cudaEventSynchronize(engine->inflight_event);
-    if (cuda_err != cudaSuccess) {
-      // Left set on purpose. The wait did not finish, so work may still be running, and the
-      // destructor's own wait is the only thing left that can catch it. Clearing here would make it
-      // free the execution context under a live enqueue.
-      ET_LOG(Error, "TensorRTBackend::execute: cudaEventSynchronize failed: %s", cudaGetErrorString(cuda_err));
-      return Error::InvalidProgram;
-    }
-    engine->inflight_pending = false;
-  }
   const auto caller_stream = ::executorch::extension::cuda::getCallerStream();
   cudaStream_t stream = caller_stream.value_or(cudaStreamPerThread);
   StreamDrainOnEarlyReturn drain_on_early_return(stream);
@@ -993,12 +951,9 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     if (cuda_err != cudaSuccess) {
       ET_LOG(
           Error, "TensorRTBackend::execute: aliased-output reflect D2D copy failed: %s", cudaGetErrorString(cuda_err));
-      // enqueueV3 already submitted engine work to `stream`, and inflight_pending
-      // is not armed until the end of the happy path -- drain now so a later
-      // execute() or the destructor never reconfigures/frees exec_ctx while this
-      // enqueue is still running.
+      // The engine work is already on `stream`, so drain before returning rather than leaving a
+      // later run or the destructor to reconfigure the context underneath it.
       (void)cudaStreamSynchronize(stream);
-      engine->inflight_pending = false;
       return Error::InvalidProgram;
     }
   }
@@ -1042,7 +997,6 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     ET_LOG(Error, "TensorRTBackend::execute: cudaStreamSynchronize failed: %s", cudaGetErrorString(cuda_err));
     return Error::InvalidProgram;
   }
-  engine->inflight_pending = false;
   if (copy_err != Error::Ok) {
     return copy_err;
   }

@@ -6,11 +6,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(_default_torch_tensorrt_root "${CMAKE_CURRENT_LIST_DIR}/../..")
 set(_default_project_root "${CMAKE_CURRENT_LIST_DIR}/../../..")
-set(_default_torchtrt_executorch_source_dir
+set(_default_executorch_backend_tensorrt_source_dir
     "${_default_torch_tensorrt_root}/src/torch_tensorrt/executorch"
 )
-if(NOT EXISTS "${_default_torchtrt_executorch_source_dir}/CMakeLists.txt")
-  set(_default_torchtrt_executorch_source_dir
+if(NOT EXISTS "${_default_executorch_backend_tensorrt_source_dir}/CMakeLists.txt")
+  set(_default_executorch_backend_tensorrt_source_dir
       "${_default_torch_tensorrt_root}/cpp/src/torch_tensorrt/executorch"
   )
 endif()
@@ -20,8 +20,8 @@ set(EXECUTORCH_SOURCE_DIR
     CACHE PATH
     "Path to the ExecuTorch source tree"
 )
-set(TORCHTRT_EXECUTORCH_SOURCE_DIR
-    "${_default_torchtrt_executorch_source_dir}"
+set(EXECUTORCH_BACKEND_TENSORRT_SOURCE_DIR
+    "${_default_executorch_backend_tensorrt_source_dir}"
     CACHE PATH
     "Path to the Torch-TensorRT ExecuTorch backend source directory"
 )
@@ -45,16 +45,16 @@ if(NOT EXISTS "${EXECUTORCH_SOURCE_DIR}/CMakeLists.txt")
   message(FATAL_ERROR "EXECUTORCH_SOURCE_DIR must point to an ExecuTorch source checkout with a CMakeLists.txt: ${EXECUTORCH_SOURCE_DIR}")
 endif()
 
-if(NOT TORCHTRT_EXECUTORCH_SOURCE_DIR)
-  message(FATAL_ERROR "TORCHTRT_EXECUTORCH_SOURCE_DIR is empty. Set it to torch_tensorrt/src/torch_tensorrt/executorch")
+if(NOT EXECUTORCH_BACKEND_TENSORRT_SOURCE_DIR)
+  message(FATAL_ERROR "EXECUTORCH_BACKEND_TENSORRT_SOURCE_DIR is empty. Set it to torch_tensorrt/src/torch_tensorrt/executorch")
 endif()
 
-if(NOT EXISTS "${TORCHTRT_EXECUTORCH_SOURCE_DIR}/CMakeLists.txt")
-  message(FATAL_ERROR "TORCHTRT_EXECUTORCH_SOURCE_DIR must point to the Torch-TensorRT ExecuTorch backend source directory with a CMakeLists.txt: ${TORCHTRT_EXECUTORCH_SOURCE_DIR}")
+if(NOT EXISTS "${EXECUTORCH_BACKEND_TENSORRT_SOURCE_DIR}/CMakeLists.txt")
+  message(FATAL_ERROR "EXECUTORCH_BACKEND_TENSORRT_SOURCE_DIR must point to the Torch-TensorRT ExecuTorch backend source directory with a CMakeLists.txt: ${EXECUTORCH_BACKEND_TENSORRT_SOURCE_DIR}")
 endif()
 
 add_subdirectory("${EXECUTORCH_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/executorch")
-add_subdirectory("${TORCHTRT_EXECUTORCH_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/torch_tensorrt_executorch")
+add_subdirectory("${EXECUTORCH_BACKEND_TENSORRT_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/torch_tensorrt_executorch")
 
 add_executable(example_executorch_runner main.cpp)
 target_link_libraries(
@@ -65,7 +65,7 @@ target_link_libraries(
     executorch::backends
     executorch::extensions
     executorch::kernels
-    torchtrt::executorch_backend)
+    executorch::backend_tensorrt)
 
 # Caller-owned KV-cache persistence check (see kv_cache_decode_check.cpp). It
 # cudaMalloc's the device-tagged planned arenas that hold the KV buffers and
@@ -79,5 +79,5 @@ target_link_libraries(
     executorch::backends
     executorch::extensions
     executorch::kernels
-    torchtrt::executorch_backend
+    executorch::backend_tensorrt
     CUDA::cudart)

@@ -85,7 +85,7 @@ fi
 
 verify_parent="${RUNNER_TEMP:-/tmp}"
 mkdir -p "${verify_parent}"
-verify_root="$(mktemp -d "${verify_parent%/}/torchtrt_executorch_readme_verify.XXXXXX")"
+verify_root="$(mktemp -d "${verify_parent%/}/executorch_backend_tensorrt_readme_verify.XXXXXX")"
 
 # Prefer the TensorRT SDK that Bazel already fetched for //:libtorchtrt. This
 # keeps CI from downloading the same SDK twice and keeps CMake linked against
@@ -299,7 +299,7 @@ require_tar_entry "torch_tensorrt/examples/executorch_reference_runner/kv_cache_
 require_tar_entry "torch_tensorrt/BUILD"
 
 export TORCH_TENSORRT_ROOT="${verify_root}/torch_tensorrt"
-export TORCHTRT_EXECUTORCH_SOURCE_DIR="${TORCH_TENSORRT_ROOT}/src/torch_tensorrt/executorch"
+export EXECUTORCH_BACKEND_TENSORRT_SOURCE_DIR="${TORCH_TENSORRT_ROOT}/src/torch_tensorrt/executorch"
 
 # Configure the example exactly as an end user would after unpacking
 # libtorchtrt.tar.gz.
@@ -307,7 +307,7 @@ cmake_args=(
   -S "${TORCH_TENSORRT_ROOT}/examples/executorch_reference_runner"
   -B "${verify_root}/build-executorch-reference-runner"
   -DEXECUTORCH_SOURCE_DIR="${EXECUTORCH_SOURCE_DIR}"
-  -DTORCHTRT_EXECUTORCH_SOURCE_DIR="${TORCHTRT_EXECUTORCH_SOURCE_DIR}"
+  -DEXECUTORCH_BACKEND_TENSORRT_SOURCE_DIR="${EXECUTORCH_BACKEND_TENSORRT_SOURCE_DIR}"
   -DPYTHON_EXECUTABLE="${python_executable}"
 )
 

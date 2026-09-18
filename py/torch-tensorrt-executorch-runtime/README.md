@@ -11,7 +11,7 @@ is an out-of-tree sibling of them rather than a special case:
 ```
 executorch/                            torch_tensorrt_executorch_runtime/
   lib/libexecutorch_backend_cuda.so      lib/libexecutorch_backend_tensorrt.so
-  share/cmake/executorch-config.cmake    lib/cmake/torchtrt_executorch/torchtrt_executorch-config.cmake
+  share/cmake/executorch-config.cmake    lib/cmake/executorch_backend_tensorrt/executorch_backend_tensorrt-config.cmake
 ```
 
 Python users just import the package. A C++ app links it the same way it links
@@ -19,13 +19,26 @@ one of ExecuTorch's own backends:
 
 ```cmake
 find_package(executorch REQUIRED COMPONENTS backend_cuda kernels_optimized)
-find_package(torchtrt_executorch REQUIRED)
+find_package(executorch_backend_tensorrt REQUIRED)
 target_link_libraries(my_app PRIVATE
   executorch::runtime executorch::backend_cuda
-  executorch::kernels_optimized torchtrt::executorch_backend)
+  executorch::kernels_optimized executorch::backend_tensorrt)
 ```
 
 The optimized-kernel library supplies the `et_copy` host/device copy operators.
+
+Linking that target also records the wheel's own library directory in your binary,
+so it finds the delegate without a library path being set. That is right for an
+application built against an installed wheel and wrong for anything you intend to
+redistribute, so it can be turned off:
+
+```cmake
+set(EXECUTORCH_BACKEND_TENSORRT_EMBED_RUNPATH OFF)
+find_package(executorch_backend_tensorrt REQUIRED)
+```
+
+Set it before `find_package`, and ship the delegate yourself, or point a library
+path at it at run time.
 For device-resident exports with `alloc_graph_output=False`, C++ Module callers
 must provide a CUDA output tensor with `Module::set_output` before execution.
 Python callers cannot, so that arrangement is C++ only.
@@ -60,11 +73,11 @@ instead of its targets:
 
 ```cmake
 find_package(executorch REQUIRED)
-find_package(torchtrt_executorch REQUIRED)
+find_package(executorch_backend_tensorrt REQUIRED)
 target_include_directories(app PRIVATE ${EXECUTORCH_INCLUDE_DIRS})
 target_compile_definitions(app PRIVATE ${EXECUTORCH_COMPILE_DEFINITIONS})
 target_link_libraries(app PRIVATE
-  ${EXECUTORCH_LIBRARIES} torchtrt::executorch_backend)
+  ${EXECUTORCH_LIBRARIES} executorch::backend_tensorrt)
 ```
 
 Without an imported target to carry them, the include directories and the compile
@@ -82,6 +95,48 @@ The wheel must use the same Python, PyTorch, ExecuTorch, CUDA, TensorRT, and
 C++ ABI as its matching Torch-TensorRT wheel. This delegate requires CUDA 13;
 the build matrix currently covers `cu130`, `cu132` and `cu134`, on both architectures. Ordinary Torch-TensorRT
 release and JetPack builds retain their separate CUDA 12 support.
+
+## Install
+
+Two pieces, because the delegate and the runtime it plugs into are separate wheels.
+
+The first brings PyTorch, Torch-TensorRT and a CUDA build of ExecuTorch. Pick the
+index for the CUDA version you run:
+
+```bash
+python -m pip install --pre "torch_tensorrt[executorch]" \
+  --extra-index-url https://download.pytorch.org/whl/nightly/cu130
+```
+
+The second is this wheel, which is not on an index yet, so build it once with the
+instructions below and install the file. When it is published, the extra above will
+pull it in and this step goes away.
+
+A CUDA build of ExecuTorch is required, not only to build against. The delegate
+needs a library that only ExecuTorch's CUDA wheels carry, so a processor-only build
+installs and then fails on import. This wheel pins the exact ExecuTorch build it was
+compiled against, label and all, which is what stops that happening quietly.
+
+## Use it from Python
+
+Import the package once, anywhere before you load a program. Importing is what
+registers the delegate, and nothing else about your code changes:
+
+```python
+import torch
+import torch_tensorrt_executorch_runtime  # noqa: F401
+from executorch.extension.pybindings.portable_lib import _load_for_executorch
+
+program = _load_for_executorch("model.pte")
+outputs = program.run_method("forward", (torch.ones((2, 3, 4, 4)),))
+```
+
+If the delegate cannot be loaded, that import raises, rather than letting the
+failure surface later as a program that will not load.
+
+A program whose graph is split between TensorRT and ExecuTorch's own CUDA backend
+needs nothing extra here: both backends are registered, and the program says which
+parts go where.
 
 ## Runtime libraries
 
