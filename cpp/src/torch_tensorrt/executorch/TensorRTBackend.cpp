@@ -667,6 +667,10 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   cudaStream_t stream = caller_stream.value_or(cudaStreamPerThread);
   bool output_staged_to_host = false;
   bool input_staged_from_host = false;
+  // A host pointer bound straight through, which a device that reads pageable host memory
+  // allows. No copy happens, so neither staging flag is set, yet the engine reads or writes the
+  // caller's own host buffer while the work runs. Same hazard as staging, same wait.
+  bool host_memory_bound_directly = false;
 
   if (engine->cached_input_ptrs.empty()) {
     engine->cached_input_ptrs.resize(num_inputs, nullptr);
@@ -756,6 +760,9 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       bind_ptr = engine->cached_input_ptrs[i];
     } else if (engine->pageable_host_access || is_cuda_accessible_ptr(et_in.const_data_ptr())) {
       bind_ptr = et_in.mutable_data_ptr();
+      if (!is_cuda_accessible_ptr(et_in.const_data_ptr())) {
+        host_memory_bound_directly = true;
+      }
     } else {
       const size_t needed = et_in.nbytes();
       if (needed > engine->cached_input_sizes[i]) {
@@ -919,6 +926,9 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       bind_ptr = engine->cached_output_ptrs[o];
     } else if (engine->pageable_host_access || is_cuda_accessible_ptr(et_out.const_data_ptr())) {
       bind_ptr = et_out.mutable_data_ptr();
+      if (!is_cuda_accessible_ptr(et_out.const_data_ptr())) {
+        host_memory_bound_directly = true;
+      }
     } else {
       const size_t needed = et_out.nbytes();
       if (needed > engine->cached_output_sizes[o]) {
@@ -993,8 +1003,8 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // it: the ordinary reason to set one is ordering, and a caller who did that gets a buffer the engine
   // has not written yet. Measured on two architectures, forty runs of forty came back all zero on an
   // idle GPU, because the only caller that can wait is a C++ one and Python has no way to.
-  const bool must_sync = output_staged_to_host || input_staged_from_host || aliased_reflect_pending ||
-      !caller_stream_set || !engine->async_return_requested;
+  const bool must_sync = output_staged_to_host || input_staged_from_host || host_memory_bound_directly ||
+      aliased_reflect_pending || !caller_stream_set || !engine->async_return_requested;
   if (must_sync) {
     Error copy_err = Error::Ok;
     for (auto& output : outputs_needing_copy) {
