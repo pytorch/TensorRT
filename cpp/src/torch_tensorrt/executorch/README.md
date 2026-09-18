@@ -119,6 +119,21 @@ all, and the devices differ: three of the four tested report that they can read 
 memory and
 one does not, so the same program that works on a discrete card can fail on an integrated one.
 
+### Loading the same program many times grows host memory
+
+A program whose graph is split across this delegate and ExecuTorch's CUDA backend grows the
+process by roughly 390 to 415 kilobytes for every load, run and drop cycle. Measured on three
+machines and two architectures, each time as a slope fitted over hundreds of cycles rather than
+as the difference between two readings, and the three agree within about six percent.
+
+The cause is on the CUDA backend's side: it opens a compiled library per load and never unmaps
+it. A program carrying only this delegate does not, and the same measurement puts that at a
+couple of hundred bytes per cycle, which is noise. Device memory does not grow at all, with a
+slope of zero over hundreds of cycles on a probe proven to be reporting rather than dead.
+
+So a long-lived process that loads programs repeatedly will grow. Load once and keep the
+program if you can.
+
 ### A corrupted engine can return a wrong answer instead of an error
 
 Nothing checks the serialized engine against a digest, because the blob format carries none. The

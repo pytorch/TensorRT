@@ -239,6 +239,13 @@ placement, method lookup and output devices are all documented by ExecuTorch. A
 program exported with `skip_h2d_for_method_inputs` keeps its inputs on the
 device, because nothing here copies them.
 
+Such a program does not check that promise, and it will not tell you when you
+break it. Hand it a host tensor and it runs, returns the right answer, and
+stages the copy for you, once per call. So a program you believe is copying
+nothing can be copying on every run with nothing to show it. The other
+direction is refused, so the leniency goes one way only. If the copies are why
+you exported this way, measure them rather than trusting the flag.
+
 The device copies around the delegate need the program's device-tagged
 memory-planned arenas backed by real device memory, which ExecuTorch does only
 through its Module API. The examples therefore use `_load_for_executorch`
