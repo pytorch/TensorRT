@@ -138,6 +138,12 @@ python -m pip wheel --no-build-isolation --no-deps \
 ```
 
 Install the matching full `torch-tensorrt` wheel before building the companion.
+
+A wheel built here, or taken from a continuous integration run, pins the exact
+`torch-tensorrt` build it was made against, label included. That build is on no
+index until it is published, so such a wheel installs only alongside the sibling
+from the same run, not on its own. Installing both from the same nightly channel,
+which is what a release looks like, resolves normally.
 The exact main-wheel dependency comes from that installed distribution, with
 its local CUDA suffix removed. `TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION`
 sets only the companion's own version. When unset, the companion uses its own
