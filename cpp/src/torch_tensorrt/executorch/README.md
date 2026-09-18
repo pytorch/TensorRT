@@ -154,6 +154,13 @@ the removed `CudaStreamGuard`:
   complete, order any cross-stream producers/consumers with their own events,
   and synchronize the stream before reading outputs on the host.
 - With no guard active, the backend falls back to `cudaStreamPerThread`.
+- Returning before the work finishes is opt in, through the `async_return` load-time option that
+  `Module::load` accepts. Without it the backend waits, even under a guard, because setting a stream
+  is usually about ordering rather than about wanting the result later, and a caller who did that
+  would read the output before the engine writes it. Measured on two architectures, forty runs of
+  forty came back entirely zero on an idle GPU, with the stream still unready for a median of 142
+  microseconds after the call returned, growing to 38 milliseconds on a larger graph. Pass the option
+  only if the caller waits on the stream or on its own event before reading.
 - The reference-runner smoke test runs inference inside a caller-stream guard on
   the discrete-GPU CI configuration. Host-backed input and output do not imply the
   synchronized staging path there: the backend takes the direct path whenever the

@@ -118,6 +118,10 @@ EngineHandle::~EngineHandle() {
 
 namespace {
 
+// Opting in to being handed work that is still in flight. A caller that passes this promises to
+// synchronize the stream, or to wait on its own event, before reading an output.
+inline constexpr char kAsyncReturnKey[] = "async_return";
+
 // The process-wide TensorRT runtime and its logger. Function-local statics, so it is constructed
 // once, thread safely, and outlives every engine deserialized from it as TensorRT requires.
 nvinfer1::IRuntime* shared_runtime() {
@@ -342,6 +346,15 @@ Result<DelegateHandle*> TensorRTBackend::init(
   // so a runtime option is never silently dropped. The const char* returned by
   // get_runtime_spec points into the caller's LoadBackendOptionsMap storage, which
   // outlives init(); we parse it immediately and keep only the int64 result.
+  const auto async_runtime = context.get_runtime_spec<const char*>(kAsyncReturnKey);
+  if (async_runtime.ok()) {
+    const char* const value = async_runtime.get();
+    // A non-empty value that is not "0" means yes. Empty means unset, the same as the budget option
+    // above, so that a caller clearing the option gets the safe behaviour rather than the fast one.
+    // The array need not be NUL terminated, so one byte is read rather than scanned.
+    handle->async_return_requested = value != nullptr && value[0] != '\0' && value[0] != '0';
+  }
+
   const auto ws_runtime = context.get_runtime_spec<const char*>(kWeightStreamingBudgetKey);
   if (ws_runtime.ok()) {
     const char* const value = ws_runtime.get();
@@ -976,8 +989,12 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // after execute() returns, so the reflect must complete first. A model with
   // aliased outputs therefore always syncs here.
   const bool aliased_reflect_pending = !aliased_reflects.empty();
-  const bool must_sync =
-      output_staged_to_host || input_staged_from_host || aliased_reflect_pending || !caller_stream_set;
+  // Returning with work in flight is opt in. Setting a caller stream is not on its own a request for
+  // it: the ordinary reason to set one is ordering, and a caller who did that gets a buffer the engine
+  // has not written yet. Measured on two architectures, forty runs of forty came back all zero on an
+  // idle GPU, because the only caller that can wait is a C++ one and Python has no way to.
+  const bool must_sync = output_staged_to_host || input_staged_from_host || aliased_reflect_pending ||
+      !caller_stream_set || !engine->async_return_requested;
   if (must_sync) {
     Error copy_err = Error::Ok;
     for (auto& output : outputs_needing_copy) {
