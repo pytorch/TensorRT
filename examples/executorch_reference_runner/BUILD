@@ -5,6 +5,17 @@ load("@rules_cc//cc:defs.bzl", "cc_binary")
 
 package(default_visibility = ["//visibility:public"])
 
+config_setting(
+    name = "driveos",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:linux",
+    ],
+    flag_values = {
+        "//toolchains/dep_collection:compute_libs": "driveos",
+    },
+)
+
 filegroup(
     name = "source_files",
     srcs = [
@@ -61,7 +72,7 @@ cc_binary(
         "@executorch//:executorch_core",
         "@executorch//:executorch_file_data_loader",
     ] + select({
-        "//toolchains/dep_collection:driveos": ["@cuda_driveos//:cudart"],
+        ":driveos": ["@cuda_driveos//:cudart"],
         "//conditions:default": ["@cuda//:cudart"],
     }),
 )
