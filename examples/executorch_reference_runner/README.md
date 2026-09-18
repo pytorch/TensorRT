@@ -190,7 +190,8 @@ build-executorch-reference-runner/example_executorch_runner \
 ```
 
 `--green_context_sms=N` creates the caller stream inside a green context holding N
-SMs. The runner aborts rather than falling back if one cannot be created, so a
+SMs. The runner refuses with a distinct status rather than falling back if one
+cannot be created, and says how many the device has, so a
 passing run always means a green context was really used. `N=0`, the default, uses
 an ordinary stream.
 

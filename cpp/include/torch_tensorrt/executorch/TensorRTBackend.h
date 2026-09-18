@@ -77,7 +77,10 @@ struct EngineHandle {
   std::vector<bool> input_is_alias_target;
   size_t num_aliased_outputs = 0;
   int device_id = 0;
-  bool unified_memory = false;
+  // Whether this device can read pageable host memory, which is the question the uses of this flag
+  // ask. It is not whether the device is integrated: a discrete card answers no to that and yes to
+  // this, and the two answers select different paths.
+  bool pageable_host_access = false;
   // Whether the caller asked to be handed work still in flight. Off unless asked, because a caller
   // that merely set a stream, which is the ordinary reason to set one, cannot wait for the result
   // from Python and would read the buffer before the engine writes it.

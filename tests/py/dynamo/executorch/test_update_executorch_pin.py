@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+
 from packaging.version import Version
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
@@ -471,6 +472,7 @@ def test_development_constraint_update_detects_removed_site(pin_repo, monkeypatc
         test_write_pins_updates_the_development_constraint(pin_repo)
 
 
+@pytest.mark.unit
 def test_write_pins_requires_a_separate_lock_refresh(tmp_path, monkeypatch):
     """A history-free pin bump must pass source guards and fail only the stale lock."""
     import xml.etree.ElementTree as ET
@@ -688,6 +690,7 @@ def test_an_unrelated_package_at_the_target_version_is_not_a_pin_site(pin_repo):
         updater.write_pins("9.9.9", "c" * 40)
 
 
+@pytest.mark.unit
 def test_the_stable_track_warns_that_its_pin_will_not_build(monkeypatch, capsys):
     """A stable pin cannot build, and that used to be discovered from a failed pull request.
 

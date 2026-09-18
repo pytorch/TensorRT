@@ -14,13 +14,13 @@ import re
 import shlex
 import subprocess
 import sys
+import types
 from collections import Counter
 from pathlib import Path
 
-import types
-
 import pytest
 import yaml
+
 from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
 
@@ -961,6 +961,7 @@ def test_import_errors_preserve_context_and_install_guidance(
     monkeypatch, cuda, entrypoint
 ):
     import __future__
+
     import importlib.util
     import types
 
@@ -1042,6 +1043,7 @@ def test_derived_requirements_roll_the_minor_over(tmp_path: Path) -> None:
     assert _runner_requirement(tmp_path) == f"executorch=={version}"
 
 
+@pytest.mark.unit
 def test_the_pinned_commit_is_the_pinned_wheels_own_source() -> None:
     """The two pins must name one ExecuTorch, not two that happen to be close.
 
@@ -2165,6 +2167,7 @@ def test_docgen_pin_reader_accepts_only_the_allowed_ast(monkeypatch, side_effect
 @pytest.mark.unit
 def test_gpu_filter_checks_detect_lost_selection(monkeypatch, tmp_path, route, removed):
     from dataclasses import replace
+
     from tests.ci import suites
 
     def mutate(keyword):
@@ -2584,6 +2587,7 @@ def test_the_pairing_check_fails_when_the_two_pins_disagree(
             test_the_pinned_commit_is_the_pinned_wheels_own_source()
 
 
+@pytest.mark.unit
 @pytest.mark.parametrize("branch", ["windows", "linux"])
 def test_the_install_script_leaves_the_companion_out(tmp_path, branch):
     """Removing both exclusions left every pin test green, so nothing protected this.

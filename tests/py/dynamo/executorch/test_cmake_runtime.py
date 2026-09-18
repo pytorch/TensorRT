@@ -4,11 +4,11 @@
 """Exercise the installed companion CMake target with a CPU-only native fixture."""
 
 import os
-from pathlib import Path
 import re
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 

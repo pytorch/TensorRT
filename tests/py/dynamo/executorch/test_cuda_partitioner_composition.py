@@ -375,7 +375,6 @@ def test_the_partitioner_refuses_a_device_it_cannot_run_on(requested, accepted):
     caused it.
     """
     from executorch.exir.backend.compile_spec_schema import CompileSpec
-
     from torch_tensorrt.executorch.partitioner import TensorRTPartitioner
 
     specs = [CompileSpec("target_device", requested)]

@@ -10,8 +10,8 @@ import os
 import runpy
 import shlex
 import shutil
-import subprocess
 import stat
+import subprocess
 import sys
 import tempfile
 import types

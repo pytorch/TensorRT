@@ -306,9 +306,9 @@ def test_register_retries_after_load_failure(monkeypatch):
 
 @pytest.mark.unit
 def test_concurrent_registration_loads_and_checks_once(monkeypatch):
+    import time
     from concurrent.futures import ThreadPoolExecutor
     from threading import Barrier
-    import time
 
     delegate = load_delegate_module()
     registered = set()

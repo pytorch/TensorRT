@@ -13,7 +13,6 @@ import shutil
 import subprocess
 import sys
 import types
-import zipfile
 from pathlib import Path
 
 import pytest
@@ -537,6 +536,7 @@ def test_runtime_workflows_filter_cuda_12_without_changing_main_releases(
 def test_shared_repair_preserves_the_companion_payload(tmp_path, arch, floor):
     """Run the shared repair loop with real wheels and check tags, hashes, and routing."""
     from email.parser import BytesParser
+
     from wheel.wheelfile import WheelFile
 
     dist = tmp_path / "dist"

@@ -307,7 +307,7 @@ Result<DelegateHandle*> TensorRTBackend::init(
         "TensorRTBackend::init: cudaDeviceGetAttribute(cudaDevAttrPageableMemoryAccess) failed: %s",
         cudaGetErrorString(cuda_err));
   }
-  handle->unified_memory = pageable_access != 0;
+  handle->pageable_host_access = pageable_access != 0;
 
   // One runtime for the process, not one per program. TensorRT documents a runtime as sharable
   // across threads for nonmodifying use, and creating a second one logs that the logger passed in
@@ -732,7 +732,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     // caller's unchanged buffer. Fail loudly instead.
     if (engine->input_is_alias_target[i]) {
       const bool device_resident =
-          et_in.nbytes() > 0 && (engine->unified_memory || is_cuda_accessible_ptr(et_in.const_data_ptr()));
+          et_in.nbytes() > 0 && (engine->pageable_host_access || is_cuda_accessible_ptr(et_in.const_data_ptr()));
       if (!device_resident) {
         ET_LOG(
             Error,
@@ -754,7 +754,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
         engine->cached_input_sizes[i] = 1;
       }
       bind_ptr = engine->cached_input_ptrs[i];
-    } else if (engine->unified_memory || is_cuda_accessible_ptr(et_in.const_data_ptr())) {
+    } else if (engine->pageable_host_access || is_cuda_accessible_ptr(et_in.const_data_ptr())) {
       bind_ptr = et_in.mutable_data_ptr();
     } else {
       const size_t needed = et_in.nbytes();
@@ -917,7 +917,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
         engine->cached_output_sizes[o] = 1;
       }
       bind_ptr = engine->cached_output_ptrs[o];
-    } else if (engine->unified_memory || is_cuda_accessible_ptr(et_out.const_data_ptr())) {
+    } else if (engine->pageable_host_access || is_cuda_accessible_ptr(et_out.const_data_ptr())) {
       bind_ptr = et_out.mutable_data_ptr();
     } else {
       const size_t needed = et_out.nbytes();

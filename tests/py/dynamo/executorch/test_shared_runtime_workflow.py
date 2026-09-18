@@ -5,19 +5,20 @@
 
 import ast
 import importlib
-import warnings
 import json
 import os
 import shutil
 import subprocess
 import sys
 import types
+import warnings
 from pathlib import Path
 
 import pytest
 import yaml
-from packaging.requirements import Requirement
 from wheel.wheelfile import WheelFile
+
+from packaging.requirements import Requirement
 
 pytestmark = pytest.mark.unit
 ROOT = Path(__file__).resolve().parents[4]
