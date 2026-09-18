@@ -25,7 +25,9 @@
 
 #include <dlfcn.h>
 
+#include <cerrno>
 #include <cinttypes>
+#include <climits>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -237,7 +239,23 @@ int main(int argc, char** argv) {
     ET_LOG(Error, "--num_runs must be at least 1, got %d", num_runs);
     return 2;
   }
-  const int green_context_sms = atoi(get_flag(argc, argv, "--green_context_sms", "0"));
+  const char* const green_context_arg = get_flag(argc, argv, "--green_context_sms", "0");
+  // atoi answers 0 for anything it cannot parse, and 0 means no green context, so a typo or a
+  // negative number would quietly give an ordinary stream while the caller believed it had asked
+  // for a partition. That is the one thing this flag must never do, so parse it strictly.
+  char* green_context_end = nullptr;
+  errno = 0;
+  const long green_context_parsed = strtol(green_context_arg, &green_context_end, 10);
+  if (green_context_end == green_context_arg || *green_context_end != '\0' || errno == ERANGE ||
+      green_context_parsed < 0 || green_context_parsed > INT_MAX) {
+    ET_LOG(
+        Error,
+        "--green_context_sms must be a whole number of streaming multiprocessors, zero for an "
+        "ordinary stream, got '%s'",
+        green_context_arg);
+    return 2;
+  }
+  const int green_context_sms = static_cast<int>(green_context_parsed);
 
   Result<FileDataLoader> loader_result = FileDataLoader::from(model_path);
   if (!loader_result.ok()) {

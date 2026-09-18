@@ -740,8 +740,9 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       if (!device_resident) {
         ET_LOG(
             Error,
-            "TensorRTBackend::execute: aliased input '%s' must be device-resident (non-empty and "
-            "CUDA-accessible or unified memory); its caller-owned in-place update cannot be staged "
+            "TensorRTBackend::execute: aliased input '%s' must be reachable by the engine without "
+            "staging (non-empty, and either CUDA-accessible or plain host memory on a device that "
+            "can read pageable host memory); its caller-owned in-place update cannot be staged "
             "through host scratch",
             name.c_str());
         return Error::InvalidArgument;
@@ -960,10 +961,13 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   if (!ctx->enqueueV3(stream)) {
     ET_LOG(
         Error,
-        "TensorRTBackend::execute: enqueueV3 failed. Verify that the selected "
-        "CallerStreamGuard stream belongs to the TensorRT engine device. If a CUDA "
-        "green context is current, scope a CallerStreamGuard with a green-context "
-        "stream: cudaStreamPerThread is invalid while a green context is current.");
+        "TensorRTBackend::execute: enqueueV3 failed. The usual cause is an output with no address: "
+        "a program built without runtime-allocated outputs needs the caller to supply each output "
+        "buffer through set_output_data_ptr before running, and TensorRT reports that as a parameter "
+        "check rather than as a missing address. Failing that, check that the selected "
+        "CallerStreamGuard stream belongs to the TensorRT engine's device, and note that "
+        "cudaStreamPerThread is invalid while a CUDA green context is current, so a green context "
+        "needs a guard scoped with one of its own streams.");
     return Error::InvalidState;
   }
 
