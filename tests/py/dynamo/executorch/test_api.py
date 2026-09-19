@@ -58,24 +58,41 @@ def test_the_install_script_puts_the_cuda_runtime_on_the_library_path():
     assert "cu13*)" in script
 
 
+@pytest.mark.parametrize("branch", ["windows", "linux"])
 @pytest.mark.unit
-def test_the_install_script_does_not_install_the_companion_as_the_main_wheel(tmp_path):
+def test_the_install_script_does_not_install_the_companion_as_the_main_wheel(
+    tmp_path, branch
+):
     """The two wheel names share a prefix, so a glob written for the main one matches the companion
     too and installs it in the same breath, which is how a delegate meant to be optional became
     mandatory. Driven by running the script's own selection loop over two named files, rather than
     by looking for words in it: the words that used to be checked here are on the base branch as
     well, so they could not tell the two versions apart.
+
+    Both arms, because each carries its own copy of the loop. Taking the first one in the file
+    covered Windows alone, so deleting the exclusion from the Linux arm, which is the one every
+    Linux row runs, left this passing.
     """
     script = (_REPO_ROOT / ".github/scripts/install-torch-tensorrt.sh").read_text(
         encoding="utf-8"
     )
-    assert 'wheels=""' in script, (
-        "the script no longer builds an explicit wheel list, so nothing stops the glob for the main "
-        "wheel from matching the companion as well"
+    loops = []
+    at = script.find('wheels=""')
+    while at != -1:
+        loops.append(script[at : script.index("done", at) + len("done")])
+        at = script.find('wheels=""', at + 1)
+    assert len(loops) == 2, (
+        "expected one wheel selection loop per platform arm, so that each arm is covered; "
+        f"found {len(loops)}"
     )
-    start = script.index('wheels=""')
-    end = script.index("done", start) + len("done")
-    loop = script[start:end]
+    # The Windows arm reads the runner's artifact directory; the Linux arm globs the build
+    # directory the container mounts, so point it at the fixture instead.
+    loop = loops[0 if branch == "windows" else 1]
+    if branch == "linux":
+        assert "/opt/torch-tensorrt-builds" in loop, loop
+        loop = loop.replace("/opt/torch-tensorrt-builds", str(tmp_path))
+    else:
+        assert "RUNNER_ARTIFACT_DIR" in loop, loop
     for name in (
         "torch_tensorrt-2.15.0-cp312-cp312-linux_x86_64.whl",
         "torch_tensorrt_executorch_runtime-0.2.0-py3-none-linux_x86_64.whl",
@@ -1627,9 +1644,13 @@ def test_the_guard_actually_rejects_a_bad_artifact(tmp_path, case, expect_pass):
     # exit status alone let a case pass by any route that also exits non-zero: the three readelf
     # and no-RUNPATH cases each survived their own branch being deleted because a later check still
     # failed. Requiring the branch's own message pins each case to the branch it is named for.
+    # One entry per rejection case, because a non-zero status on its own proves nothing: point the
+    # test at a tree with no guard script and the shell fails to open the file, which also exits
+    # non-zero. Sixteen of these cases passed that way before they were given a message to match.
     expected_messages = {
         "no_runpath": "carries no RUNPATH",
         "no_needed_executorch": "has no DT_NEEDED on libexecutorch.so",
+        "no_needed_extension_cuda": "has no DT_NEEDED on libexecutorch_extension_cuda.so",
         "no_needed_libstdcxx": "has no DT_NEEDED on libstdc++",
         "cuda_12_runtime": "this delegate requires CUDA 13",
         "readelf_broken": "could not inspect",
@@ -1637,17 +1658,37 @@ def test_the_guard_actually_rejects_a_bad_artifact(tmp_path, case, expect_pass):
         "unversioned_cxx_undef": "unversioned undefined C++ runtime symbols",
         "readelf_dynsyms_broken": "could not read the dynamic symbols of",
         "no_pybindings_extension": "could not find the pybindings extension",
+        "no_register_backend": "does not reference register_backend at all",
+        "defines_register_backend": "defines register_backend instead of importing it",
+        "runtime_only_imports_register_backend": "does not export",
+        "runtime_exports_a_near_miss": "does not export",
+        "dt_rpath": "carries DT_RPATH rather than DT_RUNPATH",
+        "absolute_runpath": "RUNPATH entries that are not relative to the artifact",
+        "elfutils_bare_rpath": "carries DT_RPATH rather than DT_RUNPATH",
+        "wrong_depth_runpath": "has a RUNPATH but not $ORIGIN/../../executorch/lib",
+        "runpath_missing_executorch": "has a RUNPATH but not $ORIGIN/../../executorch/lib",
+        "runpath_missing_a_sibling": "carries a RUNPATH the build did not ask for",
+        "no_cxxabi": "declares no CXXABI requirement",
+        "floor_above_runtime": "which manylinux",
+        "glibc_above_runtime": "which manylinux",
+        "above_the_runtime": "requires GLIBCXX_3.4.26, which manylinux",
+        "cxxabi_above_the_runtime": "requires CXXABI_1.3.15, which manylinux",
     }
     if expect_pass:
         assert result.returncode == 0, result.stdout + result.stderr
     else:
         assert result.returncode != 0, f"{case} was accepted:\n{result.stdout}"
-        expected = expected_messages.get(case)
-        if expected is not None:
-            assert expected in result.stderr, (
-                f"{case} failed, but not through its own branch: expected {expected!r} in\n"
-                f"{result.stderr}"
-            )
+        # The guard prefixes every refusal, so this is what tells a real rejection apart from the
+        # shell failing to start the script at all.
+        assert "FATAL:" in result.stderr, (
+            f"{case} exited non-zero without the guard refusing it, so the guard may not have run:\n"
+            f"{result.stderr}"
+        )
+        expected = expected_messages[case]
+        assert expected in result.stderr, (
+            f"{case} failed, but not through its own branch: expected {expected!r} in\n"
+            f"{result.stderr}"
+        )
 
 
 @pytest.mark.unit
