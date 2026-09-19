@@ -237,7 +237,7 @@ def test_ownership_regression_rejects_presence_only_acceptance(
         and isinstance(node.test.op, ast.Not)
         and isinstance(node.test.operand, ast.Call)
         and isinstance(node.test.operand.func, ast.Name)
-        and node.test.operand.func.id == "owns_registration"
+        and node.test.operand.func.id == "query_ownership"
     ]
     assert len(checks) == 1
     checks[0].test = ast.parse(

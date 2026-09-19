@@ -212,7 +212,8 @@ def _register_locked() -> None:
             )
     else:
         try:
-            # Resolve imports eagerly; the ownership query needs only this local handle.
+            # Eagerly, so a missing dependency surfaces here as an OSError this code can explain,
+            # rather than later as a failed lookup with nothing to say about the cause.
             loaded = ctypes.CDLL(path, mode=os.RTLD_NOW | os.RTLD_LOCAL)
         except OSError as error:
             # A present CUDA extension can also fail to load because of an ABI mismatch.
@@ -241,15 +242,15 @@ def _register_locked() -> None:
             "ExecuTorch were probably built against different runtimes."
         )
     try:
-        owns_registration = loaded.torch_tensorrt_owns_executorch_registration
+        query_ownership = loaded.torch_tensorrt_owns_executorch_registration
     except AttributeError as error:
         raise DelegateCompatibilityError(
             f"The delegate at {path} has no registration ownership query. "
             "Reinstall this package so its Python module and native library match."
         ) from error
-    owns_registration.argtypes = []
-    owns_registration.restype = ctypes.c_bool
-    if not owns_registration():
+    query_ownership.argtypes = []
+    query_ownership.restype = ctypes.c_bool
+    if not query_ownership():
         raise DelegateCompatibilityError(
             f"The delegate at {path} does not own the {BACKEND_NAME} registration. "
             "ExecuTorch keeps the first registration, so another library would execute "

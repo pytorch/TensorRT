@@ -10,8 +10,11 @@
 #   find_package(executorch REQUIRED COMPONENTS backend_cuda kernels_optimized)
 #   find_package(executorch_backend_tensorrt REQUIRED)
 #   target_link_libraries(my_app PRIVATE
-#     executorch::runtime executorch::backend_cuda
-#     executorch::kernels_optimized executorch::backend_tensorrt)
+#     executorch::runtime
+#     executorch::backend_cuda
+#     executorch::backend_tensorrt
+#     executorch::kernels_optimized
+#   )
 #
 # kernels_optimized supplies the et_copy host/device copy operators.
 # There is nothing to include. The delegate exposes no public header: it
@@ -19,7 +22,7 @@
 # inside the shared library, and everything a caller does afterwards is
 # ExecuTorch's own Runtime API.
 #
-# Point CMake at it with either of. The variable matters: importing this package loads the delegate,
+# Point CMake at it with either of the two lines below. Which one matters: importing this package loads the delegate,
 # which raises where ExecuTorch is not installed yet, and asking for a path does not need it loaded.
 #   -Dexecutorch_backend_tensorrt_DIR=$(TORCH_TENSORRT_SKIP_DELEGATE_REGISTRATION=1 python -c "import torch_tensorrt_executorch_runtime as m, pathlib; print(pathlib.Path(m.__file__).parent / 'lib/cmake/executorch_backend_tensorrt')")
 #   -DCMAKE_PREFIX_PATH=$(TORCH_TENSORRT_SKIP_DELEGATE_REGISTRATION=1 python -c "import torch_tensorrt_executorch_runtime as m, pathlib; print(pathlib.Path(m.__file__).parent)")
@@ -101,6 +104,9 @@ endif()
 # a subdirectory gets a message about a target that plainly exists, which is the ordinary layout for
 # a project of more than one directory.
 add_library(executorch::backend_tensorrt SHARED IMPORTED GLOBAL)
+# Aliased to the name this target had before. An alias to an imported target needs it to be
+# global, which it is above, and this keeps a consumer that has not been updated working.
+add_library(torchtrt::executorch_backend ALIAS executorch::backend_tensorrt)
 set_target_properties(
   executorch::backend_tensorrt
   PROPERTIES
@@ -139,7 +145,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   else()
     # This removes the run path this package adds, not the one CMake adds by itself:
     # linking an imported library records its directory as DT_RUNPATH regardless, which is
-    # still this machine absolute path. Only CMAKE_SKIP_BUILD_RPATH in the consumer own
+    # still this machine's absolute path. Only CMAKE_SKIP_BUILD_RPATH in the consumer's own
     # project removes that, and a package config has no business setting it there.
     message(STATUS
       "executorch_backend_tensorrt: not adding a run path. CMake still records "

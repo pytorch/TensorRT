@@ -51,8 +51,9 @@ and leave it on for the outputs. The caller then supplies the input buffer, whic
 is the copy worth avoiding, and the program's own device arena owns the output.
 Measured on two architectures, that arrangement runs from Python and from C++ with
 no boundary copies in the program and results identical to eager. Turning
-allocation off for both works only from C++, and turning it off for neither is
-refused from both.
+allocation off for both works only from C++. Leaving it on for both is refused by the
+export step, because a program that allocates its own inputs has nothing for a caller
+to hand in.
 
 Point CMake at both wheels. The example above calls `find_package(executorch)`
 as well, and that package lives in its own distribution. ExecuTorch is a
@@ -302,7 +303,9 @@ exactly as they do without this wheel.
 
 Registration happens in the delegate's static initializer, so the library has
 to be loaded before a delegated program is loaded. Importing this package does
-that, and nothing else: there is no API to call.
+that, and nothing else, so an import is all a normal program needs. There is a
+`register()` for the rare case where the import order is not yours to choose, and
+calling it twice is harmless.
 
 ```python
 from pathlib import Path

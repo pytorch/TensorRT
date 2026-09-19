@@ -309,9 +309,9 @@ def test_the_runner_rejects_an_output_that_came_back_on_the_host(
         # except the guard's own complaint proves the guard let a device output through.
         with pytest.raises(Exception) as caught:
             exec(compile(tree, str(path), "exec"), namespace)
-        assert "output came back on" not in str(caught.value), caught.value
+        assert "output is tagged" not in str(caught.value), caught.value
     else:
-        with pytest.raises(AssertionError, match="output came back on"):
+        with pytest.raises(AssertionError, match="output is tagged"):
             exec(compile(tree, str(path), "exec"), namespace)
 
 

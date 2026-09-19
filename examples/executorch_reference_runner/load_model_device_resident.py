@@ -70,8 +70,9 @@ y = outputs[0]
 # claim is the narrow one. The numbers below are still checked, and they are correct.
 if not y.is_cuda:
     raise AssertionError(
-        f"FATAL: output came back on {y.device}, so the method boundary still "
-        "copies device to host. The skip_d2h_for_method_outputs flag did not take."
+        f"FATAL: output is tagged {y.device}, not cuda. The usual cause is that "
+        "skip_d2h_for_method_outputs did not take during export, so the method "
+        "boundary still copies device to host."
     )
 
 expected = torch.cos(torch.erfinv(torch.tanh(x)))

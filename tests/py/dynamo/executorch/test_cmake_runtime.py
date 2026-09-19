@@ -293,6 +293,20 @@ def test_the_config_does_not_raise_the_consumers_cmake_floor() -> None:
 
 
 @pytest.mark.unit
+def test_the_config_keeps_the_target_name_it_used_to_have() -> None:
+    """A project outside this repository links this by the name it had before the rename. Dropping
+    that name fails such a project at configure time, which is the worst place to learn about a
+    rename, so the old name stays as an alias and this pins it.
+    """
+    config = _CONFIG.read_text(encoding="utf-8")
+    assert (
+        "add_library(torchtrt::executorch_backend ALIAS executorch::backend_tensorrt)"
+        in config
+    )
+    # Aliasing an imported target requires it to be global, so the alias is only valid if it is.
+    assert "SHARED IMPORTED GLOBAL" in config
+
+
 def test_the_config_looks_for_the_delegate_in_one_place_only() -> None:
     """Discovery used to walk up until a delegate turned up under lib/.
 

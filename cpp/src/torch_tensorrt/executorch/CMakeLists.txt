@@ -200,6 +200,10 @@ target_link_libraries(executorch_trt_backend
 
 add_library(executorch_backend_tensorrt_backend INTERFACE)
 add_library(executorch::backend_tensorrt ALIAS executorch_backend_tensorrt_backend)
+# The name this target had before, kept because a project outside this repository that links
+# it by the old name would otherwise fail at configure time, which is a worse way to learn
+# about a rename than a deprecation notice.
+add_library(torchtrt::executorch_backend ALIAS executorch_backend_tensorrt_backend)
 add_dependencies(executorch_backend_tensorrt_backend executorch_trt_backend)
 
 if(MSVC)
