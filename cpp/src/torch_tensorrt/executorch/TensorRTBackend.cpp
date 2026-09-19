@@ -79,10 +79,11 @@ void TRTLogger::log(Severity severity, const char* msg) noexcept {
 
 EngineHandle::~EngineHandle() {
   cudaSetDevice(device_id);
-  // Nothing is waited for here on purpose. execute() drains its own stream before returning, and
-  // the guard inside it drains on every early exit, so this handle owns no running work by now. A
-  // device-wide wait would not be free either: it blocks on unrelated work in the same context, so
-  // destroying one program was measured holding another one up for a full second.
+  // Nothing is waited for here on purpose. execute() waits on its own stream before returning, and
+  // the guard inside it waits on every early exit from the point work is first submitted, so this
+  // handle owns no running work by now. A device-wide wait would not be free either: it blocks on
+  // unrelated work in the same context, so destroying one program was measured holding another one
+  // up for a full second.
   for (void* p : cached_input_ptrs) {
     if (p != nullptr) {
       cudaFree(p);
@@ -108,8 +109,20 @@ namespace {
 // anything has called this. The runtime would then be destroyed first and the engine second, which
 // is the wrong way round. The cost is one runtime and one logger still allocated at exit.
 nvinfer1::IRuntime* shared_runtime() {
-  static TRTLogger* const logger = new TRTLogger();
-  static nvinfer1::IRuntime* const runtime = nvinfer1::createInferRuntime(*logger);
+  static std::mutex mutex;
+  static TRTLogger* logger = nullptr;
+  static nvinfer1::IRuntime* runtime = nullptr;
+  const std::lock_guard<std::mutex> lock(mutex);
+  // Retried while it is null, rather than initialised once. A function-local static that captures a
+  // failed call keeps the failure for the life of the process, so one bad moment, a transient
+  // allocation failure or a driver not ready yet, would disable the backend permanently. Once a
+  // runtime exists it is kept forever, which is what the paragraph above requires.
+  if (runtime == nullptr) {
+    if (logger == nullptr) {
+      logger = new TRTLogger();
+    }
+    runtime = nvinfer1::createInferRuntime(*logger);
+  }
   return runtime;
 }
 
@@ -1001,6 +1014,11 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // ------------------------------------------------------------------
   // 4. Enqueue inference on the current CUDA stream
   // ------------------------------------------------------------------
+  // Armed before the launch, not after. Until now only the async copies armed it, so a program with
+  // device-resident boundaries and no staging reached here unarmed, and a launch that fails partway
+  // would then return with whatever it did submit still running. Arming first costs one wait on a
+  // path that is already failing, and makes the destructor's claim of no running work true.
+  drain_on_early_return.arm();
   if (!ctx->enqueueV3(stream)) {
     ET_LOG(
         Error,

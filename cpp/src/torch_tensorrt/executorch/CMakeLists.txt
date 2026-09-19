@@ -85,6 +85,17 @@ if(TARGET executorch::extension_cuda)
     # while trying to use both packages together.
     if(NOT TARGET extension_cuda)
         add_library(extension_cuda ALIAS executorch::extension_cuda)
+    else()
+        # Both names exist, so the plain one wins the link below and the package's own target is
+        # never reached. Check the one that will actually be linked, or a static copy slips past
+        # the branch further down that was written to catch exactly this.
+        get_target_property(_extension_cuda_type extension_cuda TYPE)
+        if(NOT _extension_cuda_type STREQUAL "SHARED_LIBRARY")
+            message(FATAL_ERROR
+                "ExecuTorch's extension_cuda target must be shared; got "
+                "${_extension_cuda_type}. Static copies break caller-stream sharing."
+            )
+        endif()
     endif()
 elseif(TARGET extension_cuda)
     # Provided by ExecuTorch, e.g. add_subdirectory() with EXECUTORCH_BUILD_CUDA=ON.
@@ -204,6 +215,10 @@ add_library(executorch::backend_tensorrt ALIAS executorch_backend_tensorrt_backe
 # it by the old name would otherwise fail at configure time, which is a worse way to learn
 # about a rename than a deprecation notice.
 add_library(torchtrt::executorch_backend ALIAS executorch_backend_tensorrt_backend)
+# And the plain name, because the base branch carried both and a consumer could link either. Keeping
+# only the namespaced one let an out-of-tree project configure clean and then fail at link time
+# looking for a library nobody builds any more.
+add_library(torchtrt_executorch_backend ALIAS executorch_backend_tensorrt_backend)
 add_dependencies(executorch_backend_tensorrt_backend executorch_trt_backend)
 
 if(MSVC)

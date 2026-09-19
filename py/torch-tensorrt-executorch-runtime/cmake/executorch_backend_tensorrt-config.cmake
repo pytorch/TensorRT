@@ -107,6 +107,8 @@ add_library(executorch::backend_tensorrt SHARED IMPORTED GLOBAL)
 # Aliased to the name this target had before. An alias to an imported target needs it to be
 # global, which it is above, and this keeps a consumer that has not been updated working.
 add_library(torchtrt::executorch_backend ALIAS executorch::backend_tensorrt)
+# The plain name too. Both existed before the rename and a consumer could link either.
+add_library(torchtrt_executorch_backend ALIAS executorch::backend_tensorrt)
 set_target_properties(
   executorch::backend_tensorrt
   PROPERTIES

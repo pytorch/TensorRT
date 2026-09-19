@@ -27,7 +27,19 @@ def __getattr__(name: str) -> Any:
     against a main wheel that does not have it, which is the same reason load defers its own import.
     """
     if name == "Program":
-        from torch_tensorrt._executorch_compat import Program
+        # Guarded for the same reason load is, and with the same message. Left bare, this door
+        # produced the very error the other door's guard exists to avoid, so an install that skipped
+        # dependency resolution got a bare module-not-found naming a module the caller never asked
+        # for, depending only on which name they reached for first.
+        try:
+            from torch_tensorrt._executorch_compat import Program
+        except ImportError as error:
+            raise ImportError(
+                "This deprecated module forwards into torch_tensorrt, and the installed "
+                "Torch-TensorRT is older than the one this package was built against, so it does "
+                "not carry the receiving module. Install the Torch-TensorRT this package requires. "
+                f"Underlying error: {error}"
+            ) from error
 
         return Program
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

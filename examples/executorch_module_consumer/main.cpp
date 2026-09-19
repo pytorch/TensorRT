@@ -9,10 +9,14 @@
 // outputs runs with forward() alone. A program exported to leave its outputs to the caller has no
 // address to write to until one is supplied, so forward() by itself fails on it by design, and the
 // caller has to hand a device buffer in first.
+#include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <deque>
+#include <fstream>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -39,6 +43,22 @@ const char* flag(int argc, char** argv, const char* name, const char* fallback) 
     }
   }
   return fallback;
+}
+
+// The value the export script recorded for this program, read from the file it writes beside the
+// .pte. Returned as an optional so a missing file is a refusal rather than a silent pass: a gate
+// that cannot find its reference has to say so, not accept whatever it was given.
+std::optional<float> expected_value(const std::string& model_path) {
+  std::ifstream file(model_path + ".expected");
+  if (!file) {
+    return std::nullopt;
+  }
+  std::string shape_line;
+  float value = 0.0f;
+  if (!std::getline(file, shape_line) || !(file >> value)) {
+    return std::nullopt;
+  }
+  return value;
 }
 
 bool cuda_ok(cudaError_t status, const char* what) {
@@ -108,13 +128,16 @@ int main(int argc, char** argv) {
         return 1;
       }
       owned.push_back(device);
-      const std::vector<uint8_t> filled(bytes, 0);
+      // Ones, because that is what the export script feeds when it records the reference value
+      // this run is checked against. Zeros would compare a different computation.
+      const std::vector<float> filled(count, 1.0f);
       if (!cuda_ok(cudaMemcpy(device, filled.data(), bytes, cudaMemcpyHostToDevice), "input upload")) {
         return 1;
       }
       inputs.push_back(from_blob(device, sizes, type));
     } else {
       host_buffers.emplace_back(bytes, 0);
+      std::fill_n(reinterpret_cast<float*>(host_buffers.back().data()), count, 1.0f);
       inputs.push_back(from_blob(host_buffers.back().data(), sizes, type));
     }
     // forward() takes EValue, and an EValue borrows the tensor, so the pointers above are kept
@@ -164,32 +187,79 @@ int main(int argc, char** argv) {
     if (run + 1 == num_runs) {
       const auto& outputs = result.get();
       std::printf("ran %d time(s), %zu output(s)\n", num_runs, outputs.size());
+      // The value the export script recorded. Without it there is nothing to compare against, so
+      // this refuses rather than printing numbers and returning success, which is what it used to
+      // do: a run with every element wrong exited zero.
+      const std::optional<float> want = expected_value(model_path);
+      if (!want.has_value()) {
+        std::fprintf(
+            stderr,
+            "no reference value beside %s, so the output cannot be checked. The export script "
+            "writes it; run that first.\n",
+            model_path);
+        return 1;
+      }
       for (size_t o = 0; o < outputs.size(); ++o) {
         const auto tensor = outputs[o].toTensor();
-        // Printed as floats only when they are floats. Reading float-sized words out of a tensor of
-        // another type would be a made-up number dressed as a result.
         if (tensor.scalar_type() != executorch::aten::ScalarType::Float) {
-          std::printf("  output %zu holds %zu elements of another type\\n", o, size_t(tensor.numel()));
-          continue;
+          std::fprintf(stderr, "output %zu is not float, so the recorded reference does not describe it\n", o);
+          return 1;
         }
-        const size_t print_n = tensor.numel() < 4 ? static_cast<size_t>(tensor.numel()) : 4;
-        std::vector<float> staged(print_n, 0.0f);
+        const size_t count = static_cast<size_t>(tensor.numel());
+        std::vector<float> host(count, 0.0f);
         cudaPointerAttributes attrs{};
         const void* src = tensor.const_data_ptr();
-        if (cudaPointerGetAttributes(&attrs, src) == cudaSuccess && attrs.type == cudaMemoryTypeDevice) {
+        const bool on_device =
+            cudaPointerGetAttributes(&attrs, src) == cudaSuccess && attrs.type == cudaMemoryTypeDevice;
+        cudaGetLastError();
+        if (on_device) {
           if (!cuda_ok(
-                  cudaMemcpy(staged.data(), src, print_n * sizeof(float), cudaMemcpyDeviceToHost), "output download")) {
+                  cudaMemcpy(host.data(), src, count * sizeof(float), cudaMemcpyDeviceToHost), "output download")) {
             return 1;
           }
-          std::printf("  output %zu lives on the device", o);
         } else {
-          std::memcpy(staged.data(), src, print_n * sizeof(float));
-          std::printf("  output %zu lives on the host", o);
+          std::memcpy(host.data(), src, count * sizeof(float));
         }
-        for (size_t v = 0; v < print_n; ++v) {
-          std::printf(" %g", staged[v]);
+        // Where the program was asked for device boundaries, a host-backed output means the
+        // arrangement did not take, and saying so is the entire point of asking for it.
+        if (device_boundary && !on_device) {
+          std::fprintf(stderr, "output %zu came back on the host in device mode\n", o);
+          return 1;
         }
-        std::printf("\n");
+        // Every element, not the first four. A wrong tail is exactly what printing a prefix hides.
+        size_t bad = 0;
+        float worst = 0.0f;
+        for (size_t v = 0; v < count; ++v) {
+          if (!std::isfinite(host[v])) {
+            std::fprintf(stderr, "output %zu element %zu is not finite\n", o, v);
+            return 1;
+          }
+          const float error = std::fabs(host[v] - *want);
+          if (error > worst) {
+            worst = error;
+          }
+          if (error > 2e-3f) {
+            ++bad;
+          }
+        }
+        if (bad != 0) {
+          std::fprintf(
+              stderr,
+              "output %zu: %zu of %zu elements differ from %g, worst %g\n",
+              o,
+              bad,
+              count,
+              static_cast<double>(*want),
+              static_cast<double>(worst));
+          return 1;
+        }
+        std::printf(
+            "  output %zu: %zu elements match %g on the %s, worst %g\n",
+            o,
+            count,
+            static_cast<double>(*want),
+            on_device ? "device" : "host",
+            static_cast<double>(worst));
       }
     }
   }
