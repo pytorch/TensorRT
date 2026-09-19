@@ -241,11 +241,11 @@ TEST(ExecuTorchTensorRTBlobHeader, MetadataKeyOrderDoesNotChangeWhatIsRead) {
 TEST(ExecuTorchTensorRTBlobHeader, InputNamedLikeAScalarKeyIsNotReadAsOne) {
   // The io_bindings array holds caller-chosen tensor names, which is why the scalars are not simply
   // searched for across the whole object.
-  const auto blob =
-      make_blob(R"({"io_bindings":[{"name":"device_id","is_input":true},{"name":"out_0","is_input":false}],)"
-                R"("device_id":3,"hardware_compatible":true})",
-                4,
-                TENSORRT_MAGIC_ALIASED_IO);
+  const auto blob = make_blob(
+      R"({"io_bindings":[{"name":"device_id","is_input":true},{"name":"out_0","is_input":false}],)"
+      R"("device_id":3,"hardware_compatible":true})",
+      4,
+      TENSORRT_MAGIC_ALIASED_IO);
 
   TensorRTBlobHeader header;
   ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));

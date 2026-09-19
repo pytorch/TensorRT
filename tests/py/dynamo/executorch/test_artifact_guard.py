@@ -468,6 +468,9 @@ def _native_project(tmp_path, tools, *, mutation=None, static_cuda=False):
         'namespace { struct R { std::string s; R() : s("fixture") {\n'
         "executorch::runtime::register_backend({}); extension_cuda(); cuda_fixture();\n"
         "} } r; }\n"
+        # The guard requires this export, because the Python package cannot import without asking
+        # it, so a stub standing in for a well-formed delegate has to carry it too.
+        'extern "C" bool torch_tensorrt_owns_executorch_registration() { return true; }\n'
     )
     for name in ("TensorRTBlobHeader.cpp", "WeightStreamingBudget.cpp"):
         (sources / name).write_text("\n")
