@@ -2928,6 +2928,10 @@ def _elf_object(architecture: str) -> bytes:
         ("wrong_architecture_floor", False),
         ("wheel_tag_mismatch", False),
         ("requires_a_mismatched_main", False),
+        # Taking the expected TensorRT and CUDA versions from the same environment that
+        # produced the requirement made the comparison agree with itself, so a wheel built
+        # against the wrong ones validated clean.
+        ("built_against_an_unpinned_tensorrt", False),
         ("requires_a_conditional_main", False),
         ("bundles_a_stowaway", False),
         ("bundles_the_executorch_runtime", False),
@@ -2984,11 +2988,23 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
             "${CONDA_RUN} python .github/scripts/check-executorch-runtime-wheel.py"
         )[0]
     )
+    pins = (_REPO_ROOT / "dev_dep_versions.yml").read_text(encoding="utf-8")
+
+    def _pin(field):
+        return re.search(rf'^{field}:\s*"?([^"\s]+)"?\s*$', pins, re.MULTILINE).group(1)
+
+    pin = _pin("__executorch_version__")
+    # The checker compares these two against the repository as well, because taking the expected
+    # value from the same environment that produced the requirement made the comparison agree with
+    # itself. So a fixture standing in for a correct build has to agree with the pins too.
+    tensorrt_version = f'{_pin("__tensorrt_version__")}.99'
+    cuda_runtime_version = f'{_pin("__cuda_version__")}.131'
+
     dependencies = {
         "torch": "2.15.0.dev20260824+cu132",
         "torch-tensorrt": "2.15.0.dev20260824+cu132",
-        "tensorrt-cu13": "11.2.1",
-        "nvidia-cuda-runtime": "13.2.0",
+        "tensorrt-cu13": tensorrt_version,
+        "nvidia-cuda-runtime": cuda_runtime_version,
     }
     for name, version in dependencies.items():
         info = tmp_path / f"{name.replace('-', '_')}-{version}.dist-info"
@@ -2997,11 +3013,6 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
             f"Metadata-Version: 2.1\nName: {name}\nVersion: {version}\n"
         )
 
-    pin = re.search(
-        r'^__executorch_version__:\s*"?([^"\s]+)"?\s*$',
-        (_REPO_ROOT / "dev_dep_versions.yml").read_text(encoding="utf-8"),
-        re.MULTILINE,
-    ).group(1)
     package = "torch_tensorrt_executorch_runtime/"
     payload = [package + "lib/libexecutorch_backend_tensorrt.so"]
     # The label naming the CUDA build is part of the ExecuTorch requirement, because the delegate
@@ -3022,8 +3033,8 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
         f"executorch=={installed_executorch}",
         "torch==2.15.0.dev20260824+cu132",
         "torch-tensorrt==2.15.0.dev20260824+cu132",
-        "tensorrt-cu13==11.2.1",
-        "nvidia-cuda-runtime==13.2.0",
+        f"tensorrt-cu13=={tensorrt_version}",
+        f"nvidia-cuda-runtime=={cuda_runtime_version}",
     ]
     purelib, tag, arch = "false", "manylinux_2_28_x86_64", "x86_64"
     elf_machine = None
@@ -3039,6 +3050,20 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
     elif case == "wrong_architecture_floor":
         # A floor the companion does not ship, so the guard has to refuse it.
         tag, arch = "manylinux_2_39_aarch64", "aarch64"
+    elif case == "built_against_an_unpinned_tensorrt":
+        stale = "9.9.9"
+        dependencies["tensorrt-cu13"] = stale
+        requires = [
+            f"tensorrt-cu13=={stale}" if r.startswith("tensorrt-cu13==") else r
+            for r in requires
+        ]
+        for info in tmp_path.glob("tensorrt_cu13-*.dist-info"):
+            shutil.rmtree(info)
+        info = tmp_path / f"tensorrt_cu13-{stale}.dist-info"
+        info.mkdir()
+        (info / "METADATA").write_text(
+            f"Metadata-Version: 2.1\nName: tensorrt-cu13\nVersion: {stale}\n"
+        )
     elif case == "requires_a_mismatched_main":
         requires = [
             "torch-tensorrt==2.15.0a0" if r.startswith("torch-tensorrt==") else r
@@ -3198,6 +3223,7 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
     # survived their own branch being deleted because an earlier check rejected a sibling payload
     # that also dropped other requirements. Requiring the branch's own message pins each to it.
     expected_messages = {
+        "built_against_an_unpinned_tensorrt": "the repository pins __tensorrt_version__",
         "payload_carries_a_mangled_name": (
             "expected torch_tensorrt_executorch_runtime/lib/libexecutorch_backend_tensorrt.so"
         ),
