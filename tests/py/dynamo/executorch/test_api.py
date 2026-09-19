@@ -1376,6 +1376,9 @@ def _assert_the_checker_is_reachable(prologue: str) -> None:
         ("good", True),
         ("no_register_backend", False),
         ("defines_register_backend", False),
+        # The Python package cannot import without this export, so a build that drops it
+        # must not reach an index.
+        ("no_ownership_query", False),
         ("no_runpath", False),
         ("wrong_depth_runpath", False),
         ("dt_rpath", False),
@@ -1502,6 +1505,13 @@ def test_the_guard_actually_rejects_a_bad_artifact(tmp_path, case, expect_pass):
     syms = "" if case == "no_register_backend" else f"  1: {undefined} {mangled}\n"
     if case == "defines_register_backend":
         syms = f"  1: 000123 FUNC GLOBAL DEFAULT 12 {mangled}\n"
+    # The ownership query the Python package asks for. A well-formed delegate defines it, so it
+    # carries a section index rather than UND.
+    if case != "no_ownership_query":
+        syms += (
+            "  2: 000456    31 FUNC GLOBAL DEFAULT 12 "
+            "torch_tensorrt_owns_executorch_registration\n"
+        )
     # What the runtime's own symbol table says. A defined export carries a section index; the
     # runtime_only_imports case carries UND instead, which is a runtime that imports the symbol
     # rather than providing it, and must be rejected.
@@ -1660,6 +1670,7 @@ def test_the_guard_actually_rejects_a_bad_artifact(tmp_path, case, expect_pass):
         "no_pybindings_extension": "could not find the pybindings extension",
         "no_register_backend": "does not reference register_backend at all",
         "defines_register_backend": "defines register_backend instead of importing it",
+        "no_ownership_query": "does not define torch_tensorrt_owns_executorch_registration",
         "runtime_only_imports_register_backend": "does not export",
         "runtime_exports_a_near_miss": "does not export",
         "dt_rpath": "carries DT_RPATH rather than DT_RUNPATH",

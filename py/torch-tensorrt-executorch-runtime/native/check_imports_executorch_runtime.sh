@@ -163,6 +163,13 @@ fi
 if printf '%s\n' "${syms}" | grep "${register_backend}" | grep -qvE '[[:space:]]UND(EF)?[[:space:]]'; then
     fail "${target} defines register_backend instead of importing it, so it would register into a private registry"
 fi
+# The Python package refuses to import unless it can ask the delegate whether it owns the
+# registration, so a build that dropped this export publishes looking fine and then tells every user
+# to reinstall, which cannot help them.
+owns_registration='torch_tensorrt_owns_executorch_registration'
+if ! printf '%s\n' "${syms}" | grep "${owns_registration}" | grep -qvE '[[:space:]]UND(EF)?[[:space:]]'; then
+    fail "${target} does not define ${owns_registration}, so the Python package cannot tell whether this delegate owns its registration"
+fi
 
 if [ "$#" -ge 3 ]; then
     [ -f "${runtime}" ] || fail "cannot compare symbol versions: ${runtime} does not exist"

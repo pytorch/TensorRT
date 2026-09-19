@@ -1128,11 +1128,12 @@ const Error kRegistrationResult = ::executorch::runtime::register_backend(kBacke
 
 } // namespace
 
-#ifdef TORCH_TENSORRT_EXECUTORCH_RUNTIME
+// Compiled everywhere, not only in the wheel build. The Python package refuses to import unless it
+// can ask this, and a C++ consumer linking two delegates is the case most likely to need the answer,
+// yet the in-tree build that serves those consumers used to leave it out entirely.
 extern "C" bool torch_tensorrt_owns_executorch_registration() {
   return ::executorch::runtime::get_backend_class(kBackendId.name) == &get_backend();
 }
-#endif
 
 } // namespace executorch_backend
 } // namespace torch_tensorrt
