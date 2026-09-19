@@ -51,8 +51,6 @@ struct InputProfileBounds {
 };
 
 struct EngineHandle {
-  TRTLogger logger;
-  TRTUniquePtr<nvinfer1::IRuntime> runtime;
   TRTUniquePtr<nvinfer1::ICudaEngine> engine;
   TRTUniquePtr<nvinfer1::IExecutionContext> exec_ctx;
   std::vector<std::string> input_binding_names;
@@ -79,15 +77,11 @@ struct EngineHandle {
   std::vector<bool> input_is_alias_target;
   size_t num_aliased_outputs = 0;
   int device_id = 0;
-  bool unified_memory = false;
+  // Whether this device can read pageable host memory, which is the question the uses of this flag
+  // ask. It is not whether the device is integrated: a discrete card answers no to that and yes to
+  // this, and the two answers select different paths.
+  bool pageable_host_access = false;
   std::mutex mu;
-  // Makes the skip-sync fast path safe to reuse: TensorRT forbids reconfiguring or
-  // destroying an execution context while one of its enqueues is in flight, so when
-  // execute() returns without an end sync it records this event; the next execute()
-  // and the destructor wait on it before touching exec_ctx. One event/flag pair
-  // suffices because a handle runs on a single thread at a time.
-  cudaEvent_t inflight_event = nullptr;
-  bool inflight_pending = false;
 
   ~EngineHandle();
 };
@@ -101,14 +95,9 @@ class TensorRTBackend final : public ::executorch::runtime::BackendInterface {
       ::executorch::runtime::FreeableBuffer* processed,
       ::executorch::runtime::ArrayRef<::executorch::runtime::CompileSpec> compile_specs) const override;
 
-  // Runs the engine. With an executorch::extension::cuda::CallerStreamGuard active and
-  // no host staging required, this may return while the enqueue is still in flight on
-  // the selected stream, so the caller must keep device buffers alive and unmodified
-  // past return, order any other stream against this one, and synchronize the stream
-  // before reading device-resident outputs. The selected stream must be on the engine's
+  // Runs the engine and returns once the work is finished, whatever memory it was given, so
+  // outputs are readable as soon as this returns. The stream in use must be on the engine's
   // device, and calls on one handle must not overlap each other or its destruction.
-  // Note that other CUDA delegates sharing the same guard may instead synchronize before
-  // returning, so do not assume results are ready on return from this one.
   ::executorch::runtime::Error execute(
       ::executorch::runtime::BackendExecutionContext& context,
       ::executorch::runtime::DelegateHandle* handle,

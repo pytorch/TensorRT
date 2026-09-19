@@ -1,89 +1,83 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Python inference API for Torch-TensorRT ExecuTorch programs."""
+"""Deprecated: loading moved to ExecuTorch's own Module API.
+
+The published Torch-TensorRT wheel imports ``load`` from this submodule by name, so removing it
+would turn ``torch_tensorrt.load(..., format="executorch")`` into a ModuleNotFoundError for anyone
+who upgrades this package on its own. It stays until that call is gone from a released main wheel.
+"""
 
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
-from typing import Any, Collection, Sequence, Union, cast
+from typing import Any, Union
+
+# Program resolves through __getattr__ below rather than being bound here, so the linter cannot see
+# it and is told so. It stays exported because the published package exported it.
+__all__ = ["load", "Program"]  # noqa: F822
 
 
-def _load_module(data: bytes) -> Any:
-    """Load a program through ExecuTorch's Module API.
+def __getattr__(name: str) -> Any:
+    """Resolve Program from the main wheel on first use.
 
-    A TensorRT delegated program is exported with device-tagged memory-planned
-    arenas, and ExecuTorch backs those with real device memory only through
-    this API. Its program loader plans every arena on the host, so the device
-    copy the exporter inserts around the delegate would hand ``cudaMemcpy`` a
-    host destination and fail with ``invalid argument``.
+    The published package exported this name alongside load, so code that imported it by name has to
+    keep working. Resolving it lazily rather than at module import keeps this module importable
+    against a main wheel that does not have it, which is the same reason load defers its own import.
     """
-    from torch_tensorrt_executorch_runtime import activate, get_runtime
+    if name == "Program":
+        # Guarded for the same reason load is, and with the same message. Left bare, this door
+        # produced the very error the other door's guard exists to avoid, so an install that skipped
+        # dependency resolution got a bare module-not-found naming a module the caller never asked
+        # for, depending only on which name they reached for first.
+        try:
+            from torch_tensorrt._executorch_compat import Program
+        except ImportError as error:
+            raise ImportError(
+                "This deprecated module forwards into torch_tensorrt, and the installed "
+                "Torch-TensorRT is older than the one this package was built against, so it does "
+                "not carry the receiving module. Install the Torch-TensorRT this package requires. "
+                f"Underlying error: {error}"
+            ) from error
 
-    # get_runtime verifies TensorRTBackend is registered; activate returns the native module it
-    # installed as the process portable runtime, which is what loads the program.
-    get_runtime()
-    native = activate()
-    # Taken off the native module rather than imported through
-    # executorch.extension.pybindings.portable_lib. That wrapper's presence in sys.modules is how
-    # activate() detects that ExecuTorch's stock runtime was imported first, so importing it here
-    # would make a later activate() in the same process refuse.
-    return native._load_for_executorch_from_buffer(data)
+        return Program
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
-class Program:
-    """A loaded ExecuTorch program backed by TensorRTBackend.
+def load(path: Union[str, Path]) -> Any:
+    """Deprecated: register the delegate and load through ExecuTorch.
 
-    The ExecuTorch Python portable runtime executes across a CPU tensor
-    boundary: CUDA inputs are copied to CPU before dispatch and outputs are
-    returned on CPU. TensorRT still executes the delegated graph on GPU, but
-    the device-resident input/output fast path is available only through the
-    ExecuTorch C++ runner.
+    Registration is what this package exists for, and ExecuTorch owns execution, so this does the
+    first and forwards the second rather than carrying a loader of its own.
+
+    The parameter matches the shim that forwards to it. No released wheel imports this submodule,
+    so the name is not a contract; it is spelled the same way as its only caller for readability.
     """
+    warnings.warn(
+        "torch_tensorrt_executorch_runtime.runtime.load() is deprecated; use "
+        'torch_tensorrt.load(path, format="executorch") instead, which returns the same object.',
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    # Forward to the main wheel's loader rather than ExecuTorch's. The API this replaces returned a
+    # Program carrying run() and forward() and raised FileNotFoundError for a missing path, and
+    # ExecuTorch's own loader returns neither, so a caller of the published API would break on the
+    # return value instead of on the import. The main wheel is always present: this package declares
+    # it as a dependency.
+    # The loader this forwards to is part of the main wheel, and a main wheel old enough to import
+    # this submodule by name does not carry it. That pairing should not arise, because this package
+    # requires the main wheel of its own build exactly, so installing it moves the main wheel too.
+    # If it does arise, through an install that skipped dependency resolution, say which of the two
+    # is too old rather than reporting a module nobody asked for.
+    try:
+        from torch_tensorrt._executorch_compat import load as _load
+    except ImportError as error:
+        raise ImportError(
+            "This deprecated loader forwards into torch_tensorrt, and the installed Torch-TensorRT "
+            "is older than the one this package was built against, so it does not carry the "
+            "receiving module. Install the Torch-TensorRT this package requires, or call "
+            f'torch_tensorrt.load(path, format="executorch") directly. Underlying error: {error}'
+        ) from error
 
-    def __init__(self, module: Any, data: bytes) -> None:
-        # ExecuTorch's BufferDataLoader references this memory without copying it.
-        self._data = data
-        self._module = module
-
-    @property
-    def method_names(self) -> Collection[str]:
-        return cast(Collection[str], self._module.method_names())
-
-    def run(self, inputs: Sequence[Any], method: str = "forward") -> Sequence[Any]:
-        """Run a method using CPU inputs and return CPU outputs.
-
-        CUDA tensor inputs are copied to CPU before entering the portable
-        Python runtime. Use the C++ runner when inputs and outputs must remain
-        device-resident.
-        """
-        import torch
-
-        inputs = tuple(
-            value.cpu() if isinstance(value, torch.Tensor) and value.is_cuda else value
-            for value in inputs
-        )
-        if method not in self.method_names:
-            raise ValueError(
-                f"Unknown method {method!r}; available methods: {sorted(self.method_names)}"
-            )
-        return cast(Sequence[Any], self._module.run_method(method, inputs))
-
-    def forward(self, *inputs: Any) -> Sequence[Any]:
-        return self.run(inputs, "forward")
-
-
-def load(path: Union[str, Path]) -> Program:
-    """Load a `.pte` with the delegate-enabled ExecuTorch Python runtime.
-
-    External `.ptd` weight files are not supported; weights must be embedded
-    in the `.pte` file.
-    """
-    model_path = Path(path)
-    if not model_path.is_file():
-        raise FileNotFoundError(f"ExecuTorch model not found: {model_path}")
-    data = model_path.read_bytes()
-    return Program(_load_module(data), data)
-
-
-__all__ = ["Program", "load"]
+    return _load(path)

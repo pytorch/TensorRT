@@ -25,7 +25,9 @@
 
 #include <dlfcn.h>
 
+#include <cerrno>
 #include <cinttypes>
+#include <climits>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -60,8 +62,8 @@ using executorch::runtime::MethodMeta;
 using executorch::runtime::Program;
 using executorch::runtime::Result;
 using executorch::runtime::Span;
-using executorch::runtime::etensor::Device;
 using executorch::runtime::TensorInfo;
+using executorch::runtime::etensor::Device;
 
 static uint8_t method_allocator_pool[4 * 1024U * 1024U];
 static uint8_t temp_allocator_pool[1 * 1024U * 1024U];
@@ -76,7 +78,6 @@ static const char* get_flag(int argc, char** argv, const char* flag, const char*
   return def;
 }
 
-
 // The CUDA driver API is resolved at runtime rather than linked. The release build
 // image ships neither libcuda nor a stub, so linking it would break the build for
 // everyone to serve one optional flag, and it would have to be wired into both this
@@ -89,7 +90,12 @@ struct CudaDriverApi {
   CUresult (*DeviceGet)(CUdevice*, int) = nullptr;
   CUresult (*DeviceGetDevResource)(CUdevice, CUdevResource*, CUdevResourceType) = nullptr;
   CUresult (*DevSmResourceSplitByCount)(
-      CUdevResource*, unsigned int*, const CUdevResource*, CUdevResource*, unsigned int, unsigned int) = nullptr;
+      CUdevResource*,
+      unsigned int*,
+      const CUdevResource*,
+      CUdevResource*,
+      unsigned int,
+      unsigned int) = nullptr;
   CUresult (*DevResourceGenerateDesc)(CUdevResourceDesc*, CUdevResource*, unsigned int) = nullptr;
   CUresult (*GreenCtxCreate)(CUgreenCtx*, CUdevResourceDesc, CUdevice, unsigned int) = nullptr;
   CUresult (*GreenCtxStreamCreate)(CUstream*, CUgreenCtx, unsigned int, int) = nullptr;
@@ -124,10 +130,8 @@ const CudaDriverApi* load_cuda_driver_api() {
   const bool ok = bind(api.Init, "cuInit") && bind(api.DeviceGet, "cuDeviceGet") &&
       bind(api.DeviceGetDevResource, "cuDeviceGetDevResource") &&
       bind(api.DevSmResourceSplitByCount, "cuDevSmResourceSplitByCount") &&
-      bind(api.DevResourceGenerateDesc, "cuDevResourceGenerateDesc") &&
-      bind(api.GreenCtxCreate, "cuGreenCtxCreate") &&
-      bind(api.GreenCtxStreamCreate, "cuGreenCtxStreamCreate") &&
-      bind(api.GreenCtxDestroy, "cuGreenCtxDestroy") &&
+      bind(api.DevResourceGenerateDesc, "cuDevResourceGenerateDesc") && bind(api.GreenCtxCreate, "cuGreenCtxCreate") &&
+      bind(api.GreenCtxStreamCreate, "cuGreenCtxStreamCreate") && bind(api.GreenCtxDestroy, "cuGreenCtxDestroy") &&
       bind(api.GetErrorString, "cuGetErrorString");
   loaded = ok;
   return ok ? &api : nullptr;
@@ -213,9 +217,45 @@ static bool make_green_context_stream(
 int main(int argc, char** argv) {
   executorch::runtime::runtime_init();
 
+  // Reject anything unrecognised rather than ignoring it. Every option here is a --name=value flag,
+  // so a bare path silently fell through to the default and the program ran a different file than
+  // the one it was asked for, reporting success.
+  for (int i = 1; i < argc; ++i) {
+    if (strncmp(argv[i], "--model_path=", 13) != 0 && strncmp(argv[i], "--num_runs=", 11) != 0 &&
+        strncmp(argv[i], "--green_context_sms=", 20) != 0) {
+      ET_LOG(
+          Error,
+          "unrecognised argument '%s'. Usage: example_executorch_runner "
+          "--model_path=model.pte [--num_runs=1] [--green_context_sms=0]",
+          argv[i]);
+      return 1;
+    }
+  }
   const char* model_path = get_flag(argc, argv, "--model_path", "model.pte");
   const int num_runs = atoi(get_flag(argc, argv, "--num_runs", "1"));
-  const int green_context_sms = atoi(get_flag(argc, argv, "--green_context_sms", "0"));
+  // Zero would skip the loop and then print the output buffer as if it held a result, which is
+  // whatever was there before. Refuse instead, because a run count of zero has no meaning here.
+  if (num_runs < 1) {
+    ET_LOG(Error, "--num_runs must be at least 1, got %d", num_runs);
+    return 2;
+  }
+  const char* const green_context_arg = get_flag(argc, argv, "--green_context_sms", "0");
+  // atoi answers 0 for anything it cannot parse, and 0 means no green context, so a typo or a
+  // negative number would quietly give an ordinary stream while the caller believed it had asked
+  // for a partition. That is the one thing this flag must never do, so parse it strictly.
+  char* green_context_end = nullptr;
+  errno = 0;
+  const long green_context_parsed = strtol(green_context_arg, &green_context_end, 10);
+  if (green_context_end == green_context_arg || *green_context_end != '\0' || errno == ERANGE ||
+      green_context_parsed < 0 || green_context_parsed > INT_MAX) {
+    ET_LOG(
+        Error,
+        "--green_context_sms must be a whole number of streaming multiprocessors, zero for an "
+        "ordinary stream, got '%s'",
+        green_context_arg);
+    return 2;
+  }
+  const int green_context_sms = static_cast<int>(green_context_parsed);
 
   Result<FileDataLoader> loader_result = FileDataLoader::from(model_path);
   if (!loader_result.ok()) {
@@ -286,11 +326,7 @@ int main(int argc, char** argv) {
           static_cast<int>(buffer_device->type()),
           static_cast<uint32_t>(device_buffer.error()));
       ET_LOG(
-          Info,
-          "  planned buffer[%zu] = %zu bytes on device_type %d",
-          i,
-          sz,
-          static_cast<int>(buffer_device->type()));
+          Info, "  planned buffer[%zu] = %zu bytes on device_type %d", i, sz, static_cast<int>(buffer_device->type()));
       planned_spans.push_back(device_buffer->as_span());
       planned_device_buffers.push_back(std::move(device_buffer.get()));
     }
@@ -356,9 +392,22 @@ int main(int argc, char** argv) {
     unsigned int partition_sms = 0;
     const bool ok = make_green_context_stream(
         static_cast<unsigned int>(green_context_sms), &green_ctx, &caller_stream, &partition_sms);
-    // Do not fall back to an ordinary stream: a test that asked for a green
-    // context and silently got a normal one would report a pass it did not earn.
-    ET_CHECK_MSG(ok, "--green_context_sms=%d was requested but no green context could be created", green_context_sms);
+    // Do not fall back to an ordinary stream: a run that asked for a green context and silently
+    // got an ordinary one would report a pass it did not earn. Refuse by returning rather than by
+    // aborting, because a device that cannot provide the partition is a normal answer and a caller
+    // has to tell it apart from a crash. Asking for more than the device has is the usual reason,
+    // so say how many it has.
+    if (!ok) {
+      int device_sms = 0;
+      cudaDeviceGetAttribute(&device_sms, cudaDevAttrMultiProcessorCount, 0);
+      ET_LOG(
+          Error,
+          "--green_context_sms=%d was requested and no green context could be created. This "
+          "device reports %d SMs in total, and a partition cannot exceed that.",
+          green_context_sms,
+          device_sms);
+      return 2;
+    }
     fprintf(stderr, "caller stream: green context with %u SM(s)\n", partition_sms);
   } else {
     cuda_status = cudaStreamCreate(&caller_stream);
@@ -413,8 +462,25 @@ int main(int argc, char** argv) {
     fprintf(stderr, "] numel=%zu dtype=%d\n", static_cast<size_t>(t.numel()), static_cast<int>(t.scalar_type()));
 
     if (t.scalar_type() == exec_aten::ScalarType::Float) {
-      const float* data = t.const_data_ptr<float>();
+      const void* src = t.const_data_ptr<float>();
       const size_t print_n = t.numel() < 8 ? static_cast<size_t>(t.numel()) : 8;
+      // A device-resident program can leave its output in the program's own CUDA arena, and
+      // reading that as host memory is a segmentation fault rather than a wrong number. Ask the
+      // driver where the pointer lives and copy first when it is not ours to read directly. A
+      // pointer CUDA does not recognise is host memory, which is the ordinary case here.
+      std::vector<float> staged(print_n);
+      const float* data = static_cast<const float*>(src);
+      cudaPointerAttributes attrs{};
+      if (cudaPointerGetAttributes(&attrs, src) == cudaSuccess && attrs.type == cudaMemoryTypeDevice) {
+        const cudaError_t copied = cudaMemcpy(staged.data(), src, print_n * sizeof(float), cudaMemcpyDeviceToHost);
+        if (copied != cudaSuccess) {
+          fprintf(stderr, "  could not read the output: %s\n", cudaGetErrorString(copied));
+          continue;
+        }
+        data = staged.data();
+      }
+      // A pointer CUDA does not know sets an error flag that would otherwise surface later.
+      cudaGetLastError();
       fprintf(stderr, "  first %zu values:", print_n);
       for (size_t j = 0; j < print_n; ++j) {
         fprintf(stderr, " %.4f", data[j]);

@@ -141,6 +141,20 @@ bool parse_int_after_key(const std::string& json, std::size_t search_from, const
   return true;
 }
 
+// Finds a metadata key anywhere in the object except inside the io_bindings array. The array holds
+// caller-chosen tensor names, so a model input named "device_id" would otherwise be read as the
+// key. Searching only past the array instead, which is what this replaces, made the reader depend
+// on key order: JSON does not order keys, sorting them is one word in any writer, and a blob whose
+// keys sorted came back with no aliases and device 0 while parsing clean.
+std::size_t find_key_outside(const std::string& json, const char* key, std::size_t skip_begin, std::size_t skip_end) {
+  for (std::size_t at = json.find(key); at != std::string::npos; at = json.find(key, at + 1)) {
+    if (at < skip_begin || at >= skip_end) {
+      return at;
+    }
+  }
+  return std::string::npos;
+}
+
 bool parse_metadata_json(const std::string& json, TensorRTBlobHeader& out) {
   out.input_binding_names.clear();
   out.output_binding_names.clear();
@@ -241,10 +255,7 @@ bool parse_metadata_json(const std::string& json, TensorRTBlobHeader& out) {
   // Optional aliased_io array: [{"output":..,"input":..,"kind":..}, ...].
   // Absent in older blobs -> leave empty (backward compatible). Mirrors the
   // io_bindings walk above using the same string helpers.
-  //
-  // Search from pos (past the io_bindings array) so a model input literally
-  // named "aliased_io" isn't matched as the array key.
-  const std::size_t alias_key = json.find("\"aliased_io\"", pos);
+  const std::size_t alias_key = find_key_outside(json, "\"aliased_io\"", bindings_pos, pos);
   if (alias_key != std::string::npos) {
     std::size_t apos = json.find('[', alias_key);
     if (apos == std::string::npos) {
@@ -321,8 +332,10 @@ bool parse_metadata_json(const std::string& json, TensorRTBlobHeader& out) {
     }
   }
 
-  return parse_bool_after_key(json, pos, "\"hardware_compatible\"", out.hardware_compatible) &&
-      parse_int_after_key(json, pos, "\"device_id\"", out.device_id);
+  const std::size_t hw_key = find_key_outside(json, "\"hardware_compatible\"", bindings_pos, pos);
+  const std::size_t device_key = find_key_outside(json, "\"device_id\"", bindings_pos, pos);
+  return parse_bool_after_key(json, hw_key, "\"hardware_compatible\"", out.hardware_compatible) &&
+      parse_int_after_key(json, device_key, "\"device_id\"", out.device_id);
 }
 
 } // namespace
@@ -364,13 +377,17 @@ bool TensorRTBlobHeader::parse(const void* data, std::size_t size, TensorRTBlobH
   if (out.engine_offset % ENGINE_ALIGNMENT != 0) {
     return false;
   }
-  if (static_cast<std::size_t>(out.metadata_offset) + out.metadata_size > size) {
+  // Compared against the space that is left, not by adding first. These sizes come from the file
+  // and are 64 bit, so a large one makes offset plus size wrap and slip past a check written that
+  // way, and the reader would then walk far past the end of the blob.
+  if (out.metadata_offset > size || out.metadata_size > size - out.metadata_offset) {
     return false;
   }
-  if (static_cast<std::size_t>(out.engine_offset) + out.engine_size > size) {
+  if (out.engine_offset > size || out.engine_size > size - out.engine_offset) {
     return false;
   }
-  if (static_cast<std::size_t>(out.metadata_offset) + out.metadata_size > out.engine_offset) {
+  if (out.metadata_offset > out.engine_offset ||
+      out.metadata_size > static_cast<std::size_t>(out.engine_offset) - out.metadata_offset) {
     return false;
   }
 

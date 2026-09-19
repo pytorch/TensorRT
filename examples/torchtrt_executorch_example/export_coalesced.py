@@ -24,6 +24,17 @@ The CUDA backend also writes an ``aoti_cuda_blob.ptd`` next to the ``.pte`` for
 its external weights. This model has no weights, so that file is empty of
 tensors and the reference runner does not need it.
 
+That name is fixed, and a model with weights makes it dangerous. Exporting twice
+into one directory overwrites the first program's weights with the second's, and
+the keys inside encode the graph's shape rather than its values, so the first
+program still loads afterwards, still reports the weights it found, and returns a
+wrong answer with no error at all. Measured on two GPUs: wrong by 0.85, and bit
+identical across five runs, which is what makes it look like a working model.
+
+Give each export its own directory. That is not optional for anything with
+weights, and retraining and re-exporting the same architecture is exactly the
+workflow that hits it.
+
 Besides the ``.pte`` this writes ``<model_path>.expected``, holding the output
 shape and the eager reference value for an all-ones input. The reference runner
 gate reads that file instead of hard-coding a number, so the expected value

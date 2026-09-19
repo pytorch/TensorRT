@@ -3,9 +3,8 @@
 
 """ExecuTorch compilation and export integration.
 
-Runtime loading is provided by the optional
-``torch-tensorrt-executorch-runtime`` distribution and dispatched through
-``torch_tensorrt.load(..., format="executorch")``.
+Import ``torch_tensorrt_executorch_runtime`` to register the TensorRT delegate,
+then load and run programs through ExecuTorch's Module API.
 """
 
 import importlib.util

@@ -20,7 +20,15 @@ cc_binary(
     # The driver itself is deliberately not a link dependency: the release build image
     # ships neither libcuda nor a stub.
     linkopts = [
+        # The wheel installs this at torch_tensorrt/bin, so ../lib reaches Torch-TensorRT's own
+        # libraries and ../../ reaches the other distributions in site-packages. Without the latter
+        # two the binary cannot start at all: TensorRT and the CUDA runtime ship in their own
+        # distributions, and nothing else adds them to the search path for a program that is not
+        # launched through Python. The delegate library in the companion wheel already carries the
+        # same two entries, which is why it loads and this did not.
         "-Wl,-rpath,$$ORIGIN/../lib",
+        "-Wl,-rpath,$$ORIGIN/../../tensorrt_libs",
+        "-Wl,-rpath,$$ORIGIN/../../nvidia/cu13/lib",
         "-ldl",
     ],
     deps = [
@@ -36,6 +44,12 @@ cc_binary(
 cc_binary(
     name = "kv_cache_decode_check",
     srcs = ["kv_cache_decode_check.cpp"],
+    linkopts = [
+        # Same reasoning as the runner above. This one carried no run path at all.
+        "-Wl,-rpath,$$ORIGIN/../lib",
+        "-Wl,-rpath,$$ORIGIN/../../tensorrt_libs",
+        "-Wl,-rpath,$$ORIGIN/../../nvidia/cu13/lib",
+    ],
     deps = [
         "//cpp:tensorrt_executorch_backend",
         "//cpp:tensorrt_executorch_cuda_device_allocator",
