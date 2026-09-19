@@ -27,6 +27,7 @@ _RUNPATH = (
     "$ORIGIN/../../nvidia/cu13/lib"
 )
 _REGISTER = "_ZN10executorch7runtime16register_backendERKNS0_7BackendE"
+_OWNS_QUERY = "torch_tensorrt_owns_executorch_registration"
 _X86 = "manylinux_2_28_x86_64"
 _ARM = "manylinux_2_35_aarch64"
 _BASE_VERSIONS = "CXXABI_1.3 GLIBCXX_3.4.21 GLIBC_2.17 GCC_3.0"
@@ -68,6 +69,7 @@ def artifact(tmp_path):
         "kernel_versions": _BASE_VERSIONS,
         "failure": None,
         "extra_syms": [],
+        "owns_query": True,
     }
     config = tmp_path / "readelf.json"
     reader = tmp_path / "readelf"
@@ -92,6 +94,8 @@ def artifact(tmp_path):
         "elif flag in ('-Ws', '--dyn-syms'):\n"
         "    ndx = ('UNDEF' if eu else 'UND') if name == 'libdelegate.so' else '12'\n"
         f"    print(' 1: 00000000 8 FUNC GLOBAL DEFAULT ' + ndx + ' {_REGISTER}')\n"
+        "    if name == 'libdelegate.so' and d.get('owns_query', True):\n"
+        f"        print(' 3: 00000100 31 FUNC GLOBAL DEFAULT 12 {_OWNS_QUERY}')\n"
         "    for extra in d.get('extra_syms', []):\n"
         "        print(' 2: 00000000 0 FUNC GLOBAL DEFAULT ' + ('UNDEF' if eu else 'UND') + ' ' + extra)\n"
         "elif flag == '-V':\n"
@@ -156,6 +160,19 @@ def test_an_absolute_runpath_entry_is_rejected(artifact):
     assert result.returncode != 0
     assert "not relative to the artifact" in result.stderr
     assert "/opt/buildbot/stage/lib" in result.stderr
+
+
+def test_a_delegate_without_the_ownership_query_is_rejected(artifact):
+    """The Python package refuses to import unless it can ask the delegate whether it owns the
+    registration, so a build that dropped that export would publish looking fine and then tell every
+    user to reinstall, which cannot help them.
+    """
+    data, invoke, runtime = artifact
+    data["needed"].append("libcudart.so.13")
+    data["owns_query"] = False
+    result = invoke(options=[str(runtime)])
+    assert result.returncode != 0
+    assert "torch_tensorrt_owns_executorch_registration" in result.stderr
 
 
 def test_an_undefined_unversioned_cxx_symbol_is_rejected(artifact):
@@ -733,8 +750,16 @@ def test_the_shipped_binaries_can_find_the_libraries_they_need() -> None:
     that was installed the whole time. The delegate library in the companion wheel already carried
     the right entries, which is why it loaded and the binary did not.
     """
-    build = (_ROOT / "examples/executorch_reference_runner/BUILD").read_text(
-        encoding="utf-8"
+    # Comments stripped, and the entries looked for inside the linkopts list rather than anywhere in
+    # the block. Searching the raw text passed with every one of these commented out: the words
+    # stayed, the link options did not, and the binaries would have shipped unable to find their
+    # libraries.
+    build = "\n".join(
+        line
+        for line in (_ROOT / "examples/executorch_reference_runner/BUILD")
+        .read_text(encoding="utf-8")
+        .splitlines()
+        if not line.lstrip().startswith("#")
     )
     binaries = [
         block
@@ -744,12 +769,16 @@ def test_the_shipped_binaries_can_find_the_libraries_they_need() -> None:
     assert len(binaries) == 2, f"expected two shipped binaries, found {len(binaries)}"
     for block in binaries:
         name = block.split('name = "', 1)[1].split('"', 1)[0]
+        assert "linkopts = [" in block, f"{name} declares no linkopts"
+        options = block.split("linkopts = [", 1)[1].split("]", 1)[0]
         for needed in (
             "$$ORIGIN/../lib",
             "$$ORIGIN/../../tensorrt_libs",
             "$$ORIGIN/../../nvidia/cu13/lib",
         ):
-            assert needed in block, f"{name} has no run path entry for {needed}"
+            assert f'"-Wl,-rpath,{needed}"' in options, (
+                f"{name} has no run path link option for {needed}"
+            )
 
 
 def _drop_needed(data, name):

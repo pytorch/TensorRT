@@ -324,17 +324,52 @@ def test_the_config_looks_for_the_delegate_in_one_place_only() -> None:
 
 
 @pytest.mark.unit
-def test_the_published_target_is_visible_outside_the_finding_directory() -> None:
+def test_the_published_target_is_visible_outside_the_finding_directory(
+    tmp_path, linker_tools
+) -> None:
     """A project of more than one directory could not use the one target this package publishes.
 
     An imported target is scoped to the directory that created it. Descendants inherit it, so a
     find_package at the top level looks fine, but the ordinary layout where one directory finds the
     package and a sibling links it fails with a message about a target that plainly exists.
+
+    Configured rather than read: looking for the declaration in the config passed with find_package
+    creating no target at all, so it could not tell a published target from an absent one.
     """
-    config = _CONFIG.read_text(encoding="utf-8")
-    assert (
-        "add_library(executorch::backend_tensorrt SHARED IMPORTED GLOBAL)" in config
-    ), config
+    prefix = tmp_path / "prefix"
+    config_dir = prefix / "lib/cmake/executorch_backend_tensorrt"
+    config_dir.mkdir(parents=True)
+    (config_dir / _CONFIG.name).write_text(_CONFIG.read_text(encoding="utf-8"))
+    (prefix / "lib" / "libexecutorch_backend_tensorrt.so").write_bytes(b"")
+    project = tmp_path / "consumer"
+    (project / "app").mkdir(parents=True)
+    (project / "finder").mkdir()
+    (project / "app" / "main.cpp").write_text("int main() { return 0; }\n")
+    # The find_package and the link sit in sibling directories, which is the layout that fails when
+    # the imported target is not global. A single directory would inherit it either way.
+    (project / "CMakeLists.txt").write_text(
+        "cmake_minimum_required(VERSION 3.20)\n"
+        "project(consumer CXX)\n"
+        "add_subdirectory(finder)\n"
+        "add_subdirectory(app)\n"
+    )
+    (project / "finder" / "CMakeLists.txt").write_text(
+        f'list(APPEND CMAKE_PREFIX_PATH "{prefix}")\n'
+        "find_package(executorch_backend_tensorrt REQUIRED)\n"
+    )
+    (project / "app" / "CMakeLists.txt").write_text(
+        "add_executable(app main.cpp)\n"
+        "target_link_libraries(app PRIVATE executorch::backend_tensorrt)\n"
+    )
+    _run(
+        [
+            linker_tools["cmake"],
+            "-S",
+            str(project),
+            "-B",
+            str(tmp_path / "build"),
+        ]
+    )
 
 
 @pytest.mark.unit

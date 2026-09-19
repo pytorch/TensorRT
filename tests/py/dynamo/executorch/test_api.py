@@ -828,6 +828,23 @@ def test_the_wheel_ships_a_cmake_package_for_cpp_consumers():
         "the config does not force the delegate onto the link line; nothing references a symbol "
         "it defines, so the linker would drop it and the backend would never register"
     )
+
+    # A config that sits in the source tree and never reaches the wheel is the same as no config at
+    # all, and the three checks above all passed with the call that copies it deleted. Read from the
+    # parsed build step rather than the text, so a commented-out call does not satisfy it.
+    build = ast.parse((package_dir / "setup.py").read_text(encoding="utf-8"))
+    installer = "_install_cmake_package"
+    calls = [
+        node
+        for node in ast.walk(build)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == installer
+    ]
+    assert calls, (
+        f"the build never calls {installer}, so the config above stays in the source tree and the "
+        "wheel ships without a CMake package"
+    )
     assert "push-state" in link_options[0] and "pop-state" in link_options[0], (
         "--no-as-needed is not bracketed with push-state/pop-state, so it leaks into the rest of "
         "the consumer's link line"
