@@ -170,9 +170,9 @@ TEST(ExecuTorchTensorRTBlobHeader, ParsesAliasedIo) {
 TEST(ExecuTorchTensorRTBlobHeader, DefaultsMissingAliasedIo) {
   // Blobs written before aliased_io existed omit the key; parsing must still
   // succeed and leave aliased_io empty (backward compatible).
-  const auto blob = make_blob(
-      R"({"io_bindings":[{"name":"input_0","is_input":true},{"name":"output_0","is_input":false}],)"
-      R"("hardware_compatible":false,"device_id":0})");
+  const auto blob =
+      make_blob(R"({"io_bindings":[{"name":"input_0","is_input":true},{"name":"output_0","is_input":false}],)"
+                R"("hardware_compatible":false,"device_id":0})");
 
   TensorRTBlobHeader header;
   ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
@@ -180,9 +180,9 @@ TEST(ExecuTorchTensorRTBlobHeader, DefaultsMissingAliasedIo) {
 }
 
 TEST(ExecuTorchTensorRTBlobHeader, ParsesEmptyAliasedIo) {
-  const auto blob = make_blob(
-      R"({"io_bindings":[{"name":"input_0","is_input":true},{"name":"output_0","is_input":false}],)"
-      R"("aliased_io":[],"hardware_compatible":false,"device_id":0})");
+  const auto blob =
+      make_blob(R"({"io_bindings":[{"name":"input_0","is_input":true},{"name":"output_0","is_input":false}],)"
+                R"("aliased_io":[],"hardware_compatible":false,"device_id":0})");
 
   TensorRTBlobHeader header;
   ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
@@ -204,9 +204,9 @@ TEST(ExecuTorchTensorRTBlobHeader, ParsesAliasedIoMagic) {
 TEST(ExecuTorchTensorRTBlobHeader, InputNamedAliasedIoWithNoAliasesStillParses) {
   // A model input literally named "aliased_io" must not be mistaken for the
   // real aliased_io array key.
-  const auto blob = make_blob(
-      R"({"io_bindings":[{"name":"aliased_io","is_input":true},{"name":"out_0","is_input":false}],)"
-      R"("hardware_compatible":false,"device_id":0})");
+  const auto blob =
+      make_blob(R"({"io_bindings":[{"name":"aliased_io","is_input":true},{"name":"out_0","is_input":false}],)"
+                R"("hardware_compatible":false,"device_id":0})");
 
   TensorRTBlobHeader header;
   ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
@@ -241,11 +241,11 @@ TEST(ExecuTorchTensorRTBlobHeader, MetadataKeyOrderDoesNotChangeWhatIsRead) {
 TEST(ExecuTorchTensorRTBlobHeader, InputNamedLikeAScalarKeyIsNotReadAsOne) {
   // The io_bindings array holds caller-chosen tensor names, which is why the scalars are not simply
   // searched for across the whole object.
-  const auto blob = make_blob(
-      R"({"io_bindings":[{"name":"device_id","is_input":true},{"name":"out_0","is_input":false}],)"
-      R"("device_id":3,"hardware_compatible":true})",
-      4,
-      TENSORRT_MAGIC_ALIASED_IO);
+  const auto blob =
+      make_blob(R"({"io_bindings":[{"name":"device_id","is_input":true},{"name":"out_0","is_input":false}],)"
+                R"("device_id":3,"hardware_compatible":true})",
+                4,
+                TENSORRT_MAGIC_ALIASED_IO);
 
   TensorRTBlobHeader header;
   ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
