@@ -213,6 +213,48 @@ TEST(ExecuTorchTensorRTBlobHeader, InputNamedAliasedIoWithNoAliasesStillParses) 
   EXPECT_TRUE(header.aliased_io.empty());
 }
 
+TEST(ExecuTorchTensorRTBlobHeader, MetadataKeyOrderDoesNotChangeWhatIsRead) {
+  // JSON does not order keys and sorting them is one word in any writer, so a reader that depends
+  // on the order our writer happens to emit loses aliases silently. For a KV cache program that is
+  // wrong answers rather than a failure, because every in-place update lands in the delegate's own
+  // output slot instead of the caller's buffer.
+  const std::string bindings =
+      R"("io_bindings":[{"name":"in_k","is_input":true},{"name":"out_k","is_input":false}])";
+  const std::string aliases =
+      R"("aliased_io":[{"output":"out_k","input":"in_k","kind":"kv_cache_update"}])";
+  const std::string scalars = R"("device_id":3,"hardware_compatible":true)";
+
+  for (const std::string& metadata :
+       {"{" + bindings + "," + aliases + "," + scalars + "}",
+        "{" + aliases + "," + scalars + "," + bindings + "}",
+        "{" + scalars + "," + bindings + "," + aliases + "}"}) {
+    const auto blob = make_blob(metadata, 4, TENSORRT_MAGIC_ALIASED_IO);
+
+    TensorRTBlobHeader header;
+    ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header)) << metadata;
+    ASSERT_EQ(header.aliased_io.size(), 1u) << metadata;
+    EXPECT_EQ(header.aliased_io[0].output, "out_k") << metadata;
+    EXPECT_EQ(header.aliased_io[0].input, "in_k") << metadata;
+    EXPECT_EQ(header.device_id, 3) << metadata;
+    EXPECT_TRUE(header.hardware_compatible) << metadata;
+  }
+}
+
+TEST(ExecuTorchTensorRTBlobHeader, InputNamedLikeAScalarKeyIsNotReadAsOne) {
+  // The io_bindings array holds caller-chosen tensor names, which is why the scalars are not simply
+  // searched for across the whole object.
+  const auto blob = make_blob(
+      R"({"io_bindings":[{"name":"device_id","is_input":true},{"name":"out_0","is_input":false}],)"
+      R"("device_id":3,"hardware_compatible":true})",
+      4,
+      TENSORRT_MAGIC_ALIASED_IO);
+
+  TensorRTBlobHeader header;
+  ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
+  EXPECT_EQ(header.device_id, 3);
+  EXPECT_TRUE(header.hardware_compatible);
+}
+
 TEST(ExecuTorchTensorRTBlobHeader, RejectsUnknownFutureMagic) {
   constexpr char kFutureMagic[4] = {'T', 'R', '0', '3'};
   const std::string metadata = R"({"io_bindings":[{"name":"x","is_input":true}]})";
