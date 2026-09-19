@@ -25,6 +25,13 @@ def reject(message):
 
 _LINKED_AT_BUILD_TIME = frozenset({"torch", "torch-tensorrt"})
 
+# The pin each remaining requirement has to agree with. These name a release series rather than an
+# exact build, so the comparison is on the leading release components the pin actually spells.
+_REPOSITORY_PIN = {
+    "tensorrt-cu13": "__tensorrt_version__",
+    "nvidia-cuda-runtime": "__cuda_version__",
+}
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -116,9 +123,8 @@ def main():
         requirements = [
             Requirement(value) for value in metadata.get_all("Requires-Dist", [])
         ]
-        pinned = yaml.safe_load((root / "dev_dep_versions.yml").read_text())[
-            "__executorch_version__"
-        ]
+        pins = yaml.safe_load((root / "dev_dep_versions.yml").read_text())
+        pinned = pins["__executorch_version__"]
         for distribution in (
             "executorch",
             "torch-tensorrt",
@@ -148,9 +154,18 @@ def main():
                     Version(importlib.metadata.version(distribution))
                 )
             else:
-                expected_version = Version(
-                    importlib.metadata.version(distribution)
-                ).public
+                # Against the repository's own pin, not just against the environment that produced
+                # the requirement. Taking the expected value from the same environment setup.py read
+                # it from makes the comparison agree with itself, so a wheel built against the wrong
+                # TensorRT or CUDA runtime validated clean.
+                installed = Version(importlib.metadata.version(distribution))
+                pin = pins[_REPOSITORY_PIN[distribution]]
+                if installed.release[: len(Version(pin).release)] != Version(pin).release:
+                    reject(
+                        f"the repository pins {_REPOSITORY_PIN[distribution]} {pin}, but this "
+                        f"wheel was built against {distribution} {installed}"
+                    )
+                expected_version = installed.public
             matched = [
                 r for r in requirements if canonicalize_name(r.name) == distribution
             ]
