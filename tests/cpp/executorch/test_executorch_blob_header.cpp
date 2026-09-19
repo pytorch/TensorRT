@@ -170,9 +170,9 @@ TEST(ExecuTorchTensorRTBlobHeader, ParsesAliasedIo) {
 TEST(ExecuTorchTensorRTBlobHeader, DefaultsMissingAliasedIo) {
   // Blobs written before aliased_io existed omit the key; parsing must still
   // succeed and leave aliased_io empty (backward compatible).
-  const auto blob =
-      make_blob(R"({"io_bindings":[{"name":"input_0","is_input":true},{"name":"output_0","is_input":false}],)"
-                R"("hardware_compatible":false,"device_id":0})");
+  const auto blob = make_blob(
+      R"({"io_bindings":[{"name":"input_0","is_input":true},{"name":"output_0","is_input":false}],)"
+      R"("hardware_compatible":false,"device_id":0})");
 
   TensorRTBlobHeader header;
   ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
@@ -180,9 +180,9 @@ TEST(ExecuTorchTensorRTBlobHeader, DefaultsMissingAliasedIo) {
 }
 
 TEST(ExecuTorchTensorRTBlobHeader, ParsesEmptyAliasedIo) {
-  const auto blob =
-      make_blob(R"({"io_bindings":[{"name":"input_0","is_input":true},{"name":"output_0","is_input":false}],)"
-                R"("aliased_io":[],"hardware_compatible":false,"device_id":0})");
+  const auto blob = make_blob(
+      R"({"io_bindings":[{"name":"input_0","is_input":true},{"name":"output_0","is_input":false}],)"
+      R"("aliased_io":[],"hardware_compatible":false,"device_id":0})");
 
   TensorRTBlobHeader header;
   ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
@@ -204,9 +204,9 @@ TEST(ExecuTorchTensorRTBlobHeader, ParsesAliasedIoMagic) {
 TEST(ExecuTorchTensorRTBlobHeader, InputNamedAliasedIoWithNoAliasesStillParses) {
   // A model input literally named "aliased_io" must not be mistaken for the
   // real aliased_io array key.
-  const auto blob =
-      make_blob(R"({"io_bindings":[{"name":"aliased_io","is_input":true},{"name":"out_0","is_input":false}],)"
-                R"("hardware_compatible":false,"device_id":0})");
+  const auto blob = make_blob(
+      R"({"io_bindings":[{"name":"aliased_io","is_input":true},{"name":"out_0","is_input":false}],)"
+      R"("hardware_compatible":false,"device_id":0})");
 
   TensorRTBlobHeader header;
   ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
@@ -218,10 +218,8 @@ TEST(ExecuTorchTensorRTBlobHeader, MetadataKeyOrderDoesNotChangeWhatIsRead) {
   // on the order our writer happens to emit loses aliases silently. For a KV cache program that is
   // wrong answers rather than a failure, because every in-place update lands in the delegate's own
   // output slot instead of the caller's buffer.
-  const std::string bindings =
-      R"("io_bindings":[{"name":"in_k","is_input":true},{"name":"out_k","is_input":false}])";
-  const std::string aliases =
-      R"("aliased_io":[{"output":"out_k","input":"in_k","kind":"kv_cache_update"}])";
+  const std::string bindings = R"("io_bindings":[{"name":"in_k","is_input":true},{"name":"out_k","is_input":false}])";
+  const std::string aliases = R"("aliased_io":[{"output":"out_k","input":"in_k","kind":"kv_cache_update"}])";
   const std::string scalars = R"("device_id":3,"hardware_compatible":true)";
 
   for (const std::string& metadata :

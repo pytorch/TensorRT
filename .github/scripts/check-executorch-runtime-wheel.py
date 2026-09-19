@@ -160,7 +160,10 @@ def main():
                 # TensorRT or CUDA runtime validated clean.
                 installed = Version(importlib.metadata.version(distribution))
                 pin = pins[_REPOSITORY_PIN[distribution]]
-                if installed.release[: len(Version(pin).release)] != Version(pin).release:
+                if (
+                    installed.release[: len(Version(pin).release)]
+                    != Version(pin).release
+                ):
                     reject(
                         f"the repository pins {_REPOSITORY_PIN[distribution]} {pin}, but this "
                         f"wheel was built against {distribution} {installed}"

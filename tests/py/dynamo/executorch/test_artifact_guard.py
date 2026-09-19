@@ -776,9 +776,9 @@ def test_the_shipped_binaries_can_find_the_libraries_they_need() -> None:
             "$$ORIGIN/../../tensorrt_libs",
             "$$ORIGIN/../../nvidia/cu13/lib",
         ):
-            assert f'"-Wl,-rpath,{needed}"' in options, (
-                f"{name} has no run path link option for {needed}"
-            )
+            assert (
+                f'"-Wl,-rpath,{needed}"' in options
+            ), f"{name} has no run path link option for {needed}"
 
 
 def _drop_needed(data, name):

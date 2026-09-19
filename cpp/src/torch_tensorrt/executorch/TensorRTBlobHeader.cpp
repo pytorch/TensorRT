@@ -146,11 +146,7 @@ bool parse_int_after_key(const std::string& json, std::size_t search_from, const
 // key. Searching only past the array instead, which is what this replaces, made the reader depend
 // on key order: JSON does not order keys, sorting them is one word in any writer, and a blob whose
 // keys sorted came back with no aliases and device 0 while parsing clean.
-std::size_t find_key_outside(
-    const std::string& json,
-    const char* key,
-    std::size_t skip_begin,
-    std::size_t skip_end) {
+std::size_t find_key_outside(const std::string& json, const char* key, std::size_t skip_begin, std::size_t skip_end) {
   for (std::size_t at = json.find(key); at != std::string::npos; at = json.find(key, at + 1)) {
     if (at < skip_begin || at >= skip_end) {
       return at;
@@ -342,10 +338,7 @@ bool parse_metadata_json(const std::string& json, TensorRTBlobHeader& out) {
              "\"hardware_compatible\"",
              out.hardware_compatible) &&
       parse_int_after_key(
-             json,
-             find_key_outside(json, "\"device_id\"", bindings_pos, pos),
-             "\"device_id\"",
-             out.device_id);
+             json, find_key_outside(json, "\"device_id\"", bindings_pos, pos), "\"device_id\"", out.device_id);
 }
 
 } // namespace
