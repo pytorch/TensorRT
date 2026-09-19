@@ -55,9 +55,9 @@ x = torch.ones((64, 64), dtype=torch.float32, device="cuda")
 
 # The Module API backs device-tagged arenas with device memory.
 program = Runtime.get().load_program(model_path)
-forward = program.load_method("forward")
 if "forward" not in program.method_names:
     raise RuntimeError(f"{model_path} has no 'forward' method")
+forward = program.load_method("forward")
 
 for _ in range(args.num_runs):
     outputs = forward.execute((x,))

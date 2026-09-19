@@ -81,10 +81,10 @@ void TRTLogger::log(Severity severity, const char* msg) noexcept {
 
 EngineHandle::~EngineHandle() {
   cudaSetDevice(device_id);
-  // execute() always waits for its own work before returning, so nothing of this handle's can
-  // still be running here. The device sync costs nothing then and is the correct thing to do if a
-  // later change ever submits work this destructor does not know about.
-  cudaDeviceSynchronize();
+  // Nothing is waited for here on purpose. execute() drains its own stream before returning, and
+  // the guard inside it drains on every early exit, so this handle owns no running work by now. A
+  // device-wide wait would not be free either: it blocks on unrelated work in the same context, so
+  // destroying one program was measured holding another one up for a full second.
   for (void* p : cached_input_ptrs) {
     if (p != nullptr) {
       cudaFree(p);
@@ -262,10 +262,14 @@ bool is_cuda_accessible_ptr(const void* ptr) {
   return attrs.type == cudaMemoryTypeDevice || attrs.type == cudaMemoryTypeManaged;
 }
 
-// The GPU a pointer lives on, or -1 when it is not device memory. Separate from the check above
-// because that one answers whether a pointer can be bound at all, and this one answers whether it
-// can be bound to THIS engine, which is a different question with a different remedy.
-int cuda_device_of_ptr(const void* ptr) {
+// The device a pointer is pinned to, or -1 when it is pinned to none. Three kinds carry no
+// constraint and so are not reported: host memory, which the caller stages or the device reads
+// directly; managed memory, which is reachable from every device in the context, measured working
+// from device 0 while reporting device 1; and a plain allocation on a peer the engine's device can
+// reach. The last is deliberately permissive: "can access" is not "access enabled", but refusing a
+// case that works costs a user a working program, where allowing one that does not leaves TensorRT
+// to say so itself.
+int cuda_foreign_device_of_ptr(const void* ptr, int engine_device) {
   if (ptr == nullptr) {
     return -1;
   }
@@ -274,7 +278,13 @@ int cuda_device_of_ptr(const void* ptr) {
     cudaGetLastError();
     return -1;
   }
-  if (attrs.type != cudaMemoryTypeDevice && attrs.type != cudaMemoryTypeManaged) {
+  if (attrs.type != cudaMemoryTypeDevice || attrs.device == engine_device) {
+    return -1;
+  }
+  int peer = 0;
+  if (cudaDeviceCanAccessPeer(&peer, engine_device, attrs.device) != cudaSuccess) {
+    cudaGetLastError();
+  } else if (peer != 0) {
     return -1;
   }
   return attrs.device;
@@ -743,8 +753,8 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     // Caught here rather than at submission. Device memory on the wrong GPU binds without complaint
     // and then fails inside TensorRT as an invalid program, which sends the reader to re-export a
     // model that was never the problem.
-    const int input_device = cuda_device_of_ptr(et_in.const_data_ptr());
-    if (input_device >= 0 && input_device != engine->device_id) {
+    const int input_device = cuda_foreign_device_of_ptr(et_in.const_data_ptr(), engine->device_id);
+    if (input_device >= 0) {
       ET_LOG(
           Error,
           "TensorRTBackend::execute: input '%s' is on CUDA device %d but this engine runs on device "
@@ -962,8 +972,8 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     // buffer the caller hands over rather than one the engine allocated. Handing over one on the
     // wrong GPU used to be accepted and then written to, which is an illegal access that leaves the
     // process's CUDA context unusable rather than returning an error anyone can act on.
-    const int output_device = cuda_device_of_ptr(et_out.const_data_ptr());
-    if (output_device >= 0 && output_device != engine->device_id) {
+    const int output_device = cuda_foreign_device_of_ptr(et_out.const_data_ptr(), engine->device_id);
+    if (output_device >= 0) {
       ET_LOG(
           Error,
           "TensorRTBackend::execute: the buffer supplied for output '%s' is on CUDA device %d but "
