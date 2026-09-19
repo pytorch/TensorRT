@@ -59,6 +59,40 @@ def test_the_install_script_puts_the_cuda_runtime_on_the_library_path():
 
 
 @pytest.mark.unit
+def test_the_install_script_does_not_install_the_companion_as_the_main_wheel(tmp_path):
+    """The two wheel names share a prefix, so a glob written for the main one matches the companion
+    too and installs it in the same breath, which is how a delegate meant to be optional became
+    mandatory. Driven by running the script's own selection loop over two named files, rather than
+    by looking for words in it: the words that used to be checked here are on the base branch as
+    well, so they could not tell the two versions apart.
+    """
+    script = (_REPO_ROOT / ".github/scripts/install-torch-tensorrt.sh").read_text(
+        encoding="utf-8"
+    )
+    assert 'wheels=""' in script, (
+        "the script no longer builds an explicit wheel list, so nothing stops the glob for the main "
+        "wheel from matching the companion as well"
+    )
+    start = script.index('wheels=""')
+    end = script.index("done", start) + len("done")
+    loop = script[start:end]
+    for name in (
+        "torch_tensorrt-2.15.0-cp312-cp312-linux_x86_64.whl",
+        "torch_tensorrt_executorch_runtime-0.2.0-py3-none-linux_x86_64.whl",
+    ):
+        (tmp_path / name).touch()
+    result = subprocess.run(
+        ["bash", "-c", f'RUNNER_ARTIFACT_DIR={tmp_path} \n{loop}\necho "${{wheels}}"'],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    selected = result.stdout.split()
+    assert any("torch_tensorrt-2.15.0" in w for w in selected), selected
+    assert not any("executorch_runtime" in w for w in selected), selected
+
+
+@pytest.mark.unit
 def test_the_examples_load_through_the_public_runtime_api() -> None:
     """The examples must not show the underscore-prefixed loader inside the pybindings extension.
 

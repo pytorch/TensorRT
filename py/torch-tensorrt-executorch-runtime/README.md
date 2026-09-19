@@ -210,13 +210,24 @@ produced. Arm does not have this problem, and its tag is higher for that reason.
 
 The build reads the CUDA location out of the repository's `MODULE.bazel`, and the
 copy checked in names one specific version. On a machine with a different CUDA, the
-fetch fails saying that path does not exist. That file is generated, so render it for
-your machine before building. It takes seven values, so run the packaging script that
-already sets them rather than substituting by hand:
+fetch fails saying that path does not exist. That file is generated from a template, so
+render it for your machine before building. The template takes seven values:
 
 ```bash
-CUDA_HOME=/usr/local/cuda-13.2 bash packaging/pre_build_script.sh
+export CUDA_HOME=/usr/local/cuda-13.2
+export CU_VERSION=cu132
+export CHANNEL=nightly
+export BUILD_VERSION=0.2.0.dev0
+export TORCH_INSTALL_PATH="$(python -c 'import torch; print(torch.__path__[0])')"
+export TENSORRT_CUDA_VERSION_UPPER_BOUND=14.0
+export TENSORRT_RTX_CUDA_VERSION_UPPER_BOUND=14.0
+envsubst < toolchains/ci_workspaces/MODULE.bazel.tmpl > MODULE.bazel
 ```
+
+Render it yourself rather than running `packaging/pre_build_script.sh`. That script is
+for the release containers: it also installs packages, and on a development machine it
+can replace the PyTorch you already have with one from another index, which leaves you
+worse off than when you started.
 
 ```bash
 python -m pip install pyyaml patchelf tensorrt-cu13 \
