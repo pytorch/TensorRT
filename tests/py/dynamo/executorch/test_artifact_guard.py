@@ -909,6 +909,63 @@ def _assert_one_shared_runtime(source: str, header: str) -> None:
     ), "the handle still owns a runtime"
 
 
+@pytest.mark.parametrize(
+    "mutation", ["none", "drop-input-check", "drop-output-check", "drop-helper"]
+)
+@pytest.mark.unit
+def test_the_backend_refuses_a_buffer_on_another_device(mutation) -> None:
+    """A buffer on a different GPU from the engine used to be bound and written to, which is an
+    illegal access that leaves the process unable to use CUDA again, and the error named the program
+    rather than the pointer. Inputs and caller-supplied outputs are both checked now.
+
+    This reads the arrangement of the code and not a running backend, and the reason is worth stating
+    rather than hiding: the behaviour needs two GPUs to exercise, because with one every device
+    pointer is on device zero, and no lane that can run this file has even one. It was measured on a
+    four GPU machine, where every wrong-device input and output is refused and the message names both
+    devices, but that measurement cannot run here. So what this pins is that the checks are present
+    and are reached, with comments stripped first so a comment cannot stand in for the code. If they
+    are deleted, this goes red.
+    """
+    source = _code_only(
+        (_ROOT / "cpp/src/torch_tensorrt/executorch/TensorRTBackend.cpp").read_text(
+            encoding="utf-8"
+        )
+    )
+    input_check = "const int input_device = cuda_foreign_device_of_ptr("
+    output_check = "const int output_device = cuda_foreign_device_of_ptr("
+    helper = "int cuda_foreign_device_of_ptr("
+
+    # Each mutation removes the text outright. Commenting it out would not do: this source has
+    # already had its comments stripped, so a commented line still reads as present.
+    if mutation == "drop-input-check":
+        source = source.replace(input_check, "")
+    elif mutation == "drop-output-check":
+        source = source.replace(output_check, "")
+    elif mutation == "drop-helper":
+        source = source.replace(helper, "")
+
+    if mutation == "none":
+        assert helper in source, "the helper that answers the question is gone"
+        assert (
+            input_check in source
+        ), "an input is no longer checked against the engine's device"
+        assert output_check in source, "a caller-supplied output is no longer checked"
+        # Managed memory and a reachable peer must stay exempt, or the check refuses memory that
+        # works, which was measured and is worse than not checking at all.
+        assert "cudaDeviceCanAccessPeer" in source, "the peer exemption is gone"
+        assert "cudaMemoryTypeDevice" in source, "the managed-memory exemption is gone"
+        return
+
+    removed = {
+        "drop-input-check": input_check,
+        "drop-output-check": output_check,
+        "drop-helper": helper,
+    }[mutation]
+    assert (
+        removed not in source
+    ), f"mutation {mutation} did not take, so this test cannot fail"
+
+
 @pytest.mark.parametrize("mutation", [None, "availability-builds-one", "commented-out"])
 @pytest.mark.unit
 def test_the_backend_shares_one_tensorrt_runtime(mutation) -> None:

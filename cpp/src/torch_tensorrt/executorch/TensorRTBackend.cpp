@@ -100,9 +100,6 @@ EngineHandle::~EngineHandle() {
 
 namespace {
 
-// Opting in to being handed work that is still in flight. A caller that passes this promises to
-// synchronize the stream, or to wait on its own event, before reading an output.
-
 // The process-wide TensorRT runtime and its logger, built once on first use and then never
 // destroyed. TensorRT requires the runtime to outlive every engine deserialized from it, and never
 // destroying it is the only way to promise that here. Destroying it at exit would not: statics are

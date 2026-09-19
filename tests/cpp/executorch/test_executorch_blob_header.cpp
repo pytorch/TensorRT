@@ -80,13 +80,18 @@ TEST(ExecuTorchTensorRTBlobHeader, RejectsASizeThatWouldWrapWhenAddedToItsOffset
   // lets the parse through, after which the reader walks far past the end of the blob. The check
   // has to compare against the space that is left instead, and this is the case that tells the two
   // forms apart: every other input in this file is accepted or rejected identically by both.
+  // Metadata that parses, so the only thing left that can refuse the blob is the length check. With
+  // "{}" the parse fails for want of a bindings list and the test passes either way, which is how
+  // this case originally proved nothing.
+  static constexpr const char* kValidMetadata =
+      R"({"io_bindings":[{"name":"input_0","is_input":true},{"name":"output_0","is_input":false}]})";
   const std::vector<uint64_t> wrapping = {
       UINT64_MAX,
       UINT64_MAX - 15,
       UINT64_MAX - HEADER_SIZE,
   };
   for (const uint64_t engine_size : wrapping) {
-    std::vector<uint8_t> blob = make_blob("{}");
+    std::vector<uint8_t> blob = make_blob(kValidMetadata);
     write_field(blob, ENGINE_SIZE_FIELD_OFFSET, engine_size);
     TensorRTBlobHeader header;
     EXPECT_FALSE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header))
@@ -94,7 +99,7 @@ TEST(ExecuTorchTensorRTBlobHeader, RejectsASizeThatWouldWrapWhenAddedToItsOffset
   }
   // The metadata length is read the same way. This one does not tell the two forms apart, because a
   // 32 bit length cannot wrap a 64 bit sum, but it is the boundary worth pinning anyway.
-  std::vector<uint8_t> blob = make_blob("{}");
+  std::vector<uint8_t> blob = make_blob(kValidMetadata);
   write_field(blob, METADATA_SIZE_FIELD_OFFSET, static_cast<uint32_t>(UINT32_MAX));
   TensorRTBlobHeader header;
   EXPECT_FALSE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
