@@ -1082,7 +1082,9 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   }
   cuda_err = cudaStreamSynchronize(stream);
   if (cuda_err != cudaSuccess) {
-    // Left set for the same reason as above: a failed drain means the work may still be live.
+    // Returning with the guard still armed, so its destructor waits: a failed drain says nothing
+    // about whether the work finished, and the staging buffers it may still be writing outlive
+    // this call.
     ET_LOG(Error, "TensorRTBackend::execute: cudaStreamSynchronize failed: %s", cudaGetErrorString(cuda_err));
     return Error::InvalidProgram;
   }
