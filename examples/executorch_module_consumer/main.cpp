@@ -1,3 +1,7 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
 // Runs a delegated program the way an application does: through ExecuTorch's module extension,
 // linking the delegate out of its installed wheel rather than building it.
 //
@@ -8,6 +12,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <deque>
 #include <string>
 #include <vector>
 
@@ -17,7 +22,6 @@
 #include <executorch/extension/tensor/tensor.h>
 
 using executorch::extension::from_blob;
-using executorch::extension::make_tensor_ptr;
 using executorch::extension::Module;
 using executorch::runtime::Error;
 using executorch::runtime::EValue;
@@ -50,14 +54,17 @@ bool cuda_ok(cudaError_t status, const char* what) {
 int main(int argc, char** argv) {
   const char* const model_path = flag(argc, argv, "--model_path", nullptr);
   if (model_path == nullptr) {
-    std::fprintf(stderr, "usage: %s --model_path <file.pte> [--device_outputs] [--num_runs N]\n", argv[0]);
+    std::fprintf(stderr, "usage: %s --model_path <file.pte> [--device_io] [--num_runs N]\n", argv[0]);
     return 2;
   }
-  // Present means the program leaves its outputs to the caller, so one has to be supplied.
-  bool caller_owns_outputs = false;
+  // A program exported for device-resident boundaries wants device memory on both sides and leaves
+  // its outputs to the caller. One exported for host boundaries wants host memory and plans its own
+  // outputs, and handing it a device pointer crashes rather than failing, because something on the
+  // host side reads through it.
+  bool device_boundary = false;
   for (int i = 1; i < argc; ++i) {
-    if (std::strcmp(argv[i], "--device_outputs") == 0) {
-      caller_owns_outputs = true;
+    if (std::strcmp(argv[i], "--device_io") == 0 || std::strcmp(argv[i], "--device_outputs") == 0) {
+      device_boundary = true;
     }
   }
   const int num_runs = std::atoi(flag(argc, argv, "--num_runs", "1"));
@@ -79,6 +86,7 @@ int main(int argc, char** argv) {
 
   // Inputs come from device memory, which is what the delegate binds without a staging copy.
   std::vector<void*> owned;
+  std::deque<std::vector<uint8_t>> host_buffers;
   std::vector<executorch::extension::TensorPtr> inputs;
   std::vector<EValue> input_values;
   for (size_t i = 0; i < meta->num_inputs(); ++i) {
@@ -92,24 +100,30 @@ int main(int argc, char** argv) {
     for (const auto extent : sizes) {
       count *= static_cast<size_t>(extent);
     }
-    const size_t bytes = count * sizeof(float);
-    const std::vector<float> host(count, 1.0f);
-    void* device = nullptr;
-    if (!cuda_ok(cudaMalloc(&device, bytes), "cudaMalloc for an input")) {
-      return 1;
+    const auto type = info->scalar_type();
+    const size_t bytes = count * executorch::runtime::elementSize(type);
+    if (device_boundary) {
+      void* device = nullptr;
+      if (!cuda_ok(cudaMalloc(&device, bytes), "cudaMalloc for an input")) {
+        return 1;
+      }
+      owned.push_back(device);
+      const std::vector<uint8_t> filled(bytes, 0);
+      if (!cuda_ok(cudaMemcpy(device, filled.data(), bytes, cudaMemcpyHostToDevice), "input upload")) {
+        return 1;
+      }
+      inputs.push_back(from_blob(device, sizes, type));
+    } else {
+      host_buffers.emplace_back(bytes, 0);
+      inputs.push_back(from_blob(host_buffers.back().data(), sizes, type));
     }
-    owned.push_back(device);
-    if (!cuda_ok(cudaMemcpy(device, host.data(), bytes, cudaMemcpyHostToDevice), "input upload")) {
-      return 1;
-    }
-    inputs.push_back(from_blob(device, sizes, executorch::aten::ScalarType::Float));
     // forward() takes EValue, and an EValue borrows the tensor, so the pointers above are kept
     // alive in `inputs` for as long as the call needs them.
     input_values.emplace_back(*inputs.back());
   }
 
   std::vector<executorch::extension::TensorPtr> outputs_held;
-  if (caller_owns_outputs) {
+  if (device_boundary) {
     for (size_t o = 0; o < meta->num_outputs(); ++o) {
       const auto info = meta->output_tensor_meta(o);
       if (!info.ok()) {
@@ -121,12 +135,13 @@ int main(int argc, char** argv) {
       for (const auto extent : sizes) {
         count *= static_cast<size_t>(extent);
       }
+      const auto type = info->scalar_type();
       void* device = nullptr;
-      if (!cuda_ok(cudaMalloc(&device, count * sizeof(float)), "cudaMalloc for an output")) {
+      if (!cuda_ok(cudaMalloc(&device, count * executorch::runtime::elementSize(type)), "cudaMalloc for an output")) {
         return 1;
       }
       owned.push_back(device);
-      auto out = from_blob(device, sizes, executorch::aten::ScalarType::Float);
+      auto out = from_blob(device, sizes, type);
       outputs_held.push_back(out);
       if (module.set_output(EValue(*out), o) != Error::Ok) {
         std::fprintf(stderr, "could not hand output %zu to the program\n", o);
@@ -141,7 +156,7 @@ int main(int argc, char** argv) {
       std::fprintf(
           stderr,
           "run %d failed with status 0x%x. A program whose outputs it does not plan needs "
-          "--device_outputs so a buffer is supplied first.\n",
+          "--device_io so a buffer is supplied first.\n",
           run,
           static_cast<unsigned>(result.error()));
       return 1;
@@ -151,6 +166,12 @@ int main(int argc, char** argv) {
       std::printf("ran %d time(s), %zu output(s)\n", num_runs, outputs.size());
       for (size_t o = 0; o < outputs.size(); ++o) {
         const auto tensor = outputs[o].toTensor();
+        // Printed as floats only when they are floats. Reading float-sized words out of a tensor of
+        // another type would be a made-up number dressed as a result.
+        if (tensor.scalar_type() != executorch::aten::ScalarType::Float) {
+          std::printf("  output %zu holds %zu elements of another type\\n", o, size_t(tensor.numel()));
+          continue;
+        }
         const size_t print_n = tensor.numel() < 4 ? static_cast<size_t>(tensor.numel()) : 4;
         std::vector<float> staged(print_n, 0.0f);
         cudaPointerAttributes attrs{};

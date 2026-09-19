@@ -421,7 +421,9 @@ setup(
         ]
     },
     cmdclass={"build_py": BazelBuild, "bdist_wheel": WheelTag},
-    python_requires=">=3.10",
+    # Capped for the same reason the main manifest is: the pinned ExecuTorch ships no wheel
+    # above 3.14, so declaring support past it promises something that cannot resolve.
+    python_requires=">=3.10,<3.15",
     install_requires=[
         # Full versions, local label included, for these three, but for two different reasons.
         # ExecuTorch is the one this delegate is compiled and linked against, so another build of it

@@ -305,11 +305,14 @@ to be loaded before a delegated program is loaded. Importing this package does
 that, and nothing else: there is no API to call.
 
 ```python
+from pathlib import Path
+
+import torch
 import torch_tensorrt_executorch_runtime  # noqa: F401
 from executorch.runtime import Runtime
 
 program = Runtime.get().load_program(Path("model.pte"))
-outputs = program.load_method("forward").execute((tensor,))
+outputs = program.load_method("forward").execute((torch.randn(1, 3, 224, 224),))
 ```
 
 ExecuTorch's own delegates register because they are linked into its pybindings

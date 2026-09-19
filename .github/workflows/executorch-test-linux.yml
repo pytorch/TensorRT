@@ -169,4 +169,4 @@ jobs:
           --model_path="${RUNNER_TEMP}/torchtrt-coalesced.pte" --num_runs=2
         # Device outputs: the program leaves them to the caller, so one is supplied first.
         "${RUNNER_TEMP}/module-consumer/executorch_module_consumer" \
-          --model_path="${RUNNER_TEMP}/torchtrt-device-resident.pte" --device_outputs --num_runs=2
+          --model_path="${RUNNER_TEMP}/torchtrt-device-resident.pte" --device_io --num_runs=2

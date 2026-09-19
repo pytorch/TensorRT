@@ -474,7 +474,7 @@ int main(int argc, char** argv) {
       if (cudaPointerGetAttributes(&attrs, src) == cudaSuccess && attrs.type == cudaMemoryTypeDevice) {
         const cudaError_t copied = cudaMemcpy(staged.data(), src, print_n * sizeof(float), cudaMemcpyDeviceToHost);
         if (copied != cudaSuccess) {
-          fprintf(stderr, "  could not read the output: %s\\n", cudaGetErrorString(copied));
+          fprintf(stderr, "  could not read the output: %s\n", cudaGetErrorString(copied));
           continue;
         }
         data = staged.data();

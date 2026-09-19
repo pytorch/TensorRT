@@ -163,10 +163,11 @@ Torch-TensorRT delegate subgraphs embedded in the `.pte`. Applications can
 scope `executorch::extension::cuda::CallerStreamGuard` around execution to run
 TensorRT and CUDA/AOTI delegates on one ordinary caller-owned CUDA stream. On the
 discrete-GPU CI configuration, this runner's host-backed inputs and outputs take
-the synchronized staging path; that test exercises guarded inference and checks the
-output values, not the device-resident asynchronous fast path. Integrated GPUs may bind
-host-backed storage directly and can follow the asynchronous contract documented in
-[the backend README](../../cpp/src/torch_tensorrt/executorch/README.md).
+the synchronized staging path, and that is the path a discrete card always takes: it
+can read pageable host memory, but by faulting pages in one at a time rather than
+through shared page tables, which is far slower than one bulk copy. Only an integrated
+part that shares host page tables has its host storage bound directly. Either way the
+call returns with the work finished.
 The Python `torch_tensorrt` package is needed when exporting the `.pte`; it is not
 needed by this native runner at inference time.
 

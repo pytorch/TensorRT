@@ -836,12 +836,11 @@ def test_the_native_build_runs_the_guard_after_linking() -> None:
     build = (
         _ROOT / "py/torch-tensorrt-executorch-runtime/native/CMakeLists.txt"
     ).read_text(encoding="utf-8")
-    commands = [
-        block
-        for block in build.split(
-            "add_custom_command(TARGET executorch_backend_tensorrt POST_BUILD"
-        )[1:]
-    ]
+    commands = list(
+        build.split("add_custom_command(TARGET executorch_backend_tensorrt POST_BUILD")[
+            1:
+        ]
+    )
     assert commands, "nothing runs after the delegate is linked"
     guard = [b for b in commands if "check_imports_executorch_runtime.sh" in b]
     assert (

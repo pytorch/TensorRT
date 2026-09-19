@@ -3,6 +3,7 @@
 
 # ExecuTorch partitioner: partition by execute_engine nodes.
 
+import re
 import logging
 from typing import Callable, Dict, List, Optional, Tuple
 
@@ -144,7 +145,10 @@ class TensorRTPartitioner(Partitioner):  # type: ignore[misc]
         # instruction, which says nothing about the request that caused it.
         for spec in explicit:
             requested = spec.value.decode(errors="replace")
-            if requested.split(":", 1)[0] != "cuda":
+            # Matched whole and case-insensitively. The framework accepts "CUDA" and this used to
+            # refuse it, while "cuda:" and "cuda:abc" passed a check on the part before the colon
+            # and then failed later as something else.
+            if re.fullmatch(r"cuda(:\d+)?", requested.strip(), re.IGNORECASE) is None:
                 raise ValueError(
                     f"{_TARGET_DEVICE_COMPILE_SPEC_KEY}={requested!r} is not a device this "
                     "delegate runs on. It compiles to TensorRT engines, which need a CUDA device, "

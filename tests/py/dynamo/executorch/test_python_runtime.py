@@ -65,7 +65,6 @@ def test_examples_use_the_module_loader(
     )
     monkeypatch.setitem(sys.modules, "torch", torch)
     _fake_executorch(monkeypatch, set())
-    portable = sys.modules["executorch.extension.pybindings.portable_lib"]
     model = tmp_path / "model.pte"
     methods = ["forward"] if has_forward else []
 

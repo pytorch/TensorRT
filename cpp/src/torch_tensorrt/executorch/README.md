@@ -220,15 +220,11 @@ the removed `CudaStreamGuard`:
 - Calls using one delegate handle must not overlap, and must not overlap with
   its destruction; the backend serializes `execute()` calls with an internal
   mutex, but destruction is not mutex-guarded.
-- With a guard active and when no host staging is required (all inputs and
-  outputs are directly bindable, so device, managed, or unified memory),
-  `execute()` may return with the TensorRT enqueue still in flight on the
-  stream (no end-of-execute sync). The backend orders the next `execute()` and
-  the handle's destruction after that work via an internal completion event, but
-  that event only protects backend-owned state. The caller must therefore keep
-  all directly bound input/output storage alive and unmodified until the work is
-  complete, order any cross-stream producers/consumers with their own events,
-  and synchronize the stream before reading outputs on the host.
+- `execute()` always returns with the work finished, whatever the memory it was
+  given. The runtime this plugs into has no asynchronous execute: its own
+  `execute()` returns to mean the work is done, and callers read the outputs
+  straight afterwards. There was an opt-in that returned early, and it could not
+  be honoured safely, so nothing returns in flight any more.
 - With no guard active, the backend falls back to `cudaStreamPerThread`.
 - The backend always waits for the engine before returning, whatever stream it ran on.
   ExecuTorch's runtime has no asynchronous execute: its `execute()` returns success to mean the

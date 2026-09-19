@@ -274,10 +274,6 @@ def _filter_matrix_declarations() -> dict[str, object]:
     return declared
 
 
-def _executorch_cuda_major() -> str:
-    return str(_filter_matrix_declarations()["EXECUTORCH_CUDA_MAJOR"])
-
-
 def _executorch_cuda_rows() -> set[str]:
     """CUDA rows the delegate can take: the wheel matrix filtered to its CUDA major.
 
