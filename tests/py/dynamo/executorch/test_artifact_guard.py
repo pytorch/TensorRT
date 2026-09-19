@@ -67,6 +67,7 @@ def artifact(tmp_path):
         "runtime_versions": _BASE_VERSIONS,
         "kernel_versions": _BASE_VERSIONS,
         "failure": None,
+        "extra_syms": [],
     }
     config = tmp_path / "readelf.json"
     reader = tmp_path / "readelf"
@@ -91,6 +92,8 @@ def artifact(tmp_path):
         "elif flag in ('-Ws', '--dyn-syms'):\n"
         "    ndx = ('UNDEF' if eu else 'UND') if name == 'libdelegate.so' else '12'\n"
         f"    print(' 1: 00000000 8 FUNC GLOBAL DEFAULT ' + ndx + ' {_REGISTER}')\n"
+        "    for extra in d.get('extra_syms', []):\n"
+        "        print(' 2: 00000000 0 FUNC GLOBAL DEFAULT ' + ('UNDEF' if eu else 'UND') + ' ' + extra)\n"
         "elif flag == '-V':\n"
         "    key = 'versions' if name == 'libdelegate.so' else (\n"
         "        'kernel_versions' if name == 'libkernels.so' else 'runtime_versions')\n"
@@ -139,6 +142,32 @@ def test_cuda_path_must_be_an_actual_entry(artifact, suffix):
     result = invoke(options=[str(runtime)])
     assert result.returncode != 0
     assert "RUNPATH carries no nvidia/cu13/lib" in result.stderr
+
+
+def test_an_absolute_runpath_entry_is_rejected(artifact):
+    """A build machine path baked into a published wheel fails on a user's machine and nowhere else,
+    so the rule that catches it needs a test of its own. The expected value is passed in so the
+    equality rule above is satisfied and this rule is the one being measured.
+    """
+    data, invoke, runtime = artifact
+    data["needed"].append("libcudart.so.13")
+    data["runpath"] = _RUNPATH + ":/opt/buildbot/stage/lib"
+    result = invoke(options=[str(runtime), data["runpath"]])
+    assert result.returncode != 0
+    assert "not relative to the artifact" in result.stderr
+    assert "/opt/buildbot/stage/lib" in result.stderr
+
+
+def test_an_undefined_unversioned_cxx_symbol_is_rejected(artifact):
+    """An unversioned C++ symbol resolves against whatever libstdc++ the user happens to have, which
+    is how an artifact that loads here fails there. Driven by handing the reader one such symbol.
+    """
+    data, invoke, runtime = artifact
+    data["needed"].append("libcudart.so.13")
+    data["extra_syms"] = ["_ZNSt6vectorIiSaIiEE9push_backERKi"]
+    result = invoke(options=[str(runtime)])
+    assert result.returncode != 0
+    assert "unversioned" in result.stderr.lower()
 
 
 def test_expected_runpath_is_only_an_equality_check(artifact):
