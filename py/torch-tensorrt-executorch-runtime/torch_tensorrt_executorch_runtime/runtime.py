@@ -33,14 +33,14 @@ def __getattr__(name: str) -> Any:
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
-def load(file_path: Union[str, Path]) -> Any:
+def load(path: Union[str, Path]) -> Any:
     """Deprecated: register the delegate and load through ExecuTorch.
 
     Registration is what this package exists for, and ExecuTorch owns execution, so this does the
     first and forwards the second rather than carrying a loader of its own.
 
-    The parameter is named and typed as the published wheel had it, because a caller passing the
-    path by keyword or as a Path is one of the callers this module exists to keep working.
+    The parameter matches the shim that forwards to it. No released wheel imports this submodule,
+    so the name is not a contract; it is spelled the same way as its only caller for readability.
     """
     warnings.warn(
         "torch_tensorrt_executorch_runtime.runtime.load() is deprecated; use "
@@ -68,4 +68,4 @@ def load(file_path: Union[str, Path]) -> Any:
             f'torch_tensorrt.load(path, format="executorch") directly. Underlying error: {error}'
         ) from error
 
-    return _load(file_path)
+    return _load(path)

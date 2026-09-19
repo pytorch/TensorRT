@@ -114,9 +114,9 @@ device memory and both accept it. Only one of them checks.
 
 Which is also why this backend's leniency is not something to rely on. It never reads the device
 tag at
-all, and the devices differ: three of the four tested report that they can read pageable host
-memory and
-one does not, so the same program that works on a discrete card can fail on an integrated one.
+all, and the devices differ: of the four tested, one reads pageable host memory through shared
+page tables, two read it by faulting pages in, and one cannot read it at all, so the same program
+that works on a discrete card can fail on an integrated one.
 
 ### A split program runs only on the first GPU
 
@@ -238,10 +238,12 @@ the removed `CudaStreamGuard`:
   it is gone: on an idle GPU it returned zeros forty times out of forty, with the stream still
   unready for a median of 142 microseconds, growing to 38 milliseconds on a larger graph.
 - The reference-runner smoke test runs inference inside a caller-stream guard on
-  the discrete-GPU CI configuration. Host-backed input and output do not imply the
-  staging path there: the backend binds a host pointer straight through whenever the
-  device reports that it can read pageable host memory, which a discrete H100 does,
-  and stages it only on a device that reports it cannot. Either way that
+  the discrete-GPU CI configuration, and it takes the staging path there. The backend
+  binds a host pointer straight through only where the device both reads pageable host
+  memory and does so through shared host page tables. A discrete card reports the first
+  and not the second, because it serves pageable memory by faulting pages in one at a
+  time, which measured 33 times slower than one bulk copy on a loop that rewrites its
+  input each call. So only integrated parts get the direct bind. Either way that
   configuration returns with the work already finished, because the backend always
   waits. CI separately asserts that the runner resolves one shared
   `libextension_cuda.so`.

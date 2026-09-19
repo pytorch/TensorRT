@@ -474,9 +474,7 @@ def test_the_published_main_wheel_can_still_reach_the_loader_it_imports() -> Non
     load = next(
         n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "load"
     )
-    assert [a.arg for a in load.args.args] == ["file_path"], [
-        a.arg for a in load.args.args
-    ]
+    assert [a.arg for a in load.args.args] == ["path"], [a.arg for a in load.args.args]
     # Parsing alone cannot see a module that raises while being imported, and the published wheel
     # imports this one, so run its top level. Everything it needs at that point is standard library;
     # the import of the main wheel's loader sits inside the function and is not reached here.
@@ -703,14 +701,14 @@ def test_the_forwarder_actually_forwards_and_warns(monkeypatch) -> None:
         returned = namespace["load"]("some/model.pte")
     assert returned is sentinel, returned
     with pytest.warns(DeprecationWarning):
-        # By keyword, deliberately: the published main wheel calls it this way, so the
-        # parameter name is part of the contract and renaming it breaks that caller.
-        assert namespace["load"](file_path="some/model.pte") is sentinel
+        # By keyword, so a rename shows up here rather than in a caller. Nothing released calls
+        # this submodule today, so the name is a convention rather than a contract.
+        assert namespace["load"](path="some/model.pte") is sentinel
     with pytest.warns(DeprecationWarning):
         assert namespace["load"](Path("some/model.pte")) is sentinel
     assert calls == ["some/model.pte", "some/model.pte", Path("some/model.pte")], calls
     signature = inspect.signature(namespace["load"])
-    assert list(signature.parameters) == ["file_path"], signature
+    assert list(signature.parameters) == ["path"], signature
 
 
 @pytest.mark.unit
