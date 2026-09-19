@@ -111,12 +111,7 @@ if(TensorRT_INCLUDE_DIR)
       endif()
 
       if(_TensorRT_VERSION_LINE)
-        string(REGEX REPLACE
-          "^#define[ \t]+[^ \t]+[ \t]+([0-9]+).*$"
-          "\\1"
-          TensorRT_VERSION_${component}
-          "${_TensorRT_VERSION_LINE}"
-        )
+        string(REGEX MATCH "[0-9]+" TensorRT_VERSION_${component} "${_TensorRT_VERSION_LINE}")
       endif()
       unset(_TensorRT_VERSION_LINE)
     endforeach()
