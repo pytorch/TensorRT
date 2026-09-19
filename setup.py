@@ -228,15 +228,18 @@ EXECUTORCH_REQUIREMENT = (
     f"<{_executorch_major}.{int(_executorch_minor) + 1}; "
     "platform_system == 'Linux'"
 )
-# TODO: Enable this once the runtime wheel is published to the PyTorch index.
-# EXECUTORCH_RUNTIME_REQUIREMENT = (
-#     f"torch-tensorrt-executorch-runtime=={__version__}; " "platform_system == 'Linux'"
-# )
+# No version here, deliberately. The runtime wheel carries its own base version, independent of this
+# one, so there is nothing shared to pin against and naming this package's version would ask for a
+# release that does not exist. It does not need one either: that wheel pins this package, ExecuTorch
+# and torch exactly, so asking for it by name alone still resolves to the build that matches whatever
+# of this package is being installed, and a mismatch is refused from its side rather than ours.
+# Linux-only for the same reason as the requirement above: the delegate is a Linux shared object.
+EXECUTORCH_RUNTIME_REQUIREMENT = (
+    "torch-tensorrt-executorch-runtime; platform_system == 'Linux'"
+)
 EXTRAS_REQUIRE = {
-    #     "executorch": [EXECUTORCH_REQUIREMENT, EXECUTORCH_RUNTIME_REQUIREMENT],
-    #     "all": [EXECUTORCH_REQUIREMENT, EXECUTORCH_RUNTIME_REQUIREMENT],
-    "executorch": [EXECUTORCH_REQUIREMENT],
-    "all": [EXECUTORCH_REQUIREMENT],
+    "executorch": [EXECUTORCH_REQUIREMENT, EXECUTORCH_RUNTIME_REQUIREMENT],
+    "all": [EXECUTORCH_REQUIREMENT, EXECUTORCH_RUNTIME_REQUIREMENT],
 }
 
 if "--ci" in sys.argv:

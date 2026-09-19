@@ -112,12 +112,11 @@ already declare the extra. If an older installation lacks it, first install the
 intended compatible Torch-TensorRT wheel deliberately. Adding the extra may change
 dependencies, so use a fresh environment to preserve an existing working stack.
 
-The extra installs `executorch` only. Install the matching companion artifact,
-`torch-tensorrt-executorch-runtime`, or build and install it from source following
-`py/torch-tensorrt-executorch-runtime/README.md`. That wheel ships just the TensorRT delegate, a
-single shared library that registers itself with the ExecuTorch runtime from the `executorch`
-distribution rather than bundling a runtime of its own, and loading a `.pte` through the delegate
-needs it.
+The extra also installs the companion wheel, `torch-tensorrt-executorch-runtime`, so there is no
+second command. That wheel ships just the TensorRT delegate, a single shared library that registers
+itself with the ExecuTorch runtime from the `executorch` distribution rather than bundling a runtime
+of its own, and loading a `.pte` through the delegate needs it. To build it from source instead,
+follow `py/torch-tensorrt-executorch-runtime/README.md`.
 
 The Python example uses ExecuTorch's Module API to back planned device arenas
 with CUDA memory. Then load and run the model:

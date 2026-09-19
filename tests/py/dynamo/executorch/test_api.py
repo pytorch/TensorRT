@@ -2231,9 +2231,13 @@ def test_packaging_declares_executorch_extra():
         assert extra_name in extras_by_name
         requirements = extras_by_name[extra_name]
         assert isinstance(requirements, ast.List)
-        assert len(requirements.elts) == 1
-        assert isinstance(requirements.elts[0], ast.Name)
-        assert requirements.elts[0].id == "EXECUTORCH_REQUIREMENT"
+        # Both halves: the runtime the delegate plugs into, and the delegate itself. Naming only the
+        # first left a user to find the second by hand, which is the whole point of the extra.
+        named = [e.id for e in requirements.elts if isinstance(e, ast.Name)]
+        assert named == [
+            "EXECUTORCH_REQUIREMENT",
+            "EXECUTORCH_RUNTIME_REQUIREMENT",
+        ], named
 
     setup_call = next(
         node

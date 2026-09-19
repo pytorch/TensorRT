@@ -112,19 +112,38 @@ release and JetPack builds retain their separate CUDA 12 support.
 
 ## Install
 
-Two pieces, because the delegate and the runtime it plugs into are separate wheels.
-
-The first brings PyTorch, Torch-TensorRT and a CUDA build of ExecuTorch. Pick the
-index for the CUDA version you run:
+One command. The `executorch` extra brings this wheel, a CUDA build of ExecuTorch,
+Torch-TensorRT and PyTorch. Swap `cu132` for the CUDA version you run:
 
 ```bash
-python -m pip install --pre "torch_tensorrt[executorch]" \
-  --extra-index-url https://download.pytorch.org/whl/nightly/cu130
+python -m pip install --pre "torch-tensorrt[executorch]" \
+  --index-url https://download.pytorch.org/whl/nightly/cu132 \
+  --extra-index-url https://pypi.org/simple \
+  --extra-index-url https://pypi.nvidia.com
 ```
 
-The second is this wheel, which is not on an index yet, so build it once with the
-instructions below and install the file. When it is published, the extra above will
-pull it in and this step goes away.
+All three indexes are needed, and so is `--pre`. Without `--pre` pip picks the stable
+Torch-TensorRT from the public index, which is far older and does not carry this extra.
+Without NVIDIA's index, the inference library resolves to a source distribution and pip
+spends around twenty minutes trying to build it before failing.
+
+You do not name PyTorch or this wheel yourself. PyTorch arrives as a dependency of
+Torch-TensorRT, and this wheel arrives through the extra. Building it by hand is only
+needed to work on it, and those instructions are below.
+
+On a fresh environment that command was measured installing:
+
+| package | version |
+| --- | --- |
+| torch-tensorrt | 2.15.0.dev20260919+cu132 |
+| torch-tensorrt-executorch-runtime | 0.2.0.dev20260919+cu132 |
+| executorch | 1.6.0.dev20260915+cu132 |
+| torch | 2.15.0.dev20260919+cu132 |
+| tensorrt-cu13-libs | 11.3.0.99 |
+| nvidia-cuda-runtime | 13.4.92 |
+
+ExecuTorch lands on an older date than the rest because this wheel pins the exact build
+it was compiled against. That is deliberate, and the next section says why.
 
 A CUDA build of ExecuTorch is required, not only to build against. The delegate
 needs a library that only ExecuTorch's CUDA wheels carry, so a processor-only build
