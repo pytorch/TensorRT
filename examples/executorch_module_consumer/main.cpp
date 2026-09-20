@@ -114,10 +114,6 @@ int main(int argc, char** argv) {
       return 1;
     }
     std::vector<executorch::aten::SizesType> sizes(info->sizes().begin(), info->sizes().end());
-    size_t count = 1;
-    for (const auto extent : sizes) {
-      count *= static_cast<size_t>(extent);
-    }
     const auto type = info->scalar_type();
     // Float only, and refused rather than approximated for anything else. The value written
     // below is a float, so on a narrower type it would run past the end of the buffer and on a
@@ -131,7 +127,10 @@ int main(int argc, char** argv) {
           i);
       return 1;
     }
-    const size_t bytes = count * sizeof(float);
+    // From the program's own byte size, not the product of the dims, which wraps on a shape whose
+    // extents multiply past 2^64 and would then describe a huge tensor over a zero-byte buffer.
+    const size_t bytes = info->nbytes();
+    const size_t count = bytes / sizeof(float);
     // Ones, because that is what the export script feeds when it records the reference value
     // this run is checked against. Zeros would compare a different computation.
     const std::vector<float> filled(count, 1.0f);
@@ -164,13 +163,9 @@ int main(int argc, char** argv) {
         return 1;
       }
       std::vector<executorch::aten::SizesType> sizes(info->sizes().begin(), info->sizes().end());
-      size_t count = 1;
-      for (const auto extent : sizes) {
-        count *= static_cast<size_t>(extent);
-      }
       const auto type = info->scalar_type();
       void* device = nullptr;
-      if (!cuda_ok(cudaMalloc(&device, count * elementSize(type)), "cudaMalloc for an output")) {
+      if (!cuda_ok(cudaMalloc(&device, info->nbytes()), "cudaMalloc for an output")) {
         return 1;
       }
       owned.push_back(device);

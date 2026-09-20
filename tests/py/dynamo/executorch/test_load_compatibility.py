@@ -583,39 +583,50 @@ def test_the_forwarder_returns_the_shape_the_published_api_returned() -> None:
         assert member in compat, f"the compatibility loader lost {member}"
 
 
+@pytest.mark.parametrize("installed", [False, True])
 @pytest.mark.unit
-def test_the_forwarder_says_which_side_is_too_old() -> None:
-    """The loader this forwards to belongs to the main wheel and is new in this change.
+def test_the_forwarder_tells_absent_apart_from_too_old(monkeypatch, installed) -> None:
+    """Absent is the ordinary state, because this package does not require Torch-TensorRT.
 
-    A main wheel old enough to import this submodule by name does not carry it, so the forward would
-    have raised a bare missing-module error naming something the reader never asked for. That pairing
-    should not arise, because this package requires the main wheel of its own build exactly, but an
-    install that skipped dependency resolution can produce it.
+    Reported as too old, it sent a reader who has none at all to upgrade one they do not have, and
+    offered them a call in the module that is missing. Both doors are driven, since both forward.
     """
-    source = (
+    path = (
         ROOT
         / "py/torch-tensorrt-executorch-runtime"
         / "torch_tensorrt_executorch_runtime/runtime.py"
-    ).read_text(encoding="utf-8")
-    tree = ast.parse(source)
-    load = next(
-        node
-        for node in tree.body
-        if isinstance(node, ast.FunctionDef) and node.name == "load"
     )
-    guarded = [
-        node
-        for node in ast.walk(load)
-        if isinstance(node, ast.Try)
-        and any(
-            isinstance(h.type, ast.Name) and h.type.id == "ImportError"
-            for h in node.handlers
+    spec = importlib.util.spec_from_file_location("_forwarder_under_test", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    for name in ("torch_tensorrt", "torch_tensorrt._executorch_compat"):
+        monkeypatch.delitem(sys.modules, name, raising=False)
+    if installed:
+        monkeypatch.setitem(
+            sys.modules, "torch_tensorrt", types.ModuleType("torch_tensorrt")
         )
-    ]
-    assert guarded, "the forward into the main wheel is not guarded"
-    # From the parsed handler, not the whole file: a comment satisfies a source-wide search.
-    handled = "\n".join(ast.unparse(h) for node in guarded for h in node.handlers)
-    assert "older than the one this package was built against" in handled, handled
+    else:
+        monkeypatch.setattr(sys, "path", [])
+
+    raised = []
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        with pytest.raises(ImportError) as load_error:
+            module.load("model.pte")
+    raised.append(str(load_error.value))
+    with pytest.raises(ImportError) as program_error:
+        module.Program
+    raised.append(str(program_error.value))
+
+    for message in raised:
+        aged = "older than the one this package was built against" in message
+        assert aged is installed, message
+        if installed:
+            assert "torch_tensorrt.load(" in message, message
+        else:
+            assert "is not installed" in message, message
+            assert "load_program(path)" in message, message
+            assert "torch_tensorrt.load(" not in message, message
 
 
 @pytest.mark.parametrize(

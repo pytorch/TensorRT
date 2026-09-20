@@ -10,6 +10,7 @@ who upgrades this package on its own. It stays until that call is gone from a re
 
 from __future__ import annotations
 
+import sys
 import warnings
 from pathlib import Path
 from typing import Any, Union
@@ -17,6 +18,32 @@ from typing import Any, Union
 # Program resolves through __getattr__ below rather than being bound here, so the linter cannot see
 # it and is told so. It stays exported because the published package exported it.
 __all__ = ["load", "Program"]  # noqa: F822
+
+
+def _cannot_forward(error: ImportError) -> ImportError:
+    """Name the case the reader is actually in.
+
+    This package does not declare Torch-TensorRT, so absent is the ordinary state and too old is the
+    rare one. Reporting the rare one told a reader with no Torch-TensorRT at all to go and upgrade it,
+    and offered them a call in the module they do not have.
+
+    Read from sys.modules: the failed import above already put the package there if it imported at
+    all, so absent here means absent.
+    """
+    if "torch_tensorrt" not in sys.modules:
+        return ImportError(
+            "This deprecated door forwards into torch_tensorrt, which is not installed. This "
+            "package does not require it. Either install torch-tensorrt, or drop the deprecated "
+            "call: import this package to register the TensorRT delegate, then load with "
+            "executorch.runtime.Runtime.get().load_program(path). "
+            f"Underlying error: {error}"
+        )
+    return ImportError(
+        "This deprecated door forwards into torch_tensorrt, and the installed Torch-TensorRT is "
+        "older than the one this package was built against, so it does not carry the receiving "
+        "module. Install the Torch-TensorRT this package requires, or call "
+        f'torch_tensorrt.load(path, format="executorch") directly. Underlying error: {error}'
+    )
 
 
 def __getattr__(name: str) -> Any:
@@ -34,12 +61,7 @@ def __getattr__(name: str) -> Any:
         try:
             from torch_tensorrt._executorch_compat import Program
         except ImportError as error:
-            raise ImportError(
-                "This deprecated module forwards into torch_tensorrt, and the installed "
-                "Torch-TensorRT is older than the one this package was built against, so it does "
-                "not carry the receiving module. Install the Torch-TensorRT this package requires. "
-                f"Underlying error: {error}"
-            ) from error
+            raise _cannot_forward(error) from error
 
         return Program
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
@@ -51,8 +73,8 @@ def load(path: Union[str, Path]) -> Any:
     Registration is what this package exists for, and ExecuTorch owns execution, so this does the
     first and forwards the second rather than carrying a loader of its own.
 
-    The parameter matches the shim that forwards to it. No released wheel imports this submodule,
-    so the name is not a contract; it is spelled the same way as its only caller for readability.
+    The parameter matches the shim that forwards to it; it is spelled the same way as its only
+    caller for readability.
     """
     warnings.warn(
         "torch_tensorrt_executorch_runtime.runtime.load() is deprecated; import this package to "
@@ -65,21 +87,10 @@ def load(path: Union[str, Path]) -> Any:
     # Forward to the main wheel's loader rather than ExecuTorch's. The API this replaces returned a
     # Program carrying run() and forward() and raised FileNotFoundError for a missing path, and
     # ExecuTorch's own loader returns neither, so a caller of the published API would break on the
-    # return value instead of on the import. The main wheel is always present: this package declares
-    # it as a dependency.
-    # The loader this forwards to is part of the main wheel, and a main wheel old enough to import
-    # this submodule by name does not carry it. That pairing should not arise, because this package
-    # requires the main wheel of its own build exactly, so installing it moves the main wheel too.
-    # If it does arise, through an install that skipped dependency resolution, say which of the two
-    # is too old rather than reporting a module nobody asked for.
+    # return value instead of on the import.
     try:
         from torch_tensorrt._executorch_compat import load as _load
     except ImportError as error:
-        raise ImportError(
-            "This deprecated loader forwards into torch_tensorrt, and the installed Torch-TensorRT "
-            "is older than the one this package was built against, so it does not carry the "
-            "receiving module. Install the Torch-TensorRT this package requires, or call "
-            f'torch_tensorrt.load(path, format="executorch") directly. Underlying error: {error}'
-        ) from error
+        raise _cannot_forward(error) from error
 
     return _load(path)

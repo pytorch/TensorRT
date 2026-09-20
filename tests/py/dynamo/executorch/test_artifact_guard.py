@@ -162,32 +162,6 @@ def test_an_absolute_runpath_entry_is_rejected(artifact):
     assert "/opt/buildbot/stage/lib" in result.stderr
 
 
-@pytest.mark.parametrize("suffix", ["", "-backup", "/not-the-lib-dir"])
-def test_cuda_path_must_be_an_actual_entry(artifact, suffix):
-    data, invoke, runtime = artifact
-    data["needed"].append("libcudart.so.13")
-    data["runpath"] = _RUNPATH.rsplit(":", 1)[0]
-    if suffix:
-        data["runpath"] += ":$ORIGIN/../../nvidia/cu13/lib" + suffix
-    result = invoke(options=[str(runtime)])
-    assert result.returncode != 0
-    assert "RUNPATH carries no nvidia/cu13/lib" in result.stderr
-
-
-def test_an_absolute_runpath_entry_is_rejected(artifact):
-    """A build machine path baked into a published wheel fails on a user's machine and nowhere else,
-    so the rule that catches it needs a test of its own. The expected value is passed in so the
-    equality rule above is satisfied and this rule is the one being measured.
-    """
-    data, invoke, runtime = artifact
-    data["needed"].append("libcudart.so.13")
-    data["runpath"] = _RUNPATH + ":/opt/buildbot/stage/lib"
-    result = invoke(options=[str(runtime), data["runpath"]])
-    assert result.returncode != 0
-    assert "not relative to the artifact" in result.stderr
-    assert "/opt/buildbot/stage/lib" in result.stderr
-
-
 def test_an_empty_runpath_entry_is_rejected(artifact):
     """An empty field is the working directory to the loader, which is the worst entry to publish and
     the easiest to introduce: a trailing separator is enough. It reads as nothing, so the rule had to
@@ -983,8 +957,6 @@ def _assert_wrong_device_buffers_are_refused(source: str) -> None:
     assert (
         "const int output_device = cuda_foreign_device_of_ptr(" in execute
     ), "a caller-supplied output is no longer checked where it is bound"
-    # Managed memory and a reachable peer must stay exempt, or the check refuses memory that
-    # works, which was measured and is worse than not checking at all.
     # Asserted absent, not present. Permitting a buffer because two cards COULD reach each other
     # let the engine read an address it cannot dereference, since peer access still has to be
     # turned on for a pair and nothing here turns it on.
@@ -1026,6 +998,7 @@ def _assert_one_shared_runtime(source: str, header: str) -> None:
         "drop-output-check",
         "drop-helper",
         "input-check-outside-execute",
+        "peer-capability-back",
     ],
 )
 @pytest.mark.unit
@@ -1039,7 +1012,7 @@ def test_the_backend_refuses_a_buffer_on_another_device(mutation) -> None:
     pointer is on device zero, and no lane that can run this file has even one. It was measured on a
     four GPU machine, where every wrong-device input and output is refused and the message names both
     devices, but that measurement cannot run here. So what this pins is that both checks and their
-    two exemptions are present in the body that binds the buffers, with comments stripped first so a
+    the managed-memory exemption is present in the body that binds the buffers, with comments stripped first so a
     comment cannot stand in for the code. Each mutation below is required to turn the reading red,
     which is what keeps the reading from passing on any source at all. What text cannot see is a
     check left in place and disabled by a surrounding condition; only two GPUs catch that.
@@ -1056,9 +1029,21 @@ def test_the_backend_refuses_a_buffer_on_another_device(mutation) -> None:
     if mutation == "input-check-outside-execute":
         # Still in the file, and no longer where a buffer is bound.
         availability = "bool TensorRTBackend::is_available() const {"
+        assert (
+            input_check in source
+        ), "mutation input-check-outside-execute has nothing to move"
         assert availability in source
         source = source.replace(input_check, "", 1).replace(
             availability, availability + f"\n  {input_check}nullptr, 0);", 1
+        )
+    elif mutation == "peer-capability-back":
+        # The one reading that asserts absence, so the only mutation that can pin it is one that
+        # puts the call back.
+        assert input_check in source, f"mutation {mutation} has nothing to anchor on"
+        source = source.replace(
+            input_check,
+            f"cudaDeviceCanAccessPeer(&reachable, 0, 1);\n    {input_check}",
+            1,
         )
     else:
         # Removed outright. Commenting it out would not do: the reading strips comments, so a

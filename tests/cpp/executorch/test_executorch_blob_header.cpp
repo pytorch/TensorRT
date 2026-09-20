@@ -27,6 +27,11 @@ constexpr uint32_t ENGINE_SIZE_FIELD_OFFSET = 16;
 constexpr uint32_t HEADER_SIZE = 32;
 constexpr uint32_t ENGINE_ALIGNMENT = 16;
 
+// Metadata a valid blob would carry, so a case that corrupts one header field is refused by the
+// check it targets and not by the metadata parser.
+constexpr const char* VALID_METADATA =
+    R"({"io_bindings":[{"name":"input_0","is_input":true},{"name":"output_0","is_input":false}]})";
+
 template <typename T>
 void write_field(std::vector<uint8_t>& blob, std::size_t offset, T value) {
   std::memcpy(blob.data() + offset, &value, sizeof(value));
@@ -133,7 +138,7 @@ TEST(ExecuTorchTensorRTBlobHeader, RejectsInvalidMagic) {
 }
 
 TEST(ExecuTorchTensorRTBlobHeader, RejectsUnalignedEngineOffset) {
-  const std::string metadata = "{}";
+  const std::string metadata = R"({"io_bindings":[{"name":"input_0","is_input":true}]})";
   const auto metadata_offset = static_cast<uint32_t>(HEADER_SIZE);
   const auto metadata_size = static_cast<uint32_t>(metadata.size());
   const auto engine_offset = static_cast<uint32_t>(HEADER_SIZE + metadata.size());
@@ -154,6 +159,36 @@ TEST(ExecuTorchTensorRTBlobHeader, RejectsUnalignedEngineOffset) {
 TEST(ExecuTorchTensorRTBlobHeader, RejectsEnginePastEndOfBlob) {
   auto blob = make_blob(R"({"io_bindings":[]})");
   write_field(blob, ENGINE_SIZE_FIELD_OFFSET, static_cast<uint64_t>(blob.size()));
+
+  TensorRTBlobHeader header;
+  EXPECT_FALSE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
+}
+
+// A program file is untrusted input, so each bounds check below gets a case of its own. Without one
+// the fields are read out of a buffer that does not hold them.
+TEST(ExecuTorchTensorRTBlobHeader, RejectsABlobShorterThanTheHeader) {
+  const std::vector<uint8_t> blob(sizeof(TENSORRT_MAGIC), 0);
+  std::memcpy(const_cast<uint8_t*>(blob.data()), TENSORRT_MAGIC, sizeof(TENSORRT_MAGIC));
+
+  TensorRTBlobHeader header;
+  EXPECT_FALSE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
+}
+
+TEST(ExecuTorchTensorRTBlobHeader, RejectsAnEngineOffsetPastEndOfBlob) {
+  auto blob = make_blob(VALID_METADATA);
+  const auto past_end = static_cast<uint32_t>(align_up(blob.size() + ENGINE_ALIGNMENT, ENGINE_ALIGNMENT));
+  write_field(blob, ENGINE_OFFSET_FIELD_OFFSET, past_end);
+  write_field(blob, ENGINE_SIZE_FIELD_OFFSET, uint64_t{0});
+
+  TensorRTBlobHeader header;
+  EXPECT_FALSE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
+}
+
+TEST(ExecuTorchTensorRTBlobHeader, RejectsMetadataThatRunsIntoTheEngine) {
+  auto blob = make_blob(VALID_METADATA);
+  uint32_t engine_offset = 0;
+  std::memcpy(&engine_offset, blob.data() + ENGINE_OFFSET_FIELD_OFFSET, sizeof(engine_offset));
+  write_field(blob, METADATA_SIZE_FIELD_OFFSET, static_cast<uint32_t>(engine_offset - HEADER_SIZE + 1));
 
   TensorRTBlobHeader header;
   EXPECT_FALSE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));

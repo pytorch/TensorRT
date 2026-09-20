@@ -429,6 +429,13 @@ def test_missing_test_wheel_dependency_is_detected(tmp_path, monkeypatch, entryp
         from tests.ci import runner
 
         setup = runner._setup_commands
+        declared = setup("executorch")
+        stripped = [
+            ([arg for arg in argv if not arg.startswith("wheel")], cwd)
+            for argv, cwd in declared
+        ]
+        # Removing it has to change something, or this passes on a tree that never declared it.
+        assert stripped != declared, "no wheel pin to strip, so this proves nothing"
         monkeypatch.setattr(
             runner,
             "_setup_commands",

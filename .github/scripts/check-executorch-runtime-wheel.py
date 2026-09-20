@@ -24,7 +24,7 @@ def reject(message: str) -> NoReturn:
     sys.exit(f"FATAL: {message}")
 
 
-_PINNED_WITH_LOCAL_LABEL = frozenset({"torch", "torch-tensorrt"})
+_LINKED_DISTRIBUTIONS = ("executorch", "tensorrt-cu13", "nvidia-cuda-runtime")
 
 # The pin each remaining requirement has to agree with. These name a release series rather than an
 # exact build, so the comparison is on the leading release components the pin actually spells.
@@ -137,11 +137,7 @@ def main() -> None:
         # Only the three the delegate links. Neither PyTorch nor Torch-TensorRT belongs here: the
         # library links neither, requiring Torch-TensorRT would make this wheel depend on the project
         # that builds it, and ExecuTorch leaves the choice of PyTorch build to the user.
-        for distribution in (
-            "executorch",
-            "tensorrt-cu13",
-            "nvidia-cuda-runtime",
-        ):
+        for distribution in _LINKED_DISTRIBUTIONS:
             if distribution == "executorch":
                 # The delegate links one specific ExecuTorch build, so its requirement carries the
                 # label naming that build. Without it the requirement is satisfied by a
@@ -155,15 +151,6 @@ def main() -> None:
                         f"against {installed}, whose version differs from that pin"
                     )
                 expected_version = str(installed)
-            elif distribution in _PINNED_WITH_LOCAL_LABEL:
-                # These two are not linked into the delegate. They only have to come from the same
-                # CUDA row, and the local label is the only part of a version that names the row, so
-                # the requirement pins the whole installed version including that label. Comparing
-                # against the public part alone reported a mismatch between a requirement and the
-                # very version it was generated from.
-                expected_version = str(
-                    Version(importlib.metadata.version(distribution))
-                )
             else:
                 # Against the repository's own pin, not just against the environment that produced
                 # the requirement. Taking the expected value from the same environment setup.py read
@@ -202,8 +189,17 @@ def main() -> None:
                 reject(
                     f"{reason} {distribution}=={expected_version}, but the wheel requires {matched}"
                 )
-        # These requirements carry the label naming the build, deliberately: the delegate links one
-        # specific build of each, and without the label the requirement is satisfied by a
+        # The loop checks each of the three it names; a fourth requirement is invisible to it, and an
+        # unlabelled one clears the local-label check below as well.
+        unexpected = sorted(
+            str(requirement)
+            for requirement in requirements
+            if canonicalize_name(requirement.name) not in _LINKED_DISTRIBUTIONS
+        )
+        if unexpected:
+            reject(f"the wheel requires more than the delegate links: {unexpected}")
+        # The three runtimes the delegate links carry the label naming the build, deliberately: it
+        # links one specific build of each, and without the label the requirement is satisfied by a
         # processor-only build or another CUDA build of the same date. They resolve from the CUDA
         # channel this wheel already requires. Everything else stays label-free so it resolves
         # anywhere, and a label appearing there would narrow the wheel for no reason.
