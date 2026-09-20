@@ -113,19 +113,14 @@ the build matrix currently covers `cu130`, `cu132` and `cu134`, on both architec
 release and JetPack builds retain their separate CUDA 12 support.
 
 ## Install
-One command, naming this wheel and the `executorch` extra together. The extra brings a
-CUDA build of ExecuTorch, and Torch-TensorRT brings PyTorch. Swap `cu132` for the CUDA
-version you run:
+One command. The `executorch` extra brings this wheel and a CUDA build of ExecuTorch, and
+Torch-TensorRT brings PyTorch. Swap `cu132` for the CUDA version you run:
 ```bash
 python -m pip install --pre "torch-tensorrt[executorch]" \
-  torch-tensorrt-executorch-runtime \
   --index-url https://download.pytorch.org/whl/nightly/cu132 \
   --extra-index-url https://pypi.org/simple \
   --extra-index-url https://pypi.nvidia.com
 ```
-This wheel is named on the command line rather than reached through the extra, because it is
-published on the nightly channel only. An extra that required it would leave the extra itself
-unresolvable for every released build, which is worse than naming the wheel here.
 All three indexes are needed, and so is `--pre`. Without `--pre` pip takes the stable
 Torch-TensorRT from the public index, which is far older. Without NVIDIA's index the
 inference library resolves to a source distribution, and pip spends around twenty minutes

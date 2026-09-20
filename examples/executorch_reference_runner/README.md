@@ -101,11 +101,9 @@ as `cu134` for CUDA 13.4, keeping PyTorch, ExecuTorch and Torch-TensorRT on the
 same channel:
 
 ```bash
-pip install --pre "torch-tensorrt[executorch]" torch-tensorrt-executorch-runtime \
+pip install --pre "torch-tensorrt[executorch]" \
   --extra-index-url https://download.pytorch.org/whl/nightly/cu130
 ```
-The delegate wheel is named separately because it is published on that channel only, so the
-extra cannot require it without breaking a released install.
 
 The index is required, not optional: the extra's ExecuTorch floor names a dev build, and PyPI's
 `executorch` stops below it, so without the nightly channel pip reports no matching distribution.
