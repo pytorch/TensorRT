@@ -209,7 +209,10 @@ bool parse_metadata_json(const std::string& json, TensorRTBlobHeader& out) {
   out.hardware_compatible = false;
   out.device_id = 0;
 
-  const std::size_t bindings_pos = json.find("\"io_bindings\"");
+  // The same depth rule as the other three keys. A raw search here was the last one left, and it has
+  // the same failure: a nested "io_bindings" inside an unrelated key would be walked instead of the
+  // object's own list, so the bindings would come from whatever that key held.
+  const std::size_t bindings_pos = find_top_level_key(json, "\"io_bindings\"");
   if (bindings_pos == std::string::npos) {
     return false;
   }

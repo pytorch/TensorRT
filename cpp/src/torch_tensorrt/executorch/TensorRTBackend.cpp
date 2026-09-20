@@ -762,11 +762,9 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     if (input_device >= 0) {
       ET_LOG(
           Error,
-          "TensorRTBackend::execute: input '%s' is on CUDA device %d but this engine runs on device "
-          "%d. Move the input to the engine's device, or load the program on the device the input is "
-          "already on. The program itself is fine. Two cards being able to reach each other is not "
-          "enough, because the mapping has to be turned on for the pair and nothing here turns it "
-          "on, so a buffer left on the other card faults rather than being read.",
+          "TensorRTBackend::execute: input '%s' is on CUDA device %d, this engine on %d. Move it, or "
+          "load the program on that device. Cards able to reach each other is not enough: the "
+          "mapping must be on, and nothing here turns it on.",
           name.c_str(),
           input_device,
           engine->device_id);
@@ -812,11 +810,8 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       if (!device_resident) {
         ET_LOG(
             Error,
-            "TensorRTBackend::execute: aliased input '%s' must be reachable by the engine without "
-            "staging (non-empty, and either CUDA-accessible or plain host memory on a device that "
-            "reads pageable host memory through the host page tables); its caller-owned in-place "
-            "update cannot be staged "
-            "through host scratch",
+            "TensorRTBackend::execute: aliased input '%s' must be reachable from the engine's device %d, "
+            "but is on %d. Move it, or load the program on that device",
             name.c_str());
         return Error::InvalidArgument;
       }
@@ -1067,13 +1062,9 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   if (!ctx->enqueueV3(stream)) {
     ET_LOG(
         Error,
-        "TensorRTBackend::execute: enqueueV3 failed. The usual cause is an output with no address: "
-        "a program built without runtime-allocated outputs needs the caller to supply each output "
-        "buffer through set_output_data_ptr before running, and TensorRT reports that as a parameter "
-        "check rather than as a missing address. Failing that, check that the selected "
-        "CallerStreamGuard stream belongs to the TensorRT engine's device, and note that "
-        "cudaStreamPerThread is invalid while a CUDA green context is current, so a green context "
-        "needs a guard scoped with one of its own streams.");
+        "TensorRTBackend::execute: enqueueV3 failed. Likely an output with no address: supply each "
+        "with set_output_data_ptr. Else the guard's stream is on another device, or is the "
+        "per-thread stream inside a green context, which is invalid there.");
     return Error::InvalidState;
   }
 
