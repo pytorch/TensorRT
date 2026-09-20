@@ -248,7 +248,11 @@ ${sibling_versions}"
                 sed "s/@@*${worst}//" | sort -u | head -3 | tr '\n' ' ')
             fail "${target} requires ${worst}, which ${manylinux_tag} does not allow (auditwheel 6.8.2).
 Symbols needing it: ${culprits:-unknown}.
-All disallowed: $(printf '%s' "${disallowed}" | grep '[^[:space:]]' | sort -t_ -k2 -V | tr '\n' ' ')"
+All disallowed: $(printf '%s' "${disallowed}" | grep '[^[:space:]]' | sort -t_ -k2 -V | tr '\n' ' ')
+This is the compiler, not the code: a newer C++ runtime stamps a version the wheel tag promises not to
+need, so a user on an older system would fail to load it. Build in the release container, whose
+toolchain is old enough, or with an older compiler here. There is no override, because a wheel that
+skips this check breaks at load time instead of at build time."
         fi
     else
         # Without a platform tag, retain the conservative named-node comparison only.
