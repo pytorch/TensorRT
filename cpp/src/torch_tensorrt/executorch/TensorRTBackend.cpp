@@ -766,8 +766,8 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       if (!device_resident) {
         ET_LOG(
             Error,
-            "TensorRTBackend::execute: aliased input '%s' must be reachable from the engine's device %d, "
-            "but is on %d. Move it, or load the program on that device",
+            "TensorRTBackend::execute: aliased input '%s' must be device-reachable without staging, "
+            "because its caller-owned in-place update cannot go through host scratch",
             name.c_str());
         return Error::InvalidArgument;
       }
