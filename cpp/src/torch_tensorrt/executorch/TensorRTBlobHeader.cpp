@@ -129,9 +129,7 @@ bool parse_int_after_key(const std::string& json, std::size_t search_from, const
     neg = true;
     ++pos;
   }
-  // The digits come from the program file. Accumulating them in an int overflows, which is
-  // undefined behaviour and hands back a small plausible number instead of a refusal, so the
-  // running value is kept in 64 bits and any run of digits that leaves the int range is rejected.
+  // Digits come from the file, so accumulate wide and refuse what will not fit.
   constexpr int64_t MAX_MAGNITUDE = -static_cast<int64_t>(std::numeric_limits<int>::min());
   int64_t parsed = 0;
   bool saw_digit = false;
@@ -154,17 +152,8 @@ bool parse_int_after_key(const std::string& json, std::size_t search_from, const
   return true;
 }
 
-// Finds a metadata key anywhere in the object except inside the two arrays that hold caller-chosen
-// tensor names, io_bindings and aliased_io, so a model input named "device_id" is not read as the
-// key. Searching only past io_bindings instead, which is what this replaces, made the reader depend
-// on key order: JSON does not order keys, sorting them is one word in any writer, and a blob whose
-// keys sorted came back with no aliases and device 0 while parsing clean.
+// A key of the outermost object, so a tensor named after a key is not mistaken for it.
 std::size_t find_top_level_key(const std::string& json, const char* key) {
-  // Only a key of the outermost object counts. Searching the whole document and excluding the ranges
-  // the arrays occupy was tried and is not sound: the ranges are computed while walking, so any other
-  // key shifts what they cover, and a real program asking for device 9 was read as asking for device 0
-  // because of one extra key. Depth answers it directly, since every array here is nested inside the
-  // object, and a key inside one is never at depth one.
   const std::size_t key_len = std::strlen(key);
   int depth = 0;
   bool in_string = false;
@@ -209,9 +198,6 @@ bool parse_metadata_json(const std::string& json, TensorRTBlobHeader& out) {
   out.hardware_compatible = false;
   out.device_id = 0;
 
-  // The same depth rule as the other three keys. A raw search here was the last one left, and it has
-  // the same failure: a nested "io_bindings" inside an unrelated key would be walked instead of the
-  // object's own list, so the bindings would come from whatever that key held.
   const std::size_t bindings_pos = find_top_level_key(json, "\"io_bindings\"");
   if (bindings_pos == std::string::npos) {
     return false;
@@ -427,9 +413,7 @@ bool TensorRTBlobHeader::parse(const void* data, std::size_t size, TensorRTBlobH
   if (out.engine_offset % ENGINE_ALIGNMENT != 0) {
     return false;
   }
-  // Compared against the space that is left, not by adding first. These sizes come from the file
-  // and are 64 bit, so a large one makes offset plus size wrap and slip past a check written that
-  // way, and the reader would then walk far past the end of the blob.
+  // Against the space left, not offset plus size, which wraps on a 64 bit size.
   if (out.metadata_offset > size || out.metadata_size > size - out.metadata_offset) {
     return false;
   }

@@ -79,11 +79,7 @@ void TRTLogger::log(Severity severity, const char* msg) noexcept {
 
 EngineHandle::~EngineHandle() {
   cudaSetDevice(device_id);
-  // Nothing is waited for here on purpose. execute() waits on its own stream before returning, and
-  // the guard inside it waits on every early exit from the point work is first submitted, so this
-  // handle owns no running work by now. A device-wide wait would not be free either: it blocks on
-  // unrelated work in the same context, so destroying one program was measured holding another one
-  // up for a full second.
+  // No wait here: execute already waited, and a device-wide one blocks unrelated work.
   for (void* p : cached_input_ptrs) {
     if (p != nullptr) {
       cudaFree(p);
@@ -113,10 +109,7 @@ nvinfer1::IRuntime* shared_runtime() {
   static TRTLogger* logger = nullptr;
   static nvinfer1::IRuntime* runtime = nullptr;
   const std::lock_guard<std::mutex> lock(mutex);
-  // Retried while it is null, rather than initialised once. A function-local static that captures a
-  // failed call keeps the failure for the life of the process, so one bad moment, a transient
-  // allocation failure or a driver not ready yet, would disable the backend permanently. Once a
-  // runtime exists it is kept forever, which is what the paragraph above requires.
+  // Retried while null, so one transient failure does not disable the backend for the process.
   if (runtime == nullptr) {
     if (logger == nullptr) {
       logger = new TRTLogger();
@@ -126,10 +119,7 @@ nvinfer1::IRuntime* shared_runtime() {
   return runtime;
 }
 
-// Drains the stream when execute() leaves early with a copy still in flight. The staging buffers
-// belong to the handle and outlive the call, so a caller that retries after a failure, on another
-// stream, can have the failed call's copy land in the same buffer with nothing ordering the two.
-// The successful paths disarm this: one drains already and the other hands the work to the handle.
+// Drains on an early exit, so a retry cannot land in a staging buffer still being written.
 class StreamDrainOnEarlyReturn {
  public:
   explicit StreamDrainOnEarlyReturn(cudaStream_t stream) : stream_(stream) {}
@@ -201,11 +191,7 @@ Error initialize_engine_io(EngineHandle& handle) {
   handle.num_inputs = handle.input_binding_names.size();
   handle.num_outputs = handle.output_binding_names.size();
 
-  // Against the engine's own count, because the two come from different places and a metadata
-  // list that lost an entry still parses. One damaged character in a binding's "name" key is
-  // enough: the reader skips the key it does not recognise, drops that binding, and the engine is
-  // then driven with fewer than it has. That surfaced later at the first missing address, with a
-  // message about supplying output buffers, which sends the reader to the wrong component.
+  // Against the engine's own count, since a metadata list that lost an entry still parses.
   const int32_t engine_io_count = handle.engine->getNbIOTensors();
   const size_t named_io_count = handle.num_inputs + handle.num_outputs;
   if (engine_io_count < 0 || named_io_count != static_cast<size_t>(engine_io_count)) {
@@ -264,21 +250,13 @@ bool is_cuda_accessible_ptr(const void* ptr) {
   return attrs.type == cudaMemoryTypeDevice || attrs.type == cudaMemoryTypeManaged;
 }
 
-// The device a pointer is pinned to, or -1 when it is pinned to none. Three kinds carry no
-// constraint and so are not reported: host memory, which the caller stages or the device reads
-// directly; managed memory, which is reachable from every device in the context, measured working
-// from device 0 while reporting device 1; and a plain allocation on a peer the engine's device can
-// reach. The last is deliberately permissive: "can access" is not "access enabled", but refusing a
-// case that works costs a user a working program, where allowing one that does not leaves TensorRT
-// to say so itself.
+// The device a pointer is tied to, or -1 for host, managed, and this engine's own.
 int cuda_foreign_device_of_ptr(const void* ptr, int engine_device) {
   if (ptr == nullptr) {
     return -1;
   }
   cudaPointerAttributes attrs{};
-  // A pointer this runtime cannot describe is let through. Ordinary host memory answers with an
-  // unregistered type on a current runtime, but an older one reports an outright failure for it, and
-  // refusing on that would reject the host buffers the staging path is built around.
+  // Let through: an older runtime reports plain host memory as an outright failure.
   if (cudaPointerGetAttributes(&attrs, ptr) != cudaSuccess) {
     cudaGetLastError();
     return -1;
@@ -286,11 +264,7 @@ int cuda_foreign_device_of_ptr(const void* ptr, int engine_device) {
   if (attrs.type != cudaMemoryTypeDevice || attrs.device == engine_device) {
     return -1;
   }
-  // Device memory on another device, and that is refused whatever the two cards could do for each
-  // other. Asking whether they CAN reach each other was tried and is the wrong question: the answer
-  // is yes on every pair of cards measured, while peer access still has to be turned on for a
-  // particular pair and nothing here turns it on, so permitting the pointer let the engine read an
-  // address it cannot actually dereference.
+  // Refused whatever the cards could do for each other: reaching needs a mapping nobody enables.
   return attrs.device;
 }
 
@@ -304,10 +278,7 @@ bool TensorRTBackend::is_available() const {
     return false;
   }
 
-  // The shared one, not a second runtime with its own logger. Building it is the check: there is no
-  // cheaper question whose answer means this backend can actually run. So a process that asks and
-  // then loads nothing still carries one runtime and one logger for its lifetime, which is the price
-  // of the answer being true rather than hopeful.
+  // Building it is the check, so a process that asks and loads nothing still carries one.
   return shared_runtime() != nullptr;
 }
 
@@ -358,12 +329,7 @@ Result<DelegateHandle*> TensorRTBackend::init(
     return Error::InvalidProgram;
   }
 
-  // Whether this device can read pageable host memory, which is the question the three uses of this
-  // flag actually ask before handing a caller's pointer to TensorRT without a copy. Being an
-  // integrated part is a different question, and the answers differ on real devices: an H100 reports
-  // integrated 0 with pageable access 1, so asking the wrong one gave up a copy-free path there, and
-  // an integrated part is not obliged to report pageable access, where the wrong one would have bound
-  // ordinary host memory in as though the device could reach it.
+  // Whether this device can read pageable host memory at a useful speed.
   int pageable_access = 0;
   cuda_err = cudaDeviceGetAttribute(&pageable_access, cudaDevAttrPageableMemoryAccess, handle->device_id);
   if (cuda_err != cudaSuccess) {
@@ -372,12 +338,7 @@ Result<DelegateHandle*> TensorRTBackend::init(
         "TensorRTBackend::init: cudaDeviceGetAttribute(cudaDevAttrPageableMemoryAccess) failed: %s",
         cudaGetErrorString(cuda_err));
   }
-  // Both attributes, because "can reach it" and "can reach it without paying for every page" are
-  // different questions. A discrete card answers yes to the first and no to the second: it serves
-  // pageable memory by faulting pages in one at a time, so binding the caller's buffer straight
-  // through made an inference loop that rewrites its input 33 times slower than staging one bulk
-  // copy, measured on an H100 at 138 ms against 4 ms. Only a device that shares host page tables
-  // gets the buffer bound directly.
+  // Both, because reachable and reachable-without-per-page-faults are different questions.
   int pageable_via_page_tables = 0;
   cuda_err = cudaDeviceGetAttribute(
       &pageable_via_page_tables, cudaDevAttrPageableMemoryAccessUsesHostPageTables, handle->device_id);
@@ -390,12 +351,7 @@ Result<DelegateHandle*> TensorRTBackend::init(
   }
   handle->pageable_host_access = pageable_access != 0 && pageable_via_page_tables != 0;
 
-  // One runtime for the process, not one per program. TensorRT documents a runtime as sharable
-  // across threads for nonmodifying use, and creating a second one logs that the logger passed in
-  // differs from one already registered and is ignored, so a per-program runtime bought nothing and
-  // produced that warning on every load after the first. No lock around the deserialize below:
-  // TensorRT lists deserializing an engine from a runtime as thread safe. What it does require
-  // serializing is the modifying setters, and this backend calls none of them.
+  // One per process: TensorRT wants one runtime outliving every engine from it.
   nvinfer1::IRuntime* runtime = shared_runtime();
   TORCHTRT_ET_CHECK_NOT_NULL(
       runtime, Error::InvalidProgram, "TensorRTBackend::init: failed to create TensorRT runtime");
@@ -942,10 +898,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
         continue;
       }
       void* dst = et_alias_out.mutable_data_ptr();
-      // Bytes to write and nowhere to write them, which is a program built for caller-supplied
-      // outputs whose caller did not supply this one. The plain output path already refuses that
-      // through TensorRT; skipping it here instead would return success while the engine's in-place
-      // update went nowhere, which is the one outcome worse than an error.
+      // Bytes to write and no address: refuse, or the engine's update goes nowhere silently.
       if (dst == nullptr) {
         ET_LOG(
             Error,
@@ -974,10 +927,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     }
 
     exec_aten::Tensor et_out = arg->toTensor();
-    // Same question as for the inputs, and it has to be asked separately, because an output is a
-    // buffer the caller hands over rather than one the engine allocated. Handing over one on the
-    // wrong GPU used to be accepted and then written to, which is an illegal access that leaves the
-    // process's CUDA context unusable rather than returning an error anyone can act on.
+    // Asked separately, because an output address comes from the caller rather than the engine.
     const int output_device = cuda_foreign_device_of_ptr(et_out.const_data_ptr(), engine->device_id);
     if (output_device >= 0) {
       ET_LOG(
@@ -1054,10 +1004,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // ------------------------------------------------------------------
   // 4. Enqueue inference on the current CUDA stream
   // ------------------------------------------------------------------
-  // Armed before the launch, not after. Until now only the async copies armed it, so a program with
-  // device-resident boundaries and no staging reached here unarmed, and a launch that fails partway
-  // would then return with whatever it did submit still running. Arming first costs one wait on a
-  // path that is already failing, and makes the destructor's claim of no running work true.
+  // Armed before the launch, so a partial launch still drains what it submitted.
   drain_on_early_return.arm();
   if (!ctx->enqueueV3(stream)) {
     ET_LOG(
@@ -1076,8 +1023,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     if (cuda_err != cudaSuccess) {
       ET_LOG(
           Error, "TensorRTBackend::execute: aliased-output reflect D2D copy failed: %s", cudaGetErrorString(cuda_err));
-      // The engine work is already on `stream`, so drain before returning rather than leaving a
-      // later run or the destructor to reconfigure the context underneath it.
+      // Drain first: the engine work is on this stream and the buffers outlive the call.
       (void)cudaStreamSynchronize(stream);
       return Error::InvalidProgram;
     }
@@ -1108,10 +1054,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
           output_index,
           output_name,
           cudaGetErrorString(cuda_err));
-      // The enqueue already succeeded, so the engine is still running on the
-      // stream. Drain below before returning, or the next call mutates a live
-      // execution context, which TensorRT forbids.
-      // Not InvalidProgram: the program is fine and runs correctly once the buffer is supplied.
+      // The engine is still running on the stream, so drain before returning.
       copy_err = Error::InvalidArgument;
       break;
     }
