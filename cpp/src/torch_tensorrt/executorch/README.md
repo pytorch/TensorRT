@@ -268,8 +268,9 @@ the removed `CudaStreamGuard`:
   memory and does so through shared host page tables. A discrete card reports the first
   and not the second, because it serves pageable memory by faulting pages in one at a
   time, which measured 33 times slower than one bulk copy on a loop that rewrites its
-  input each call. So only integrated parts get the direct bind. Either way that
+  input each call. Either way that
   configuration returns with the work already finished, because the backend always
+  waits.
   waits. CI separately asserts that the runner resolves one shared
   `libextension_cuda.so`.
 - CUDA green-context streams work, and are the case this shared primitive exists

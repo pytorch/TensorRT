@@ -6,7 +6,6 @@
 import ast
 import importlib.util
 import inspect
-import os
 import sys
 import types
 import warnings
@@ -584,43 +583,6 @@ def test_the_forwarder_returns_the_shape_the_published_api_returned() -> None:
         assert member in compat, f"the compatibility loader lost {member}"
 
 
-@pytest.mark.parametrize(
-    "search_path,expected",
-    [
-        (None, "loader could not find it, not that it is incompatible"),
-        ("/opt/cuda/lib64:", "empty entry"),
-        (":", "empty entry"),
-        ("/opt/cuda/lib64", "loader could not find it, not that it is incompatible"),
-    ],
-)
-@pytest.mark.unit
-def test_a_library_the_loader_cannot_find_is_not_reported_as_an_abi_mismatch(
-    search_path, expected
-) -> None:
-    """A library the loader could not find is a different problem from one it could not use.
-
-    Only the second is an ABI mismatch. A correct installation failed to import from some working
-    directories and not others, because an empty entry in the search path is read as the working
-    directory and stops this package's own origin-relative entries resolving. Blaming the ABI sent
-    the reader to rebuild a stack that already matched.
-    """
-    source = (
-        ROOT
-        / "py/torch-tensorrt-executorch-runtime"
-        / "torch_tensorrt_executorch_runtime/__init__.py"
-    ).read_text(encoding="utf-8")
-    assert "cannot open shared object file" in source, source[:200]
-    assert "LD_LIBRARY_PATH" in source, "the empty entry trap is not mentioned"
-    # The classification the source performs, applied to the text the loader really produces.
-    text = (
-        "libexecutorch_extension_cuda.so: cannot open shared object file: No such file"
-    )
-    missing = "cannot open shared object file" in text
-    empty = search_path is not None and "" in search_path.split(os.pathsep)
-    assert missing, "this case is meant to be a not-found error"
-    assert empty == (expected == "empty entry"), (search_path, empty)
-
-
 @pytest.mark.unit
 def test_the_forwarder_says_which_side_is_too_old() -> None:
     """The loader this forwards to belongs to the main wheel and is new in this change.
@@ -651,7 +613,9 @@ def test_the_forwarder_says_which_side_is_too_old() -> None:
         )
     ]
     assert guarded, "the forward into the main wheel is not guarded"
-    assert "older than the one this package was built against" in source, source[-600:]
+    # From the parsed handler, not the whole file: a comment satisfies a source-wide search.
+    handled = "\n".join(ast.unparse(h) for node in guarded for h in node.handlers)
+    assert "older than the one this package was built against" in handled, handled
 
 
 @pytest.mark.parametrize(

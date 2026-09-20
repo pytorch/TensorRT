@@ -37,11 +37,13 @@ redistribute, so it can be turned off:
 
 ```cmake
 set(EXECUTORCH_BACKEND_TENSORRT_EMBED_RUNPATH OFF)
+set(CMAKE_SKIP_BUILD_RPATH ON)
 find_package(executorch_backend_tensorrt REQUIRED)
 ```
 
-Set it before `find_package`, and ship the delegate yourself, or point a library
-path at it at run time.
+Set both before `find_package`. The second is needed because CMake records the
+wheel's directory on its own when you link an imported library. Then ship the
+delegate yourself, or point a library path at it at run time.
 For device-resident exports with `alloc_graph_output=False`, C++ Module callers
 must provide a CUDA output tensor with `Module::set_output` before execution.
 Python callers cannot, so that arrangement is C++ only.

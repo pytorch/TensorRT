@@ -807,6 +807,44 @@ def test_an_unloadable_executorch_is_not_reported_as_absent(
     ), f"for {message!r} the diagnosis was: {raised.value}"
 
 
+@pytest.mark.parametrize(
+    "search_path,expected",
+    [
+        (None, "could not find it, not that it is incompatible"),
+        ("/opt/cuda/lib64:", "empty entry"),
+        (":", "empty entry"),
+        ("/opt/cuda/lib64", "could not find it, not that it is incompatible"),
+    ],
+)
+def test_a_library_the_loader_cannot_find_is_not_reported_as_an_abi_mismatch(
+    monkeypatch, search_path, expected
+):
+    # An empty entry in the search path is read as the working directory and stops this package's
+    # own origin-relative entries resolving, so a correct install fails from some directories only.
+    delegate = load_delegate_module()
+
+    class Boom:
+        def find_spec(self, name, path=None, target=None):
+            if name.startswith("executorch"):
+                raise ImportError(
+                    "libexecutorch_extension_cuda.so: cannot open shared object file: "
+                    "No such file or directory"
+                )
+            return None
+
+    for name in [n for n in sys.modules if n.startswith("executorch")]:
+        monkeypatch.delitem(sys.modules, name, raising=False)
+    monkeypatch.setattr(sys, "meta_path", [Boom(), *sys.meta_path])
+    if search_path is None:
+        monkeypatch.delenv("LD_LIBRARY_PATH", raising=False)
+    else:
+        monkeypatch.setenv("LD_LIBRARY_PATH", search_path)
+
+    with pytest.raises(delegate.DelegateCompatibilityError) as raised:
+        delegate.register()
+    assert expected in str(raised.value), raised.value
+
+
 def _documented_path_recipes() -> list[tuple[str, bool, str]]:
     """Every documented command that imports this package only to print a path.
 

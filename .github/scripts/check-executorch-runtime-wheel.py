@@ -171,6 +171,10 @@ def main() -> None:
                 # TensorRT or CUDA runtime validated clean.
                 installed = Version(importlib.metadata.version(distribution))
                 pin = pins[_REPOSITORY_PIN[distribution]]
+                if distribution == "nvidia-cuda-runtime":
+                    # The build row picks the minor, and the file pin names only one row, so
+                    # compare what the builder itself requires: the CUDA major.
+                    pin = pin.split(".")[0]
                 if (
                     installed.release[: len(Version(pin).release)]
                     != Version(pin).release

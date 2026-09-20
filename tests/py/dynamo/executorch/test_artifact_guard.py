@@ -421,7 +421,6 @@ def native_tools():
     return tools
 
 
-@pytest.mark.unit
 def _unquote(text: str) -> str:
     """Strip one matching pair of quotes, the way a TOML string is delimited."""
     for quote in ('"', "'"):
@@ -1017,28 +1016,6 @@ def _assert_one_shared_runtime(source: str, header: str) -> None:
     assert "IRuntime> runtime;" not in _code_only(
         header
     ), "the handle still owns a runtime"
-
-
-def _assert_device_checks(source: str) -> None:
-    code = _code_only(source)
-    assert (
-        "int cuda_foreign_device_of_ptr(" in code
-    ), "the helper that answers the question is gone"
-    assert (
-        "const int input_device = cuda_foreign_device_of_ptr(" in code
-    ), "an input is no longer checked against the engine's device"
-    assert (
-        "const int output_device = cuda_foreign_device_of_ptr(" in code
-    ), "a caller-supplied output is no longer checked"
-    # Managed memory and a reachable peer must stay exempt, or the check refuses memory that
-    # works, which was measured and is worse than not checking at all.
-    # Asserted absent, not present. Permitting a buffer because two cards COULD reach each other
-    # let the engine read an address it cannot dereference, since peer access still has to be
-    # turned on for a pair and nothing here turns it on.
-    assert (
-        "cudaDeviceCanAccessPeer" not in code
-    ), "the capability check is back, and capability is not access"
-    assert "cudaMemoryTypeDevice" in code, "the managed-memory exemption is gone"
 
 
 @pytest.mark.parametrize(

@@ -31,7 +31,7 @@ except ImportError:  # pragma: no cover
     lift = None
 
 _needs_exporter = pytest.mark.skipif(
-    _resolve_lifted_custom_obj is None,
+    importlib.util.find_spec("torch_tensorrt") is None,
     reason="needs Torch-TensorRT installed for its exporter internals",
 )
 _needs_torch_tensorrt = pytest.mark.skipif(
