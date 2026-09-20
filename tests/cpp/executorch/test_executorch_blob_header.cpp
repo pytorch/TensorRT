@@ -106,6 +106,24 @@ TEST(ExecuTorchTensorRTBlobHeader, RejectsASizeThatWouldWrapWhenAddedToItsOffset
   EXPECT_FALSE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
 }
 
+TEST(ExecuTorchTensorRTBlobHeader, ReadsTheDeviceTheProgramAsksForWhateverElseIsInTheMetadata) {
+  // A real program asking for device 9 was read as asking for device 0. The reader searched the whole
+  // document for the key and excluded the ranges the arrays occupied, but those ranges are computed
+  // while walking, so one unrelated key shifted what they covered and the search matched inside it.
+  auto blob = make_blob(R"({"io_bindings":[{"name":"x","is_input":true}],"unrelated":{"device_id":0},)"
+                        R"("device_id":9,"hardware_compatible":false})");
+  TensorRTBlobHeader header;
+  ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
+  EXPECT_EQ(header.device_id, 9);
+
+  // A tensor may legitimately carry the same name as a key, and the key is still the object's own.
+  auto named = make_blob(R"({"io_bindings":[{"name":"device_id","is_input":true}],"device_id":7,)"
+                         R"("hardware_compatible":false})");
+  TensorRTBlobHeader named_header;
+  ASSERT_TRUE(TensorRTBlobHeader::parse(named.data(), named.size(), named_header));
+  EXPECT_EQ(named_header.device_id, 7);
+}
+
 TEST(ExecuTorchTensorRTBlobHeader, RejectsInvalidMagic) {
   auto blob = make_blob(R"({"io_bindings":[]})");
   blob[0] = 'X';

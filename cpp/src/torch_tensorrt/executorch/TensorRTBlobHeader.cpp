@@ -5,6 +5,7 @@
 
 #include "torch_tensorrt/executorch/TensorRTBlobHeader.h"
 
+#include <cctype>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -158,18 +159,44 @@ bool parse_int_after_key(const std::string& json, std::size_t search_from, const
 // key. Searching only past io_bindings instead, which is what this replaces, made the reader depend
 // on key order: JSON does not order keys, sorting them is one word in any writer, and a blob whose
 // keys sorted came back with no aliases and device 0 while parsing clean.
-std::size_t find_key_outside(
-    const std::string& json,
-    const char* key,
-    std::size_t skip_begin,
-    std::size_t skip_end,
-    std::size_t alias_begin = std::string::npos,
-    std::size_t alias_end = std::string::npos) {
-  for (std::size_t at = json.find(key); at != std::string::npos; at = json.find(key, at + 1)) {
-    const bool in_bindings = at >= skip_begin && at < skip_end;
-    const bool in_aliases = at >= alias_begin && at < alias_end;
-    if (!in_bindings && !in_aliases) {
-      return at;
+std::size_t find_top_level_key(const std::string& json, const char* key) {
+  // Only a key of the outermost object counts. Searching the whole document and excluding the ranges
+  // the arrays occupy was tried and is not sound: the ranges are computed while walking, so any other
+  // key shifts what they cover, and a real program asking for device 9 was read as asking for device 0
+  // because of one extra key. Depth answers it directly, since every array here is nested inside the
+  // object, and a key inside one is never at depth one.
+  const std::size_t key_len = std::strlen(key);
+  int depth = 0;
+  bool in_string = false;
+  for (std::size_t at = 0; at < json.size(); ++at) {
+    const char c = json[at];
+    if (in_string) {
+      if (c == '\\') {
+        ++at;
+      } else if (c == '"') {
+        in_string = false;
+      }
+      continue;
+    }
+    if (c == '"') {
+      // A name, not a value, and only when it belongs to the outermost object. The colon after it is
+      // what distinguishes the two, since a value is a string in exactly the same shape.
+      if (depth == 1 && json.compare(at, key_len, key) == 0) {
+        std::size_t after = at + key_len;
+        while (after < json.size() && std::isspace(static_cast<unsigned char>(json[after]))) {
+          ++after;
+        }
+        if (after < json.size() && json[after] == ':') {
+          return at;
+        }
+      }
+      in_string = true;
+      continue;
+    }
+    if (c == '{' || c == '[') {
+      ++depth;
+    } else if (c == '}' || c == ']') {
+      --depth;
     }
   }
   return std::string::npos;
@@ -275,15 +302,12 @@ bool parse_metadata_json(const std::string& json, TensorRTBlobHeader& out) {
   // Optional aliased_io array: [{"output":..,"input":..,"kind":..}, ...].
   // Absent in older blobs -> leave empty (backward compatible). Mirrors the
   // io_bindings walk above using the same string helpers.
-  std::size_t alias_begin = std::string::npos;
-  std::size_t alias_end = std::string::npos;
-  const std::size_t alias_key = find_key_outside(json, "\"aliased_io\"", bindings_pos, pos);
+  const std::size_t alias_key = find_top_level_key(json, "\"aliased_io\"");
   if (alias_key != std::string::npos) {
     std::size_t apos = json.find('[', alias_key);
     if (apos == std::string::npos) {
       return false;
     }
-    alias_begin = alias_key;
     ++apos;
     while (true) {
       apos = skip_ws(json, apos);
@@ -353,12 +377,10 @@ bool parse_metadata_json(const std::string& json, TensorRTBlobHeader& out) {
         out.aliased_io.push_back(std::move(ab));
       }
     }
-    alias_end = apos;
   }
 
-  const std::size_t hw_key =
-      find_key_outside(json, "\"hardware_compatible\"", bindings_pos, pos, alias_begin, alias_end);
-  const std::size_t device_key = find_key_outside(json, "\"device_id\"", bindings_pos, pos, alias_begin, alias_end);
+  const std::size_t hw_key = find_top_level_key(json, "\"hardware_compatible\"");
+  const std::size_t device_key = find_top_level_key(json, "\"device_id\"");
   return parse_bool_after_key(json, hw_key, "\"hardware_compatible\"", out.hardware_compatible) &&
       parse_int_after_key(json, device_key, "\"device_id\"", out.device_id);
 }
