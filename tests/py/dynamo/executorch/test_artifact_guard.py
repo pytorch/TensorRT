@@ -986,7 +986,12 @@ def _assert_wrong_device_buffers_are_refused(source: str) -> None:
     ), "a caller-supplied output is no longer checked where it is bound"
     # Managed memory and a reachable peer must stay exempt, or the check refuses memory that
     # works, which was measured and is worse than not checking at all.
-    assert "cudaDeviceCanAccessPeer" in code, "the peer exemption is gone"
+    # Asserted absent, not present. Permitting a buffer because two cards COULD reach each other
+    # let the engine read an address it cannot dereference, since peer access still has to be
+    # turned on for a pair and nothing here turns it on.
+    assert (
+        "cudaDeviceCanAccessPeer" not in code
+    ), "the capability check is back, and capability is not access"
     assert "cudaMemoryTypeDevice" in code, "the managed-memory exemption is gone"
 
 
@@ -1027,7 +1032,12 @@ def _assert_device_checks(source: str) -> None:
     ), "a caller-supplied output is no longer checked"
     # Managed memory and a reachable peer must stay exempt, or the check refuses memory that
     # works, which was measured and is worse than not checking at all.
-    assert "cudaDeviceCanAccessPeer" in code, "the peer exemption is gone"
+    # Asserted absent, not present. Permitting a buffer because two cards COULD reach each other
+    # let the engine read an address it cannot dereference, since peer access still has to be
+    # turned on for a pair and nothing here turns it on.
+    assert (
+        "cudaDeviceCanAccessPeer" not in code
+    ), "the capability check is back, and capability is not access"
     assert "cudaMemoryTypeDevice" in code, "the managed-memory exemption is gone"
 
 

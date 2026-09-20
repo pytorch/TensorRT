@@ -266,15 +266,11 @@ int cuda_foreign_device_of_ptr(const void* ptr, int engine_device) {
   if (attrs.type != cudaMemoryTypeDevice || attrs.device == engine_device) {
     return -1;
   }
-  int peer = 0;
-  // The opposite direction here, on purpose. This is already known to be device memory on another
-  // device, so the only question left is whether that device is reachable, and an unanswered
-  // question is not a yes. Falling through refuses it.
-  if (cudaDeviceCanAccessPeer(&peer, engine_device, attrs.device) != cudaSuccess) {
-    cudaGetLastError();
-  } else if (peer != 0) {
-    return -1;
-  }
+  // Device memory on another device, and that is refused whatever the two cards could do for each
+  // other. Asking whether they CAN reach each other was tried and is the wrong question: the answer
+  // is yes on every pair of cards measured, while peer access still has to be turned on for a
+  // particular pair and nothing here turns it on, so permitting the pointer let the engine read an
+  // address it cannot actually dereference.
   return attrs.device;
 }
 
@@ -748,7 +744,9 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
           Error,
           "TensorRTBackend::execute: input '%s' is on CUDA device %d but this engine runs on device "
           "%d. Move the input to the engine's device, or load the program on the device the input is "
-          "already on. The program itself is fine.",
+          "already on. The program itself is fine. Two cards being able to reach each other is not "
+          "enough, because the mapping has to be turned on for the pair and nothing here turns it "
+          "on, so a buffer left on the other card faults rather than being read.",
           name.c_str(),
           input_device,
           engine->device_id);
