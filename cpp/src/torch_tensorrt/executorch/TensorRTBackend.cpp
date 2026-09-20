@@ -201,6 +201,26 @@ Error initialize_engine_io(EngineHandle& handle) {
   handle.num_inputs = handle.input_binding_names.size();
   handle.num_outputs = handle.output_binding_names.size();
 
+  // Against the engine's own count, because the two come from different places and a metadata
+  // list that lost an entry still parses. One damaged character in a binding's "name" key is
+  // enough: the reader skips the key it does not recognise, drops that binding, and the engine is
+  // then driven with fewer than it has. That surfaced later at the first missing address, with a
+  // message about supplying output buffers, which sends the reader to the wrong component.
+  const int32_t engine_io_count = handle.engine->getNbIOTensors();
+  const size_t named_io_count = handle.num_inputs + handle.num_outputs;
+  if (engine_io_count < 0 || named_io_count != static_cast<size_t>(engine_io_count)) {
+    ET_LOG(
+        Error,
+        "TensorRTBackend::init: the program names %zu bindings (%zu in, %zu out) but the engine "
+        "has %d. The metadata and the engine disagree, so the program is damaged rather than "
+        "merely unsupported.",
+        named_io_count,
+        handle.num_inputs,
+        handle.num_outputs,
+        engine_io_count);
+    return Error::InvalidProgram;
+  }
+
   handle.exec_ctx.reset(handle.engine->createExecutionContext());
   TORCHTRT_ET_CHECK_NOT_NULL(
       handle.exec_ctx, Error::InvalidProgram, "TensorRTBackend::init: failed to create TensorRT execution context");
