@@ -111,25 +111,25 @@ the build matrix currently covers `cu130`, `cu132` and `cu134`, on both architec
 release and JetPack builds retain their separate CUDA 12 support.
 
 ## Install
-
-One command. The `executorch` extra brings this wheel, a CUDA build of ExecuTorch,
-Torch-TensorRT and PyTorch. Swap `cu132` for the CUDA version you run:
-
+One command, naming this wheel and the `executorch` extra together. The extra brings a
+CUDA build of ExecuTorch, and Torch-TensorRT brings PyTorch. Swap `cu132` for the CUDA
+version you run:
 ```bash
 python -m pip install --pre "torch-tensorrt[executorch]" \
+  torch-tensorrt-executorch-runtime \
   --index-url https://download.pytorch.org/whl/nightly/cu132 \
   --extra-index-url https://pypi.org/simple \
   --extra-index-url https://pypi.nvidia.com
 ```
-
-All three indexes are needed, and so is `--pre`. Without `--pre` pip picks the stable
-Torch-TensorRT from the public index, which is far older and does not carry this extra.
-Without NVIDIA's index, the inference library resolves to a source distribution and pip
-spends around twenty minutes trying to build it before failing.
-
-You do not name PyTorch or this wheel yourself. PyTorch arrives as a dependency of
-Torch-TensorRT, and this wheel arrives through the extra. Building it by hand is only
-needed to work on it, and those instructions are below.
+This wheel is named on the command line rather than reached through the extra, because it is
+published on the nightly channel only. An extra that required it would leave the extra itself
+unresolvable for every released build, which is worse than naming the wheel here.
+All three indexes are needed, and so is `--pre`. Without `--pre` pip takes the stable
+Torch-TensorRT from the public index, which is far older. Without NVIDIA's index the
+inference library resolves to a source distribution, and pip spends around twenty minutes
+trying to build it before failing.
+PyTorch you never name: it arrives as a dependency of Torch-TensorRT. Building this wheel
+by hand is only needed to work on it, and those instructions are below.
 
 On a fresh environment that command was measured installing:
 
@@ -142,14 +142,13 @@ On a fresh environment that command was measured installing:
 | tensorrt-cu13-libs | 11.3.0.99 |
 | nvidia-cuda-runtime | 13.4.92 |
 
-ExecuTorch lands on an older date than the rest because this wheel pins the exact build
-it was compiled against. That is deliberate, and the next section says why.
+ExecuTorch lands on an older date than the rest because this wheel pins the exact build it
+was compiled against. That is deliberate, and the next section says why.
 
-A CUDA build of ExecuTorch is required, not only to build against. The delegate
-needs a library that only ExecuTorch's CUDA wheels carry, so a processor-only build
-installs and then fails on import. This wheel pins the exact ExecuTorch build it was
-compiled against, label and all, which is what stops that happening quietly.
-
+A CUDA build of ExecuTorch is required, not only to build against. The delegate needs a
+library that only ExecuTorch's CUDA wheels carry, so a processor-only build installs and
+then fails on import. This wheel pins the exact ExecuTorch build it was compiled against,
+label and all, which is what stops that happening quietly.
 ## Use it from Python
 
 Import the package once, anywhere before you load a program. Importing is what

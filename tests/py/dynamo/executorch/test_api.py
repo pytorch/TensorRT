@@ -2298,13 +2298,11 @@ def test_packaging_declares_executorch_extra():
         assert extra_name in extras_by_name
         requirements = extras_by_name[extra_name]
         assert isinstance(requirements, ast.List)
-        # Both halves: the runtime the delegate plugs into, and the delegate itself. Naming only the
-        # first left a user to find the second by hand, which is the whole point of the extra.
+        # The runtime only. The delegate wheel is published on the nightly channel alone, so requiring
+        # it here would make this extra unresolvable for every released build.
         named = [e.id for e in requirements.elts if isinstance(e, ast.Name)]
-        assert named == [
-            "EXECUTORCH_REQUIREMENT",
-            "EXECUTORCH_RUNTIME_REQUIREMENT",
-        ], named
+        assert named == ["EXECUTORCH_REQUIREMENT"], named
+        assert "executorch-runtime" not in ast.dump(requirements)
 
     setup_call = next(
         node
