@@ -259,8 +259,8 @@ TEST(ExecuTorchTensorRTBlobHeader, RejectsADeviceIdThatDoesNotFitAnInt) {
   // Wrapping it instead yields a small plausible number: 4294967299 came back as device 3, which
   // runs the engine on the wrong card on a machine that has one.
   for (const char* too_large : {"2147483648", "4294967299", "99999999999999999999", "-2147483649"}) {
-    const auto blob = make_blob(
-        R"({"io_bindings":[{"name":"x","is_input":true}],"device_id":)" + std::string(too_large) + "}");
+    const auto blob =
+        make_blob(R"({"io_bindings":[{"name":"x","is_input":true}],"device_id":)" + std::string(too_large) + "}");
 
     TensorRTBlobHeader header;
     EXPECT_FALSE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header)) << "device_id " << too_large;
@@ -269,8 +269,8 @@ TEST(ExecuTorchTensorRTBlobHeader, RejectsADeviceIdThatDoesNotFitAnInt) {
 
 TEST(ExecuTorchTensorRTBlobHeader, ParsesTheEndsOfTheDeviceIdRange) {
   for (const int expected : {0, 7, -1, std::numeric_limits<int>::max(), std::numeric_limits<int>::min()}) {
-    const auto blob = make_blob(
-        R"({"io_bindings":[{"name":"x","is_input":true}],"device_id":)" + std::to_string(expected) + "}");
+    const auto blob =
+        make_blob(R"({"io_bindings":[{"name":"x","is_input":true}],"device_id":)" + std::to_string(expected) + "}");
 
     TensorRTBlobHeader header;
     ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header)) << "device_id " << expected;

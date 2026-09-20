@@ -358,8 +358,7 @@ bool parse_metadata_json(const std::string& json, TensorRTBlobHeader& out) {
 
   const std::size_t hw_key =
       find_key_outside(json, "\"hardware_compatible\"", bindings_pos, pos, alias_begin, alias_end);
-  const std::size_t device_key =
-      find_key_outside(json, "\"device_id\"", bindings_pos, pos, alias_begin, alias_end);
+  const std::size_t device_key = find_key_outside(json, "\"device_id\"", bindings_pos, pos, alias_begin, alias_end);
   return parse_bool_after_key(json, hw_key, "\"hardware_compatible\"", out.hardware_compatible) &&
       parse_int_after_key(json, device_key, "\"device_id\"", out.device_id);
 }
