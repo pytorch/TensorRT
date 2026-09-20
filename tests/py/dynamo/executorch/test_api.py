@@ -2995,9 +2995,15 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
     tensorrt_version = f'{_pin("__tensorrt_version__")}.99'
     cuda_runtime_version = f'{_pin("__cuda_version__")}.131'
 
+    # ExecuTorch belongs here with the others. The checker reads each of these through
+    # importlib.metadata, and the subprocess below runs with this directory ahead of site-packages,
+    # so a synthetic distribution here is the version it sees. Leaving ExecuTorch out made it read
+    # whatever the machine happened to have, which is why this group used to skip everywhere except
+    # an environment matching the pin, and why a change to the checker could reach CI with a green
+    # local run behind it. The label is part of it because the checker compares the whole version.
+    installed_executorch = f"{pin}+cu132"
     dependencies = {
-        "torch": "2.15.0.dev20260824+cu132",
-        "torch-tensorrt": "2.15.0.dev20260824+cu132",
+        "executorch": installed_executorch,
         "tensorrt-cu13": tensorrt_version,
         "nvidia-cuda-runtime": cuda_runtime_version,
     }
@@ -3010,25 +3016,6 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
 
     package = "torch_tensorrt_executorch_runtime/"
     payload = [package + "lib/libexecutorch_backend_tensorrt.so"]
-    # The label naming the CUDA build is part of the ExecuTorch requirement, because the delegate
-    # links one specific build. The checker compares against the installed wheel, so read the same
-    # source it does rather than the label-free pin, or a correct wheel is rejected here.
-    try:
-        installed_executorch = importlib.metadata.version("executorch")
-    except importlib.metadata.PackageNotFoundError:
-        pytest.skip(
-            "ExecuTorch is not installed, so the requirement the checker expects cannot be built"
-        )
-    # Every case needs this, not only the accepting ones, because the ExecuTorch comparison runs
-    # before the others and short-circuits: with a mismatched install, a wheel built to fail some
-    # later check is refused for the ExecuTorch version instead, and the case proves nothing. That
-    # makes this whole group invisible outside an environment matching the pin, which is how a
-    # checker change here reached CI green locally. Install the pinned ExecuTorch to run them.
-    if installed_executorch.split("+")[0] != pin:
-        pytest.skip(
-            f"the installed ExecuTorch is {installed_executorch}, not the pinned {pin}, so this "
-            "cannot say whether the checker accepts a correct wheel"
-        )
     # The three the delegate links. PyTorch and Torch-TensorRT are not required by the wheel any more,
     # so a fixture that lists them is testing a shape the build cannot produce.
     requires = [
@@ -3120,7 +3107,7 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
         # wheel makes it depend on its own parent, which no resolver can satisfy in general, so
         # the checker has to refuse the requirement rather than insist on it.
         requires = [
-            f"executorch=={pin}",
+            f"executorch=={installed_executorch}",
             "torch-tensorrt==2.15.0.dev20260824+cu132",
             f"tensorrt-cu13=={tensorrt_version}",
             f"nvidia-cuda-runtime=={cuda_runtime_version}",
@@ -3129,7 +3116,7 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
         # Same shape: the delegate links no PyTorch, and ExecuTorch leaves that choice to the
         # user, so a wheel pinning one is narrower than anything here justifies.
         requires = [
-            f"executorch=={pin}",
+            f"executorch=={installed_executorch}",
             "torch==2.15.0.dev20260824+cu132",
             f"tensorrt-cu13=={tensorrt_version}",
             f"nvidia-cuda-runtime=={cuda_runtime_version}",
@@ -3138,14 +3125,14 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
         # setup.py derives tensorrt-cu13 the same way it derives executorch, so a wheel that drops
         # it ships with the dependency missing and every content check above still passes.
         requires = [
-            f"executorch=={pin}",
+            f"executorch=={installed_executorch}",
             "nvidia-cuda-runtime==13.2.0",
         ]
     elif case == "requires_an_unpinned_cuda_runtime":
         # A derived requirement loosened to a range no longer binds the wheel to the version it was
         # built beside, which is the whole reason the metadata is read.
         requires = [
-            f"executorch=={pin}",
+            f"executorch=={installed_executorch}",
             f"tensorrt-cu13=={tensorrt_version}",
             "nvidia-cuda-runtime>=13.2.0",
         ]
