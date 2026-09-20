@@ -93,6 +93,15 @@ std::size_t skip_value(const std::string& s, std::size_t pos) {
   return pos;
 }
 
+// A reader that stops short of the delimiter silently accepts a different value, so 3.5 reads as 3.
+bool ends_value(const std::string& json, std::size_t pos) {
+  if (pos >= json.size()) {
+    return true;
+  }
+  const char c = json[pos];
+  return c == ',' || c == '}' || c == ']' || std::isspace(static_cast<unsigned char>(c));
+}
+
 bool parse_bool_after_key(const std::string& json, std::size_t search_from, const char* key, bool& value) {
   const std::size_t key_pos = json.find(key, search_from);
   if (key_pos == std::string::npos) {
@@ -103,11 +112,11 @@ bool parse_bool_after_key(const std::string& json, std::size_t search_from, cons
     return false;
   }
   const std::size_t val = skip_ws(json, colon + 1);
-  if (json.compare(val, 4, "true") == 0) {
+  if (json.compare(val, 4, "true") == 0 && ends_value(json, val + 4)) {
     value = true;
     return true;
   }
-  if (json.compare(val, 5, "false") == 0) {
+  if (json.compare(val, 5, "false") == 0 && ends_value(json, val + 5)) {
     value = false;
     return true;
   }
@@ -142,6 +151,9 @@ bool parse_int_after_key(const std::string& json, std::size_t search_from, const
     ++pos;
   }
   if (!saw_digit) {
+    return false;
+  }
+  if (!ends_value(json, pos)) {
     return false;
   }
   const int64_t signed_value = neg ? -parsed : parsed;

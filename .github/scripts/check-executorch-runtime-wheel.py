@@ -198,17 +198,17 @@ def main() -> None:
                 reject(
                     f"{reason} {distribution}=={expected_version}, but the wheel requires {matched}"
                 )
-        # The three runtimes the delegate links carry the label naming the build, deliberately: it
-        # links one specific build of each, and without the label the requirement is satisfied by a
+        # These requirements carry the label naming the build, deliberately: the delegate links one
+        # specific build of each, and without the label the requirement is satisfied by a
         # processor-only build or another CUDA build of the same date. They resolve from the CUDA
         # channel this wheel already requires. Everything else stays label-free so it resolves
         # anywhere, and a label appearing there would narrow the wheel for no reason.
-        linked = {"executorch", "torch", "torch-tensorrt"}
+        label_allowed = {"executorch", "torch", "torch-tensorrt"}
         labelled = [
             requirement
             for requirement in requirements
             if "+" in str(requirement.specifier)
-            and canonicalize_name(requirement.name) not in linked
+            and canonicalize_name(requirement.name) not in label_allowed
         ]
         if labelled:
             reject(

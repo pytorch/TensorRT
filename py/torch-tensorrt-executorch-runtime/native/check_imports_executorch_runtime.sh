@@ -171,8 +171,9 @@ fi
 # registration, so a build that dropped this export publishes looking fine and then tells every user
 # to reinstall, which cannot help them.
 owns_registration='torch_tensorrt_owns_executorch_registration'
-if ! printf '%s\n' "${syms}" | grep "${owns_registration}" | grep -qvE '[[:space:]]UND(EF)?[[:space:]]'; then
-    fail "${target} does not define ${owns_registration}, so the Python package cannot tell whether this delegate owns its registration"
+if ! printf '%s\n' "${syms}" |
+    grep -qE "(GLOBAL|WEAK)[[:space:]]+DEFAULT[[:space:]]+[0-9]+[[:space:]]+${owns_registration}$"; then
+    fail "${target} does not export ${owns_registration}, so the Python package cannot tell whether this delegate owns its registration"
 fi
 
 if [ "$#" -ge 3 ]; then

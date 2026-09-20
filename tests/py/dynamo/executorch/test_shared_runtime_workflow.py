@@ -257,7 +257,10 @@ _DEVICE_RUN = 'python examples/executorch_reference_runner/load_model_device_res
 
 def _assert_device_commands(tmp_path, workflow, failure=""):
     job = workflow["jobs"]["test"]
-    assert job.get("if", "success()") in ("success()", "${{ success() }}")
+    assert job.get("if", "success()") in (
+        "success()",
+        "${{ success() }}",
+    ), "the device job must not be conditional"
     assert job["uses"] == "./.github/workflows/linux-test.yml"
     script = job["with"]["script"]
     bin_dir = tmp_path / "bin"
@@ -448,7 +451,7 @@ def test_missing_test_wheel_dependency_is_detected(tmp_path, monkeypatch, entryp
 def test_disabled_device_job_is_detected(tmp_path):
     workflow = _workflow("executorch-test-linux.yml")
     workflow["jobs"]["test"]["if"] = "${{ false }}"
-    with pytest.raises(AssertionError):
+    with pytest.raises(AssertionError, match="must not be conditional"):
         _assert_device_commands(tmp_path, workflow)
 
 

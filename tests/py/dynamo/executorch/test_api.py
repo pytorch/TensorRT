@@ -481,6 +481,7 @@ def test_the_delegate_follows_the_main_wheels_cuda_versions():
         [
             sys.executable,
             str(_REPO_ROOT / ".github/scripts/filter-matrix.py"),
+            "--executorch-runtime",
             "--matrix",
             json.dumps(matrix),
             "--use-rtx",
@@ -501,6 +502,43 @@ def test_the_delegate_follows_the_main_wheels_cuda_versions():
         "linux": _executorch_cuda_rows(),
         "linux-aarch64": _executorch_cuda_rows(),
     }
+
+
+@pytest.mark.unit
+def test_the_delegate_flag_drops_a_cuda_12_row_the_ordinary_filter_keeps(capsys):
+    """Measure the CUDA 13 gate where it is the only thing that can drop the row.
+
+    Both row lists are CUDA 13 only, so the ordinary filter already drops every CUDA 12 row and a
+    test that runs the script as a subprocess cannot tell the gate from that: deleting the gate
+    leaves it green. Widening the lists in process leaves the gate standing alone.
+    """
+    spec = importlib.util.spec_from_file_location("filter_matrix", _FILTER_MATRIX_PY)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    module.x86_cuda_versions = ["cu126", "cu134"]
+    module.arm_cuda_versions = ["cu126", "cu134"]
+    matrix = json.dumps(
+        {
+            "include": [
+                {
+                    "python_version": "3.12",
+                    "desired_cuda": cuda,
+                    "gpu_arch_type": "cuda",
+                }
+                for cuda in ("cu126", "cu134")
+            ]
+        }
+    )
+
+    def kept(*extra: str) -> set[str]:
+        module.main(["--matrix", matrix, *extra])
+        return {
+            row["desired_cuda"]
+            for row in json.loads(capsys.readouterr().out)["include"]
+        }
+
+    assert kept() == {"cu126", "cu134"}
+    assert kept("--executorch-runtime") == {"cu134"}
 
 
 @pytest.mark.parametrize(
@@ -1395,6 +1433,7 @@ def _assert_the_checker_is_reachable(prologue: str) -> None:
         # The Python package cannot import without this export, so a build that drops it
         # must not reach an index.
         ("no_ownership_query", False),
+        ("local_ownership_query", False),
         ("no_runpath", False),
         ("wrong_depth_runpath", False),
         ("dt_rpath", False),
@@ -1521,11 +1560,12 @@ def test_the_guard_actually_rejects_a_bad_artifact(tmp_path, case, expect_pass):
     syms = "" if case == "no_register_backend" else f"  1: {undefined} {mangled}\n"
     if case == "defines_register_backend":
         syms = f"  1: 000123 FUNC GLOBAL DEFAULT 12 {mangled}\n"
-    # The ownership query the Python package asks for. A well-formed delegate defines it, so it
-    # carries a section index rather than UND.
+    # ctypes resolves this through the dynamic symbol table, so a definition the linker kept local
+    # is as useless to the Python package as no definition at all.
     if case != "no_ownership_query":
+        binding = "LOCAL" if case == "local_ownership_query" else "GLOBAL"
         syms += (
-            "  2: 000456    31 FUNC GLOBAL DEFAULT 12 "
+            f"  2: 000456    31 FUNC {binding} DEFAULT 12 "
             "torch_tensorrt_owns_executorch_registration\n"
         )
     # What the runtime's own symbol table says. A defined export carries a section index; the
@@ -1686,7 +1726,8 @@ def test_the_guard_actually_rejects_a_bad_artifact(tmp_path, case, expect_pass):
         "no_pybindings_extension": "could not find the pybindings extension",
         "no_register_backend": "does not reference register_backend at all",
         "defines_register_backend": "defines register_backend instead of importing it",
-        "no_ownership_query": "does not define torch_tensorrt_owns_executorch_registration",
+        "no_ownership_query": "does not export torch_tensorrt_owns_executorch_registration",
+        "local_ownership_query": "does not export torch_tensorrt_owns_executorch_registration",
         "runtime_only_imports_register_backend": "does not export",
         "runtime_exports_a_near_miss": "does not export",
         "dt_rpath": "carries DT_RPATH rather than DT_RUNPATH",

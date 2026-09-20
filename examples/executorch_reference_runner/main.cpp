@@ -232,13 +232,19 @@ int main(int argc, char** argv) {
     }
   }
   const char* model_path = get_flag(argc, argv, "--model_path", "model.pte");
-  const int num_runs = atoi(get_flag(argc, argv, "--num_runs", "1"));
   // Zero would skip the loop and then print the output buffer as if it held a result, which is
-  // whatever was there before. Refuse instead, because a run count of zero has no meaning here.
-  if (num_runs < 1) {
-    ET_LOG(Error, "--num_runs must be at least 1, got %d", num_runs);
+  // whatever was there before, and atoi answers zero for anything it cannot parse. Parse strictly
+  // so a typo cannot pick a run count the caller never asked for.
+  const char* const num_runs_arg = get_flag(argc, argv, "--num_runs", "1");
+  char* num_runs_end = nullptr;
+  errno = 0;
+  const long num_runs_parsed = strtol(num_runs_arg, &num_runs_end, 10);
+  if (errno != 0 || num_runs_end == num_runs_arg || *num_runs_end != '\0' || num_runs_parsed < 1 ||
+      num_runs_parsed > INT_MAX) {
+    ET_LOG(Error, "--num_runs must be a whole number of at least 1, got %s", num_runs_arg);
     return 2;
   }
+  const int num_runs = static_cast<int>(num_runs_parsed);
   const char* const green_context_arg = get_flag(argc, argv, "--green_context_sms", "0");
   // atoi answers 0 for anything it cannot parse, and 0 means no green context, so a typo or a
   // negative number would quietly give an ordinary stream while the caller believed it had asked
