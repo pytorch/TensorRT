@@ -173,40 +173,69 @@ then, treat a program file as trusted input: check it in transit, and do not run
 source you would
 not run code from.
 
-### Running from several threads at once does not work today
+### Running from several threads at once
 
-Measured on three GPUs, two architectures. Loading and running from more than one thread fails
-consistently: on one discrete card two threads failed twenty one times out of twenty one, and on an
-integrated part every variant failed five times out of five, including the variant where all threads
-share a single loaded program. A separate case hangs rather than crashing.
+One program per thread works. Sharing one program across threads does not, and is refused
+rather than allowed, because the runtime this plugs into does not permit it.
 
-The cause is a deadlock, and it has been narrowed to a stack. TensorRT calls this backend's
-logger from
-whichever thread it is initialising on, that logger writes through ExecuTorch's logging, and
-under the
-Python bindings that logging is redirected into a Python text stream, whose flush needs the
-interpreter
-lock. A thread that does not hold the lock waits for it there and never returns:
+Measured on a two-card A100 host, 100 inference calls per thread per attempt, with the threads
+released into `execute()` by a barrier so they really do overlap (confirmed by an in-flight
+counter reaching the thread count, and by the calls' own start and finish times overlapping for
+about half of the busy time):
 
-    TRTLogger::log -> ET_LOG -> std::ostream -> the bindings' stream redirect
-                   -> TextIOWrapper flush -> acquire the interpreter lock
+| shape | attempts with a failure |
+| --- | --- |
+| one `Module` per thread, 2 threads | 0 of 20 |
+| one `Module` per thread, 4 threads | 0 of 20 |
+| one `Module` per thread, staggered starts instead of a barrier | 0 of 20 |
+| one `Module` per thread, both threads reading one input buffer | 0 of 20 |
+| one `Module` per thread, both inside a `CallerStreamGuard` on one shared stream | 0 of 20 |
+| one `Module` per thread, loaded concurrently with nothing warmed up first | 0 of 10 |
+| one `Module` shared by 2 threads | 20 of 20 |
+| one `Module` shared by 4 threads | 19 of 20 |
 
-Two measurements pin it down. Loading each program under a lock, so only one is ever
-initialising, fixes
-it: zero failures in five. Running a program once before any thread starts, so initialisation is
-already
-done, also fixes it: zero failures in five. Silencing standard error does not, in any of three ways,
-because the redirect is inside the process rather than at the file descriptor.
+That is 26,000 answers compared against the expected value with no mismatch on the per-thread
+shape. The backend's own `execute()` mutex is what makes it hold: two threads on one delegate
+handle are serialized, and two threads on two handles run at the same time without touching each
+other's state.
 
-So the practical workaround is to load and run each program once on one thread, and only then
-hand it to
-several. Sharing one program does not help on its own, which is why an earlier reading of this as a
-problem with several programs at once was wrong.
+Sharing one `Module` is not a backend problem and no backend change can fix it. ExecuTorch says so
+itself, in `extension/module/module.h`: "This class is not thread-safe and performs no internal
+synchronization. Calling execute concurrently on the same Module instance from multiple threads is
+unsafe, regardless of whether share_memory_arenas is true or false." Note "regardless": two threads
+on two different methods of one `Module` is unsafe too, not only two threads on the same method.
+Mostly the runtime catches it and returns `Error::InvalidState` with "Inputs can not be set mid
+execution", but not always: in the measurements above it also returned between 16 and 107 answers
+per configuration that belonged to the other thread.
+
+### A crash when two threads load at the same time under the Python bindings
+
+Loading from more than one thread through the Python bindings crashes, roughly one attempt in six.
+The same shape in C++ is clean (the sixth row of the table above), so this is specific to the
+bindings and not to loading.
+
+The crash is a jump to a null address inside a stream flush, and the stack names every layer:
+
+    TensorRTBackend::init
+      -> ET_LOG -> executorch::runtime::internal::logf -> vlogf   (in libexecutorch.so)
+        -> std::cerr flush -> the sentry also flushes std::cout
+          -> std::cout's stream buffer -> address 0
+
+ExecuTorch's logging writes to the process-wide `std::cerr`, and `std::cerr` is tied to
+`std::cout`, so every log line flushes `std::cout` as well. The bindings swap what those two
+streams point at, per call, so that output reaches a Python stream. When a second thread is
+inside a log call while that swap happens, it flushes a stream buffer that is being replaced and
+calls through a pointer that is no longer there. An earlier reading of this as a deadlock was
+looking at the same stack with a different ending: whether it hangs on the interpreter lock or
+crashes on the swapped buffer depends on where the second thread happens to be.
+
+Nothing in this backend can fix that, because a backend cannot log without going through
+ExecuTorch's logging. The workaround is the same either way: load every program once on one
+thread, then hand them out. The fix belongs in ExecuTorch, which should serialize its own logging
+and should not redirect a process-wide stream while another thread may be writing through it.
 
 A standalone program using TensorRT the same way from several threads, with no ExecuTorch and no
-Python,
-runs eighty thousand cycles cleanly. The fix belongs in the bindings, which should not take the
-interpreter lock on a thread the runtime owns.
+Python, runs eighty thousand cycles cleanly.
 
 ### Caller-stream contract for the TensorRT backend
 
