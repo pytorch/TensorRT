@@ -125,10 +125,11 @@ def main() -> None:
         ]
         pins = yaml.safe_load((root / "dev_dep_versions.yml").read_text())
         pinned = pins["__executorch_version__"]
+        # Only the three the delegate links. Neither PyTorch nor Torch-TensorRT belongs here: the
+        # library links neither, requiring Torch-TensorRT would make this wheel depend on the project
+        # that builds it, and ExecuTorch leaves the choice of PyTorch build to the user.
         for distribution in (
             "executorch",
-            "torch-tensorrt",
-            "torch",
             "tensorrt-cu13",
             "nvidia-cuda-runtime",
         ):
@@ -187,6 +188,14 @@ def main() -> None:
                 )
                 reject(
                     f"{reason} {distribution}=={expected_version}, but the wheel requires {matched}"
+                )
+        for forbidden in ("torch", "torch-tensorrt"):
+            present = [
+                r for r in requirements if canonicalize_name(r.name) == forbidden
+            ]
+            if present:
+                reject(
+                    f"the wheel requires {forbidden}, which the delegate does not link: {present}"
                 )
         # The three runtimes the delegate links carry the label naming the build, deliberately: it
         # links one specific build of each, and without the label the requirement is satisfied by a
