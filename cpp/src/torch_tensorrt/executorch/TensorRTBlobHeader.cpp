@@ -141,14 +141,22 @@ bool parse_int_after_key(const std::string& json, std::size_t search_from, const
   return true;
 }
 
-// Finds a metadata key anywhere in the object except inside the io_bindings array. The array holds
-// caller-chosen tensor names, so a model input named "device_id" would otherwise be read as the
-// key. Searching only past the array instead, which is what this replaces, made the reader depend
+// Finds a metadata key anywhere in the object except inside the two arrays that hold caller-chosen
+// tensor names, io_bindings and aliased_io, so a model input named "device_id" is not read as the
+// key. Searching only past io_bindings instead, which is what this replaces, made the reader depend
 // on key order: JSON does not order keys, sorting them is one word in any writer, and a blob whose
 // keys sorted came back with no aliases and device 0 while parsing clean.
-std::size_t find_key_outside(const std::string& json, const char* key, std::size_t skip_begin, std::size_t skip_end) {
+std::size_t find_key_outside(
+    const std::string& json,
+    const char* key,
+    std::size_t skip_begin,
+    std::size_t skip_end,
+    std::size_t alias_begin = std::string::npos,
+    std::size_t alias_end = std::string::npos) {
   for (std::size_t at = json.find(key); at != std::string::npos; at = json.find(key, at + 1)) {
-    if (at < skip_begin || at >= skip_end) {
+    const bool in_bindings = at >= skip_begin && at < skip_end;
+    const bool in_aliases = at >= alias_begin && at < alias_end;
+    if (!in_bindings && !in_aliases) {
       return at;
     }
   }
@@ -255,12 +263,15 @@ bool parse_metadata_json(const std::string& json, TensorRTBlobHeader& out) {
   // Optional aliased_io array: [{"output":..,"input":..,"kind":..}, ...].
   // Absent in older blobs -> leave empty (backward compatible). Mirrors the
   // io_bindings walk above using the same string helpers.
+  std::size_t alias_begin = std::string::npos;
+  std::size_t alias_end = std::string::npos;
   const std::size_t alias_key = find_key_outside(json, "\"aliased_io\"", bindings_pos, pos);
   if (alias_key != std::string::npos) {
     std::size_t apos = json.find('[', alias_key);
     if (apos == std::string::npos) {
       return false;
     }
+    alias_begin = alias_key;
     ++apos;
     while (true) {
       apos = skip_ws(json, apos);
@@ -330,10 +341,13 @@ bool parse_metadata_json(const std::string& json, TensorRTBlobHeader& out) {
         out.aliased_io.push_back(std::move(ab));
       }
     }
+    alias_end = apos;
   }
 
-  const std::size_t hw_key = find_key_outside(json, "\"hardware_compatible\"", bindings_pos, pos);
-  const std::size_t device_key = find_key_outside(json, "\"device_id\"", bindings_pos, pos);
+  const std::size_t hw_key =
+      find_key_outside(json, "\"hardware_compatible\"", bindings_pos, pos, alias_begin, alias_end);
+  const std::size_t device_key =
+      find_key_outside(json, "\"device_id\"", bindings_pos, pos, alias_begin, alias_end);
   return parse_bool_after_key(json, hw_key, "\"hardware_compatible\"", out.hardware_compatible) &&
       parse_int_after_key(json, device_key, "\"device_id\"", out.device_id);
 }

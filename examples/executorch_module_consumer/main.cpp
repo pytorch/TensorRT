@@ -25,10 +25,8 @@
 #include <executorch/extension/module/module.h>
 #include <executorch/extension/tensor/tensor.h>
 
-using executorch::extension::from_blob;
-using executorch::extension::Module;
-using executorch::runtime::Error;
-using executorch::runtime::EValue;
+using namespace executorch::extension;
+using namespace executorch::runtime;
 
 namespace {
 
@@ -121,23 +119,35 @@ int main(int argc, char** argv) {
       count *= static_cast<size_t>(extent);
     }
     const auto type = info->scalar_type();
-    const size_t bytes = count * executorch::runtime::elementSize(type);
+    // Float only, and refused rather than approximated for anything else. The value written
+    // below is a float, so on a narrower type it would run past the end of the buffer and on a
+    // wider one it would read past the end of its own source. The reference this run is checked
+    // against is recorded from float input too, so another type has nothing to compare against.
+    if (type != executorch::aten::ScalarType::Float) {
+      std::fprintf(
+          stderr,
+          "input %zu is not float, and this example only feeds float. Export the program with "
+          "float inputs, or extend this example to write the value in the input's own type.\\n",
+          i);
+      return 1;
+    }
+    const size_t bytes = count * sizeof(float);
+    // Ones, because that is what the export script feeds when it records the reference value
+    // this run is checked against. Zeros would compare a different computation.
+    const std::vector<float> filled(count, 1.0f);
     if (device_boundary) {
       void* device = nullptr;
       if (!cuda_ok(cudaMalloc(&device, bytes), "cudaMalloc for an input")) {
         return 1;
       }
       owned.push_back(device);
-      // Ones, because that is what the export script feeds when it records the reference value
-      // this run is checked against. Zeros would compare a different computation.
-      const std::vector<float> filled(count, 1.0f);
       if (!cuda_ok(cudaMemcpy(device, filled.data(), bytes, cudaMemcpyHostToDevice), "input upload")) {
         return 1;
       }
       inputs.push_back(from_blob(device, sizes, type));
     } else {
       host_buffers.emplace_back(bytes, 0);
-      std::fill_n(reinterpret_cast<float*>(host_buffers.back().data()), count, 1.0f);
+      std::memcpy(host_buffers.back().data(), filled.data(), bytes);
       inputs.push_back(from_blob(host_buffers.back().data(), sizes, type));
     }
     // forward() takes EValue, and an EValue borrows the tensor, so the pointers above are kept
@@ -160,7 +170,7 @@ int main(int argc, char** argv) {
       }
       const auto type = info->scalar_type();
       void* device = nullptr;
-      if (!cuda_ok(cudaMalloc(&device, count * executorch::runtime::elementSize(type)), "cudaMalloc for an output")) {
+      if (!cuda_ok(cudaMalloc(&device, count * elementSize(type)), "cudaMalloc for an output")) {
         return 1;
       }
       owned.push_back(device);

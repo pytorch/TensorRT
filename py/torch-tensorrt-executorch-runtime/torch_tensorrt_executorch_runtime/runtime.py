@@ -55,8 +55,10 @@ def load(path: Union[str, Path]) -> Any:
     so the name is not a contract; it is spelled the same way as its only caller for readability.
     """
     warnings.warn(
-        "torch_tensorrt_executorch_runtime.runtime.load() is deprecated; use "
-        'torch_tensorrt.load(path, format="executorch") instead, which returns the same object.',
+        "torch_tensorrt_executorch_runtime.runtime.load() is deprecated; import this package to "
+        "register the TensorRT delegate, then load with "
+        "executorch.runtime.Runtime.get().load_program(path) and run with "
+        "program.load_method('forward').execute(inputs).",
         DeprecationWarning,
         stacklevel=2,
     )

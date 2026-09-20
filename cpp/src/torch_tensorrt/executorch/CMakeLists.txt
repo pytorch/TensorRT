@@ -211,13 +211,13 @@ target_link_libraries(executorch_trt_backend
 
 add_library(executorch_backend_tensorrt_backend INTERFACE)
 add_library(executorch::backend_tensorrt ALIAS executorch_backend_tensorrt_backend)
-# The name this target had before, kept because a project outside this repository that links
-# it by the old name would otherwise fail at configure time, which is a worse way to learn
-# about a rename than a deprecation notice.
+# The names this target had before, so a project outside this repository that links it by an old
+# name keeps working. Both are aliases, which covers linking and nothing else: CMake refuses an
+# alias in install(TARGETS) and in set_target_properties, so a consumer doing either has to move to
+# executorch::backend_tensorrt. The base branch carried both spellings and a consumer could link
+# either, so dropping one would let an out-of-tree project configure clean and then fail at link
+# time looking for a library nobody builds any more.
 add_library(torchtrt::executorch_backend ALIAS executorch_backend_tensorrt_backend)
-# And the plain name, because the base branch carried both and a consumer could link either. Keeping
-# only the namespaced one let an out-of-tree project configure clean and then fail at link time
-# looking for a library nobody builds any more.
 add_library(torchtrt_executorch_backend ALIAS executorch_backend_tensorrt_backend)
 add_dependencies(executorch_backend_tensorrt_backend executorch_trt_backend)
 

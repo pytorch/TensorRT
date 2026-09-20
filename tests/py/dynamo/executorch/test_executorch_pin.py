@@ -963,7 +963,6 @@ def test_import_errors_preserve_context_and_install_guidance(
     import __future__
 
     import importlib.util
-    import types
 
     _, command = _load_utils_channel_helpers(cuda)
     utils = types.ModuleType("torch_tensorrt._utils")

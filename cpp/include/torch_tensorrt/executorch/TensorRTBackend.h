@@ -18,7 +18,6 @@
 #pragma once
 
 #include <NvInfer.h>
-#include <cuda_runtime.h>
 
 #include <executorch/runtime/backend/interface.h>
 

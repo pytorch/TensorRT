@@ -204,7 +204,7 @@ class BazelBuild(build_py):
             self._build()
         except SystemExit:
             raise
-        except BaseException as error:
+        except Exception as error:
             raise SystemExit(f"ExecuTorch delegate build failed: {error}") from error
 
     def _build(self) -> None:

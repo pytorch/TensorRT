@@ -256,6 +256,9 @@ int cuda_foreign_device_of_ptr(const void* ptr, int engine_device) {
     return -1;
   }
   cudaPointerAttributes attrs{};
+  // A pointer this runtime cannot describe is let through. Ordinary host memory answers with an
+  // unregistered type on a current runtime, but an older one reports an outright failure for it, and
+  // refusing on that would reject the host buffers the staging path is built around.
   if (cudaPointerGetAttributes(&attrs, ptr) != cudaSuccess) {
     cudaGetLastError();
     return -1;
@@ -264,6 +267,9 @@ int cuda_foreign_device_of_ptr(const void* ptr, int engine_device) {
     return -1;
   }
   int peer = 0;
+  // The opposite direction here, on purpose. This is already known to be device memory on another
+  // device, so the only question left is whether that device is reachable, and an unanswered
+  // question is not a yes. Falling through refuses it.
   if (cudaDeviceCanAccessPeer(&peer, engine_device, attrs.device) != cudaSuccess) {
     cudaGetLastError();
   } else if (peer != 0) {
@@ -282,9 +288,10 @@ bool TensorRTBackend::is_available() const {
     return false;
   }
 
-  // The shared one, not a second runtime with its own logger. This is the earlier of the two
-  // callers: the runtime asks whether the backend is available before it initialises anything, so
-  // building one here is what produced the ignored-logger warning on every load.
+  // The shared one, not a second runtime with its own logger. Building it is the check: there is no
+  // cheaper question whose answer means this backend can actually run. So a process that asks and
+  // then loads nothing still carries one runtime and one logger for its lifetime, which is the price
+  // of the answer being true rather than hopeful.
   return shared_runtime() != nullptr;
 }
 
@@ -915,11 +922,30 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
         ET_LOG(Error, "TensorRTBackend::execute: resize_tensor failed for aliased output '%s'", name.c_str());
         return a_resize_err;
       }
-      void* dst = et_alias_out.nbytes() > 0 ? et_alias_out.mutable_data_ptr() : nullptr;
+      // Nothing to copy when the slot holds no bytes, which is a shape TensorRT inferred as empty
+      // rather than a mistake, so it is skipped rather than refused.
+      if (et_alias_out.nbytes() == 0) {
+        continue;
+      }
+      void* dst = et_alias_out.mutable_data_ptr();
+      // Bytes to write and nowhere to write them, which is a program built for caller-supplied
+      // outputs whose caller did not supply this one. The plain output path already refuses that
+      // through TensorRT; skipping it here instead would return success while the engine's in-place
+      // update went nowhere, which is the one outcome worse than an error.
+      if (dst == nullptr) {
+        ET_LOG(
+            Error,
+            "TensorRTBackend::execute: aliased output '%s' needs %zu bytes but carries no address. A "
+            "program built without runtime-allocated outputs needs the caller to supply each output "
+            "buffer through set_output_data_ptr before running.",
+            name.c_str(),
+            size_t(et_alias_out.nbytes()));
+        return Error::InvalidArgument;
+      }
       // dst != bind_ptr guards against issuing a self-copy. The memory planner does
       // not currently place the delegate's output slot on the aliased input -- the
       // two are live at the same time -- so this holds for every aliased output.
-      if (dst != nullptr && dst != bind_ptr) {
+      if (dst != bind_ptr) {
         aliased_reflects.emplace_back(dst, bind_ptr, et_alias_out.nbytes());
       }
       continue;

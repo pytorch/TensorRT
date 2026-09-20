@@ -742,21 +742,44 @@ def test_a_second_build_in_the_same_tree_succeeds(tmp_path):
     The build system leaves its output read only and copy2 carries the mode across, so the second
     build could not overwrite what the first one left. The sweep before the copy also skipped the
     destination, which is the one file that needed removing.
+
+    The whole build needs bazel, torch and Linux, so it cannot run here. What runs instead is the
+    three statements the build itself uses, lifted out of its own parsed source and executed twice
+    over a read only fixture, so deleting one of them or narrowing its glob turns this red rather
+    than passing against a copy of the idea.
     """
     source = (COMPANION / "setup.py").read_text(encoding="utf-8")
-    copy_block = source.split("shutil.copy2(built, output)")[0]
-    # The sweep must not exempt the destination.
-    assert "if stale != output:" not in copy_block, copy_block[-400:]
-    assert "output.chmod(output.stat().st_mode | stat.S_IWUSR)" in source, source[-400:]
-    # And the behaviour, on real files, because the mode is what actually bites.
+    build = next(
+        node
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.FunctionDef) and node.name == "_build"
+    )
+    wanted = (
+        'for stale in output.parent.glob("*.so*")',
+        "shutil.copy2(built, output)",
+        "output.chmod(",
+    )
+    # Whole statements out of the parsed function, so a commented-out line is not there to find,
+    # and the destination sweep cannot come back with the exemption that caused the failure.
+    routine = [
+        text
+        for text in (ast.get_source_segment(source, node) or "" for node in build.body)
+        if text.startswith(wanted)
+    ]
+    assert len(routine) == len(wanted), routine
+    assert "if stale != output:" not in routine[0], routine[0]
+
     built = tmp_path / "built.so"
     built.write_bytes(b"\x7fELF")
     built.chmod(0o555)
-    out = tmp_path / "out" / "built.so"
-    out.parent.mkdir()
+    output = tmp_path / "out" / "built.so"
+    output.parent.mkdir()
+    # A shared object the previous build left behind under a versioned name. The sweep exists to
+    # take these out of the wheel, and the copy alone would leave it there.
+    (output.parent / "libstale.so.1").write_bytes(b"\x7fELF")
+    namespace = {"shutil": shutil, "stat": stat, "built": built, "output": output}
     for _ in range(2):
-        for existing in out.parent.glob("*.so*"):
-            existing.unlink()
-        shutil.copy2(built, out)
-        out.chmod(out.stat().st_mode | stat.S_IWUSR)
-    assert out.stat().st_mode & stat.S_IWUSR, oct(out.stat().st_mode)
+        for text in routine:
+            exec(text, namespace)
+    assert output.stat().st_mode & stat.S_IWUSR, oct(output.stat().st_mode)
+    assert sorted(p.name for p in output.parent.iterdir()) == ["built.so"]

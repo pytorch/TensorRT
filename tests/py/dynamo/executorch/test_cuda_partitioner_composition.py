@@ -363,6 +363,13 @@ def test_trt_only_writes_no_ptd(tmp_path):
         (b"cuda", True),
         (b"cuda:0", True),
         (b"cuda:3", True),
+        # The three shapes the guard's comment names as past bugs: the framework's own spelling,
+        # which this used to refuse, and two that passed a check on the part before the colon and
+        # failed later as something else.
+        (b"CUDA", True),
+        (b" cuda ", True),
+        (b"cuda:", False),
+        (b"cuda:abc", False),
         (b"cpu", False),
         (b"mps", False),
     ],

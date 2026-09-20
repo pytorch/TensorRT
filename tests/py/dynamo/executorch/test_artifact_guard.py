@@ -367,7 +367,16 @@ def test_missing_pybindings_is_fatal(artifact):
 @pytest.fixture
 def native_tools():
     tools = {name: shutil.which(name) for name in _NATIVE_TOOLS}
-    if sys.platform != "linux" or not all(tools.values()):
+    missing = sorted(name for name, path in tools.items() if path is None)
+    if missing and sys.platform == "linux" and os.environ.get("CI"):
+        # Skipping here is what left eleven tests doing nothing while the job reported success, so
+        # on the lane that is meant to block a pull request a missing tool is a failure. The lint
+        # group declaring the tool is checked below; this catches the install itself drifting.
+        pytest.fail(
+            f"this lane must install {missing}: the real-build tests are the only ones that "
+            "configure the native project and read the artifact back"
+        )
+    if sys.platform != "linux" or missing:
         pytest.skip("needs Linux, CMake >= 3.28, a C++ compiler, readelf and patchelf")
     return tools
 
@@ -388,6 +397,11 @@ def test_the_lane_that_runs_this_file_installs_the_tools_it_needs() -> None:
     back with the platform's own tools. With patchelf absent from the lint job, eleven of them did
     nothing on every pull request while the job reported success. Whatever the runner image does not
     carry has to be installed by the job, and what the job installs is the lint dependency group.
+
+    This reads that group rather than calling which, because the lane that runs this file is often a
+    developer machine where the tool is legitimately absent and the real-build tests legitimately
+    skip. Deleting the declaration turns this red. The runner having the tool despite the
+    declaration is the other half, and native_tools above fails rather than skips for that.
     """
     text = (_ROOT / "pyproject.toml").read_text(encoding="utf-8")
     try:
@@ -941,6 +955,23 @@ def _assert_one_shared_runtime(source: str, header: str) -> None:
     ), "the handle still owns a runtime"
 
 
+def _assert_device_checks(source: str) -> None:
+    code = _code_only(source)
+    assert (
+        "int cuda_foreign_device_of_ptr(" in code
+    ), "the helper that answers the question is gone"
+    assert (
+        "const int input_device = cuda_foreign_device_of_ptr(" in code
+    ), "an input is no longer checked against the engine's device"
+    assert (
+        "const int output_device = cuda_foreign_device_of_ptr(" in code
+    ), "a caller-supplied output is no longer checked"
+    # Managed memory and a reachable peer must stay exempt, or the check refuses memory that
+    # works, which was measured and is worse than not checking at all.
+    assert "cudaDeviceCanAccessPeer" in code, "the peer exemption is gone"
+    assert "cudaMemoryTypeDevice" in code, "the managed-memory exemption is gone"
+
+
 @pytest.mark.parametrize(
     "mutation", ["none", "drop-input-check", "drop-output-check", "drop-helper"]
 )
@@ -956,46 +987,25 @@ def test_the_backend_refuses_a_buffer_on_another_device(mutation) -> None:
     four GPU machine, where every wrong-device input and output is refused and the message names both
     devices, but that measurement cannot run here. So what this pins is that the checks are present
     and are reached, with comments stripped first so a comment cannot stand in for the code. If they
-    are deleted, this goes red.
+    are deleted, this goes red, and each mutation below shows which assertion catches which deletion.
     """
-    source = _code_only(
-        (_ROOT / "cpp/src/torch_tensorrt/executorch/TensorRTBackend.cpp").read_text(
-            encoding="utf-8"
-        )
-    )
-    input_check = "const int input_device = cuda_foreign_device_of_ptr("
-    output_check = "const int output_device = cuda_foreign_device_of_ptr("
-    helper = "int cuda_foreign_device_of_ptr("
-
-    # Each mutation removes the text outright. Commenting it out would not do: this source has
-    # already had its comments stripped, so a commented line still reads as present.
-    if mutation == "drop-input-check":
-        source = source.replace(input_check, "")
-    elif mutation == "drop-output-check":
-        source = source.replace(output_check, "")
-    elif mutation == "drop-helper":
-        source = source.replace(helper, "")
-
+    source = (
+        _ROOT / "cpp/src/torch_tensorrt/executorch/TensorRTBackend.cpp"
+    ).read_text(encoding="utf-8")
     if mutation == "none":
-        assert helper in source, "the helper that answers the question is gone"
-        assert (
-            input_check in source
-        ), "an input is no longer checked against the engine's device"
-        assert output_check in source, "a caller-supplied output is no longer checked"
-        # Managed memory and a reachable peer must stay exempt, or the check refuses memory that
-        # works, which was measured and is worse than not checking at all.
-        assert "cudaDeviceCanAccessPeer" in source, "the peer exemption is gone"
-        assert "cudaMemoryTypeDevice" in source, "the managed-memory exemption is gone"
+        _assert_device_checks(source)
         return
 
+    # Each mutation removes the text outright. Commenting it out would not do: the source has its
+    # comments stripped before the checks run, so a commented line still reads as present.
     removed = {
-        "drop-input-check": input_check,
-        "drop-output-check": output_check,
-        "drop-helper": helper,
+        "drop-input-check": "const int input_device = cuda_foreign_device_of_ptr(",
+        "drop-output-check": "const int output_device = cuda_foreign_device_of_ptr(",
+        "drop-helper": "int cuda_foreign_device_of_ptr(",
     }[mutation]
-    assert (
-        removed not in source
-    ), f"mutation {mutation} did not take, so this test cannot fail"
+    assert removed in source, f"mutation {mutation} has nothing to remove"
+    with pytest.raises(AssertionError):
+        _assert_device_checks(source.replace(removed, ""))
 
 
 @pytest.mark.parametrize("mutation", [None, "availability-builds-one", "commented-out"])
