@@ -135,7 +135,11 @@ if [ "$#" -ge 4 ]; then
 elif ! printf '%s\n' "${runpath}" | tr ':' '\n' | grep -Fxq '$ORIGIN/../../executorch/lib'; then
     fail "${target} has a RUNPATH but not \$ORIGIN/../../executorch/lib"
 fi
-absolute=$(printf '%s\n' "${runpath}" | tr ':' '\n' | grep -v '^\$ORIGIN\(/\|$\)' || true)
+# An empty field is the loader's working directory, and grep -v keeps it while the command
+# substitution then strips it back to nothing, so it has to be named before the test.
+absolute=$(printf '%s\n' "${runpath}" | tr ':' '\n' |
+    sed 's/^$/(empty, so the loader would search the working directory)/' |
+    grep -v '^\$ORIGIN\(/\|$\)' || true)
 if [ -n "${absolute}" ]; then
     fail "${target} carries RUNPATH entries that are not relative to the artifact:
 ${absolute}"

@@ -10,6 +10,7 @@ import re
 import sys
 from email.parser import BytesParser
 from pathlib import Path
+from typing import NoReturn
 
 import yaml
 from wheel.wheelfile import WheelFile
@@ -19,11 +20,11 @@ from packaging.utils import canonicalize_name, parse_wheel_filename
 from packaging.version import Version
 
 
-def reject(message):
+def reject(message: str) -> NoReturn:
     sys.exit(f"FATAL: {message}")
 
 
-_LINKED_AT_BUILD_TIME = frozenset({"torch", "torch-tensorrt"})
+_PINNED_WITH_LOCAL_LABEL = frozenset({"torch", "torch-tensorrt"})
 
 # The pin each remaining requirement has to agree with. These name a release series rather than an
 # exact build, so the comparison is on the leading release components the pin actually spells.
@@ -33,7 +34,7 @@ _REPOSITORY_PIN = {
 }
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("wheel", type=Path)
     parser.add_argument("--architecture", choices=("x86_64", "aarch64"), required=True)
@@ -144,9 +145,10 @@ def main():
                         f"against {installed}, whose version differs from that pin"
                     )
                 expected_version = str(installed)
-            elif distribution in _LINKED_AT_BUILD_TIME:
-                # PyTorch and Torch-TensorRT are linked the same way ExecuTorch is, so the
-                # requirement names the whole installed version including any label. Comparing
+            elif distribution in _PINNED_WITH_LOCAL_LABEL:
+                # These two are not linked into the delegate. They only have to come from the same
+                # CUDA row, and the local label is the only part of a version that names the row, so
+                # the requirement pins the whole installed version including that label. Comparing
                 # against the public part alone reported a mismatch between a requirement and the
                 # very version it was generated from.
                 expected_version = str(

@@ -9,6 +9,7 @@ filegroup(
         "README.md",
         "kv_cache_decode_check.cpp",
         "load_model.py",
+        "load_model_device_resident.py",
         "main.cpp",
     ],
 )

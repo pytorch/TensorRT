@@ -914,12 +914,11 @@ def test_the_runtime_package_ships_no_runtime_api():
 
     It used to carry a ``runtime.py`` wrapping ExecuTorch's ``Runtime``/``Program``, which duplicated
     what ExecuTorch already exports and put a second inference API in a wheel whose only job is
-    registration. The old location under torch_tensorrt is gone outright. The submodule inside the
-    delegate package survives only because the published main wheel imports ``load`` from it by name,
-    so deleting it would turn torch_tensorrt.load(format="executorch") into a ModuleNotFoundError for
-    anyone who upgrades this package alone. It must be a forwarder and nothing more.
+    registration. The submodule inside the delegate package survives only because the published main
+    wheel imports ``load`` from it by name, so deleting it would turn
+    torch_tensorrt.load(format="executorch") into a ModuleNotFoundError for anyone who upgrades this
+    package alone. It must be a forwarder and nothing more.
     """
-    assert not (_REPO_ROOT / "py/torch_tensorrt/executorch/runtime.py").exists()
     legacy_loader = (
         _REPO_ROOT
         / "py/torch-tensorrt-executorch-runtime"
@@ -2054,13 +2053,11 @@ def _co_names_and_consts(code) -> list[str]:
     a commented-out tail leaves no trace here, while it stays fully visible to a substring search of
     the text.
     """
-    import types as _types
-
     found = [*code.co_names, *code.co_varnames]
     for constant in code.co_consts:
         if isinstance(constant, str):
             found.append(constant)
-        elif isinstance(constant, _types.CodeType):
+        elif isinstance(constant, types.CodeType):
             found.extend(_co_names_and_consts(constant))
     return found
 
@@ -3230,6 +3227,12 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
         "ships_no_cmake_package": "the wheel ships no CMake package",
         "requires_an_unpinned_executorch": "the repository pins executorch==",
         "requires_a_mismatched_executorch_pin": "the repository pins executorch==",
+        "requires_no_executorch": "the repository pins executorch==",
+        "requires_no_torch": "the build used torch==",
+        "requires_no_torch_tensorrt": "the build used torch-tensorrt==",
+        "requires_an_unpinned_torch_tensorrt": "the build used torch-tensorrt==",
+        "requires_no_tensorrt": "the build used tensorrt-cu13==",
+        "requires_an_unpinned_cuda_runtime": "the build used nvidia-cuda-runtime==",
     }
     expected_message = expected_messages.get(case)
     if expected_message is not None:

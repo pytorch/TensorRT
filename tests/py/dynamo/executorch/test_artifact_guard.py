@@ -162,6 +162,46 @@ def test_an_absolute_runpath_entry_is_rejected(artifact):
     assert "/opt/buildbot/stage/lib" in result.stderr
 
 
+@pytest.mark.parametrize("suffix", ["", "-backup", "/not-the-lib-dir"])
+def test_cuda_path_must_be_an_actual_entry(artifact, suffix):
+    data, invoke, runtime = artifact
+    data["needed"].append("libcudart.so.13")
+    data["runpath"] = _RUNPATH.rsplit(":", 1)[0]
+    if suffix:
+        data["runpath"] += ":$ORIGIN/../../nvidia/cu13/lib" + suffix
+    result = invoke(options=[str(runtime)])
+    assert result.returncode != 0
+    assert "RUNPATH carries no nvidia/cu13/lib" in result.stderr
+
+
+def test_an_absolute_runpath_entry_is_rejected(artifact):
+    """A build machine path baked into a published wheel fails on a user's machine and nowhere else,
+    so the rule that catches it needs a test of its own. The expected value is passed in so the
+    equality rule above is satisfied and this rule is the one being measured.
+    """
+    data, invoke, runtime = artifact
+    data["needed"].append("libcudart.so.13")
+    data["runpath"] = _RUNPATH + ":/opt/buildbot/stage/lib"
+    result = invoke(options=[str(runtime), data["runpath"]])
+    assert result.returncode != 0
+    assert "not relative to the artifact" in result.stderr
+    assert "/opt/buildbot/stage/lib" in result.stderr
+
+
+def test_an_empty_runpath_entry_is_rejected(artifact):
+    """An empty field is the working directory to the loader, which is the worst entry to publish and
+    the easiest to introduce: a trailing separator is enough. It reads as nothing, so the rule had to
+    name it before testing, or the shell strips it and the check passes.
+    """
+    data, invoke, runtime = artifact
+    data["needed"].append("libcudart.so.13")
+    data["runpath"] = _RUNPATH + ":"
+    result = invoke(options=[str(runtime), data["runpath"]])
+    assert result.returncode != 0
+    assert "not relative to the artifact" in result.stderr
+    assert "empty" in result.stderr
+
+
 def test_a_delegate_without_the_ownership_query_is_rejected(artifact):
     """The Python package refuses to import unless it can ask the delegate whether it owns the
     registration, so a build that dropped that export would publish looking fine and then tell every
@@ -931,6 +971,25 @@ def _definition_body(source: str, signature: str) -> str:
     raise AssertionError(f"unbalanced braces after {signature!r}")
 
 
+def _assert_wrong_device_buffers_are_refused(source: str) -> None:
+    code = _code_only(source)
+    helper = "int cuda_foreign_device_of_ptr("
+    assert helper in code, "the helper that answers the question is gone"
+    # Read the body that binds the buffers, not the whole file: a check that still exists but sits
+    # somewhere execute() never reaches refuses nothing.
+    execute = _definition_body(code, "Error TensorRTBackend::execute(")
+    assert (
+        "const int input_device = cuda_foreign_device_of_ptr(" in execute
+    ), "an input is no longer checked against the engine's device where it is bound"
+    assert (
+        "const int output_device = cuda_foreign_device_of_ptr(" in execute
+    ), "a caller-supplied output is no longer checked where it is bound"
+    # Managed memory and a reachable peer must stay exempt, or the check refuses memory that
+    # works, which was measured and is worse than not checking at all.
+    assert "cudaDeviceCanAccessPeer" in code, "the peer exemption is gone"
+    assert "cudaMemoryTypeDevice" in code, "the managed-memory exemption is gone"
+
+
 def _assert_one_shared_runtime(source: str, header: str) -> None:
     code = _code_only(source)
     accessor = "nvinfer1::IRuntime* shared_runtime()"
@@ -973,7 +1032,14 @@ def _assert_device_checks(source: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "mutation", ["none", "drop-input-check", "drop-output-check", "drop-helper"]
+    "mutation",
+    [
+        None,
+        "drop-input-check",
+        "drop-output-check",
+        "drop-helper",
+        "input-check-outside-execute",
+    ],
 )
 @pytest.mark.unit
 def test_the_backend_refuses_a_buffer_on_another_device(mutation) -> None:
@@ -985,27 +1051,41 @@ def test_the_backend_refuses_a_buffer_on_another_device(mutation) -> None:
     rather than hiding: the behaviour needs two GPUs to exercise, because with one every device
     pointer is on device zero, and no lane that can run this file has even one. It was measured on a
     four GPU machine, where every wrong-device input and output is refused and the message names both
-    devices, but that measurement cannot run here. So what this pins is that the checks are present
-    and are reached, with comments stripped first so a comment cannot stand in for the code. If they
-    are deleted, this goes red, and each mutation below shows which assertion catches which deletion.
+    devices, but that measurement cannot run here. So what this pins is that both checks and their
+    two exemptions are present in the body that binds the buffers, with comments stripped first so a
+    comment cannot stand in for the code. Each mutation below is required to turn the reading red,
+    which is what keeps the reading from passing on any source at all. What text cannot see is a
+    check left in place and disabled by a surrounding condition; only two GPUs catch that.
     """
     source = (
         _ROOT / "cpp/src/torch_tensorrt/executorch/TensorRTBackend.cpp"
     ).read_text(encoding="utf-8")
-    if mutation == "none":
-        _assert_device_checks(source)
+    input_check = "const int input_device = cuda_foreign_device_of_ptr("
+
+    if mutation is None:
+        _assert_wrong_device_buffers_are_refused(source)
         return
 
-    # Each mutation removes the text outright. Commenting it out would not do: the source has its
-    # comments stripped before the checks run, so a commented line still reads as present.
-    removed = {
-        "drop-input-check": "const int input_device = cuda_foreign_device_of_ptr(",
-        "drop-output-check": "const int output_device = cuda_foreign_device_of_ptr(",
-        "drop-helper": "int cuda_foreign_device_of_ptr(",
-    }[mutation]
-    assert removed in source, f"mutation {mutation} has nothing to remove"
+    if mutation == "input-check-outside-execute":
+        # Still in the file, and no longer where a buffer is bound.
+        availability = "bool TensorRTBackend::is_available() const {"
+        assert availability in source
+        source = source.replace(input_check, "", 1).replace(
+            availability, availability + f"\n  {input_check}nullptr, 0);", 1
+        )
+    else:
+        # Removed outright. Commenting it out would not do: the reading strips comments, so a
+        # commented line already reads as absent.
+        removed = {
+            "drop-input-check": input_check,
+            "drop-output-check": "const int output_device = cuda_foreign_device_of_ptr(",
+            "drop-helper": "int cuda_foreign_device_of_ptr(",
+        }[mutation]
+        assert removed in source, f"mutation {mutation} has nothing to remove"
+        source = source.replace(removed, "")
+
     with pytest.raises(AssertionError):
-        _assert_device_checks(source.replace(removed, ""))
+        _assert_wrong_device_buffers_are_refused(source)
 
 
 @pytest.mark.parametrize("mutation", [None, "availability-builds-one", "commented-out"])

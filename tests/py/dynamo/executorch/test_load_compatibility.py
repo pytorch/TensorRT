@@ -531,6 +531,21 @@ def test_the_loader_calls_activate_on_a_companion_that_has_no_register(
 
 
 @pytest.mark.unit
+def test_a_companion_with_no_entry_point_is_named_in_the_error(
+    compiler, monkeypatch, tmp_path
+) -> None:
+    """A companion exposing neither register() nor activate() is the one shape the loader cannot
+    drive, so the only thing it can do is say which build to install. Nothing exercised that branch,
+    so the message could rot with the suite green."""
+    module = types.ModuleType("torch_tensorrt_executorch_runtime")
+    monkeypatch.setitem(sys.modules, "torch_tensorrt_executorch_runtime", module)
+    program = tmp_path / "m.pte"
+    program.write_bytes(b"unused")
+    with pytest.raises(ImportError, match=r"neither register\(\) nor activate\(\)"):
+        compiler.load(str(program), format="executorch")
+
+
+@pytest.mark.unit
 def test_the_forwarder_returns_the_shape_the_published_api_returned() -> None:
     """Restoring the file was not enough; it has to return what callers already use.
 

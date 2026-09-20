@@ -10,6 +10,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -251,6 +252,30 @@ TEST(ExecuTorchTensorRTBlobHeader, InputNamedLikeAScalarKeyIsNotReadAsOne) {
   ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
   EXPECT_EQ(header.device_id, 3);
   EXPECT_TRUE(header.hardware_compatible);
+}
+
+TEST(ExecuTorchTensorRTBlobHeader, RejectsADeviceIdThatDoesNotFitAnInt) {
+  // The device id goes to cudaSetDevice, so a value the reader cannot hold has to stop the parse.
+  // Wrapping it instead yields a small plausible number: 4294967299 came back as device 3, which
+  // runs the engine on the wrong card on a machine that has one.
+  for (const char* too_large : {"2147483648", "4294967299", "99999999999999999999", "-2147483649"}) {
+    const auto blob = make_blob(
+        R"({"io_bindings":[{"name":"x","is_input":true}],"device_id":)" + std::string(too_large) + "}");
+
+    TensorRTBlobHeader header;
+    EXPECT_FALSE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header)) << "device_id " << too_large;
+  }
+}
+
+TEST(ExecuTorchTensorRTBlobHeader, ParsesTheEndsOfTheDeviceIdRange) {
+  for (const int expected : {0, 7, -1, std::numeric_limits<int>::max(), std::numeric_limits<int>::min()}) {
+    const auto blob = make_blob(
+        R"({"io_bindings":[{"name":"x","is_input":true}],"device_id":)" + std::to_string(expected) + "}");
+
+    TensorRTBlobHeader header;
+    ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header)) << "device_id " << expected;
+    EXPECT_EQ(header.device_id, expected);
+  }
 }
 
 TEST(ExecuTorchTensorRTBlobHeader, RejectsUnknownFutureMagic) {

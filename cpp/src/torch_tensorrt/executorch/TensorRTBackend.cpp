@@ -796,7 +796,8 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
             Error,
             "TensorRTBackend::execute: aliased input '%s' must be reachable by the engine without "
             "staging (non-empty, and either CUDA-accessible or plain host memory on a device that "
-            "can read pageable host memory); its caller-owned in-place update cannot be staged "
+            "reads pageable host memory through the host page tables); its caller-owned in-place "
+            "update cannot be staged "
             "through host scratch",
             name.c_str());
         return Error::InvalidArgument;
@@ -1076,7 +1077,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // The engine work is in flight on `stream`, and we always wait for it. ExecuTorch's runtime
   // has no asynchronous execute: its execute() returns Error::Ok to mean the work is finished,
   // every caller reads the outputs straight after it returns, and the API hands back no event or
-  // future to wait on. So there is nobody a early return could be honest with.
+  // future to wait on. So there is nobody an early return could be honest with.
   Error copy_err = Error::Ok;
   for (auto& output : outputs_needing_copy) {
     exec_aten::Tensor et_out = args[output.first]->toTensor();

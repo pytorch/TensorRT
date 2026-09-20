@@ -81,7 +81,7 @@ int main(int argc, char** argv) {
   // host side reads through it.
   bool device_boundary = false;
   for (int i = 1; i < argc; ++i) {
-    if (std::strcmp(argv[i], "--device_io") == 0 || std::strcmp(argv[i], "--device_outputs") == 0) {
+    if (std::strcmp(argv[i], "--device_io") == 0) {
       device_boundary = true;
     }
   }

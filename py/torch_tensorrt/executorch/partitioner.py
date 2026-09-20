@@ -3,8 +3,8 @@
 
 # ExecuTorch partitioner: partition by execute_engine nodes.
 
-import re
 import logging
+import re
 from typing import Callable, Dict, List, Optional, Tuple
 
 import torch
@@ -140,14 +140,13 @@ class TensorRTPartitioner(Partitioner):  # type: ignore[misc]
         explicit = [
             s for s in self.compile_specs if s.key == _TARGET_DEVICE_COMPILE_SPEC_KEY
         ]
-        # Refuse a device this delegate cannot run on. Taking the value verbatim meant a request for
-        # the processor was accepted here and produced a program that failed at its first
-        # instruction, which says nothing about the request that caused it.
+        # Refuse a device this delegate cannot run on here, at export, rather than leaving the
+        # program to fail at its first instruction, where the failure says nothing about the request
+        # that caused it.
         for spec in explicit:
             requested = spec.value.decode(errors="replace")
-            # Matched whole and case-insensitively. The framework accepts "CUDA" and this used to
-            # refuse it, while "cuda:" and "cuda:abc" passed a check on the part before the colon
-            # and then failed later as something else.
+            # Whole match, case-insensitive: the framework spells the device "CUDA" as readily as
+            # "cuda", while "cuda:" and "cuda:abc" name no device at all.
             if re.fullmatch(r"cuda(:\d+)?", requested.strip(), re.IGNORECASE) is None:
                 raise ValueError(
                     f"{_TARGET_DEVICE_COMPILE_SPEC_KEY}={requested!r} is not a device this "

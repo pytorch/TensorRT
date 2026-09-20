@@ -76,9 +76,9 @@ struct EngineHandle {
   std::vector<bool> input_is_alias_target;
   size_t num_aliased_outputs = 0;
   int device_id = 0;
-  // Whether this device can read pageable host memory, which is the question the uses of this flag
-  // ask. It is not whether the device is integrated: a discrete card answers no to that and yes to
-  // this, and the two answers select different paths.
+  // Whether this device can reach pageable host memory through shared host page tables, which is the
+  // question the uses of this flag ask. A discrete card answers no: it can reach pageable memory, but
+  // only by faulting pages in one at a time, so it takes the staged-copy path instead.
   bool pageable_host_access = false;
   std::mutex mu;
 

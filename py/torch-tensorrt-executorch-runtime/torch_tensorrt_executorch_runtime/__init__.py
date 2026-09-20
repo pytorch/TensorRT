@@ -266,8 +266,9 @@ def _delegate_already_loaded(path: str) -> ctypes.CDLL | None:
     count rather than mapping a second copy, so this cannot introduce the duplicate it is checking
     for. ``RTLD_NOLOAD`` is what makes the question safe to ask: it refuses to load anything, so a
     library that is not present yields ``None`` instead of being pulled in as a side effect of the
-    test. It is absent on some platforms, and this delegate is Linux-only, so treat a missing flag
-    as "cannot tell" rather than guessing.
+    test. It is absent on some platforms; this delegate is Linux-only, where CPython always defines
+    it, and a build without it answers ``None`` here, the same answer as a library that is not
+    loaded.
     """
     noload = getattr(os, "RTLD_NOLOAD", None)
     if noload is None:

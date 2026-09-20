@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 #include <string>
 
 namespace torch_tensorrt {
@@ -127,17 +128,28 @@ bool parse_int_after_key(const std::string& json, std::size_t search_from, const
     neg = true;
     ++pos;
   }
-  int parsed = 0;
+  // The digits come from the program file. Accumulating them in an int overflows, which is
+  // undefined behaviour and hands back a small plausible number instead of a refusal, so the
+  // running value is kept in 64 bits and any run of digits that leaves the int range is rejected.
+  constexpr int64_t MAX_MAGNITUDE = -static_cast<int64_t>(std::numeric_limits<int>::min());
+  int64_t parsed = 0;
   bool saw_digit = false;
   while (pos < json.size() && json[pos] >= '0' && json[pos] <= '9') {
     saw_digit = true;
     parsed = parsed * 10 + (json[pos] - '0');
+    if (parsed > MAX_MAGNITUDE) {
+      return false;
+    }
     ++pos;
   }
   if (!saw_digit) {
     return false;
   }
-  value = neg ? -parsed : parsed;
+  const int64_t signed_value = neg ? -parsed : parsed;
+  if (signed_value < std::numeric_limits<int>::min() || signed_value > std::numeric_limits<int>::max()) {
+    return false;
+  }
+  value = static_cast<int>(signed_value);
   return true;
 }
 
