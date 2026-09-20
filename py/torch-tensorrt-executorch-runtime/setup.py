@@ -424,16 +424,19 @@ setup(
     # Capped for the same reason the main manifest is: the pinned ExecuTorch ships no wheel
     # above 3.14, so declaring support past it promises something that cannot resolve.
     python_requires=">=3.10,<3.15",
+    # Exactly what the delegate library links, and nothing else. Each of these three is an ABI
+    # question: the shared object names libexecutorch, libnvinfer and libcudart in its own headers,
+    # so a different build of any of them is a different binary contract, and the local label is the
+    # only part of a version that names the CUDA row they have to share.
+    #
+    # Neither PyTorch nor Torch-TensorRT is here, and neither is linked. Torch-TensorRT is needed
+    # only by the deprecated forwarder in runtime.py, which imports it lazily and already says which
+    # package is missing if it is absent; naming it here also made this wheel depend on the project
+    # that builds it, which no resolver can satisfy. PyTorch arrives through ExecuTorch's Python
+    # bindings, and ExecuTorch deliberately leaves the choice of build to the user rather than
+    # pinning one, so a wheel that plugs into it has no business being stricter than it is.
     install_requires=[
-        # Full versions, local label included, for these three, but for two different reasons.
-        # ExecuTorch is the one this delegate is compiled and linked against, so another build of it
-        # is an ABI question. PyTorch and Torch-TensorRT are not linked here at all; they share a
-        # process with a delegate that links one CUDA runtime and one TensorRT, so what matters is
-        # that they come from the same CUDA row. A local label is the only part of a version that
-        # names the row, and there is no wildcard for one, so it is an exact pin or nothing.
-        f"torch=={torch.__version__}",
         f"executorch=={executorch_version}",
-        f"torch-tensorrt=={installed_version('torch-tensorrt')}",
         f"{TENSORRT_DISTRIBUTION}=={public_version(tensorrt_version)}",
         f"{CUDA_RUNTIME_DISTRIBUTION}=={public_version(cuda_runtime_version)}",
     ],

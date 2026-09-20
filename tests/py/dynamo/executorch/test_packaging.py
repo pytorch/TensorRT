@@ -665,23 +665,24 @@ def test_the_three_pinned_runtimes_keep_their_build_labels() -> None:
     """A version without its label admits a processor build and any other build of the same date.
 
     ExecuTorch is the one the delegate is compiled and linked against, so a requirement another
-    build satisfies is not a pin at all. PyTorch and Torch-TensorRT are not linked here; they share
-    a process with a delegate that links one CUDA runtime and one TensorRT, and the label is the
-    only part of a version that names the row those came from.
+    build satisfies is not a pin at all, and the label is the only part of a version that names the
+    CUDA row it came from.
+
+    Two names must stay out. Torch-TensorRT builds this wheel, so requiring it makes the wheel
+    depend on its own parent and no resolver can satisfy that. PyTorch is reached through
+    ExecuTorch's bindings, and ExecuTorch leaves that choice to the user, so pinning it here would
+    be stricter than the runtime this plugs into.
     """
     source = (COMPANION / "setup.py").read_text(encoding="utf-8")
     requires = source.split("install_requires=[", 1)[1].split("]", 1)[0]
-    for name, expression in (
-        ("torch", 'f"torch=={torch.__version__}"'),
-        ("executorch", 'f"executorch=={executorch_version}"'),
-        (
-            "torch-tensorrt",
-            "f\"torch-tensorrt=={installed_version('torch-tensorrt')}\"",
-        ),
-    ):
+    assert (
+        'f"executorch=={executorch_version}"' in requires
+    ), f"executorch is not pinned with its label: {requires}"
+    # Anchored on the opening quote, because "torch==" is a substring of "executorch==".
+    for absent in ('"torch==', '"torch-tensorrt=='):
         assert (
-            expression in requires
-        ), f"{name} is not pinned with its label: {requires}"
+            absent not in requires
+        ), f"{absent[1:]} is back in the requirements: {requires}"
     # And the two that legitimately have no label keep the public form.
     assert "public_version(tensorrt_version)" in requires, requires
     assert "public_version(cuda_runtime_version)" in requires, requires
@@ -698,10 +699,16 @@ def test_the_declared_pins_keep_their_build_labels(packaging_build, monkeypatch)
     state = packaging_build
     monkeypatch.setattr(sys, "argv", [str(state.project / "setup.py"), "--name"])
     runpy.run_path(str(state.project / "setup.py"), run_name="__main__")
-    for name in ("torch", "executorch", "torch-tensorrt"):
-        requirement = [r for r in state.requires if r.startswith(f"{name}==")]
-        assert requirement, state.requires
-        assert "+cu" in requirement[0], requirement[0]
+    executorch = [r for r in state.requires if r.startswith("executorch==")]
+    assert executorch, state.requires
+    assert "+cu" in executorch[0], executorch[0]
+    # And the two that must not be declared at all, read off what the build produced rather than
+    # off the source, because a value can be rewritten between the line that sets it and the line
+    # that uses it.
+    for absent in ("torch", "torch-tensorrt"):
+        assert not [
+            r for r in state.requires if r.startswith(f"{absent}==")
+        ], f"{absent} is declared again: {state.requires}"
 
 
 @pytest.mark.unit

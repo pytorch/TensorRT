@@ -2243,11 +2243,12 @@ def test_runtime_wheel_pins_its_cuda_13_dependencies(monkeypatch, cuda):
     monkeypatch.setenv(
         "TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION", "0.1.0.dev20200103+cu130"
     )
+    # No torch-tensorrt entry: the build no longer asks for its version, and leaving it here would
+    # make the query assertion below pass against a build that had started asking again.
     versions = {
         "executorch": "1.5.0.dev20200103+cu130",
         "tensorrt-cu13": "11.2.1",
         "nvidia-cuda-runtime": "13.0.0",
-        "torch-tensorrt": "2.15.0.dev20200102+cu130",
     }
     queries = []
     original_version = importlib.metadata.version
@@ -2270,15 +2271,15 @@ def test_runtime_wheel_pins_its_cuda_13_dependencies(monkeypatch, cuda):
         runpy.run_path(str(_RUNTIME_SETUP_PY))
         assert queries == list(versions)
         assert metadata["version"] == "0.1.0.dev20200103+cu130"
-        # The three runtimes the delegate links keep the label naming the build, because it links one
-        # specific build of each. The other two have no label to keep.
-        labelled = {"executorch", "torch-tensorrt"}
+        # Only what the delegate links, and ExecuTorch keeps the label because the delegate links one
+        # specific build of it. The inference library and the CUDA runtime have no label to keep.
+        # PyTorch and Torch-TensorRT are deliberately absent: neither is linked, requiring the second
+        # would make this wheel depend on the project that builds it, and ExecuTorch leaves the choice
+        # of PyTorch build to the user rather than pinning one.
         assert set(metadata["install_requires"]) == {
-            f"torch=={fake_torch.__version__}",
-            *(
-                f"{name}=={version if name in labelled else version.partition('+')[0]}"
-                for name, version in versions.items()
-            ),
+            f"executorch=={versions['executorch']}",
+            f"tensorrt-cu13=={versions['tensorrt-cu13'].partition('+')[0]}",
+            f"nvidia-cuda-runtime=={versions['nvidia-cuda-runtime'].partition('+')[0]}",
         }
 
 
