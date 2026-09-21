@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import json
+from inspect import Parameter, signature
 from pathlib import Path
 from typing import Any
 
 import torch
 import torch_tensorrt
 
-from .measure import cuda_ms, parity
+from .measure import cuda_ms
 from .ops import _as_tuple, record_engine
 from .spec import ComponentBundle
 
@@ -34,17 +35,12 @@ def compile_component(
     *,
     name: str,
     engine_dir: Path,
-    dryrun: bool = False,
     trt_settings: dict[str, Any] | None = None,
-    bench: dict[str, tuple[float, float]] | None = None,
-) -> tuple[str, tuple[torch.Tensor, ...]]:
+) -> tuple[str, tuple[torch.Tensor, ...], float]:
     """Export one component, compile it, write ``engine_dir/<name>/``.
 
-    Returns ``(engine_dir, example_outputs)`` from a patched eager run so the
-    exporter can chain components without a second unpatched forward.
-
-    Family setattr is owned by ``EdgeSpec.apply_patches``, not this helper.
-    ``dryrun`` records the patched eager module for ``execute_engine``.
+    Family setattr is owned by ``EdgeSpec.apply_patches`` around this call.
+    ``execute_engine`` records the TensorRT module, not eager.
     """
     from .plugin.attn_patches import (
         set_language_mask_type,
@@ -61,81 +57,84 @@ def compile_component(
     if bundle.context_attention_mask_type is not None:
         set_language_mask_type(bundle.context_attention_mask_type)
 
-    patched = bundle.patch_fn(module) if bundle.patch_fn is not None else None
-    try:
-        with torch.no_grad():
-            example = module(*execute_args)
-        outputs = _as_tuple(example)
-        record_engine(
-            engine_path,
-            component=name,
-            input_names=bundle.input_names,
-            outputs=outputs,
-            module=module,
-        )
-        if dryrun:
-            _write_sidecar(out_dir, bundle, name, outputs, dryrun=True)
-            return engine_path, outputs
+    export_kwargs: dict[str, Any] = {"strict": False}
+    if bundle.input_specs is not None:
+        from torch_tensorrt.dynamo._tracer import build_dim_registry, get_dynamic_shapes
 
-        exported = torch.export.export(module, args=trace_args, strict=False)
-        settings = {
-            k: v
-            for k, v in {
-                **DEFAULT_TRT_SETTINGS,
-                **(trt_settings or {}),
-                **bundle.trt_settings,
-            }.items()
-            if k in _TRT_COMPILE_KEYS
-        }
+        specs = tuple(bundle.input_specs)
+        leading = 0
+        for input_name in bundle.input_names:
+            if input_name.startswith("past_key_values"):
+                break
+            leading += 1
+        dim_registry = build_dim_registry(specs[:leading], {})
+        dynamic_shapes: dict[str, Any] = {}
+        positional_names: list[str] = []
+        var_pos_name: str | None = None
+        for param in signature(module.forward).parameters.values():
+            if param.kind == Parameter.VAR_POSITIONAL:
+                var_pos_name = param.name
+                break
+            if param.kind in (
+                Parameter.POSITIONAL_ONLY,
+                Parameter.POSITIONAL_OR_KEYWORD,
+            ):
+                positional_names.append(param.name)
+        for spec, param_name in zip(specs[:leading], positional_names[:leading]):
+            if param_name in ("inputs_embeds", "ds_stack"):
+                dynamic_shapes[param_name] = get_dynamic_shapes(spec, dim_registry)
+            else:
+                dynamic_shapes[param_name] = {}
+        if var_pos_name is not None:
+            dynamic_shapes[var_pos_name] = tuple(
+                get_dynamic_shapes(spec, dim_registry) for spec in specs[leading:]
+            )
+        export_kwargs["dynamic_shapes"] = dynamic_shapes
 
-        compiled = torch_tensorrt.dynamo.compile(
+    exported = torch.export.export(module, args=trace_args, **export_kwargs)
+    settings = {
+        k: v
+        for k, v in {
+            **DEFAULT_TRT_SETTINGS,
+            **(trt_settings or {}),
+            **bundle.trt_settings,
+        }.items()
+        if k in _TRT_COMPILE_KEYS
+    }
+
+    arg_inputs = (
+        tuple(bundle.input_specs) if bundle.input_specs is not None else trace_args
+    )
+    compiled = torch_tensorrt.dynamo.compile(
+        exported,
+        arg_inputs=arg_inputs,
+        **settings,
+    )
+
+    with torch.no_grad():
+        trt_out = _as_tuple(compiled(*execute_args))
+    trt_ms = cuda_ms(lambda: compiled(*execute_args))
+
+    record_engine(
+        engine_path,
+        component=name,
+        input_names=bundle.input_names,
+        outputs=trt_out,
+        module=compiled,
+    )
+    engine_file = bundle.engine_file
+
+    serialized = (
+        torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_engine(
             exported,
-            arg_inputs=trace_args,
+            arg_inputs=arg_inputs,
             **settings,
         )
+    )
+    (out_dir / engine_file).write_bytes(serialized)
 
-        with torch.no_grad():
-            trt_out = _as_tuple(compiled(*execute_args))
-        for i, (eager_t, trt_t) in enumerate(zip(outputs, trt_out)):
-            if not isinstance(eager_t, torch.Tensor) or not isinstance(
-                trt_t, torch.Tensor
-            ):
-                continue
-            label = name if i == 0 else f"{name}[{i}]"
-            parity(f"{label} A vs C (TRT)", eager_t, trt_t)
-
-        eager_ms = cuda_ms(lambda: module(*execute_args))
-        trt_ms = cuda_ms(lambda: compiled(*execute_args))
-        if bench is not None:
-            bench[name] = (eager_ms, trt_ms)
-
-        record_engine(
-            engine_path,
-            component=name,
-            input_names=bundle.input_names,
-            outputs=outputs,
-            module=compiled,
-        )
-        engine_file = bundle.engine_file
-
-        serialized = (
-            torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_engine(
-                exported,
-                arg_inputs=trace_args,
-                **settings,
-            )
-        )
-        (out_dir / engine_file).write_bytes(serialized)
-
-        _write_sidecar(out_dir, bundle, name, outputs, engine_file=engine_file)
-        return engine_path, outputs
-    finally:
-        if not dryrun and patched is not None:
-            from .plugin.plugin_utils import (
-                restore_attention,
-            )
-
-            restore_attention(patched)  # type: ignore[no-untyped-call]
+    _write_sidecar(out_dir, bundle, name, trt_out, engine_file=engine_file)
+    return engine_path, trt_out, trt_ms
 
 
 def _write_sidecar(
@@ -145,7 +144,6 @@ def _write_sidecar(
     outputs: tuple[torch.Tensor, ...],
     *,
     engine_file: str | None = None,
-    dryrun: bool = False,
 ) -> None:
     config = {
         "model_type": bundle.model_type,
@@ -153,7 +151,6 @@ def _write_sidecar(
         "engine_file": engine_file or bundle.engine_file,
         "input_names": list(bundle.input_names),
         "output_names": list(bundle.output_names),
-        "dryrun": dryrun,
         "outputs": [{"shape": list(t.shape), "dtype": str(t.dtype)} for t in outputs],
     }
     config.update(bundle.extra_config)

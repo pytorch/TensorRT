@@ -28,8 +28,6 @@ from .patches import (
 
 @register_edge_spec("nemotron_h", "nemotron")
 class NemotronSpec(EdgeSpec):  # type: ignore[misc]
-    components = ("language",)
-
     def apply_patches(self, model=None):
         return apply_nemotron_patches(model)
 
@@ -65,17 +63,33 @@ class NemotronSpec(EdgeSpec):  # type: ignore[misc]
             "bsz": embeddings.shape[0],
         }
 
+    def capture_eager_outputs(
+        self, model, sample, config, bench=None
+    ) -> dict[str, torch.Tensor]:
+        del config
+        from ...measure import cuda_ms
+
+        kwargs = {
+            "inputs_embeds": sample["inputs_embeds"],
+            "return_dict": True,
+        }
+        if sample.get("attention_mask") is not None:
+            kwargs["attention_mask"] = sample["attention_mask"]
+        with torch.no_grad():
+            out = model(**kwargs)
+        logits = out.logits if hasattr(out, "logits") else out[0]
+        if bench is not None:
+            bench["language"] = cuda_ms(lambda: model(**kwargs))
+        return {"language": logits}
+
     def prepare(
         self,
-        name: str,
         model: nn.Module,
         sample: MutableMapping[str, Any],
-        upstream: Mapping[str, Any],
         config: Any,
-    ) -> ComponentBundle:
+    ) -> dict[str, ComponentBundle]:
         from ...rope import make_rope_rotary_cos_sin
 
-        del name, upstream
         embeds = sample["inputs_embeds"]
         device, dtype = embeds.device, embeds.dtype
         bsz, seq_len, _ = embeds.shape
@@ -107,18 +121,27 @@ class NemotronSpec(EdgeSpec):  # type: ignore[misc]
             *[f"ssm_state_{i}" for i in range(nm)],
         ]
         sample.update(split_flat_to_kwargs(flat, names))
-        return ComponentBundle(
-            module=model.eval(),
-            trace_args=flat,
-            save_args=flat,
-            input_names=names,
-            output_names=["logits"]
-            + [f"present_kv_{i}" for i in range(na)]
-            + [f"present_conv_{i}" for i in range(nm)]
-            + [f"present_ssm_{i}" for i in range(nm)],
-            model_type="nemotron",
-            engine_file="language.engine",
-        )
+        return {
+            "language": ComponentBundle(
+                module=model.eval(),
+                trace_args=flat,
+                save_args=flat,
+                input_names=names,
+                output_names=["logits"]
+                + [f"present_kv_{i}" for i in range(na)]
+                + [f"present_conv_{i}" for i in range(nm)]
+                + [f"present_ssm_{i}" for i in range(nm)],
+                model_type="nemotron",
+                engine_file="language.engine",
+                trt_settings={
+                    "disable_tf32": True,
+                    "use_fp32_acc": True,
+                    "use_explicit_typing": True,
+                    "decompose_attention": True,
+                    "assume_dynamic_shape_support": True,
+                },
+            )
+        }
 
     def run(self, engines: Mapping[str, str], sample: Mapping[str, Any]) -> Any:
         leading = [
