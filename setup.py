@@ -632,6 +632,7 @@ dynamo_packages = [
     "torch_tensorrt.dynamo.lowering.constant_fold_exclusions",
     "torch_tensorrt.dynamo.partitioning",
     "torch_tensorrt.dynamo.runtime",
+    "torch_tensorrt.dynamo.runtime.meta_ops",
     "torch_tensorrt.dynamo.tools",
     "torch_tensorrt.executorch",
     "torch_tensorrt.runtime",
@@ -671,6 +672,7 @@ dynamo_package_dir = {
     "torch_tensorrt.dynamo.lowering.constant_fold_exclusions": "py/torch_tensorrt/dynamo/lowering/constant_fold_exclusions",
     "torch_tensorrt.dynamo.partitioning": "py/torch_tensorrt/dynamo/partitioning",
     "torch_tensorrt.dynamo.runtime": "py/torch_tensorrt/dynamo/runtime",
+    "torch_tensorrt.dynamo.runtime.meta_ops": "py/torch_tensorrt/dynamo/runtime/meta_ops",
     "torch_tensorrt.dynamo.tools": "py/torch_tensorrt/dynamo/tools",
     "torch_tensorrt.executorch": "py/torch_tensorrt/executorch",
     "torch_tensorrt.runtime": "py/torch_tensorrt/runtime",
@@ -936,12 +938,11 @@ if not (PY_ONLY or NO_TS):
         )
     ]
 
-    packages += ["torch_tensorrt.ts", "torch_tensorrt.dynamo.runtime.meta_ops"]
+    packages += ["torch_tensorrt.ts"]
 
     package_dir.update(
         {
             "torch_tensorrt.ts": "py/torch_tensorrt/ts",
-            "torch_tensorrt.dynamo.runtime.meta_ops": "py/torch_tensorrt/dynamo/runtime/meta_ops",
         }
     )
 

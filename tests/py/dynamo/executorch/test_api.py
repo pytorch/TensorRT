@@ -290,6 +290,23 @@ def test_public_api_symbols_present():
     assert "to_executorch" not in module.__all__
 
 
+@pytest.mark.unit
+def test_python_only_wheel_packages_the_executorch_export_ops():
+    """The placeholder registration module must not live in the C++-only arm."""
+    tree = ast.parse(_SETUP_PY.read_text(encoding="utf-8"))
+    assignments = {
+        node.targets[0].id: ast.literal_eval(node.value)
+        for node in tree.body
+        if isinstance(node, ast.Assign)
+        and len(node.targets) == 1
+        and isinstance(node.targets[0], ast.Name)
+        and node.targets[0].id in {"dynamo_packages", "dynamo_package_dir"}
+    }
+    package = "torch_tensorrt.dynamo.runtime.meta_ops"
+    assert package in assignments["dynamo_packages"]
+    assert package in assignments["dynamo_package_dir"]
+
+
 _REPO_ROOT = Path(__file__).resolve().parents[4]
 _SETUP_PY = _REPO_ROOT / "setup.py"
 _FILTER_MATRIX_PY = _REPO_ROOT / ".github/scripts/filter-matrix.py"
@@ -2801,6 +2818,24 @@ def test_save_executorch_defaults_when_lowering_kwargs_omitted(monkeypatch, tmp_
     assert captured["generate_etrecord"] is False
     # No etrecord written when generate_etrecord is falsy.
     assert not (tmp_path / "model_etrecord.bin").exists()
+
+
+@pytest.mark.unit
+def test_save_executorch_does_not_require_the_cpp_runtime(monkeypatch, tmp_path):
+    pytest.importorskip("executorch.exir")
+    import torch_tensorrt._compile as tc
+
+    captured = {}
+    _patch_executorch_lowering(monkeypatch, captured)
+    monkeypatch.setattr(
+        tc, "ENABLED_FEATURES", types.SimpleNamespace(torch_tensorrt_runtime=False)
+    )
+
+    ep = torch.export.export(_AddOne(), (torch.randn(2, 2),))
+    tc._save_as_executorch(ep, str(tmp_path / "python-only.pte"))
+
+    assert "export_kwargs" in captured
+    assert (tmp_path / "python-only.pte").is_file()
 
 
 # --- the same lowering kwargs flow through the *public* torch_tensorrt.save() -----
