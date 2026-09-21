@@ -143,40 +143,45 @@ const CudaDriverApi* g_cuda_driver = nullptr;
 
 // Creates a stream inside a green context holding at least `min_sms` SMs, so all
 // work on it is confined to that SM partition. Confinement rides the stream, so
-// the green context does not need to be made current. Returns false and leaves
-// the outputs untouched if the platform cannot provide one.
-static bool make_green_context_stream(
+// the green context does not need to be made current. Leaves the outputs untouched unless it
+// returns Created.
+enum class GreenContext { Created, Unsupported, Failed };
+
+static GreenContext make_green_context_stream(
     unsigned int min_sms,
     CUgreenCtx* out_green_ctx,
     cudaStream_t* out_stream,
     unsigned int* out_sms) {
   const CudaDriverApi* api = load_cuda_driver_api();
   if (api == nullptr) {
-    return false;
+    return GreenContext::Failed;
   }
   g_cuda_driver = api;
 
-  auto failed = [api](const char* what, CUresult res) {
+  // A device that cannot spare the SMs has to be told apart from a driver interface that does not
+  // work: the first is a normal answer and the second is a regression. Only the partition calls can
+  // give the first answer, because by here this process has already run the model on the GPU.
+  auto failed = [api](const char* what, CUresult res, GreenContext kind) {
     const char* msg = nullptr;
     api->GetErrorString(res, &msg);
     ET_LOG(Error, "green context: %s failed: %s", what, msg ? msg : "unknown");
-    return false;
+    return kind;
   };
 
   CUresult res = api->Init(0);
   if (res != CUDA_SUCCESS) {
-    return failed("cuInit", res);
+    return failed("cuInit", res, GreenContext::Failed);
   }
   CUdevice device;
   res = api->DeviceGet(&device, 0);
   if (res != CUDA_SUCCESS) {
-    return failed("cuDeviceGet", res);
+    return failed("cuDeviceGet", res, GreenContext::Failed);
   }
 
   CUdevResource whole{};
   res = api->DeviceGetDevResource(device, &whole, CU_DEV_RESOURCE_TYPE_SM);
   if (res != CUDA_SUCCESS) {
-    return failed("cuDeviceGetDevResource", res);
+    return failed("cuDeviceGetDevResource", res, GreenContext::Failed);
   }
 
   CUdevResource partition{};
@@ -184,21 +189,21 @@ static bool make_green_context_stream(
   unsigned int groups = 1;
   res = api->DevSmResourceSplitByCount(&partition, &groups, &whole, &remaining, 0, min_sms);
   if (res != CUDA_SUCCESS) {
-    return failed("cuDevSmResourceSplitByCount", res);
+    return failed("cuDevSmResourceSplitByCount", res, GreenContext::Unsupported);
   }
   if (groups < 1) {
     ET_LOG(Error, "green context: device could not provide an SM partition");
-    return false;
+    return GreenContext::Unsupported;
   }
 
   CUdevResourceDesc desc{};
   res = api->DevResourceGenerateDesc(&desc, &partition, 1);
   if (res != CUDA_SUCCESS) {
-    return failed("cuDevResourceGenerateDesc", res);
+    return failed("cuDevResourceGenerateDesc", res, GreenContext::Failed);
   }
   res = api->GreenCtxCreate(out_green_ctx, desc, device, CU_GREEN_CTX_DEFAULT_STREAM);
   if (res != CUDA_SUCCESS) {
-    return failed("cuGreenCtxCreate", res);
+    return failed("cuGreenCtxCreate", res, GreenContext::Unsupported);
   }
 
   CUstream raw_stream{};
@@ -206,12 +211,12 @@ static bool make_green_context_stream(
   if (res != CUDA_SUCCESS) {
     api->GreenCtxDestroy(*out_green_ctx);
     *out_green_ctx = nullptr;
-    return failed("cuGreenCtxStreamCreate", res);
+    return failed("cuGreenCtxStreamCreate", res, GreenContext::Failed);
   }
 
   *out_stream = reinterpret_cast<cudaStream_t>(raw_stream);
   *out_sms = partition.sm.smCount;
-  return true;
+  return GreenContext::Created;
 }
 
 int main(int argc, char** argv) {
@@ -396,14 +401,14 @@ int main(int argc, char** argv) {
   CUgreenCtx green_ctx = nullptr;
   if (green_context_sms > 0) {
     unsigned int partition_sms = 0;
-    const bool ok = make_green_context_stream(
+    const GreenContext green = make_green_context_stream(
         static_cast<unsigned int>(green_context_sms), &green_ctx, &caller_stream, &partition_sms);
     // Do not fall back to an ordinary stream: a run that asked for a green context and silently
     // got an ordinary one would report a pass it did not earn. Refuse by returning rather than by
     // aborting, because a device that cannot provide the partition is a normal answer and a caller
     // has to tell it apart from a crash. Asking for more than the device has is the usual reason,
     // so say how many it has.
-    if (!ok) {
+    if (green != GreenContext::Created) {
       int device_sms = 0;
       cudaDeviceGetAttribute(&device_sms, cudaDevAttrMultiProcessorCount, 0);
       ET_LOG(
@@ -412,7 +417,9 @@ int main(int argc, char** argv) {
           "device reports %d SMs in total, and a partition cannot exceed that.",
           green_context_sms,
           device_sms);
-      return 2;
+      // Only a device that answered "not this partition" is a skip for the caller; anything else is
+      // the interface failing and must not read as one.
+      return green == GreenContext::Unsupported ? 2 : 1;
     }
     fprintf(stderr, "caller stream: green context with %u SM(s)\n", partition_sms);
   } else {

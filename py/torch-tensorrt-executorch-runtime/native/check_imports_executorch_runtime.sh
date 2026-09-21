@@ -158,6 +158,18 @@ if [ -n "${unversioned_cxx}" ]; then
 ${unversioned_cxx}"
 fi
 
+# A second exception and locale implementation, absorbed from libstdc++.a, is preferred over the
+# shared runtime by everything loaded beside it, which the DT_NEEDED entry above cannot see. Only
+# libstdc++'s own translation units define these three families.
+own_cxx_runtime=$(printf '%s\n' "${dyn_syms}" |
+    awk '($5 == "GLOBAL" || $5 == "WEAK") && $7 != "UND" && $7 != "UNDEF" { print $8 }' |
+    sed 's/@.*//' |
+    grep -E '^(__cxa_(throw|rethrow|begin_catch|end_catch|allocate_exception|free_exception)$|_ZTVN10__cxxabiv1|_ZNS[tK]?6locale)')
+if [ -n "${own_cxx_runtime}" ]; then
+    fail "${target} defines $(printf '%s\n' "${own_cxx_runtime}" | wc -l) libstdc++ symbols of its own, so it carries a second C++ runtime:
+$(printf '%s\n' "${own_cxx_runtime}" | head -20)"
+fi
+
 syms=$("${readelf_bin}" -Ws "${target}") ||
     fail "could not read the symbols of ${target}"
 register_backend='_ZN10executorch7runtime16register_backendERKNS0_7BackendE'

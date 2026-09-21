@@ -619,14 +619,15 @@ def test_the_forwarder_tells_absent_apart_from_too_old(monkeypatch, installed) -
     raised.append(str(program_error.value))
 
     for message in raised:
-        aged = "older than the one this package was built against" in message
-        assert aged is installed, message
+        present = "does not carry the receiving module" in message
+        assert present is installed, message
         if installed:
-            assert "torch_tensorrt.load(" in message, message
+            assert "Upgrade Torch-TensorRT" in message, message
         else:
-            assert "is not installed" in message, message
-            assert "load_program(path)" in message, message
-            assert "torch_tensorrt.load(" not in message, message
+            assert "which is not installed" in message, message
+            assert "install torch-tensorrt" in message, message
+        # Both doors offer the way off the deprecated call, whichever case the reader is in.
+        assert "load_program(path)" in message, message
 
 
 @pytest.mark.parametrize(

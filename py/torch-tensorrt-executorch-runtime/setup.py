@@ -96,8 +96,14 @@ def executorch_cmake_prefix_path() -> str:
     # processor-only build of the pinned date, which cannot supply the CUDA runtime the delegate
     # links, and the wheel this build then publishes requires the label it did not check.
     label = distribution.version.partition("+")[2]
+    # The row too, not just the shape of the label. The delegate links CUDA 13, so a CUDA 12 build
+    # of the pinned date passes a prefix test and then publishes a wheel requiring an ExecuTorch
+    # that cannot run beside it. The major is the comparable part: the build row picks the minor.
+    cuda_major = yaml.safe_load(
+        (REPO_ROOT / "dev_dep_versions.yml").read_text(encoding="utf-8")
+    )["__cuda_version__"].split(".")[0]
     wrong_version = public_version(pinned) != installed
-    wrong_build = not label.startswith("cu")
+    wrong_build = not label.startswith(f"cu{cuda_major}")
     if (wrong_version or wrong_build) and os.getenv(
         "TORCH_TENSORRT_ALLOW_UNPINNED_EXECUTORCH", ""
     ).lower() not in ("1", "true", "yes", "on"):

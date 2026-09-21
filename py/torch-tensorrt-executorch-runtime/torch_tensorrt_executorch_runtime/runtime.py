@@ -38,11 +38,15 @@ def _cannot_forward(error: ImportError) -> ImportError:
             "executorch.runtime.Runtime.get().load_program(path). "
             f"Underlying error: {error}"
         )
+    # No advice to call torch_tensorrt.load(format="executorch") here: on the wheel that reaches
+    # this branch, that call is what forwards into this function, so it returns the reader to the
+    # error they already have.
     return ImportError(
-        "This deprecated door forwards into torch_tensorrt, and the installed Torch-TensorRT is "
-        "older than the one this package was built against, so it does not carry the receiving "
-        "module. Install the Torch-TensorRT this package requires, or call "
-        f'torch_tensorrt.load(path, format="executorch") directly. Underlying error: {error}'
+        "This deprecated door forwards into torch_tensorrt, and the installed Torch-TensorRT does "
+        "not carry the receiving module. Upgrade Torch-TensorRT to a build that has it, or drop "
+        "the deprecated call: import this package to register the TensorRT delegate, then load "
+        "with executorch.runtime.Runtime.get().load_program(path). "
+        f"Underlying error: {error}"
     )
 
 

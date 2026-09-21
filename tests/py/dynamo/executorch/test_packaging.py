@@ -541,7 +541,7 @@ def test_a_missing_pin_file_fails_rather_than_disabling_the_check() -> None:
 
 @pytest.mark.parametrize(
     "installed,accepted",
-    [("+cu130", True), ("+cu134", True), ("+cpu", False), ("", False)],
+    [("+cu130", True), ("+cu134", True), ("+cu126", False), ("+cpu", False), ("", False)],
 )
 def test_the_build_refuses_an_executorch_that_is_not_a_cuda_build(
     packaging_build, installed, accepted
