@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """TensorRT conversion for ``aten.index_copy.default``.
 
 Mirrors the structure of ``slice_scatter`` but the eligibility check is

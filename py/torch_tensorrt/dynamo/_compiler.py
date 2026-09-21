@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 from __future__ import annotations
 
 import collections.abc
@@ -49,6 +52,7 @@ from torch_tensorrt.dynamo.lowering._buffer_lifting import (
     aliased_input_bindings,
     assert_no_kv_alias_markers_survived,
     assert_predicted_kv_aliased,
+    erase_export_guards,
     hide_copyback_outputs,
     inline_lifted_buffers_into_gm,
     lift_mutated_buffers,
@@ -470,6 +474,9 @@ def compile(
     enable_experimental_decompositions: bool = _defaults.ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     dryrun: bool = _defaults.DRYRUN,
     hardware_compatible: bool = _defaults.HARDWARE_COMPATIBLE,
+    target_compute_capabilities: Optional[
+        List[Tuple[int, int]]
+    ] = _defaults.TARGET_COMPUTE_CAPABILITIES,
     timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
     lazy_engine_init: bool = _defaults.LAZY_ENGINE_INIT,
     cache_built_engines: bool = _defaults.CACHE_BUILT_ENGINES,
@@ -568,6 +575,7 @@ def compile(
         enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
         dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
+        target_compute_capabilities (Optional[List[Tuple[int, int]]]): Compute capabilities to build for, e.g. ``[(7, 5)]`` for Turing. Defaults to ``None``. The compilation then targets the current device, from ``torch.cuda.get_device_capability()``. TensorRT-RTX only. Drives both engine targeting and op partitioning, so ops unsupported on any listed target fall back to PyTorch.
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX.
         lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.
         cache_built_engines (bool): Whether to save the compiled TRT engines to storage
@@ -771,6 +779,7 @@ def compile(
         "dla_global_dram_size": dla_global_dram_size,
         "dryrun": dryrun,
         "hardware_compatible": hardware_compatible,
+        "target_compute_capabilities": target_compute_capabilities,
         "timing_cache_path": timing_cache_path,
         "lazy_engine_init": lazy_engine_init,
         "cache_built_engines": cache_built_engines,
@@ -1284,8 +1293,10 @@ def compile_module(
     CONVERTERS.set_compilation_settings(settings)
 
     # Check the number of supported operations in the graph
-    num_supported_ops, total_ops = partitioning.get_graph_converter_support(
-        gm, settings.torch_executed_ops
+    num_supported_ops, total_ops, op_support = (
+        partitioning.get_graph_converter_support_overview(
+            gm, settings.torch_executed_ops
+        )
     )
 
     dryrun_tracker.total_ops_in_graph = total_ops
@@ -1307,6 +1318,11 @@ def compile_module(
             f"{num_supported_ops} supported operations detected in subgraph containing {total_ops} computational nodes. "
             f"Skipping this subgraph, since min_block_size was detected to be {settings.min_block_size}"
         )
+
+        dryrun_tracker.unsupported_ops = op_support.unsupported_operators
+        dryrun_tracker.to_run_in_torch.extend(parse_non_trt_nodes(gm))
+        parse_graph_io(gm, dryrun_tracker)
+        dryrun_stats_display(dryrun_tracker, settings.dryrun)
         return gm
     else:
         logger.debug(
@@ -1327,6 +1343,37 @@ def compile_module(
         # TODO: For future, explore when nodes don't have metadata and if fake_tensor_prop can resolve this.
         logger.warning(
             "Some nodes do not have metadata (shape and dtype information). This could lead to problems sometimes if the graph has PyTorch and TensorRT segments."
+        )
+
+    # Every computational op is TRT-legal: skip AccNodesFinder / tag / split and
+    # convert the lowered graph as a single engine. Mixed graphs still partition.
+    if (
+        settings.require_full_compilation
+        and num_supported_ops == total_ops
+        and not settings.enable_resource_partitioning
+    ):
+        logger.info(
+            "require_full_compilation + full operator support: "
+            "skipping partitioner, converting whole graph"
+        )
+        if settings.dryrun:
+            return gm
+        gm = erase_export_guards(gm)
+        # Do not delete `_frozen_param*` here. Stock compile_module only drops
+        # them on the parent after split; convert still needs them on the
+        # graph being interpreted. Use placeholder meta for engine I/O — a
+        # flattened copy of compile() sample args can wrap kwargs dicts and
+        # non-tensor flags (Flux `return_dict`) that are not TRT bindings.
+        convert_inputs = partitioning.construct_submodule_inputs(
+            gm,
+            user_symbol_bounds=user_symbol_bounds,
+        )
+        return convert_module(
+            gm,
+            convert_inputs,
+            settings=settings,
+            name="_run_on_acc_0",
+            engine_cache=engine_cache,
         )
 
     # Store the original input spec for later use
@@ -1363,6 +1410,9 @@ def compile_module(
                 torch_executed_ops=settings.torch_executed_ops,
                 require_full_compilation=settings.require_full_compilation,
                 skip_fusion=(num_supported_ops == total_ops),
+                assume_full_support=(
+                    settings.require_full_compilation and num_supported_ops == total_ops
+                ),
             )
 
         except torch.fx.passes.splitter_base.FxNetSplitterInternalError:
@@ -1806,6 +1856,9 @@ def convert_exported_program_to_serialized_trt_engine(
     enable_experimental_decompositions: bool = _defaults.ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     dryrun: bool = _defaults.DRYRUN,
     hardware_compatible: bool = _defaults.HARDWARE_COMPATIBLE,
+    target_compute_capabilities: Optional[
+        List[Tuple[int, int]]
+    ] = _defaults.TARGET_COMPUTE_CAPABILITIES,
     timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
     lazy_engine_init: bool = _defaults.LAZY_ENGINE_INIT,
     cache_built_engines: bool = _defaults.CACHE_BUILT_ENGINES,
@@ -1908,6 +1961,7 @@ def convert_exported_program_to_serialized_trt_engine(
         enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
         dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
+        target_compute_capabilities (Optional[List[Tuple[int, int]]]): Compute capabilities to build for, e.g. ``[(7, 5)]`` for Turing. Defaults to ``None``. The compilation then targets the current device, from ``torch.cuda.get_device_capability()``. TensorRT-RTX only. Drives both engine targeting and op partitioning, so ops unsupported on any listed target fall back to PyTorch.
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX.
         lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.
         cache_built_engines (bool): Whether to save the compiled TRT engines to storage
@@ -2092,6 +2146,7 @@ def convert_exported_program_to_serialized_trt_engine(
         "dla_global_dram_size": dla_global_dram_size,
         "dryrun": dryrun,
         "hardware_compatible": hardware_compatible,
+        "target_compute_capabilities": target_compute_capabilities,
         "timing_cache_path": timing_cache_path,
         "lazy_engine_init": lazy_engine_init,
         "cache_built_engines": cache_built_engines,

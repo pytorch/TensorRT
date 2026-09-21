@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """Regression tests for the annotations we hand TRT for scalar plugin attributes.
 
 numpy 2.5 redefined ``npt.NDArray`` as a PEP 695 alias, which made

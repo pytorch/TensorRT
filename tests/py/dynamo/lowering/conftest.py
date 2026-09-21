@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 import pytest
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     DYNAMO_ATEN_CONVERTERS,

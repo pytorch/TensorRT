@@ -20,13 +20,13 @@ find_package(TensorRT REQUIRED)
 find_package(CUDAToolkit REQUIRED)
 find_package(Threads REQUIRED)
 
-set(_torchtrt_executorch_sources
+set(_executorch_backend_tensorrt_sources
     "${CMAKE_CURRENT_LIST_DIR}/TensorRTBackend.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/TensorRTBlobHeader.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/WeightStreamingBudget.cpp"
 )
 
-add_library(executorch_trt_backend STATIC ${_torchtrt_executorch_sources})
+add_library(executorch_trt_backend STATIC ${_executorch_backend_tensorrt_sources})
 set_target_properties(executorch_trt_backend
     PROPERTIES
         OUTPUT_NAME "executorch_trt_backend"
@@ -51,10 +51,10 @@ target_compile_definitions(executorch_trt_backend
         C10_USING_CUSTOM_GENERATED_MACROS
 )
 
-set(_torchtrt_executorch_source_root "")
+set(_executorch_backend_tensorrt_source_root "")
 foreach(_executorch_root_candidate IN ITEMS "${EXECUTORCH_SOURCE_DIR}" "${EXECUTORCH_ROOT}")
     if(_executorch_root_candidate AND EXISTS "${_executorch_root_candidate}/runtime/core/portable_type/c10")
-        set(_torchtrt_executorch_source_root "${_executorch_root_candidate}")
+        set(_executorch_backend_tensorrt_source_root "${_executorch_root_candidate}")
         get_filename_component(_executorch_include_parent "${_executorch_root_candidate}" DIRECTORY)
         target_include_directories(executorch_trt_backend
             PUBLIC
@@ -67,10 +67,40 @@ endforeach()
 # Select ExecuTorch's shared extension_cuda so every CUDA-capable delegate shares
 # one caller-stream thread-local. A static copy linked into a second shared object
 # would create a second thread-local and silently break the handshake, so every
-# branch below must resolve to one shared library. Precedence: an
-# ExecuTorch-provided target, then an explicit prebuilt shared library, then a
-# source build.
-if(TARGET extension_cuda)
+# branch below must resolve to one shared library. Precedence: the installed wheel's
+# package, then an ExecuTorch-provided target, then an explicit prebuilt shared
+# library, then a source build.
+if(TARGET executorch::extension_cuda)
+    # Already provided by a parent project that called find_package(executorch), i.e. the
+    # installed wheel. This file does not call it itself, because it is also configured
+    # standalone against a source tree. Aliased rather than queried for its type: the package
+    # only ever defines this as a shared imported target, so the static-copy hazard the other
+    # branches guard against cannot arise here. The wheel's config withholds these targets
+    # entirely below CMake 3.28, and none of the branches below can stand in for them: each
+    # needs an add_subdirectory of ExecuTorch, an explicit prebuilt library, or a source
+    # checkout, none of which a wheel-only consumer has. That case is diagnosed at the bottom of
+    # this chain rather than left to fail as a missing target.
+    # Only when the plain name is free. A consumer that already defines extension_cuda, which is
+    # what an add_subdirectory of ExecuTorch produces, would otherwise fail on a duplicate name
+    # while trying to use both packages together.
+    if(NOT TARGET extension_cuda)
+        add_library(extension_cuda ALIAS executorch::extension_cuda)
+    else()
+        # Both names exist, so the plain one wins the link below and the package's own target is
+        # never reached. Check the one that will actually be linked, or a static copy slips past
+        # the branch further down that was written to catch exactly this.
+        get_target_property(_extension_cuda_type extension_cuda TYPE)
+        if(NOT _extension_cuda_type STREQUAL "SHARED_LIBRARY")
+            message(FATAL_ERROR
+                "ExecuTorch's extension_cuda target must be shared; got "
+                "${_extension_cuda_type}. Static copies break caller-stream sharing."
+            )
+        endif()
+        # The runtime below has to come from the same build as the target that just won this link,
+        # or the backend carries two ExecuTorch builds at once.
+        set(_executorch_backend_tensorrt_et_not_from_package TRUE)
+    endif()
+elseif(TARGET extension_cuda)
     # Provided by ExecuTorch, e.g. add_subdirectory() with EXECUTORCH_BUILD_CUDA=ON.
     get_target_property(_extension_cuda_type extension_cuda TYPE)
     if(NOT _extension_cuda_type STREQUAL "SHARED_LIBRARY")
@@ -113,8 +143,8 @@ elseif(EXECUTORCH_EXTENSION_CUDA_LIBRARY)
     set_target_properties(extension_cuda PROPERTIES
         IMPORTED_LOCATION "${EXECUTORCH_EXTENSION_CUDA_LIBRARY}"
     )
-elseif(_torchtrt_executorch_source_root AND
-       EXISTS "${_torchtrt_executorch_source_root}/extension/cuda/CMakeLists.txt")
+elseif(_executorch_backend_tensorrt_source_root AND
+       EXISTS "${_executorch_backend_tensorrt_source_root}/extension/cuda/CMakeLists.txt")
     # Build the single shared library from ExecuTorch's own definition rather
     # than a copy of it, so this stays correct if ExecuTorch changes the target
     # and so a duplicate definition is a hard error instead of two libraries.
@@ -122,10 +152,19 @@ elseif(_torchtrt_executorch_source_root AND
         set(_common_include_directories "${_executorch_include_parent}")
     endif()
     add_subdirectory(
-        "${_torchtrt_executorch_source_root}/extension/cuda"
+        "${_executorch_backend_tensorrt_source_root}/extension/cuda"
         "${CMAKE_CURRENT_BINARY_DIR}/executorch_extension_cuda"
     )
 else()
+    # Name the version gate first when that is what happened, so a consumer who did everything
+    # right is not told to install what they already installed.
+    if(executorch_FOUND AND CMAKE_VERSION VERSION_LESS 3.28)
+        message(FATAL_ERROR
+            "The installed ExecuTorch wheel withholds its CMake targets below CMake 3.28, and "
+            "this build is running CMake ${CMAKE_VERSION}. Upgrade to 3.28 or newer, or point "
+            "EXECUTORCH_EXTENSION_CUDA_LIBRARY at the wheel's "
+            "libexecutorch_extension_cuda.so directly.")
+    endif()
     message(FATAL_ERROR
         "Torch-TensorRT's ExecuTorch backend requires ExecuTorch's shared "
         "extension_cuda library. Add ExecuTorch first with EXECUTORCH_BUILD_CUDA=ON, "
@@ -136,17 +175,29 @@ else()
     )
 endif()
 
-set(_torchtrt_executorch_link_libraries
+set(_executorch_backend_tensorrt_link_libraries
     CUDA::cudart
     TensorRT::nvinfer
     Threads::Threads
     extension_cuda
 )
 
-if(TARGET executorch_core)
-    list(APPEND _torchtrt_executorch_link_libraries executorch_core)
+if(_executorch_backend_tensorrt_et_not_from_package AND (TARGET executorch_core OR TARGET executorch))
+    # extension_cuda above resolved to the consumer's own ExecuTorch, so take the runtime from there
+    # too rather than from the installed package.
+    if(TARGET executorch_core)
+        list(APPEND _executorch_backend_tensorrt_link_libraries executorch_core)
+    else()
+        list(APPEND _executorch_backend_tensorrt_link_libraries executorch)
+    endif()
+elseif(TARGET executorch::runtime)
+    # The installed wheel's prebuilt runtime, which also carries the include directories,
+    # compile definitions and C++ standard it was built with.
+    list(APPEND _executorch_backend_tensorrt_link_libraries executorch::runtime)
+elseif(TARGET executorch_core)
+    list(APPEND _executorch_backend_tensorrt_link_libraries executorch_core)
 elseif(TARGET executorch)
-    list(APPEND _torchtrt_executorch_link_libraries executorch)
+    list(APPEND _executorch_backend_tensorrt_link_libraries executorch)
 elseif(DEFINED EXECUTORCH_ROOT AND EXISTS "${EXECUTORCH_ROOT}/runtime")
     if(NOT DEFINED EXECUTORCH_CORE_LIBRARY)
         set(
@@ -159,33 +210,41 @@ elseif(DEFINED EXECUTORCH_ROOT AND EXISTS "${EXECUTORCH_ROOT}/runtime")
     if(NOT EXISTS "${EXECUTORCH_CORE_LIBRARY}")
         message(FATAL_ERROR "EXECUTORCH_CORE_LIBRARY='${EXECUTORCH_CORE_LIBRARY}' does not exist")
     endif()
-    list(APPEND _torchtrt_executorch_link_libraries "${EXECUTORCH_CORE_LIBRARY}")
+    list(APPEND _executorch_backend_tensorrt_link_libraries "${EXECUTORCH_CORE_LIBRARY}")
 else()
     message(FATAL_ERROR "Add ExecuTorch before torch_tensorrt_executorch or set EXECUTORCH_ROOT to an ExecuTorch source tree")
 endif()
 
 target_link_libraries(executorch_trt_backend
     PUBLIC
-        ${_torchtrt_executorch_link_libraries}
+        ${_executorch_backend_tensorrt_link_libraries}
 )
 
-add_library(torchtrt_executorch_backend INTERFACE)
-add_library(torchtrt::executorch_backend ALIAS torchtrt_executorch_backend)
-add_dependencies(torchtrt_executorch_backend executorch_trt_backend)
+add_library(executorch_backend_tensorrt_backend INTERFACE)
+add_library(executorch::backend_tensorrt ALIAS executorch_backend_tensorrt_backend)
+# The names this target had before, so a project outside this repository that links it by an old
+# name keeps working. Both are aliases, which covers linking and nothing else: CMake refuses an
+# alias in install(TARGETS) and in set_target_properties, so a consumer doing either has to move to
+# executorch::backend_tensorrt. The base branch carried both spellings and a consumer could link
+# either, so dropping one would let an out-of-tree project configure clean and then fail at link
+# time looking for a library nobody builds any more.
+add_library(torchtrt::executorch_backend ALIAS executorch_backend_tensorrt_backend)
+add_library(torchtrt_executorch_backend ALIAS executorch_backend_tensorrt_backend)
+add_dependencies(executorch_backend_tensorrt_backend executorch_trt_backend)
 
 if(MSVC)
-    target_link_libraries(torchtrt_executorch_backend
+    target_link_libraries(executorch_backend_tensorrt_backend
         INTERFACE
             executorch_trt_backend
-            ${_torchtrt_executorch_link_libraries}
+            ${_executorch_backend_tensorrt_link_libraries}
     )
 else()
-    target_link_libraries(torchtrt_executorch_backend
+    target_link_libraries(executorch_backend_tensorrt_backend
         INTERFACE
             "-Wl,--whole-archive"
             "$<TARGET_FILE:executorch_trt_backend>"
             "-Wl,--no-whole-archive"
-            ${_torchtrt_executorch_link_libraries}
+            ${_executorch_backend_tensorrt_link_libraries}
     )
 endif()
 

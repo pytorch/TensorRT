@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """
 .. _executorch_export:
 
@@ -12,7 +15,8 @@ Prerequisites
 -------------
 Install Torch-TensorRT with the ExecuTorch extra before running this example::
 
-    pip install -e ".[executorch]"
+    pip install -e ".[executorch]" \
+        --extra-index-url https://download.pytorch.org/whl/nightly/cu130
 
 See https://pytorch.org/executorch/stable/getting-started-setup.html for details.
 """

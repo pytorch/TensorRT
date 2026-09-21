@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 # type: ignore
 
 import atexit
@@ -206,22 +209,32 @@ else:
 # The delegate is compiled from the ExecuTorch source revision pinned in MODULE.bazel, so the
 # installed wheel should agree with it. The upper bound is the load-bearing half: ExecuTorch's C++
 # runtime API is not stable across minor releases, and an unbounded floor would resolve a future
-# minor against a backend built for this one. Patch releases stay allowed because they come off the
-# same release branch; the exact pin belongs in the runtime package, which does derive it.
+# minor against a backend built for this one. Everything below that ceiling resolves: later 1.5
+# nightlies, a 1.5 release candidate, and 1.5 patch releases alike, since the exact pin belongs in
+# the runtime package, which does derive it.
+# The floor currently names a dev build, because the runtime split the delegate needs does not
+# exist in any ExecuTorch release yet: 1.4.1's executorch/lib carries no standalone linkable
+# runtime, and no CUDA wheel at all.
+# That also makes this range prefer a release as soon as one exists, since 1.5.0 sorts above
+# every 1.5.0.devN, so nothing here changes on the day it ships.
 _executorch_major, _executorch_minor = __executorch_version__.split(".")[:2]
+# Linux-only, and not incidentally: the delegate is a Linux shared object, ExecuTorch publishes
+# CUDA wheels for no other platform, and the feature is documented Linux-only. Without the marker
+# the extra also has to resolve for the win32 entry in pyproject.toml's uv required-environments,
+# where the only candidates are PyPI's, which stop at 1.4.1 -- so raising this floor above that
+# makes `uv lock` fail outright rather than pick something older.
 EXECUTORCH_REQUIREMENT = (
     f"executorch>={__executorch_version__},"
-    f"<{_executorch_major}.{int(_executorch_minor) + 1}"
+    f"<{_executorch_major}.{int(_executorch_minor) + 1}; "
+    "platform_system == 'Linux'"
 )
-# TODO: Enable this once the runtime wheel is published to the PyTorch index.
-# EXECUTORCH_RUNTIME_REQUIREMENT = (
-#     f"torch-tensorrt-executorch-runtime=={__version__}; " "platform_system == 'Linux'"
-# )
+# No version: the delegate pins ExecuTorch itself, so a mismatch is refused from its side.
+EXECUTORCH_RUNTIME_REQUIREMENT = (
+    "torch-tensorrt-executorch-runtime; platform_system == 'Linux'"
+)
 EXTRAS_REQUIRE = {
-    #     "executorch": [EXECUTORCH_REQUIREMENT, EXECUTORCH_RUNTIME_REQUIREMENT],
-    #     "all": [EXECUTORCH_REQUIREMENT, EXECUTORCH_RUNTIME_REQUIREMENT],
-    "executorch": [EXECUTORCH_REQUIREMENT],
-    "all": [EXECUTORCH_REQUIREMENT],
+    "executorch": [EXECUTORCH_REQUIREMENT, EXECUTORCH_RUNTIME_REQUIREMENT],
+    "all": [EXECUTORCH_REQUIREMENT, EXECUTORCH_RUNTIME_REQUIREMENT],
 }
 
 if "--ci" in sys.argv:
@@ -371,6 +384,11 @@ def gen_version_file():
 
     with open(dir_path + "/torch_tensorrt/_version.py", "w") as f:
         print("creating version file")
+        f.write(
+            "# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & "
+            "AFFILIATES. All rights reserved.\n"
+        )
+        f.write("# SPDX-License-Identifier: BSD-3-Clause\n\n")
         f.write('__version__ = "' + __version__ + '"\n')
         f.write('__cuda_version__ = "' + __cuda_version__ + '"\n')
         f.write('__tensorrt_version__ = "' + __tensorrt_version__ + '"\n')
@@ -1015,16 +1033,7 @@ def get_x86_64_requirements(base_requirements):
             ]
         else:
             cuda_version = torch.version.cuda
-            if cuda_version.startswith("12"):
-                # In cu12* envs, keep the CUDA-specific TensorRT wheels explicit so the default CUDA 13
-                # TensorRT dependency path is not pulled in as well.
-                tensorrt_prefix = "tensorrt-cu12"
-                requirements = requirements + [
-                    f"{tensorrt_prefix}>=11.3.0,<11.4.0",
-                    f"{tensorrt_prefix}-bindings>=11.3.0,<11.4.0",
-                    f"{tensorrt_prefix}-libs>=11.3.0,<11.4.0",
-                ]
-            elif cuda_version.startswith("13"):
+            if cuda_version.startswith("13"):
                 tensorrt_prefix = "tensorrt-cu13"
                 requirements = requirements + [
                     f"{tensorrt_prefix}>=11.3.0,<11.4.0",

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 import os
 import platform
 import tempfile
@@ -63,6 +66,7 @@ ENABLE_WEIGHT_STREAMING = False
 ENABLE_CROSS_COMPILE_FOR_WINDOWS = False
 TILING_OPTIMIZATION_LEVEL = "none"
 L2_LIMIT_FOR_TILING = -1
+TARGET_COMPUTE_CAPABILITIES = None
 USE_DISTRIBUTED_MODE_TRACE = False
 OFFLOAD_MODULE_TO_CPU = False
 ENABLE_AUTOCAST = False

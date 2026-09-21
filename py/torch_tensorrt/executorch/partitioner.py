@@ -1,6 +1,10 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 # ExecuTorch partitioner: partition by execute_engine nodes.
 
 import logging
+import re
 from typing import Callable, Dict, List, Optional, Tuple
 
 import torch
@@ -133,9 +137,23 @@ class TensorRTPartitioner(Partitioner):  # type: ignore[misc]
         # it we use that verbatim; otherwise each partition's device is derived from
         # its own engine node in partition() (engine nodes are not available here)
         # so a cuda:N engine is not mislabeled cuda:0.
-        self._has_explicit_target_device = any(
-            s.key == _TARGET_DEVICE_COMPILE_SPEC_KEY for s in self.compile_specs
-        )
+        explicit = [
+            s for s in self.compile_specs if s.key == _TARGET_DEVICE_COMPILE_SPEC_KEY
+        ]
+        # Refuse a device this delegate cannot run on here, at export, rather than leaving the
+        # program to fail at its first instruction, where the failure says nothing about the request
+        # that caused it.
+        for spec in explicit:
+            requested = spec.value.decode(errors="replace")
+            # Whole match, case-insensitive: the framework spells the device "CUDA" as readily as
+            # "cuda", while "cuda:" and "cuda:abc" name no device at all.
+            if re.fullmatch(r"cuda(:\d+)?", requested.strip(), re.IGNORECASE) is None:
+                raise ValueError(
+                    f"{_TARGET_DEVICE_COMPILE_SPEC_KEY}={requested!r} is not a device this "
+                    "delegate runs on. It compiles to TensorRT engines, which need a CUDA device, "
+                    'so the value has to be "cuda" or "cuda:N".'
+                )
+        self._has_explicit_target_device = bool(explicit)
         self.delegation_spec = DelegationSpec(
             backend_id=TensorRTBackend.__name__,
             compile_specs=self.compile_specs,

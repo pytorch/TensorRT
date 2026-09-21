@@ -1,10 +1,13 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 import torch
 import torch.nn as nn
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
 
-from .harness import DispatchTestCase
+from .harness import DispatchTestCase, skip_if_trt_rtx_turing
 
 
 class TestLinearConverter(DispatchTestCase):
@@ -17,6 +20,8 @@ class TestLinearConverter(DispatchTestCase):
         ]
     )
     def test_linear_converter(self, in_features, out_features):
+        skip_if_trt_rtx_turing(self, "nn.Linear (an FP32 GEMM)")
+
         class LinearModel(nn.Module):
             def __init__(self, in_features, out_features):
                 super(LinearModel, self).__init__()
@@ -30,6 +35,8 @@ class TestLinearConverter(DispatchTestCase):
         self.run_test(model, inputs, use_dynamo_tracer=True, enable_passes=True)
 
     def test_linear_with_dynamic_shape(self):
+        skip_if_trt_rtx_turing(self, "aten.linear (an FP32 GEMM)")
+
         class LinearModel(torch.nn.Module):
             def forward(self, x, weight, bias):
                 return torch.ops.aten.linear.default(x, weight, bias)
@@ -50,6 +57,8 @@ class TestLinearConverter(DispatchTestCase):
         )
 
     def test_linear_with_rank_3_input_and_bias(self):
+        skip_if_trt_rtx_turing(self, "aten.linear (an FP32 GEMM)")
+
         class LinearModel(torch.nn.Module):
             def forward(self, x, weight, bias):
                 return torch.ops.aten.linear.default(x, weight, bias)

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 import ctypes
 import getpass
 import logging
@@ -7,7 +10,7 @@ import sys
 import tempfile
 import urllib.request
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Tuple
 
 import tensorrt as trt
 import torch
@@ -22,12 +25,49 @@ _TENSORRT_LLM_VERSION_ = "1.2.0"
 # "libnvinfer.so.<N>: cannot open shared object file" error at dlopen time.
 _TENSORRT_LLM_REQUIRED_TENSORRT_MAJOR_MINOR_ = "10.14"
 
+# The delegate links CUDA 13 libraries, so the major is what decides support.
+EXECUTORCH_CUDA_MAJOR = "13"
+
 
 def sanitized_torch_version() -> Any:
     return (
         torch.__version__
         if ".nv" not in torch.__version__
         else torch.__version__.split(".nv")[0]
+    )
+
+
+def executorch_install_channel() -> str | None:
+    """Return the nightly channel matching the active PyTorch CUDA build, if supported.
+
+    Names the channel matching the installed torch. It does not promise that channel exists,
+    because PyTorch publishes a new CUDA minor before ExecuTorch fills it.
+    """
+    cuda_version = torch.version.cuda or ""
+    major, _, minor = cuda_version.partition(".")
+    if major != EXECUTORCH_CUDA_MAJOR or not minor.isdigit():
+        return None
+    return f"cu{major}{minor}"
+
+
+def executorch_install_command() -> str:
+    """Return an install command, or guidance for an unsupported CUDA build.
+
+    Adding this package's missing extra does not need a blanket --upgrade, but pip
+    may still change dependencies to satisfy it. --pre permits prerelease candidates.
+    """
+    channel = executorch_install_channel()
+    # The extra carries a Linux marker, so off Linux that pip command resolves to nothing,
+    # installs nothing and still succeeds, sending the user back to the same error.
+    if channel is None or not sys.platform.startswith("linux"):
+        return (
+            f"This ExecuTorch integration requires Linux with a PyTorch CUDA "
+            f"{EXECUTORCH_CUDA_MAJOR} build. Use matching PyTorch, ExecuTorch and "
+            "Torch-TensorRT wheels in a fresh environment."
+        )
+    return (
+        'pip install --pre "torch_tensorrt[executorch]" '
+        f"--extra-index-url https://download.pytorch.org/whl/nightly/{channel}"
     )
 
 
@@ -396,3 +436,35 @@ def load_tensorrt_llm_for_nccl() -> bool:
             return False
         return load_and_initialize_trtllm_plugin(plugin_lib_path)
     return False
+
+
+# --- TensorRT-RTX architecture targeting -------------------------------------
+
+TURING_COMPUTE_CAPABILITY = (7, 5)
+
+
+def get_target_compute_capabilities(
+    settings: Optional[Any] = None,
+) -> Tuple[Tuple[int, int], ...]:
+    """Compute capabilities this compilation targets: the declared targets, or the
+    current device when none were declared.
+
+    Capability validators key off this rather than the build host, so a module compiled
+    on Ampere and shipped to Turing does not retain ops Turing cannot execute.
+    """
+    if settings and (targets := getattr(settings, "target_compute_capabilities", None)):
+        return tuple((int(major), int(minor)) for major, minor in targets)
+    return (torch.cuda.get_device_capability(),)
+
+
+def trt_rtx_targets_turing(settings: Optional[Any] = None) -> bool:
+    """True when TensorRT-RTX is in use and SM 7.5 is among the build targets.
+
+    A single compiled artifact carries a single partitioning, so an op unsupported on
+    *any* targeted architecture must fall back to PyTorch for all of them.
+    """
+    from torch_tensorrt._features import ENABLED_FEATURES
+
+    if not ENABLED_FEATURES.tensorrt_rtx:
+        return False
+    return TURING_COMPUTE_CAPABILITY in get_target_compute_capabilities(settings)

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 from collections import defaultdict
 from functools import lru_cache
 from typing import Any, Callable, Dict, List, Set, Tuple

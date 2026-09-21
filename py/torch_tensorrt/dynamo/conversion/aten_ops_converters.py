@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 # mypy: disallow-untyped-decorators=False
 
 import logging
@@ -23,6 +26,7 @@ from torch_tensorrt import ENABLED_FEATURES
 from torch_tensorrt._utils import (
     is_tensorrt_rtx_version_supported,
     is_tensorrt_version_supported,
+    trt_rtx_targets_turing,
 )
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo._SourceIR import SourceIR
@@ -845,12 +849,62 @@ def aten_ops_gelu(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.matmul, supports_dynamic_shapes=True)
-@dynamo_tensorrt_converter(torch.ops.aten.matmul.default, supports_dynamic_shapes=True)
-@dynamo_tensorrt_converter(torch.ops.aten.dot.default, supports_dynamic_shapes=True)
-@dynamo_tensorrt_converter(torch.ops.aten.mm.default, supports_dynamic_shapes=True)
-@dynamo_tensorrt_converter(torch.ops.aten.mv.default, supports_dynamic_shapes=True)
-@dynamo_tensorrt_converter(torch.ops.aten.bmm.default, supports_dynamic_shapes=True)
+def gemm_capability_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    """Reject FP32 GEMMs on TensorRT-RTX when Turing (SM 7.5) is a build target.
+
+    Only operand dtype matters, so fp16 GEMMs accumulating in fp32 (``use_fp32_acc``)
+    keep running on TensorRT.
+    """
+    if not trt_rtx_targets_turing(settings):
+        return True
+
+    def is_fp32(operand: Argument) -> bool:
+        val = operand.meta.get("val") if hasattr(operand, "meta") else None
+        return bool(getattr(val, "dtype", None) == torch.float32)
+
+    if any(map(is_fp32, node.args[:2])):
+        _LOGGER.debug(
+            "FP32 GEMM '%s' is not supported on TensorRT-RTX for Turing "
+            "(SM 7.5). Falling back to PyTorch.",
+            node.name,
+        )
+        return False
+
+    return True
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.matmul,
+    capability_validator=gemm_capability_validator,
+    supports_dynamic_shapes=True,
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.matmul.default,
+    capability_validator=gemm_capability_validator,
+    supports_dynamic_shapes=True,
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.dot.default,
+    capability_validator=gemm_capability_validator,
+    supports_dynamic_shapes=True,
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.mm.default,
+    capability_validator=gemm_capability_validator,
+    supports_dynamic_shapes=True,
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.mv.default,
+    capability_validator=gemm_capability_validator,
+    supports_dynamic_shapes=True,
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.bmm.default,
+    capability_validator=gemm_capability_validator,
+    supports_dynamic_shapes=True,
+)
 def aten_ops_matmul(
     ctx: ConversionContext,
     target: Target,
@@ -1226,7 +1280,7 @@ def _index_copy_kv_eligible(
     if len(node.args) < 4:
         return False
     if input_node is None:
-        input_node = node.args[0]  # type: ignore[assignment]
+        input_node = node.args[0]
     dim, _index_node, src_node = node.args[1:4]
 
     if not isinstance(input_node, Node) or input_node.op != "placeholder":
@@ -2858,7 +2912,7 @@ _ABSORBING_BITWISE_SCALAR = {
 
 
 def _is_absorbing_bitwise_scalar(target: Target, scalar: Any) -> bool:
-    """Would TensorRT mis-evaluate this scalar bitwise op (see above)?"""
+    """Would TensorRT evaluate this scalar bitwise op incorrectly (see above)?"""
     if target not in _ABSORBING_BITWISE_SCALAR:
         return False
     # A non-bool scalar is rejected by the dtype check further down anyway, and
@@ -3213,6 +3267,38 @@ def aten_ops_le(
     )
 
 
+# aten.convolution(input, weight, bias, stride, padding, dilation, transposed,
+#                  output_padding, groups)
+_CONV_ARG_INPUT = 0
+_CONV_ARG_STRIDE = 3
+_CONV_ARG_DILATION = 5
+_CONV_ARG_TRANSPOSED = 6
+
+
+def turing_rejects_forward_convolution(
+    node: Node,
+    spatial_rank: Optional[int],
+    settings: Optional[CompilationSettings] = None,
+) -> bool:
+    """Whether a forward convolution over ``spatial_rank`` spatial dims must fall back.
+
+    No valid kernel config for 3D ConvFwd on SM 7.5 for TensorRT-RTX, a known gap.
+    Transposed 3D is a distinct layer and is unaffected, so callers must only ask about
+    non-transposed convolutions.
+    """
+    unsupported_spatial_rank = 3
+    if spatial_rank != unsupported_spatial_rank:
+        return False
+    if not trt_rtx_targets_turing(settings):
+        return False
+    _LOGGER.debug(
+        "3D convolution '%s' is not supported on TensorRT-RTX for Turing "
+        "(SM 7.5). Falling back to PyTorch.",
+        node.name,
+    )
+    return True
+
+
 def convolution_capability_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
@@ -3226,9 +3312,9 @@ def convolution_capability_validator(
         return True
 
     if (
-        args_bounds_check(node.args, 6)  # transposed?
-        and (stride := args_bounds_check(node.args, 3))
-        and (dilation := args_bounds_check(node.args, 5))
+        args_bounds_check(node.args, _CONV_ARG_TRANSPOSED)
+        and (stride := args_bounds_check(node.args, _CONV_ARG_STRIDE))
+        and (dilation := args_bounds_check(node.args, _CONV_ARG_DILATION))
         and any(s > 1 for s in stride)
         and any(d > 1 for d in dilation)
     ):
@@ -3238,6 +3324,16 @@ def convolution_capability_validator(
             node.name,
         )
         return False
+
+    # aten.convolution input is (N, C, *spatial), so ndim - 2 is the spatial rank.
+    # Like every validator in this module this relies on meta["val"] and fails open
+    # when it is absent.
+    if not args_bounds_check(node.args, _CONV_ARG_TRANSPOSED):
+        input_node = node.args[_CONV_ARG_INPUT]
+        val = input_node.meta.get("val") if hasattr(input_node, "meta") else None
+        spatial_rank = val.ndim - 2 if val is not None else None
+        if turing_rejects_forward_convolution(node, spatial_rank, settings):
+            return False
 
     return True
 
@@ -3296,7 +3392,55 @@ def aten_ops_convolution(
         )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten._cdist_forward.default)
+# Above this many rows in either operand, the p == 2 path of
+# impl.normalization.cdist_forward switches from a broadcast-subtract to a matrix
+# multiply. Kept deliberately in sync with the threshold in that converter.
+# aten._cdist_forward(x1, x2, p, compute_mode)
+_CDIST_ARG_P = 2
+_CDIST_ARG_COMPUTE_MODE = 3
+
+
+def cdist_forward_capability_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    """Reject the cdist variants whose converter emits a GEMM, on Turing (SM 7.5).
+
+    The GEMM is emitted *inside* the converter, so the graph holds one
+    ``_cdist_forward`` node and no ``mm``/``bmm`` for ``gemm_capability_validator`` to
+    reject, and TensorRT-RTX then fails. Which arguments emit one is decided by
+    ``cdist_emits_matmul``, the converter's own predicate, so the two cannot drift.
+    """
+    if not trt_rtx_targets_turing(settings):
+        return True
+
+    def operand_rows(operand: Argument) -> Optional[int]:
+        val = operand.meta.get("val") if hasattr(operand, "meta") else None
+        shape = getattr(val, "shape", None)
+        if shape is None or len(shape) < 2:
+            return None
+        rows = shape[-2]
+        return rows if isinstance(rows, int) else None
+
+    operands = node.args[:2]  # x1, x2
+    if not impl.normalization.ops.cdist_emits_matmul(
+        args_bounds_check(node.args, _CDIST_ARG_P, replacement=2.0),
+        args_bounds_check(node.args, _CDIST_ARG_COMPUTE_MODE, replacement=None),
+        [operand_rows(operand) for operand in operands],
+    ):
+        return True
+
+    _LOGGER.debug(
+        "cdist '%s' computes p=2 as a matrix multiply, which is not supported on "
+        "TensorRT-RTX for Turing (SM 7.5). Falling back to PyTorch.",
+        node.name,
+    )
+    return False
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten._cdist_forward.default,
+    capability_validator=cdist_forward_capability_validator,
+)
 def aten_ops_cdist_forward(
     ctx: ConversionContext,
     target: Target,
@@ -3674,7 +3818,11 @@ def aten_ops_argmin(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.addmm.default, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.addmm.default,
+    capability_validator=gemm_capability_validator,
+    supports_dynamic_shapes=True,
+)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -4406,7 +4554,11 @@ def aten_ops_nonzero(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.linear.default, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.linear.default,
+    capability_validator=gemm_capability_validator,
+    supports_dynamic_shapes=True,
+)
 def aten_ops_linear(
     ctx: ConversionContext,
     target: Target,
@@ -4425,9 +4577,43 @@ def aten_ops_linear(
     )
 
 
+def attention_capability_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    """Reject fused attention TensorRT-RTX cannot serve when Turing (SM 7.5) is a target.
+
+    A fused attention op carries the same FP32 GEMMs ``gemm_capability_validator``
+    rejects, but inside the converter, so the graph holds one node and no ``mm``/``bmm``
+    for that guard to see. On Turing TRT-RTX this results in failure. Only the q/k/v
+    dtypes matter, so FP16 attention keeps running on TensorRT.
+    """
+    if not trt_rtx_targets_turing(settings):
+        return True
+
+    unsupported_dtypes = (torch.float32,)
+
+    def is_unsupported(operand: Argument) -> bool:
+        val = operand.meta.get("val") if hasattr(operand, "meta") else None
+        return bool(getattr(val, "dtype", None) in unsupported_dtypes)
+
+    qkv = node.args[:3]  # query, key, value
+    if any(map(is_unsupported, qkv)):
+        _LOGGER.debug(
+            "Attention '%s' is not supported on TensorRT-RTX for Turing (SM 7.5). "
+            "Falling back to PyTorch.",
+            node.name,
+        )
+        return False
+
+    return True
+
+
 def scaled_dot_product_attention_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
+    if not attention_capability_validator(node, settings):
+        return False
+
     attn_mask = args_bounds_check(node.args, 3, None)
     is_causal = args_bounds_check(node.args, 5, False)
     if is_causal and attn_mask is not None:
@@ -4526,6 +4712,9 @@ def aten_ops_scaled_dot_product_attention(
 def scaled_dot_product_flash_attention_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
+    if not attention_capability_validator(node, settings):
+        return False
+
     if args_bounds_check(node.args, 5, False):
         _LOGGER.debug("return_debug_mask is not yet supported.")
         return False
@@ -4620,6 +4809,9 @@ def aten_ops_scaled_dot_product_flash_attention(
 def scaled_dot_product_efficient_attention_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
+    if not attention_capability_validator(node, settings):
+        return False
+
     if args_bounds_check(node.args, 4, False):
         _LOGGER.debug("compute_log_sumexp is not yet supported.")
         return False
@@ -4706,6 +4898,7 @@ def scaled_dot_product_cudnn_attention_validator(
         _LOGGER.debug("return_debug_mask is not yet supported.")
         return False
 
+    # Delegating also picks up the Turing (SM 7.5) dtype guard.
     return scaled_dot_product_efficient_attention_validator(node, settings)
 
 

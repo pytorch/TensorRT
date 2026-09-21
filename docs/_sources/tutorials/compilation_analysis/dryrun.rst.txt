@@ -196,3 +196,39 @@ The dryrun output is also available at ``DEBUG`` log level even when ``dryrun=Fa
 
     import logging
     logging.getLogger("torch_tensorrt").setLevel(logging.DEBUG)
+
+----
+
+.. _dryrun-programmatic:
+
+Capturing the Stats Programmatically
+--------------------------------------
+
+To use the stats in a CI check or a coverage sweep, register a callback on
+``dryrun_stats_display`` rather than parsing its output. It is an
+:ref:`@observable() <observer>`, so its ``pre`` and ``post`` observers receive the
+``DryRunTracker`` behind the report:
+
+.. code-block:: python
+
+    from torch_tensorrt.dynamo._DryRunTracker import dryrun_stats_display
+    from torch_tensorrt.dynamo.observer import ObserveContext
+
+    trackers = []
+
+    def capture(ctx: ObserveContext) -> None:
+        trackers.append(ctx.args[0])  # ctx.args == (tracker, dryrun_enabled)
+
+    with dryrun_stats_display.observers.pre.add(capture):
+        torch_tensorrt.dynamo.compile(exp_program, arg_inputs=inputs, dryrun=True)
+
+    tracker = trackers[0]
+    print(f"{tracker.supported_ops_in_graph}/{tracker.total_ops_in_graph} supported")
+
+The tracker holds every field in the report: ``total_ops_in_graph``,
+``supported_ops_in_graph``, ``unsupported_ops``, ``to_run_in_torch``,
+``tensorrt_graph_count``, ``per_subgraph_data`` and ``compilation_settings``.
+
+The callback fires once per ``compile_module`` call — so once per graph break, and on
+ordinary compiles too, since ``dryrun`` only controls where the report is written. Graphs
+with no TRT coverage report as well, with ``tensorrt_graph_count == 0``.

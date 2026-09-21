@@ -1,8 +1,15 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 import argparse
 from pathlib import Path
 
 import torch
-import torch_tensorrt
+
+# Registers TensorRTBackend with ExecuTorch's backend registry as an import side effect. Nothing
+# from this package is referenced below: loading and running a program is ExecuTorch's own API.
+import torch_tensorrt_executorch_runtime  # noqa: F401
+from executorch.runtime import Runtime
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -19,9 +26,13 @@ if args.num_runs < 1:
 model_path = args.model_path
 x = torch.ones((2, 3, 4, 4), dtype=torch.float32)
 
-program = torch_tensorrt.load(model_path, format="executorch")
+# The Runtime API backs device-tagged arenas with device memory.
+program = Runtime.get().load_program(model_path)
+if "forward" not in program.method_names:
+    raise RuntimeError(f"{model_path} has no 'forward' method")
+forward = program.load_method("forward")
 for _ in range(args.num_runs):
-    outputs = program.forward(x)
+    outputs = forward.execute((x,))
 y = outputs[0]
 
 expected = x + 1

@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=f53c6055"></script>
+    <script src="../../../_static/documentation_options.js?v=9564b768"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -474,7 +474,10 @@ document.write(`
                 <article class="bd-article">
                   
   <h1>Source code for torch_tensorrt.dynamo._compiler</h1><div class="highlight"><pre>
-<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+<span></span><span class="c1"># SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION &amp; AFFILIATES. All rights reserved.</span>
+<span class="c1"># SPDX-License-Identifier: BSD-3-Clause</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">collections.abc</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
@@ -525,6 +528,7 @@ document.write(`
     <span class="n">aliased_input_bindings</span><span class="p">,</span>
     <span class="n">assert_no_kv_alias_markers_survived</span><span class="p">,</span>
     <span class="n">assert_predicted_kv_aliased</span><span class="p">,</span>
+    <span class="n">erase_export_guards</span><span class="p">,</span>
     <span class="n">hide_copyback_outputs</span><span class="p">,</span>
     <span class="n">inline_lifted_buffers_into_gm</span><span class="p">,</span>
     <span class="n">lift_mutated_buffers</span><span class="p">,</span>
@@ -948,6 +952,9 @@ document.write(`
     <span class="n">enable_experimental_decompositions</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ENABLE_EXPERIMENTAL_DECOMPOSITIONS</span><span class="p">,</span>
     <span class="n">dryrun</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DRYRUN</span><span class="p">,</span>
     <span class="n">hardware_compatible</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">HARDWARE_COMPATIBLE</span><span class="p">,</span>
+    <span class="n">target_compute_capabilities</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span>
+        <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]</span>
+    <span class="p">]</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">TARGET_COMPUTE_CAPABILITIES</span><span class="p">,</span>
     <span class="n">timing_cache_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">TIMING_CACHE_PATH</span><span class="p">,</span>
     <span class="n">lazy_engine_init</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">LAZY_ENGINE_INIT</span><span class="p">,</span>
     <span class="n">cache_built_engines</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">CACHE_BUILT_ENGINES</span><span class="p">,</span>
@@ -1046,6 +1053,7 @@ document.write(`
 <span class="sd">        enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.</span>
 <span class="sd">        dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs</span>
 <span class="sd">        hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)</span>
+<span class="sd">        target_compute_capabilities (Optional[List[Tuple[int, int]]]): Compute capabilities to build for, e.g. ``[(7, 5)]`` for Turing. Defaults to ``None``. The compilation then targets the current device, from ``torch.cuda.get_device_capability()``. TensorRT-RTX only. Drives both engine targeting and op partitioning, so ops unsupported on any listed target fall back to PyTorch.</span>
 <span class="sd">        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX.</span>
 <span class="sd">        lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.</span>
 <span class="sd">        cache_built_engines (bool): Whether to save the compiled TRT engines to storage</span>
@@ -1249,6 +1257,7 @@ document.write(`
         <span class="s2">"dla_global_dram_size"</span><span class="p">:</span> <span class="n">dla_global_dram_size</span><span class="p">,</span>
         <span class="s2">"dryrun"</span><span class="p">:</span> <span class="n">dryrun</span><span class="p">,</span>
         <span class="s2">"hardware_compatible"</span><span class="p">:</span> <span class="n">hardware_compatible</span><span class="p">,</span>
+        <span class="s2">"target_compute_capabilities"</span><span class="p">:</span> <span class="n">target_compute_capabilities</span><span class="p">,</span>
         <span class="s2">"timing_cache_path"</span><span class="p">:</span> <span class="n">timing_cache_path</span><span class="p">,</span>
         <span class="s2">"lazy_engine_init"</span><span class="p">:</span> <span class="n">lazy_engine_init</span><span class="p">,</span>
         <span class="s2">"cache_built_engines"</span><span class="p">:</span> <span class="n">cache_built_engines</span><span class="p">,</span>
@@ -1763,8 +1772,10 @@ document.write(`
     <span class="n">CONVERTERS</span><span class="o">.</span><span class="n">set_compilation_settings</span><span class="p">(</span><span class="n">settings</span><span class="p">)</span>
 
     <span class="c1"># Check the number of supported operations in the graph</span>
-    <span class="n">num_supported_ops</span><span class="p">,</span> <span class="n">total_ops</span> <span class="o">=</span> <span class="n">partitioning</span><span class="o">.</span><span class="n">get_graph_converter_support</span><span class="p">(</span>
-        <span class="n">gm</span><span class="p">,</span> <span class="n">settings</span><span class="o">.</span><span class="n">torch_executed_ops</span>
+    <span class="n">num_supported_ops</span><span class="p">,</span> <span class="n">total_ops</span><span class="p">,</span> <span class="n">op_support</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">partitioning</span><span class="o">.</span><span class="n">get_graph_converter_support_overview</span><span class="p">(</span>
+            <span class="n">gm</span><span class="p">,</span> <span class="n">settings</span><span class="o">.</span><span class="n">torch_executed_ops</span>
+        <span class="p">)</span>
     <span class="p">)</span>
 
     <span class="n">dryrun_tracker</span><span class="o">.</span><span class="n">total_ops_in_graph</span> <span class="o">=</span> <span class="n">total_ops</span>
@@ -1786,6 +1797,11 @@ document.write(`
             <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">num_supported_ops</span><span class="si">}</span><span class="s2"> supported operations detected in subgraph containing </span><span class="si">{</span><span class="n">total_ops</span><span class="si">}</span><span class="s2"> computational nodes. "</span>
             <span class="sa">f</span><span class="s2">"Skipping this subgraph, since min_block_size was detected to be </span><span class="si">{</span><span class="n">settings</span><span class="o">.</span><span class="n">min_block_size</span><span class="si">}</span><span class="s2">"</span>
         <span class="p">)</span>
+
+        <span class="n">dryrun_tracker</span><span class="o">.</span><span class="n">unsupported_ops</span> <span class="o">=</span> <span class="n">op_support</span><span class="o">.</span><span class="n">unsupported_operators</span>
+        <span class="n">dryrun_tracker</span><span class="o">.</span><span class="n">to_run_in_torch</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">parse_non_trt_nodes</span><span class="p">(</span><span class="n">gm</span><span class="p">))</span>
+        <span class="n">parse_graph_io</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">dryrun_tracker</span><span class="p">)</span>
+        <span class="n">dryrun_stats_display</span><span class="p">(</span><span class="n">dryrun_tracker</span><span class="p">,</span> <span class="n">settings</span><span class="o">.</span><span class="n">dryrun</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">gm</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
@@ -1806,6 +1822,37 @@ document.write(`
         <span class="c1"># TODO: For future, explore when nodes don't have metadata and if fake_tensor_prop can resolve this.</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
             <span class="s2">"Some nodes do not have metadata (shape and dtype information). This could lead to problems sometimes if the graph has PyTorch and TensorRT segments."</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Every computational op is TRT-legal: skip AccNodesFinder / tag / split and</span>
+    <span class="c1"># convert the lowered graph as a single engine. Mixed graphs still partition.</span>
+    <span class="k">if</span> <span class="p">(</span>
+        <span class="n">settings</span><span class="o">.</span><span class="n">require_full_compilation</span>
+        <span class="ow">and</span> <span class="n">num_supported_ops</span> <span class="o">==</span> <span class="n">total_ops</span>
+        <span class="ow">and</span> <span class="ow">not</span> <span class="n">settings</span><span class="o">.</span><span class="n">enable_resource_partitioning</span>
+    <span class="p">):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">"require_full_compilation + full operator support: "</span>
+            <span class="s2">"skipping partitioner, converting whole graph"</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">dryrun</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">gm</span>
+        <span class="n">gm</span> <span class="o">=</span> <span class="n">erase_export_guards</span><span class="p">(</span><span class="n">gm</span><span class="p">)</span>
+        <span class="c1"># Do not delete `_frozen_param*` here. Stock compile_module only drops</span>
+        <span class="c1"># them on the parent after split; convert still needs them on the</span>
+        <span class="c1"># graph being interpreted. Use placeholder meta for engine I/O — a</span>
+        <span class="c1"># flattened copy of compile() sample args can wrap kwargs dicts and</span>
+        <span class="c1"># non-tensor flags (Flux `return_dict`) that are not TRT bindings.</span>
+        <span class="n">convert_inputs</span> <span class="o">=</span> <span class="n">partitioning</span><span class="o">.</span><span class="n">construct_submodule_inputs</span><span class="p">(</span>
+            <span class="n">gm</span><span class="p">,</span>
+            <span class="n">user_symbol_bounds</span><span class="o">=</span><span class="n">user_symbol_bounds</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">convert_module</span><span class="p">(</span>
+            <span class="n">gm</span><span class="p">,</span>
+            <span class="n">convert_inputs</span><span class="p">,</span>
+            <span class="n">settings</span><span class="o">=</span><span class="n">settings</span><span class="p">,</span>
+            <span class="n">name</span><span class="o">=</span><span class="s2">"_run_on_acc_0"</span><span class="p">,</span>
+            <span class="n">engine_cache</span><span class="o">=</span><span class="n">engine_cache</span><span class="p">,</span>
         <span class="p">)</span>
 
     <span class="c1"># Store the original input spec for later use</span>
@@ -1842,6 +1889,9 @@ document.write(`
                 <span class="n">torch_executed_ops</span><span class="o">=</span><span class="n">settings</span><span class="o">.</span><span class="n">torch_executed_ops</span><span class="p">,</span>
                 <span class="n">require_full_compilation</span><span class="o">=</span><span class="n">settings</span><span class="o">.</span><span class="n">require_full_compilation</span><span class="p">,</span>
                 <span class="n">skip_fusion</span><span class="o">=</span><span class="p">(</span><span class="n">num_supported_ops</span> <span class="o">==</span> <span class="n">total_ops</span><span class="p">),</span>
+                <span class="n">assume_full_support</span><span class="o">=</span><span class="p">(</span>
+                    <span class="n">settings</span><span class="o">.</span><span class="n">require_full_compilation</span> <span class="ow">and</span> <span class="n">num_supported_ops</span> <span class="o">==</span> <span class="n">total_ops</span>
+                <span class="p">),</span>
             <span class="p">)</span>
 
         <span class="k">except</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">passes</span><span class="o">.</span><span class="n">splitter_base</span><span class="o">.</span><span class="n">FxNetSplitterInternalError</span><span class="p">:</span>
@@ -2287,6 +2337,9 @@ document.write(`
     <span class="n">enable_experimental_decompositions</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ENABLE_EXPERIMENTAL_DECOMPOSITIONS</span><span class="p">,</span>
     <span class="n">dryrun</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DRYRUN</span><span class="p">,</span>
     <span class="n">hardware_compatible</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">HARDWARE_COMPATIBLE</span><span class="p">,</span>
+    <span class="n">target_compute_capabilities</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span>
+        <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]</span>
+    <span class="p">]</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">TARGET_COMPUTE_CAPABILITIES</span><span class="p">,</span>
     <span class="n">timing_cache_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">TIMING_CACHE_PATH</span><span class="p">,</span>
     <span class="n">lazy_engine_init</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">LAZY_ENGINE_INIT</span><span class="p">,</span>
     <span class="n">cache_built_engines</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">CACHE_BUILT_ENGINES</span><span class="p">,</span>
@@ -2389,6 +2442,7 @@ document.write(`
 <span class="sd">        enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.</span>
 <span class="sd">        dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs</span>
 <span class="sd">        hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)</span>
+<span class="sd">        target_compute_capabilities (Optional[List[Tuple[int, int]]]): Compute capabilities to build for, e.g. ``[(7, 5)]`` for Turing. Defaults to ``None``. The compilation then targets the current device, from ``torch.cuda.get_device_capability()``. TensorRT-RTX only. Drives both engine targeting and op partitioning, so ops unsupported on any listed target fall back to PyTorch.</span>
 <span class="sd">        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX.</span>
 <span class="sd">        lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.</span>
 <span class="sd">        cache_built_engines (bool): Whether to save the compiled TRT engines to storage</span>
@@ -2573,6 +2627,7 @@ document.write(`
         <span class="s2">"dla_global_dram_size"</span><span class="p">:</span> <span class="n">dla_global_dram_size</span><span class="p">,</span>
         <span class="s2">"dryrun"</span><span class="p">:</span> <span class="n">dryrun</span><span class="p">,</span>
         <span class="s2">"hardware_compatible"</span><span class="p">:</span> <span class="n">hardware_compatible</span><span class="p">,</span>
+        <span class="s2">"target_compute_capabilities"</span><span class="p">:</span> <span class="n">target_compute_capabilities</span><span class="p">,</span>
         <span class="s2">"timing_cache_path"</span><span class="p">:</span> <span class="n">timing_cache_path</span><span class="p">,</span>
         <span class="s2">"lazy_engine_init"</span><span class="p">:</span> <span class="n">lazy_engine_init</span><span class="p">,</span>
         <span class="s2">"cache_built_engines"</span><span class="p">:</span> <span class="n">cache_built_engines</span><span class="p">,</span>

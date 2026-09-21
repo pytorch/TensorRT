@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """CPU-only tests for the ExecuTorch weight streaming budget option.
 
 These exercise the export-time plumbing: budget validation and the compile spec
@@ -18,8 +21,8 @@ import torch  # noqa: E402
 from executorch.exir.backend.compile_spec_schema import CompileSpec  # noqa: E402
 from torch_tensorrt._compile import save  # noqa: E402
 from torch_tensorrt.executorch.partitioner import (  # noqa: E402
-    normalize_weight_streaming_budget_per_engine,
     WEIGHT_STREAMING_BUDGET_COMPILE_SPEC_KEY,
+    normalize_weight_streaming_budget_per_engine,
 )
 
 _KEY = WEIGHT_STREAMING_BUDGET_COMPILE_SPEC_KEY

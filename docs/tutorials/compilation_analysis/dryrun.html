@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=f53c6055"></script>
+    <script src="../../_static/documentation_options.js?v=9564b768"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -760,6 +760,35 @@ Remove the old file manually before rerunning.</p>
 <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">"torch_tensorrt"</span><span class="p">)</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
 </pre></div>
 </div>
+<hr class="docutils" />
+</section>
+<section id="capturing-the-stats-programmatically">
+<span id="dryrun-programmatic"></span><h2>Capturing the Stats Programmatically<a class="headerlink" href="#capturing-the-stats-programmatically" title="Link to this heading">#</a></h2>
+<p>To use the stats in a CI check or a coverage sweep, register a callback on
+<code class="docutils literal notranslate"><span class="pre">dryrun_stats_display</span></code> rather than parsing its output. It is an
+<a class="reference internal" href="../../contributors/observer.html#observer"><span class="std std-ref">&#64;observable()</span></a>, so its <code class="docutils literal notranslate"><span class="pre">pre</span></code> and <code class="docutils literal notranslate"><span class="pre">post</span></code> observers receive the
+<code class="docutils literal notranslate"><span class="pre">DryRunTracker</span></code> behind the report:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._DryRunTracker</span><span class="w"> </span><span class="kn">import</span> <span class="n">dryrun_stats_display</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.observer</span><span class="w"> </span><span class="kn">import</span> <span class="n">ObserveContext</span>
+
+<span class="n">trackers</span> <span class="o">=</span> <span class="p">[]</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">capture</span><span class="p">(</span><span class="n">ctx</span><span class="p">:</span> <span class="n">ObserveContext</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="n">trackers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>  <span class="c1"># ctx.args == (tracker, dryrun_enabled)</span>
+
+<span class="k">with</span> <span class="n">dryrun_stats_display</span><span class="o">.</span><span class="n">observers</span><span class="o">.</span><span class="n">pre</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">capture</span><span class="p">):</span>
+    <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">exp_program</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span> <span class="n">dryrun</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="n">tracker</span> <span class="o">=</span> <span class="n">trackers</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">tracker</span><span class="o">.</span><span class="n">supported_ops_in_graph</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">tracker</span><span class="o">.</span><span class="n">total_ops_in_graph</span><span class="si">}</span><span class="s2"> supported"</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The tracker holds every field in the report: <code class="docutils literal notranslate"><span class="pre">total_ops_in_graph</span></code>,
+<code class="docutils literal notranslate"><span class="pre">supported_ops_in_graph</span></code>, <code class="docutils literal notranslate"><span class="pre">unsupported_ops</span></code>, <code class="docutils literal notranslate"><span class="pre">to_run_in_torch</span></code>,
+<code class="docutils literal notranslate"><span class="pre">tensorrt_graph_count</span></code>, <code class="docutils literal notranslate"><span class="pre">per_subgraph_data</span></code> and <code class="docutils literal notranslate"><span class="pre">compilation_settings</span></code>.</p>
+<p>The callback fires once per <code class="docutils literal notranslate"><span class="pre">compile_module</span></code> call — so once per graph break, and on
+ordinary compiles too, since <code class="docutils literal notranslate"><span class="pre">dryrun</span></code> only controls where the report is written. Graphs
+with no TRT coverage report as well, with <code class="docutils literal notranslate"><span class="pre">tensorrt_graph_count</span> <span class="pre">==</span> <span class="pre">0</span></code>.</p>
 </section>
 </section>
 
@@ -814,6 +843,7 @@ Remove the old file manually before rerunning.</p>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#workflow-tuning-min-block-size">Workflow: Tuning min_block_size</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#debugging-fallback-ops">Debugging Fallback Ops</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#saving-the-report">Saving the Report</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#capturing-the-stats-programmatically">Capturing the Stats Programmatically</a></li>
 </ul>
   </nav></div>
 

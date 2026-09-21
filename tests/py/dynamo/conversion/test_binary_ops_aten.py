@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 import unittest
 from typing import Callable
 
@@ -8,7 +11,7 @@ from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
 
-from .harness import DispatchTestCase
+from .harness import DispatchTestCase, skip_if_trt_rtx_turing
 
 NEED_TEST_BOTH_CONSTANTS_CASE = True
 
@@ -238,6 +241,8 @@ class TestBinaryOpConverters(DispatchTestCase):
         ]
     )
     def test_elementwise_ops_bf16(self, _, orig_op):
+        skip_if_trt_rtx_turing(self, "bfloat16")
+
         class TestModule(nn.Module):
             def __init__(self, orig_op):
                 super().__init__()

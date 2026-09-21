@@ -1,3 +1,8 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+
 #include "torch/csrc/jit/ir/subgraph_matcher.h"
 #include "torch/csrc/jit/passes/subgraph_rewrite.h"
 

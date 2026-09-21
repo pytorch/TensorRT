@@ -1,3 +1,8 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+
 #include "torch_tensorrt/executorch/TensorRTBlobHeader.h"
 
 #include "gtest/gtest.h"
@@ -5,6 +10,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -20,6 +26,11 @@ constexpr uint32_t ENGINE_OFFSET_FIELD_OFFSET = 12;
 constexpr uint32_t ENGINE_SIZE_FIELD_OFFSET = 16;
 constexpr uint32_t HEADER_SIZE = 32;
 constexpr uint32_t ENGINE_ALIGNMENT = 16;
+
+// Metadata a valid blob would carry, so a case that corrupts one header field is refused by the
+// check it targets and not by the metadata parser.
+constexpr const char* VALID_METADATA =
+    R"({"io_bindings":[{"name":"input_0","is_input":true},{"name":"output_0","is_input":false}]})";
 
 template <typename T>
 void write_field(std::vector<uint8_t>& blob, std::size_t offset, T value) {
@@ -69,6 +80,55 @@ TEST(ExecuTorchTensorRTBlobHeader, ParsesValidHeaderAndMetadata) {
   EXPECT_EQ(TensorRTBlobHeader::engine_data(blob.data(), header), blob.data() + header.engine_offset);
 }
 
+TEST(ExecuTorchTensorRTBlobHeader, RejectsASizeThatWouldWrapWhenAddedToItsOffset) {
+  // These sizes come from the file, so a hostile or truncated one can be large enough that adding
+  // it to its offset wraps past zero. A check written as offset plus size then reads as small and
+  // lets the parse through, after which the reader walks far past the end of the blob. The check
+  // has to compare against the space that is left instead, and this is the case that tells the two
+  // forms apart: every other input in this file is accepted or rejected identically by both.
+  // Metadata that parses, so the only thing left that can refuse the blob is the length check. With
+  // "{}" the parse fails for want of a bindings list and the test passes either way, which is how
+  // this case originally proved nothing.
+  static constexpr const char* kValidMetadata =
+      R"({"io_bindings":[{"name":"input_0","is_input":true},{"name":"output_0","is_input":false}]})";
+  const std::vector<uint64_t> wrapping = {
+      UINT64_MAX,
+      UINT64_MAX - 15,
+      UINT64_MAX - HEADER_SIZE,
+  };
+  for (const uint64_t engine_size : wrapping) {
+    std::vector<uint8_t> blob = make_blob(kValidMetadata);
+    write_field(blob, ENGINE_SIZE_FIELD_OFFSET, engine_size);
+    TensorRTBlobHeader header;
+    EXPECT_FALSE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header))
+        << "engine_size " << engine_size << " must be refused on a blob of " << blob.size() << " bytes";
+  }
+  // The metadata length is read the same way. This one does not tell the two forms apart, because a
+  // 32 bit length cannot wrap a 64 bit sum, but it is the boundary worth pinning anyway.
+  std::vector<uint8_t> blob = make_blob(kValidMetadata);
+  write_field(blob, METADATA_SIZE_FIELD_OFFSET, static_cast<uint32_t>(UINT32_MAX));
+  TensorRTBlobHeader header;
+  EXPECT_FALSE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
+}
+
+TEST(ExecuTorchTensorRTBlobHeader, ReadsTheDeviceTheProgramAsksForWhateverElseIsInTheMetadata) {
+  // A real program asking for device 9 was read as asking for device 0. The reader searched the whole
+  // document for the key and excluded the ranges the arrays occupied, but those ranges are computed
+  // while walking, so one unrelated key shifted what they covered and the search matched inside it.
+  auto blob = make_blob(R"({"io_bindings":[{"name":"x","is_input":true}],"unrelated":{"device_id":0},)"
+                        R"("device_id":9,"hardware_compatible":false})");
+  TensorRTBlobHeader header;
+  ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
+  EXPECT_EQ(header.device_id, 9);
+
+  // A tensor may legitimately carry the same name as a key, and the key is still the object's own.
+  auto named = make_blob(R"({"io_bindings":[{"name":"device_id","is_input":true}],"device_id":7,)"
+                         R"("hardware_compatible":false})");
+  TensorRTBlobHeader named_header;
+  ASSERT_TRUE(TensorRTBlobHeader::parse(named.data(), named.size(), named_header));
+  EXPECT_EQ(named_header.device_id, 7);
+}
+
 TEST(ExecuTorchTensorRTBlobHeader, RejectsInvalidMagic) {
   auto blob = make_blob(R"({"io_bindings":[]})");
   blob[0] = 'X';
@@ -78,7 +138,7 @@ TEST(ExecuTorchTensorRTBlobHeader, RejectsInvalidMagic) {
 }
 
 TEST(ExecuTorchTensorRTBlobHeader, RejectsUnalignedEngineOffset) {
-  const std::string metadata = "{}";
+  const std::string metadata = R"({"io_bindings":[{"name":"input_0","is_input":true}]})";
   const auto metadata_offset = static_cast<uint32_t>(HEADER_SIZE);
   const auto metadata_size = static_cast<uint32_t>(metadata.size());
   const auto engine_offset = static_cast<uint32_t>(HEADER_SIZE + metadata.size());
@@ -99,6 +159,36 @@ TEST(ExecuTorchTensorRTBlobHeader, RejectsUnalignedEngineOffset) {
 TEST(ExecuTorchTensorRTBlobHeader, RejectsEnginePastEndOfBlob) {
   auto blob = make_blob(R"({"io_bindings":[]})");
   write_field(blob, ENGINE_SIZE_FIELD_OFFSET, static_cast<uint64_t>(blob.size()));
+
+  TensorRTBlobHeader header;
+  EXPECT_FALSE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
+}
+
+// A program file is untrusted input, so each bounds check below gets a case of its own. Without one
+// the fields are read out of a buffer that does not hold them.
+TEST(ExecuTorchTensorRTBlobHeader, RejectsABlobShorterThanTheHeader) {
+  const std::vector<uint8_t> blob(sizeof(TENSORRT_MAGIC), 0);
+  std::memcpy(const_cast<uint8_t*>(blob.data()), TENSORRT_MAGIC, sizeof(TENSORRT_MAGIC));
+
+  TensorRTBlobHeader header;
+  EXPECT_FALSE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
+}
+
+TEST(ExecuTorchTensorRTBlobHeader, RejectsAnEngineOffsetPastEndOfBlob) {
+  auto blob = make_blob(VALID_METADATA);
+  const auto past_end = static_cast<uint32_t>(align_up(blob.size() + ENGINE_ALIGNMENT, ENGINE_ALIGNMENT));
+  write_field(blob, ENGINE_OFFSET_FIELD_OFFSET, past_end);
+  write_field(blob, ENGINE_SIZE_FIELD_OFFSET, uint64_t{0});
+
+  TensorRTBlobHeader header;
+  EXPECT_FALSE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
+}
+
+TEST(ExecuTorchTensorRTBlobHeader, RejectsMetadataThatRunsIntoTheEngine) {
+  auto blob = make_blob(VALID_METADATA);
+  uint32_t engine_offset = 0;
+  std::memcpy(&engine_offset, blob.data() + ENGINE_OFFSET_FIELD_OFFSET, sizeof(engine_offset));
+  write_field(blob, METADATA_SIZE_FIELD_OFFSET, static_cast<uint32_t>(engine_offset - HEADER_SIZE + 1));
 
   TensorRTBlobHeader header;
   EXPECT_FALSE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
@@ -175,6 +265,70 @@ TEST(ExecuTorchTensorRTBlobHeader, InputNamedAliasedIoWithNoAliasesStillParses) 
   TensorRTBlobHeader header;
   ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
   EXPECT_TRUE(header.aliased_io.empty());
+}
+
+TEST(ExecuTorchTensorRTBlobHeader, MetadataKeyOrderDoesNotChangeWhatIsRead) {
+  // JSON does not order keys and sorting them is one word in any writer, so a reader that depends
+  // on the order our writer happens to emit loses aliases silently. For a KV cache program that is
+  // wrong answers rather than a failure, because every in-place update lands in the delegate's own
+  // output slot instead of the caller's buffer.
+  const std::string bindings = R"("io_bindings":[{"name":"in_k","is_input":true},{"name":"out_k","is_input":false}])";
+  const std::string aliases = R"("aliased_io":[{"output":"out_k","input":"in_k","kind":"kv_cache_update"}])";
+  const std::string scalars = R"("device_id":3,"hardware_compatible":true)";
+
+  for (const std::string& metadata :
+       {"{" + bindings + "," + aliases + "," + scalars + "}",
+        "{" + aliases + "," + scalars + "," + bindings + "}",
+        "{" + scalars + "," + bindings + "," + aliases + "}"}) {
+    const auto blob = make_blob(metadata, 4, TENSORRT_MAGIC_ALIASED_IO);
+
+    TensorRTBlobHeader header;
+    ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header)) << metadata;
+    ASSERT_EQ(header.aliased_io.size(), 1u) << metadata;
+    EXPECT_EQ(header.aliased_io[0].output, "out_k") << metadata;
+    EXPECT_EQ(header.aliased_io[0].input, "in_k") << metadata;
+    EXPECT_EQ(header.device_id, 3) << metadata;
+    EXPECT_TRUE(header.hardware_compatible) << metadata;
+  }
+}
+
+TEST(ExecuTorchTensorRTBlobHeader, InputNamedLikeAScalarKeyIsNotReadAsOne) {
+  // The io_bindings array holds caller-chosen tensor names, which is why the scalars are not simply
+  // searched for across the whole object.
+  const auto blob = make_blob(
+      R"({"io_bindings":[{"name":"device_id","is_input":true},{"name":"out_0","is_input":false}],)"
+      R"("device_id":3,"hardware_compatible":true})",
+      4,
+      TENSORRT_MAGIC_ALIASED_IO);
+
+  TensorRTBlobHeader header;
+  ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
+  EXPECT_EQ(header.device_id, 3);
+  EXPECT_TRUE(header.hardware_compatible);
+}
+
+TEST(ExecuTorchTensorRTBlobHeader, RejectsADeviceIdThatDoesNotFitAnInt) {
+  // The device id goes to cudaSetDevice, so a value the reader cannot hold has to stop the parse.
+  // Wrapping it instead yields a small plausible number: 4294967299 came back as device 3, which
+  // runs the engine on the wrong card on a machine that has one.
+  for (const char* too_large : {"2147483648", "4294967299", "99999999999999999999", "-2147483649"}) {
+    const auto blob =
+        make_blob(R"({"io_bindings":[{"name":"x","is_input":true}],"device_id":)" + std::string(too_large) + "}");
+
+    TensorRTBlobHeader header;
+    EXPECT_FALSE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header)) << "device_id " << too_large;
+  }
+}
+
+TEST(ExecuTorchTensorRTBlobHeader, ParsesTheEndsOfTheDeviceIdRange) {
+  for (const int expected : {0, 7, -1, std::numeric_limits<int>::max(), std::numeric_limits<int>::min()}) {
+    const auto blob =
+        make_blob(R"({"io_bindings":[{"name":"x","is_input":true}],"device_id":)" + std::to_string(expected) + "}");
+
+    TensorRTBlobHeader header;
+    ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header)) << "device_id " << expected;
+    EXPECT_EQ(header.device_id, expected);
+  }
 }
 
 TEST(ExecuTorchTensorRTBlobHeader, RejectsUnknownFutureMagic) {
