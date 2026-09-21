@@ -2083,8 +2083,21 @@ def test_runtime_readme_build_recipe_sets_the_version():
             f"the build recipe does not set {variable} on an uncommented line, so the build would "
             "stop rather than record the version the wheel requires"
         )
+        # The recipe sets its CUDA row once and reuses it, so a reader on another row edits one line.
+        # Expand from the whole file, since the setting and the use are in different blocks of one
+        # sequence.
+        assignments = dict(
+            re.findall(r"(?m)^\s*(?:export\s+)?(\w+)=[\"']?([^\"'\s]+)", readme)
+        )
         for line in exports:
             value = line.split("=", 1)[1].strip().strip("\"'")
+            for name, setting in assignments.items():
+                value = value.replace(f"${{{name}}}", setting).replace(
+                    f"${name}", setting
+                )
+            assert (
+                "$" not in value
+            ), f"unexpanded variable in {value}, file sets {assignments}"
             from packaging.version import Version
 
             assert (

@@ -102,11 +102,13 @@ same channel:
 
 ```bash
 pip install --pre "torch-tensorrt[executorch]" \
-  --extra-index-url https://download.pytorch.org/whl/nightly/cu130
+  --extra-index-url https://download.pytorch.org/whl/nightly/cu130 \
+  --extra-index-url https://pypi.nvidia.com
 ```
 
-The index is required, not optional: the extra's ExecuTorch floor names a dev build, and PyPI's
-`executorch` stops below it, so without the nightly channel pip reports no matching distribution.
+Both indexes are required. The extra's ExecuTorch floor names a development build the public index
+does not carry, and that index ships the inference library only as source, which pip spends about
+twenty minutes failing to build.
 `--pre` allows prereleases; it does not request an upgrade. Released versions can
 already declare the extra. If an older installation lacks it, first install the
 intended compatible Torch-TensorRT wheel deliberately. Adding the extra may change

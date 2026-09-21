@@ -9,7 +9,6 @@
 // outputs runs with forward() alone. A program exported to leave its outputs to the caller has no
 // address to write to until one is supplied, so forward() by itself fails on it by design, and the
 // caller has to hand a device buffer in first.
-#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -102,7 +101,8 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  // Inputs come from device memory, which is what the delegate binds without a staging copy.
+  // Device memory with --device_io, which the delegate binds without staging, host buffers
+  // otherwise.
   std::vector<void*> owned;
   std::deque<std::vector<uint8_t>> host_buffers;
   std::vector<executorch::extension::TensorPtr> inputs;
