@@ -25,6 +25,8 @@ def reject(message: str) -> NoReturn:
 
 
 _LINKED_DISTRIBUTIONS = ("executorch", "tensorrt-cu13", "nvidia-cuda-runtime")
+# Required but not linked: ExecuTorch's Python imports it and declares it nowhere.
+_UNPINNED_DISTRIBUTIONS = ("torch",)
 
 # The pin each remaining requirement has to agree with. These name a release series rather than an
 # exact build, so the comparison is on the leading release components the pin actually spells.
@@ -125,7 +127,18 @@ def main() -> None:
         ]
         pins = yaml.safe_load((root / "dev_dep_versions.yml").read_text())
         pinned = pins["__executorch_version__"]
-        for forbidden in ("torch", "torch-tensorrt"):
+        # Present and unbounded. A bound here would have this wheel decide which PyTorch is
+        # acceptable, which ExecuTorch deliberately leaves to whoever installs it.
+        for name in _UNPINNED_DISTRIBUTIONS:
+            matched = [r for r in requirements if canonicalize_name(r.name) == name]
+            if len(matched) != 1:
+                reject(f"the wheel must require {name} exactly once, found {matched}")
+            elif str(matched[0].specifier):
+                reject(
+                    f"the wheel pins {matched[0]}, but {name} is required unbounded so the user "
+                    "chooses it"
+                )
+        for forbidden in ("torch-tensorrt",):
             present = [
                 r for r in requirements if canonicalize_name(r.name) == forbidden
             ]
@@ -194,7 +207,8 @@ def main() -> None:
         unexpected = sorted(
             str(requirement)
             for requirement in requirements
-            if canonicalize_name(requirement.name) not in _LINKED_DISTRIBUTIONS
+            if canonicalize_name(requirement.name)
+            not in _LINKED_DISTRIBUTIONS + _UNPINNED_DISTRIBUTIONS
         )
         if unexpected:
             reject(f"the wheel requires more than the delegate links: {unexpected}")

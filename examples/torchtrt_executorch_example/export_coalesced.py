@@ -88,9 +88,12 @@ def main() -> None:
             min_block_size=1,
             truncate_double=True,
         )
+        # Write beside the target and move it into place only after the checks below pass. Saving
+        # straight over the target would let a rejected export replace a good program.
+        staged_path = model_path.with_name(model_path.name + ".staged")
         torch_tensorrt.save(
             trt_gm,
-            str(model_path),
+            str(staged_path),
             output_format="executorch",
             arg_inputs=example_input,
             retrace=False,
@@ -106,12 +109,13 @@ def main() -> None:
         # Both delegates must really be in the file. A partitioner change that
         # quietly routed the whole graph to TensorRT would otherwise leave a
         # green job that no longer tests the coalesced path at all.
-        program = deserialize_pte_binary(model_path.read_bytes()).program
+        program = deserialize_pte_binary(staged_path.read_bytes()).program
         delegates = [d.id for plan in program.execution_plan for d in plan.delegates]
         missing = [
             name for name in ("TensorRTBackend", "CudaBackend") if name not in delegates
         ]
         if missing:
+            staged_path.unlink(missing_ok=True)
             sys.exit(
                 f"{model_path} is not coalesced: missing {missing}, found {delegates}"
             )
@@ -125,11 +129,13 @@ def main() -> None:
         # non-uniform would otherwise still write a plausible reference file, and the
         # gate would then either fail blaming the runner or pass proving nothing.
         if not torch.isfinite(reference).all():
+            staged_path.unlink(missing_ok=True)
             sys.exit(
                 f"{model_path} produced a non-finite reference output, which the gate reads as "
                 "zero and would then accept a run of zeros from a dead delegate."
             )
         if reference.unique().numel() != 1:
+            staged_path.unlink(missing_ok=True)
             sys.exit(
                 f"{model_path} produced a non-uniform reference output "
                 f"({reference.unique().numel()} distinct values), so one number cannot "
@@ -146,6 +152,9 @@ def main() -> None:
                 reference.flatten()[0].item(),
             )
         )
+        # Last, so a failure anywhere above leaves the target and its reference file as they were,
+        # still describing each other.
+        staged_path.replace(model_path)
 
     print(f"Saved {model_path} with delegates {delegates}.")
     print(f"Saved {expected_path} with the eager reference output.")

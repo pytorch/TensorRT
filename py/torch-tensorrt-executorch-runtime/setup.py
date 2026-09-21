@@ -442,6 +442,10 @@ setup(
     # bindings, and ExecuTorch deliberately leaves the choice of build to the user rather than
     # pinning one, so a wheel that plugs into it has no business being stricter than it is.
     install_requires=[
+        # Unpinned on purpose. The delegate links no PyTorch, but ExecuTorch's Python imports it at
+        # module level and declares it nowhere, so without the name here a delegate-only install
+        # resolves and then fails on import. A bound would be this wheel deciding for ExecuTorch.
+        "torch",
         f"executorch=={executorch_version}",
         f"{TENSORRT_DISTRIBUTION}=={public_version(tensorrt_version)}",
         f"{CUDA_RUNTIME_DISTRIBUTION}=={public_version(cuda_runtime_version)}",
