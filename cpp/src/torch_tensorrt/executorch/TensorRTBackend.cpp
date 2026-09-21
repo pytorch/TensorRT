@@ -1053,9 +1053,9 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
           : "unknown";
       ET_LOG(
           Error,
-          "TensorRTBackend::execute: D2H copy failed for output %zu ('%s'): %s. A program built "
-          "without runtime-allocated outputs needs the caller to supply that buffer, through "
-          "set_output_data_ptr with this index.",
+          "TensorRTBackend::execute: copy out of output %zu ('%s') failed: %s. Either no buffer "
+          "was supplied for it with set_output_data_ptr, or an earlier failure left the device "
+          "unusable. Read the first error, not this one.",
           output_index,
           output_name,
           cudaGetErrorString(cuda_err));
@@ -1069,8 +1069,13 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     // Returning with the guard still armed, so its destructor waits: a failed drain says nothing
     // about whether the work finished, and the staging buffers it may still be writing outlive
     // this call.
-    ET_LOG(Error, "TensorRTBackend::execute: cudaStreamSynchronize failed: %s", cudaGetErrorString(cuda_err));
-    return Error::InvalidProgram;
+    ET_LOG(
+        Error,
+        "TensorRTBackend::execute: the device reported '%s' while finishing this call. Usual causes, "
+        "in order: an input buffer shorter than its shape, storage freed while the call was running, "
+        "and an output address that is not writable.",
+        cudaGetErrorString(cuda_err));
+    return Error::Internal;
   }
   if (copy_err != Error::Ok) {
     return copy_err;

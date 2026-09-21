@@ -97,6 +97,9 @@ class TensorRTBackend final : public ::executorch::runtime::BackendInterface {
   // Runs the engine and returns once the work is finished, whatever memory it was given, so
   // outputs are readable as soon as this returns. The stream in use must be on the engine's
   // device, and calls on one handle must not overlap each other or its destruction.
+  // Every buffer passed in must stay alive and unchanged until this returns. Freeing one while the
+  // call runs is not detectable here or anywhere below, and returns a plausible wrong answer rather
+  // than an error.
   ::executorch::runtime::Error execute(
       ::executorch::runtime::BackendExecutionContext& context,
       ::executorch::runtime::DelegateHandle* handle,

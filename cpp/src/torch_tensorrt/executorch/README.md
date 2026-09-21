@@ -173,6 +173,18 @@ then, treat a program file as trusted input: check it in transit, and do not run
 source you would
 not run code from.
 
+### A buffer handed in has to outlive the call
+
+Measured, because it is the one misuse nothing reports. Freeing an input from another thread while
+`execute` is running returned a plausible wrong answer in 253 of 300 runs: the right rank, the right
+type, every value finite, and a status of success. On a linear model the recycled bytes produce a
+scaled version of the right answer, which is exactly the shape a caller would not question.
+
+Nothing below this layer can catch it. The delegate is handed an address, and by the time the device
+reads it the memory belongs to somebody else. So the rule is the caller's to keep: every buffer stays
+alive and unchanged until the call returns. The Python path cannot reach this, because a tensor there
+owns its storage.
+
 ### Running from several threads at once
 
 One program per thread works. Sharing one program across threads does not, and is refused
