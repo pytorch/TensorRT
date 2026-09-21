@@ -6,6 +6,7 @@ This directory provides utilities and scripts for compiling, optimizing, and ben
 
 - **Model Support:** Works with popular LLMs such as Llama-3, Qwen2.5, etc.
 - **VLM Support:** Supports Visual Language Models like Qwen2.5-VL and Eagle2.
+- **VLA Support:** Compiles PI05 and GR00T hybrid VLM graphs plus a separate action expert (`run_vla.py`).
 - **Precision Modes:** Supports FP16, BF16, and FP32.
 - **Quantization:** Supports FP8 and NVFP4 quantization formats for reduced memory usage and improved inference speed.
 - **KV Cache:** Supports static and dynamic KV cache for efficient autoregressive decoding.
@@ -34,6 +35,13 @@ We have officially verified support for the following models:
 | Qwen 2.5 VL | Qwen/Qwen2.5-VL-3B-Instruct | FP16, FP32 | Yes |
 | Eagle2 | nvidia/Eagle2-2B | FP16, FP32 | Yes |
 
+### Supported VLA Models
+
+| Policy | Model / alias | Precision | Notes |
+|--------|---------------|-----------|-------|
+| PI05 | `lerobot/pi05_libero_base` (`pi05`) | FP16, FP32 | Hybrid VLM + action expert |
+| GR00T N1.5 | `nvidia/GR00T-N1.5-3B` (`groot`) | FP16, FP32 | Adds context projection island |
+
 ### Usage
 
 #### Text-only LLMs: `run_llm.py`
@@ -46,6 +54,19 @@ python run_llm.py --model meta-llama/Llama-3.2-1B-Instruct --prompt "What is par
 
 ```bash
 python run_vlm.py --model nvidia/Eagle2-2B --precision FP16 --num_tokens 128 --cache static_v1 --enable_pytorch_run --benchmark
+```
+
+#### Vision Language Action policies: `run_vla.py`
+
+Compiles a hybrid VLM graph (vision + leftover fuse/scatter + language) and a
+separate action expert. Chat template, tokenize, and Euler denoise stay on the
+host. Requires the EdgeExporter prototype (`VLA_TEST_ROOT`, default
+`<workspace>/Test`) and `EDGE_LLM_PLUGIN_SO`.
+
+```bash
+python run_vla.py --model pi05 --precision FP16 --dryrun
+python run_vla.py --model lerobot/pi05_libero_base --precision FP16 --enable_pytorch_run --benchmark
+python run_vla.py --model groot --precision FP16 --save /tmp/groot_engines
 ```
 
 #### Key Arguments
@@ -62,6 +83,9 @@ python run_vlm.py --model nvidia/Eagle2-2B --precision FP16 --num_tokens 128 --c
 - `--cache`: KV cache type (`static_v1`, `static_v2`, or empty for no KV caching).
 - `--benchmark`: Enable benchmarking mode.
 - `--enable_pytorch_run`: Also run and compare PyTorch baseline.
+- `--dryrun`: (VLA) Partition the hybrid graph without building TRT engines.
+- `--save`: (VLA) Write named engines and `hybrid.pt2` to a directory.
+- `--num_steps`: (VLA) Host Euler denoise steps.
 
 ### Quantization
 
