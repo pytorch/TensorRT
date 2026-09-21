@@ -10,6 +10,7 @@
 #include "torch/csrc/jit/runtime/custom_operator.h"
 #include "torch/torch.h"
 
+#include "core/runtime/CUDAGraphUtils.h"
 #include "core/runtime/TRTEngineProfiler.h"
 #include "core/runtime/runtime.h"
 #include "core/util/prelude.h"
@@ -95,6 +96,15 @@ bool _validate_shapes(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngi
   }
 
   return false;
+}
+
+// TensorRT reports enqueue failure via a false return (and its logger), not an
+// exception. Swallowing that leaves output tensors uninitialized / stale.
+void enqueue_v3_checked(nvinfer1::IExecutionContext* ctx, const c10::cuda::CUDAStream& stream) {
+  TORCHTRT_CHECK(
+      ctx->enqueueV3(stream),
+      "IExecutionContext::enqueueV3 failed. The TensorRT engine did not execute; "
+      "output tensors are invalid.");
 }
 
 void setup_input_tensors(
@@ -476,14 +486,12 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
         // Direct execution uses the caller buffers directly. On TRT-RTX with a
         // cuda_graph_strategy set, the engine captures/replays internally during
         // this enqueueV3 call.
-        ctx->enqueueV3(compiled_engine->engine_stream);
+        enqueue_v3_checked(ctx, compiled_engine->engine_stream);
       } else {
         if (need_cudagraphs_record) {
           // If cudagraphs needs to record a graph, capture the enqueueV3 call in a graph
           c10::cuda::CUDAStream recording_stream = compiled_engine->engine_stream;
-          compiled_engine->cudagraph.capture_begin();
-          ctx->enqueueV3(recording_stream);
-          compiled_engine->cudagraph.capture_end();
+          capture_cudagraph_safely(compiled_engine->cudagraph, [&]() { enqueue_v3_checked(ctx, recording_stream); });
           compiled_engine->cudagraph.instantiate();
           if (compiled_engine->profile_execution) {
             cudaError_t debug_dump_err = cudaGraphDebugDotPrint(
@@ -626,7 +634,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       }
 
       // Direct execution uses the caller buffers directly
-      ctx->enqueueV3(compiled_engine->engine_stream);
+      enqueue_v3_checked(ctx, compiled_engine->engine_stream);
 
     } // End engine exeuction (resets to caller stream)
 
