@@ -30,6 +30,11 @@ from torch_tensorrt.dynamo._DryRunTracker import (
 )
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache, DiskEngineCache
 from torch_tensorrt.dynamo._exporter import replace_execute_engine_no_op_node
+from torch_tensorrt.dynamo._lowering_cache import (
+    DiskLoweringCache,
+    LoweringCacheEntry,
+    repropagate_graph_metadata,
+)
 from torch_tensorrt.dynamo.conversion import (
     CompilationSettings,
     UnsupportedOperatorException,
@@ -484,6 +489,9 @@ def compile(
     engine_cache_dir: str = _defaults.ENGINE_CACHE_DIR,
     engine_cache_size: int = _defaults.ENGINE_CACHE_SIZE,
     custom_engine_cache: Optional[BaseEngineCache] = _defaults.CUSTOM_ENGINE_CACHE,
+    cache_lowered_graphs: bool = _defaults.CACHE_LOWERED_GRAPHS,
+    reuse_cached_lowered_graphs: bool = _defaults.REUSE_CACHED_LOWERED_GRAPHS,
+    lowering_cache_dir: str = _defaults.LOWERING_CACHE_DIR,
     use_fp32_acc: bool = _defaults.USE_FP32_ACC,
     refit_identical_engine_weights: bool = _defaults.REFIT_IDENTICAL_ENGINE_WEIGHTS,
     strip_engine_weights: bool = _defaults.STRIP_ENGINE_WEIGHTS,
@@ -582,7 +590,10 @@ def compile(
         reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
         engine_cache_dir (str): Directory to store the cached TRT engines
         engine_cache_size (int): Maximum hard-disk space (bytes) to use for the engine cache, default is 1GB. If the cache exceeds this size, the oldest engines will be removed by default
-        custom_engine_cache (Optional[BaseEngineCache]): Engine cache instance to use for saving and loading engines. Users can provide their own engine cache by inheriting from BaseEngineCache. If used, engine_cache_dir and engine_cache_size will be ignored.
+        custom_engine_cache (Optional[BaseEngineCache]): Cache instance for engines and, if enabled, lowered graphs. Users can provide their own cache by inheriting from BaseEngineCache. If used, engine_cache_dir, engine_cache_size, and lowering_cache_dir will be ignored. Graph entries are stored under a ``lowering_`` key prefix.
+        cache_lowered_graphs (bool): Whether to save lowered graphs for warm compilation
+        reuse_cached_lowered_graphs (bool): Whether to reuse lowered graphs before decomposition
+        lowering_cache_dir (str): Directory used by the default lowered-graph DiskEngineCache. Ignored if custom_engine_cache is set.
         use_fp32_acc (bool): Enable FP32 accumulation for FP16 matmul layers while retaining FP16
             inputs and outputs. When combined with ``decompose_attention=True``, the complete
             decomposed FP16 scaled dot product attention calculation runs in FP32 and only its
@@ -784,6 +795,8 @@ def compile(
         "lazy_engine_init": lazy_engine_init,
         "cache_built_engines": cache_built_engines,
         "reuse_cached_engines": reuse_cached_engines,
+        "cache_lowered_graphs": cache_lowered_graphs,
+        "reuse_cached_lowered_graphs": reuse_cached_lowered_graphs,
         "use_fp32_acc": use_fp32_acc,
         "refit_identical_engine_weights": refit_identical_engine_weights,
         "strip_engine_weights": strip_engine_weights,
@@ -814,32 +827,70 @@ def compile(
 
     logger.info("Compilation Settings: %s\n", settings)
     exported_program = pre_export_lowering(exported_program, settings)
-    exported_program = exported_program.run_decompositions(
-        filter_decomposition_table(
-            get_decompositions(
-                enable_experimental_decompositions,
-                decompose_attention,
-                use_distributed_mode_trace,
-                use_fp32_acc=use_fp32_acc,
-            ),
-            exported_program.graph_module,
+    lowering_cache = None
+    lowering_cache_key = None
+    lowering_cache_entry = None
+    if cache_lowered_graphs or reuse_cached_lowered_graphs:
+        if not DiskLoweringCache.can_cache(settings):
+            logger.warning(
+                "Lowering cache bypassed: the initial implementation requires "
+                "require_full_compilation=True, use_fast_partitioner=True, dryrun=False, "
+                "enable_autocast=False, and use_distributed_mode_trace=False"
+            )
+        else:
+            store = (
+                custom_engine_cache
+                if custom_engine_cache is not None
+                else DiskEngineCache(lowering_cache_dir, engine_cache_size)
+            )
+            lowering_cache = DiskLoweringCache(store)
+            lowering_cache_key = lowering_cache.get_hash(
+                exported_program, trt_arg_inputs, trt_kwarg_inputs, settings
+            )
+            if reuse_cached_lowered_graphs:
+                lowering_cache_entry = lowering_cache.load(lowering_cache_key)
+
+    if lowering_cache_entry is not None:
+        gm = lowering_cache_entry.lowered_module
+        lifted_buffers = list(lowering_cache_entry.lifted_buffers)
+        gm = repropagate_graph_metadata(
+            gm, trt_arg_inputs, trt_kwarg_inputs, settings.device
         )
-    )
+        logger.info(
+            "Reusing cached lowered graph; skipping decomposition and post-lowering"
+        )
+        _copyback_mutation_buffers = gm.meta.get("_copyback_mutation_buffers", [])
+        _copyback_bindings = gm.meta.get("_copyback_bindings", [])
+        _predicted_kv_bindings = gm.meta.get("_predicted_kv_bindings", [])
+        _no_kv_alias_writes = gm.meta.get("_no_kv_alias_writes", [])
+    else:
+        exported_program = exported_program.run_decompositions(
+            filter_decomposition_table(
+                get_decompositions(
+                    enable_experimental_decompositions,
+                    decompose_attention,
+                    use_distributed_mode_trace,
+                    use_fp32_acc=use_fp32_acc,
+                ),
+                exported_program.graph_module,
+            )
+        )
 
-    gm = exported_program.module()
-    # Move the weights in the state_dict to CPU
-    logger.debug("Input graph: " + str(gm.graph))
+        gm = exported_program.module()
+        logger.debug("Input graph: " + str(gm.graph))
 
-    # Lift mutated buffers from get_attr to placeholders BEFORE post_lowering's
-    # constant_fold runs, so the engine sees them as input bindings (a
-    # prerequisite for IKVCacheUpdateLayer / aliased I/O to fire on a
-    # module-held cache). Returns a fresh GraphModule whose forward signature
-    # reflects the new placeholders.
-    gm, lifted_buffers = lift_mutated_buffers(gm, settings)
-    _copyback_mutation_buffers = gm.meta.get("_copyback_mutation_buffers", [])
-    _copyback_bindings = gm.meta.get("_copyback_bindings", [])
-    _predicted_kv_bindings = gm.meta.get("_predicted_kv_bindings", [])
-    _no_kv_alias_writes = gm.meta.get("_no_kv_alias_writes", [])
+        # Lift mutated buffers from get_attr to placeholders BEFORE post_lowering's
+        # constant_fold runs, so the engine sees them as input bindings (a
+        # prerequisite for IKVCacheUpdateLayer / aliased I/O to fire on a
+        # module-held cache). Returns a fresh GraphModule whose forward signature
+        # reflects the new placeholders.
+        gm, lifted_buffers = lift_mutated_buffers(gm, settings)
+        _copyback_mutation_buffers = gm.meta.get("_copyback_mutation_buffers", [])
+        _copyback_bindings = gm.meta.get("_copyback_bindings", [])
+        _predicted_kv_bindings = gm.meta.get("_predicted_kv_bindings", [])
+        _no_kv_alias_writes = gm.meta.get("_no_kv_alias_writes", [])
+        gm = post_lowering(gm, settings)
+
     if lifted_buffers:
         # Append each lifted buffer as an engine input AFTER the user inputs.
         # Buffer tensors live on the gm's state; prepare an Input spec for
@@ -853,9 +904,17 @@ def compile(
             [b for _, b, _ in lifted_buffers],
         )
 
-    # Apply lowering on the graph module. Note: constant_fold runs inside post_lowering and requires
-    # module parameters to still be on GPU, so we must not deallocate before this call.
-    gm = post_lowering(gm, settings)
+    if (
+        lowering_cache_entry is None
+        and cache_lowered_graphs
+        and lowering_cache is not None
+        and lowering_cache_key is not None
+    ):
+        gm = lowering_cache.save(
+            lowering_cache_key,
+            LoweringCacheEntry(gm, tuple(lifted_buffers)),
+        )
+
     logger.debug(f"CPU memory usage after post_lowering: {get_cpu_memory_usage()} MB")
     logger.debug("Lowered Input graph: " + str(gm.graph))
 
@@ -878,6 +937,7 @@ def compile(
             logger.warning(
                 "Remaining GPU memory may not be enough to compile the TensorRT engine for this model resulting in an OOM error, Consider setting offload_module_to_cpu=True"
             )
+
     trt_gm = compile_module(
         gm,
         trt_arg_inputs,
