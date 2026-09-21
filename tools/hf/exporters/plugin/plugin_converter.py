@@ -296,6 +296,38 @@ def convert_update_ssm_state(ctx: ConversionContext, target, args, kwargs, name)
     return layer.get_output(0), layer.get_output(1)
 
 
+@dynamo_tensorrt_converter(
+    torch.ops.trt.kimi_kda_plugin.default,
+    supports_dynamic_shapes=True,
+    priority=ConverterPriority.HIGH,
+)
+def convert_kimi_kda_plugin(ctx: ConversionContext, target, args, kwargs, name):
+    del target, kwargs
+    args = list(args)
+    tensors = args[:9]
+    lower_bound = float(args[9])
+    use_lower_bound = int(bool(args[10]))
+
+    creator = get_trt_plugin_creator("kimi_kda", "1", "")
+    if creator is None:
+        raise RuntimeError("kimi_kda not found in TensorRT plugin registry")
+
+    plugin = _create_trt_plugin(
+        creator,
+        name,
+        [
+            _float_field("lower_bound", lower_bound),
+            _int_field("use_lower_bound", use_lower_bound),
+        ],
+    )
+    if plugin is None:
+        raise RuntimeError("Failed to create kimi_kda plugin")
+
+    inputs = _as_plugin_inputs(ctx, tensors, name)
+    layer = _add_plugin_layer(ctx, inputs, plugin, name)
+    return layer.get_output(0), layer.get_output(1)
+
+
 def _convert_nvfp4_moe(ctx: ConversionContext, args, name: str, plugin_name: str):
     args = list(args)
     tensors = args[:11]
