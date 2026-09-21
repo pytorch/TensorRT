@@ -28,6 +28,9 @@ Model Zoo
 * :ref:`quantize_linear_fp8_woq`: TorchAO FP8 weight-only quantization of a Linear layer (``examples/dynamo/torchao``)
 * :ref:`quantize_linear_fp8_static`: TorchAO static FP8 (act + weight) quantization of a Linear layer (``examples/dynamo/torchao``)
 * :ref:`torch_export_flux_fp8_woq`: Compiling FLUX.1-dev with TorchAO FP8 weight-only quantization (``examples/dynamo/torchao``)
+* :ref:`quantize_linear_int4_woq`: TorchAO INT4 weight-only quantization of a Linear layer (``examples/dynamo/torchao``)
+* :ref:`torch_export_flux_int4_woq`: Compiling FLUX.1-dev with TorchAO INT4 weight-only quantization (``examples/dynamo/torchao``)
+* :ref:`torch_export_qwen3_int4_woq`: Compiling Qwen3-8B with TorchAO INT4 weight-only quantization (``examples/dynamo/torchao``)
 * :ref:`debugger_example`: Debugging Torch-TensorRT Compilation
 * :ref:`torch_export_3d_rope`: Compiling a 3D RoPE video-transformer block with complex numerics support
 * :ref:`engine_converter_binding_names`: Naming input / output bindings when emitting a raw serialized TRT engine
