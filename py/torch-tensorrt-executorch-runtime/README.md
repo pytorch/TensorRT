@@ -125,7 +125,12 @@ All three indexes are needed, and so is `--pre`. Without `--pre` pip takes the s
 Torch-TensorRT from the public index, which is far older. Without NVIDIA's index the
 inference library resolves to a source distribution, and pip spends around twenty minutes
 trying to build it before failing.
-PyTorch you never name: it arrives as a dependency of Torch-TensorRT. Building this wheel
+PyTorch you never name: it arrives as a dependency of Torch-TensorRT. This wheel asks for it by
+name with no version, because ExecuTorch imports it and leaves the choice open, so installing this
+wheel on its own lets the resolver pick a PyTorch older than the ExecuTorch it pins. That
+combination installs, imports and loads a program, then fails at the first run with a message about
+a tensor rather than about versions. Install it the way this section shows and the question does not
+arise. Building this wheel
 by hand is only needed to work on it, and those instructions are below.
 
 On a fresh environment that command was measured installing:
