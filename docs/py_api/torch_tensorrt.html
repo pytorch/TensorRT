@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=9564b768"></script>
+    <script src="../_static/documentation_options.js?v=d97752b8"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -794,15 +794,13 @@ resident. Requires the engine to have been compiled with
 <dt class="sig sig-object py" id="torch_tensorrt.load">
 <span class="sig-prename descclassname"><span class="pre">torch_tensorrt.</span></span><span class="sig-name descname"><span class="pre">load</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">extra_files</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">format</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Any</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/_compile.html#load"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.load" title="Link to this definition">#</a></dt>
 <dd><p>Load a TorchScript, ExportedProgram, or ExecuTorch program.</p>
-<p>By default, detects TorchScript and ExportedProgram files. Set
-<code class="docutils literal notranslate"><span class="pre">format=&quot;executorch&quot;</span></code> explicitly for an ExecuTorch <code class="docutils literal notranslate"><span class="pre">.pte</span></code> file.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>file_path</strong> (<em>str</em>) – Path to file on the disk</p></li>
 <li><p><strong>extra_files</strong> (<em>dict</em><em>[</em><em>str</em><em>, </em><em>Any</em><em>]</em>) – Extra files to load with the model</p></li>
-<li><p><strong>format</strong> (<em>Optional</em><em>[</em><em>str</em><em>]</em>) – Set to <code class="docutils literal notranslate"><span class="pre">&quot;executorch&quot;</span></code> to load a <code class="docutils literal notranslate"><span class="pre">.pte</span></code> file
-using the separately installed ExecuTorch runtime package.</p></li>
+<li><p><strong>format</strong> (<em>Optional</em><em>[</em><em>str</em><em>]</em>) – None detects TorchScript and ExportedProgram files.
+The deprecated <code class="docutils literal notranslate"><span class="pre">&quot;executorch&quot;</span></code> option loads a <code class="docutils literal notranslate"><span class="pre">.pte</span></code> program.</p></li>
 </ul>
 </dd>
 </dl>
@@ -816,11 +814,31 @@ print(extra_files[“foo.txt”])</p>
 <dl class="field-list simple">
 <dt class="field-odd">Raises<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>ImportError</strong> – If ExecuTorch format is requested without the runtime package</p></li>
-<li><p><strong>ValueError</strong> – If the format is unsupported or the file is not a TorchScript or ExportedProgram file</p></li>
+<li><p><strong>ImportError</strong> – If ExecuTorch format is requested without its runtime dependencies</p></li>
+<li><p><strong>ValueError</strong> – If the format is unsupported or neither standard loader accepts the file</p></li>
 </ul>
 </dd>
 </dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><code class="docutils literal notranslate"><span class="pre">format=&quot;executorch&quot;</span></code> preserves the legacy <code class="docutils literal notranslate"><span class="pre">method_names</span></code> property,
+<code class="docutils literal notranslate"><span class="pre">run(inputs,</span> <span class="pre">method=&quot;forward&quot;)</span></code>, and <code class="docutils literal notranslate"><span class="pre">forward(*inputs)</span></code> interface.
+CUDA inputs are copied to CPU. As before, <code class="docutils literal notranslate"><span class="pre">extra_files</span></code> and additional
+kwargs are ignored for this format; external <code class="docutils literal notranslate"><span class="pre">.ptd</span></code> files are not supported.
+This compatibility path will remain for at least six months after the
+deprecation first ships. New code should import the TensorRT delegate and
+use ExecuTorch’s own runtime API directly:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">from</span><span class="w"> </span><span class="n">pathlib</span><span class="w"> </span><span class="k">import</span><span class="w"> </span><span class="n">Path</span>
+
+<span class="k">import</span><span class="w"> </span><span class="n">torch_tensorrt_executorch_runtime</span><span class="w">  </span><span class="err">#</span><span class="w"> </span><span class="n">noqa</span><span class="o">:</span><span class="w"> </span><span class="n">F401</span>
+<span class="n">from</span><span class="w"> </span><span class="n">executorch</span><span class="p">.</span><span class="n">runtime</span><span class="w"> </span><span class="k">import</span><span class="w"> </span><span class="n">Runtime</span>
+
+<span class="n">program</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Runtime</span><span class="p">.</span><span class="n">get</span><span class="p">().</span><span class="n">load_program</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s">"model.pte"</span><span class="p">))</span>
+<span class="n">forward</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">program</span><span class="p">.</span><span class="n">load_method</span><span class="p">(</span><span class="s">"forward"</span><span class="p">)</span>
+<span class="n">outputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">forward</span><span class="p">.</span><span class="n">execute</span><span class="p">((</span><span class="n">tensor</span><span class="p">,))</span>
+</pre></div>
+</div>
+</div>
 </dd></dl>
 
 </section>

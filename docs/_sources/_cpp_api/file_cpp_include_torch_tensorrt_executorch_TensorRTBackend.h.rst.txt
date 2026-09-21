@@ -32,8 +32,6 @@ Includes
 
 - ``NvInfer.h``
 
-- ``cuda_runtime.h``
-
 - ``executorch/runtime/backend/interface.h``
 
 - ``memory``

@@ -79,24 +79,7 @@ void TRTLogger::log(Severity severity, const char* msg) noexcept {
 
 EngineHandle::~EngineHandle() {
   cudaSetDevice(device_id);
-  // A fast-path execute() may have returned with its enqueue still in flight on the
-  // caller's stream, still using exec_ctx and the cached staging buffers. Wait on
-  // the recorded completion event before destroying the context or freeing the
-  // buffers. We wait on the event, not the stream, so this stays valid even if the
-  // caller already destroyed the stream. Non-skip executes synchronized inline, so
-  // inflight_pending is false there. Fall back to a device sync if no event exists.
-  if (inflight_event != nullptr) {
-    if (inflight_pending) {
-      cudaError_t err = cudaEventSynchronize(inflight_event);
-      if (err != cudaSuccess) {
-        ET_LOG(Error, "EngineHandle::~EngineHandle: cudaEventSynchronize failed: %s", cudaGetErrorString(err));
-        cudaGetLastError(); // clear sticky error; tear down regardless
-      }
-      inflight_pending = false;
-    }
-  } else {
-    cudaDeviceSynchronize();
-  }
+  // No wait here: execute already waited, and a device-wide one blocks unrelated work.
   for (void* p : cached_input_ptrs) {
     if (p != nullptr) {
       cudaFree(p);
@@ -109,14 +92,56 @@ EngineHandle::~EngineHandle() {
   }
   exec_ctx.reset();
   engine.reset();
-  runtime.reset();
-  if (inflight_event != nullptr) {
-    cudaEventDestroy(inflight_event);
-    inflight_event = nullptr;
-  }
+  // The runtime is shared and outlives this handle, so there is nothing to release for it.
 }
 
 namespace {
+
+// The process-wide TensorRT runtime and its logger, built once on first use and then never
+// destroyed. TensorRT requires the runtime to outlive every engine deserialized from it, and never
+// destroying it is the only way to promise that here. Destroying it at exit would not: statics are
+// torn down in reverse order of when their construction FINISHED, and an application holding a
+// program in a global finishes that global's constructor during static initialization, before
+// anything has called this. The runtime would then be destroyed first and the engine second, which
+// is the wrong way round. The cost is one runtime and one logger still allocated at exit.
+nvinfer1::IRuntime* shared_runtime() {
+  static std::mutex mutex;
+  static TRTLogger* logger = nullptr;
+  static nvinfer1::IRuntime* runtime = nullptr;
+  const std::lock_guard<std::mutex> lock(mutex);
+  // Retried while null, so one transient failure does not disable the backend for the process.
+  if (runtime == nullptr) {
+    if (logger == nullptr) {
+      logger = new TRTLogger();
+    }
+    runtime = nvinfer1::createInferRuntime(*logger);
+  }
+  return runtime;
+}
+
+// Drains on an early exit, so a retry cannot land in a staging buffer still being written.
+class StreamDrainOnEarlyReturn {
+ public:
+  explicit StreamDrainOnEarlyReturn(cudaStream_t stream) : stream_(stream) {}
+  StreamDrainOnEarlyReturn(const StreamDrainOnEarlyReturn&) = delete;
+  StreamDrainOnEarlyReturn& operator=(const StreamDrainOnEarlyReturn&) = delete;
+  ~StreamDrainOnEarlyReturn() {
+    if (armed_) {
+      (void)cudaStreamSynchronize(stream_);
+      cudaGetLastError();
+    }
+  }
+  void arm() {
+    armed_ = true;
+  }
+  void disarm() {
+    armed_ = false;
+  }
+
+ private:
+  cudaStream_t stream_;
+  bool armed_ = false;
+};
 
 struct EngineHandleDeleter {
   void operator()(EngineHandle* handle) const {
@@ -166,6 +191,22 @@ Error initialize_engine_io(EngineHandle& handle) {
   handle.num_inputs = handle.input_binding_names.size();
   handle.num_outputs = handle.output_binding_names.size();
 
+  // Against the engine's own count, since a metadata list that lost an entry still parses.
+  const int32_t engine_io_count = handle.engine->getNbIOTensors();
+  const size_t named_io_count = handle.num_inputs + handle.num_outputs;
+  if (engine_io_count < 0 || named_io_count != static_cast<size_t>(engine_io_count)) {
+    ET_LOG(
+        Error,
+        "TensorRTBackend::init: the program names %zu bindings (%zu in, %zu out) but the engine "
+        "has %d. The metadata and the engine disagree, so the program is damaged rather than "
+        "merely unsupported.",
+        named_io_count,
+        handle.num_inputs,
+        handle.num_outputs,
+        engine_io_count);
+    return Error::InvalidProgram;
+  }
+
   handle.exec_ctx.reset(handle.engine->createExecutionContext());
   TORCHTRT_ET_CHECK_NOT_NULL(
       handle.exec_ctx, Error::InvalidProgram, "TensorRTBackend::init: failed to create TensorRT execution context");
@@ -209,6 +250,30 @@ bool is_cuda_accessible_ptr(const void* ptr) {
   return attrs.type == cudaMemoryTypeDevice || attrs.type == cudaMemoryTypeManaged;
 }
 
+// The device a pointer is tied to, or -1 for host, managed, and this engine's own.
+int cuda_foreign_device_of_ptr(const void* ptr, int engine_device) {
+  if (ptr == nullptr) {
+    return -1;
+  }
+  cudaPointerAttributes attrs{};
+  // Let through: an older runtime reports plain host memory as an outright failure.
+  if (cudaPointerGetAttributes(&attrs, ptr) != cudaSuccess) {
+    cudaGetLastError();
+    return -1;
+  }
+  if (attrs.type != cudaMemoryTypeDevice || attrs.device == engine_device) {
+    return -1;
+  }
+  // A non-null devicePointer is an address usable from here, which is the question. Asking instead
+  // whether the two cards CAN reach each other answered yes on every pair measured and still faulted,
+  // because a mapping has to be enabled per pair; refusing outright then rejected buffers that work
+  // once it is.
+  if (attrs.devicePointer != nullptr) {
+    return -1;
+  }
+  return attrs.device;
+}
+
 } // namespace
 
 // ---------------------------------------------------------------------------
@@ -219,9 +284,8 @@ bool TensorRTBackend::is_available() const {
     return false;
   }
 
-  TRTLogger logger;
-  TRTUniquePtr<nvinfer1::IRuntime> runtime(nvinfer1::createInferRuntime(logger));
-  return runtime != nullptr;
+  // Building it is the check, so a process that asks and loads nothing still carries one.
+  return shared_runtime() != nullptr;
 }
 
 // ---------------------------------------------------------------------------
@@ -271,31 +335,35 @@ Result<DelegateHandle*> TensorRTBackend::init(
     return Error::InvalidProgram;
   }
 
-  // Created while device_id is current so the event belongs to the engine's device.
-  // It orders a later execute()/teardown after a skip-sync enqueue (see execute()
-  // and ~EngineHandle). Blocking-sync so the host yields instead of busy-spinning.
-  cuda_err = cudaEventCreateWithFlags(&handle->inflight_event, cudaEventDisableTiming | cudaEventBlockingSync);
-  if (cuda_err != cudaSuccess) {
-    ET_LOG(Error, "TensorRTBackend::init: cudaEventCreateWithFlags failed: %s", cudaGetErrorString(cuda_err));
-    return Error::InvalidProgram;
-  }
-
-  int is_integrated = 0;
-  cuda_err = cudaDeviceGetAttribute(&is_integrated, cudaDevAttrIntegrated, handle->device_id);
+  // Whether this device can reach pageable host memory at all. Speed is the query below.
+  int pageable_access = 0;
+  cuda_err = cudaDeviceGetAttribute(&pageable_access, cudaDevAttrPageableMemoryAccess, handle->device_id);
   if (cuda_err != cudaSuccess) {
     ET_LOG(
         Info,
-        "TensorRTBackend::init: cudaDeviceGetAttribute(cudaDevAttrIntegrated) failed: %s",
+        "TensorRTBackend::init: cudaDeviceGetAttribute(cudaDevAttrPageableMemoryAccess) failed: %s",
         cudaGetErrorString(cuda_err));
   }
-  handle->unified_memory = is_integrated != 0;
+  // Both, because reachable and reachable-without-per-page-faults are different questions.
+  int pageable_via_page_tables = 0;
+  cuda_err = cudaDeviceGetAttribute(
+      &pageable_via_page_tables, cudaDevAttrPageableMemoryAccessUsesHostPageTables, handle->device_id);
+  if (cuda_err != cudaSuccess) {
+    ET_LOG(
+        Info,
+        "TensorRTBackend::init: cudaDeviceGetAttribute(cudaDevAttrPageableMemoryAccessUsesHostPageTables) "
+        "failed: %s",
+        cudaGetErrorString(cuda_err));
+  }
+  handle->pageable_host_access = pageable_access != 0 && pageable_via_page_tables != 0;
 
-  handle->runtime.reset(nvinfer1::createInferRuntime(handle->logger));
+  // One per process: TensorRT wants one runtime outliving every engine from it.
+  nvinfer1::IRuntime* runtime = shared_runtime();
   TORCHTRT_ET_CHECK_NOT_NULL(
-      handle->runtime, Error::InvalidProgram, "TensorRTBackend::init: failed to create TensorRT runtime");
+      runtime, Error::InvalidProgram, "TensorRTBackend::init: failed to create TensorRT runtime");
 
   const void* engine_data = TensorRTBlobHeader::engine_data(processed->data(), header);
-  handle->engine.reset(handle->runtime->deserializeCudaEngine(engine_data, header.engine_size));
+  handle->engine.reset(runtime->deserializeCudaEngine(engine_data, header.engine_size));
   TORCHTRT_ET_CHECK_NOT_NULL(
       handle->engine, Error::InvalidProgram, "TensorRTBackend::init: failed to deserialize TensorRT engine");
 
@@ -321,6 +389,7 @@ Result<DelegateHandle*> TensorRTBackend::init(
   // so a runtime option is never silently dropped. The const char* returned by
   // get_runtime_spec points into the caller's LoadBackendOptionsMap storage, which
   // outlives init(); we parse it immediately and keep only the int64 result.
+
   const auto ws_runtime = context.get_runtime_spec<const char*>(kWeightStreamingBudgetKey);
   if (ws_runtime.ok()) {
     const char* const value = ws_runtime.get();
@@ -616,23 +685,9 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   nvinfer1::IExecutionContext* ctx = engine->exec_ctx.get();
   TORCHTRT_ET_CHECK_NOT_NULL(ctx, Error::InvalidState, "TensorRTBackend::execute: backend is not initialized");
 
-  // A prior fast-path execute() may have returned with its enqueue still in flight
-  // on the shared exec_ctx. Wait for it before reconfiguring the context below:
-  // TensorRT forbids mutating a context while one of its enqueues is in flight, and
-  // setInputShape/setTensorAddress run on the host, so this must be a host-side wait.
-  if (engine->inflight_pending) {
-    cuda_err = cudaEventSynchronize(engine->inflight_event);
-    engine->inflight_pending = false;
-    if (cuda_err != cudaSuccess) {
-      ET_LOG(Error, "TensorRTBackend::execute: cudaEventSynchronize failed: %s", cudaGetErrorString(cuda_err));
-      return Error::InvalidProgram;
-    }
-  }
   const auto caller_stream = ::executorch::extension::cuda::getCallerStream();
-  const bool caller_stream_set = caller_stream.has_value();
   cudaStream_t stream = caller_stream.value_or(cudaStreamPerThread);
-  bool output_staged_to_host = false;
-  bool input_staged_from_host = false;
+  StreamDrainOnEarlyReturn drain_on_early_return(stream);
 
   if (engine->cached_input_ptrs.empty()) {
     engine->cached_input_ptrs.resize(num_inputs, nullptr);
@@ -662,6 +717,21 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     }
 
     exec_aten::Tensor et_in = arg->toTensor();
+    // Caught here rather than at submission. Device memory on the wrong GPU binds without complaint
+    // and then fails inside TensorRT as an invalid program, which sends the reader to re-export a
+    // model that was never the problem.
+    const int input_device = cuda_foreign_device_of_ptr(et_in.const_data_ptr(), engine->device_id);
+    if (input_device >= 0) {
+      ET_LOG(
+          Error,
+          "TensorRTBackend::execute: input '%s' is on CUDA device %d, this engine on %d. Move it, or "
+          "load the program on that device. Cards able to reach each other is not enough: the "
+          "mapping must be on, and nothing here turns it on.",
+          name.c_str(),
+          input_device,
+          engine->device_id);
+      return Error::InvalidArgument;
+    }
     nvinfer1::Dims dims = to_trt_dims(et_in);
     if (dims.nbDims > nvinfer1::Dims::MAX_DIMS) {
       ET_LOG(Error, "TensorRTBackend::execute: input '%s' rank exceeds TensorRT limit", name.c_str());
@@ -698,13 +768,12 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     // caller's unchanged buffer. Fail loudly instead.
     if (engine->input_is_alias_target[i]) {
       const bool device_resident =
-          et_in.nbytes() > 0 && (engine->unified_memory || is_cuda_accessible_ptr(et_in.const_data_ptr()));
+          et_in.nbytes() > 0 && (engine->pageable_host_access || is_cuda_accessible_ptr(et_in.const_data_ptr()));
       if (!device_resident) {
         ET_LOG(
             Error,
-            "TensorRTBackend::execute: aliased input '%s' must be device-resident (non-empty and "
-            "CUDA-accessible or unified memory); its caller-owned in-place update cannot be staged "
-            "through host scratch",
+            "TensorRTBackend::execute: aliased input '%s' must be device-reachable without staging, "
+            "because its caller-owned in-place update cannot go through host scratch",
             name.c_str());
         return Error::InvalidArgument;
       }
@@ -720,7 +789,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
         engine->cached_input_sizes[i] = 1;
       }
       bind_ptr = engine->cached_input_ptrs[i];
-    } else if (engine->unified_memory || is_cuda_accessible_ptr(et_in.const_data_ptr())) {
+    } else if (engine->pageable_host_access || is_cuda_accessible_ptr(et_in.const_data_ptr())) {
       bind_ptr = et_in.mutable_data_ptr();
     } else {
       const size_t needed = et_in.nbytes();
@@ -737,8 +806,8 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
         engine->cached_input_sizes[i] = needed;
       }
       bind_ptr = engine->cached_input_ptrs[i];
-      input_staged_from_host = true;
       cuda_err = cudaMemcpyAsync(bind_ptr, et_in.const_data_ptr(), needed, cudaMemcpyHostToDevice, stream);
+      drain_on_early_return.arm();
       if (cuda_err != cudaSuccess) {
         ET_LOG(
             Error,
@@ -829,11 +898,40 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
         ET_LOG(Error, "TensorRTBackend::execute: resize_tensor failed for aliased output '%s'", name.c_str());
         return a_resize_err;
       }
-      void* dst = et_alias_out.nbytes() > 0 ? et_alias_out.mutable_data_ptr() : nullptr;
+      // Nothing to copy when the slot holds no bytes, which is a shape TensorRT inferred as empty
+      // rather than a mistake, so it is skipped rather than refused.
+      if (et_alias_out.nbytes() == 0) {
+        continue;
+      }
+      void* dst = et_alias_out.mutable_data_ptr();
+      // Bytes to write and no address: refuse, or the engine's update goes nowhere silently.
+      if (dst == nullptr) {
+        ET_LOG(
+            Error,
+            "TensorRTBackend::execute: aliased output '%s' needs %zu bytes but carries no address. A "
+            "program built without runtime-allocated outputs needs the caller to supply each output "
+            "buffer through set_output_data_ptr before running.",
+            name.c_str(),
+            size_t(et_alias_out.nbytes()));
+        return Error::InvalidArgument;
+      }
+      // The ordinary output path asks this and the aliased one did not, so a buffer on a card
+      // this engine cannot reach was copied into rather than refused.
+      const int foreign_alias_device = cuda_foreign_device_of_ptr(dst, engine->device_id);
+      if (foreign_alias_device >= 0) {
+        ET_LOG(
+            Error,
+            "TensorRTBackend::execute: aliased output '%s' is on CUDA device %d, this engine on "
+            "%d. Move it, or load the program on that device.",
+            name.c_str(),
+            foreign_alias_device,
+            engine->device_id);
+        return Error::InvalidArgument;
+      }
       // dst != bind_ptr guards against issuing a self-copy. The memory planner does
       // not currently place the delegate's output slot on the aliased input -- the
       // two are live at the same time -- so this holds for every aliased output.
-      if (dst != nullptr && dst != bind_ptr) {
+      if (dst != bind_ptr) {
         aliased_reflects.emplace_back(dst, bind_ptr, et_alias_out.nbytes());
       }
       continue;
@@ -848,6 +946,19 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     }
 
     exec_aten::Tensor et_out = arg->toTensor();
+    // Asked separately, because an output address comes from the caller rather than the engine.
+    const int output_device = cuda_foreign_device_of_ptr(et_out.const_data_ptr(), engine->device_id);
+    if (output_device >= 0) {
+      ET_LOG(
+          Error,
+          "TensorRTBackend::execute: the buffer supplied for output '%s' is on CUDA device %d but "
+          "this engine runs on device %d. Supply a buffer on the engine's device. The program "
+          "itself is fine.",
+          name.c_str(),
+          output_device,
+          engine->device_id);
+      return Error::InvalidArgument;
+    }
 
     // Update the ExecuTorch tensor shape to the actual TRT output shape.
     // getTensorShape() is valid after inferShapes() has been called.
@@ -883,7 +994,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
         engine->cached_output_sizes[o] = 1;
       }
       bind_ptr = engine->cached_output_ptrs[o];
-    } else if (engine->unified_memory || is_cuda_accessible_ptr(et_out.const_data_ptr())) {
+    } else if (engine->pageable_host_access || is_cuda_accessible_ptr(et_out.const_data_ptr())) {
       bind_ptr = et_out.mutable_data_ptr();
     } else {
       const size_t needed = et_out.nbytes();
@@ -900,7 +1011,6 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
         engine->cached_output_sizes[o] = needed;
       }
       bind_ptr = engine->cached_output_ptrs[o];
-      output_staged_to_host = true;
       outputs_needing_copy.push_back({arg_i, bind_ptr});
     }
 
@@ -913,90 +1023,77 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // ------------------------------------------------------------------
   // 4. Enqueue inference on the current CUDA stream
   // ------------------------------------------------------------------
+  // Armed before the launch, so a partial launch still drains what it submitted.
+  drain_on_early_return.arm();
   if (!ctx->enqueueV3(stream)) {
     ET_LOG(
         Error,
-        "TensorRTBackend::execute: enqueueV3 failed. Verify that the selected "
-        "CallerStreamGuard stream belongs to the TensorRT engine device. If a CUDA "
-        "green context is current, scope a CallerStreamGuard with a green-context "
-        "stream: cudaStreamPerThread is invalid while a green context is current.");
+        "TensorRTBackend::execute: enqueueV3 failed. Likely an output with no address: supply each "
+        "with set_output_data_ptr. Else the guard's stream is on another device, or is the "
+        "per-thread stream inside a green context, which is invalid there.");
     return Error::InvalidState;
   }
 
   // Caller-owned KV: reflect each engine in-place update into its delegate output
   // EValue (D2D on the same stream, after the engine work).
   for (const auto& r : aliased_reflects) {
-    cuda_err = cudaMemcpyAsync(std::get<0>(r), std::get<1>(r), std::get<2>(r), cudaMemcpyDeviceToDevice, stream);
+    cuda_err = cudaMemcpyAsync(std::get<0>(r), std::get<1>(r), std::get<2>(r), cudaMemcpyDefault, stream);
+    drain_on_early_return.arm();
     if (cuda_err != cudaSuccess) {
-      ET_LOG(
-          Error, "TensorRTBackend::execute: aliased-output reflect D2D copy failed: %s", cudaGetErrorString(cuda_err));
-      // enqueueV3 already submitted engine work to `stream`, and inflight_pending
-      // is not armed until the end of the happy path -- drain now so a later
-      // execute() or the destructor never reconfigures/frees exec_ctx while this
-      // enqueue is still running.
+      ET_LOG(Error, "TensorRTBackend::execute: aliased-output reflect copy failed: %s", cudaGetErrorString(cuda_err));
+      // Drain first: the engine work is on this stream and the buffers outlive the call.
       (void)cudaStreamSynchronize(stream);
-      engine->inflight_pending = false;
       return Error::InvalidProgram;
     }
   }
 
-  // The engine work is now in flight on `stream`. Decide whether to wait for it:
-  //   must_sync = an output is staged to host (the caller reads the D2H result on
-  //   return), an input was staged from host (its async H2D read the caller's host
-  //   buffer, which the caller may reuse once we return), or no caller stream is
-  //   active (preserve the historical "results ready on return" behavior).
-  // Otherwise (caller stream + all I/O device-resident) leave the work enqueued so
-  // it composes with the caller's later GPU work, and record inflight_event so the
-  // next execute() and the destructor wait before reusing/freeing exec_ctx. The D2H
-  // copies live in the must_sync branch: an output staged to host always sets
-  // output_staged_to_host, so outputs_needing_copy is empty on the skip path.
-  // An aliased reflect enqueues the engine's in-place update into the delegate
-  // output EValue on `stream`; ExecuTorch's buffer-mutation copy_ reads that EValue
-  // after execute() returns, so the reflect must complete first. A model with
-  // aliased outputs therefore always syncs here.
-  const bool aliased_reflect_pending = !aliased_reflects.empty();
-  const bool must_sync =
-      output_staged_to_host || input_staged_from_host || aliased_reflect_pending || !caller_stream_set;
-  if (must_sync) {
-    Error copy_err = Error::Ok;
-    for (auto& output : outputs_needing_copy) {
-      exec_aten::Tensor et_out = args[output.first]->toTensor();
-      cuda_err =
-          cudaMemcpyAsync(et_out.mutable_data_ptr(), output.second, et_out.nbytes(), cudaMemcpyDeviceToHost, stream);
-      if (cuda_err != cudaSuccess) {
-        ET_LOG(
-            Error,
-            "TensorRTBackend::execute: D2H copy failed for output %zu: %s",
-            output.first,
-            cudaGetErrorString(cuda_err));
-        // The enqueue already succeeded, so the engine is still running on the
-        // stream. Drain below before returning, or the next call mutates a live
-        // execution context, which TensorRT forbids.
-        copy_err = Error::InvalidProgram;
-        break;
-      }
-    }
-    cuda_err = cudaStreamSynchronize(stream);
-    engine->inflight_pending = false;
+  // The engine work is in flight on `stream`, and we always wait for it. ExecuTorch's runtime
+  // has no asynchronous execute: its execute() returns Error::Ok to mean the work is finished,
+  // every caller reads the outputs straight after it returns, and the API hands back no event or
+  // future to wait on. So there is nobody an early return could be honest with.
+  Error copy_err = Error::Ok;
+  for (auto& output : outputs_needing_copy) {
+    exec_aten::Tensor et_out = args[output.first]->toTensor();
+    cuda_err =
+        cudaMemcpyAsync(et_out.mutable_data_ptr(), output.second, et_out.nbytes(), cudaMemcpyDeviceToHost, stream);
     if (cuda_err != cudaSuccess) {
-      ET_LOG(Error, "TensorRTBackend::execute: cudaStreamSynchronize failed: %s", cudaGetErrorString(cuda_err));
-      return Error::InvalidProgram;
+      // Name the output and number it the way the caller does. output.first indexes the whole
+      // argument list, so on a one-input engine the first output read as "output 1", and the
+      // index a caller passes to set_output_data_ptr counts outputs from zero.
+      const size_t output_index = output.first - engine->num_inputs;
+      const char* output_name = output_index < engine->output_binding_names.size()
+          ? engine->output_binding_names[output_index].c_str()
+          : "unknown";
+      ET_LOG(
+          Error,
+          "TensorRTBackend::execute: copy out of output %zu ('%s') failed: %s. Either no buffer "
+          "was supplied for it with set_output_data_ptr, or an earlier failure left the device "
+          "unusable. Read the first error, not this one.",
+          output_index,
+          output_name,
+          cudaGetErrorString(cuda_err));
+      // The engine is still running on the stream, so drain before returning.
+      copy_err = Error::InvalidArgument;
+      break;
     }
-    if (copy_err != Error::Ok) {
-      return copy_err;
-    }
-  } else {
-    cuda_err = cudaEventRecord(engine->inflight_event, stream);
-    if (cuda_err != cudaSuccess) {
-      // Could not arm the completion marker; drain now so a later execute() or the
-      // destructor never reconfigures or frees exec_ctx while this enqueue runs.
-      ET_LOG(Error, "TensorRTBackend::execute: cudaEventRecord failed: %s", cudaGetErrorString(cuda_err));
-      (void)cudaStreamSynchronize(stream);
-      engine->inflight_pending = false;
-      return Error::InvalidProgram;
-    }
-    engine->inflight_pending = true;
   }
+  cuda_err = cudaStreamSynchronize(stream);
+  if (cuda_err != cudaSuccess) {
+    // Returning with the guard still armed, so its destructor waits: a failed drain says nothing
+    // about whether the work finished, and the staging buffers it may still be writing outlive
+    // this call.
+    ET_LOG(
+        Error,
+        "TensorRTBackend::execute: the device reported '%s' while finishing this call. Usual causes, "
+        "in order: an input buffer shorter than its shape, storage freed while the call was running, "
+        "and an output address that is not writable.",
+        cudaGetErrorString(cuda_err));
+    return Error::Internal;
+  }
+  if (copy_err != Error::Ok) {
+    return copy_err;
+  }
+  drain_on_early_return.disarm();
   return Error::Ok;
 }
 
@@ -1032,5 +1129,13 @@ const ::executorch::runtime::Backend kBackendId{"TensorRTBackend", &get_backend(
 const Error kRegistrationResult = ::executorch::runtime::register_backend(kBackendId);
 
 } // namespace
+
+// Compiled everywhere, not only in the wheel build. The Python package refuses to import unless it
+// can ask this, and a C++ consumer linking two delegates is the case most likely to need the answer,
+// yet the in-tree build that serves those consumers used to leave it out entirely.
+extern "C" bool torch_tensorrt_owns_executorch_registration() {
+  return ::executorch::runtime::get_backend_class(kBackendId.name) == &get_backend();
+}
+
 } // namespace executorch_backend
 } // namespace torch_tensorrt

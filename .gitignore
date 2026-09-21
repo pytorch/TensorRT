@@ -97,4 +97,5 @@ CLAUDE.md
 /external/
 build-executorch/
 py/torch-tensorrt-executorch-runtime/build/
+py/torch-tensorrt-executorch-runtime/torch_tensorrt_executorch_runtime/lib/
 py/torch-tensorrt-executorch-runtime/dist/

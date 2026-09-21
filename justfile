@@ -56,6 +56,11 @@ suites:
 
 # Run ONE suite exactly as CI runs it (uses the {{variant}} backend). Args after `--`:
 #   just suite dynamo-runtime -- -k test_foo -x        just variant=rtx suite dynamo-converters
+#
+# The executorch suite additionally needs CU_VERSION set, because it installs the exact pinned
+# ExecuTorch nightly and that build exists only on the matching PyTorch nightly channel, never on
+# PyPI. CI always sets it; a local shell does not, so without it setup fails before any test runs:
+#   CU_VERSION=cu134 just suite executorch
 suite name *args:
     {{_ci}} run {{name}} --variant {{variant}} {{args}}
 
@@ -92,7 +97,7 @@ install-test-ext:
     #
     # Exact, not a range: the nightly channel gains a member every day, and the delegate is
     # compiled from the commit this version pairs with.
-    uv pip install pyyaml \
+    uv pip install pyyaml patchelf \
       --extra-index-url https://download.pytorch.org/whl/nightly/cu130 \
       "executorch==1.6.0.dev20260915"
 

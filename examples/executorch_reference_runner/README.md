@@ -24,7 +24,7 @@ python examples/torchtrt_executorch_example/export_static_shape.py --model_path=
 A normal reference runner build does not need separate steps for
 `libexecutorch_core.a` and `libexecutorch_trt_backend.a`. The runner CMake adds
 both ExecuTorch and the Torch-TensorRT ExecuTorch source package, and linking
-`torchtrt::executorch_backend` makes the backend archive a dependency of
+`executorch::backend_tensorrt` makes the backend archive a dependency of
 `example_executorch_runner`.
 
 The build also turns on ExecuTorch's CUDA backend, so the CUDA toolkit has to be
@@ -59,14 +59,14 @@ tar xvf libtorchtrt.tar.gz
 export EXECUTORCH_SOURCE_DIR="${PWD}/executorch"
 # tarball untared path
 export TORCH_TENSORRT_ROOT="${PWD}/torch_tensorrt"
-export TORCHTRT_EXECUTORCH_SOURCE_DIR="${TORCH_TENSORRT_ROOT}/src/torch_tensorrt/executorch"
+export EXECUTORCH_BACKEND_TENSORRT_SOURCE_DIR="${TORCH_TENSORRT_ROOT}/src/torch_tensorrt/executorch"
 export TensorRT_ROOT=/path/to/extracted/TensorRT
 export LD_LIBRARY_PATH="${TensorRT_ROOT}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
 
 cmake -S "${TORCH_TENSORRT_ROOT}/examples/executorch_reference_runner" \
   -B build-executorch-reference-runner \
   -DEXECUTORCH_SOURCE_DIR="${EXECUTORCH_SOURCE_DIR}" \
-  -DTORCHTRT_EXECUTORCH_SOURCE_DIR="${TORCHTRT_EXECUTORCH_SOURCE_DIR}" \
+  -DEXECUTORCH_BACKEND_TENSORRT_SOURCE_DIR="${EXECUTORCH_BACKEND_TENSORRT_SOURCE_DIR}" \
   -DTensorRT_ROOT="${TensorRT_ROOT}"
 
 cmake --build build-executorch-reference-runner --target example_executorch_runner -j
@@ -102,30 +102,40 @@ same channel:
 
 ```bash
 pip install --pre "torch-tensorrt[executorch]" \
-  --extra-index-url https://download.pytorch.org/whl/nightly/cu130
+  --extra-index-url https://download.pytorch.org/whl/nightly/cu130 \
+  --extra-index-url https://pypi.nvidia.com
 ```
 
-The index is required, not optional: the extra's ExecuTorch floor names a dev build, and PyPI's
-`executorch` stops below it, so without the nightly channel pip reports no matching distribution.
+Both indexes are required. The extra's ExecuTorch floor names a development build the public index
+does not carry, and that index ships the inference library only as source, which pip spends about
+twenty minutes failing to build.
 `--pre` allows prereleases; it does not request an upgrade. Released versions can
 already declare the extra. If an older installation lacks it, first install the
 intended compatible Torch-TensorRT wheel deliberately. Adding the extra may change
 dependencies, so use a fresh environment to preserve an existing working stack.
 
-The extra installs `executorch` only. The delegate runtime,
-`torch-tensorrt-executorch-runtime`, is not yet published to any index: its requirement in the
-top-level `setup.py` is commented out for that reason. Build and install it from source following
-`py/torch-tensorrt-executorch-runtime/README.md`. That wheel contains an ExecuTorch Python runtime
-with `TensorRTBackend` linked into its backend registry, and loading a `.pte` through the delegate
-needs it.
+The extra also installs the companion wheel, `torch-tensorrt-executorch-runtime`, so there is no
+second command. That wheel ships just the TensorRT delegate, a single shared library that registers
+itself with the ExecuTorch runtime from the `executorch` distribution rather than bundling a runtime
+of its own, and loading a `.pte` through the delegate needs it. To build it from source instead,
+follow `py/torch-tensorrt-executorch-runtime/README.md`.
 
-Then load and run the model:
+The Python example uses ExecuTorch's Runtime API to back planned device arenas
+with CUDA memory. Then load and run the model:
 
 ```bash
 python examples/executorch_reference_runner/load_model.py \
   --model_path=model.pte \
   --num_runs=1
 ```
+
+The legacy `torch_tensorrt.load(path, format="executorch")` entry point still
+works, but emits a deprecation warning. Its `method_names` property,
+`run(inputs, method="forward")`, and `forward(*inputs)` interface remain
+supported for at least six months after the deprecation first ships. It still
+copies CUDA inputs to CPU and supports embedded weights only. New applications
+should use the Runtime API shown above; device-resident programs must use it
+directly to keep their inputs on CUDA.
 
 ### C++
 
@@ -154,10 +164,11 @@ Torch-TensorRT delegate subgraphs embedded in the `.pte`. Applications can
 scope `executorch::extension::cuda::CallerStreamGuard` around execution to run
 TensorRT and CUDA/AOTI delegates on one ordinary caller-owned CUDA stream. On the
 discrete-GPU CI configuration, this runner's host-backed inputs and outputs take
-the synchronized staging path; that test exercises guarded inference and checks the
-output values, not the device-resident asynchronous fast path. Integrated GPUs may bind
-host-backed storage directly and can follow the asynchronous contract documented in
-[the backend README](../../cpp/src/torch_tensorrt/executorch/README.md).
+the synchronized staging path, and that is the path a discrete card always takes: it
+can read pageable host memory, but by faulting pages in one at a time rather than
+through shared page tables, which is far slower than one bulk copy. Only an integrated
+part that shares host page tables has its host storage bound directly. Either way the
+call returns with the work finished.
 The Python `torch_tensorrt` package is needed when exporting the `.pte`; it is not
 needed by this native runner at inference time.
 
@@ -181,7 +192,8 @@ build-executorch-reference-runner/example_executorch_runner \
 ```
 
 `--green_context_sms=N` creates the caller stream inside a green context holding N
-SMs. The runner aborts rather than falling back if one cannot be created, so a
+SMs. The runner refuses with a distinct status rather than falling back if one
+cannot be created, and says how many the device has, so a
 passing run always means a green context was really used. `N=0`, the default, uses
 an ordinary stream.
 
@@ -189,9 +201,12 @@ Enabling `EXECUTORCH_BUILD_CUDA` does not make this runner depend on libtorch. I
 needs `EXECUTORCH_BUILD_EXTENSION_TENSOR=ON`, which is set automatically, and the
 result links no libtorch and no libc10.
 
-This path is verified by hand, not in CI: the CI configuration builds the runner
-without the CUDA delegate. It also takes the synchronized path, because the method
-inputs and outputs are host-backed.
+CI exercises the green-context option. The verification script runs the coalesced
+program twice, once on an ordinary stream and once with `--green_context_sms=8`, and
+treats the runner's distinct status for "no green context available" as a skip, so the
+green run happens only where the device has the SMs for one. The other reference-runner
+checks use the CUDA-enabled build with an ordinary stream and host-backed method inputs
+and outputs.
 
 ## Caller-Owned KV-Cache Persistence Check
 

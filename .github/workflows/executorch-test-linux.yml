@@ -40,7 +40,7 @@ jobs:
           set -eou pipefail
           MATRIX_BLOB=${{ toJSON(inputs.build-matrix) }}
           LIMIT_PR=${{ (github.event_name == 'push' || github.event_name == 'schedule') && 'false' || 'true' }}
-          MATRIX_BLOB="$(python3 .github/scripts/filter-matrix.py --use-rtx false --limit-pr-builds "${LIMIT_PR}" --matrix "${MATRIX_BLOB}")"
+          MATRIX_BLOB="$(python3 .github/scripts/filter-matrix.py --executorch-runtime --use-rtx false --limit-pr-builds "${LIMIT_PR}" --matrix "${MATRIX_BLOB}")"
           echo "${MATRIX_BLOB}"
           echo "matrix=${MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
 
@@ -66,13 +66,11 @@ jobs:
         # ExecuTorch's CUDA wheels live only on the PyTorch nightly index, so the channel is
         # needed. No --pre: a specifier naming a prerelease admits prereleases by itself, and
         # --pre would apply to every other requirement in the same command too.
-        python -m pip install pyyaml \
+        python -m pip install pyyaml "wheel>=0.40" \
           --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" \
           "executorch==1.6.0.dev20260915"
 
-        # The standard wheel build packages the matching runtime wheel in its
-        # artifact alongside torch_tensorrt*.whl; install it after the shared
-        # core-wheel installer has selected the matrix-matched core wheel.
+        # The shared artifact carries the matching core and companion wheels.
         shopt -s nullglob
         runtime_wheels=(/opt/torch-tensorrt-builds/torch_tensorrt_executorch_runtime*.whl)
         echo "Downloaded wheel artifact contents:"
@@ -83,12 +81,16 @@ jobs:
         fi
         echo "Installing ExecuTorch runtime wheel: ${runtime_wheels[0]}"
         python -m pip install --no-deps "${runtime_wheels[0]}"
-        # Run the check directly so its exit status is the step's exit status.
-        # Wrapping it in `gdb --batch` reports gdb's own status, which is 0
-        # whatever the program does, so a SIGSEGV here was passing.
-        # On failure, re-run under gdb for the backtrace, then fail the step.
+        # Check stock backends too, since delegated programs can fall back to them.
+        # Run directly so a native crash fails the step; gdb is only for a backtrace.
         ulimit -c unlimited || true
-        runtime_check='import torch; print(torch.__version__, torch.version.cuda); from torch_tensorrt_executorch_runtime import BACKEND_NAME, get_runtime; print(1); runtime = get_runtime(); print(2); assert runtime.backend_registry.is_available(BACKEND_NAME); assert runtime.backend_registry.is_available("XnnpackBackend"); assert runtime.backend_registry.is_available("CudaBackend")'
+        # sys.exit, not assert: under PYTHONOPTIMIZE or python -O every assert is compiled out and
+        # this check would pass over a runtime with no backends registered at all.
+        #
+        # Importing the delegate package is the whole registration step; it exposes no runtime API,
+        # so the registry is queried through ExecuTorch's own Runtime. Importing it for its side
+        # effect only is exactly what a user does, so this also proves the side effect works.
+        runtime_check='import sys, torch; print(torch.__version__, torch.version.cuda); import torch_tensorrt_executorch_runtime; from torch_tensorrt_executorch_runtime import BACKEND_NAME; from executorch.runtime import Runtime; registry = Runtime.get().backend_registry; missing = [n for n in (BACKEND_NAME, "XnnpackBackend", "CudaBackend") if not registry.is_available(n)]; sys.exit("FATAL: backends not registered: " + ", ".join(missing)) if missing else None'
         check_status=0
         PYTHONFAULTHANDLER=1 python -u -X faulthandler -c "${runtime_check}" ||
           check_status=$?
@@ -139,9 +141,32 @@ jobs:
           --model_path="${RUNNER_TEMP}/torchtrt-kv-cache-decode.pte"
         python examples/torchtrt_executorch_example/export_coalesced.py \
           --model_path="${RUNNER_TEMP}/torchtrt-coalesced.pte"
+        python examples/torchtrt_executorch_example/export_device_resident.py \
+          --model_path="${RUNNER_TEMP}/torchtrt-device-resident.pte"
         .github/scripts/verify-executorch-reference-runner.sh \
           "${RUNNER_TEMP}/torchtrt-python.pte" \
           "${RUNNER_TEMP}/torchtrt-kv-cache-decode.pte" \
           "${RUNNER_TEMP}/torchtrt-coalesced.pte"
         python examples/executorch_reference_runner/load_model.py \
           --model_path="${RUNNER_TEMP}/torchtrt-python.pte" --num_runs=1
+        # The device-resident program is deliberately NOT handed to the C++
+        # reference runner above: that runner feeds host tensors, which this
+        # program's boundary contract forbids. Its Python runner passes CUDA
+        # tensors and asserts the export flags took and the values match.
+        python examples/executorch_reference_runner/load_model_device_resident.py \
+          --model_path="${RUNNER_TEMP}/torchtrt-device-resident.pte" --num_runs=2
+        # The only consumer that links the delegate the way an application does: out of the
+        # installed wheel, found by name, through ExecuTorch's module extension. The reference
+        # runner above drives the low level Method API and builds the delegate from source, so
+        # nothing else here exercises the CMake package the wheel ships, or that C++ API.
+        executorch_share="$(python -c 'import importlib.metadata as m, pathlib; print(pathlib.Path(str(m.distribution("executorch").locate_file("executorch"))) / "share" / "cmake")')"
+        delegate_cmake="$(TORCH_TENSORRT_SKIP_DELEGATE_REGISTRATION=1 python -c 'import pathlib, torch_tensorrt_executorch_runtime as r; print(pathlib.Path(r.__file__).parent / "lib" / "cmake" / "executorch_backend_tensorrt")')"
+        cmake -S examples/executorch_module_consumer -B "${RUNNER_TEMP}/module-consumer" \
+          -DCMAKE_PREFIX_PATH="${executorch_share};${delegate_cmake}"
+        cmake --build "${RUNNER_TEMP}/module-consumer" -j"$(nproc)"
+        # Host outputs: the program plans them, so forward() alone is enough.
+        "${RUNNER_TEMP}/module-consumer/executorch_module_consumer" \
+          --model_path="${RUNNER_TEMP}/torchtrt-coalesced.pte" --num_runs=2
+        # Device outputs: the program leaves them to the caller, so one is supplied first.
+        "${RUNNER_TEMP}/module-consumer/executorch_module_consumer" \
+          --model_path="${RUNNER_TEMP}/torchtrt-device-resident.pte" --device_io --num_runs=2

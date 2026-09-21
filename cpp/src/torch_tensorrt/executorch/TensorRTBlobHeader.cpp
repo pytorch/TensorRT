@@ -5,9 +5,11 @@
 
 #include "torch_tensorrt/executorch/TensorRTBlobHeader.h"
 
+#include <cctype>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 #include <string>
 
 namespace torch_tensorrt {
@@ -91,6 +93,15 @@ std::size_t skip_value(const std::string& s, std::size_t pos) {
   return pos;
 }
 
+// A reader that stops short of the delimiter silently accepts a different value, so 3.5 reads as 3.
+bool ends_value(const std::string& json, std::size_t pos) {
+  if (pos >= json.size()) {
+    return true;
+  }
+  const char c = json[pos];
+  return c == ',' || c == '}' || c == ']' || std::isspace(static_cast<unsigned char>(c));
+}
+
 bool parse_bool_after_key(const std::string& json, std::size_t search_from, const char* key, bool& value) {
   const std::size_t key_pos = json.find(key, search_from);
   if (key_pos == std::string::npos) {
@@ -101,11 +112,11 @@ bool parse_bool_after_key(const std::string& json, std::size_t search_from, cons
     return false;
   }
   const std::size_t val = skip_ws(json, colon + 1);
-  if (json.compare(val, 4, "true") == 0) {
+  if (json.compare(val, 4, "true") == 0 && ends_value(json, val + 4)) {
     value = true;
     return true;
   }
-  if (json.compare(val, 5, "false") == 0) {
+  if (json.compare(val, 5, "false") == 0 && ends_value(json, val + 5)) {
     value = false;
     return true;
   }
@@ -127,18 +138,69 @@ bool parse_int_after_key(const std::string& json, std::size_t search_from, const
     neg = true;
     ++pos;
   }
-  int parsed = 0;
+  // Digits come from the file, so accumulate wide and refuse what will not fit.
+  constexpr int64_t MAX_MAGNITUDE = -static_cast<int64_t>(std::numeric_limits<int>::min());
+  int64_t parsed = 0;
   bool saw_digit = false;
   while (pos < json.size() && json[pos] >= '0' && json[pos] <= '9') {
     saw_digit = true;
     parsed = parsed * 10 + (json[pos] - '0');
+    if (parsed > MAX_MAGNITUDE) {
+      return false;
+    }
     ++pos;
   }
   if (!saw_digit) {
     return false;
   }
-  value = neg ? -parsed : parsed;
+  if (!ends_value(json, pos)) {
+    return false;
+  }
+  const int64_t signed_value = neg ? -parsed : parsed;
+  if (signed_value < std::numeric_limits<int>::min() || signed_value > std::numeric_limits<int>::max()) {
+    return false;
+  }
+  value = static_cast<int>(signed_value);
   return true;
+}
+
+// A key of the outermost object, so a tensor named after a key is not mistaken for it.
+std::size_t find_top_level_key(const std::string& json, const char* key) {
+  const std::size_t key_len = std::strlen(key);
+  int depth = 0;
+  bool in_string = false;
+  for (std::size_t at = 0; at < json.size(); ++at) {
+    const char c = json[at];
+    if (in_string) {
+      if (c == '\\') {
+        ++at;
+      } else if (c == '"') {
+        in_string = false;
+      }
+      continue;
+    }
+    if (c == '"') {
+      // A name, not a value, and only when it belongs to the outermost object. The colon after it is
+      // what distinguishes the two, since a value is a string in exactly the same shape.
+      if (depth == 1 && json.compare(at, key_len, key) == 0) {
+        std::size_t after = at + key_len;
+        while (after < json.size() && std::isspace(static_cast<unsigned char>(json[after]))) {
+          ++after;
+        }
+        if (after < json.size() && json[after] == ':') {
+          return at;
+        }
+      }
+      in_string = true;
+      continue;
+    }
+    if (c == '{' || c == '[') {
+      ++depth;
+    } else if (c == '}' || c == ']') {
+      --depth;
+    }
+  }
+  return std::string::npos;
 }
 
 bool parse_metadata_json(const std::string& json, TensorRTBlobHeader& out) {
@@ -148,7 +210,7 @@ bool parse_metadata_json(const std::string& json, TensorRTBlobHeader& out) {
   out.hardware_compatible = false;
   out.device_id = 0;
 
-  const std::size_t bindings_pos = json.find("\"io_bindings\"");
+  const std::size_t bindings_pos = find_top_level_key(json, "\"io_bindings\"");
   if (bindings_pos == std::string::npos) {
     return false;
   }
@@ -241,10 +303,7 @@ bool parse_metadata_json(const std::string& json, TensorRTBlobHeader& out) {
   // Optional aliased_io array: [{"output":..,"input":..,"kind":..}, ...].
   // Absent in older blobs -> leave empty (backward compatible). Mirrors the
   // io_bindings walk above using the same string helpers.
-  //
-  // Search from pos (past the io_bindings array) so a model input literally
-  // named "aliased_io" isn't matched as the array key.
-  const std::size_t alias_key = json.find("\"aliased_io\"", pos);
+  const std::size_t alias_key = find_top_level_key(json, "\"aliased_io\"");
   if (alias_key != std::string::npos) {
     std::size_t apos = json.find('[', alias_key);
     if (apos == std::string::npos) {
@@ -321,8 +380,10 @@ bool parse_metadata_json(const std::string& json, TensorRTBlobHeader& out) {
     }
   }
 
-  return parse_bool_after_key(json, pos, "\"hardware_compatible\"", out.hardware_compatible) &&
-      parse_int_after_key(json, pos, "\"device_id\"", out.device_id);
+  const std::size_t hw_key = find_top_level_key(json, "\"hardware_compatible\"");
+  const std::size_t device_key = find_top_level_key(json, "\"device_id\"");
+  return parse_bool_after_key(json, hw_key, "\"hardware_compatible\"", out.hardware_compatible) &&
+      parse_int_after_key(json, device_key, "\"device_id\"", out.device_id);
 }
 
 } // namespace
@@ -364,13 +425,15 @@ bool TensorRTBlobHeader::parse(const void* data, std::size_t size, TensorRTBlobH
   if (out.engine_offset % ENGINE_ALIGNMENT != 0) {
     return false;
   }
-  if (static_cast<std::size_t>(out.metadata_offset) + out.metadata_size > size) {
+  // Against the space left, not offset plus size, which wraps on a 64 bit size.
+  if (out.metadata_offset > size || out.metadata_size > size - out.metadata_offset) {
     return false;
   }
-  if (static_cast<std::size_t>(out.engine_offset) + out.engine_size > size) {
+  if (out.engine_offset > size || out.engine_size > size - out.engine_offset) {
     return false;
   }
-  if (static_cast<std::size_t>(out.metadata_offset) + out.metadata_size > out.engine_offset) {
+  if (out.metadata_offset > out.engine_offset ||
+      out.metadata_size > static_cast<std::size_t>(out.engine_offset) - out.metadata_offset) {
     return false;
   }
 

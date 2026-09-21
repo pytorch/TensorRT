@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=9564b768"></script>
+    <script src="../_static/documentation_options.js?v=d97752b8"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -562,9 +562,8 @@ document.write(`
   <section id="torch-tensorrt-executorch">
 <span id="torch-tensorrt-executorch-py"></span><h1>torch_tensorrt.executorch<a class="headerlink" href="#torch-tensorrt-executorch" title="Link to this heading">#</a></h1>
 <p id="module-torch_tensorrt.executorch">ExecuTorch compilation and export integration.</p>
-<p>Runtime loading is provided by the optional
-<code class="docutils literal notranslate"><span class="pre">torch-tensorrt-executorch-runtime</span></code> distribution and dispatched through
-<code class="docutils literal notranslate"><span class="pre">torch_tensorrt.load(...,</span> <span class="pre">format=&quot;executorch&quot;)</span></code>.</p>
+<p>Import <code class="docutils literal notranslate"><span class="pre">torch_tensorrt_executorch_runtime</span></code> to register the TensorRT delegate,
+then load and run programs through ExecuTorch’s Module API.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>This module requires ExecuTorch and is only supported on Linux.</p>

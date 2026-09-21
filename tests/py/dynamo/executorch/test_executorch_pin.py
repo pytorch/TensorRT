@@ -14,11 +14,13 @@ import re
 import shlex
 import subprocess
 import sys
+import types
 from collections import Counter
 from pathlib import Path
 
 import pytest
 import yaml
+
 from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
 
@@ -546,8 +548,15 @@ _RUNTIME_SETUP_PY = "py/torch-tensorrt-executorch-runtime/setup.py"
 
 
 @pytest.mark.unit
-def test_the_runtime_wheel_pins_executorch_to_the_public_pin(monkeypatch) -> None:
-    """Evaluate the metadata without invoking a native build."""
+def test_the_runtime_wheel_pins_the_executorch_build_it_linked(monkeypatch) -> None:
+    """The label naming the CUDA build is part of the pin, not noise to strip.
+
+    The delegate links one specific ExecuTorch build. A requirement carrying only the public version
+    is satisfied by a processor-only build, or another CUDA build of the same date, so the pin would
+    look exact while permitting the pairings it exists to refuse.
+
+    Evaluated without invoking a native build.
+    """
     import importlib.metadata
     import runpy
     import types
@@ -580,7 +589,7 @@ def test_the_runtime_wheel_pins_executorch_to_the_public_pin(monkeypatch) -> Non
     requirements = [
         r for r in metadata["install_requires"] if r.startswith("executorch")
     ]
-    assert requirements == [f"executorch=={pin}"]
+    assert requirements == [f"executorch=={pin}+cu132"], requirements
 
 
 def _declared_cuda_versions(name: str) -> set[str]:
@@ -952,8 +961,8 @@ def test_import_errors_preserve_context_and_install_guidance(
     monkeypatch, cuda, entrypoint
 ):
     import __future__
+
     import importlib.util
-    import types
 
     _, command = _load_utils_channel_helpers(cuda)
     utils = types.ModuleType("torch_tensorrt._utils")
@@ -1033,6 +1042,7 @@ def test_derived_requirements_roll_the_minor_over(tmp_path: Path) -> None:
     assert _runner_requirement(tmp_path) == f"executorch=={version}"
 
 
+@pytest.mark.unit
 def test_the_pinned_commit_is_the_pinned_wheels_own_source() -> None:
     """The two pins must name one ExecuTorch, not two that happen to be close.
 
@@ -1530,11 +1540,12 @@ def test_every_printed_install_instruction_names_the_nightly_channel():
 
 
 @pytest.mark.unit
-def test_the_no_nightly_marker_only_exempts_a_win32_install():
-    """Only the Windows main-wheel install may omit this Linux integration's nightly index."""
+def test_the_no_nightly_marker_only_exempts_main_wheel_installs():
+    """Only main-wheel-only installs may omit this integration's nightly index."""
     tracked = _tracked_files()
 
     misplaced = []
+    missing = []
     for name in tracked:
         if not name or _is_source_test(name):
             continue
@@ -1545,27 +1556,48 @@ def test_the_no_nightly_marker_only_exempts_a_win32_install():
         if NO_NIGHTLY_MARKER not in text:
             continue
         lines = text.splitlines()
-        control = re.compile(r"^\s*(?:if\b|elif\b|else\b|fi\b)")
+        if name == ".github/scripts/install-torch-tensorrt.sh":
+            for index, content in enumerate(lines):
+                if "pip install ${wheels}" not in content:
+                    continue
+                context = "\n".join(lines[max(0, index - 3) : index])
+                if NO_NIGHTLY_MARKER not in context:
+                    missing.append(
+                        f"{name}:{index + 1} installs main wheels without the marker"
+                    )
         for index, content in enumerate(lines):
             if NO_NIGHTLY_MARKER not in content:
                 continue
-            # The exempted install sits just below the marker, so the branch it lives in is the
-            # nearest control-flow keyword above it. Requiring that keyword to be the win32 guard
-            # ties the exemption to the one platform it describes: a marker pasted onto a Linux
-            # "else" install resolves to that "else", not to "if ... win32", and is rejected.
-            branch = next(
-                (lines[j] for j in range(index - 1, -1, -1) if control.match(lines[j])),
+            # The exemption is only honest when the install below it cannot pull the companion in,
+            # since the companion is what needs the ExecuTorch channel. An unanchored
+            # torch_tensorrt* glob also matches torch_tensorrt_executorch_runtime, so requiring the
+            # hyphen ties the exemption to installing the main wheel alone rather than to a platform
+            # that merely happens to do so.
+            install = next(
+                (
+                    lines[j]
+                    for j in range(index + 1, min(index + 5, len(lines)))
+                    if "pip install" in lines[j]
+                ),
                 "",
             )
-            if "win32" not in branch:
+            # Either the install names an explicitly filtered list, or it globs with the hyphen
+            # anchor. What it may not do is pass a bare torch_tensorrt* glob, which also matches
+            # the companion, and the companion is what needs the channel.
+            unfiltered = "torch_tensorrt*" in install
+            if unfiltered and "${wheels}" not in install:
                 misplaced.append(
-                    f"{name}:{index + 1} carries {NO_NIGHTLY_MARKER!r} outside a win32 branch, "
-                    "so it would exempt a Linux install that simply lost its index"
+                    f"{name}:{index + 1} carries {NO_NIGHTLY_MARKER!r} above an install that can "
+                    f"match the companion wheel, which does need the channel: {install.strip()!r}"
                 )
 
     assert not misplaced, (
-        "the no-nightly exemption is only valid inside a win32 branch: " f"{misplaced}"
+        "the no-nightly exemption is only valid above a main-wheel-only install: "
+        f"{misplaced}"
     )
+    assert (
+        not missing
+    ), f"main-wheel-only installs missing no-nightly markers: {missing}"
 
 
 @pytest.mark.unit
@@ -2142,6 +2174,7 @@ def test_docgen_pin_reader_accepts_only_the_allowed_ast(monkeypatch, side_effect
 @pytest.mark.unit
 def test_gpu_filter_checks_detect_lost_selection(monkeypatch, tmp_path, route, removed):
     from dataclasses import replace
+
     from tests.ci import suites
 
     def mutate(keyword):
@@ -2445,6 +2478,10 @@ def test_suite_validation_check_detects_removed_validator(monkeypatch, field, va
         ("schedule", "refs/heads/release/2.14", "", "", "true"),
         # The shipped-release guard now sits where it can actually fire.
         ("workflow_dispatch", "refs/heads/release/2.14", "stable", None, "true"),
+        # Anything other than an explicit false counts as tagged, so a typo closes the guard.
+        ("workflow_dispatch", "refs/heads/release/2.14", "stable", None, "yes"),
+        ("workflow_dispatch", "refs/heads/release/2.14", "stable", None, "1"),
+        ("workflow_dispatch", "refs/heads/release/2.14", "stable", "stable", "false"),
         # A branch that only looks like a release must not be treated as one.
         (
             "schedule",
@@ -2527,3 +2564,72 @@ def test_the_install_message_does_not_hand_a_no_op_command_to_other_platforms(
     message = command()
     assert "pip install" not in message, message
     assert "Linux" in message, message
+
+
+@pytest.mark.parametrize("agree", [True, False])
+@pytest.mark.unit
+def test_the_pairing_check_fails_when_the_two_pins_disagree(
+    agree: bool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The pairing check is the only guard on the two pins naming one ExecuTorch.
+
+    It skips whenever the pinned wheel is not installed, which is every pull request lane, so
+    without this it could stop working and nothing would say so. A stand-in wheel is injected
+    reporting the pinned version and either the pinned commit or a different one, which is the
+    only difference the check exists to notice.
+    """
+    versions = _versions()
+    pinned_commit = versions["__executorch_commit__"]
+    module = types.ModuleType("executorch.version")
+    module.__version__ = versions["__executorch_version__"] + "+cu134"
+    module.git_version = pinned_commit if agree else "f" * 40
+    package = types.ModuleType("executorch")
+    package.version = module
+    monkeypatch.setitem(sys.modules, "executorch", package)
+    monkeypatch.setitem(sys.modules, "executorch.version", module)
+    if agree:
+        test_the_pinned_commit_is_the_pinned_wheels_own_source()
+    else:
+        with pytest.raises(AssertionError):
+            test_the_pinned_commit_is_the_pinned_wheels_own_source()
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("branch", ["windows", "linux"])
+def test_the_install_script_leaves_the_companion_out(tmp_path, branch):
+    """Removing both exclusions left every pin test green, so nothing protected this.
+
+    Installing the companion from this script is what forced a nightly index onto release jobs. The
+    selection works by excluding the companion rather than by matching the main wheel, because the
+    main wheel's name varies by variant and a prefix guess leaves the pattern unexpanded for pip to
+    read literally. That is exactly what a test reading the script for the words cannot check.
+    """
+    source = (REPO_ROOT / ".github/scripts/install-torch-tensorrt.sh").read_text(
+        encoding="utf-8"
+    )
+    # Take the case block straight from the script, so the test cannot drift from what runs.
+    cases = re.findall(r"case \"\$\{wheel\}\" in.*?esac", source, re.S)
+    assert len(cases) == 2, len(cases)
+    case = cases[0 if branch == "windows" else 1]
+    directory = tmp_path / "artifacts"
+    directory.mkdir()
+    for name in (
+        "torch_tensorrt-2.15.0.dev1+cu134-cp310-cp310-linux_x86_64.whl",
+        "torch_tensorrt_rtx-2.15.0.dev1+cu134-cp310-cp310-linux_x86_64.whl",
+        "torch_tensorrt_executorch_runtime-0.2.0.dev1+cu134-py3-none-linux_x86_64.whl",
+    ):
+        (directory / name).write_bytes(b"")
+    script = (
+        'wheels=""\n'
+        f"for wheel in {directory}/torch_tensorrt*.whl; do\n"
+        f"{case}\n"
+        '    wheels="${wheels} ${wheel}"\n'
+        "done\n"
+        "echo ${wheels}\n"
+    )
+    result = subprocess.run(["sh", "-c", script], text=True, capture_output=True)
+    assert result.returncode == 0, result.stderr
+    selected = [Path(name).name for name in result.stdout.split()]
+    assert not any("executorch_runtime" in name for name in selected), selected
+    # Both of the others, including the variant a prefix match would have missed.
+    assert len(selected) == 2, selected

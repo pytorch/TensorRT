@@ -85,7 +85,7 @@ fi
 
 verify_parent="${RUNNER_TEMP:-/tmp}"
 mkdir -p "${verify_parent}"
-verify_root="$(mktemp -d "${verify_parent%/}/torchtrt_executorch_readme_verify.XXXXXX")"
+verify_root="$(mktemp -d "${verify_parent%/}/executorch_backend_tensorrt_readme_verify.XXXXXX")"
 
 # Prefer the TensorRT SDK that Bazel already fetched for //:libtorchtrt. This
 # keeps CI from downloading the same SDK twice and keeps CMake linked against
@@ -299,7 +299,7 @@ require_tar_entry "torch_tensorrt/examples/executorch_reference_runner/kv_cache_
 require_tar_entry "torch_tensorrt/BUILD"
 
 export TORCH_TENSORRT_ROOT="${verify_root}/torch_tensorrt"
-export TORCHTRT_EXECUTORCH_SOURCE_DIR="${TORCH_TENSORRT_ROOT}/src/torch_tensorrt/executorch"
+export EXECUTORCH_BACKEND_TENSORRT_SOURCE_DIR="${TORCH_TENSORRT_ROOT}/src/torch_tensorrt/executorch"
 
 # Configure the example exactly as an end user would after unpacking
 # libtorchtrt.tar.gz.
@@ -307,7 +307,7 @@ cmake_args=(
   -S "${TORCH_TENSORRT_ROOT}/examples/executorch_reference_runner"
   -B "${verify_root}/build-executorch-reference-runner"
   -DEXECUTORCH_SOURCE_DIR="${EXECUTORCH_SOURCE_DIR}"
-  -DTORCHTRT_EXECUTORCH_SOURCE_DIR="${TORCHTRT_EXECUTORCH_SOURCE_DIR}"
+  -DEXECUTORCH_BACKEND_TENSORRT_SOURCE_DIR="${EXECUTORCH_BACKEND_TENSORRT_SOURCE_DIR}"
   -DPYTHON_EXECUTABLE="${python_executable}"
 )
 
@@ -615,4 +615,30 @@ if [[ -n "${coalesced_model_path}" ]]; then
   # TensorRT, AOTInductor and eager PyTorch compute the same math with different
   # kernels, so compare within a tolerance instead of on the printed digits.
   assert_runner_output "${coalesced_runner_log}" "${coalesced_shape}" "${coalesced_value}" 0.001
+
+    # The same program again, on a caller stream created inside a green context. This is the
+    # combination the delegate exists for and the one nothing else here covers: two backends in one
+    # program, every activation on the device, and both confined to the caller's stream and its
+    # slice of the machine. A delegate that ignored the caller stream would still return the right
+    # numbers on an idle GPU, so the value is asserted and not just the exit status.
+    green_runner_log="${verify_root}/coalesced_green_context.log"
+    green_status=0
+    "${runner_path}" \
+      --model_path="${coalesced_model_path}" \
+      --green_context_sms=8 \
+      --num_runs=2 > "${green_runner_log}" 2>&1 || green_status=$?
+    cat "${green_runner_log}"
+    if [ "${green_status}" -eq 0 ]; then
+      assert_runner_output "${green_runner_log}" "${coalesced_shape}" "${coalesced_value}" 0.001
+    else
+      # The runner returns 2 when the device cannot provide the partition, which is a normal answer
+      # on a small GPU and a skip here. Any other status is the delegate breaking on a
+      # caller-provided stream, and a crash is never a skip however its message reads.
+      if [ "${green_status}" -eq 2 ]; then
+        echo "green context unavailable on this device, skipping that case" >&2
+      else
+        echo "the coalesced program failed on a caller-provided stream, status ${green_status}" >&2
+        exit 1
+      fi
+    fi
 fi

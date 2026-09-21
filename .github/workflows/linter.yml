@@ -101,3 +101,31 @@ jobs:
           cd $GITHUB_WORKSPACE
           python3 -m pytest tests/py/dynamo/executorch/test_update_executorch_pin.py \
             -q --no-header -p no:cacheprovider --noconftest -o addopts=""
+      # The rest of the ExecuTorch suite that needs no GPU. Without this the only lane running these
+      # is nightly, so a pull request could not fail on anything they cover, and they cover the
+      # packaging, the wheel guard, the shipped CMake package and the shared workflow.
+      - name: Check the ExecuTorch packaging and workflow
+        if: always()
+        run: |
+          cd $GITHUB_WORKSPACE
+          python3 -m pytest \
+            tests/py/dynamo/executorch/test_packaging.py \
+            tests/py/dynamo/executorch/test_artifact_guard.py \
+            tests/py/dynamo/executorch/test_shared_runtime_workflow.py \
+            tests/py/dynamo/executorch/test_example_boundaries.py \
+            tests/py/dynamo/executorch/test_cmake_runtime.py \
+            tests/py/dynamo/executorch/test_python_runtime.py \
+            -q --no-header -p no:cacheprovider --noconftest -o addopts=""
+      # The two files that import torch at module level. A CPU build is enough: both read source,
+      # packaging metadata and workflow text, and neither runs a model. Nightly was the only lane
+      # running them, so a pull request could not fail on the loader compatibility paths or the
+      # release matrix gates they cover.
+      - name: Check the ExecuTorch API and loader compatibility
+        if: always()
+        run: |
+          cd $GITHUB_WORKSPACE
+          uv pip install --system torch --index-url https://download.pytorch.org/whl/cpu
+          python3 -m pytest \
+            tests/py/dynamo/executorch/test_api.py \
+            tests/py/dynamo/executorch/test_load_compatibility.py \
+            -q --no-header -p no:cacheprovider --noconftest -o addopts=""
