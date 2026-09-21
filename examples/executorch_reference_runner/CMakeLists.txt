@@ -62,6 +62,8 @@ if(NOT EXISTS "${TORCHTRT_EXECUTORCH_SOURCE_DIR}/CMakeLists.txt")
   message(FATAL_ERROR "TORCHTRT_EXECUTORCH_SOURCE_DIR must point to the Torch-TensorRT ExecuTorch backend source directory with a CMakeLists.txt: ${TORCHTRT_EXECUTORCH_SOURCE_DIR}")
 endif()
 
+# Keep the DRIVE setting as a fallback; use CUDAToolkit_ROOT for both toolkit
+# discovery and the DRIVE header paths below.
 if(TORCHTRT_ENABLE_DRIVE_OS_COMPAT
    AND TORCHTRT_DRIVE_CUDA_ROOT
    AND NOT CUDAToolkit_ROOT)
@@ -75,15 +77,15 @@ add_subdirectory("${TORCHTRT_EXECUTORCH_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/torch_
 if(TORCHTRT_ENABLE_DRIVE_OS_COMPAT)
   message(STATUS "Torch-TensorRT DRIVE OS compatibility: enabled")
 
-  if(NOT TORCHTRT_DRIVE_CUDA_ROOT)
+  if(NOT CUDAToolkit_ROOT)
     message(FATAL_ERROR
-      "Set TORCHTRT_DRIVE_CUDA_ROOT to the CUDA root injected into the DRIVE build container")
+      "Set CUDAToolkit_ROOT (or TORCHTRT_DRIVE_CUDA_ROOT) to the CUDA root injected into the DRIVE build container")
   endif()
 
   set(_torchtrt_drive_common_include
-      "${TORCHTRT_DRIVE_CUDA_ROOT}/targets/aarch64-linux/include")
+      "${CUDAToolkit_ROOT}/targets/aarch64-linux/include")
   set(_torchtrt_drive_thor_include
-      "${TORCHTRT_DRIVE_CUDA_ROOT}/thor/targets/aarch64-linux/include")
+      "${CUDAToolkit_ROOT}/thor/targets/aarch64-linux/include")
   if(NOT EXISTS "${_torchtrt_drive_common_include}/cuda_runtime_api.h")
     message(FATAL_ERROR
       "DRIVE common CUDA headers not found under ${_torchtrt_drive_common_include}")
