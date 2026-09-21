@@ -1005,6 +1005,11 @@ def _assert_wrong_device_buffers_are_refused(source: str) -> None:
     assert (
         "const int output_device = cuda_foreign_device_of_ptr(" in execute
     ), "a caller-supplied output is no longer checked where it is bound"
+    # The aliased branch returns before reaching the ordinary output check, so it needs its own. It
+    # went without one, and a buffer on a card the engine cannot reach was copied into.
+    assert (
+        "const int foreign_alias_device = cuda_foreign_device_of_ptr(" in execute
+    ), "an aliased output is no longer checked, and its branch skips the ordinary check"
     # Capability asserted absent and usability asserted present: whether two cards CAN reach each
     # other answered yes on every pair measured and still faulted, while a non-null devicePointer is
     # an address that works from here.
@@ -1047,6 +1052,7 @@ def _assert_one_shared_runtime(source: str, header: str) -> None:
         None,
         "drop-input-check",
         "drop-output-check",
+        "drop-alias-check",
         "drop-helper",
         "input-check-outside-execute",
         "peer-capability-back",
@@ -1102,6 +1108,7 @@ def test_the_backend_refuses_a_buffer_on_another_device(mutation) -> None:
         removed = {
             "drop-input-check": input_check,
             "drop-output-check": "const int output_device = cuda_foreign_device_of_ptr(",
+            "drop-alias-check": "const int foreign_alias_device = cuda_foreign_device_of_ptr(",
             "drop-helper": "int cuda_foreign_device_of_ptr(",
         }[mutation]
         assert removed in source, f"mutation {mutation} has nothing to remove"

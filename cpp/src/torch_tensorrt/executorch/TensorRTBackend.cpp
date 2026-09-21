@@ -915,6 +915,19 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
             size_t(et_alias_out.nbytes()));
         return Error::InvalidArgument;
       }
+      // The ordinary output path asks this and the aliased one did not, so a buffer on a card
+      // this engine cannot reach was copied into rather than refused.
+      const int foreign_alias_device = cuda_foreign_device_of_ptr(dst, engine->device_id);
+      if (foreign_alias_device >= 0) {
+        ET_LOG(
+            Error,
+            "TensorRTBackend::execute: aliased output '%s' is on CUDA device %d, this engine on "
+            "%d. Move it, or load the program on that device.",
+            name.c_str(),
+            foreign_alias_device,
+            engine->device_id);
+        return Error::InvalidArgument;
+      }
       // dst != bind_ptr guards against issuing a self-copy. The memory planner does
       // not currently place the delegate's output slot on the aliased input -- the
       // two are live at the same time -- so this holds for every aliased output.
