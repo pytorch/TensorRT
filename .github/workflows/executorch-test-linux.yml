@@ -152,7 +152,7 @@ jobs:
         # The device-resident program is deliberately NOT handed to the C++
         # reference runner above: that runner feeds host tensors, which this
         # program's boundary contract forbids. Its Python runner passes CUDA
-        # tensors and asserts the output never left the device.
+        # tensors and asserts the export flags took and the values match.
         python examples/executorch_reference_runner/load_model_device_resident.py \
           --model_path="${RUNNER_TEMP}/torchtrt-device-resident.pte" --num_runs=2
         # The only consumer that links the delegate the way an application does: out of the

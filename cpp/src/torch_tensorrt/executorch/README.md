@@ -270,7 +270,6 @@ the removed `CudaStreamGuard`:
   time, which measured 33 times slower than one bulk copy on a loop that rewrites its
   input each call. Either way that
   configuration returns with the work already finished, because the backend always
-  waits.
   waits. CI separately asserts that the runner resolves one shared
   `libextension_cuda.so`.
 - CUDA green-context streams work, and are the case this shared primitive exists

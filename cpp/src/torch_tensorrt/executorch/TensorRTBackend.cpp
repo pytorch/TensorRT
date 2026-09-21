@@ -335,7 +335,7 @@ Result<DelegateHandle*> TensorRTBackend::init(
     return Error::InvalidProgram;
   }
 
-  // Whether this device can read pageable host memory at a useful speed.
+  // Whether this device can reach pageable host memory at all. Speed is the query below.
   int pageable_access = 0;
   cuda_err = cudaDeviceGetAttribute(&pageable_access, cudaDevAttrPageableMemoryAccess, handle->device_id);
   if (cuda_err != cudaSuccess) {

@@ -290,6 +290,10 @@ def test_the_config_does_not_raise_the_consumers_cmake_floor() -> None:
         if line.lstrip().startswith("if(CMAKE_VERSION")
     ]
     assert checks == ["if(CMAKE_VERSION VERSION_LESS 3.19)"], checks
+    # The refusal, not just the number. Downgrading it to a status message leaves a floor nothing
+    # enforces, and every assertion above still passed.
+    floor = config[config.index("if(CMAKE_VERSION VERSION_LESS 3.19)") :]
+    assert "FATAL_ERROR" in floor[: floor.index("endif()")], floor[:400]
 
 
 @pytest.mark.unit

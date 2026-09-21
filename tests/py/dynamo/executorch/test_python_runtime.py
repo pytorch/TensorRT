@@ -187,6 +187,24 @@ def _delegate_handle(owns_registration=True):
 
 
 @pytest.mark.unit
+def test_the_missing_registry_query_names_the_build_to_install(monkeypatch):
+    """An ExecuTorch that does not export the private name must not surface as a bare ImportError.
+
+    Nothing covered the conversion, so deleting the guidance left every test green.
+    """
+    delegate = load_delegate_module()
+    _fake_executorch(monkeypatch, set())
+    monkeypatch.delattr(
+        sys.modules["executorch.extension.pybindings.portable_lib"],
+        "_get_registered_backend_names",
+    )
+    with pytest.raises(
+        delegate.DelegateCompatibilityError, match="build this package pins"
+    ):
+        delegate._registered_backend_names()
+
+
+@pytest.mark.unit
 @pytest.mark.parametrize("preloaded", [False, True])
 @pytest.mark.parametrize("owns_registration", [False, True])
 def test_register_checks_the_loaded_handles_ownership(

@@ -50,12 +50,30 @@ _CMAKE_BLOCK_CLOSE = r"end(?:if|while|foreach|function|macro|block)\s*\("
 
 @pytest.mark.unit
 def test_the_install_script_puts_the_cuda_runtime_on_the_library_path():
-    """The CUDA 13 runtime directory must be available to the reference runner."""
+    """The CUDA 13 runtime directory must be available to the reference runner.
+
+    Driven by running the script's own lines, because looking for the two words in the file left
+    the entire export block deletable with this still passing: both words live in the case
+    statement above it.
+    """
     script = (_REPO_ROOT / ".github/scripts/install-torch-tensorrt.sh").read_text(
         encoding="utf-8"
     )
-    assert "nvidia/cu13/lib" in script
-    assert "cu13*)" in script
+    start = script.index('case "${CU_VERSION}" in')
+    block = script[start : script.index("\nfi\n", start) + len("\nfi")]
+    for cu_version, expected in (("cu130", "/site/nvidia/cu13/lib"), ("cu126", "")):
+        result = subprocess.run(
+            [
+                "bash",
+                "-c",
+                f'CU_VERSION={cu_version}\nSITE_PACKAGES=/site\nLD_LIBRARY_PATH=""\n'
+                f'{block}\necho "${{LD_LIBRARY_PATH}}"',
+            ],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.strip() == expected, result.stdout
 
 
 @pytest.mark.parametrize("branch", ["windows", "linux"])
@@ -2982,6 +3000,7 @@ def _elf_object(architecture: str) -> bytes:
         ("well_formed", True),
         ("aarch64_tag", True),
         ("payload_for_the_other_architecture", False),
+        ("truncated_payload", False),
         ("unrepaired_tag", False),
         ("wrong_architecture_floor", False),
         ("wheel_tag_mismatch", False),
@@ -3211,10 +3230,16 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
             r + "+cu130" if r.startswith("tensorrt-cu13==") else r for r in requires
         ]
 
+    object_bytes = _elf_object(elf_machine or arch)
+    if case == "truncated_payload":
+        # Slicing past the end is not an error and int.from_bytes accepts a short slice, so the
+        # machine word read out of nineteen bytes still matched and the object passed.
+        object_bytes = object_bytes[:19]
+
     wheel = tmp_path / f"torch_tensorrt_executorch_runtime-0.1.0-py3-none-{tag}.whl"
     with WheelFile(wheel, "w") as archive:
         for name in payload:
-            archive.writestr(name, _elf_object(elf_machine or arch))
+            archive.writestr(name, object_bytes)
         # The CMake package a C++ consumer links through. Present in every case except the one that
         # deliberately drops it, so the other cases fail for their own reason rather than this one.
         if case != "ships_no_cmake_package":

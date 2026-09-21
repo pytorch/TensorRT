@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Validate the repaired companion wheel before it enters the shared artifact."""
+"""Validate the retagged companion wheel before it enters the shared artifact."""
 
 import argparse
 import ast
@@ -61,6 +61,10 @@ def main() -> None:
         # to check it, so a wheel tagged for one architecture could carry a library built for
         # the other and pass. The ELF header names the machine in two bytes at offset 18.
         header = archive.read(expected)[:20]
+        # Length first: slicing past the end is not an error and int.from_bytes accepts a short
+        # slice, so a truncated object read as the tagged machine and passed.
+        if len(header) < 20:
+            reject(f"{expected} is {len(header)} bytes, too short for an ELF header")
         if header[:4] != b"\x7fELF":
             reject(f"{expected} is not an ELF object")
         machine = int.from_bytes(header[18:20], "little")
@@ -106,7 +110,7 @@ def main() -> None:
         floor = {"x86_64": "2_28", "aarch64": "2_35"}[args.architecture]
         expected_tag = f"py3-none-manylinux_{floor}_{args.architecture}"
         if {str(tag) for tag in tags} != {expected_tag}:
-            reject(f"expected repaired tag {expected_tag}, got {tags}")
+            reject(f"expected retagged tag {expected_tag}, got {tags}")
         wheel_metadata = BytesParser().parsebytes(
             archive.read(f"{archive.dist_info_path}/WHEEL")
         )
