@@ -410,13 +410,20 @@ int main(int argc, char** argv) {
     // so say how many it has.
     if (green != GreenContext::Created) {
       int device_sms = 0;
-      cudaDeviceGetAttribute(&device_sms, cudaDevAttrMultiProcessorCount, 0);
-      ET_LOG(
-          Error,
-          "--green_context_sms=%d was requested and no green context could be created. This "
-          "device reports %d SMs in total, and a partition cannot exceed that.",
-          green_context_sms,
-          device_sms);
+      if (cudaDeviceGetAttribute(&device_sms, cudaDevAttrMultiProcessorCount, 0) == cudaSuccess) {
+        ET_LOG(
+            Error,
+            "--green_context_sms=%d was requested and no green context could be created. This "
+            "device reports %d SMs in total, and a partition cannot exceed that.",
+            green_context_sms,
+            device_sms);
+      } else {
+        ET_LOG(
+            Error,
+            "--green_context_sms=%d was requested and no green context could be created, and the "
+            "device's SM count could not be read.",
+            green_context_sms);
+      }
       // Only a device that answered "not this partition" is a skip for the caller; anything else is
       // the interface failing and must not read as one.
       return green == GreenContext::Unsupported ? 2 : 1;

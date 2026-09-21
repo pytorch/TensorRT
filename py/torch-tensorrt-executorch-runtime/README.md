@@ -114,7 +114,7 @@ release and JetPack builds retain their separate CUDA 12 support.
 
 ## Install
 One command. The `executorch` extra brings this wheel and a CUDA build of ExecuTorch, and
-Torch-TensorRT brings PyTorch. Swap `cu132` for the CUDA version you run:
+Torch-TensorRT brings PyTorch. Swap `cu132` for the CUDA 13 channel you run, `cu130` or `cu134`:
 ```bash
 python -m pip install --pre "torch-tensorrt[executorch]" \
   --index-url https://download.pytorch.org/whl/nightly/cu132 \

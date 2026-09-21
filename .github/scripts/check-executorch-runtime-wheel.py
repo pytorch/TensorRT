@@ -212,12 +212,10 @@ def main() -> None:
         )
         if unexpected:
             reject(f"the wheel requires more than the delegate links: {unexpected}")
-        # The three runtimes the delegate links carry the label naming the build, deliberately: it
-        # links one specific build of each, and without the label the requirement is satisfied by a
-        # processor-only build or another CUDA build of the same date. They resolve from the CUDA
-        # channel this wheel already requires. Everything else stays label-free so it resolves
-        # anywhere, and a label appearing there would narrow the wheel for no reason.
-        label_allowed = {"executorch", "torch", "torch-tensorrt"}
+        # Only the ExecuTorch requirement carries the label, for the reason given above. The loop
+        # builds the other two from the public version, so a label on anything else is the wheel
+        # narrowed for no reason.
+        label_allowed = {"executorch"}
         labelled = [
             requirement
             for requirement in requirements

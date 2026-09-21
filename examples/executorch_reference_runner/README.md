@@ -118,7 +118,7 @@ itself with the ExecuTorch runtime from the `executorch` distribution rather tha
 of its own, and loading a `.pte` through the delegate needs it. To build it from source instead,
 follow `py/torch-tensorrt-executorch-runtime/README.md`.
 
-The Python example uses ExecuTorch's Module API to back planned device arenas
+The Python example uses ExecuTorch's Runtime API to back planned device arenas
 with CUDA memory. Then load and run the model:
 
 ```bash
@@ -132,7 +132,7 @@ works, but emits a deprecation warning. Its `method_names` property,
 `run(inputs, method="forward")`, and `forward(*inputs)` interface remain
 supported for at least six months after the deprecation first ships. It still
 copies CUDA inputs to CPU and supports embedded weights only. New applications
-should use the Module API shown above; device-resident programs must use it
+should use the Runtime API shown above; device-resident programs must use it
 directly to keep their inputs on CUDA.
 
 ### C++

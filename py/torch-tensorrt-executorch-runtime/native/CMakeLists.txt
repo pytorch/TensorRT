@@ -57,8 +57,8 @@ target_include_directories(executorch_backend_tensorrt PRIVATE
   "${TORCH_TENSORRT_SOURCE_DIR}"
   "${TORCH_TENSORRT_SOURCE_DIR}/cpp/include")
 
-# Compile definitions and the C++ standard come from the package rather than being repeated
-# here. ET_EVENT_TRACER_ENABLED in particular has to match how the runtime was built: it
+# Compile definitions come from the package rather than being repeated here.
+# ET_EVENT_TRACER_ENABLED in particular has to match how the runtime was built: it
 # switches the tracer hooks between real bodies and empty ones, so a delegate that guesses
 # wrong still links and runs while recording nothing.
 target_link_libraries(executorch_backend_tensorrt PRIVATE
@@ -67,6 +67,14 @@ target_link_libraries(executorch_backend_tensorrt PRIVATE
   CUDA::cudart
   TensorRT::nvinfer
   Threads::Threads)
+
+# Build to the standard ExecuTorch's own exported configuration asks for. The delegate is compiled
+# through CMake from Bazel, which forwards the main build's -std=c++20, and under C++20 an ordinary
+# std::string assignment reaches for a libstdc++ helper that only newer runtimes export. That would
+# put the artifact above the platform its wheel is tagged for. This is a compile option rather than
+# the CXX_STANDARD property because the forwarded flag arrives in CMAKE_CXX_FLAGS, and only an option
+# on the target is placed after it on the command line.
+target_compile_options(executorch_backend_tensorrt PRIVATE -std=c++17)
 
 # Link the C++ runtime dynamically, the way ExecuTorch's own delegates and every other shared object
 # in the process (libtorch, libc10, libnvinfer) already do. The build toolchain is newer than the
@@ -79,14 +87,6 @@ target_link_libraries(executorch_backend_tensorrt PRIVATE
 # runtime is deliberately avoided: this delegate is dlopened beside libtorch and ExecuTorch, and a
 # private libstdc++ would give it its own exception type_info and locale state, which breaks exceptions
 # and dynamic_cast across the boundary.
-# Build to the standard ExecuTorch's own exported configuration asks for. The delegate is compiled
-# through CMake from Bazel, which forwards the main build's -std=c++20, and under C++20 an ordinary
-# std::string assignment reaches for a libstdc++ helper that only newer runtimes export. That would
-# put the artifact above the platform its wheel is tagged for. This is a compile option rather than
-# the CXX_STANDARD property because the forwarded flag arrives in CMAKE_CXX_FLAGS, and only an option
-# on the target is placed after it on the command line.
-target_compile_options(executorch_backend_tensorrt PRIVATE -std=c++17)
-
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   target_link_libraries(executorch_backend_tensorrt PRIVATE stdc++)
 endif()

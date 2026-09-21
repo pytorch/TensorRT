@@ -26,7 +26,7 @@ if args.num_runs < 1:
 model_path = args.model_path
 x = torch.ones((2, 3, 4, 4), dtype=torch.float32)
 
-# The Module API backs device-tagged arenas with device memory.
+# The Runtime API backs device-tagged arenas with device memory.
 program = Runtime.get().load_program(model_path)
 if "forward" not in program.method_names:
     raise RuntimeError(f"{model_path} has no 'forward' method")

@@ -87,9 +87,8 @@ def available_versions(index_args: list[str]) -> list[str]:
     )
     match = re.search(r"^\s*Available versions:\s*(.+)$", out, re.MULTILINE)
     if match is None:
-        # A channel with no ExecuTorch release yet prints no such line. That is the expected state
-        # between adding a CUDA minor's rows and the first ExecuTorch build for it, so report it as
-        # an empty list and let the caller say which channel is not ready.
+        # Defensive only. A channel with no ExecuTorch release makes pip exit non-zero, which the
+        # helper above raises on, so this branch is not the path that state takes.
         return []
     return [v.strip() for v in match.group(1).split(",") if v.strip()]
 

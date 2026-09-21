@@ -90,7 +90,6 @@ def load(path: Union[str, Path]) -> Program:
             "ExecuTorch's own bindings. Upgrade it to a build that registers on import, from the "
             f"same release matrix as Torch-TensorRT. Underlying error: {error}"
         ) from error
-    # The Module API honors device-tagged arenas; the host Program loader does not.
     from executorch.extension.pybindings.portable_lib import (
         _load_for_executorch_from_buffer,
     )

@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Run a device-resident .pte and prove the method boundary did not copy.
+"""Run a device-resident .pte and check the method boundary kept the tensors on CUDA.
 
 The program this loads was exported with ``skip_h2d_for_method_inputs`` and
 ``skip_d2h_for_method_outputs``, so its boundary carries no copy operators and it
@@ -53,7 +53,7 @@ x = torch.ones((64, 64), dtype=torch.float32, device="cuda")
 # failed by the time a check would run, so testing the result was a guard that could not fire.
 # Whether CUDA is present at all is checked above, where the question can actually be answered.
 
-# The Module API backs device-tagged arenas with device memory.
+# The Runtime API backs device-tagged arenas with device memory.
 program = Runtime.get().load_program(model_path)
 if "forward" not in program.method_names:
     raise RuntimeError(f"{model_path} has no 'forward' method")

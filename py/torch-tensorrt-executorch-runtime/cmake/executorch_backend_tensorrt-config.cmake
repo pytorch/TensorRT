@@ -36,7 +36,7 @@
 # offers plain path variables instead of imported targets. Asked for a component it fails outright, so
 # the recipe this package's own readme gives cannot be used below 3.28. A consumer on 3.19 to 3.27 has
 # to find ExecuTorch without components and link its variables alongside this package's target, which
-# works and is measured but is not written down anywhere else.
+# this package's readme spells out.
 #
 # 3.19, checked rather than declared, so the consumer's own minimum is left alone.
 if(CMAKE_VERSION VERSION_LESS 3.19)

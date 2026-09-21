@@ -1051,9 +1051,15 @@ def test_runtime_extension_has_dependency_wheel_rpaths():
     Set equality rather than membership, so an entry silently added to the shipped path fails here
     too and has to be justified.
     """
-    cmake = (
-        _REPO_ROOT / "py/torch-tensorrt-executorch-runtime/native/CMakeLists.txt"
-    ).read_text(encoding="utf-8")
+    cmake = "\n".join(
+        line
+        for line in (
+            _REPO_ROOT / "py/torch-tensorrt-executorch-runtime/native/CMakeLists.txt"
+        )
+        .read_text(encoding="utf-8")
+        .splitlines()
+        if not line.lstrip().startswith("#")
+    )
     assert "BUILD_WITH_INSTALL_RPATH ON" in cmake
     assert "-Wl,-Bsymbolic" not in cmake
 

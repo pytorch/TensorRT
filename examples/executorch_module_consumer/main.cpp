@@ -123,7 +123,7 @@ int main(int argc, char** argv) {
       std::fprintf(
           stderr,
           "input %zu is not float, and this example only feeds float. Export the program with "
-          "float inputs, or extend this example to write the value in the input's own type.\\n",
+          "float inputs, or extend this example to write the value in the input's own type.\n",
           i);
       return 1;
     }
