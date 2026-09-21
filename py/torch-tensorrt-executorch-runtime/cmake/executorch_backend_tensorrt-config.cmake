@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 # CMake package for the Torch-TensorRT ExecuTorch delegate, as installed by the
 # torch-tensorrt-executorch-runtime wheel.
 #

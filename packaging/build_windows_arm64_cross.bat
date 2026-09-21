@@ -1,4 +1,7 @@
 @echo off
+REM SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+REM SPDX-License-Identifier: BSD-3-Clause
+
 setlocal enabledelayedexpansion
 if not "%VSCMD_ARG_HOST_ARCH%"=="x64" (
   echo Expected the x64-hosted MSVC toolchain, got %VSCMD_ARG_HOST_ARCH%

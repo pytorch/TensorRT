@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 load("@rules_cc//cc:defs.bzl", "cc_binary")
 
 package(default_visibility = ["//visibility:public"])
@@ -5,7 +8,7 @@ package(default_visibility = ["//visibility:public"])
 config_setting(
     name = "use_torch_whl",
     flag_values = {
-        "//toolchains/dep_src:torch": "whl"
+        "//toolchains/dep_src:torch": "whl",
     },
 )
 
@@ -15,9 +18,10 @@ config_setting(
         "@platforms//cpu:aarch64",
     ],
     flag_values = {
-        "//toolchains/dep_collection:compute_libs": "jetpack"
+        "//toolchains/dep_collection:compute_libs": "jetpack",
     },
 )
+
 config_setting(
     name = "windows",
     constraint_values = [
@@ -28,7 +32,7 @@ config_setting(
 cc_binary(
     name = "torchtrt_aoti_example",
     srcs = [
-        "inference.cpp"
+        "inference.cpp",
     ],
     linkopts = [
         "-ldl",
@@ -36,17 +40,17 @@ cc_binary(
     deps = [
         "//cpp:torch_tensorrt",
     ] + select({
-        ":windows": [
-            "@libtorch_win//:caffe2",
-            "@libtorch_win//:libtorch"
+        ":jetpack": [
+            "@torch_l4t//:caffe2",
+            "@torch_l4t//:libtorch",
         ],
         ":use_torch_whl": [
             "@torch_whl//:caffe2",
-            "@torch_whl//:libtorch"
+            "@torch_whl//:libtorch",
         ],
-        ":jetpack": [
-            "@torch_l4t//:caffe2",
-            "@torch_l4t//:libtorch"
+        ":windows": [
+            "@libtorch_win//:caffe2",
+            "@libtorch_win//:libtorch",
         ],
         "//conditions:default": [
             "@libtorch",

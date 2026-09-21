@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 # Recipes use bash (shebang recipes + the _ci launcher), so run them in bash.
 set shell := ["bash", "-cu"]
 
