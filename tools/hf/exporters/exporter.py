@@ -11,12 +11,13 @@ from typing import Any
 import torch
 import torch.nn as nn
 from torch.export import ExportedProgram
-from torch_tensorrt.hf.exporters import ops as _ops  # noqa: F401
-from torch_tensorrt.hf.exporters.compile import compile_component
-from torch_tensorrt.hf.exporters.config import EdgeConfig
-from torch_tensorrt.hf.exporters.runtime import EdgeRuntimeModule
-from torch_tensorrt.hf.exporters.spec import get_edge_spec
 from transformers.exporters.exporter_dynamo import DynamoExporter
+
+from . import ops as _ops  # noqa: F401
+from .compile import compile_component
+from .config import EdgeConfig
+from .runtime import EdgeRuntimeModule
+from .spec import get_edge_spec
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,7 @@ class EdgeExporter(DynamoExporter):  # type: ignore[misc]
         self.engines: dict[str, str] = {}
         self.runtime: EdgeRuntimeModule | None = None
         self.sample: dict[str, Any] = {}
+        self.bench: dict[str, tuple[float, float]] = {}
         self._dryrun_patches: contextlib.ExitStack | None = None
 
     def export(
@@ -71,6 +73,7 @@ class EdgeExporter(DynamoExporter):  # type: ignore[misc]
 
         engines: dict[str, str] = {}
         upstream: dict[str, Any] = {}
+        self.bench = {}
 
         def _compile_components() -> None:
             for name in names:
@@ -81,6 +84,7 @@ class EdgeExporter(DynamoExporter):  # type: ignore[misc]
                     engine_dir=engine_dir,
                     dryrun=config.dryrun,
                     trt_settings=config.trt_settings,
+                    bench=self.bench,
                 )
                 upstream.update(spec.capture_upstream(name, outs, sample, bundle))
 
