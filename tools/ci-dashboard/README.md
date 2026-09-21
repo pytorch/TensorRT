@@ -34,11 +34,12 @@ reachable over your tailnet/LAN — the startup log prints the Tailscale + LAN U
 ## What you get
 
 - **Test plan — "what will run"** — a panel that resolves the branch's PR labels
-  into the exact plan CI will execute, *before* it runs: `labels → lane + backend`
+  into the exact plan CI will execute, *before* it runs: `labels → lane + backend + suite`
   (mirroring `.github/workflows/_decide.yml`) → the per-platform channels (Linux
   x86_64 / Windows / SBSA-build-only, standard + RTX + python-only) → the suites
   each channel runs (from `tests.ci matrix`). It shows the job count and a hint for
-  which label widens it (`ci: full`, `ci: nightly`, `backend: TensorRT-RTX`). `main`
+  which label selects it (`ci: full`, `ci: nightly`, `ci:trt-api`,
+  `backend: TensorRT-RTX`). `main`
   is shown as its push canary (full / both).
 - **Platform board** — one card per workflow (Linux x86_64, aarch64, Windows,
   the RTX and python-only variants, jetpack…), sorted worst-first, with a live

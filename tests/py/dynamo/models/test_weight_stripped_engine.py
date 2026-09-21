@@ -7,16 +7,18 @@ import pickle
 import shutil
 import unittest
 
+import pytest
 import torch
 import torch_tensorrt as torch_trt
 from torch.testing._internal.common_utils import TestCase
 from torch_tensorrt._utils import trt_rtx_targets_turing
 from torch_tensorrt.dynamo import convert_exported_program_to_serialized_trt_engine
-from torch_tensorrt.dynamo._defaults import TIMING_CACHE_PATH
 from torch_tensorrt.dynamo._refit import refit_module_weights
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 
 import tensorrt as trt  # isort: skip  # must import after torch_tensorrt to resolve tensorrt_rtx alias
+
+pytestmark = [pytest.mark.trt_api]
 
 assertions = unittest.TestCase()
 
@@ -312,10 +314,6 @@ class TestWeightStrippedEngine(TestCase):
         if os.path.exists(engine_cache_dir):
             shutil.rmtree(engine_cache_dir)
 
-        def remove_timing_cache(path=TIMING_CACHE_PATH):
-            if os.path.exists(path):
-                os.remove(path)
-
         # The 1st iteration is to measure the compilation time without engine caching
         # The 2nd and 3rd iterations are to measure the compilation time with engine caching.
         # Since the 2nd iteration needs to compile and save the engine, it will be slower than the 1st iteration.
@@ -325,7 +323,6 @@ class TestWeightStrippedEngine(TestCase):
         start = torch.cuda.Event(enable_timing=True)
         end = torch.cuda.Event(enable_timing=True)
         for i in range(3):
-            remove_timing_cache()
             torch._dynamo.reset()
             if i == 0:
                 cache_built_engines = False
@@ -344,6 +341,11 @@ class TestWeightStrippedEngine(TestCase):
                 cache_built_engines=cache_built_engines,
                 reuse_cached_engines=reuse_cached_engines,
                 engine_cache_dir=engine_cache_dir,
+                # Use a fresh cache instead of removing the process-wide default.
+                # TensorRT may still hold the previous file open on Windows.
+                timing_cache_path=os.path.join(
+                    engine_cache_dir, f"timing_cache_{i}.bin"
+                ),
                 strip_engine_weights=False,
                 refit_identical_engine_weights=False,
             )
@@ -392,10 +394,6 @@ class TestWeightStrippedEngine(TestCase):
         if os.path.exists(engine_cache_dir):
             shutil.rmtree(engine_cache_dir)
 
-        def remove_timing_cache(path=TIMING_CACHE_PATH):
-            if os.path.exists(path):
-                os.remove(path)
-
         # The 1st iteration is to measure the compilation time without engine caching
         # The 2nd and 3rd iterations are to measure the compilation time with engine caching.
         # Since the 2nd iteration needs to compile and save the engine, it will be slower than the 1st iteration.
@@ -406,7 +404,6 @@ class TestWeightStrippedEngine(TestCase):
         start = torch.cuda.Event(enable_timing=True)
         end = torch.cuda.Event(enable_timing=True)
         for i in range(3):
-            remove_timing_cache()
             torch._dynamo.reset()
             if i == 0:
                 cache_built_engines = False
@@ -426,6 +423,11 @@ class TestWeightStrippedEngine(TestCase):
                     "cache_built_engines": cache_built_engines,
                     "reuse_cached_engines": reuse_cached_engines,
                     "engine_cache_dir": engine_cache_dir,
+                    # Use a fresh cache instead of removing the process-wide default.
+                    # TensorRT may still hold the previous file open on Windows.
+                    "timing_cache_path": os.path.join(
+                        engine_cache_dir, f"timing_cache_{i}.bin"
+                    ),
                     "strip_engine_weights": False,
                     "refit_identical_engine_weights": True,
                 },
