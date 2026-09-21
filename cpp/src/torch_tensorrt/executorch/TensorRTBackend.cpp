@@ -264,7 +264,13 @@ int cuda_foreign_device_of_ptr(const void* ptr, int engine_device) {
   if (attrs.type != cudaMemoryTypeDevice || attrs.device == engine_device) {
     return -1;
   }
-  // Refused whatever the cards could do for each other: reaching needs a mapping nobody enables.
+  // A non-null devicePointer is an address usable from here, which is the question. Asking instead
+  // whether the two cards CAN reach each other answered yes on every pair measured and still faulted,
+  // because a mapping has to be enabled per pair; refusing outright then rejected buffers that work
+  // once it is.
+  if (attrs.devicePointer != nullptr) {
+    return -1;
+  }
   return attrs.device;
 }
 

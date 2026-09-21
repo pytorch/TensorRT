@@ -96,6 +96,9 @@ if(TARGET executorch::extension_cuda)
                 "${_extension_cuda_type}. Static copies break caller-stream sharing."
             )
         endif()
+        # The runtime below has to come from the same build as the target that just won this link,
+        # or the backend carries two ExecuTorch builds at once.
+        set(_executorch_backend_tensorrt_et_not_from_package TRUE)
     endif()
 elseif(TARGET extension_cuda)
     # Provided by ExecuTorch, e.g. add_subdirectory() with EXECUTORCH_BUILD_CUDA=ON.
@@ -179,7 +182,15 @@ set(_executorch_backend_tensorrt_link_libraries
     extension_cuda
 )
 
-if(TARGET executorch::runtime)
+if(_executorch_backend_tensorrt_et_not_from_package AND (TARGET executorch_core OR TARGET executorch))
+    # extension_cuda above resolved to the consumer's own ExecuTorch, so take the runtime from there
+    # too rather than from the installed package.
+    if(TARGET executorch_core)
+        list(APPEND _executorch_backend_tensorrt_link_libraries executorch_core)
+    else()
+        list(APPEND _executorch_backend_tensorrt_link_libraries executorch)
+    endif()
+elseif(TARGET executorch::runtime)
     # The installed wheel's prebuilt runtime, which also carries the include directories,
     # compile definitions and C++ standard it was built with.
     list(APPEND _executorch_backend_tensorrt_link_libraries executorch::runtime)

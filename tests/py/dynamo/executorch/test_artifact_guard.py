@@ -97,7 +97,8 @@ def artifact(tmp_path):
         "    if name == 'libdelegate.so' and d.get('owns_query', True):\n"
         f"        print(' 3: 00000100 31 FUNC GLOBAL DEFAULT 12 {_OWNS_QUERY}')\n"
         "    for extra in d.get('extra_syms', []):\n"
-        "        print(' 2: 00000000 0 FUNC GLOBAL DEFAULT ' + ('UNDEF' if eu else 'UND') + ' ' + extra)\n"
+        "        kind, sym = extra if isinstance(extra, list) else ['FUNC', extra]\n"
+        "        print(' 2: 00000000 0 ' + kind + ' GLOBAL DEFAULT ' + ('UNDEF' if eu else 'UND') + ' ' + sym)\n"
         "elif flag == '-V':\n"
         "    key = 'versions' if name == 'libdelegate.so' else (\n"
         "        'kernel_versions' if name == 'libkernels.so' else 'runtime_versions')\n"
@@ -189,16 +190,29 @@ def test_a_delegate_without_the_ownership_query_is_rejected(artifact):
     assert "torch_tensorrt_owns_executorch_registration" in result.stderr
 
 
-def test_an_undefined_unversioned_cxx_symbol_is_rejected(artifact):
+@pytest.mark.parametrize(
+    "kind,symbol",
+    [
+        ("FUNC", "_ZNSt6vectorIiSaIiEE9push_backERKi"),
+        ("OBJECT", "_ZSt4cout"),
+        ("TLS", "_ZSt11__once_call"),
+        ("NOTYPE", "_ZNSt8ios_base4InitC1Ev"),
+    ],
+)
+def test_an_undefined_unversioned_cxx_symbol_is_rejected(artifact, kind, symbol):
     """An unversioned C++ symbol resolves against whatever libstdc++ the user happens to have, which
     is how an artifact that loads here fails there. Driven by handing the reader one such symbol.
+
+    Every symbol type, because real libraries import TLS entries and some toolchains emit NOTYPE, so
+    a guard that only looked at FUNC and OBJECT would miss exactly those.
     """
     data, invoke, runtime = artifact
     data["needed"].append("libcudart.so.13")
-    data["extra_syms"] = ["_ZNSt6vectorIiSaIiEE9push_backERKi"]
+    data["extra_syms"] = [[kind, symbol]]
     result = invoke(options=[str(runtime)])
     assert result.returncode != 0
     assert "unversioned" in result.stderr.lower()
+    assert symbol in result.stderr
 
 
 def test_expected_runpath_is_only_an_equality_check(artifact):
@@ -957,12 +971,15 @@ def _assert_wrong_device_buffers_are_refused(source: str) -> None:
     assert (
         "const int output_device = cuda_foreign_device_of_ptr(" in execute
     ), "a caller-supplied output is no longer checked where it is bound"
-    # Asserted absent, not present. Permitting a buffer because two cards COULD reach each other
-    # let the engine read an address it cannot dereference, since peer access still has to be
-    # turned on for a pair and nothing here turns it on.
+    # Capability asserted absent and usability asserted present: whether two cards CAN reach each
+    # other answered yes on every pair measured and still faulted, while a non-null devicePointer is
+    # an address that works from here.
     assert (
         "cudaDeviceCanAccessPeer" not in code
     ), "the capability check is back, and capability is not access"
+    assert (
+        "attrs.devicePointer != nullptr" in code
+    ), "the usability check is gone, so a buffer reachable from here is refused"
     assert "cudaMemoryTypeDevice" in code, "the managed-memory exemption is gone"
 
 
