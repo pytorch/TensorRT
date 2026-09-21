@@ -804,12 +804,50 @@ def test_the_delegate_is_built_for_every_architecture_the_main_wheel_ships():
     assert not (workflows / "executorch-build-linux.yml").exists()
 
 
+def _cmake_code_only(source: str) -> str:
+    """CMake source with its comments removed, so a reading cannot be satisfied by one.
+
+    A hash starts a comment unless it sits inside a quoted string, and a hash followed by an open
+    bracket starts a block that runs to the matching close. Both forms hid a deleted argument from
+    this file's checks while they stayed green.
+    """
+    out: list[str] = []
+    rest = source
+    while True:
+        start = -1
+        quoted = False
+        for i, ch in enumerate(rest):
+            if ch == '"' and (i == 0 or rest[i - 1] != "\\"):
+                quoted = not quoted
+            elif ch == "#" and not quoted:
+                start = i
+                break
+            elif ch == "\n":
+                quoted = False
+        if start < 0:
+            out.append(rest)
+            break
+        out.append(rest[:start])
+        after = rest[start + 1 :]
+        if after.startswith("[["):
+            end = after.find("]]")
+            rest = after[end + 2 :] if end >= 0 else ""
+        else:
+            nl = after.find("\n")
+            rest = after[nl:] if nl >= 0 else ""
+    return "".join(out)
+
+
 @pytest.mark.unit
 def test_the_guard_is_given_the_platform_it_must_compare_against():
     """Production passes the full architecture-specific tag to the artifact guard."""
-    cmake = (
-        _REPO_ROOT / "py/torch-tensorrt-executorch-runtime/native/CMakeLists.txt"
-    ).read_text(encoding="utf-8")
+    # Stripped once, here, so every reading below sees code. Stripping the slice instead left the
+    # set() search twelve lines down reading raw text, where a commented-out assignment matched.
+    cmake = _cmake_code_only(
+        (
+            _REPO_ROOT / "py/torch-tensorrt-executorch-runtime/native/CMakeLists.txt"
+        ).read_text(encoding="utf-8")
+    )
     guard = (
         _REPO_ROOT
         / "py/torch-tensorrt-executorch-runtime/native/check_imports_executorch_runtime.sh"

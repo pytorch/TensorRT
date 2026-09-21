@@ -167,11 +167,24 @@ TEST(ExecuTorchTensorRTBlobHeader, RejectsEnginePastEndOfBlob) {
 // A program file is untrusted input, so each bounds check below gets a case of its own. Without one
 // the fields are read out of a buffer that does not hold them.
 TEST(ExecuTorchTensorRTBlobHeader, RejectsABlobShorterThanTheHeader) {
-  const std::vector<uint8_t> blob(sizeof(TENSORRT_MAGIC), 0);
-  std::memcpy(const_cast<uint8_t*>(blob.data()), TENSORRT_MAGIC, sizeof(TENSORRT_MAGIC));
-
-  TensorRTBlobHeader header;
-  EXPECT_FALSE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
+  // Refusing has to happen before the fields are read, and the return value alone cannot show
+  // that: a four byte buffer reads its metadata offset out of memory it does not own, gets a
+  // small number, and is then refused by the offset floor instead. So the length check could be
+  // deleted outright with every case in this file still passing. What the length check alone
+  // decides is whether anything past the caller's size is read at all, so the buffer here holds
+  // a header that parses and only the size says it is not there. A reader that trusts the bytes
+  // instead of the size fills the output in from them, which is what the last assertion catches.
+  const auto valid = make_blob(VALID_METADATA);
+  for (const std::size_t short_size : {std::size_t{0}, sizeof(TENSORRT_MAGIC), std::size_t{HEADER_SIZE} - 1}) {
+    std::vector<uint8_t> blob(valid);
+    TensorRTBlobHeader header;
+    EXPECT_FALSE(TensorRTBlobHeader::parse(blob.data(), short_size, header))
+        << "a blob of " << short_size << " bytes is shorter than the " << HEADER_SIZE << " byte header";
+    EXPECT_EQ(header.metadata_offset, 0u) << "a field was read past the " << short_size << " bytes the caller offered";
+    EXPECT_EQ(header.metadata_size, 0u);
+    EXPECT_EQ(header.engine_offset, 0u);
+    EXPECT_EQ(header.engine_size, 0u);
+  }
 }
 
 TEST(ExecuTorchTensorRTBlobHeader, RejectsAnEngineOffsetPastEndOfBlob) {
