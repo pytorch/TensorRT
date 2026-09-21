@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=9564b768"></script>
+    <script src="../../_static/documentation_options.js?v=d97752b8"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -571,13 +571,6 @@ document.write(`
         <span class="k">return</span> <span class="kc">False</span>
 
 
-<span class="k">def</span><span class="w"> </span><span class="nf">_has_executorch_runtime</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-    <span class="k">try</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">importlib</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">find_spec</span><span class="p">(</span><span class="s2">"torch_tensorrt_executorch_runtime"</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-    <span class="k">except</span> <span class="ne">ModuleNotFoundError</span><span class="p">:</span>
-        <span class="k">return</span> <span class="kc">False</span>
-
-
 <span class="k">def</span><span class="w"> </span><span class="nf">_non_fx_input_interface</span><span class="p">(</span>
     <span class="n">inputs</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Input</span> <span class="o">|</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TypeGuard</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Input</span> <span class="o">|</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]]:</span>
@@ -1099,14 +1092,11 @@ document.write(`
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Load a TorchScript, ExportedProgram, or ExecuTorch program.</span>
 
-<span class="sd">    By default, detects TorchScript and ExportedProgram files. Set</span>
-<span class="sd">    ``format="executorch"`` explicitly for an ExecuTorch ``.pte`` file.</span>
-
 <span class="sd">    Arguments:</span>
 <span class="sd">        file_path (str): Path to file on the disk</span>
 <span class="sd">        extra_files (dict[str, Any]): Extra files to load with the model</span>
-<span class="sd">        format (Optional[str]): Set to ``"executorch"`` to load a ``.pte`` file</span>
-<span class="sd">            using the separately installed ExecuTorch runtime package.</span>
+<span class="sd">        format (Optional[str]): None detects TorchScript and ExportedProgram files.</span>
+<span class="sd">            The deprecated ``"executorch"`` option loads a ``.pte`` program.</span>
 
 <span class="sd">    Example:</span>
 <span class="sd">    # Load with extra files.</span>
@@ -1115,18 +1105,39 @@ document.write(`
 <span class="sd">        print(extra_files["foo.txt"])</span>
 
 <span class="sd">    Raises:</span>
-<span class="sd">        ImportError: If ExecuTorch format is requested without the runtime package</span>
-<span class="sd">        ValueError: If the format is unsupported or the file is not a TorchScript or ExportedProgram file</span>
+<span class="sd">        ImportError: If ExecuTorch format is requested without its runtime dependencies</span>
+<span class="sd">        ValueError: If the format is unsupported or neither standard loader accepts the file</span>
+
+<span class="sd">    Note:</span>
+<span class="sd">        ``format="executorch"`` preserves the legacy ``method_names`` property,</span>
+<span class="sd">        ``run(inputs, method="forward")``, and ``forward(*inputs)`` interface.</span>
+<span class="sd">        CUDA inputs are copied to CPU. As before, ``extra_files`` and additional</span>
+<span class="sd">        kwargs are ignored for this format; external ``.ptd`` files are not supported.</span>
+<span class="sd">        This compatibility path will remain for at least six months after the</span>
+<span class="sd">        deprecation first ships. New code should import the TensorRT delegate and</span>
+<span class="sd">        use ExecuTorch's own runtime API directly::</span>
+
+<span class="sd">            from pathlib import Path</span>
+
+<span class="sd">            import torch_tensorrt_executorch_runtime  # noqa: F401</span>
+<span class="sd">            from executorch.runtime import Runtime</span>
+
+<span class="sd">            program = Runtime.get().load_program(Path("model.pte"))</span>
+<span class="sd">            forward = program.load_method("forward")</span>
+<span class="sd">            outputs = forward.execute((tensor,))</span>
 <span class="sd">    """</span>
+
     <span class="k">if</span> <span class="nb">format</span> <span class="o">==</span> <span class="s2">"executorch"</span><span class="p">:</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">_has_executorch_runtime</span><span class="p">():</span>
-            <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span>
-                <span class="s2">"Loading an ExecuTorch program requires the Torch-TensorRT "</span>
-                <span class="s2">"ExecuTorch delegate runtime (torch_tensorrt_executorch_runtime). "</span>
-                <span class="s2">"Install it from the PyTorch nightly index for the CUDA version this "</span>
-                <span class="s2">"build targets."</span>
-            <span class="p">)</span>
-        <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt_executorch_runtime.runtime</span><span class="w"> </span><span class="kn">import</span> <span class="n">load</span> <span class="k">as</span> <span class="n">load_executorch</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+            <span class="s2">"torch_tensorrt.load(format='executorch') is deprecated and will remain "</span>
+            <span class="s2">"supported for at least six months after this deprecation first ships. "</span>
+            <span class="s2">"Import torch_tensorrt_executorch_runtime to register the TensorRT delegate, "</span>
+            <span class="s2">"then load it with executorch.runtime.Runtime.get().load_program(path) and run it "</span>
+            <span class="s2">"with program.load_method('forward').execute(inputs)."</span><span class="p">,</span>
+            <span class="ne">DeprecationWarning</span><span class="p">,</span>
+            <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._executorch_compat</span><span class="w"> </span><span class="kn">import</span> <span class="n">load</span> <span class="k">as</span> <span class="n">load_executorch</span>
 
         <span class="k">return</span> <span class="n">load_executorch</span><span class="p">(</span><span class="n">file_path</span><span class="p">)</span>
     <span class="k">if</span> <span class="nb">format</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -1362,8 +1373,9 @@ document.write(`
             <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
                 <span class="s2">"save() received unexpected keyword argument(s) for "</span>
                 <span class="sa">f</span><span class="s2">"output_format='executorch': </span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">kwargs</span><span class="p">)</span><span class="si">}</span><span class="s2">. Supported executorch "</span>
-                <span class="s2">"options are 'partitioners', 'compile_specs', 'backend_config', and "</span>
-                <span class="s2">"'weight_streaming_budget_per_engine'."</span>
+                <span class="s2">"options are 'partitioners', 'compile_specs', 'backend_config', "</span>
+                <span class="s2">"'constant_methods', 'transform_passes', 'compile_config', "</span>
+                <span class="s2">"'generate_etrecord', and 'weight_streaming_budget_per_engine'."</span>
             <span class="p">)</span>
         <span class="c1"># Validate the budget before the input and model-shape checks below, so a wrong</span>
         <span class="c1"># type is not reported as an unrelated failure.</span>

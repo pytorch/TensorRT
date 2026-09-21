@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=9564b768"></script>
+    <script src="../../../_static/documentation_options.js?v=d97752b8"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -483,6 +483,7 @@ document.write(`
 <span class="c1"># ExecuTorch partitioner: partition by execute_engine nodes.</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
@@ -617,9 +618,23 @@ document.write(`
         <span class="c1"># it we use that verbatim; otherwise each partition's device is derived from</span>
         <span class="c1"># its own engine node in partition() (engine nodes are not available here)</span>
         <span class="c1"># so a cuda:N engine is not mislabeled cuda:0.</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_has_explicit_target_device</span> <span class="o">=</span> <span class="nb">any</span><span class="p">(</span>
-            <span class="n">s</span><span class="o">.</span><span class="n">key</span> <span class="o">==</span> <span class="n">_TARGET_DEVICE_COMPILE_SPEC_KEY</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">compile_specs</span>
-        <span class="p">)</span>
+        <span class="n">explicit</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">s</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">compile_specs</span> <span class="k">if</span> <span class="n">s</span><span class="o">.</span><span class="n">key</span> <span class="o">==</span> <span class="n">_TARGET_DEVICE_COMPILE_SPEC_KEY</span>
+        <span class="p">]</span>
+        <span class="c1"># Refuse a device this delegate cannot run on here, at export, rather than leaving the</span>
+        <span class="c1"># program to fail at its first instruction, where the failure says nothing about the request</span>
+        <span class="c1"># that caused it.</span>
+        <span class="k">for</span> <span class="n">spec</span> <span class="ow">in</span> <span class="n">explicit</span><span class="p">:</span>
+            <span class="n">requested</span> <span class="o">=</span> <span class="n">spec</span><span class="o">.</span><span class="n">value</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">errors</span><span class="o">=</span><span class="s2">"replace"</span><span class="p">)</span>
+            <span class="c1"># Whole match, case-insensitive: the framework spells the device "CUDA" as readily as</span>
+            <span class="c1"># "cuda", while "cuda:" and "cuda:abc" name no device at all.</span>
+            <span class="k">if</span> <span class="n">re</span><span class="o">.</span><span class="n">fullmatch</span><span class="p">(</span><span class="sa">r</span><span class="s2">"cuda(:\d+)?"</span><span class="p">,</span> <span class="n">requested</span><span class="o">.</span><span class="n">strip</span><span class="p">(),</span> <span class="n">re</span><span class="o">.</span><span class="n">IGNORECASE</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">_TARGET_DEVICE_COMPILE_SPEC_KEY</span><span class="si">}</span><span class="s2">=</span><span class="si">{</span><span class="n">requested</span><span class="si">!r}</span><span class="s2"> is not a device this "</span>
+                    <span class="s2">"delegate runs on. It compiles to TensorRT engines, which need a CUDA device, "</span>
+                    <span class="s1">'so the value has to be "cuda" or "cuda:N".'</span>
+                <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_has_explicit_target_device</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="n">explicit</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">delegation_spec</span> <span class="o">=</span> <span class="n">DelegationSpec</span><span class="p">(</span>
             <span class="n">backend_id</span><span class="o">=</span><span class="n">TensorRTBackend</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
             <span class="n">compile_specs</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">compile_specs</span><span class="p">,</span>

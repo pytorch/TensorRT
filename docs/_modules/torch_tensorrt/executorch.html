@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=9564b768"></script>
+    <script src="../../_static/documentation_options.js?v=d97752b8"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -479,9 +479,8 @@ document.write(`
 
 <span class="sd">"""ExecuTorch compilation and export integration.</span>
 
-<span class="sd">Runtime loading is provided by the optional</span>
-<span class="sd">``torch-tensorrt-executorch-runtime`` distribution and dispatched through</span>
-<span class="sd">``torch_tensorrt.load(..., format="executorch")``.</span>
+<span class="sd">Import ``torch_tensorrt_executorch_runtime`` to register the TensorRT delegate,</span>
+<span class="sd">then load and run programs through ExecuTorch's Module API.</span>
 <span class="sd">"""</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">importlib.util</span>
