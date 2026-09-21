@@ -492,28 +492,39 @@ def test_the_delegate_lane_narrows_the_matrix_to_cuda_13_rows() -> None:
     assert live, f"the flag reaches no live command line: {invocations}"
 
     script = ROOT / ".github/scripts/filter-matrix.py"
+
+    def kept(rows, *flags):
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(script),
+                *flags,
+                "--use-rtx",
+                "false",
+                "--limit-pr-builds",
+                "false",
+                "--matrix",
+                json.dumps({"include": rows}),
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return {row["desired_cuda"] for row in json.loads(result.stdout)["include"]}
+
     rows = [
         {"desired_cuda": cuda, "python_version": "3.10", "gpu_arch_type": "cuda"}
         for cuda in ("cu126", "cu130", "cu134")
     ]
-    result = subprocess.run(
-        [
-            sys.executable,
-            str(script),
-            "--executorch-runtime",
-            "--use-rtx",
-            "false",
-            "--limit-pr-builds",
-            "false",
-            "--matrix",
-            json.dumps({"include": rows}),
-        ],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    kept = {row["desired_cuda"] for row in json.loads(result.stdout)["include"]}
-    assert kept == {"cu130", "cu134"}, kept
+    assert kept(rows, "--executorch-runtime") == {"cu130", "cu134"}
+    # A row the other rules keep, so only the flag can drop it. Every row those rules keep on x86
+    # and on Arm is already CUDA 13, so the assertion above held with the flag's branch deleted and
+    # could not see it.
+    jetpack = [
+        {"desired_cuda": "cu126", "python_version": "3.10", "gpu_arch_type": "cuda"}
+    ]
+    assert kept(jetpack, "--jetpack", "true") == {"cu126"}
+    assert kept(jetpack, "--jetpack", "true", "--executorch-runtime") == set()
 
 
 @pytest.mark.unit

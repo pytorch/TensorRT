@@ -324,6 +324,47 @@ def test_the_config_looks_for_the_delegate_in_one_place_only() -> None:
 
 
 @pytest.mark.unit
+def test_the_config_refuses_a_delegate_belonging_to_something_else(
+    tmp_path, linker_tools
+) -> None:
+    """Configured rather than read: the asserts above are a word count and a substring, so a walk
+    written with a second variable instead of a foreach passes them while accepting the library in
+    the directory above the package, which is the failure they exist to stop.
+    """
+    prefix = tmp_path / "prefix"
+    config_dir = prefix / "lib/cmake/executorch_backend_tensorrt"
+    config_dir.mkdir(parents=True)
+    (config_dir / _CONFIG.name).write_text(_CONFIG.read_text(encoding="utf-8"))
+    stranger = tmp_path / "lib"
+    stranger.mkdir()
+    (stranger / "libexecutorch_backend_tensorrt.so").write_bytes(b"")
+    project = tmp_path / "consumer"
+    project.mkdir()
+    (project / "CMakeLists.txt").write_text(
+        "cmake_minimum_required(VERSION 3.20)\n"
+        "project(consumer CXX)\n"
+        f'list(APPEND CMAKE_PREFIX_PATH "{prefix}")\n'
+        "find_package(executorch_backend_tensorrt REQUIRED)\n"
+    )
+
+    def configure():
+        return subprocess.run(
+            [linker_tools["cmake"], "-S", str(project), "-B", str(tmp_path / "build")],
+            capture_output=True,
+            text=True,
+        )
+
+    result = configure()
+    assert result.returncode != 0, result.stdout + result.stderr
+    # The package's own copy, so a failure above cannot be the fixture being wrong about something
+    # else.
+    (prefix / "lib/libexecutorch_backend_tensorrt.so").write_bytes(b"")
+    shutil.rmtree(tmp_path / "build")
+    result = configure()
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+@pytest.mark.unit
 def test_the_published_target_is_visible_outside_the_finding_directory(
     tmp_path, linker_tools
 ) -> None:

@@ -1024,11 +1024,10 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // Caller-owned KV: reflect each engine in-place update into its delegate output
   // EValue (D2D on the same stream, after the engine work).
   for (const auto& r : aliased_reflects) {
-    cuda_err = cudaMemcpyAsync(std::get<0>(r), std::get<1>(r), std::get<2>(r), cudaMemcpyDeviceToDevice, stream);
+    cuda_err = cudaMemcpyAsync(std::get<0>(r), std::get<1>(r), std::get<2>(r), cudaMemcpyDefault, stream);
     drain_on_early_return.arm();
     if (cuda_err != cudaSuccess) {
-      ET_LOG(
-          Error, "TensorRTBackend::execute: aliased-output reflect D2D copy failed: %s", cudaGetErrorString(cuda_err));
+      ET_LOG(Error, "TensorRTBackend::execute: aliased-output reflect copy failed: %s", cudaGetErrorString(cuda_err));
       // Drain first: the engine work is on this stream and the buffers outlive the call.
       (void)cudaStreamSynchronize(stream);
       return Error::InvalidProgram;

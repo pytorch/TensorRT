@@ -3,6 +3,7 @@
 
 """CPU-only behavior checks for the companion's native artifact guard."""
 
+import ast
 import json
 import os
 import re
@@ -748,6 +749,39 @@ def test_guard_removal_controls(artifact, tmp_path, mutation):
         assert "unsupported manylinux tag" in result.stderr
     else:
         _ok(result)
+
+
+@pytest.mark.unit
+def test_every_layer_spells_the_backend_id_the_same_way() -> None:
+    """The exporter derives the id written into a program from the delegate class's name, while the
+    library that answers to it, the runtime package and the examples each spell it out, so a rename
+    would change what new programs ask for and nothing would refuse until load time.
+    """
+    native = (
+        _ROOT / "cpp/src/torch_tensorrt/executorch/TensorRTBackend.cpp"
+    ).read_text(encoding="utf-8")
+    registered = re.search(r"Backend kBackendId\{\s*\"([^\"]+)\"", native)
+    assert registered, "the native registration does not name a backend"
+    name = registered.group(1)
+    exported = ast.parse(
+        (_ROOT / "py/torch_tensorrt/executorch/backend.py").read_text(encoding="utf-8")
+    )
+    classes = [
+        node.name
+        for node in exported.body
+        if isinstance(node, ast.ClassDef) and node.name == name
+    ]
+    assert classes == [name], (
+        f"the exporter derives the backend id from a class name, and no class is called {name!r}, "
+        "so exported programs would ask for a backend the delegate does not register"
+    )
+    spellings = {
+        "py/torch-tensorrt-executorch-runtime/torch_tensorrt_executorch_runtime/__init__.py": f'BACKEND_NAME = "{name}"',
+        "examples/torchtrt_executorch_example/export_device_resident.py": f'"{name}"',
+        "examples/torchtrt_executorch_example/export_coalesced.py": f'"{name}"',
+    }
+    for path, spelling in spellings.items():
+        assert spelling in (_ROOT / path).read_text(encoding="utf-8"), (path, spelling)
 
 
 @pytest.mark.unit
