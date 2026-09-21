@@ -44,7 +44,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=d97752b8"></script>
+    <script src="../../../_static/documentation_options.js?v=542eb810"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -439,6 +439,10 @@ document.write(`
 <li class="toctree-l2"><a class="reference internal" href="../../huggingface/compile_hf_models.html">Compiling LLM models from Huggingface</a></li>
 <li class="toctree-l2 current active"><a class="current reference internal" href="#">Example: Compiling Stable Diffusion with torch.compile</a></li>
 <li class="toctree-l2"><a class="reference internal" href="torch_export_flux_dev.html">Example: Compiling FLUX.1-dev with the dynamo backend</a></li>
+<li class="toctree-l2"><a class="reference internal" href="torchao/torch_export_flux_int4_woq.html">Example: FLUX.1-dev INT4 WOQ</a></li>
+<li class="toctree-l2"><a class="reference internal" href="torchao/torch_export_flux_nvfp4_woq.html">Example: FLUX.1-dev NVFP4 WOQ</a></li>
+<li class="toctree-l2"><a class="reference internal" href="torchao/torch_export_flux_mxfp4.html">Example: FLUX.1-dev MXFP4</a></li>
+<li class="toctree-l2"><a class="reference internal" href="torchao/torch_export_qwen3_int4_woq.html">Example: Qwen3-8B INT4 WOQ</a></li>
 <li class="toctree-l2"><a class="reference internal" href="mutable_torchtrt_module_example.html">Example: Mutable Torch TensorRT Module</a></li>
 </ul>
 </details></li>
@@ -597,7 +601,7 @@ document.write(`
   <section id="Compiling-Stable-Diffusion-model-using-the-torch.compile-backend">
 <h1>Compiling Stable Diffusion model using the <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> backend<a class="headerlink" href="#Compiling-Stable-Diffusion-model-using-the-torch.compile-backend" title="Link to this heading">#</a></h1>
 <p>This interactive script is intended as a sample of the Torch-TensorRT workflow with <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> on a Stable Diffusion model. A sample output is featured below:</p>
-<p><img alt="6ec25b8d836b4dae932e8366cbd7d2b1" class="no-scaled-link" src="file://tutorials/images/majestic_castle.png" style="width: 512px; height: 512px;" /></p>
+<p><img alt="8e8661c7548d4249922995aee26b0e5c" class="no-scaled-link" src="file://tutorials/images/majestic_castle.png" style="width: 512px; height: 512px;" /></p>
 <section id="Imports-and-Model-Definition">
 <h2>Imports and Model Definition<a class="headerlink" href="#Imports-and-Model-Definition" title="Link to this heading">#</a></h2>
 <div class="nbinput nblast docutils container">

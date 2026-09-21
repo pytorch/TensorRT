@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=d97752b8"></script>
+    <script src="../../_static/documentation_options.js?v=542eb810"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -450,6 +450,16 @@ document.write(`
 <li class="toctree-l2 current active"><a class="current reference internal" href="#">Quantization (INT8 / FP8 / FP4)</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/vgg16_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/quantize_vit_fp8.html">Example: ViT FP8 Quantization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torchao/quantize_linear_fp8_woq.html">Example: TorchAO FP8 WOQ Linear</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torchao/quantize_linear_fp8_static.html">Example: TorchAO Static FP8 Linear</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torchao/torch_export_flux_fp8_woq.html">Example: FLUX.1-dev FP8 WOQ</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torchao/quantize_linear_int4_woq.html">Example: TorchAO INT4 WOQ Linear</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torchao/torch_export_flux_int4_woq.html">Example: FLUX.1-dev INT4 WOQ</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torchao/torch_export_qwen3_int4_woq.html">Example: Qwen3-8B INT4 WOQ</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torchao/quantize_linear_nvfp4_woq.html">Example: TorchAO NVFP4 WOQ Linear</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torchao/torch_export_flux_nvfp4_woq.html">Example: FLUX.1-dev NVFP4 WOQ</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torchao/quantize_linear_mxfp4.html">Example: TorchAO MXFP4 Linear</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torchao/torch_export_flux_mxfp4.html">Example: FLUX.1-dev MXFP4</a></li>
 </ul>
 </details></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../runtime_performance/index.html">Runtime &amp; Serialization</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
@@ -530,21 +540,28 @@ document.write(`
 <span id="quantization"></span><h1>Quantization (INT8 / FP8 / FP4)<a class="headerlink" href="#quantization-int8-fp8-fp4" title="Link to this heading">#</a></h1>
 <p>Torch-TensorRT supports post-training quantization (PTQ) with <strong>INT8</strong>, <strong>FP8</strong>, and
 <strong>FP4</strong> precisions via NVIDIA’s
-<a class="reference external" href="https://github.com/NVIDIA/TensorRT-Model-Optimizer">ModelOpt</a> library. ModelOpt
-inserts quantize/dequantize (QDQ) nodes into the model graph; Torch-TensorRT then
+<a class="reference external" href="https://github.com/NVIDIA/TensorRT-Model-Optimizer">ModelOpt</a> library, and
+<strong>FP8 weight-only</strong>, <strong>static FP8</strong>, <strong>INT4 weight-only</strong>, <strong>NVFP4
+weight-only</strong>, and <strong>MXFP4</strong> (<code class="docutils literal notranslate"><span class="pre">MXDynamicActivationMXWeightConfig</span></code>) via
+<a class="reference external" href="https://github.com/pytorch/ao">TorchAO</a>. Quantizers insert
+quantize/dequantize (QDQ) nodes into the model graph; Torch-TensorRT then
 converts those nodes into TRT quantization layers and sets the appropriate builder flags.</p>
 <hr class="docutils" />
 <section id="prerequisites">
 <h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Link to this heading">#</a></h2>
-<p>Install ModelOpt (requires <code class="docutils literal notranslate"><span class="pre">nvidia-modelopt</span></code>):</p>
+<p>Install ModelOpt (requires <code class="docutils literal notranslate"><span class="pre">nvidia-modelopt</span></code>) and/or TorchAO:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>nvidia-modelopt
+pip<span class="w"> </span>install<span class="w"> </span>torchao
 </pre></div>
 </div>
 <p>Hardware requirements:</p>
 <ul class="simple">
 <li><p><strong>INT8</strong>: Any NVIDIA GPU with TensorRT support.</p></li>
 <li><p><strong>FP8</strong>: NVIDIA Hopper (H100) or newer.</p></li>
-<li><p><strong>FP4 (NVFP4)</strong>: NVIDIA Blackwell (B100/B200) or newer; requires TensorRT ≥ 10.8.</p></li>
+<li><p><strong>INT4 (TorchAO WOQ)</strong>: TensorRT with INT4 constants (TRT ≥ 10.8); storage + DQ, not low-bit MMA.</p></li>
+<li><p><strong>NVFP4 (TorchAO WOQ)</strong>: TensorRT with FP4 constants (TRT ≥ 10.8); packed FP4 storage + DQ, not native FP4 MMA.</p></li>
+<li><p><strong>MXFP4 (TorchAO)</strong>: TensorRT with FP4 + E8M0 constants (TRT ≥ 10.8); packed FP4 storage + DQ, not native MXFP4 MMA. There is no MXFP4 weight-only config.</p></li>
+<li><p><strong>FP4 (ModelOpt NVFP4)</strong>: NVIDIA Blackwell (B100/B200) or newer; requires TensorRT ≥ 10.8.</p></li>
 </ul>
 </section>
 <hr class="docutils" />
@@ -655,6 +672,174 @@ when quantization precisions are detected — no manual wrapping required. See
 </div>
 </section>
 <hr class="docutils" />
+<section id="torchao-fp8-weight-only-quantization">
+<h2>TorchAO FP8 Weight-Only Quantization<a class="headerlink" href="#torchao-fp8-weight-only-quantization" title="Link to this heading">#</a></h2>
+<p>TorchAO <code class="docutils literal notranslate"><span class="pre">Float8WeightOnlyConfig</span></code> quantizes Linear weights to FP8 (e4m3) while
+leaving activations in BF16/FP16. Unlike ModelOpt PTQ, no calibration dataset is
+required.</p>
+<p>Default TorchAO <code class="docutils literal notranslate"><span class="pre">Float8Tensor.dequantize</span></code> decomposes into primitive ops. The
+examples promote weights to a <code class="docutils literal notranslate"><span class="pre">Float8TensorNonDecomposed</span></code> subclass so export
+emits <code class="docutils literal notranslate"><span class="pre">torch.ops.torchao.dequantize_affine</span></code>, which Torch-TensorRT converts to
+<code class="docutils literal notranslate"><span class="pre">IDequantizeLayer</span></code>.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">torchao.quantization</span><span class="w"> </span><span class="kn">import</span> <span class="n">Float8WeightOnlyConfig</span><span class="p">,</span> <span class="n">quantize_</span>
+
+<span class="n">quantize_</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">Float8WeightOnlyConfig</span><span class="p">())</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">pre_process_model_for_export</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>  <span class="c1"># emit dequantize_affine</span>
+
+<span class="k">with</span> <span class="n">exclude_dq_from_constant_folding</span><span class="p">():</span>
+    <span class="n">exp_program</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="p">(</span><span class="n">example_input</span><span class="p">,),</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="n">exp_program</span><span class="p">,</span>
+    <span class="n">inputs</span><span class="o">=</span><span class="p">[</span><span class="n">example_input</span><span class="p">],</span>
+    <span class="n">min_block_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">require_full_compilation</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>The intended engine keeps an FP8 weight constant plus a DQ prologue into GEMM.
+On <strong>Blackwell</strong>, Myelin can fuse that prologue into the matmul. On other GPUs
+DQ + GEMM may run as two kernels — that is still correct as long as the FP8
+weight is not constant-folded into a dense high-precision weight.</p>
+<p>See <span class="xref std std-ref">quantize_linear_fp8_woq</span> for a toy Linear model and
+<span class="xref std std-ref">torch_export_flux_fp8_woq</span> for FLUX.1-dev.</p>
+</section>
+<hr class="docutils" />
+<section id="torchao-int4-weight-only-quantization">
+<h2>TorchAO INT4 Weight-Only Quantization<a class="headerlink" href="#torchao-int4-weight-only-quantization" title="Link to this heading">#</a></h2>
+<p>TorchAO group-wise INT4 quantizes Linear weights to 4-bit integers while
+leaving activations in BF16. This is <strong>weight-only storage</strong>: TensorRT keeps an
+INT4 constant and dequantizes into a high-precision GEMM. It is not NVFP4
+Tensor Core MMA.</p>
+<p>TensorRT’s <code class="docutils literal notranslate"><span class="pre">IDequantizeLayer</span></code> rejects nonzero zero-points, so examples use
+TorchAO’s <strong>symmetric</strong> <code class="docutils literal notranslate"><span class="pre">Int4Tensor.from_hp</span></code> path (the float8-activation
+branch, then restore BF16 as the activation dtype). Default
+<code class="docutils literal notranslate"><span class="pre">Int4WeightOnlyConfig</span></code> is asymmetric and will fail conversion.</p>
+<p>Parent <code class="docutils literal notranslate"><span class="pre">Int4Tensor</span></code> Linear dispatches to fused mslk kernels and never calls
+<code class="docutils literal notranslate"><span class="pre">dequantize()</span></code>. Promote weights to <code class="docutils literal notranslate"><span class="pre">Int4TensorNonDecomposed</span></code> so export emits
+<code class="docutils literal notranslate"><span class="pre">torch.ops.torchao.dequantize_affine</span></code>. The converter re-packs the unpacked
+int8 qdata into <code class="docutils literal notranslate"><span class="pre">trt.DataType.INT4</span></code>. Blocked INT4 DQ currently uses an FP32
+DQ output, then a cast back to BF16.</p>
+<p>Compile with <code class="docutils literal notranslate"><span class="pre">immutable_weights=True</span></code>. The converter packs INT4 at build
+time; engine refit would push the graph’s int8 qdata at an INT4 prototype
+(<code class="docutils literal notranslate"><span class="pre">refit</span> <span class="pre">weights</span> <span class="pre">data</span> <span class="pre">type</span> <span class="pre">Int8</span> <span class="pre">must</span> <span class="pre">equal</span> <span class="pre">to</span> <span class="pre">weights</span> <span class="pre">prototype</span> <span class="pre">Int4</span></code>).</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">quantize_linear_int4_symmetric</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">group_size</span><span class="o">=</span><span class="mi">128</span><span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">pre_process_model_for_export</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+
+<span class="k">with</span> <span class="n">exclude_dq_from_constant_folding</span><span class="p">():</span>
+    <span class="n">exp_program</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="p">(</span><span class="n">example_input</span><span class="p">,),</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="n">exp_program</span><span class="p">,</span>
+    <span class="n">inputs</span><span class="o">=</span><span class="p">[</span><span class="n">example_input</span><span class="p">],</span>
+    <span class="n">min_block_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">require_full_compilation</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">immutable_weights</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>Hub checkpoints such as <a class="reference external" href="https://huggingface.co/pytorch/Qwen3-8B-INT4">pytorch/Qwen3-8B-INT4</a>
+may use HQQ or <code class="docutils literal notranslate"><span class="pre">Int4TilePackedTo4dTensor</span></code>. Dequantize those weights to dense
+BF16, then re-pack with <code class="docutils literal notranslate"><span class="pre">quantize_linear_int4_symmetric</span></code> /
+<code class="docutils literal notranslate"><span class="pre">convert_hub_int4_to_symmetric_trt</span></code>.</p>
+<p>See <span class="xref std std-ref">quantize_linear_int4_woq</span> for a toy Linear model,
+<span class="xref std std-ref">torch_export_flux_int4_woq</span> for FLUX.1-dev, and
+<span class="xref std std-ref">torch_export_qwen3_int4_woq</span> for Qwen3-8B.</p>
+</section>
+<hr class="docutils" />
+<section id="torchao-nvfp4-weight-only-quantization">
+<h2>TorchAO NVFP4 Weight-Only Quantization<a class="headerlink" href="#torchao-nvfp4-weight-only-quantization" title="Link to this heading">#</a></h2>
+<p>TorchAO NVFP4 quantizes Linear weights to packed FP4 E2M1 (two values per
+byte) with FP8 E4M3 block scales (block size 16) and an FP32 per-tensor
+global scale. Activations stay BF16. This is <strong>weight-only storage</strong>:
+TensorRT keeps an FP4 constant and dequantizes into a high-precision GEMM.
+It is not native FP4 Tensor Core MMA, and it is a different graph from
+ModelOpt <code class="docutils literal notranslate"><span class="pre">NVFP4_DEFAULT_CFG</span></code> (<code class="docutils literal notranslate"><span class="pre">dynamic_block_quantize_op</span></code>).</p>
+<p>Last two weight dims must be divisible by 16. Parent <code class="docutils literal notranslate"><span class="pre">NVFP4Tensor</span></code> Linear
+does not emit a DQ op TensorRT can map. Promote weights to
+<code class="docutils literal notranslate"><span class="pre">NVFP4TensorNonDecomposed</span></code> so export emits
+<code class="docutils literal notranslate"><span class="pre">torch.ops.torchao_trt.dequantize_nvfp4</span></code>. The converter unswizzles TorchAO
+block scales, then builds an FP4 constant, an FP8 block-scale constant, and
+two-level <code class="docutils literal notranslate"><span class="pre">IDequantizeLayer</span></code>.</p>
+<p>Torch-TensorRT marks <code class="docutils literal notranslate"><span class="pre">dequantize_nvfp4</span></code> impure in constant folding so the
+packed FP4 weight is not folded into a dense BF16 constant. Compile with
+<code class="docutils literal notranslate"><span class="pre">immutable_weights=True</span></code>.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">quantize_linear_nvfp4</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">pre_process_model_for_export</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+
+<span class="n">exp_program</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="p">(</span><span class="n">example_input</span><span class="p">,),</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="n">exp_program</span><span class="p">,</span>
+    <span class="n">inputs</span><span class="o">=</span><span class="p">[</span><span class="n">example_input</span><span class="p">],</span>
+    <span class="n">min_block_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">require_full_compilation</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">immutable_weights</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>See <span class="xref std std-ref">quantize_linear_nvfp4_woq</span> for a toy Linear model and
+<span class="xref std std-ref">torch_export_flux_nvfp4_woq</span> for FLUX.1-dev.</p>
+</section>
+<hr class="docutils" />
+<section id="torchao-mxfp4-dynamic-activation-mx-weight">
+<h2>TorchAO MXFP4 (Dynamic Activation + MX Weight)<a class="headerlink" href="#torchao-mxfp4-dynamic-activation-mx-weight" title="Link to this heading">#</a></h2>
+<p>TorchAO MXFP4 stores Linear weights as packed FP4 E2M1 (two values per
+byte) with E8M0 block scales (block size 32). The public config is
+<code class="docutils literal notranslate"><span class="pre">MXDynamicActivationMXWeightConfig</span></code> — there is no MXFP4 weight-only
+recipe (that is NVFP4 / <code class="docutils literal notranslate"><span class="pre">NVFP4WeightOnlyConfig</span></code>). Native MXFP4xMXFP4
+kernels need B200/B300. This path uses emulated storage and a weight DQ
+prologue into a high-precision GEMM. Activations stay BF16.</p>
+<p>Last two weight dims must be divisible by 32. Parent <code class="docutils literal notranslate"><span class="pre">MXTensor</span></code> Linear
+does not emit a DQ op TensorRT can map. Promote weights to
+<code class="docutils literal notranslate"><span class="pre">MXTensorNonDecomposed</span></code> so export emits
+<code class="docutils literal notranslate"><span class="pre">torch.ops.torchao_trt.dequantize_mxfp4</span></code>. The converter unswizzles TorchAO
+block scales, then builds an FP4 constant, an E8M0 block-scale constant, and
+<code class="docutils literal notranslate"><span class="pre">IDequantizeLayer</span></code>. Myelin accepts FP4 + E8M0 at block size 32; FP4 +
+float32 scales fail at that block size.</p>
+<p>Torch-TensorRT marks <code class="docutils literal notranslate"><span class="pre">dequantize_mxfp4</span></code> impure in constant folding so the
+packed FP4 weight is not folded into a dense BF16 constant. Compile with
+<code class="docutils literal notranslate"><span class="pre">immutable_weights=True</span></code>.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">quantize_linear_mxfp4</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">pre_process_model_for_export</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+
+<span class="n">exp_program</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="p">(</span><span class="n">example_input</span><span class="p">,),</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="n">exp_program</span><span class="p">,</span>
+    <span class="n">inputs</span><span class="o">=</span><span class="p">[</span><span class="n">example_input</span><span class="p">],</span>
+    <span class="n">min_block_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">require_full_compilation</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">immutable_weights</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>See <span class="xref std std-ref">quantize_linear_mxfp4</span> for a toy Linear model and
+<span class="xref std std-ref">torch_export_flux_mxfp4</span> for FLUX.1-dev.</p>
+</section>
+<hr class="docutils" />
+<section id="torchao-static-fp8-quantization">
+<h2>TorchAO Static FP8 Quantization<a class="headerlink" href="#torchao-static-fp8-quantization" title="Link to this heading">#</a></h2>
+<p>Static FP8 quantizes <strong>activations and weights</strong>. Activation scales are chosen
+offline with min/max observers (per-tensor activations, per-channel weights),
+then Linear layers are rewritten so export emits
+<code class="docutils literal notranslate"><span class="pre">quantize_affine_float8_non_decomposed</span></code> and
+<code class="docutils literal notranslate"><span class="pre">dequantize_affine_float8_non_decomposed</span></code>. Torch-TensorRT maps those ops to
+<code class="docutils literal notranslate"><span class="pre">IQuantizeLayer</span></code> / <code class="docutils literal notranslate"><span class="pre">IDequantizeLayer</span></code>. After fusion, GEMMs can run in FP8.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">quantize_static_fp8</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="p">(</span><span class="n">example_input</span><span class="p">,),</span> <span class="n">calibration_steps</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+<span class="n">exp_program</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="p">(</span><span class="n">example_input</span><span class="p">,),</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="n">exp_program</span><span class="p">,</span>
+    <span class="n">inputs</span><span class="o">=</span><span class="p">[</span><span class="n">example_input</span><span class="p">],</span>
+    <span class="n">min_block_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">require_full_compilation</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>This needs a calibration loop (unlike weight-only). See
+<span class="xref std std-ref">quantize_linear_fp8_static</span>.</p>
+</section>
+<hr class="docutils" />
 <section id="how-qdq-nodes-are-converted">
 <h2>How QDQ Nodes Are Converted<a class="headerlink" href="#how-qdq-nodes-are-converted" title="Link to this heading">#</a></h2>
 <p>When Torch-TensorRT encounters <code class="docutils literal notranslate"><span class="pre">torch.ops.tensorrt.quantize_op.default</span></code> nodes in the
@@ -662,8 +847,22 @@ graph (inserted by ModelOpt), the
 <code class="docutils literal notranslate"><span class="pre">aten_ops_quantize_op</span></code> converter maps them to TRT <code class="docutils literal notranslate"><span class="pre">IQuantizeLayer</span></code> /
 <code class="docutils literal notranslate"><span class="pre">IDequantizeLayer</span></code> pairs. The TRT builder then fuses these with adjacent compute layers
 (e.g. Conv, Linear) to produce INT8 or FP8 kernel variants.</p>
-<p>For FP4, <code class="docutils literal notranslate"><span class="pre">torch.ops.tensorrt.dynamic_block_quantize_op.default</span></code> nodes are converted
-via the dynamic block quantize converter, which uses TRT’s
+<p>For TorchAO weight-only graphs, <code class="docutils literal notranslate"><span class="pre">torch.ops.torchao.dequantize_affine.default</span></code> is
+mapped to <code class="docutils literal notranslate"><span class="pre">IDequantizeLayer</span></code> (weight constant stays FP8 or INT4, activations stay
+high precision). Group-wise INT4 qdata is re-packed from unpacked int8 into a
+<code class="docutils literal notranslate"><span class="pre">trt.DataType.INT4</span></code> constant.</p>
+<p>For TorchAO static FP8 graphs,
+<code class="docutils literal notranslate"><span class="pre">quantize_affine_float8_non_decomposed</span></code> / <code class="docutils literal notranslate"><span class="pre">dequantize_affine_float8_non_decomposed</span></code>
+map to <code class="docutils literal notranslate"><span class="pre">IQuantizeLayer</span></code> / <code class="docutils literal notranslate"><span class="pre">IDequantizeLayer</span></code> so both activations and weights
+participate in FP8 GEMM fusion.</p>
+<p>For TorchAO NVFP4 weight-only graphs, <code class="docutils literal notranslate"><span class="pre">torch.ops.torchao_trt.dequantize_nvfp4.default</span></code>
+is mapped to two-level <code class="docutils literal notranslate"><span class="pre">IDequantizeLayer</span></code> (FP8 block scales restored with the
+global scale, then packed FP4 dequantized into the GEMM input type).</p>
+<p>For TorchAO MXFP4 graphs, <code class="docutils literal notranslate"><span class="pre">torch.ops.torchao_trt.dequantize_mxfp4.default</span></code>
+is mapped to <code class="docutils literal notranslate"><span class="pre">IDequantizeLayer</span></code> (packed FP4 + logical E8M0 block scales at
+block size 32).</p>
+<p>For ModelOpt FP4, <code class="docutils literal notranslate"><span class="pre">torch.ops.tensorrt.dynamic_block_quantize_op.default</span></code> nodes
+are converted via the dynamic block quantize converter, which uses TRT’s
 <code class="docutils literal notranslate"><span class="pre">add_dynamic_quantize</span></code> API (TRT ≥ 10.8).</p>
 <p>The <code class="docutils literal notranslate"><span class="pre">constant_folding</span></code> lowering pass explicitly marks quantization ops as <em>impure</em> to
 prevent their scales from being folded away before the TRT conversion step.</p>
@@ -705,7 +904,19 @@ quantized layers were included:</p>
 <td><p>NVIDIA Hopper (H100+)</p></td>
 <td><p>TRT ≥ 8.6</p></td>
 </tr>
-<tr class="row-even"><td><p>FP4 (NVFP4)</p></td>
+<tr class="row-even"><td><p>INT4 (TorchAO WOQ)</p></td>
+<td><p>Any TRT-capable GPU with INT4 support</p></td>
+<td><p>TRT ≥ 10.8</p></td>
+</tr>
+<tr class="row-odd"><td><p>NVFP4 (TorchAO WOQ)</p></td>
+<td><p>GPU with TRT FP4 constants</p></td>
+<td><p>TRT ≥ 10.8</p></td>
+</tr>
+<tr class="row-even"><td><p>MXFP4 (TorchAO)</p></td>
+<td><p>GPU with TRT FP4 + E8M0 constants</p></td>
+<td><p>TRT ≥ 10.8</p></td>
+</tr>
+<tr class="row-odd"><td><p>FP4 (ModelOpt NVFP4)</p></td>
 <td><p>NVIDIA Blackwell (B100+)</p></td>
 <td><p>TRT ≥ 10.8</p></td>
 </tr>
@@ -730,6 +941,31 @@ Linux with standard TensorRT instead of TensorRT-RTX.</p>
 </dd>
 <dt><strong>FP4 “requires TRT ≥ 10.8” error</strong></dt><dd><p>Upgrade TensorRT. FP4 uses <code class="docutils literal notranslate"><span class="pre">add_dynamic_quantize</span></code> which is only available in
 TRT 10.8 and newer.</p>
+</dd>
+<dt><strong>TorchAO FP8 weights folded to BF16/FP16</strong></dt><dd><p>Export or Torch-TensorRT constant folding removed <code class="docutils literal notranslate"><span class="pre">dequantize_affine</span></code>.
+Promote weights with <code class="docutils literal notranslate"><span class="pre">pre_process_model_for_export</span></code> and wrap export in
+<code class="docutils literal notranslate"><span class="pre">exclude_dq_from_constant_folding</span></code> as in <span class="xref std std-ref">quantize_linear_fp8_woq</span>.
+Install <code class="docutils literal notranslate"><span class="pre">torchao</span></code> so the converter and constant-folding exclusion register.</p>
+</dd>
+<dt><strong>TorchAO INT4 weights folded to BF16, or engine constants are Int8 not Int4</strong></dt><dd><p>The graph must keep <code class="docutils literal notranslate"><span class="pre">dequantize_affine</span></code> (same preprocess / constant-fold
+exclusion as FP8 WOQ). Group-wise INT4 also requires the INT4 pack path in
+the converter; per-channel INT8-style DQ will not emit <code class="docutils literal notranslate"><span class="pre">Datatype:</span> <span class="pre">Int4</span></code>.
+Use symmetric quantization (zero zero-point) and <code class="docutils literal notranslate"><span class="pre">immutable_weights=True</span></code>.</p>
+</dd>
+<dt><strong>“IDequantizeLayer rejects nonzero zero_point” / INT4 compile fails</strong></dt><dd><p>TorchAO’s default INT4 config is asymmetric. Use
+<code class="docutils literal notranslate"><span class="pre">quantize_linear_int4_symmetric</span></code> (or <code class="docutils literal notranslate"><span class="pre">convert_hub_int4_to_symmetric_trt</span></code>
+for Hub checkpoints) as in <span class="xref std std-ref">quantize_linear_int4_woq</span>.</p>
+</dd>
+<dt><strong>TorchAO NVFP4 weights folded to BF16, or engine has no FP4E2M1 constant</strong></dt><dd><p>The graph must keep <code class="docutils literal notranslate"><span class="pre">torchao_trt.dequantize_nvfp4</span></code>. Promote weights with
+<code class="docutils literal notranslate"><span class="pre">pre_process_model_for_export</span></code> as in <span class="xref std std-ref">quantize_linear_nvfp4_woq</span>.
+Last two Linear dims must be divisible by 16. This path is weight-only DQ
++ BF16 GEMM, not ModelOpt <code class="docutils literal notranslate"><span class="pre">dynamic_block_quantize_op</span></code>.</p>
+</dd>
+<dt><strong>TorchAO MXFP4 weights folded to BF16, or engine has no FP4E2M1 constant</strong></dt><dd><p>The graph must keep <code class="docutils literal notranslate"><span class="pre">torchao_trt.dequantize_mxfp4</span></code>. Promote weights with
+<code class="docutils literal notranslate"><span class="pre">pre_process_model_for_export</span></code> as in <span class="xref std std-ref">quantize_linear_mxfp4</span>.
+Last two Linear dims must be divisible by 32. Pass E8M0 scales (not
+float32) at block size 32. This is a weight DQ prologue, not native
+MXFP4xMXFP4 MMA.</p>
 </dd>
 </dl>
 </section>
@@ -786,6 +1022,11 @@ TRT 10.8 and newer.</p>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#fp4-nvfp4-workflow">FP4 (NVFP4) Workflow</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#using-exportedprogram-dynamo-compile">Using <code class="docutils literal notranslate"><span class="pre">ExportedProgram</span></code> (<code class="docutils literal notranslate"><span class="pre">dynamo.compile</span></code>)</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#torch-compile-path"><code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> Path</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#torchao-fp8-weight-only-quantization">TorchAO FP8 Weight-Only Quantization</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#torchao-int4-weight-only-quantization">TorchAO INT4 Weight-Only Quantization</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#torchao-nvfp4-weight-only-quantization">TorchAO NVFP4 Weight-Only Quantization</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#torchao-mxfp4-dynamic-activation-mx-weight">TorchAO MXFP4 (Dynamic Activation + MX Weight)</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#torchao-static-fp8-quantization">TorchAO Static FP8 Quantization</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#how-qdq-nodes-are-converted">How QDQ Nodes Are Converted</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#verifying-quantized-layers">Verifying Quantized Layers</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#supported-precision-hardware-matrix">Supported Precision / Hardware Matrix</a></li>

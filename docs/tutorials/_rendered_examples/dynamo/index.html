@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=d97752b8"></script>
+    <script src="../../../_static/documentation_options.js?v=542eb810"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -496,6 +496,16 @@ document.write(`
 <li><p><span class="xref std std-ref">_torch_export_llama2</span>: Compiling a Llama2 model using AOT workflow (<cite>ir=dynamo</cite>)</p></li>
 <li><p><span class="xref std std-ref">_torch_export_sam2</span>: Compiling SAM2 model using AOT workflow (<cite>ir=dynamo</cite>)</p></li>
 <li><p><span class="xref std std-ref">_torch_export_flux_dev</span>: Compiling FLUX.1-dev model using AOT workflow (<cite>ir=dynamo</cite>)</p></li>
+<li><p><span class="xref std std-ref">quantize_linear_fp8_woq</span>: TorchAO FP8 weight-only quantization of a Linear layer (<code class="docutils literal notranslate"><span class="pre">examples/dynamo/torchao</span></code>)</p></li>
+<li><p><span class="xref std std-ref">quantize_linear_fp8_static</span>: TorchAO static FP8 (act + weight) quantization of a Linear layer (<code class="docutils literal notranslate"><span class="pre">examples/dynamo/torchao</span></code>)</p></li>
+<li><p><span class="xref std std-ref">torch_export_flux_fp8_woq</span>: Compiling FLUX.1-dev with TorchAO FP8 weight-only quantization (<code class="docutils literal notranslate"><span class="pre">examples/dynamo/torchao</span></code>)</p></li>
+<li><p><span class="xref std std-ref">quantize_linear_int4_woq</span>: TorchAO INT4 weight-only quantization of a Linear layer (<code class="docutils literal notranslate"><span class="pre">examples/dynamo/torchao</span></code>)</p></li>
+<li><p><span class="xref std std-ref">torch_export_flux_int4_woq</span>: Compiling FLUX.1-dev with TorchAO INT4 weight-only quantization (<code class="docutils literal notranslate"><span class="pre">examples/dynamo/torchao</span></code>)</p></li>
+<li><p><span class="xref std std-ref">torch_export_qwen3_int4_woq</span>: Compiling Qwen3-8B with TorchAO INT4 weight-only quantization (<code class="docutils literal notranslate"><span class="pre">examples/dynamo/torchao</span></code>)</p></li>
+<li><p><span class="xref std std-ref">quantize_linear_nvfp4_woq</span>: TorchAO NVFP4 weight-only quantization of a Linear layer (<code class="docutils literal notranslate"><span class="pre">examples/dynamo/torchao</span></code>)</p></li>
+<li><p><span class="xref std std-ref">torch_export_flux_nvfp4_woq</span>: Compiling FLUX.1-dev with TorchAO NVFP4 weight-only quantization (<code class="docutils literal notranslate"><span class="pre">examples/dynamo/torchao</span></code>)</p></li>
+<li><p><span class="xref std std-ref">quantize_linear_mxfp4</span>: TorchAO MXFP4 (dyn-act + MX weight) quantization of a Linear layer (<code class="docutils literal notranslate"><span class="pre">examples/dynamo/torchao</span></code>)</p></li>
+<li><p><span class="xref std std-ref">torch_export_flux_mxfp4</span>: Compiling FLUX.1-dev with TorchAO MXFP4 (<code class="docutils literal notranslate"><span class="pre">examples/dynamo/torchao</span></code>)</p></li>
 <li><p><span class="xref std std-ref">debugger_example</span>: Debugging Torch-TensorRT Compilation</p></li>
 <li><p><span class="xref std std-ref">torch_export_3d_rope</span>: Compiling a 3D RoPE video-transformer block with complex numerics support</p></li>
 <li><p><span class="xref std std-ref">engine_converter_binding_names</span>: Naming input / output bindings when emitting a raw serialized TRT engine</p></li>
@@ -625,6 +635,74 @@ document.write(`
   <div class="sphx-glr-thumbnail-title">Custom Kernels via torch_tensorrt.kernels.cuda_kernel_op</div>
 </div></div><div class="toctree-wrapper compound">
 </div>
+<p>“””
+TorchAO quantization
+====================</p>
+<p>Compile models quantized with <a class="reference external" href="https://github.com/pytorch/ao">TorchAO</a> using
+the Torch-TensorRT Dynamo backend.</p>
+<p>Weight-only FP8 keeps activations in BF16/FP16. Export emits
+<code class="docutils literal notranslate"><span class="pre">dequantize_affine</span></code>, which Torch-TensorRT maps to TensorRT
+<code class="docutils literal notranslate"><span class="pre">IDequantizeLayer</span></code> so the engine can keep an FP8 weight constant.</p>
+<p>Static FP8 also quantizes activations. Calibrate observers, then export
+<code class="docutils literal notranslate"><span class="pre">quantize_affine_float8_non_decomposed</span></code> / <code class="docutils literal notranslate"><span class="pre">dequantize_affine_float8_non_decomposed</span></code>
+so TensorRT can fuse Q/DQ into FP8 GEMMs.</p>
+<p>Weight-only INT4 is the same DQ pattern with packed 4-bit integer weights.
+Use <strong>symmetric</strong> group-wise INT4 (zero zero-point) and compile with
+<code class="docutils literal notranslate"><span class="pre">immutable_weights=True</span></code> so engine constants stay <code class="docutils literal notranslate"><span class="pre">Datatype:</span> <span class="pre">Int4</span></code>.</p>
+<p>Weight-only NVFP4 stores packed FP4 E2M1 weights with FP8 block scales.
+Export emits <code class="docutils literal notranslate"><span class="pre">dequantize_nvfp4</span></code>, which Torch-TensorRT maps to two-level
+<code class="docutils literal notranslate"><span class="pre">IDequantizeLayer</span></code> so the engine can keep <code class="docutils literal notranslate"><span class="pre">Datatype:</span> <span class="pre">FP4E2M1</span></code>. This is
+storage + DQ, not native FP4 MMA.</p>
+<p>MXFP4 uses TorchAO <code class="docutils literal notranslate"><span class="pre">MXDynamicActivationMXWeightConfig</span></code> (there is no MXFP4
+weight-only config). Export emits <code class="docutils literal notranslate"><span class="pre">dequantize_mxfp4</span></code>, which Torch-TensorRT
+maps to FP4 + E8M0 <code class="docutils literal notranslate"><span class="pre">IDequantizeLayer</span></code> (block size 32). Activations stay
+BF16 in this path.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>../requirements.txt
+python<span class="w"> </span>quantize_linear_fp8_woq.py
+python<span class="w"> </span>quantize_linear_fp8_static.py
+python<span class="w"> </span>torch_export_flux_fp8_woq.py
+python<span class="w"> </span>quantize_linear_int4_woq.py
+python<span class="w"> </span>torch_export_flux_int4_woq.py
+python<span class="w"> </span>torch_export_qwen3_int4_woq.py
+python<span class="w"> </span>quantize_linear_nvfp4_woq.py
+python<span class="w"> </span>torch_export_flux_nvfp4_woq.py
+python<span class="w"> </span>quantize_linear_mxfp4.py
+python<span class="w"> </span>torch_export_flux_mxfp4.py
+</pre></div>
+</div>
+<p>“””</p>
+<div class="sphx-glr-thumbnails"><div class="sphx-glr-thumbcontainer" tooltip="This example quantizes a toy nn.Linear to NVFP4 with TorchAO (packed FP4 E2M1 weights, FP8 E4M3..."><img alt="" src="../../../_images/sphx_glr_quantize_linear_nvfp4_woq_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_torchao_quantize_linear_nvfp4_woq.py</span></p>
+  <div class="sphx-glr-thumbnail-title">TorchAO NVFP4 Weight-Only Quantization (Linear)</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This example quantizes a toy nn.Linear with TorchAO MXDynamicActivationMXWeightConfig-shaped MX..."><img alt="" src="../../../_images/sphx_glr_quantize_linear_mxfp4_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_torchao_quantize_linear_mxfp4.py</span></p>
+  <div class="sphx-glr-thumbnail-title">TorchAO MXFP4 Dynamic Activation + MX Weight (Linear)</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This example quantizes a toy nn.Linear with TorchAO Float8WeightOnlyConfig, keeps an explicit d..."><img alt="" src="../../../_images/sphx_glr_quantize_linear_fp8_woq_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_torchao_quantize_linear_fp8_woq.py</span></p>
+  <div class="sphx-glr-thumbnail-title">TorchAO FP8 Weight-Only Quantization (Linear)</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This example quantizes a toy nn.Linear to symmetric group-wise INT4 with TorchAO, keeps an expl..."><img alt="" src="../../../_images/sphx_glr_quantize_linear_int4_woq_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_torchao_quantize_linear_int4_woq.py</span></p>
+  <div class="sphx-glr-thumbnail-title">TorchAO INT4 Weight-Only Quantization (Linear)</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This example calibrates a two-layer Linear model with TorchAO observers, then rewrites those la..."><img alt="" src="../../../_images/sphx_glr_quantize_linear_fp8_static_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_torchao_quantize_linear_fp8_static.py</span></p>
+  <div class="sphx-glr-thumbnail-title">TorchAO Static FP8 Quantization (Linear)</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This example quantizes the transformer of FLUX.1-dev with TorchAO Float8WeightOnlyConfig, then ..."><img alt="" src="../../../_images/sphx_glr_torch_export_flux_fp8_woq_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_torchao_torch_export_flux_fp8_woq.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Compiling FLUX.1-dev with TorchAO FP8 weight-only quantization</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This example quantizes the transformer of FLUX.1-dev with TorchAO MXFP4 (packed FP4 E2M1 + E8M0..."><img alt="" src="../../../_images/sphx_glr_torch_export_flux_mxfp4_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_torchao_torch_export_flux_mxfp4.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Compiling FLUX.1-dev with TorchAO MXFP4</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This example quantizes the transformer of FLUX.1-dev to NVFP4 with TorchAO (packed FP4 E2M1 + F..."><img alt="" src="../../../_images/sphx_glr_torch_export_flux_nvfp4_woq_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_torchao_torch_export_flux_nvfp4_woq.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Compiling FLUX.1-dev with TorchAO NVFP4 weight-only quantization</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This example quantizes the transformer of FLUX.1-dev to symmetric group-wise INT4 with TorchAO,..."><img alt="" src="../../../_images/sphx_glr_torch_export_flux_int4_woq_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_torchao_torch_export_flux_int4_woq.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Compiling FLUX.1-dev with TorchAO INT4 weight-only quantization</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This example loads pytorch/Qwen3-8B-INT4, converts Hub HQQ / tile-packed INT4 into TensorRT-com..."><img alt="" src="../../../_images/sphx_glr_torch_export_qwen3_int4_woq_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_torchao_torch_export_qwen3_int4_woq.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Compiling Qwen3-8B with TorchAO INT4 weight-only quantization</div>
+</div></div><div class="toctree-wrapper compound">
+</div>
 <div class="sphx-glr-footer sphx-glr-footer-gallery docutils container">
 <div class="sphx-glr-download sphx-glr-download-python docutils container">
 <p><a class="reference download internal" download="" href="../../../_downloads/da8003dffd2ae6ec9bedf975c4e4d10a/dynamo_python.zip"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">all</span> <span class="pre">examples</span> <span class="pre">in</span> <span class="pre">Python</span> <span class="pre">source</span> <span class="pre">code:</span> <span class="pre">dynamo_python.zip</span></code></a></p>
@@ -666,7 +744,9 @@ document.write(`
   <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#dependencies">Dependencies</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#model-zoo">Model Zoo</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#model-zoo">Model Zoo</a><ul class="visible nav section-nav flex-column">
+</ul>
+</li>
 </ul>
   </nav></div>
 

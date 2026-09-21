@@ -27,6 +27,16 @@ Model Zoo
 * :ref:`_torch_export_llama2`: Compiling a Llama2 model using AOT workflow (`ir=dynamo`)
 * :ref:`_torch_export_sam2`: Compiling SAM2 model using AOT workflow (`ir=dynamo`)
 * :ref:`_torch_export_flux_dev`: Compiling FLUX.1-dev model using AOT workflow (`ir=dynamo`)
+* :ref:`quantize_linear_fp8_woq`: TorchAO FP8 weight-only quantization of a Linear layer (``examples/dynamo/torchao``)
+* :ref:`quantize_linear_fp8_static`: TorchAO static FP8 (act + weight) quantization of a Linear layer (``examples/dynamo/torchao``)
+* :ref:`torch_export_flux_fp8_woq`: Compiling FLUX.1-dev with TorchAO FP8 weight-only quantization (``examples/dynamo/torchao``)
+* :ref:`quantize_linear_int4_woq`: TorchAO INT4 weight-only quantization of a Linear layer (``examples/dynamo/torchao``)
+* :ref:`torch_export_flux_int4_woq`: Compiling FLUX.1-dev with TorchAO INT4 weight-only quantization (``examples/dynamo/torchao``)
+* :ref:`torch_export_qwen3_int4_woq`: Compiling Qwen3-8B with TorchAO INT4 weight-only quantization (``examples/dynamo/torchao``)
+* :ref:`quantize_linear_nvfp4_woq`: TorchAO NVFP4 weight-only quantization of a Linear layer (``examples/dynamo/torchao``)
+* :ref:`torch_export_flux_nvfp4_woq`: Compiling FLUX.1-dev with TorchAO NVFP4 weight-only quantization (``examples/dynamo/torchao``)
+* :ref:`quantize_linear_mxfp4`: TorchAO MXFP4 (dyn-act + MX weight) quantization of a Linear layer (``examples/dynamo/torchao``)
+* :ref:`torch_export_flux_mxfp4`: Compiling FLUX.1-dev with TorchAO MXFP4 (``examples/dynamo/torchao``)
 * :ref:`debugger_example`: Debugging Torch-TensorRT Compilation
 * :ref:`torch_export_3d_rope`: Compiling a 3D RoPE video-transformer block with complex numerics support
 * :ref:`engine_converter_binding_names`: Naming input / output bindings when emitting a raw serialized TRT engine
@@ -783,6 +793,239 @@ Model Zoo
    /tutorials/_rendered_examples/dynamo/torch_export_3d_rope
    /tutorials/_rendered_examples/dynamo/custom_kernel_plugins
    /tutorials/_rendered_examples/dynamo/cuda_kernel_op
+
+"""
+TorchAO quantization
+====================
+
+Compile models quantized with `TorchAO <https://github.com/pytorch/ao>`_ using
+the Torch-TensorRT Dynamo backend.
+
+Weight-only FP8 keeps activations in BF16/FP16. Export emits
+``dequantize_affine``, which Torch-TensorRT maps to TensorRT
+``IDequantizeLayer`` so the engine can keep an FP8 weight constant.
+
+Static FP8 also quantizes activations. Calibrate observers, then export
+``quantize_affine_float8_non_decomposed`` / ``dequantize_affine_float8_non_decomposed``
+so TensorRT can fuse Q/DQ into FP8 GEMMs.
+
+Weight-only INT4 is the same DQ pattern with packed 4-bit integer weights.
+Use **symmetric** group-wise INT4 (zero zero-point) and compile with
+``immutable_weights=True`` so engine constants stay ``Datatype: Int4``.
+
+Weight-only NVFP4 stores packed FP4 E2M1 weights with FP8 block scales.
+Export emits ``dequantize_nvfp4``, which Torch-TensorRT maps to two-level
+``IDequantizeLayer`` so the engine can keep ``Datatype: FP4E2M1``. This is
+storage + DQ, not native FP4 MMA.
+
+MXFP4 uses TorchAO ``MXDynamicActivationMXWeightConfig`` (there is no MXFP4
+weight-only config). Export emits ``dequantize_mxfp4``, which Torch-TensorRT
+maps to FP4 + E8M0 ``IDequantizeLayer`` (block size 32). Activations stay
+BF16 in this path.
+
+.. code-block:: bash
+
+    pip install -r ../requirements.txt
+    python quantize_linear_fp8_woq.py
+    python quantize_linear_fp8_static.py
+    python torch_export_flux_fp8_woq.py
+    python quantize_linear_int4_woq.py
+    python torch_export_flux_int4_woq.py
+    python torch_export_qwen3_int4_woq.py
+    python quantize_linear_nvfp4_woq.py
+    python torch_export_flux_nvfp4_woq.py
+    python quantize_linear_mxfp4.py
+    python torch_export_flux_mxfp4.py
+"""
+
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbnails">
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This example quantizes a toy nn.Linear to NVFP4 with TorchAO (packed FP4 E2M1 weights, FP8 E4M3...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/torchao/images/thumb/sphx_glr_quantize_linear_nvfp4_woq_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torchao_quantize_linear_nvfp4_woq.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">TorchAO NVFP4 Weight-Only Quantization (Linear)</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This example quantizes a toy nn.Linear with TorchAO MXDynamicActivationMXWeightConfig-shaped MX...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/torchao/images/thumb/sphx_glr_quantize_linear_mxfp4_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torchao_quantize_linear_mxfp4.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">TorchAO MXFP4 Dynamic Activation + MX Weight (Linear)</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This example quantizes a toy nn.Linear with TorchAO Float8WeightOnlyConfig, keeps an explicit d...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/torchao/images/thumb/sphx_glr_quantize_linear_fp8_woq_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torchao_quantize_linear_fp8_woq.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">TorchAO FP8 Weight-Only Quantization (Linear)</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This example quantizes a toy nn.Linear to symmetric group-wise INT4 with TorchAO, keeps an expl...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/torchao/images/thumb/sphx_glr_quantize_linear_int4_woq_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torchao_quantize_linear_int4_woq.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">TorchAO INT4 Weight-Only Quantization (Linear)</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This example calibrates a two-layer Linear model with TorchAO observers, then rewrites those la...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/torchao/images/thumb/sphx_glr_quantize_linear_fp8_static_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torchao_quantize_linear_fp8_static.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">TorchAO Static FP8 Quantization (Linear)</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This example quantizes the transformer of FLUX.1-dev with TorchAO Float8WeightOnlyConfig, then ...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/torchao/images/thumb/sphx_glr_torch_export_flux_fp8_woq_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torchao_torch_export_flux_fp8_woq.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Compiling FLUX.1-dev with TorchAO FP8 weight-only quantization</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This example quantizes the transformer of FLUX.1-dev with TorchAO MXFP4 (packed FP4 E2M1 + E8M0...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/torchao/images/thumb/sphx_glr_torch_export_flux_mxfp4_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torchao_torch_export_flux_mxfp4.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Compiling FLUX.1-dev with TorchAO MXFP4</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This example quantizes the transformer of FLUX.1-dev to NVFP4 with TorchAO (packed FP4 E2M1 + F...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/torchao/images/thumb/sphx_glr_torch_export_flux_nvfp4_woq_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torchao_torch_export_flux_nvfp4_woq.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Compiling FLUX.1-dev with TorchAO NVFP4 weight-only quantization</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This example quantizes the transformer of FLUX.1-dev to symmetric group-wise INT4 with TorchAO,...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/torchao/images/thumb/sphx_glr_torch_export_flux_int4_woq_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torchao_torch_export_flux_int4_woq.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Compiling FLUX.1-dev with TorchAO INT4 weight-only quantization</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This example loads pytorch/Qwen3-8B-INT4, converts Hub HQQ / tile-packed INT4 into TensorRT-com...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/torchao/images/thumb/sphx_glr_torch_export_qwen3_int4_woq_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torchao_torch_export_qwen3_int4_woq.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Compiling Qwen3-8B with TorchAO INT4 weight-only quantization</div>
+    </div>
+
+
+.. raw:: html
+
+    </div>
+
+
+.. toctree::
+   :hidden:
+   :includehidden:
+
+
+   /tutorials/_rendered_examples/dynamo/torchao/index.rst
 
 
 .. only:: html

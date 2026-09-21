@@ -1,0 +1,650 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>&lt;no title&gt; &#8212; Torch-TensorRT</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../../../../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=72e443bf" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/sg_gallery.css?v=61a4c737" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/sg_gallery-dataframe.css?v=e5fbc548" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/collapsible-lists/css/tree_view.css?v=a885cde7" />
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/katex@0.10.0-beta/dist/katex.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/css/custom.css?v=0cb2b9ef" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../../../../_static/documentation_options.js?v=542eb810"></script>
+    <script src="../../../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
+    <script src="../../../../_static/collapsible-lists/js/apply-collapsible-lists.js?v=660e4f45"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'tutorials/_rendered_examples/dynamo/torchao/index';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://raw.githubusercontent.com/pytorch/TensorRT/refs/heads/main/docs/versions.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = 'main';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner = false;
+        </script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Torch-TensorRT</p>
+  
+</a></div>
+    
+      <div class="navbar-item">
+<script>
+document.write(`
+  <div class="version-switcher__container dropdown">
+    <button id="pst-version-switcher-button-2"
+      type="button"
+      class="version-switcher__button btn btn-sm dropdown-toggle"
+      data-bs-toggle="dropdown"
+      aria-haspopup="listbox"
+      aria-controls="pst-version-switcher-list-2"
+      aria-label="Version switcher list"
+    >
+      Choose version  <!-- this text may get changed later by javascript -->
+      <span class="caret"></span>
+    </button>
+    <div id="pst-version-switcher-list-2"
+      class="version-switcher__menu dropdown-menu list-group-flush py-0"
+      role="listbox" aria-labelledby="pst-version-switcher-button-2">
+      <!-- dropdown will be populated by javascript on page load -->
+    </div>
+  </div>
+`);
+</script></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="quantize_linear_nvfp4_woq.html">TorchAO NVFP4 Weight-Only Quantization (Linear)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantize_linear_mxfp4.html">TorchAO MXFP4 Dynamic Activation + MX Weight (Linear)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantize_linear_fp8_woq.html">TorchAO FP8 Weight-Only Quantization (Linear)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantize_linear_int4_woq.html">TorchAO INT4 Weight-Only Quantization (Linear)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quantize_linear_fp8_static.html">TorchAO Static FP8 Quantization (Linear)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_export_flux_fp8_woq.html">Compiling FLUX.1-dev with TorchAO FP8 weight-only quantization</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_export_flux_mxfp4.html">Compiling FLUX.1-dev with TorchAO MXFP4</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_export_flux_nvfp4_woq.html">Compiling FLUX.1-dev with TorchAO NVFP4 weight-only quantization</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_export_flux_int4_woq.html">Compiling FLUX.1-dev with TorchAO INT4 weight-only quantization</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_export_qwen3_int4_woq.html">Compiling Qwen3-8B with TorchAO INT4 weight-only quantization</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    <li class="breadcrumb-item active" aria-current="page">&lt;no title&gt;</li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <p id="sphx-glr-tutorials-rendered-examples-dynamo-torchao">“””
+TorchAO quantization
+====================</p>
+<p>Compile models quantized with <a class="reference external" href="https://github.com/pytorch/ao">TorchAO</a> using
+the Torch-TensorRT Dynamo backend.</p>
+<p>Weight-only FP8 keeps activations in BF16/FP16. Export emits
+<code class="docutils literal notranslate"><span class="pre">dequantize_affine</span></code>, which Torch-TensorRT maps to TensorRT
+<code class="docutils literal notranslate"><span class="pre">IDequantizeLayer</span></code> so the engine can keep an FP8 weight constant.</p>
+<p>Static FP8 also quantizes activations. Calibrate observers, then export
+<code class="docutils literal notranslate"><span class="pre">quantize_affine_float8_non_decomposed</span></code> / <code class="docutils literal notranslate"><span class="pre">dequantize_affine_float8_non_decomposed</span></code>
+so TensorRT can fuse Q/DQ into FP8 GEMMs.</p>
+<p>Weight-only INT4 is the same DQ pattern with packed 4-bit integer weights.
+Use <strong>symmetric</strong> group-wise INT4 (zero zero-point) and compile with
+<code class="docutils literal notranslate"><span class="pre">immutable_weights=True</span></code> so engine constants stay <code class="docutils literal notranslate"><span class="pre">Datatype:</span> <span class="pre">Int4</span></code>.</p>
+<p>Weight-only NVFP4 stores packed FP4 E2M1 weights with FP8 block scales.
+Export emits <code class="docutils literal notranslate"><span class="pre">dequantize_nvfp4</span></code>, which Torch-TensorRT maps to two-level
+<code class="docutils literal notranslate"><span class="pre">IDequantizeLayer</span></code> so the engine can keep <code class="docutils literal notranslate"><span class="pre">Datatype:</span> <span class="pre">FP4E2M1</span></code>. This is
+storage + DQ, not native FP4 MMA.</p>
+<p>MXFP4 uses TorchAO <code class="docutils literal notranslate"><span class="pre">MXDynamicActivationMXWeightConfig</span></code> (there is no MXFP4
+weight-only config). Export emits <code class="docutils literal notranslate"><span class="pre">dequantize_mxfp4</span></code>, which Torch-TensorRT
+maps to FP4 + E8M0 <code class="docutils literal notranslate"><span class="pre">IDequantizeLayer</span></code> (block size 32). Activations stay
+BF16 in this path.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>../requirements.txt
+python<span class="w"> </span>quantize_linear_fp8_woq.py
+python<span class="w"> </span>quantize_linear_fp8_static.py
+python<span class="w"> </span>torch_export_flux_fp8_woq.py
+python<span class="w"> </span>quantize_linear_int4_woq.py
+python<span class="w"> </span>torch_export_flux_int4_woq.py
+python<span class="w"> </span>torch_export_qwen3_int4_woq.py
+python<span class="w"> </span>quantize_linear_nvfp4_woq.py
+python<span class="w"> </span>torch_export_flux_nvfp4_woq.py
+python<span class="w"> </span>quantize_linear_mxfp4.py
+python<span class="w"> </span>torch_export_flux_mxfp4.py
+</pre></div>
+</div>
+<p>“””</p>
+<div class="sphx-glr-thumbnails"><div class="sphx-glr-thumbcontainer" tooltip="This example quantizes a toy nn.Linear to NVFP4 with TorchAO (packed FP4 E2M1 weights, FP8 E4M3..."><img alt="" src="../../../../_images/sphx_glr_quantize_linear_nvfp4_woq_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_torchao_quantize_linear_nvfp4_woq.py</span></p>
+  <div class="sphx-glr-thumbnail-title">TorchAO NVFP4 Weight-Only Quantization (Linear)</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This example quantizes a toy nn.Linear with TorchAO MXDynamicActivationMXWeightConfig-shaped MX..."><img alt="" src="../../../../_images/sphx_glr_quantize_linear_mxfp4_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_torchao_quantize_linear_mxfp4.py</span></p>
+  <div class="sphx-glr-thumbnail-title">TorchAO MXFP4 Dynamic Activation + MX Weight (Linear)</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This example quantizes a toy nn.Linear with TorchAO Float8WeightOnlyConfig, keeps an explicit d..."><img alt="" src="../../../../_images/sphx_glr_quantize_linear_fp8_woq_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_torchao_quantize_linear_fp8_woq.py</span></p>
+  <div class="sphx-glr-thumbnail-title">TorchAO FP8 Weight-Only Quantization (Linear)</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This example quantizes a toy nn.Linear to symmetric group-wise INT4 with TorchAO, keeps an expl..."><img alt="" src="../../../../_images/sphx_glr_quantize_linear_int4_woq_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_torchao_quantize_linear_int4_woq.py</span></p>
+  <div class="sphx-glr-thumbnail-title">TorchAO INT4 Weight-Only Quantization (Linear)</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This example calibrates a two-layer Linear model with TorchAO observers, then rewrites those la..."><img alt="" src="../../../../_images/sphx_glr_quantize_linear_fp8_static_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_torchao_quantize_linear_fp8_static.py</span></p>
+  <div class="sphx-glr-thumbnail-title">TorchAO Static FP8 Quantization (Linear)</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This example quantizes the transformer of FLUX.1-dev with TorchAO Float8WeightOnlyConfig, then ..."><img alt="" src="../../../../_images/sphx_glr_torch_export_flux_fp8_woq_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_torchao_torch_export_flux_fp8_woq.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Compiling FLUX.1-dev with TorchAO FP8 weight-only quantization</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This example quantizes the transformer of FLUX.1-dev with TorchAO MXFP4 (packed FP4 E2M1 + E8M0..."><img alt="" src="../../../../_images/sphx_glr_torch_export_flux_mxfp4_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_torchao_torch_export_flux_mxfp4.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Compiling FLUX.1-dev with TorchAO MXFP4</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This example quantizes the transformer of FLUX.1-dev to NVFP4 with TorchAO (packed FP4 E2M1 + F..."><img alt="" src="../../../../_images/sphx_glr_torch_export_flux_nvfp4_woq_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_torchao_torch_export_flux_nvfp4_woq.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Compiling FLUX.1-dev with TorchAO NVFP4 weight-only quantization</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This example quantizes the transformer of FLUX.1-dev to symmetric group-wise INT4 with TorchAO,..."><img alt="" src="../../../../_images/sphx_glr_torch_export_flux_int4_woq_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_torchao_torch_export_flux_int4_woq.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Compiling FLUX.1-dev with TorchAO INT4 weight-only quantization</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This example loads pytorch/Qwen3-8B-INT4, converts Hub HQQ / tile-packed INT4 into TensorRT-com..."><img alt="" src="../../../../_images/sphx_glr_torch_export_qwen3_int4_woq_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_torchao_torch_export_qwen3_int4_woq.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Compiling Qwen3-8B with TorchAO INT4 weight-only quantization</div>
+</div></div><div class="toctree-wrapper compound">
+</div>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+
+  
+  <div class="tocsection editthispage">
+    <a href="https://github.com/pytorch/TensorRT/edit/main/docsrc/tutorials/_rendered_examples/dynamo/torchao/index.rst">
+      <i class="fa-solid fa-pencil"></i>
+      
+      
+        
+          Edit on GitHub
+        
+      
+    </a>
+  </div>
+</div>
+
+  <div class="sidebar-secondary-item">
+
+  <div class="tocsection sourcelink">
+    <a href="../../../../_sources/tutorials/_rendered_examples/dynamo/torchao/index.rst.txt">
+      <i class="fa-solid fa-file-lines"></i> Show Source
+    </a>
+  </div>
+</div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2024, NVIDIA Corporation.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>

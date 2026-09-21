@@ -1,0 +1,86 @@
+{
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "\n\n# TorchAO FP8 Weight-Only Quantization (Linear)\n\nThis example quantizes a toy ``nn.Linear`` with TorchAO\n``Float8WeightOnlyConfig``, keeps an explicit ``dequantize_affine`` in the\nexported graph, and compiles with the Torch-TensorRT Dynamo backend.\n\nThe intended engine keeps an FP8 weight constant plus a DQ prologue into GEMM.\nOn Blackwell, Myelin can fuse that prologue into the matmul. On other GPUs the\nDQ + GEMM may run as two kernels \u2014 that is still correct as long as the FP8\nweight is **not** constant-folded into a dense FP16/BF16 weight.\n\nRequirements:\n\n* NVIDIA GPU with FP8 support (Hopper or newer). Blackwell for DQ fusion.\n* ``torchao``\n* ``torch-tensorrt`` with the ``torchao.dequantize_affine`` converter\n"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Imports\nThis example lives in ``examples/dynamo/torchao/``. Move that directory off\nthe front of ``sys.path`` so ``import torchao`` resolves the PyPI package\ninstead of this folder.\n\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "import sys\nfrom pathlib import Path\n\n_EXAMPLE_DIR = str(Path(__file__).resolve().parent)\nif sys.path and Path(sys.path[0]).resolve() == Path(_EXAMPLE_DIR):\n    sys.path.pop(0)\n\nimport torch\nimport torch_tensorrt as torchtrt\nfrom torchao.quantization import Float8WeightOnlyConfig, quantize_\n\nsys.path.insert(0, _EXAMPLE_DIR)\nfrom utils import exclude_dq_from_constant_folding, pre_process_model_for_export"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Define a linear model and quantize weights to FP8\n\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "class LinearModel(torch.nn.Module):\n    def __init__(self) -> None:\n        super().__init__()\n        self.linear = torch.nn.Linear(3072, 4096)\n\n    def forward(self, x: torch.Tensor) -> torch.Tensor:\n        return self.linear(x)\n\n\nmodel = LinearModel().eval().to(dtype=torch.bfloat16, device=\"cuda\")\nexample_input = torch.randn(32, 3072, dtype=torch.bfloat16, device=\"cuda\")\n\nquantize_(model, Float8WeightOnlyConfig())\nprocessed_model = pre_process_model_for_export(model)"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Export and compile\nWrap export in ``exclude_dq_from_constant_folding`` so inductor does not fold\n``dequantize_affine`` before Torch-TensorRT lowering. Torch-TensorRT also\nmarks that op impure in its own constant-folding pass.\n\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "with exclude_dq_from_constant_folding():\n    exp_program = torch.export.export(processed_model, (example_input,), strict=True)\n\ntrt_model = torchtrt.dynamo.compile(\n    exp_program,\n    inputs=[example_input],\n    min_block_size=1,\n    require_full_compilation=True,\n)\n\noutput = trt_model(example_input)\nprint(output)"
+      ]
+    }
+  ],
+  "metadata": {
+    "kernelspec": {
+      "display_name": "Python 3",
+      "language": "python",
+      "name": "python3"
+    },
+    "language_info": {
+      "codemirror_mode": {
+        "name": "ipython",
+        "version": 3
+      },
+      "file_extension": ".py",
+      "mimetype": "text/x-python",
+      "name": "python",
+      "nbconvert_exporter": "python",
+      "pygments_lexer": "ipython3",
+      "version": "3.11.16"
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 0
+}
