@@ -355,3 +355,38 @@ def test_trt_only_writes_no_ptd(tmp_path):
     assert not list(
         tmp_path.glob("*.ptd")
     ), "TRT-only program must not write an external .ptd"
+
+
+@pytest.mark.parametrize(
+    "requested,accepted",
+    [
+        (b"cuda", True),
+        (b"cuda:0", True),
+        (b"cuda:3", True),
+        # The three shapes the guard's comment names as past bugs: the framework's own spelling,
+        # which this used to refuse, and two that passed a check on the part before the colon and
+        # failed later as something else.
+        (b"CUDA", True),
+        (b" cuda ", True),
+        (b"cuda:", False),
+        (b"cuda:abc", False),
+        (b"cpu", False),
+        (b"mps", False),
+    ],
+)
+def test_the_partitioner_refuses_a_device_it_cannot_run_on(requested, accepted):
+    """A processor target was taken verbatim and produced a program that died at instruction 0.
+
+    This delegate compiles to TensorRT engines, so a target that is not a CUDA device cannot work.
+    Accepting it moved the failure to run time, where the message said nothing about the request that
+    caused it.
+    """
+    from executorch.exir.backend.compile_spec_schema import CompileSpec
+    from torch_tensorrt.executorch.partitioner import TensorRTPartitioner
+
+    specs = [CompileSpec("target_device", requested)]
+    if accepted:
+        TensorRTPartitioner(compile_specs=specs)
+    else:
+        with pytest.raises(ValueError, match="not a device this delegate runs on"):
+            TensorRTPartitioner(compile_specs=specs)

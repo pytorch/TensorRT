@@ -228,15 +228,13 @@ EXECUTORCH_REQUIREMENT = (
     f"<{_executorch_major}.{int(_executorch_minor) + 1}; "
     "platform_system == 'Linux'"
 )
-# TODO: Enable this once the runtime wheel is published to the PyTorch index.
-# EXECUTORCH_RUNTIME_REQUIREMENT = (
-#     f"torch-tensorrt-executorch-runtime=={__version__}; " "platform_system == 'Linux'"
-# )
+# No version: the delegate pins ExecuTorch itself, so a mismatch is refused from its side.
+EXECUTORCH_RUNTIME_REQUIREMENT = (
+    "torch-tensorrt-executorch-runtime; platform_system == 'Linux'"
+)
 EXTRAS_REQUIRE = {
-    #     "executorch": [EXECUTORCH_REQUIREMENT, EXECUTORCH_RUNTIME_REQUIREMENT],
-    #     "all": [EXECUTORCH_REQUIREMENT, EXECUTORCH_RUNTIME_REQUIREMENT],
-    "executorch": [EXECUTORCH_REQUIREMENT],
-    "all": [EXECUTORCH_REQUIREMENT],
+    "executorch": [EXECUTORCH_REQUIREMENT, EXECUTORCH_RUNTIME_REQUIREMENT],
+    "all": [EXECUTORCH_REQUIREMENT, EXECUTORCH_RUNTIME_REQUIREMENT],
 }
 
 if "--ci" in sys.argv:

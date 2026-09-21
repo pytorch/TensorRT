@@ -1,111 +1,353 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
+"""Register the Torch-TensorRT delegate with the installed ExecuTorch runtime.
 
-"""Activate the TensorRT delegate-enabled ExecuTorch Python runtime."""
+Importing this package is all it takes. ExecuTorch's own delegates register because they are
+linked into its pybindings extension, so loading that extension pulls them in and their static
+initializers run. A delegate shipped in a separate wheel cannot join that link, and ExecuTorch has
+no discovery hook for out-of-tree backends, so this package performs the equivalent step itself at
+import time.
+
+There is deliberately no runtime API here. Once the backend is registered, everything else belongs
+to ExecuTorch:
+
+    from pathlib import Path
+
+    import torch_tensorrt_executorch_runtime  # noqa: F401
+    from executorch.runtime import Runtime
+
+    program = Runtime.get().load_program(Path("model.pte"))
+    outputs = program.load_method("forward").execute((tensor,))
+
+Set ``TORCH_TENSORRT_SKIP_DELEGATE_REGISTRATION=1`` to import the module without loading the
+delegate. That is for tooling that wants the metadata only; a normal consumer never needs it.
+
+Registering is what this package is for, so failing to register is an import failure: importing it
+without a usable ExecuTorch and delegate raises ``DelegateCompatibilityError`` and says what to
+install, rather than handing back a module that registered nothing and letting the program fail
+much later with a backend it cannot find. That is also why the recipes that ask this package only
+for a path, in its readme and in its CMake package, set the variable above first.
+"""
 
 from __future__ import annotations
 
 import ctypes
-import importlib
-import importlib.util
 import os
-import sys
+import threading
+import warnings
 from types import ModuleType
-from typing import Any, Protocol, cast
+from typing import Any
 
 BACKEND_NAME = "TensorRTBackend"
-_NATIVE_NAME = "executorch.extension.pybindings._C"
-# The extension was called _portable_lib before ExecuTorch renamed it to _C, and portable_lib.py
-# imports whichever name its own version uses. Both are claimed so the interception works against
-# either: aliasing only the old name is silently ineffective at the pinned nightly, because nothing
-# imports it any more and the stock _C loads instead, leaving TensorRTBackend unregistered.
-_LEGACY_NATIVE_NAME = "executorch.extension.pybindings._portable_lib"
-_WRAPPER_NAME = "executorch.extension.pybindings.portable_lib"
-_DATA_LOADER_NAME = "executorch.extension.pybindings.data_loader"
+# The same name ExecuTorch gives its own delegates, and the exact filename the wheel ships.
+_DELEGATE_LIBRARY = "libexecutorch_backend_tensorrt.so"
 
-
-class _BackendRegistry(Protocol):
-    def is_available(self, name: str) -> bool: ...
-
-
-class _Runtime(Protocol):
-    backend_registry: _BackendRegistry
-
-    def load_program(self, data: bytes) -> Any: ...
+_delegate: ctypes.CDLL | None = None
+# Registration happens in the delegate's static initializer, so it takes effect inside dlopen,
+# before ctypes.CDLL returns and before _delegate is assigned. Every check below therefore has to
+# sit inside one critical section: a second thread that squeezed between the load and the
+# assignment would see the backend registered with _delegate still None, which is exactly what a
+# foreign delegate owning the name looks like.
+_registration_lock = threading.Lock()
 
 
 class DelegateCompatibilityError(ImportError):
-    """The runtime wheel is incompatible with the active native runtime."""
+    """The delegate could not be loaded against the installed ExecuTorch runtime."""
 
 
-def _probe_portable_lib_dependencies() -> None:
-    """Fail before importing data_loader if _portable_lib dependencies are missing."""
-    spec = importlib.util.find_spec(__name__ + "._portable_lib")
-    if spec is None or spec.origin is None:
-        raise ImportError("Could not find the prebuilt ExecuTorch portable runtime")
-    ctypes.CDLL(spec.origin, mode=os.RTLD_LAZY | os.RTLD_LOCAL)
+_EXTENSION_CUDA_LIBRARY = "libexecutorch_extension_cuda.so"
+
+
+def _extension_cuda_present() -> bool:
+    """Whether the installed ExecuTorch actually ships the CUDA extension.
+
+    Resolved from the imported package rather than a hardcoded path, so it follows the
+    distribution the loader would have used. ``__file__`` as well as ``__path__``, because a
+    namespace-style or synthesised module may carry only one of them, and treating "no location
+    at all" as "the file is missing" would send a user with a working CUDA wheel off to
+    reinstall it.
+    """
+    try:
+        import executorch
+    except ImportError:
+        return False
+    roots = list(getattr(executorch, "__path__", None) or ())
+    location = getattr(executorch, "__file__", None)
+    if location:
+        roots.append(os.path.dirname(os.path.abspath(location)))
+    return any(
+        os.path.isfile(os.path.join(root, "lib", _EXTENSION_CUDA_LIBRARY))
+        for root in roots
+    )
+
+
+def _delegate_path() -> str:
+    # Resolved next to this file rather than through the import system, so it does not depend on the
+    # package being on the path anywhere else. It still runs during this package's own import, and
+    # cannot run before it. A fixed filename now: the delegate is shipped as
+    # package data under its real name, not renamed by setuptools.
+    #
+    # ``lib/`` rather than the package root, matching where ExecuTorch keeps its own backends
+    # (``executorch/lib/libexecutorch_backend_cuda.so`` and friends). A C++ consumer finds this
+    # library through the CMake package in ``lib/cmake``, which searches the same directory, so
+    # the two consumers agree on one location.
+    directory = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib")
+    path = os.path.join(directory, _DELEGATE_LIBRARY)
+    if not os.path.isfile(path):
+        raise DelegateCompatibilityError(
+            f"The Torch-TensorRT ExecuTorch delegate library is missing from {directory}. "
+            "This package must be installed from a wheel; a source checkout contains no "
+            "built delegate."
+        )
+    return path
+
+
+def register() -> None:
+    """Load the delegate so ExecuTorch can execute TensorRT-delegated programs.
+
+    Called once when this package is imported, so a user never has to. It stays public and named
+    because the import side effect is the whole point of the package and a reader needs somewhere to
+    look, and because a caller that imported the package defensively can re-assert registration
+    without reaching into a private name.
+
+    Registration happens in the delegate's own static initializer, which calls into the backend
+    registry that lives in the ExecuTorch runtime. Importing ExecuTorch first is what puts that
+    runtime in the process; the delegate then binds to the same copy through its DT_NEEDED rather
+    than bringing one of its own.
+
+    Idempotent, and safe to call after ``executorch.runtime`` has already been imported. That used
+    to be an error, because the delegate arrived as a substitute for ExecuTorch's own Python
+    extension and had to get in first. It no longer substitutes anything.
+
+    Thread safe: the whole first registration is serialized, because it lands during ``dlopen``
+    while ``_delegate`` is assigned after it, and a caller observing that gap could not tell this
+    package's own load from a foreign delegate holding the name.
+    """
+    if _delegate is not None:
+        return
+
+    with _registration_lock:
+        # Re-checked under the lock so queued callers do not repeat the same registration work.
+        if _delegate is not None:
+            return
+        _register_locked()
+
+
+def _register_locked() -> None:
+    global _delegate
+
+    try:
+        import executorch.extension.pybindings.portable_lib  # noqa: F401
+    except ImportError as error:
+        # "Not installed" and "installed but unloadable" need different repairs, and the second
+        # is what an ABI mismatch looks like: the module is found, its extension fails to load.
+        # Answering both with "install executorch" sends that user to reinstall what they have.
+        # ModuleNotFoundError covers a genuinely absent package; a bare ImportError whose message
+        # names no shared object is the same thing seen through a blocked sys.modules entry. An
+        # ABI failure, by contrast, always names the library that would not load.
+        # ModuleNotFoundError naming executorch itself. Testing the type alone was wrong: if an
+        # installed ExecuTorch fails to import because one of its own transitive dependencies is
+        # missing, the exception is also a ModuleNotFoundError, and its .name is that dependency.
+        # That user was told to install ExecuTorch, which they already have.
+        # Exact match, not the top-level segment: CPython sets .name to the full dotted path when a
+        # submodule such as executorch.extension.pybindings.portable_lib is the thing that is
+        # absent or blocked, and to the bare "executorch" only when the root package itself is
+        # missing. Splitting on "." and comparing the first segment reported a blocked submodule as
+        # ExecuTorch being uninstalled, which is the ABI case this branch exists to separate out.
+        absent = (
+            isinstance(error, ModuleNotFoundError)
+            and (error.name or "") == "executorch"
+        )
+        if absent:
+            raise DelegateCompatibilityError(
+                "ExecuTorch must be installed to load the Torch-TensorRT delegate. Install "
+                "executorch from the same release matrix as this package. The import failed "
+                f"with: {error}. Importing this package registers the delegate, which is why it "
+                "raises here rather than later. Set "
+                "TORCH_TENSORRT_SKIP_DELEGATE_REGISTRATION=1 to import it without registering."
+            ) from error
+        # A library the loader could not FIND is a different problem from one it could not USE, and
+        # only the second is an ABI mismatch. Blaming the ABI for the first sends the reader to
+        # rebuild a matched stack when nothing is mismatched.
+        text = str(error)
+        missing_file = "cannot open shared object file" in text
+        if missing_file:
+            hint = (
+                "so the loader could not find it, not that it is incompatible. Check that the "
+                "ExecuTorch wheel is installed completely."
+            )
+            # An empty entry in the search path means the working directory, and it makes every
+            # origin-relative entry in this package's own search path resolve from there instead,
+            # so a correct installation fails to load from some directories and not others. A
+            # trailing separator is the usual way one appears.
+            search_path = os.environ.get("LD_LIBRARY_PATH")
+            if search_path is not None and "" in search_path.split(os.pathsep):
+                hint = (
+                    "so the loader could not find it. LD_LIBRARY_PATH has an empty entry, often "
+                    "from a trailing separator, which the loader reads as the working directory "
+                    "and which stops this package's own origin-relative search path resolving. "
+                    f"Remove it and retry. Current value: {search_path!r}"
+                )
+            raise DelegateCompatibilityError(
+                f"ExecuTorch is installed but a library it needs was not found, {hint} "
+                f"The import failed with: {error}"
+            ) from error
+        raise DelegateCompatibilityError(
+            "ExecuTorch is installed but its Python bindings could not be loaded, which "
+            "usually means it was built against a different C++ or CUDA runtime than this "
+            f"delegate. The import failed with: {error}"
+        ) from error
+
+    path = _delegate_path()
+    # A preloaded library may have lost registration to another copy. Check ownership below.
+    if BACKEND_NAME in _registered_backend_names():
+        loaded = _delegate_already_loaded(path)
+        if loaded is None:
+            raise DelegateCompatibilityError(
+                f"{BACKEND_NAME} is already registered before loading {path}, and that library is "
+                "not the one in this process, so another copy of the delegate is present. "
+                "ExecuTorch keeps the first registration, so the copy this package ships would "
+                "not be the one used. Import this package once, and do not load a second "
+                "Torch-TensorRT delegate alongside it."
+            )
+    else:
+        try:
+            # Eagerly, so a missing dependency surfaces here as an OSError this code can explain,
+            # rather than later as a failed lookup with nothing to say about the cause.
+            loaded = ctypes.CDLL(path, mode=os.RTLD_NOW | os.RTLD_LOCAL)
+        except OSError as error:
+            # A present CUDA extension can also fail to load because of an ABI mismatch.
+            if (
+                "libexecutorch_extension_cuda" in str(error)
+                and not _extension_cuda_present()
+            ):
+                raise DelegateCompatibilityError(
+                    f"Could not load the Torch-TensorRT ExecuTorch delegate from {path}. This "
+                    "requires a CUDA build of executorch, which ships "
+                    "libexecutorch_extension_cuda.so; a CPU build satisfies the version pin but "
+                    "not this dependency. Install torch, executorch, torch-tensorrt, and this "
+                    "package from the same release matrix."
+                ) from error
+            raise DelegateCompatibilityError(
+                f"Could not load the Torch-TensorRT ExecuTorch delegate from {path}: {error}. "
+                "The delegate links ExecuTorch's prebuilt runtime, TensorRT, and the CUDA runtime "
+                "from their own wheels, so install torch, executorch, torch-tensorrt, and this "
+                "package from the same release matrix."
+            ) from error
+
+    if BACKEND_NAME not in _registered_backend_names():
+        raise DelegateCompatibilityError(
+            f"Loading {path} did not register {BACKEND_NAME} with the ExecuTorch runtime, so "
+            "a delegated program would fail to load. The delegate and the installed "
+            "ExecuTorch were probably built against different runtimes."
+        )
+    try:
+        query_ownership = loaded.torch_tensorrt_owns_executorch_registration
+    except AttributeError as error:
+        raise DelegateCompatibilityError(
+            f"The delegate at {path} has no registration ownership query. "
+            "Reinstall this package so its Python module and native library match."
+        ) from error
+    query_ownership.argtypes = []
+    query_ownership.restype = ctypes.c_bool
+    if not query_ownership():
+        raise DelegateCompatibilityError(
+            f"The delegate at {path} does not own the {BACKEND_NAME} registration. "
+            "ExecuTorch keeps the first registration, so another library would execute "
+            "the delegated program. Do not load a second Torch-TensorRT delegate alongside it."
+        )
+    _delegate = loaded
+
+
+def _delegate_already_loaded(path: str) -> ctypes.CDLL | None:
+    """The handle for ``path`` if that exact library is already in this process, else ``None``.
+
+    ``dlopen`` on an already-loaded library returns the existing handle and bumps its reference
+    count rather than mapping a second copy, so this cannot introduce the duplicate it is checking
+    for. ``RTLD_NOLOAD`` is what makes the question safe to ask: it refuses to load anything, so a
+    library that is not present yields ``None`` instead of being pulled in as a side effect of the
+    test. It is absent on some platforms; this delegate is Linux-only, where CPython always defines
+    it, and a build without it answers ``None`` here, the same answer as a library that is not
+    loaded.
+    """
+    noload = getattr(os, "RTLD_NOLOAD", None)
+    if noload is None:
+        return None
+    try:
+        return ctypes.CDLL(path, mode=noload | os.RTLD_LOCAL)
+    except OSError:
+        return None
+
+
+def _registered_backend_names() -> list[str]:
+    # A private ExecuTorch name, and registration runs at import, so an ExecuTorch that does not
+    # export it would turn a plain import of this package into a bare ImportError traceback. Say
+    # what is wrong and what to do instead.
+    try:
+        from executorch.extension.pybindings.portable_lib import (
+            _get_registered_backend_names,
+        )
+    except ImportError as error:
+        raise DelegateCompatibilityError(
+            "The installed ExecuTorch does not expose its registered backend names, so this "
+            "delegate cannot confirm it owns its registration. Install the ExecuTorch build this "
+            f"package pins. Underlying error: {error}"
+        ) from error
+
+    return _get_registered_backend_names()
 
 
 def activate() -> ModuleType:
-    """Make the delegate-enabled portable runtime back ``executorch.runtime``.
+    """Deprecated: register the backend and return ExecuTorch's own portable runtime.
 
-    The replacement includes TensorRTBackend as well as ExecuTorch XNNPACK
-    backend and optimized CPU kernels, so activation preserves the stock
-    Python runtime CPU execution capabilities.
+    The companion published before this change swapped in its own bundled ``_portable_lib`` and
+    returned it. This package no longer bundles one, so it registers the backend and hands back
+    ExecuTorch's module, which is the one that now carries the delegate. A caller that only wanted
+    registration is unaffected; one that used the return value gets the module it was reaching for.
     """
-    # Both alias names are inspected: whichever one a given ExecuTorch version uses, an entry there
-    # that is not ours means the stock extension already loaded.
-    claimed = [
-        module
-        for module in (
-            sys.modules.get(_NATIVE_NAME),
-            sys.modules.get(_LEGACY_NATIVE_NAME),
-        )
-        if module is not None
-    ]
-    ours = __name__ + "._portable_lib"
-    if claimed and all(module.__name__ == ours for module in claimed):
-        return claimed[0]
-    if claimed or _WRAPPER_NAME in sys.modules:
-        raise DelegateCompatibilityError(
-            "ExecuTorch's stock runtime was imported first. Call "
-            'torch_tensorrt.load(..., format="executorch") before importing '
-            "executorch.runtime."
-        )
-    previous_data_loader = sys.modules.get(_DATA_LOADER_NAME)
-    try:
-        _probe_portable_lib_dependencies()
-        data_loader = importlib.import_module(__name__ + ".data_loader")
-        # _portable_lib imports this canonical name while its module initializer
-        # runs. Install our binding first so Python does not load ExecuTorch's
-        # stock data_loader and register PyDataLoader a second time.
-        sys.modules[_DATA_LOADER_NAME] = data_loader
-        native = importlib.import_module(__name__ + "._portable_lib")
-    except (ImportError, OSError) as error:
-        if previous_data_loader is None:
-            sys.modules.pop(_DATA_LOADER_NAME, None)
-        else:
-            sys.modules[_DATA_LOADER_NAME] = previous_data_loader
-        raise DelegateCompatibilityError(
-            "Could not load the prebuilt Torch-TensorRT ExecuTorch runtime. "
-            "Install torch, executorch, torch-tensorrt, and the runtime package from "
-            "the same release matrix."
-        ) from error
-    sys.modules[_NATIVE_NAME] = native
-    sys.modules[_LEGACY_NATIVE_NAME] = native
-    sys.modules.pop(_WRAPPER_NAME, None)
-    return native
+    warnings.warn(
+        "activate() is deprecated; the backend registers on import. Call register() if you "
+        "need to register explicitly.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    register()
+    from executorch.extension.pybindings import portable_lib
+
+    return portable_lib
 
 
-def get_runtime() -> _Runtime:
-    """Return the activated ExecuTorch Runtime singleton."""
-    activate()
+def get_runtime() -> Any:
+    """Deprecated: ExecuTorch's runtime, which now owns execution for this backend.
+
+    The companion used to return a runtime of its own. ExecuTorch's ``Runtime.get()`` is that
+    object now, so this forwards to it rather than failing, and a caller that asked for a runtime
+    still gets one that can see the registered backend.
+    """
+    warnings.warn(
+        "get_runtime() is deprecated; use executorch.runtime.Runtime.get().",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    register()
     from executorch.runtime import Runtime
 
-    value = cast(_Runtime, Runtime.get())
-    if not value.backend_registry.is_available(BACKEND_NAME):
-        raise DelegateCompatibilityError(f"{BACKEND_NAME} is not registered")
-    return value
+    return Runtime.get()
 
 
-__all__ = ["BACKEND_NAME", "DelegateCompatibilityError", "activate", "get_runtime"]
+# Tooling can opt out; normal imports must fail if this delegate cannot own registration.
+if os.getenv("TORCH_TENSORRT_SKIP_DELEGATE_REGISTRATION", "0").lower() not in (
+    "1",
+    "true",
+    "yes",
+    "on",
+):
+    register()
+
+__all__ = [
+    "BACKEND_NAME",
+    "DelegateCompatibilityError",
+    "activate",
+    "get_runtime",
+    "register",
+]

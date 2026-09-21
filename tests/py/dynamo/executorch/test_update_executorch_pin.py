@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+
 from packaging.version import Version
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
@@ -471,6 +472,7 @@ def test_development_constraint_update_detects_removed_site(pin_repo, monkeypatc
         test_write_pins_updates_the_development_constraint(pin_repo)
 
 
+@pytest.mark.unit
 def test_write_pins_requires_a_separate_lock_refresh(tmp_path, monkeypatch):
     """A history-free pin bump must pass source guards and fail only the stale lock."""
     import xml.etree.ElementTree as ET
@@ -624,3 +626,82 @@ def test_write_pins_finishes_an_interrupted_run(pin_repo, monkeypatch):
         lambda: [updater._VERSIONS_FILE, already],
     )
     assert updater.write_pins(target_version, target_commit) is True
+
+
+@pytest.mark.unit
+def test_a_site_that_loses_its_version_requirement_is_not_excused_by_its_commit(
+    pin_repo,
+):
+    """Four sites carry both coordinates, and the old check accepted either one.
+
+    So a requirement the pattern stopped matching, after a reformat say, would leave the version
+    stale while the commit moved on. That is precisely the drift the two pins exist to prevent, so
+    each declared coordinate has to be satisfied on its own.
+    """
+    both = sorted(
+        name for name, kinds in updater._SITE_COORDINATES.items() if len(kinds) == 2
+    )
+    assert both, "expected sites declaring both coordinates"
+    victim = pin_repo / both[0]
+    current = updater.read_pin("__executorch_version__")
+    # Keep the commit, break only the version requirement's spelling. The site writes it as a bare
+    # `executorch==<version>` comment, so dropping the operator is enough to defeat the pattern.
+    body = victim.read_text(encoding="utf-8")
+    assert f"executorch=={current}" in body, body[:200]
+    victim.write_text(
+        body.replace(f"executorch=={current}", f"executorch at {current}"),
+        encoding="utf-8",
+    )
+    with pytest.raises(SystemExit, match="no ExecuTorch version requirement"):
+        updater.write_pins("9.9.9", "b" * 40)
+
+
+@pytest.mark.unit
+def test_every_declared_site_coordinate_matches_the_tree(pin_repo):
+    """The declaration is only useful while it describes the files, so check it rather than trust it."""
+    commit = updater.read_pin("__executorch_commit__")
+    for name, kinds in updater._SITE_COORDINATES.items():
+        text = (pin_repo / name).read_text(encoding="utf-8")
+        assert ("version" in kinds) == bool(updater._REQUIREMENT.search(text)), name
+        assert ("commit" in kinds) == (commit in text), name
+
+
+@pytest.mark.unit
+def test_an_unrelated_package_at_the_target_version_is_not_a_pin_site(pin_repo):
+    """The version check runs through the same pattern that does the rewriting.
+
+    Accepting a bare occurrence of the target version anywhere in the file let a different package
+    happening to sit at that version stand in for the ExecuTorch requirement, so a site whose
+    requirement had been reformatted away would report as satisfied.
+    """
+    both = sorted(
+        name for name, kinds in updater._SITE_COORDINATES.items() if "version" in kinds
+    )
+    victim = pin_repo / both[0]
+    current = updater.read_pin("__executorch_version__")
+    body = victim.read_text(encoding="utf-8")
+    # Break the requirement's spelling, and leave the target version behind on another package.
+    victim.write_text(
+        body.replace(f"executorch=={current}", "executorch at large")
+        + "\nsomething-else==9.9.9\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(SystemExit, match="no ExecuTorch version requirement"):
+        updater.write_pins("9.9.9", "c" * 40)
+
+
+@pytest.mark.unit
+def test_the_stable_track_warns_that_its_pin_will_not_build(monkeypatch, capsys):
+    """A stable pin cannot build, and that used to be discovered from a failed pull request.
+
+    The delegate links the ExecuTorch runtime, so its build takes only a CUDA-labelled one. The
+    release index publishes processor-only wheels and the CUDA channels publish no stable ExecuTorch
+    at all, so a stable pin names something the build rejects. Warned rather than refused, because it
+    becomes correct as soon as a stable CUDA build exists.
+    """
+    monkeypatch.setattr(updater, "read_pin", lambda field: "1.0.dev0")
+    monkeypatch.setattr(updater, "available_versions", lambda args: ["1.5.0"])
+    monkeypatch.setattr(updater, "wheel_git_version", lambda version, args: _COMMIT)
+    monkeypatch.setattr(updater, "write_pins", lambda version, commit: True)
+    updater.main(["--track", "stable"])
+    assert "no CUDA build of ExecuTorch" in capsys.readouterr().err
