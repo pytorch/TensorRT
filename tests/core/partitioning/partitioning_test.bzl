@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """
 Partitioning test macros
 """
@@ -23,6 +26,6 @@ def partitioning_test(name, visibility = None):
             ":use_torch_whl": ["@torch_whl//:libtorch"],
             ":windows": ["@libtorch_win//:libtorch"],
             "//conditions:default": ["@libtorch"],
-        })
+        }),
         #timeout = "short",
     )

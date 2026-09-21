@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 load("@rules_cc//cc:defs.bzl", "cc_test")
 load("//tests/core/partitioning:partitioning_test.bzl", "partitioning_test")
 

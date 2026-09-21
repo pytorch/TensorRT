@@ -1,4 +1,6 @@
 @echo on
+REM SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+REM SPDX-License-Identifier: BSD-3-Clause
 
 set VC_VERSION_LOWER=17
 set VC_VERSION_UPPER=18

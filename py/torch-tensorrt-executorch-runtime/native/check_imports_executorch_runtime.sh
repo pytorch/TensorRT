@@ -1,4 +1,7 @@
 #!/bin/sh
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 # Verify that the delegate imports the shared registry and can load from the wheel layout.
 # Usage: check_imports_executorch_runtime.sh <readelf> <shared-object> [libexecutorch.so]
 #            [expected-runpath] [manylinux-tag]

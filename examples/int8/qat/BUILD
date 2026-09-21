@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 load("@rules_cc//cc:defs.bzl", "cc_binary")
 
 package(default_visibility = ["//visibility:public"])
@@ -5,7 +8,7 @@ package(default_visibility = ["//visibility:public"])
 config_setting(
     name = "use_torch_whl",
     flag_values = {
-        "//toolchains/dep_src:torch": "whl"
+        "//toolchains/dep_src:torch": "whl",
     },
 )
 
@@ -15,7 +18,7 @@ config_setting(
         "@platforms//cpu:aarch64",
     ],
     flag_values = {
-        "//toolchains/dep_collection:compute_libs": "default"
+        "//toolchains/dep_collection:compute_libs": "default",
     },
 )
 
@@ -25,7 +28,7 @@ config_setting(
         "@platforms//cpu:aarch64",
     ],
     flag_values = {
-        "//toolchains/dep_collection:compute_libs": "jetpack"
+        "//toolchains/dep_collection:compute_libs": "jetpack",
     },
 )
 
@@ -35,7 +38,6 @@ config_setting(
         "@platforms//os:windows",
     ],
 )
-
 
 cc_binary(
     name = "qat",
@@ -55,26 +57,26 @@ cc_binary(
         "@libtorch",
         "@libtorch//:caffe2",
     ] + select({
-        ":windows": [
-            "@libtorch_win//:libtorch",
-            "@libtorch_win//:caffe2",
+        ":jetpack": [
+            "@torch_l4t//:caffe2",
+            "@torch_l4t//:libtorch",
         ],
         ":use_torch_whl": [
-            "@torch_whl//:libtorch",
             "@torch_whl//:caffe2",
+            "@torch_whl//:libtorch",
         ],
-        ":jetpack": [
-            "@torch_l4t//:libtorch",
-            "@torch_l4t//:caffe2",
+        ":windows": [
+            "@libtorch_win//:caffe2",
+            "@libtorch_win//:libtorch",
         ],
         "//conditions:default": [
-            "@libtorch//:libtorch",
+            "@libtorch",
             "@libtorch//:caffe2",
         ],
     }) + select({
-        ":windows": ["@tensorrt_win//:nvinfer"],
-        ":sbsa": ["@tensorrt_sbsa//:nvinfer"],
         ":jetpack": ["@tensorrt_l4t//:nvinfer"],
+        ":sbsa": ["@tensorrt_sbsa//:nvinfer"],
+        ":windows": ["@tensorrt_win//:nvinfer"],
         "//conditions:default": ["@tensorrt//:nvinfer"],
-    })
+    }),
 )

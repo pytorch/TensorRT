@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 """Repository rule that locates the locally installed PyTorch.
 
 This avoids hardcoding torch's install path in MODULE.bazel, making the build

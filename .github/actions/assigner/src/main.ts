@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: BSD-3-Clause
+
 import * as core from "@actions/core";
 import * as github from "@actions/github";
 import * as yaml from "js-yaml";
@@ -57,7 +60,7 @@ async function main() {
 
     const issueNum = getIssueNum();
     if (!issueNum) {
-      console.log("Could not retrive issue number from context, exiting");
+      console.log("Could not retrieve issue number from context, exiting");
       return;
     }
     console.log(`Managing issue ${issueNum}`);

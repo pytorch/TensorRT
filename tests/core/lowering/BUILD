@@ -1,10 +1,13 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 load("@rules_cc//cc:defs.bzl", "cc_test")
 load("//tests/core/lowering:lowering_test.bzl", "lowering_test")
 
 config_setting(
     name = "use_torch_whl",
     flag_values = {
-        "//toolchains/dep_src:torch": "whl"
+        "//toolchains/dep_src:torch": "whl",
     },
 )
 
@@ -21,10 +24,9 @@ config_setting(
         "@platforms//cpu:aarch64",
     ],
     flag_values = {
-        "//toolchains/dep_collection:compute_libs": "jetpack"
+        "//toolchains/dep_collection:compute_libs": "jetpack",
     },
 )
-
 
 lowering_test(
     name = "test_linear_to_addmm",

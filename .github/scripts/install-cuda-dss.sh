@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 # for now we only need to install cuda_dss for jetpack
 install_cuda_dss_aarch64() {
     echo "install cuda_dss for ${CU_VERSION}"

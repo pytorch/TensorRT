@@ -1,4 +1,7 @@
 #!/bin/bash
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 batch_size=$1
 backend=$2
 model_name=$3
@@ -19,7 +22,7 @@ python perf_run.py --model_torch ${model_name} \
                 --iterations ${iterations} \
                 --report "${modified_model_name}_perf_bs${batch_size}_backend_${backend}_isl${isl}_osl${osl}.csv"
 
-# Move the report file to the mounted volume in the docker 
+# Move the report file to the mounted volume in the docker
 mv "${modified_model_name}_perf_bs${batch_size}_backend_${backend}_isl${isl}_osl${osl}.csv" /work
 
 # Clear HF cache

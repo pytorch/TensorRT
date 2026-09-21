@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 load("@rules_cc//cc:defs.bzl", "cc_binary")
 
 package(default_visibility = ["//visibility:public"])
@@ -8,7 +11,7 @@ config_setting(
         "@platforms//cpu:aarch64",
     ],
     flag_values = {
-        "//toolchains/dep_collection:compute_libs": "default"
+        "//toolchains/dep_collection:compute_libs": "default",
     },
 )
 
@@ -18,7 +21,7 @@ config_setting(
         "@platforms//cpu:aarch64",
     ],
     flag_values = {
-        "//toolchains/dep_collection:compute_libs": "jetpack"
+        "//toolchains/dep_collection:compute_libs": "jetpack",
     },
 )
 
@@ -28,7 +31,6 @@ config_setting(
         "@platforms//os:windows",
     ],
 )
-
 
 cc_binary(
     name = "torchtrt_runtime_example",
@@ -40,9 +42,9 @@ cc_binary(
         "@libtorch",
         "@libtorch//:caffe2",
     ] + select({
-        ":windows": ["@tensorrt_win//:nvinfer"],
-        ":sbsa": ["@tensorrt_sbsa//:nvinfer"],
         ":jetpack": ["@tensorrt_l4t//:nvinfer"],
+        ":sbsa": ["@tensorrt_sbsa//:nvinfer"],
+        ":windows": ["@tensorrt_win//:nvinfer"],
         "//conditions:default": ["@tensorrt//:nvinfer"],
-    })
+    }),
 )
