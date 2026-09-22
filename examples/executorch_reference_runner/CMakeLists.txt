@@ -69,11 +69,8 @@ if(TORCHTRT_ENABLE_DRIVE_OS_COMPAT
    AND NOT CUDAToolkit_ROOT)
   set(CUDAToolkit_ROOT "${TORCHTRT_DRIVE_CUDA_ROOT}" CACHE PATH "" FORCE)
 endif()
-find_package(CUDAToolkit REQUIRED)
 
-add_subdirectory("${EXECUTORCH_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/executorch")
-add_subdirectory("${TORCHTRT_EXECUTORCH_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/torch_tensorrt_executorch")
-
+# Validate DRIVE SDK inputs before configuring dependency projects.
 if(TORCHTRT_ENABLE_DRIVE_OS_COMPAT)
   message(STATUS "Torch-TensorRT DRIVE OS compatibility: enabled")
 
@@ -94,7 +91,14 @@ if(TORCHTRT_ENABLE_DRIVE_OS_COMPAT)
     message(FATAL_ERROR
       "Thor CUDA headers not found under ${_torchtrt_drive_thor_include}")
   endif()
+endif()
 
+find_package(CUDAToolkit REQUIRED)
+
+add_subdirectory("${EXECUTORCH_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/executorch")
+add_subdirectory("${TORCHTRT_EXECUTORCH_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/torch_tensorrt_executorch")
+
+if(TORCHTRT_ENABLE_DRIVE_OS_COMPAT)
   # ExecuTorch's CUDA shim target is defined in the source tree added above.
   # DRIVE exposes common and Thor-specific headers as separate target trees.
   target_include_directories(
@@ -109,13 +113,13 @@ if(TORCHTRT_ENABLE_DRIVE_OS_COMPAT)
   # ship a conventional libcurand development target, so remove that unused
   # link. Keep this local to the reference runner instead of modifying the
   # pinned ExecuTorch checkout.
-  foreach(_torch_tensorrt_curand_property LINK_LIBRARIES INTERFACE_LINK_LIBRARIES)
-    get_target_property(_torch_tensorrt_curand_value
-      aoti_cuda_shims ${_torch_tensorrt_curand_property})
-    if(_torch_tensorrt_curand_value AND CUDA::curand IN_LIST _torch_tensorrt_curand_value)
-      list(REMOVE_ITEM _torch_tensorrt_curand_value CUDA::curand)
+  foreach(_drive_property LINK_LIBRARIES INTERFACE_LINK_LIBRARIES)
+    get_target_property(_drive_links aoti_cuda_shims ${_drive_property})
+
+    if(_drive_links)
+      list(REMOVE_ITEM _drive_links CUDA::curand)
       set_property(TARGET aoti_cuda_shims
-        PROPERTY ${_torch_tensorrt_curand_property} "${_torch_tensorrt_curand_value}")
+        PROPERTY ${_drive_property} "${_drive_links}")
     endif()
   endforeach()
 endif()
