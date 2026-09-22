@@ -243,7 +243,7 @@ cc_library(
         ":driveos": [
             "@executorch//:executorch_headers",
             "@executorch//:extension_cuda",
-            "@tensorrt_sbsa//:nvinfer",
+            "@tensorrt_driveos//:nvinfer",
         ],
         "//conditions:default": [],
     }) + select({

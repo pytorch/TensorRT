@@ -112,7 +112,7 @@ cc_library(
         ":rtx_x86_64": ["@tensorrt_rtx//:nvinfer"],
         ":sbsa": ["@tensorrt_sbsa//:nvinfer"],
         ":windows": ["@tensorrt_win//:nvinfer"],
-        ":driveos": ["@tensorrt_sbsa//:nvinfer"],
+        ":driveos": ["@tensorrt_driveos//:nvinfer"],
         "//conditions:default": ["@tensorrt//:nvinfer"],
     }),
 )

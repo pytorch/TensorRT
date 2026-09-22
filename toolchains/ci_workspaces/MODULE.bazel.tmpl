@@ -63,6 +63,13 @@ new_local_repository(
     path = "${CUDA_HOME}",
 )
 
+drive_cuda_repository = use_repo_rule("//toolchains:drive_cuda_repository.bzl", "drive_cuda_repository")
+
+drive_cuda_repository(
+    name = "cuda_driveos",
+    build_file = "@//third_party/cuda/driveos:BUILD",
+)
+
 # These versions can be selected using the flag `--//toolchains/dep_collection:compute_libs="jetpack"`
 new_local_repository(
     name = "cuda_l4t",
@@ -140,6 +147,16 @@ http_archive(
     urls = [
         "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/11.3.0/tars/TensorRT-Enterprise-11.3.0.99-Linux-aarch64-cuda-13.4-Release-external.tar.zst",
     ],
+)
+
+drive_tensorrt_repository = use_repo_rule(
+    "//toolchains:drive_tensorrt_repository.bzl",
+    "drive_tensorrt_repository",
+)
+
+drive_tensorrt_repository(
+    name = "tensorrt_driveos",
+    build_file = "@//third_party/tensorrt/local:BUILD",
 )
 
 http_archive(

@@ -238,20 +238,25 @@ http_archive(
     ],
 )
 
-local_or_archive_tensorrt = use_repo_rule(
-    "//toolchains:local_or_archive_tensorrt.bzl",
-    "local_or_archive_tensorrt",
-)
-
-local_or_archive_tensorrt(
+http_archive(
     name = "tensorrt_sbsa",
-    archive_build_file = "@//third_party/tensorrt/archive:BUILD",
-    archive_type = "tar.zst",
-    local_build_file = "@//third_party/tensorrt/local:BUILD",
+    build_file = "@//third_party/tensorrt/archive:BUILD",
     strip_prefix = "TensorRT-11.3.0.99",
+    type = "tar.zst",
     urls = [
         "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/11.3.0/tars/TensorRT-Enterprise-11.3.0.99-Linux-aarch64-cuda-13.4-Release-external.tar.zst",
     ],
+)
+
+# DRIVE builds must use the target SDK, never the normal SBSA archive.
+drive_tensorrt_repository = use_repo_rule(
+    "//toolchains:drive_tensorrt_repository.bzl",
+    "drive_tensorrt_repository",
+)
+
+drive_tensorrt_repository(
+    name = "tensorrt_driveos",
+    build_file = "@//third_party/tensorrt/local:BUILD",
 )
 
 http_archive(

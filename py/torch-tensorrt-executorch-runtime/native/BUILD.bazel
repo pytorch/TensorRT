@@ -68,6 +68,7 @@ cmake(
         ":driveos": ["@cuda_driveos//:cudart"],
         "//conditions:default": ["@cuda//:cudart"],
     }) + select({
+        ":driveos": ["@tensorrt_driveos//:nvinfer"],
         ":aarch64_linux": ["@tensorrt_sbsa//:nvinfer"],
         "//conditions:default": ["@tensorrt//:nvinfer"],
     }),
