@@ -66,6 +66,12 @@ target_link_libraries(
     executorch::extensions
     executorch::kernels
     torchtrt::executorch_backend)
+if(TORCHTRT_BUILD_EDGE_LLM_EXECUTORCH_BACKEND)
+  target_link_libraries(
+    example_executorch_runner
+    PRIVATE
+      torchtrt::edge_llm_executorch_backend)
+endif()
 
 # Caller-owned KV-cache persistence check (see kv_cache_decode_check.cpp). It
 # cudaMalloc's the device-tagged planned arenas that hold the KV buffers and

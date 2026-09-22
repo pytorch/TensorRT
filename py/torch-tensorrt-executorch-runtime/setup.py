@@ -137,7 +137,13 @@ class BazelBuild(build_ext):
             source = built.parent / dependency
             if not source.is_file():
                 raise RuntimeError(f"Bazel did not produce {source}")
-            shutil.copy2(source, output.parent / dependency)
+            destination = output.parent / dependency
+            # build_ext invokes this method once for each extension. Both
+            # extensions share these libraries, and copy2 preserves Bazel's
+            # read-only mode, so the second invocation cannot overwrite the
+            # first copy unless it is removed first.
+            destination.unlink(missing_ok=True)
+            shutil.copy2(source, destination)
 
 
 TENSORRT_DISTRIBUTION = tensorrt_distribution()

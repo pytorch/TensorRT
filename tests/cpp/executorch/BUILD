@@ -6,6 +6,7 @@ test_suite(
     name = "executorch_backend_tests",
     tests = [
         ":test_caller_stream",
+        ":test_edge_llm_blob_header",
         ":test_executorch_binding_names",
         ":test_executorch_blob_header",
         ":test_executorch_weight_streaming_budget",
@@ -35,6 +36,15 @@ cc_test(
     srcs = ["test_executorch_blob_header.cpp"],
     deps = [
         "//cpp:tensorrt_executorch_blob_header",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "test_edge_llm_blob_header",
+    srcs = ["test_edge_llm_blob_header.cpp"],
+    deps = [
+        "//cpp:edge_llm_executorch_blob_header",
         "@googletest//:gtest_main",
     ],
 )

@@ -23,6 +23,7 @@ find_package(Threads REQUIRED)
 set(_torchtrt_executorch_sources
     "${CMAKE_CURRENT_LIST_DIR}/TensorRTBackend.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/TensorRTBlobHeader.cpp"
+    "${CMAKE_CURRENT_LIST_DIR}/EdgeLLMBlobHeader.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/WeightStreamingBudget.cpp"
 )
 
@@ -187,6 +188,57 @@ else()
             "-Wl,--no-whole-archive"
             ${_torchtrt_executorch_link_libraries}
     )
+endif()
+
+option(
+    TORCHTRT_BUILD_EDGE_LLM_EXECUTORCH_BACKEND
+    "Build the optional TensorRT-Edge-LLM ExecuTorch backend"
+    OFF
+)
+if(TORCHTRT_BUILD_EDGE_LLM_EXECUTORCH_BACKEND)
+    set(EDGELLM_INCLUDE_DIR "" CACHE PATH "TensorRT-Edge-LLM cpp include root")
+    set(EDGELLM_EXECUTORCH_LIBRARY "" CACHE FILEPATH "Path to libedgellmExecutorch.so")
+    foreach(_required IN ITEMS EDGELLM_INCLUDE_DIR EDGELLM_EXECUTORCH_LIBRARY)
+        if("${${_required}}" STREQUAL "" OR NOT EXISTS "${${_required}}")
+            message(FATAL_ERROR "${_required} must name an existing TensorRT-Edge-LLM artifact")
+        endif()
+    endforeach()
+
+    add_library(edgellm_executorch SHARED IMPORTED)
+    set_target_properties(edgellm_executorch PROPERTIES IMPORTED_LOCATION "${EDGELLM_EXECUTORCH_LIBRARY}")
+
+    add_library(executorch_edge_llm_backend STATIC
+        "${CMAKE_CURRENT_LIST_DIR}/EdgeLLMBackend.cpp"
+    )
+    target_include_directories(executorch_edge_llm_backend
+        PUBLIC
+            "${CMAKE_CURRENT_LIST_DIR}/../../../include"
+            "${EDGELLM_INCLUDE_DIR}"
+    )
+    target_compile_definitions(executorch_edge_llm_backend
+        PUBLIC
+            C10_USING_CUSTOM_GENERATED_MACROS
+    )
+    target_link_libraries(executorch_edge_llm_backend
+        PUBLIC
+            executorch_trt_backend
+            edgellm_executorch
+            ${_torchtrt_executorch_link_libraries}
+            ${CMAKE_DL_LIBS}
+    )
+
+    add_library(torchtrt_edge_llm_executorch_backend INTERFACE)
+    add_library(torchtrt::edge_llm_executorch_backend ALIAS torchtrt_edge_llm_executorch_backend)
+    if(MSVC)
+        target_link_libraries(torchtrt_edge_llm_executorch_backend
+            INTERFACE executorch_edge_llm_backend edgellm_executorch)
+    else()
+        target_link_libraries(torchtrt_edge_llm_executorch_backend
+            INTERFACE
+                "-Wl,--whole-archive,$<TARGET_FILE:executorch_edge_llm_backend>,--no-whole-archive"
+                edgellm_executorch
+        )
+    endif()
 endif()
 
 install(

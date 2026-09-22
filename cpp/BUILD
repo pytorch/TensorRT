@@ -120,6 +120,17 @@ cc_library(
 )
 
 cc_library(
+    name = "edge_llm_executorch_blob_header",
+    srcs = [
+        "src/torch_tensorrt/executorch/EdgeLLMBlobHeader.cpp",
+    ],
+    hdrs = [
+        "include/torch_tensorrt/executorch/EdgeLLMBlobHeader.h",
+    ],
+    strip_include_prefix = "include",
+)
+
+cc_library(
     name = "tensorrt_executorch_weight_streaming_budget",
     srcs = [
         "src/torch_tensorrt/executorch/WeightStreamingBudget.cpp",
@@ -153,7 +164,6 @@ cc_library(
     srcs = [
         "src/torch_tensorrt/executorch/RegisterCudaDeviceAllocator.cpp",
     ],
-    alwayslink = True,
     target_compatible_with = select({
         ":linux_x86_64": [],
         ":sbsa": [],
@@ -170,6 +180,7 @@ cc_library(
         ],
         "//conditions:default": [],
     }),
+    alwayslink = True,
 )
 
 # Registration only, for the same reason as the allocator above: the kernel
@@ -184,11 +195,11 @@ cc_library(
     srcs = [
         "src/torch_tensorrt/executorch/RegisterDeviceCopyKernels.cpp",
     ],
-    alwayslink = True,
     deps = [
         "@executorch//:executorch_device_copy_kernels",
         "@executorch//:executorch_headers",
     ],
+    alwayslink = True,
 )
 
 cc_library(
@@ -214,15 +225,15 @@ cc_library(
         ":tensorrt_executorch_weight_streaming_budget",
     ] + select({
         ":linux_x86_64": [
+            "@cuda//:cudart",
             "@executorch//:executorch_headers",
             "@executorch//:extension_cuda",
-            "@cuda//:cudart",
             "@tensorrt//:nvinfer",
         ],
         ":sbsa": [
+            "@cuda//:cudart",
             "@executorch//:executorch_headers",
             "@executorch//:extension_cuda",
-            "@cuda//:cudart",
             "@tensorrt_sbsa//:nvinfer",
         ],
         "//conditions:default": [],
@@ -234,6 +245,8 @@ filegroup(
     name = "executorch_backend_source_files",
     srcs = [
         "src/torch_tensorrt/executorch/CMakeLists.txt",
+        "src/torch_tensorrt/executorch/EdgeLLMBackend.cpp",
+        "src/torch_tensorrt/executorch/EdgeLLMBlobHeader.cpp",
         "src/torch_tensorrt/executorch/README.md",
         "src/torch_tensorrt/executorch/TensorRTBackend.cpp",
         "src/torch_tensorrt/executorch/TensorRTBlobHeader.cpp",
@@ -254,6 +267,8 @@ filegroup(
 filegroup(
     name = "executorch_api_headers",
     srcs = [
+        "include/torch_tensorrt/executorch/EdgeLLMBackend.h",
+        "include/torch_tensorrt/executorch/EdgeLLMBlobHeader.h",
         "include/torch_tensorrt/executorch/TensorRTBackend.h",
         "include/torch_tensorrt/executorch/TensorRTBindingNames.h",
         "include/torch_tensorrt/executorch/TensorRTBlobHeader.h",

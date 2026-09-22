@@ -7,7 +7,10 @@ import pytest
 import torch
 import torch.nn as nn
 import torch_tensorrt
-from exporters import EdgeConfig, EdgeExporter, register_edge_spec
+import torch_tensorrt.dynamo.runtime as trt_runtime
+from exporters import EdgeConfig, EdgeExporter
+from exporters import ops as exporter_ops
+from exporters import register_edge_spec
 from exporters.ops import call_engine
 from exporters.spec import ComponentBundle, EdgeSpec, registered_specs
 from torch.export import ExportedProgram
@@ -91,6 +94,66 @@ def test_edge_exporter_exported_program(tmp_path, monkeypatch):
         out = program.module()(x=sample["x"])
         expected = model(sample["x"])
     torch.testing.assert_close(out, expected)
+
+
+@pytest.mark.unit
+def test_execute_engine_prefers_in_process_module(tmp_path, monkeypatch):
+    engine_path = str(tmp_path / "language")
+    module = nn.Identity()
+    exporter_ops._COMPILED_MODULES[engine_path] = module
+    monkeypatch.setattr(
+        exporter_ops,
+        "_load_serialized_engine",
+        lambda *args: pytest.fail("serialized engine should not be loaded"),
+    )
+
+    try:
+        assert exporter_ops._get_engine(engine_path, "language") is module
+    finally:
+        exporter_ops._COMPILED_MODULES.pop(engine_path, None)
+
+
+@pytest.mark.unit
+def test_execute_engine_loads_and_caches_serialized_engine(tmp_path, monkeypatch):
+    engine_dir = tmp_path / "language"
+    engine_dir.mkdir()
+    (engine_dir / "language.engine").write_bytes(b"serialized-engine")
+    (engine_dir / "config.json").write_text("""{
+  "engine_file": "language.engine",
+  "input_names": ["x"],
+  "output_names": ["y"]
+}
+""")
+    engine_path = str(engine_dir)
+    constructor_calls = []
+    module = nn.Identity()
+
+    def fake_runtime_module(**kwargs):
+        constructor_calls.append(kwargs)
+        return module
+
+    monkeypatch.setattr(
+        trt_runtime,
+        "TorchTensorRTModule",
+        fake_runtime_module,
+    )
+
+    try:
+        first = exporter_ops._get_engine(engine_path, "language")
+        second = exporter_ops._get_engine(engine_path, "language")
+    finally:
+        exporter_ops._COMPILED_MODULES.pop(engine_path, None)
+
+    assert first is module
+    assert second is module
+    assert constructor_calls == [
+        {
+            "serialized_engine": b"serialized-engine",
+            "input_binding_names": ["x"],
+            "output_binding_names": ["y"],
+            "name": "language",
+        }
+    ]
 
 
 @pytest.mark.unit
