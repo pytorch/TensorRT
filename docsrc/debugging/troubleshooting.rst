@@ -215,6 +215,29 @@ Accuracy / Performance Issues
     See `NVIDIA ModelOpt documentation <https://nvidia.github.io/TensorRT-Model-Optimizer/>`_
     for the full list of built-in quantization configs and customization options.
 
+    For **FP8 weight-only** quantization with TorchAO (no calibration loop), see
+    :ref:`quantize_linear_fp8_woq` and :ref:`torch_export_flux_fp8_woq`. Those
+    examples keep ``dequantize_affine`` in the graph so TensorRT can emit an
+    ``IDequantizeLayer`` on an FP8 weight constant.
+
+    For **static FP8** (activations and weights, with a calibration loop), see
+    :ref:`quantize_linear_fp8_static`.
+
+    For **INT4 weight-only** quantization with TorchAO, see
+    :ref:`quantize_linear_int4_woq`, :ref:`torch_export_flux_int4_woq`, and
+    :ref:`torch_export_qwen3_int4_woq`. Use symmetric INT4 (zero zero-point)
+    and ``immutable_weights=True`` so engine constants stay ``Datatype: Int4``.
+
+    For **NVFP4 weight-only** quantization with TorchAO, see
+    :ref:`quantize_linear_nvfp4_woq` and :ref:`torch_export_flux_nvfp4_woq`.
+    Export must keep ``dequantize_nvfp4`` so the engine can keep
+    ``Datatype: FP4E2M1``.
+
+    For **MXFP4** with TorchAO (``MXDynamicActivationMXWeightConfig``; there is
+    no MXFP4 weight-only config), see :ref:`quantize_linear_mxfp4` and
+    :ref:`torch_export_flux_mxfp4`. Export must keep ``dequantize_mxfp4`` so
+    the engine can keep ``Datatype: FP4E2M1`` with E8M0 block scales.
+
 ----
 
 Distributed / Tensor-Parallel Issues

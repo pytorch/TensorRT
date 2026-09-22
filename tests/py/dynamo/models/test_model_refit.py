@@ -26,6 +26,8 @@ from torch_tensorrt.dynamo.lowering import (
 )
 from torch_tensorrt.logging import TRT_LOGGER
 
+pytestmark = [pytest.mark.trt_api]
+
 assertions = unittest.TestCase()
 
 if importlib.util.find_spec("torchvision"):

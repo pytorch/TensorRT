@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 load("@rules_cc//cc:defs.bzl", "cc_library")
 
 package(default_visibility = ["//visibility:public"])
@@ -153,7 +156,6 @@ cc_library(
     srcs = [
         "src/torch_tensorrt/executorch/RegisterCudaDeviceAllocator.cpp",
     ],
-    alwayslink = True,
     target_compatible_with = select({
         ":linux_x86_64": [],
         ":sbsa": [],
@@ -170,6 +172,7 @@ cc_library(
         ],
         "//conditions:default": [],
     }),
+    alwayslink = True,
 )
 
 # Registration only, for the same reason as the allocator above: the kernel
@@ -184,11 +187,11 @@ cc_library(
     srcs = [
         "src/torch_tensorrt/executorch/RegisterDeviceCopyKernels.cpp",
     ],
-    alwayslink = True,
     deps = [
         "@executorch//:executorch_device_copy_kernels",
         "@executorch//:executorch_headers",
     ],
+    alwayslink = True,
 )
 
 cc_library(
@@ -214,15 +217,15 @@ cc_library(
         ":tensorrt_executorch_weight_streaming_budget",
     ] + select({
         ":linux_x86_64": [
+            "@cuda//:cudart",
             "@executorch//:executorch_headers",
             "@executorch//:extension_cuda",
-            "@cuda//:cudart",
             "@tensorrt//:nvinfer",
         ],
         ":sbsa": [
+            "@cuda//:cudart",
             "@executorch//:executorch_headers",
             "@executorch//:extension_cuda",
-            "@cuda//:cudart",
             "@tensorrt_sbsa//:nvinfer",
         ],
         "//conditions:default": [],

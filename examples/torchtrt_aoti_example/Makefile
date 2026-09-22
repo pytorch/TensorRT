@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 CXX=g++
 SITE_PACKAGES=$(shell python -c 'import site; print(site.getsitepackages()[0])')
 CUDA_HOME=/usr/local/cuda-12.8

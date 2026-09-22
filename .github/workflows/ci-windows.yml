@@ -32,7 +32,7 @@ concurrency:
   # Non-CI labels and non-approved reviews get isolated groups, so automation and
   # review comments cannot cancel the active pipeline. CI-control labels, approved
   # reviews, and real pushes share the PR group and supersede it cleanly.
-  group: "${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}${{ github.event_name == 'pull_request_review' && github.event.review.state != 'approved' && format('-review-{0}', github.event.review.id) || '' }}${{ (github.event.action == 'labeled' || github.event.action == 'unlabeled') && !contains(fromJSON('[\"ci: full\", \"ci: nightly\", \"backend: TensorRT\", \"backend: TensorRT-RTX\"]'), github.event.label.name) && format('-label-{0}', github.event.label.name) || '' }}"
+  group: "${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}${{ github.event_name == 'pull_request_review' && github.event.review.state != 'approved' && format('-review-{0}', github.event.review.id) || '' }}${{ (github.event.action == 'labeled' || github.event.action == 'unlabeled') && !contains(fromJSON('[\"ci: full\", \"ci: nightly\", \"ci:trt-api\", \"backend: TensorRT\", \"backend: TensorRT-RTX\"]'), github.event.label.name) && format('-label-{0}', github.event.label.name) || '' }}"
   cancel-in-progress: true
 
 permissions:
@@ -46,7 +46,7 @@ jobs:
     # start a full run once ci:full is present. Non-label events always proceed.
     if: >-
       github.event.action != 'labeled' ||
-      contains(fromJSON('["ci: full", "ci: nightly", "backend: TensorRT", "backend: TensorRT-RTX"]'), github.event.label.name)
+      contains(fromJSON('["ci: full", "ci: nightly", "ci:trt-api", "backend: TensorRT", "backend: TensorRT-RTX"]'), github.event.label.name)
     uses: ./.github/workflows/_decide.yml
 
   # Generate the windows build matrix once (shared across channels;
@@ -66,20 +66,22 @@ jobs:
 
   standard:
     needs: [decide, generate-matrix]
-    if: (needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly') && needs.decide.outputs.backend != 'rtx'
+    if: (needs.decide.outputs.suite != '' || needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly') && needs.decide.outputs.backend != 'rtx'
     uses: ./.github/workflows/_test-windows.yml
     with:
       lane: ${{ needs.decide.outputs.lane }}
+      suite: ${{ needs.decide.outputs.suite }}
       build-flavor: standard
       use-rtx: false
       raw-matrix: ${{ needs.generate-matrix.outputs.matrix }}
 
   rtx:
     needs: [decide, generate-matrix]
-    if: (needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly') && needs.decide.outputs.backend != 'standard'
+    if: (needs.decide.outputs.suite != '' || needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly') && needs.decide.outputs.backend != 'standard'
     uses: ./.github/workflows/_test-windows.yml
     with:
       lane: ${{ needs.decide.outputs.lane }}
+      suite: ${{ needs.decide.outputs.suite }}
       build-flavor: rtx
       use-rtx: true
       name-prefix: "RTX - "
@@ -87,7 +89,7 @@ jobs:
 
   python-only:
     needs: [decide, generate-matrix]
-    if: (needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly') && needs.decide.outputs.backend != 'rtx'
+    if: needs.decide.outputs.suite == '' && (needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly') && needs.decide.outputs.backend != 'rtx'
     uses: ./.github/workflows/_test-windows.yml
     with:
       lane: python-only
@@ -99,7 +101,7 @@ jobs:
   # python-only against TensorRT-RTX (so backend=both runs BOTH python-only variants).
   python-only-rtx:
     needs: [decide, generate-matrix]
-    if: (needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly') && needs.decide.outputs.backend != 'standard'
+    if: needs.decide.outputs.suite == '' && (needs.decide.outputs.lane == 'full' || needs.decide.outputs.lane == 'nightly') && needs.decide.outputs.backend != 'standard'
     uses: ./.github/workflows/_test-windows.yml
     with:
       lane: python-only

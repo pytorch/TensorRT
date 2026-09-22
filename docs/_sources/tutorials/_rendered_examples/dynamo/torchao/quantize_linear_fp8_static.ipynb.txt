@@ -1,0 +1,104 @@
+{
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "\n\n# TorchAO Static FP8 Quantization (Linear)\n\nThis example calibrates a two-layer Linear model with TorchAO observers, then\nrewrites those layers so **activations and weights** are quantized to FP8\n(e4m3). Export keeps explicit ``quantize_affine_float8_non_decomposed`` /\n``dequantize_affine_float8_non_decomposed`` nodes, which Torch-TensorRT maps\nto ``IQuantizeLayer`` / ``IDequantizeLayer``.\n\nContrast with `quantize_linear_fp8_woq`, which quantizes **weights only**\nand needs no calibration. Static FP8 can run the GEMM itself in FP8 (Tensor\nCores) after Q/DQ fusion.\n\nGraph after export (one Linear)::\n\n    BF16 act \u2500\u2500\u25ba Q \u2500\u2500\u25ba FP8 act \u2500\u2500\u25ba DQ \u2500\u2500\u2510\n                                        \u25bc\n                                     aten.linear\n                                        \u25b2\n    FP8 weight \u2500\u2500\u25ba DQ \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n\nRequirements:\n\n* NVIDIA GPU with FP8 support (Hopper or newer)\n* ``torchao``\n* ``torch-tensorrt`` with the TorchAO float8_non_decomposed converters\n"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Imports\nThis example lives in ``examples/dynamo/torchao/``. Move that directory off\nthe front of ``sys.path`` so ``import torchao`` resolves the PyPI package\ninstead of this folder.\n\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "import sys\nfrom pathlib import Path\n\n_EXAMPLE_DIR = str(Path(__file__).resolve().parent)\nif sys.path and Path(sys.path[0]).resolve() == Path(_EXAMPLE_DIR):\n    sys.path.pop(0)\n\nimport torch\nimport torch_tensorrt as torchtrt\n\nsys.path.insert(0, _EXAMPLE_DIR)\nfrom static_fp8_utils import quantize_static_fp8\n\n\ndef sqnr(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:\n    \"\"\"Signal-to-quantization-noise ratio in dB (higher is closer).\"\"\"\n    a = a.float().flatten()\n    b = b.float().flatten()\n    signal = torch.norm(a)\n    noise = torch.norm(a - b)\n    return 20 * torch.log10(signal / noise.clamp_min(1e-12))"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Define a small two-layer Linear model\n\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "class LinearModel(torch.nn.Module):\n    def __init__(self, in_features=256, hidden=512, out_features=128):\n        super().__init__()\n        self.linear1 = torch.nn.Linear(in_features, hidden, bias=False)\n        self.linear2 = torch.nn.Linear(hidden, out_features, bias=False)\n\n    def forward(self, x: torch.Tensor) -> torch.Tensor:\n        return self.linear2(self.linear1(x))\n\n\nmodel = LinearModel().eval().to(dtype=torch.bfloat16, device=\"cuda\")\nexample_input = torch.randn(32, 256, dtype=torch.bfloat16, device=\"cuda\")"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Calibrate, then insert static FP8 Q/DQ\nObservers record per-tensor activation min/max and per-channel weight min/max\nover a few forward passes. Those scales are baked into ``QuantizedLinearQDQ``.\n\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "with torch.no_grad():\n    fp_out = model(example_input)\n\nquantize_static_fp8(model, (example_input,), calibration_steps=10)\n\nwith torch.no_grad():\n    quant_out = model(example_input)\nprint(f\"eager SQNR after static FP8: {sqnr(fp_out, quant_out):.2f} dB\")"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Export and compile\nThe exported graph should contain\n``quantize_affine_float8_non_decomposed`` (activations) and\n``dequantize_affine_float8_non_decomposed`` (activations and weights).\n\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "exp_program = torch.export.export(model, (example_input,), strict=True)\nexp_program.graph_module.print_readable()\n\ntrt_model = torchtrt.dynamo.compile(\n    exp_program,\n    inputs=[example_input],\n    min_block_size=1,\n    require_full_compilation=True,\n)\n\nwith torch.no_grad():\n    trt_out = trt_model(example_input)\n    if isinstance(trt_out, (list, tuple)):\n        trt_out = trt_out[0]\nprint(f\"TRT SQNR vs quantized eager: {sqnr(quant_out, trt_out):.2f} dB\")\nprint(trt_out)"
+      ]
+    }
+  ],
+  "metadata": {
+    "kernelspec": {
+      "display_name": "Python 3",
+      "language": "python",
+      "name": "python3"
+    },
+    "language_info": {
+      "codemirror_mode": {
+        "name": "ipython",
+        "version": 3
+      },
+      "file_extension": ".py",
+      "mimetype": "text/x-python",
+      "name": "python",
+      "nbconvert_exporter": "python",
+      "pygments_lexer": "ipython3",
+      "version": "3.11.16"
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 0
+}

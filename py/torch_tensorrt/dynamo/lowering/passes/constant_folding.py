@@ -110,8 +110,10 @@ def replace_node_with_constant(
 class _TorchTensorRTConstantFolder(ConstantFolder):  # type: ignore[misc]
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        # Set of known quantization ops to be excluded from constant folding.
-        # Currently, we exclude all quantization ops coming from modelopt library.
+        # Quantization ops excluded from constant folding so TRT sees QDQ
+        # (ModelOpt tensorrt.quantize_op, TorchAO dequantize_affine, TorchAO
+        # NVFP4 dequantize_nvfp4, and TorchAO MXFP4 dequantize_mxfp4 when
+        # those custom ops are registered).
         self.quantization_ops: Set[torch._ops.OpOverload] = set()
         try:
             # modelopt import ensures torch.ops.tensorrt.quantize_op.default is registered
@@ -124,6 +126,45 @@ class _TorchTensorRTConstantFolder(ConstantFolder):  # type: ignore[misc]
                 torch.ops.tensorrt.dynamic_block_quantize_op.default
             )
         except Exception as e:
+            pass
+
+        try:
+            import torchao  # noqa: F401
+
+            assert torch.ops.torchao.dequantize_affine.default
+            self.quantization_ops.add(torch.ops.torchao.dequantize_affine.default)
+        except Exception:
+            pass
+
+        try:
+            from torchao.quantization.quant_primitives import (  # noqa: F401
+                _dequantize_affine_float8_non_decomposed,
+                _quantize_affine_float8_non_decomposed,
+            )
+
+            self.quantization_ops.add(
+                torch.ops.torchao.quantize_affine_float8_non_decomposed.default
+            )
+            self.quantization_ops.add(
+                torch.ops.torchao.dequantize_affine_float8_non_decomposed.default
+            )
+        except Exception:
+            pass
+
+        try:
+            from torch_tensorrt.dynamo.conversion import nvfp4_custom_op  # noqa: F401
+
+            assert torch.ops.torchao_trt.dequantize_nvfp4.default
+            self.quantization_ops.add(torch.ops.torchao_trt.dequantize_nvfp4.default)
+        except Exception:
+            pass
+
+        try:
+            from torch_tensorrt.dynamo.conversion import mxfp4_custom_op  # noqa: F401
+
+            assert torch.ops.torchao_trt.dequantize_mxfp4.default
+            self.quantization_ops.add(torch.ops.torchao_trt.dequantize_mxfp4.default)
+        except Exception:
             pass
 
     # TODO: Update this function when quantization is added

@@ -6,7 +6,7 @@
 list                       all suites, tiers, lanes, variants
 show <name>                a suite's resolved command per variant
 run <name> [opts] [-- ...]  run one suite (the call CI + just both make)
-matrix [--lane|--tier]     JSON matrix `include` for GitHub Actions
+matrix [--lane|--tier|--suite]  JSON matrix `include` for GitHub Actions
 doctor                     validate the manifest (CI lints this)
 """
 
@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 
 from .runner import REPO_ROOT, describe, junit_path, matrix, run_suite, select
@@ -26,9 +27,10 @@ def _cmd_list(_: argparse.Namespace) -> int:
         f"{'SUITE'.ljust(width)}  TIER  LANES                  VARIANTS         PLATFORMS"
     )
     for s in SUITES:
+        lane_display = "manual" if s.manual else ",".join(s.lanes)
         print(
             f"{s.name.ljust(width)}  {s.tier:<4}  "
-            f"{','.join(s.lanes):<21}  {','.join(s.variants):<15}  {','.join(s.platforms)}"
+            f"{lane_display:<21}  {','.join(s.variants):<15}  {','.join(s.platforms)}"
         )
     print(
         f"\n{len(SUITES)} suites.  "
@@ -39,7 +41,8 @@ def _cmd_list(_: argparse.Namespace) -> int:
 
 def _cmd_show(args: argparse.Namespace) -> int:
     s = by_name(args.name)
-    print(f"# {s.name}  (tier={s.tier}, lanes={','.join(s.lanes)})")
+    lane_display = "manual" if s.manual else ",".join(s.lanes)
+    print(f"# {s.name}  (tier={s.tier}, lanes={lane_display})")
     for var in s.variants:
         print(f"\n## variant: {var}   junit: {junit_path(s).name}")
         print(describe(s, var))
@@ -100,6 +103,7 @@ def _cmd_matrix(args: argparse.Namespace) -> int:
     include = matrix(
         lane=args.lane,
         tier=args.tier,
+        names=[args.suite] if args.suite else None,
         variant=args.variant,
         platform=args.platform,
         changed=_read_changed(args),
@@ -112,7 +116,7 @@ def _cmd_matrix(args: argparse.Namespace) -> int:
 
 def _cmd_doctor(_: argparse.Namespace) -> int:
     """Static checks CI can gate on: unique names, unique junit paths, valid setup
-    steps, declared cwd dirs exist, every suite is reachable by some lane."""
+    steps, declared cwd dirs exist, and scheduled suites have at least one lane."""
     problems: list[str] = []
     names = [s.name for s in SUITES]
     dupes = {n for n in names if names.count(n) > 1}
@@ -129,7 +133,9 @@ def _cmd_doctor(_: argparse.Namespace) -> int:
         for step in s.setup:
             if step not in valid_setup:
                 problems.append(f"{s.name}: unknown setup step {step!r}")
-        if not s.lanes:
+        if s.manual and s.lanes:
+            problems.append(f"{s.name}: manual suite must not belong to a lane")
+        if not s.manual and not s.lanes:
             problems.append(f"{s.name}: belongs to no lane")
         if not s.variants:
             problems.append(f"{s.name}: runs on no variant")
@@ -142,7 +148,33 @@ def _cmd_doctor(_: argparse.Namespace) -> int:
             if var not in (s.overrides.keys() | {"standard", "rtx"}):
                 problems.append(f"{s.name}: bad variant {var!r}")
 
-    # Every suite should be exercised by some lane and some tier path.
+    # TRT contract markers imply membership in the manual trt-api umbrella.
+    # Keep this structural so doctor can run without importing torch/TRT or
+    # collecting GPU tests.
+    trt_suite = by_name("trt-api")
+    trt_root = REPO_ROOT / trt_suite.cwd
+    trt_paths = tuple(trt_root / path.rstrip("/") for path in trt_suite.paths)
+    contract_markers = ("trt_api", "trt_rtx_only")
+    for test_file in (REPO_ROOT / "tests/py").rglob("test_*.py"):
+        source = test_file.read_text(encoding="utf-8")
+        used_trt_markers = set(re.findall(r"pytest\.mark\.(trt_[a-z0-9_]+)", source))
+        unsupported = used_trt_markers.difference(contract_markers)
+        if unsupported:
+            problems.append(
+                f"{test_file.relative_to(REPO_ROOT)}: unsupported fine-grained "
+                f"TRT markers {sorted(unsupported)}"
+            )
+        if not any(f"pytest.mark.{marker}" in source for marker in contract_markers):
+            continue
+        if not any(
+            test_file == path or (path.is_dir() and path in test_file.parents)
+            for path in trt_paths
+        ):
+            problems.append(
+                f"{test_file.relative_to(REPO_ROOT)}: TRT API contract test is "
+                "not included in trt-api"
+            )
+
     if problems:
         for p in problems:
             print(f"✗ {p}", file=sys.stderr)
@@ -199,6 +231,11 @@ def main(argv: list[str] | None = None) -> int:
     g = sp.add_mutually_exclusive_group()
     g.add_argument("--lane", choices=("fast", "full", "nightly", "python-only"))
     g.add_argument("--tier", choices=("l0", "l1", "l2"))
+    g.add_argument(
+        "--suite",
+        choices=tuple(s.name for s in SUITES),
+        help="select one named suite, including a manual suite",
+    )
     sp.add_argument("--variant", choices=("standard", "rtx"))
     sp.add_argument("--platform", choices=("linux-x86_64", "windows"))
     sp.add_argument(

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 # Consumes the two installed wheels and nothing from this repository's source tree. That is the point
 # of it: the delegate comes out of its wheel already built, found by name, and the ExecuTorch runtime
 # comes out of its own wheel the same way.

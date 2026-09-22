@@ -281,8 +281,8 @@ def default_branch():
 
 # ── test-plan preview: what a branch's labels will actually run ───────────────
 # This mirrors, in Python, exactly what CI derives from the triggering event:
-#   1. labels → (lane, backend)              — .github/workflows/_decide.yml
-#   2. (lane, backend) → per-platform channels — the `if:` gates in the
+#   1. labels → (lane, backend, suite)         — .github/workflows/_decide.yml
+#   2. selection → per-platform channels       — the `if:` gates in the
 #      ci-linux-x86_64 / ci-windows / ci-sbsa entry workflows
 #   3. (lane, variant, platform) → suites     — `tests.ci matrix` (_test-linux.yml)
 # Keep in sync with those files if the gating changes.
@@ -292,6 +292,7 @@ def default_branch():
 CI_LABELS = [
     ("ci: full", "lane", "all tiers (L0–L2) on Linux + Windows"),
     ("ci: nightly", "lane", "everything, incl. llm / kernels / distributed"),
+    ("ci:trt-api", "lane", "only the manual TRT API suite on Linux + Windows"),
     ("backend: TensorRT", "std", "test the standard TensorRT engine"),
     ("backend: TensorRT-RTX", "rtx", "test the TensorRT-RTX engine"),
 ]
@@ -319,10 +320,11 @@ def _ci_label_chips(labels, pr):
 
 
 def resolve_lane_backend(labels, event="pull_request"):
-    """labels → (lane, backend), per _decide.yml. `contains()` in Actions is an
+    """labels → (lane, backend, suite), per _decide.yml. `contains()` in Actions is an
     exact array-element match, so the two backend labels never alias."""
     L = set(labels or [])
     has_full, has_nightly = "ci: full" in L, "ci: nightly" in L
+    suite = "trt-api" if event == "pull_request" and "ci:trt-api" in L else ""
     has_rtx, has_std = "backend: TensorRT-RTX" in L, "backend: TensorRT" in L
     if event == "schedule":
         lane = "nightly"
@@ -338,15 +340,17 @@ def resolve_lane_backend(labels, event="pull_request"):
         backend = "rtx"
     elif has_std:
         backend = "standard"
+    elif suite:
+        backend = "both"
     elif lane == "fast":  # cheap default on a plain PR push
         backend = "standard"
     else:
         backend = "both"
-    return lane, backend
+    return lane, backend, suite
 
 
-def compute_plan(lane, backend):
-    """The channels that will run for (lane, backend), each with its suite list.
+def compute_plan(lane, backend, suite=""):
+    """The channels that will run for a lane or named suite and backend.
     Mirrors the entry workflows' channel `if:` gates. Returns [{platform, engine,
     kind, suites}], suites empty for build-only channels."""
     if _ci_matrix is None:
@@ -355,18 +359,30 @@ def compute_plan(lane, backend):
     std, rtx = backend != "rtx", backend != "standard"  # which engine channels run
     plan = []
 
-    def add(platform, engine, kind, suite_lane, suite_platform):
+    def add(platform, engine, kind, suite_lane, suite_platform, suite_name=""):
         suites = (
             [
                 m["suite"]
                 for m in _ci_matrix(
-                    lane=suite_lane, variant=engine, platform=suite_platform
+                    lane=None if suite_name else suite_lane,
+                    names=[suite_name] if suite_name else None,
+                    variant=engine,
+                    platform=suite_platform,
                 )
             ]
             if suite_platform
             else []
         )
         plan.append(dict(platform=platform, engine=engine, kind=kind, suites=suites))
+
+    if suite:
+        if std:
+            add("Linux x86_64", "standard", "tests", lane, "linux-x86_64", suite)
+            add("Windows", "standard", "tests", lane, "windows", suite)
+        if rtx:
+            add("Linux x86_64", "rtx", "tests", lane, "linux-x86_64", suite)
+            add("Windows", "rtx", "tests", lane, "windows", suite)
+        return plan
 
     # Linux x86_64 (ci-linux-x86_64.yml): tests AND python-only on any non-skip lane
     # (incl. fast — PYTHON_ONLY=1 skips Bazel, so it's a cheap per-push smoke).
@@ -1305,8 +1321,13 @@ def _summary_html(runs, oob=False):
     )
 
 
-def _plan_hint(lane, backend):
-    if lane == "fast":
+def _plan_hint(lane, backend, suite=""):
+    if suite:
+        h = (
+            f"<code>ci:trt-api</code> runs only <code>{e(suite)}</code> on Linux "
+            "and Windows."
+        )
+    elif lane == "fast":
         h = (
             "<code>fast</code> = L0 smoke + python-only on Linux x86_64. Add <code>ci: full</code> "
             "for all tiers on Linux + Windows, or <code>ci: nightly</code> to also run "
@@ -1351,8 +1372,8 @@ def _render_plan(branch):
         event, src = "pull_request", f'PR #{pr["number"]}'
     else:
         labels, event, src = [], "pull_request", "no open PR"
-    lane, backend = resolve_lane_backend(labels, event)
-    plan = compute_plan(lane, backend)
+    lane, backend, suite = resolve_lane_backend(labels, event)
+    plan = compute_plan(lane, backend, suite)
     njobs = sum(len(c["suites"]) for c in plan)
 
     srchtml = (
@@ -1386,7 +1407,7 @@ def _render_plan(branch):
         labelblock = (
             f'<div class="ci-labels"><span class="cil-head">CI labels</span>'
             f"{_ci_label_chips(labels, pr)}{inert}</div>"
-            f'<div class="plan-hint-row">{_plan_hint(lane, backend)}</div>{other_html}'
+            f'<div class="plan-hint-row">{_plan_hint(lane, backend, suite)}</div>{other_html}'
         )
 
     # Live CI-control buttons: post a command as a PR comment (with a click-to-confirm

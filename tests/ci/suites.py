@@ -69,6 +69,7 @@ class Suite:
     name: str
     tier: Tier
     lanes: tuple[Lane, ...]
+    manual: bool = False  # runnable by name, excluded from lane/tier scheduling
     cwd: str = "tests/py/dynamo"  # relative to repo root
     paths: tuple[str, ...] = ()  # pytest positionals (rel to cwd); globs ok
     markers: str | None = None  # -m EXPR
@@ -177,6 +178,32 @@ _L0: list[Suite] = [
         jobs="8",
     ),
     Suite(
+        # Manual umbrella for the TensorRT / TensorRT-RTX API contracts used by
+        # Torch-TensorRT: network conversion, engine build/inspection, runtime,
+        # refit, and plugins. Keep paths explicit so unrelated model-zoo tests
+        # are not collected.
+        "trt-api",
+        tier="l0",
+        lanes=(),
+        manual=True,
+        cwd="tests/py",
+        paths=(
+            "dynamo/conversion/",
+            "dynamo/runtime/",
+            "dynamo/automatic_plugin/",
+            "dynamo/models/test_model_refit.py",
+            "dynamo/models/test_models_export.py",
+            "dynamo/models/test_weight_stripped_engine.py",
+            "kernels/test_cuda_kernel_op.py",
+        ),
+        markers="trt_api",
+        jobs=_HEAVY,
+        setup=("cuda-core",),
+        overrides={
+            "standard": {"markers": "trt_api and not trt_rtx_only"},
+        },
+    ),
+    Suite(
         "ts-api",
         tier="l0",
         lanes=("fast", "full", "nightly"),
@@ -260,8 +287,16 @@ _L2: list[Suite] = [
         tier="l2",
         lanes=("full", "nightly"),
         paths=("models/",),
-        markers="not critical",
+        # TorchAO compile tests live in dynamo-torchao.
+        markers="not critical and not torchao",
         jobs=_MODEL,
+    ),
+    Suite(
+        "dynamo-torchao",
+        tier="l2",
+        lanes=("full", "nightly"),
+        paths=("models/test_torchao*.py",),
+        jobs=_HEAVY,
     ),
     Suite(
         "dynamo-llm",

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 # ExecuTorch's package config withholds every imported target below CMake 3.28, because it exports
 # "$ORIGIN"-relative runpaths as link options and CMake writes that token incorrectly before then.
 # This build asks for components, and asked that way ExecuTorch fails outright below 3.28 rather than

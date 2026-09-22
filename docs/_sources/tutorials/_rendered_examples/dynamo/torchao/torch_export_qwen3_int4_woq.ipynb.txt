@@ -1,0 +1,176 @@
+{
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "\n\n# Compiling Qwen3-8B with TorchAO INT4 weight-only quantization\n\nThis example loads\n[pytorch/Qwen3-8B-INT4](https://huggingface.co/pytorch/Qwen3-8B-INT4),\nconverts Hub HQQ / tile-packed INT4 into TensorRT-compatible **symmetric**\ngroup-wise Int4Tensor weights, exports a logits-only wrapper, and compiles\nwith the Torch-TensorRT Dynamo backend.\n\nHub checkpoints are often asymmetric and may use Int4TilePackedTo4dTensor.\nThose layouts are dequantized to dense BF16, then re-packed with\nquantize_linear_int4_symmetric so IDequantizeLayer sees a zero\nzero-point and group-wise INT4 storage.\n\nThe compiled engine is fixed to SEQ_LEN. Greedy decode pads or windows the\ngrowing sequence into that length (no KV cache), matching other Torch-TensorRT\nLLM examples.\n\n```bash\npip install torchao transformers accelerate\n\nexport QWEN3_INT4_MODEL=pytorch/Qwen3-8B-INT4\npython torch_export_qwen3_int4_woq.py\n```\n"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Imports\nThis example lives in examples/dynamo/torchao/. Move that directory off\nthe front of sys.path so import torchao resolves the PyPI package\ninstead of this folder.\n\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "from __future__ import annotations\n\nimport copy\nimport gc\nimport os\nimport sys\nfrom pathlib import Path\n\n_EXAMPLE_DIR = str(Path(__file__).resolve().parent)\nif sys.path and Path(sys.path[0]).resolve() == Path(_EXAMPLE_DIR):\n    sys.path.pop(0)\n\nimport torch\nimport torch_tensorrt as torchtrt\nfrom transformers import AutoConfig, AutoTokenizer, Qwen3ForCausalLM\n\nsys.path.insert(0, _EXAMPLE_DIR)\nfrom int4_utils import convert_hub_int4_to_symmetric_trt, pre_process_model_for_export\nfrom utils import exclude_dq_from_constant_folding\n\nMODEL_ID = os.environ.get(\"QWEN3_INT4_MODEL\", \"pytorch/Qwen3-8B-INT4\")\nMAX_NEW_TOKENS = int(os.environ.get(\"QWEN3_MAX_NEW_TOKENS\", \"64\"))\nGROUP_SIZE = int(os.environ.get(\"QWEN3_GROUP_SIZE\", \"128\"))\nPROMPT = os.environ.get(\n    \"QWEN3_PROMPT\",\n    \"Explain weight-only INT4 quantization in one short paragraph.\",\n)\nSEQ_LEN = int(os.environ.get(\"QWEN3_SEQ_LEN\", \"128\"))"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Sanitize Hub TorchAO config and load the model\nOlder checkpoints serialize layout=TensorCoreTiledLayout and other kwargs\nremoved in torchao>=0.17. Rewrite those onto int4_packing_format before\nfrom_pretrained.\n\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "def sanitize_torchao_quant_config(qc):\n    if qc is None:\n        return None\n    if hasattr(qc, \"to_dict\"):\n        d = qc.to_dict()\n    elif isinstance(qc, dict):\n        d = copy.deepcopy(qc)\n    else:\n        d = dict(qc)\n\n    qt = d.get(\"quant_type\")\n    if isinstance(qt, dict) and \"default\" in qt:\n        entry = qt[\"default\"]\n        data = entry.get(\"_data\", entry)\n        layout = data.pop(\"layout\", None)\n        if layout is not None and data.get(\"int4_packing_format\") is None:\n            data[\"int4_packing_format\"] = \"tile_packed_to_4d\"\n        if isinstance(layout, dict):\n            inner = (layout.get(\"_data\") or {}).get(\"inner_k_tiles\")\n            if inner is not None:\n                data[\"int4_tile_packed_ntile\"] = inner\n        for k in (\"use_hqq\", \"zero_point_domain\", \"preserve_zero\", \"layout\"):\n            data.pop(k, None)\n        allowed = {\n            \"group_size\",\n            \"set_inductor_config\",\n            \"int4_packing_format\",\n            \"int4_choose_qparams_algorithm\",\n            \"int4_tile_packed_ntile\",\n        }\n        entry[\"_data\"] = {k: v for k, v in data.items() if k in allowed}\n        qt[\"default\"] = entry\n        d[\"quant_type\"] = qt\n    return d\n\n\nclass _LogitsWrapper(torch.nn.Module):\n    \"\"\"CausalLM \u2192 logits only (export / TRT friendly).\"\"\"\n\n    def __init__(self, model: torch.nn.Module) -> None:\n        super().__init__()\n        self.model = model\n\n    def forward(\n        self, input_ids: torch.Tensor, position_ids: torch.Tensor\n    ) -> torch.Tensor:\n        return self.model(\n            input_ids=input_ids,\n            position_ids=position_ids,\n            use_cache=False,\n        ).logits\n\n\ndef make_position_ids(seq_len: int, device: torch.device) -> torch.Tensor:\n    return torch.arange(seq_len, device=device).unsqueeze(0)\n\n\nprint(f\"Loading {MODEL_ID} ...\")\nconfig = AutoConfig.from_pretrained(MODEL_ID, trust_remote_code=False)\nconfig.quantization_config = sanitize_torchao_quant_config(config.quantization_config)\nconfig.use_cache = False\n\nmodel = (\n    Qwen3ForCausalLM.from_pretrained(\n        MODEL_ID,\n        config=config,\n        dtype=torch.bfloat16,\n        attn_implementation=\"eager\",\n        trust_remote_code=False,\n    )\n    .cuda()\n    .eval()\n)\ntokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=False)\nif tokenizer.pad_token_id is None:\n    tokenizer.pad_token = tokenizer.eos_token"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Convert Hub INT4 \u2192 symmetric Int4Tensor\n\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "convert_hub_int4_to_symmetric_trt(model, group_size=GROUP_SIZE, verbose=False)\npre_process_model_for_export(model)"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Tokenize a fixed-length prompt\n\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "messages = [\n    {\"role\": \"system\", \"content\": \"You are a helpful AI assistant.\"},\n    {\"role\": \"user\", \"content\": PROMPT},\n]\ntemplated = tokenizer.apply_chat_template(\n    messages,\n    tokenize=False,\n    add_generation_prompt=True,\n)\nencoded = tokenizer(\n    templated,\n    return_tensors=\"pt\",\n    padding=\"max_length\",\n    truncation=True,\n    max_length=SEQ_LEN,\n)\ninput_ids = encoded[\"input_ids\"].cuda()\nposition_ids = make_position_ids(SEQ_LEN, input_ids.device)\nwrapper = _LogitsWrapper(model).eval()"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Greedy decode without KV cache\nThe compiled engine is fixed to SEQ_LEN, so each step pads or windows the\ngrowing sequence and reads logits at the last real (non-pad) position.\n\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "def greedy_generate(\n    logits_fn,\n    input_ids: torch.Tensor,\n    max_new_tokens: int,\n    eos_token_id: int,\n    pad_token_id: int,\n) -> torch.Tensor:\n    nonempty = (input_ids[0] != pad_token_id).nonzero(as_tuple=False)\n    if nonempty.numel() == 0:\n        cur = input_ids.clone()\n    else:\n        cur = input_ids[:, : int(nonempty[-1]) + 1].clone()\n\n    for _ in range(max_new_tokens):\n        if cur.shape[1] >= SEQ_LEN:\n            window = cur[:, -SEQ_LEN:]\n            real_len = SEQ_LEN\n            start_pos = cur.shape[1] - SEQ_LEN\n            step_position_ids = torch.arange(\n                start_pos, start_pos + SEQ_LEN, device=cur.device\n            ).unsqueeze(0)\n        else:\n            pad = torch.full(\n                (cur.shape[0], SEQ_LEN - cur.shape[1]),\n                pad_token_id,\n                dtype=cur.dtype,\n                device=cur.device,\n            )\n            window = torch.cat([cur, pad], dim=1)\n            real_len = cur.shape[1]\n            step_position_ids = make_position_ids(SEQ_LEN, cur.device)\n\n        logits = logits_fn(window, step_position_ids)\n        if isinstance(logits, (tuple, list)):\n            logits = logits[0]\n        next_id = logits[:, real_len - 1, :].argmax(dim=-1, keepdim=True)\n        cur = torch.cat([cur, next_id], dim=-1)\n        if int(next_id.item()) == int(eos_token_id):\n            break\n    return cur"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Eager baseline\n\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "with torch.no_grad():\n    eager_logits = wrapper(input_ids, position_ids)\n    eager_ids = greedy_generate(\n        wrapper,\n        input_ids,\n        max_new_tokens=MAX_NEW_TOKENS,\n        eos_token_id=tokenizer.eos_token_id,\n        pad_token_id=tokenizer.pad_token_id,\n    )\nprint(\"eager:\", tokenizer.decode(eager_ids[0], skip_special_tokens=True))"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Export and compile\nstrict=False matches other Torch-TensorRT LLM examples (aotautograd).\nimmutable_weights=True is required for INT4 packed constants.\n\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "processed = pre_process_model_for_export(wrapper)\nwith exclude_dq_from_constant_folding():\n    exp_program = torch.export.export(\n        processed,\n        (input_ids, position_ids),\n        strict=False,\n    )\n\ncompiled = torchtrt.dynamo.compile(\n    exp_program,\n    inputs=[input_ids, position_ids],\n    truncate_double=True,\n    require_full_compilation=True,\n    immutable_weights=True,\n    min_block_size=1,\n)\n\ndel exp_program, processed\ngc.collect()\ntorch.cuda.empty_cache()"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Torch-TensorRT inference\n\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "with torch.no_grad():\n    trt_logits = compiled(input_ids, position_ids)\nif isinstance(trt_logits, (tuple, list)):\n    trt_logits = trt_logits[0]\ntrt_logits = trt_logits.to(device=eager_logits.device, dtype=eager_logits.dtype)\n\ndiff = (trt_logits.float() - eager_logits.float()).abs()\nprint(f\"max |\u0394logits|:  {diff.max().item():.6g}\")\nprint(f\"mean |\u0394logits|: {diff.mean().item():.6g}\")\n\nnonempty = (input_ids[0] != tokenizer.pad_token_id).nonzero(as_tuple=False)\nlast_pos = int(nonempty[-1]) if nonempty.numel() else input_ids.shape[1] - 1\neager_tok = eager_logits[0, last_pos].argmax()\ntrt_tok = trt_logits[0, last_pos].argmax()\nprint(\n    f\"next-token argmax @ pos {last_pos}: \"\n    f\"eager={int(eager_tok)} trt={int(trt_tok)} \"\n    f\"match={bool(eager_tok == trt_tok)}\"\n)\n\nwith torch.no_grad():\n    trt_ids = greedy_generate(\n        compiled,\n        input_ids,\n        max_new_tokens=MAX_NEW_TOKENS,\n        eos_token_id=tokenizer.eos_token_id,\n        pad_token_id=tokenizer.pad_token_id,\n    )\nprint(\"trt:\", tokenizer.decode(trt_ids[0], skip_special_tokens=True))"
+      ]
+    }
+  ],
+  "metadata": {
+    "kernelspec": {
+      "display_name": "Python 3",
+      "language": "python",
+      "name": "python3"
+    },
+    "language_info": {
+      "codemirror_mode": {
+        "name": "ipython",
+        "version": 3
+      },
+      "file_extension": ".py",
+      "mimetype": "text/x-python",
+      "name": "python",
+      "nbconvert_exporter": "python",
+      "pygments_lexer": "ipython3",
+      "version": "3.11.16"
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 0
+}

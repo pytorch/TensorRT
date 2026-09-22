@@ -21,7 +21,6 @@ import unittest
 import numpy as np
 import pytest
 from torch.testing._internal.common_utils import run_tests
-
 from torch_tensorrt.dynamo.conversion.plugins._generate_plugin import (
     _TORCH_SCHEMA_TYPE_TO_PLUGIN_ATTR_TYPE,
     np_scalar_attr_annotation,
@@ -56,6 +55,7 @@ class TestScalarAttrAnnotation(unittest.TestCase):
         for annotation in _TORCH_SCHEMA_TYPE_TO_PLUGIN_ATTR_TYPE.values():
             self.assertIs(typing.get_origin(annotation), np.ndarray)
 
+    @pytest.mark.trt_api
     def test_trt_validator_accepts_it(self):
         """End of the chain: TRT's own helpers must accept what we emit."""
         utils = pytest.importorskip(

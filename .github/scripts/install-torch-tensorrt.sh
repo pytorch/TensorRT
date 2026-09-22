@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
 set -ex
 
 TORCH=$(grep "^torch>" ${PWD}/py/requirements.txt)
@@ -42,6 +45,8 @@ PY
 python -m pip uninstall -y torch torchvision
 python -m pip install --force-reinstall --pre ${TORCHVISION} --index-url ${INDEX_URL} --extra-index-url https://pypi.org/simple
 python -m pip install --force-reinstall --pre ${TORCH} --index-url ${INDEX_URL} --extra-index-url https://pypi.org/simple
+# dynamo-torchao full/nightly suite
+python -m pip install torchao
 
 # Prepend the venv's NVIDIA CUDA runtime libs to LD_LIBRARY_PATH.
 SITE_PACKAGES="$(python -c 'import sysconfig; print(sysconfig.get_path("platlib"))')"

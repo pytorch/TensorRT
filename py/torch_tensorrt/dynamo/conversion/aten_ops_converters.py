@@ -1083,6 +1083,186 @@ if is_tensorrt_version_supported("10.8.0"):
             )
 
 
+try:
+    import torchao  # noqa: F401
+
+    assert torch.ops.torchao.dequantize_affine.default
+except Exception:
+    _LOGGER.debug(
+        "torchao not available; skipping torchao.dequantize_affine converter. "
+        "Install torchao to compile TorchAO weight-only quantized models."
+    )
+else:
+
+    @dynamo_tensorrt_converter(
+        torch.ops.torchao.dequantize_affine.default,
+        supports_dynamic_shapes=False,
+    )
+    def aten_ops_torchao_dequantize_affine(
+        ctx: ConversionContext,
+        target: Target,
+        args: Tuple[Argument, ...],
+        kwargs: Dict[str, Argument],
+        name: str,
+    ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+        # dequantize_affine(input, block_size, scale, zero_point, input_dtype,
+        #                   quant_min=None, quant_max=None, output_dtype=...)
+        output_dtype = kwargs.get("output_dtype")
+        if output_dtype is None:
+            output_dtype = args[7] if len(args) > 7 else torch.float16
+        input_dtype = args[4] if len(args) > 4 else None
+        zero_point = kwargs.get("zero_point")
+        if zero_point is None and len(args) > 3:
+            zero_point = args[3]
+        return impl.quantize.dequantize_affine(
+            ctx,
+            target,
+            SourceIR.ATEN,
+            name,
+            args[0],
+            args[1],
+            args[2],
+            output_dtype,
+            input_dtype=input_dtype,
+            zero_point=zero_point,
+        )
+
+
+try:
+    from torchao.quantization.quant_primitives import (  # noqa: F401
+        _dequantize_affine_float8_non_decomposed,
+        _quantize_affine_float8_non_decomposed,
+    )
+
+    assert torch.ops.torchao.quantize_affine_float8_non_decomposed.default
+    assert torch.ops.torchao.dequantize_affine_float8_non_decomposed.default
+except Exception:
+    _LOGGER.debug(
+        "torchao float8_non_decomposed ops not available; skipping static FP8 "
+        "Q/DQ converters. Import torchao quantization primitives to compile "
+        "TorchAO static FP8 graphs."
+    )
+else:
+
+    @dynamo_tensorrt_converter(
+        torch.ops.torchao.quantize_affine_float8_non_decomposed.default,
+        supports_dynamic_shapes=True,
+    )
+    def aten_ops_torchao_quantize_affine_float8(
+        ctx: ConversionContext,
+        target: Target,
+        args: Tuple[Argument, ...],
+        kwargs: Dict[str, Argument],
+        name: str,
+    ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+        return impl.quantize.quantize_affine_float8(
+            ctx,
+            target,
+            SourceIR.ATEN,
+            name,
+            args[0],
+            args[1],
+        )
+
+    @dynamo_tensorrt_converter(
+        torch.ops.torchao.dequantize_affine_float8_non_decomposed.default,
+        supports_dynamic_shapes=True,
+    )
+    def aten_ops_torchao_dequantize_affine_float8(
+        ctx: ConversionContext,
+        target: Target,
+        args: Tuple[Argument, ...],
+        kwargs: Dict[str, Argument],
+        name: str,
+    ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+        output_dtype = (
+            args[2] if len(args) > 2 else kwargs.get("output_dtype", torch.bfloat16)
+        )
+        return impl.quantize.dequantize_affine_float8(
+            ctx,
+            target,
+            SourceIR.ATEN,
+            name,
+            args[0],
+            args[1],
+            output_dtype,
+        )
+
+
+try:
+    from torch_tensorrt.dynamo.conversion import nvfp4_custom_op  # noqa: F401
+
+    assert torch.ops.torchao_trt.dequantize_nvfp4.default
+except Exception:
+    _LOGGER.debug(
+        "torchao NVFP4 custom op not available; skipping "
+        "torchao_trt.dequantize_nvfp4 converter. Install torchao with "
+        "prototype.mx_formats to compile TorchAO NVFP4 weight-only models."
+    )
+else:
+
+    @dynamo_tensorrt_converter(
+        torch.ops.torchao_trt.dequantize_nvfp4.default,
+        supports_dynamic_shapes=False,
+    )
+    def aten_ops_torchao_dequantize_nvfp4(
+        ctx: ConversionContext,
+        target: Target,
+        args: Tuple[Argument, ...],
+        kwargs: Dict[str, Argument],
+        name: str,
+    ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+        return impl.quantize.dequantize_nvfp4(
+            ctx,
+            target,
+            SourceIR.ATEN,
+            name,
+            args[0],
+            args[1],
+            args[2],
+            args[3],
+            args[4],
+            args[5],
+        )
+
+
+try:
+    from torch_tensorrt.dynamo.conversion import mxfp4_custom_op  # noqa: F401
+
+    assert torch.ops.torchao_trt.dequantize_mxfp4.default
+except Exception:
+    _LOGGER.debug(
+        "torchao MXFP4 custom op not available; skipping "
+        "torchao_trt.dequantize_mxfp4 converter. Install torchao with "
+        "prototype.mx_formats to compile TorchAO MXFP4 models."
+    )
+else:
+
+    @dynamo_tensorrt_converter(
+        torch.ops.torchao_trt.dequantize_mxfp4.default,
+        supports_dynamic_shapes=False,
+    )
+    def aten_ops_torchao_dequantize_mxfp4(
+        ctx: ConversionContext,
+        target: Target,
+        args: Tuple[Argument, ...],
+        kwargs: Dict[str, Argument],
+        name: str,
+    ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+        return impl.quantize.dequantize_mxfp4(
+            ctx,
+            target,
+            SourceIR.ATEN,
+            name,
+            args[0],
+            args[1],
+            args[2],
+            args[3],
+            args[4],
+            args[5],
+        )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.squeeze.dim, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.squeeze.dims, supports_dynamic_shapes=True)
 def aten_ops_squeeze(
@@ -1249,28 +1429,28 @@ def _index_copy_kv_eligible(
     *,
     input_node: Optional[Node] = None,
 ) -> bool:
-    """Validator for the KV-cache fast path of ``aten.index_copy.default``.
+    """Validator for the KV-cache fast path of aten.index_copy.default.
 
-    Returns True only for the narrow case our ``IKVCacheUpdateLayer``
+    Returns True only for the narrow case our IKVCacheUpdateLayer
     emitter can handle without a graph break:
 
     * Input is an FX placeholder (i.e. a network input — required for
       aliasing).
-    * Input has rank 4 and fully static shape ``[b, d, s_max, h]``.
-    * ``dim`` argument is exactly ``2``.
-    * Source tensor has rank 4 with ``shape[2] == 1`` (single-position
-      write; matches HF's per-step ``StaticCache.update`` call).
+    * Input has rank 4 and fully static shape [b, d, s_max, h].
+    * dim argument is exactly 2.
+    * Source tensor has rank 4 with shape[2] == 1 (single-position
+      write; matches HF's per-step StaticCache.update call).
     * Batch is 1 (avoids writeIndices broadcasting; trivially extensible
       to larger batches when needed).
 
     Cases that fail this validator fall through to
-    ``aten_ops_index_copy_fallback``.
+    aten_ops_index_copy_fallback.
 
-    ``input_node`` overrides which node the input checks are applied to. The
+    input_node overrides which node the input checks are applied to. The
     partitioner never passes it: by the time this runs as a capability validator,
     lowering has settled what the input is. The pre-conversion classifier in
-    ``lowering/_buffer_lifting.py`` runs before that and passes the node lowering
-    will leave behind, which is not always ``node.args[0]``.
+    lowering/_buffer_lifting.py runs before that and passes the node lowering
+    will leave behind, which is not always node.args[0].
     """
     # That same classifier marks a write it filed copy-back rather than KV, and its
     # value is a graph output by now. Aliasing it as well would hand the runtime an
@@ -1297,7 +1477,7 @@ def _index_copy_kv_eligible(
         return False  # batch > 1 deferred; see index_copy.index_copy_kv
 
     # IKVCacheUpdateLayer scatters along the sequence axis, which is axis 2 in
-    # the KV-cache layout it requires: ``[batch, num_heads, s_max, head_dim]``.
+    # the KV-cache layout it requires: [batch, num_heads, s_max, head_dim].
     # A write on any other axis is not a cache-position update and cannot be
     # expressed by the layer, so it must fall through to the scatter fallback.
     if dim != 2:
