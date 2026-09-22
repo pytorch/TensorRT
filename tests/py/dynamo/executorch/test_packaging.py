@@ -18,6 +18,8 @@ import types
 import zipfile
 from pathlib import Path
 
+import re
+
 import pytest
 import setuptools
 import yaml
@@ -684,11 +686,24 @@ def test_the_three_pinned_runtimes_keep_their_build_labels() -> None:
     assert (
         'f"executorch=={executorch_version}"' in requires
     ), f"executorch is not pinned with its label: {requires}"
-    # Anchored on the opening quote, because "torch==" is a substring of "executorch==".
-    for absent in ('"torch==', '"torch-tensorrt=='):
-        assert (
-            absent not in requires
-        ), f"{absent[1:]} is back in the requirements: {requires}"
+    # Normalised names, not source text. A substring match misses torch_tensorrt, matches this
+    # wheel's own name inside torch-tensorrt-executorch-runtime, and reads a comment that merely
+    # mentions a package as if it were a requirement.
+    from packaging.utils import canonicalize_name
+
+    named = {
+        canonicalize_name(m.group(1))
+        for m in re.finditer(r'"([A-Za-z0-9._-]+)(?:==|>=|<|;|")', requires)
+    }
+    assert (
+        canonicalize_name("torch-tensorrt") not in named
+    ), f"torch-tensorrt is back in the requirements: {sorted(named)}"
+    # PyTorch is the opposite case. It has to be there, because ExecuTorch imports it and
+    # declares it nowhere, and it has to carry no version, because ExecuTorch leaves that open.
+    assert canonicalize_name("torch") in named, f"torch is gone: {sorted(named)}"
+    assert (
+        '"torch=' not in requires and '"torch>' not in requires
+    ), f"torch is pinned again: {requires}"
     # And the two that legitimately have no label keep the public form.
     assert "public_version(tensorrt_version)" in requires, requires
     assert "public_version(cuda_runtime_version)" in requires, requires
@@ -708,13 +723,17 @@ def test_the_declared_pins_keep_their_build_labels(packaging_build, monkeypatch)
     executorch = [r for r in state.requires if r.startswith("executorch==")]
     assert executorch, state.requires
     assert "+cu" in executorch[0], executorch[0]
-    # And the two that must not be declared at all, read off what the build produced rather than
-    # off the source, because a value can be rewritten between the line that sets it and the line
-    # that uses it.
-    for absent in ("torch", "torch-tensorrt"):
-        assert not [
-            r for r in state.requires if r.startswith(f"{absent}==")
-        ], f"{absent} is declared again: {state.requires}"
+    # And the two the wheel must not pin, read off what the build produced rather than off the
+    # source, because a value can be rewritten between the line that sets it and the line that
+    # uses it. Torch-TensorRT must not appear at all, pinned or not, so it is matched by name.
+    assert not [
+        r for r in state.requires if r.startswith("torch==")
+    ], f"torch is pinned again: {state.requires}"
+    assert not [
+        r
+        for r in state.requires
+        if r.replace("_", "-").lower().startswith("torch-tensorrt")
+    ], f"torch-tensorrt is declared again: {state.requires}"
 
 
 @pytest.mark.unit
