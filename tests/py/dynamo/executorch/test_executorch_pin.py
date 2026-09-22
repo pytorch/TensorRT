@@ -96,7 +96,6 @@ _EXPECTED_REQUIREMENT_SITES = {
     "docker/MODULE.bazel.docker": 1,
     "docker/MODULE.bazel.ngc": 1,
     "justfile": 1,
-    "pyproject.toml": 1,
     # Require the fenced install command; prose cannot replace it.
     "py/torch-tensorrt-executorch-runtime/README.md": 1,
     "py/torch-tensorrt-executorch-runtime/pyproject.toml": 1,
@@ -519,9 +518,15 @@ def test_derived_requirements_match_the_pin(monkeypatch) -> None:
             for element in getattr(value, "elts", [])
             if isinstance(element, ast.Name)
         ]
-        assert named.count("EXECUTORCH_REQUIREMENT") == 1, (
+        assert named.count("EXECUTORCH_RUNTIME_REQUIREMENT") == 1, (
             f"extra {getattr(key, 'value', key)!r} does not reference "
-            f"EXECUTORCH_REQUIREMENT exactly once: {named}"
+            f"EXECUTORCH_RUNTIME_REQUIREMENT exactly once: {named}. The companion "
+            "carries the ExecuTorch version, so every published extra has to name it."
+        )
+        assert "EXECUTORCH_REQUIREMENT" not in named, (
+            f"extra {getattr(key, 'value', key)!r} states the ExecuTorch version a second "
+            f"time: {named}. The companion pins the exact build it was compiled against, and "
+            "a range here cannot agree with it on the day the pin moves."
         )
 
     # The doc build reads the pin through shell substitution, outside the literal scan.
@@ -1204,47 +1209,51 @@ def test_a_failed_setup_step_stops_the_suite(monkeypatch, tmp_path, setup_rc):
 
 
 def _assert_development_lock_matches_pin(lock: dict, version: str) -> None:
-    from packaging.markers import Marker
-    from packaging.specifiers import SpecifierSet
-    from packaging.version import Version
+    """The lock must leave the ExecuTorch version to the companion.
 
-    refresh = (
-        "Regenerate uv.lock with PYTHON_ONLY=1 uv lock --refresh --prerelease=allow."
-    )
-    constraints = [
+    It deliberately does not have to match the pin. The companion carries the exact
+    ExecuTorch it was compiled against, and on the day the pin moves no published
+    companion carries the new one yet, so requiring the pin here is what stopped the
+    nightly bump from ever landing. Agreement on the version is enforced by the
+    resolution itself: the companion asks for one build, so that is the one recorded.
+    """
+    constrained = [
         entry
         for entry in lock.get("manifest", {}).get("constraints", [])
         if entry["name"] == "executorch"
     ]
-    assert constraints == [{"name": "executorch", "specifier": f"=={version}"}], refresh
+    assert constrained == [], (
+        f"the lock constrains the ExecuTorch version: {constrained}. The companion "
+        "carries that version, so a constraint here cannot agree with it on a bump day."
+    )
+
     resolved = [p for p in lock.get("package", []) if p["name"] == "executorch"]
-    assert resolved and all(
-        Version(p["version"]).public == version for p in resolved
-    ), refresh
+    assert resolved, "the lock records no ExecuTorch at all"
+
+    companions = [
+        p
+        for p in lock.get("package", [])
+        if p["name"] == "torch-tensorrt-executorch-runtime"
+    ]
+    assert companions, "the lock records no companion, so nothing carries the version"
+    assert all(
+        any(d["name"] == "executorch" for d in c.get("dependencies", []))
+        for c in companions
+    ), "a companion in the lock does not depend on ExecuTorch"
+
     roots = [p for p in lock["package"] if p["name"] == "torch-tensorrt"]
-    assert len(roots) == 1, refresh
+    assert len(roots) == 1, "the lock does not record this project exactly once"
     recorded = [
         r
         for r in roots[0].get("metadata", {}).get("requires-dist", [])
         if r["name"] == "executorch"
     ]
-    major, minor = _release_line(version)
-    expected = SpecifierSet(f">={version},<{major}.{int(minor) + 1}")
-    assert len(recorded) == 2 and all(
-        SpecifierSet(r["specifier"]) == expected for r in recorded
-    ), refresh
-    for platform in ("linux", "win32", "darwin"):
-        for extra in ("all", "executorch", ""):
-            selected = sum(
-                Marker(r.get("marker", "")).evaluate(
-                    {"sys_platform": platform, "extra": extra}
-                )
-                for r in recorded
-            )
-            assert selected == int(platform == "linux" and extra != ""), refresh
+    assert recorded == [], (
+        f"the project records an ExecuTorch requirement of its own: {recorded}. The "
+        "companion is the only place that version belongs."
+    )
 
 
-@pytest.mark.unit
 def test_the_lockfile_executorch_matches_the_pin():
     import tomllib
 
@@ -1259,42 +1268,31 @@ def test_the_lockfile_executorch_matches_the_pin():
 )
 def test_development_lock_guard_rejects_drift(local, mutation):
     version = "1.5.0.dev1"
-    constraint = {"name": "executorch", "specifier": f"=={version}"}
     package = {"name": "executorch", "version": version + local}
-    requirements = [
-        {
-            "name": "executorch",
-            "specifier": f">={version},<1.6",
-            "marker": f"sys_platform == 'linux' and extra == '{extra}'",
-        }
-        for extra in ("all", "executorch")
-    ]
-    lock = {
-        "manifest": {"constraints": [constraint]},
-        "package": [
-            package,
-            {
-                "name": "torch-tensorrt",
-                "metadata": {
-                    "requires-dist": requirements,
-                },
-            },
-        ],
+    companion = {
+        "name": "torch-tensorrt-executorch-runtime",
+        "dependencies": [{"name": "executorch"}],
     }
+    root = {"name": "torch-tensorrt", "metadata": {"requires-dist": []}}
+    lock = {"manifest": {"constraints": []}, "package": [package, companion, root]}
     if mutation == "constraint":
-        constraint["specifier"] = ">=1.4.1"
+        lock["manifest"]["constraints"] = [
+            {"name": "executorch", "specifier": f"=={version}"}
+        ]
     elif mutation == "resolved":
-        package["version"] = "1.4.1"
-    elif mutation == "missing":
         lock["package"].remove(package)
+    elif mutation == "missing":
+        lock["package"].remove(companion)
     elif mutation == "range":
-        requirements[0]["specifier"] = ">=1.4.1,<1.5"
+        root["metadata"]["requires-dist"] = [
+            {"name": "executorch", "specifier": f">={version},<1.6"}
+        ]
     elif mutation == "marker":
-        requirements[0]["marker"] = "extra == 'all'"
+        companion["dependencies"] = []
     if mutation is None:
         _assert_development_lock_matches_pin(lock, version)
     else:
-        with pytest.raises(AssertionError, match="Regenerate uv.lock"):
+        with pytest.raises(AssertionError):
             _assert_development_lock_matches_pin(lock, version)
 
 
@@ -2321,16 +2319,19 @@ def test_update_workflow_requires_manual_downgrade_authority(tmp_path, allow):
 
 
 @pytest.mark.unit
-def test_development_lock_constraint_matches_the_pin():
+def test_development_lock_does_not_constrain_executorch():
     import tomllib
 
     config = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text())
     requirements = [
         Requirement(value) for value in config["tool"]["uv"]["constraint-dependencies"]
     ]
-    constraints = [r for r in requirements if r.name == "executorch"]
-    assert len(constraints) == 1
-    assert str(constraints[0].specifier) == f'=={_versions()["__executorch_version__"]}'
+    named = [r.name for r in requirements if r.name == "executorch"]
+    assert named == [], (
+        f"a constraint names the ExecuTorch version a second time: {named}. The companion "
+        "carries that version, and a constraint here cannot agree with it on the day the "
+        "pin moves."
+    )
 
 
 @pytest.mark.unit

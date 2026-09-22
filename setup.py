@@ -232,9 +232,16 @@ EXECUTORCH_REQUIREMENT = (
 EXECUTORCH_RUNTIME_REQUIREMENT = (
     "torch-tensorrt-executorch-runtime; platform_system == 'Linux'"
 )
+# The companion is the only thing named here. It pins the exact ExecuTorch it was
+# compiled against, so naming a range beside it states the version twice, and the
+# two statements cannot both hold on the day the pin moves: the range asks for the
+# new build while every published companion still asks for the previous one, and a
+# resolver has nothing left to choose. Leaving the companion as the single source
+# of the version keeps a bump resolvable, and a mismatch is still refused, by the
+# companion itself at import rather than by a range here.
 EXTRAS_REQUIRE = {
-    "executorch": [EXECUTORCH_REQUIREMENT, EXECUTORCH_RUNTIME_REQUIREMENT],
-    "all": [EXECUTORCH_REQUIREMENT, EXECUTORCH_RUNTIME_REQUIREMENT],
+    "executorch": [EXECUTORCH_RUNTIME_REQUIREMENT],
+    "all": [EXECUTORCH_RUNTIME_REQUIREMENT],
 }
 
 if "--ci" in sys.argv:
