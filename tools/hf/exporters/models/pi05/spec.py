@@ -25,6 +25,7 @@ from .helpers import (
     pi05_compact_index,
 )
 from .patches import PI05
+from .vision import Pi05HwcVision, nchw_to_hwc
 
 
 @register_edge_spec("pi05")
@@ -281,17 +282,22 @@ class Pi05Spec(EdgeSpec):  # type: ignore[misc]
         paligemma = core.paligemma_with_expert.paligemma.model
         language = paligemma.language_model
         px = sample["pixel_values"]
+        px_hwc = nchw_to_hwc(px)
         device = px.device
         dtype = px.dtype
 
         vision = ComponentBundle(
-            module=paligemma.eval(),
-            trace_args=(px,),
-            save_args=(px,),
+            module=Pi05HwcVision(paligemma).eval(),
+            trace_args=(px_hwc,),
+            save_args=(px_hwc,),
             input_names=["pixel_values"],
             output_names=["visual_embeds"],
             model_type="vit",
             engine_file="visual.engine",
+            extra_config={
+                "input_layout": "hwc",
+                "input_dtype": str(px_hwc.dtype).removeprefix("torch."),
+            },
             trt_settings={
                 "disable_tf32": False,
                 "use_fp32_acc": False,
@@ -451,7 +457,9 @@ class Pi05Spec(EdgeSpec):  # type: ignore[misc]
         return {"vision": vision, "language": language_bundle, "action": action}
 
     def run(self, engines: Mapping[str, str], sample: Mapping[str, Any]) -> Any:
-        vis = call_engine(engines["vision"], "vision", sample["pixel_values"])[0]
+        vis = call_engine(
+            engines["vision"], "vision", nchw_to_hwc(sample["pixel_values"])
+        )[0]
         prefix = fuse_prefix(vis, sample["lang_embeds"], sample["compact_index"])
         lm = call_engine(
             engines["language"],
