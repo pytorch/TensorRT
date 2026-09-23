@@ -8,6 +8,7 @@ import torch.nn as nn
 
 from ...ops import call_engine, scatter_image_tokens
 from ...prefix_cache import PrefixKVCache
+from ...quantization import FP8CheckpointLinear
 from ...spec import ComponentBundle, EdgeSpec, register_edge_spec
 from ..common.helpers import (
     causal_lm_flat,
@@ -23,11 +24,14 @@ from .helpers import (
     prepare_fixed_grid_vision,
     scatter_visual_tokens,
     stack_deepstack_features,
+    unpack_visual_output,
 )
 from .patches import ALPAMAYO
 
 
 def _export_module(module: nn.Module, device: torch.device, dtype: torch.dtype):
+    if any(isinstance(child, FP8CheckpointLinear) for child in module.modules()):
+        return module.eval().to(device=device)
     return module.eval().to(device=device, dtype=dtype)
 
 
@@ -144,13 +148,19 @@ class AlpamayoSpec(EdgeSpec):  # type: ignore[misc]
         del config
         from ...measure import cuda_ms
 
+        # Running all three eager components alongside an 11 GB compressed
+        # checkpoint defeats the memory savings needed for engine building.
+        # Each compiled component is still executed by compile_component.
+        if any(isinstance(module, FP8CheckpointLinear) for module in model.modules()):
+            return {}
+
         visual = alpamayo_visual(model)
         language = alpamayo_language(model)
         px = sample["pixel_values"]
         grid = sample["image_grid_thw"]
 
         with torch.no_grad():
-            visual_embeds, deepstack = visual(px, grid)
+            visual_embeds, deepstack = unpack_visual_output(visual(px, grid))
             deepstack = stack_deepstack_features(deepstack)
             language_out = language(
                 inputs_embeds=sample["inputs_embeds"],
@@ -187,7 +197,7 @@ class AlpamayoSpec(EdgeSpec):  # type: ignore[misc]
             ).reshape_as(sample["step_actions"])
 
         if bench is not None:
-            bench["vision"] = cuda_ms(lambda: visual(px, grid)[0])
+            bench["vision"] = cuda_ms(lambda: unpack_visual_output(visual(px, grid))[0])
             bench["language"] = cuda_ms(
                 lambda: language(
                     inputs_embeds=sample["inputs_embeds"],
@@ -239,15 +249,15 @@ class AlpamayoSpec(EdgeSpec):  # type: ignore[misc]
             trt_settings={
                 "disable_tf32": False,
                 "use_fp32_acc": False,
-                "use_explicit_typing": False,
+                "use_explicit_typing": True,
                 "decompose_attention": True,
             },
         )
 
         with torch.no_grad():
-            visual_embeds, deepstack = visual(px, grid)
+            visual_embeds, deepstack = unpack_visual_output(visual(px, grid))
             deepstack = stack_deepstack_features(deepstack)
-            text_embeds = model.get_input_embeddings()(sample["input_ids"])
+            text_embeds = language.embed_tokens(sample["input_ids"])
 
         image_token_id = int(vlm.config.image_token_id)
         image_token_mask = sample["input_ids"] == image_token_id
@@ -403,6 +413,10 @@ class AlpamayoSpec(EdgeSpec):  # type: ignore[misc]
                 device=device,
                 prefix_mask=sample["attention_mask"],
             )
+        )
+        suffix_attention_mask = suffix_attention_mask.to(
+            device=device,
+            dtype=dtype,
         )
         sample["prefix_k"] = prefix_k
         sample["prefix_v"] = prefix_v

@@ -63,6 +63,8 @@ class EdgeExporter(DynamoExporter):  # type: ignore[misc]
 
         eager_ms: dict[str, float] = {}
         eager = spec.capture_eager_outputs(model, sample, config, bench=eager_ms)
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
         engines: dict[str, str] = {}
         self.bench = {}
@@ -80,6 +82,8 @@ class EdgeExporter(DynamoExporter):  # type: ignore[misc]
                 ref = eager.get(name)
                 if isinstance(ref, torch.Tensor) and isinstance(trt, torch.Tensor):
                     parity(f"{name} eager vs TRT", ref, trt)
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
 
         runtime = EdgeRuntimeModule(spec, engines)
         runtime_kwargs = _clone_export_kwargs(spec.runtime_kwargs(sample))

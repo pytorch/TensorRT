@@ -1,10 +1,15 @@
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 
 import torch
 
 from ...config import EdgeConfig
+from ...quantization import (
+    is_modelopt_fp8_checkpoint,
+    load_modelopt_fp8_model,
+)
 from ...utils import force_hf_attention
 from .helpers import (
     alpamayo_language,
@@ -20,28 +25,59 @@ def prepare_export(
     dtype: torch.dtype,
 ):
     """Load a base or ModelOpt-quantized Alpamayo checkpoint."""
-    try:
-        import modelopt.torch.opt as mto
-    except ImportError as exc:
-        raise ImportError(
-            "Alpamayo export requires NVIDIA ModelOpt. "
-            "Install the nvidia-modelopt package."
-        ) from exc
-
-    # Must be enabled before ``from_pretrained`` restores modelopt_state.pth.
-    mto.enable_huggingface_checkpointing()
-
     from alpamayo1_5.models.alpamayo1_5 import Alpamayo1_5
 
-    model = (
-        Alpamayo1_5.from_pretrained(
-            args.checkpoint or DEFAULT_CHECKPOINT,
+    checkpoint = args.checkpoint or DEFAULT_CHECKPOINT
+    if Path(checkpoint).is_dir() and is_modelopt_fp8_checkpoint(checkpoint):
+        from accelerate import init_empty_weights
+        from alpamayo1_5.config import Alpamayo1_5Config
+
+        class ExportAlpamayo1_5(Alpamayo1_5):
+            """Adapt Alpamayo's Transformers 4.x tie_weights override."""
+
+            def tie_weights(self, *args, **kwargs):
+                del args, kwargs
+                return super().tie_weights()
+
+        config = Alpamayo1_5Config.from_pretrained(checkpoint)
+        config.attn_implementation = "eager"
+        with init_empty_weights():
+            model = ExportAlpamayo1_5(config)
+        stats = load_modelopt_fp8_model(
+            model,
+            checkpoint,
+            device=device,
             dtype=dtype,
-            attn_implementation="eager",
         )
-        .to(device=device, dtype=dtype)
-        .eval()
-    )
+        print(
+            "Loaded compressed ModelOpt checkpoint directly: "
+            f"{stats['fp8_linears']} FP8 linears; "
+            f"{stats['unsupported_attention_quantizers']} "
+            "attention-core quantizer tensors use FP16 plugin execution."
+        )
+        # Move non-persistent rotary/frequency buffers created by the model
+        # constructor. Do not pass dtype: compressed FP8 weights must stay FP8.
+        model.to(device=device).eval()
+    else:
+        try:
+            import modelopt.torch.opt as mto
+        except ImportError as exc:
+            raise ImportError(
+                "Alpamayo export requires NVIDIA ModelOpt. "
+                "Install the nvidia-modelopt package."
+            ) from exc
+
+        # Enable restoration for ordinary fake-quant ModelOpt checkpoints.
+        mto.enable_huggingface_checkpointing()
+        model = (
+            Alpamayo1_5.from_pretrained(
+                checkpoint,
+                dtype=dtype,
+                attn_implementation="eager",
+            )
+            .to(device=device, dtype=dtype)
+            .eval()
+        )
 
     force_hf_attention(alpamayo_visual(model), "eager")
     force_hf_attention(alpamayo_language(model), "eager")
