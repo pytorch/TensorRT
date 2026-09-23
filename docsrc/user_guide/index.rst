@@ -9,6 +9,8 @@ Conceptual guides and how-tos for Torch-TensorRT.
    torch_tensorrt_explained
    compilation/index
    edge_exporter
+   alpamayo_modelopt_fp8
+   alpamayo_fp8_edge_exporter
    shapes_precision/index
    runtime_performance/index
    performance_tuning
