@@ -856,11 +856,11 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             return output
 
         if tuple(output.shape) != (1,):
-            _LOGGER.warning(
+            raise RuntimeError(
                 f"Output {output_name} is a scalar in the graph but the network "
-                f"produced shape {tuple(output.shape)}, leaving its rank alone."
+                f"produced shape {tuple(output.shape)}; expected rank 0 or a length-1 "
+                f"vector. This likely indicates a bug in the converter that produced it."
             )
-            return output
 
         layer = self.ctx.net.add_shuffle(output)
         layer.reshape_dims = ()
