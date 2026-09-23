@@ -22,6 +22,7 @@ from typing import (
 import numpy as np
 import torch
 from tensorrt import ITensor as TRTTensor
+from torch.fx.experimental.symbolic_shapes import statically_known_true
 from torch.fx.node import Argument, Node, Target
 from torch_tensorrt import ENABLED_FEATURES, _enums
 from torch_tensorrt._utils import (
@@ -272,7 +273,7 @@ def parse_cat_args(
 
 def _is_rank1_empty_shape(shape: Sequence[int]) -> bool:
     """Is this the shape of a rank-1 empty tensor, as torch.tensor([]) produces?"""
-    return len(shape) == 1 and shape[0] == 0
+    return len(shape) == 1 and statically_known_true(shape[0] == 0)
 
 
 def _is_rank1_empty(value: Any) -> bool:

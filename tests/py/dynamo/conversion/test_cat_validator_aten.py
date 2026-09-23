@@ -43,6 +43,20 @@ class TestCatValidator(unittest.TestCase):
     def test_single_operand_is_accepted(self):
         self.assertTrue(cat_validator(_make_cat_node([(0,)])))
 
+    def test_unbacked_rank1_operands_do_not_guard(self):
+        """Data-dependent lengths must not force a guard during validation."""
+
+        class M(torch.nn.Module):
+            def forward(self, x):
+                a = torch.nonzero(x).flatten().float()
+                return torch.cat([a, a * 2])
+
+        ep = torch.export.export(M(), (torch.tensor([0, 1, 1]),), strict=False)
+        cat = next(n for n in ep.graph.nodes if n.target is torch.ops.aten.cat.default)
+        for operand in cat.args[0]:
+            self.assertIsInstance(operand.meta["tensor_meta"].shape[0], torch.SymInt)
+        self.assertTrue(cat_validator(cat))
+
 
 if __name__ == "__main__":
     run_tests()
