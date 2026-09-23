@@ -28,6 +28,7 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
 from torch_tensorrt.dynamo.partitioning._global_partitioner import (
     TorchTensorRTOperatorSupport,
 )
+from torch_tensorrt.dynamo.partitioning.common import node_in_torch_executed_module
 from torch_tensorrt.dynamo.utils import to_torch_device
 
 logger = logging.getLogger(__name__)
@@ -36,7 +37,11 @@ logger = logging.getLogger(__name__)
 class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
     """Class to determine whether operators within a module are supported"""
 
-    def __init__(self, torch_executed_ops: Collection[Target] = set()) -> None:
+    def __init__(
+        self,
+        torch_executed_ops: Collection[Target] = set(),
+        torch_executed_modules: Collection[str] = set(),
+    ) -> None:
         super().__init__()
 
         # Initialize sets of supported/unsupported operators
@@ -44,6 +49,7 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
         self.unsupported_operators: Dict[str, int] = {}
         self.torch_executed_ops = torch_executed_ops
         self._non_target_device_cache: Dict[torch.fx.Node, bool] = {}
+        self.torch_executed_modules = torch_executed_modules
 
     def is_node_supported(
         self, submodules: Dict[str, torch.nn.Module], node: torch.fx.Node
@@ -112,6 +118,7 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
             (node in CONVERTERS or node.op == "get_attr")
             and node_name not in self.torch_executed_ops
             and node.target not in self.torch_executed_ops
+            and not node_in_torch_executed_module(node, self.torch_executed_modules)
         ):
             # If node is a proper, supported computational node, store the operator
             if not node.is_impure() and node.op != "get_attr":
@@ -364,6 +371,7 @@ def partition(
     gm: torch.fx.GraphModule,
     min_block_size: int = MIN_BLOCK_SIZE,
     torch_executed_ops: Collection[Target] = set(),
+    torch_executed_modules: Collection[str] = set(),
     require_full_compilation: bool = REQUIRE_FULL_COMPILATION,
     skip_fusion: bool = False,
     assume_full_support: bool = False,
@@ -375,6 +383,7 @@ def partition(
         gm: FX GraphModule to partition
         min_block_size: Minimum number of operators per TRT-Engine Block
         torch_executed_ops: Collection of operations to run in Torch, regardless of converter coverage
+        torch_executed_modules: Collection of modules to run in Torch
         require_full_compilation: Require that all computational operators be run in TRT
         skip_fusion: Skip fusions found by FxNetAccFusionsFinder
         assume_full_support: Skip repeated support/dependency discovery because
@@ -387,8 +396,24 @@ def partition(
     gm.graph.lint()
     gm.recompile()
 
+    if torch_executed_modules:
+        all_module_types = {
+            module_type
+            for node in gm.graph.nodes
+            for _, module_type in (node.meta.get("nn_module_stack") or {}).values()
+        }
+        unmatched = set(torch_executed_modules) - all_module_types
+        if unmatched:
+            logger.warning(
+                f"The following torch_executed_modules were not found in the graph: "
+                f"{unmatched}. Ensure the module names are fully-qualified class names."
+            )
+
     # Construct
-    supported_ops = OpSupportTester(torch_executed_ops=torch_executed_ops)
+    supported_ops = OpSupportTester(
+        torch_executed_ops=torch_executed_ops,
+        torch_executed_modules=torch_executed_modules,
+    )
     partitioner = TRTPartitioner(
         gm,
         supported_ops,
