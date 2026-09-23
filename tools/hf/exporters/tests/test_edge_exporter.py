@@ -153,15 +153,17 @@ def test_alpamayo_backend_registers_qwen_vision_language_and_action():
 
     paths = [path for path, _ in _PATCHES[ALPAMAYO]]
     assert any("Qwen3VLVisionAttention.forward" in path for path in paths)
+    assert any("Qwen3VLVisionModel.forward" in path for path in paths)
     assert any("Qwen3VLTextAttention.forward" in path for path in paths)
     assert any("Qwen3VLForConditionalGeneration.forward" in path for path in paths)
+    assert any("Alpamayo1_5.forward" in path for path in paths)
 
 
 @pytest.mark.unit
-def test_alpamayo_action_module_forward_shape():
+def test_alpamayo_action_patch_uses_explicit_prefix_kv():
     from types import SimpleNamespace
 
-    from exporters.models.alpamayo.helpers import StaticKVDiffusionStepModule
+    from exporters.models.alpamayo.patches import _patch_alpamayo_action_step
 
     class ActionIn(nn.Module):
         def forward(self, actions, timestep):
@@ -172,15 +174,25 @@ def test_alpamayo_action_module_forward_shape():
             del kwargs
             return SimpleNamespace(last_hidden_state=inputs_embeds)
 
-    projection = nn.Linear(2, 2, bias=False)
-    projection.weight.data.copy_(torch.eye(2))
-    module = StaticKVDiffusionStepModule(
-        ActionIn(),
-        Expert(),
-        projection,
-        (4, 2),
-    )
-    output = module(
+    class Alpamayo(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.config = SimpleNamespace(expert_non_causal_attention=True)
+            self.action_in_proj = ActionIn()
+            self.expert = Expert()
+            self.action_out_proj = nn.Linear(2, 2, bias=False)
+            self.action_out_proj.weight.data.copy_(torch.eye(2))
+
+        def forward(self, noisy_action, timestep=None, *args, **kwargs):
+            del timestep, args, kwargs
+            return noisy_action - 1
+
+    Alpamayo.forward = _patch_alpamayo_action_step(Alpamayo.forward)
+    model = Alpamayo()
+    actions = torch.zeros(1, 4, 2)
+    torch.testing.assert_close(model(actions), actions - 1)
+
+    output = model(
         torch.zeros(1, 4, 2),
         torch.ones(1, 1, 1),
         torch.zeros(1, 1, 1, 3, 2),

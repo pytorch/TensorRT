@@ -7,6 +7,7 @@ import torch
 import torch.nn as nn
 
 from ...ops import call_engine, scatter_image_tokens
+from ...prefix_cache import PrefixKVCache
 from ...spec import ComponentBundle, EdgeSpec, register_edge_spec
 from ..common.helpers import (
     causal_lm_flat,
@@ -14,13 +15,12 @@ from ..common.helpers import (
     split_flat_to_kwargs,
 )
 from .helpers import (
-    StaticKVDiffusionStepModule,
-    VisualFixedGrid,
     alpamayo_language,
     alpamayo_visual,
     alpamayo_vlm,
     alpamayo_vlm_core,
     make_deepstack_tensor,
+    prepare_fixed_grid_vision,
     scatter_visual_tokens,
     stack_deepstack_features,
 )
@@ -163,14 +163,28 @@ class AlpamayoSpec(EdgeSpec):  # type: ignore[misc]
                 use_cache=False,
                 return_dict=True,
             )
-            velocity = sample["action_module"](
+            action_embeds = model.action_in_proj(
                 sample["step_actions"],
                 sample["step_timestep"],
-                sample["prefix_k"],
-                sample["prefix_v"],
-                sample["suffix_position_ids"],
-                sample["suffix_attention_mask"],
             )
+            expert_kwargs: dict[str, Any] = {}
+            if model.config.expert_non_causal_attention:
+                expert_kwargs["is_causal"] = False
+            expert = model.expert(
+                inputs_embeds=action_embeds,
+                position_ids=sample["suffix_position_ids"],
+                past_key_values=PrefixKVCache(
+                    sample["prefix_k"],
+                    sample["prefix_v"],
+                ),
+                attention_mask=sample["suffix_attention_mask"],
+                use_cache=False,
+                return_dict=True,
+                **expert_kwargs,
+            )
+            velocity = model.action_out_proj(
+                expert.last_hidden_state[:, -int(sample["step_actions"].shape[1]) :]
+            ).reshape_as(sample["step_actions"])
 
         if bench is not None:
             bench["vision"] = cuda_ms(lambda: visual(px, grid)[0])
@@ -212,12 +226,9 @@ class AlpamayoSpec(EdgeSpec):  # type: ignore[misc]
 
         visual.config.attn_implementation = "sdpa"
         visual.config._attn_implementation = "sdpa"
-        fixed_visual = VisualFixedGrid(visual, grid).to(
-            device=device,
-            dtype=dtype,
-        )
+        prepare_fixed_grid_vision(visual, grid)
         vision = ComponentBundle(
-            module=fixed_visual.eval(),
+            module=_export_module(visual, device, dtype),
             trace_args=(px,),
             save_args=(px,),
             input_names=["pixel_values"],
@@ -399,17 +410,6 @@ class AlpamayoSpec(EdgeSpec):  # type: ignore[misc]
         sample["suffix_attention_mask"] = suffix_attention_mask
 
         model.expert.config._attn_implementation = "sdpa"
-        action_module = (
-            StaticKVDiffusionStepModule(
-                model.action_in_proj,
-                model.expert,
-                model.action_out_proj,
-                action_dims,
-            )
-            .to(device=device, dtype=dtype)
-            .eval()
-        )
-        sample["action_module"] = action_module
         action_args = (
             step_actions,
             step_timestep,
@@ -419,7 +419,7 @@ class AlpamayoSpec(EdgeSpec):  # type: ignore[misc]
             suffix_attention_mask,
         )
         action = ComponentBundle(
-            module=action_module,
+            module=_export_module(model, device, dtype),
             trace_args=action_args,
             save_args=action_args,
             input_names=[
