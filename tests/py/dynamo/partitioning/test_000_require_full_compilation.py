@@ -2,6 +2,7 @@ import torch
 import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import TestCase, run_tests
+from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 
 
 class TestRequireFullCompilation(TestCase):
@@ -124,10 +125,12 @@ class TestRequireFullCompilation(TestCase):
         module = self._large_fully_convertible_module()
         compiled = self._compile(module, inputs, **kwargs)
         segments = self._segments(compiled)
-        self.assertTrue(
-            any("_run_on_acc" in segment for segment in segments),
-            f"expected a TensorRT engine, got {segments}",
-        )
+        engines = [
+            child
+            for child in compiled.modules()
+            if isinstance(child, TorchTensorRTModule)
+        ]
+        self.assertEqual(len(engines), 1)
         self.assertFalse(
             any("_run_on_gpu" in segment for segment in segments),
             f"expected no PyTorch segment, got {segments}",
