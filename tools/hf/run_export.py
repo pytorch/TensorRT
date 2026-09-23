@@ -21,6 +21,7 @@ ExportPreparer = Callable[
 ]
 
 EXPORT_PREPARERS = {
+    "alpamayo": "exporters.models.alpamayo.export:prepare_export",
     "groot": "exporters.models.groot.export:prepare_export",
     "pi05": "exporters.models.pi05.export:prepare_export",
     "nemotron": "exporters.models.nemotron.export:prepare_export",
@@ -42,6 +43,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--prompt", default="Hello, how are you?")
     parser.add_argument("--engine-dir")
     parser.add_argument("--max-seq-len", type=int)
+    parser.add_argument(
+        "--clip-id",
+        help="PhysicalAI clip ID used to prepare Alpamayo sample inputs.",
+    )
+    parser.add_argument(
+        "--t0-us",
+        type=int,
+        default=5_100_000,
+        help="Timestamp within the Alpamayo sample clip (default: 5100000).",
+    )
     parser.add_argument("--device")
     parser.add_argument(
         "--dtype",
