@@ -54,17 +54,22 @@ class TestScalarEngineOutputs(TestCase):
         return engines[0]
 
     def _meta_and_real_output_shapes(self, engine_module):
+        # Call the engine op directly rather than engine_module(...): the module
+        # unwraps a scalar output to a Python number (.item()), which has no shape.
         real = [
             tuple(output.shape)
-            for output in engine_module(torch.randn((ROWS,), device="cuda"))
+            for output in torch.ops.tensorrt.execute_engine(
+                [torch.randn((ROWS,), device="cuda")], engine_module.engine
+            )
         ]
         # The meta kernel answers from the engine's recorded shape metadata, which
         # is the only account of the engine any later trace sees.
         with FakeTensorMode(shape_env=ShapeEnv(), allow_non_fake_inputs=True):
             meta = [
                 tuple(output.shape)
-                for output in engine_module(
-                    torch.empty((ROWS,), dtype=torch.float32, device="cuda")
+                for output in torch.ops.tensorrt.execute_engine(
+                    [torch.empty((ROWS,), dtype=torch.float32, device="cuda")],
+                    engine_module.engine,
                 )
             ]
         return meta, real
