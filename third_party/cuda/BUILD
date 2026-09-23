@@ -17,6 +17,15 @@ config_setting(
     ],
 )
 
+# Every header in the toolkit, for targets that need the headers and none of the
+# libraries. The header-only shared scratch pool is the one that does. The library
+# targets below keep their own header globs, so nothing pre-existing changes shape.
+cc_library(
+    name = "cuda_headers",
+    hdrs = glob(["include/**/*"]),
+    includes = ["include/"],
+)
+
 cc_library(
     name = "cudart",
     srcs = select({
