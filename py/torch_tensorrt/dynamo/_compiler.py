@@ -219,7 +219,8 @@ def cross_compile_for_windows(
             Torch-TensorRT rules to disable. Rules are registered by lowering
             implementations and enabled by default; compilation users do not
             need to register them. Disabling a rule makes its matching nodes
-            foldable. Default is empty.
+            foldable. Supported IDs: ``"attention_mask_arange"``.
+            Default is empty.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
         fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.
         **kwargs: Any,
@@ -613,7 +614,8 @@ def compile(
             Torch-TensorRT rules to disable. Rules are registered by lowering
             implementations and enabled by default; compilation users do not
             need to register them. Disabling a rule makes its matching nodes
-            foldable. Default is empty.
+            foldable. Supported IDs: ``"attention_mask_arange"``.
+            Default is empty.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
         fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.
         **kwargs: Any,
@@ -1989,7 +1991,8 @@ def convert_exported_program_to_serialized_trt_engine(
             Torch-TensorRT rules to disable. Rules are registered by lowering
             implementations and enabled by default; compilation users do not
             need to register them. Disabling a rule makes its matching nodes
-            foldable. Default is empty.
+            foldable. Supported IDs: ``"attention_mask_arange"``.
+            Default is empty.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
         **kwargs: Any,
     Returns:
