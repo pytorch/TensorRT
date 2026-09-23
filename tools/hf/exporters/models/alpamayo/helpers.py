@@ -62,6 +62,49 @@ def unpack_visual_output(output: Any) -> tuple[torch.Tensor, Any]:
     )
 
 
+def prepare_edge_visual_inputs(
+    visual: nn.Module,
+    pixel_values: torch.Tensor,
+    grid_thw: torch.Tensor,
+) -> tuple[torch.Tensor, ...]:
+    """Build Qwen3-VL inputs matching Edge's Qwen3VLViTRunner bindings."""
+    from transformers.vision_utils import (
+        get_vision_bilinear_indices_and_weights,
+        get_vision_cu_seqlens,
+        get_vision_position_ids,
+    )
+
+    fast_indices, fast_weights = get_vision_bilinear_indices_and_weights(
+        grid_thw,
+        num_grid_per_side=visual.num_grid_per_side,
+        spatial_merge_size=visual.spatial_merge_size,
+    )
+    position_ids = get_vision_position_ids(
+        grid_thw,
+        visual.spatial_merge_size,
+    )
+    rotary_pos_emb = visual.rotary_pos_emb(position_ids).reshape(
+        pixel_values.shape[0],
+        -1,
+    )
+    cu_seqlens = get_vision_cu_seqlens(grid_thw)
+    sequence_lengths = cu_seqlens[1:] - cu_seqlens[:-1]
+    max_seqlen = int(sequence_lengths.max().item())
+    max_seqlen_carrier = torch.zeros(
+        max_seqlen,
+        device=pixel_values.device,
+        dtype=torch.int32,
+    )
+    return (
+        pixel_values,
+        rotary_pos_emb.to(device=pixel_values.device, dtype=torch.float32),
+        cu_seqlens.to(device=pixel_values.device, dtype=torch.int32),
+        fast_indices.to(device=pixel_values.device, dtype=torch.int64),
+        fast_weights.to(device=pixel_values.device, dtype=pixel_values.dtype),
+        max_seqlen_carrier,
+    )
+
+
 def scatter_visual_tokens(
     visual: torch.Tensor,
     text_embeds: torch.Tensor,

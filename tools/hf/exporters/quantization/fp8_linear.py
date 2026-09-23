@@ -16,6 +16,7 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     dynamo_tensorrt_converter,
 )
 from torch_tensorrt.dynamo.conversion.converter_utils import (
+    cast_trt_tensor,
     get_trt_tensor,
     set_layer_name,
 )
@@ -36,7 +37,7 @@ def fp8_linear(
     The TensorRT converter below replaces this implementation with explicit
     FP8 Q/DQ around MatMul. The eager implementation exists for parity checks.
     """
-    output_dtype = x.dtype
+    output_dtype = bias.dtype
     x_fp8 = (x.float() / input_scale.float()).to(torch.float8_e4m3fn)
     x_dq = x_fp8.to(output_dtype) * input_scale.to(output_dtype)
     weight_dq = weight.to(output_dtype) * weight_scale.to(output_dtype)
@@ -52,10 +53,10 @@ def _fp8_linear_fake(
     input_scale: torch.Tensor,
     bias: torch.Tensor,
 ) -> torch.Tensor:
-    del weight_scale, input_scale, bias
+    del weight_scale, input_scale
     return torch.empty(
         (*x.shape[:-1], weight.shape[0]),
-        dtype=x.dtype,
+        dtype=bias.dtype,
         device=x.device,
     )
 
@@ -203,4 +204,14 @@ def convert_fp8_linear(
         )
         set_layer_name(bias_add, target, f"{name}_bias_add", SourceIR.ATEN)
         output = bias_add.get_output(0)
+    output_dtype = _enums.dtype._from(bias.dtype).to(trt.DataType)
+    if output.dtype != output_dtype:
+        output = cast_trt_tensor(
+            ctx,
+            output,
+            output_dtype,
+            f"{name}_output_cast",
+            target,
+            SourceIR.ATEN,
+        )
     return output

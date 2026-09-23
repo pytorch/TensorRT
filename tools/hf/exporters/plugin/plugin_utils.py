@@ -195,9 +195,23 @@ def _register_attention_plugin_op() -> None:
         attention_mask: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.Tensor] = None,
         qkv_scales: Optional[Sequence[float]] = None,
+        kv_page_table: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         del enable_tree_attention, enable_fp8_kv_cache, sliding_window_size
         del attention_mask, position_ids, qkv_scales
+        if kv_page_table is not None:
+            batch_size, seq_len, _ = q.shape
+            return (
+                torch.empty(
+                    batch_size,
+                    seq_len,
+                    num_q_heads,
+                    head_size,
+                    dtype=q.dtype,
+                    device=q.device,
+                ),
+                past_key_value.clone(),
+            )
         return _attention_plugin_eager(
             q,
             k,
@@ -231,6 +245,7 @@ def _register_attention_plugin_op() -> None:
         attention_mask: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.Tensor] = None,
         qkv_scales: Optional[Sequence[float]] = None,
+        kv_page_table: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         del k, v, context_lengths, rope_rotary_cos_sin, kvcache_start_index
         del num_kv_heads, enable_tree_attention, enable_fp8_kv_cache
@@ -240,6 +255,7 @@ def _register_attention_plugin_op() -> None:
             attention_mask,
             position_ids,
             qkv_scales,
+            kv_page_table,
         )
         batch_size, seq_len, _ = q.shape
         attn_output = torch.empty(

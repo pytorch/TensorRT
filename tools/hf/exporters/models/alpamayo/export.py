@@ -78,6 +78,7 @@ def prepare_export(
             .to(device=device, dtype=dtype)
             .eval()
         )
+    model._edge_checkpoint_dir = str(checkpoint)
 
     force_hf_attention(alpamayo_visual(model), "eager")
     force_hf_attention(alpamayo_language(model), "eager")
@@ -87,6 +88,7 @@ def prepare_export(
         model_type="alpamayo",
         engine_dir=args.engine_dir or "/tmp/alpamayo_edge_exporter",
         max_seq_len=args.max_seq_len or 4096,
+        runtime_export=False,
     )
     return (
         model,
@@ -97,5 +99,5 @@ def prepare_export(
             "t0_us": getattr(args, "t0_us", 5_100_000),
         },
         export_config,
-        "velocity",
+        "trajectory",
     )

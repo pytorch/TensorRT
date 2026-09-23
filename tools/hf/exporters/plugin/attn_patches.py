@@ -240,6 +240,7 @@ def _patch_language_attention(original: Callable) -> Callable:
         past_key_value=None,
         ctx_len=None,
         kvcache_start_index=None,
+        kv_page_table=None,
         **kwargs,
     ):
         if rope_rotary_cos_sin is None:
@@ -291,6 +292,10 @@ def _patch_language_attention(original: Callable) -> Callable:
             False,
             -1,
             language_mask_type(),
+            None,
+            None,
+            None,
+            kv_page_table,
         )
         attn_hidden = num_heads * head_dim
         attn_out = attn_out.reshape(batch_size, seq_len, attn_hidden).to(dtype)

@@ -204,6 +204,84 @@ def test_alpamayo_action_patch_uses_explicit_prefix_kv():
 
 
 @pytest.mark.unit
+def test_alpamayo_action_patch_supports_edge_cache_abi():
+    from types import SimpleNamespace
+
+    from exporters.models.alpamayo.patches import _patch_alpamayo_action_step
+
+    class ActionIn(nn.Module):
+        def forward(self, actions, timestep):
+            del timestep
+            return torch.nn.functional.pad(actions, (0, 2))
+
+    class Attention(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.config = SimpleNamespace(
+                num_attention_heads=1,
+                num_key_value_heads=1,
+            )
+            self.head_dim = 4
+            self.scaling = 0.5
+            self.q_proj = nn.Linear(4, 4, bias=False)
+            self.k_proj = nn.Linear(4, 4, bias=False)
+            self.v_proj = nn.Linear(4, 4, bias=False)
+            self.o_proj = nn.Linear(4, 4, bias=False)
+            self.q_norm = nn.Identity()
+            self.k_norm = nn.Identity()
+
+    class Layer(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.input_layernorm = nn.Identity()
+            self.post_attention_layernorm = nn.Identity()
+            self.self_attn = Attention()
+
+        def mlp(self, hidden):
+            return torch.zeros_like(hidden)
+
+    class Expert(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.config = SimpleNamespace(num_hidden_layers=1)
+            self.layers = nn.ModuleList([Layer()])
+            self.norm = nn.Identity()
+
+    class Alpamayo(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.action_in_proj = ActionIn()
+            self.expert = Expert()
+            self.action_out_proj = nn.Linear(4, 2, bias=False)
+
+        def forward(self, noisy_action, timestep=None, *args, **kwargs):
+            del timestep, args, kwargs
+            return noisy_action
+
+    Alpamayo.forward = _patch_alpamayo_action_step(Alpamayo.forward)
+    model = Alpamayo().half().eval()
+    noise = torch.randn(1, 2, 2)
+    rope = torch.cat((torch.ones(1, 2, 2), torch.zeros(1, 2, 2)), dim=-1)
+    cache = torch.zeros(1, 1, 4, 4, dtype=torch.float16)
+    output = model(
+        noise,
+        torch.tensor([0.0]),
+        torch.tensor([0.1]),
+        torch.tensor([0], dtype=torch.int32),
+        rope,
+        torch.tensor([[0, 1]], dtype=torch.int32),
+        cache,
+        cache.clone(),
+    )
+
+    assert len(output) == 3
+    assert output[0].shape == noise.shape
+    assert output[0].dtype == torch.float32
+    assert output[1].shape == cache.shape
+    assert output[2].shape == cache.shape
+
+
+@pytest.mark.unit
 def test_alpamayo_scatter_visual_tokens():
     from exporters.models.alpamayo.helpers import scatter_visual_tokens
 

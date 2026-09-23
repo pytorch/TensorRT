@@ -196,16 +196,6 @@ class Input(object):
                 }
                 self.shape_mode = Input._ShapeMode.DYNAMIC
 
-                # Warn if min_shape has any 0 dimension (empty tensor) - TensorRT doesn't support this
-                # @apbose: Is this warning necessary?
-                if any(dim == 0 for dim in self.shape["min_shape"]):
-                    logger.warning(
-                        f"min_shape contains a 0 dimension: {self.shape['min_shape']}. "
-                        "TensorRT does not support dynamic shapes with min dimension of 0 (empty tensors). "
-                        "TensorRT will internally clamp min dimensions to 1, which may cause runtime errors "
-                        "if you try to run inference with empty tensor inputs."
-                    )
-
                 # Namedtuple shape API: field names encode per-axis dimension names.
                 # Convert to shared_dims so _tracer.py needs no changes — axes with the
                 # same name across inputs become one shared torch.export.Dim.
@@ -369,11 +359,10 @@ class Input(object):
                 )
 
             for d in range(len(min_shape)):
-                # No min=0 (and TRT requires >= 1).
-                if min_shape[d] < 1:
+                if min_shape[d] < 0:
                     raise ValueError(
                         f"Profile at index {i} min_shape[{d}]={min_shape[d]} is invalid; "
-                        "every dimension must have min >= 1 (min=0 is not supported)."
+                        "every dimension must have min >= 0."
                     )
                 if not (min_shape[d] <= opt_shape[d] <= max_shape[d]):
                     raise ValueError(

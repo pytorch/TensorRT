@@ -50,7 +50,8 @@ def compile_component(
     trace_args = tuple(bundle.trace_args)
     save_args = tuple(bundle.save_args)
     execute_args = tuple(bundle.execute_args or save_args)
-    out_dir = Path(engine_dir) / name
+    output_subdir = name if bundle.output_subdir is None else bundle.output_subdir
+    out_dir = Path(engine_dir) / output_subdir
     out_dir.mkdir(parents=True, exist_ok=True)
     engine_path = str(out_dir)
 
@@ -81,7 +82,12 @@ def compile_component(
             ):
                 positional_names.append(param.name)
         for spec, param_name in zip(specs[:leading], positional_names[:leading]):
-            if param_name in ("inputs_embeds", "ds_stack"):
+            if bundle.edge_runtime_bindings and param_name == "kvcache_start_index":
+                dynamic_shapes[param_name] = {}
+            elif bundle.edge_runtime_bindings or param_name in (
+                "inputs_embeds",
+                "ds_stack",
+            ):
                 dynamic_shapes[param_name] = get_dynamic_shapes(spec, dim_registry)
             else:
                 dynamic_shapes[param_name] = {}
@@ -105,6 +111,71 @@ def compile_component(
     arg_inputs = (
         tuple(bundle.input_specs) if bundle.input_specs is not None else trace_args
     )
+    engine_file = bundle.engine_file
+    if bundle.edge_runtime_bindings:
+        serialized = (
+            torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_engine(
+                exported,
+                arg_inputs=arg_inputs,
+                arg_input_binding_names=tuple(bundle.input_names),
+                output_binding_names=tuple(bundle.output_names),
+                **settings,
+            )
+        )
+        (out_dir / engine_file).write_bytes(serialized)
+        aliased_io = {}
+        for output_name in bundle.output_names:
+            if output_name.startswith("present_key_values_"):
+                layer_index = output_name.rsplit("_", 1)[-1]
+                aliased_io[output_name] = (
+                    f"past_key_values_{layer_index}",
+                    "kv_cache_update",
+                )
+            elif output_name.startswith("present_k_cache_"):
+                layer_index = output_name.rsplit("_", 1)[-1]
+                aliased_io[output_name] = (
+                    f"k_cache_{layer_index}",
+                    "kv_cache_update",
+                )
+            elif output_name.startswith("present_v_cache_"):
+                layer_index = output_name.rsplit("_", 1)[-1]
+                aliased_io[output_name] = (
+                    f"v_cache_{layer_index}",
+                    "kv_cache_update",
+                )
+
+        from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
+
+        compiled = TorchTensorRTModule(
+            serialized_engine=serialized,
+            input_binding_names=list(bundle.input_names),
+            output_binding_names=list(bundle.output_names),
+            name=name,
+            aliased_io=aliased_io,
+        )
+        with torch.no_grad():
+            trt_out = tuple(
+                tensor.detach().clone() for tensor in _as_tuple(compiled(*execute_args))
+            )
+        trt_ms = cuda_ms(lambda: compiled(*execute_args))
+        record_engine(
+            engine_path,
+            component=name,
+            input_names=bundle.input_names,
+            outputs=trt_out,
+            module=compiled,
+        )
+        _write_sidecar(
+            out_dir,
+            bundle,
+            name,
+            trt_out,
+            engine_file=engine_file,
+        )
+        if bundle.artifact_writer is not None:
+            bundle.artifact_writer(out_dir)
+        return engine_path, trt_out, trt_ms
+
     compiled = torch_tensorrt.dynamo.compile(
         exported,
         arg_inputs=arg_inputs,
@@ -112,7 +183,9 @@ def compile_component(
     )
 
     with torch.no_grad():
-        trt_out = _as_tuple(compiled(*execute_args))
+        trt_out = tuple(
+            tensor.detach().clone() for tensor in _as_tuple(compiled(*execute_args))
+        )
     trt_ms = cuda_ms(lambda: compiled(*execute_args))
 
     record_engine(
@@ -122,8 +195,6 @@ def compile_component(
         outputs=trt_out,
         module=compiled,
     )
-    engine_file = bundle.engine_file
-
     # ``dynamo.compile`` has already built and serialized the engine. Reuse
     # those bytes instead of calling
     # ``convert_exported_program_to_serialized_trt_engine`` and building the
@@ -153,6 +224,8 @@ def compile_component(
     (out_dir / engine_file).write_bytes(serialized)
 
     _write_sidecar(out_dir, bundle, name, trt_out, engine_file=engine_file)
+    if bundle.artifact_writer is not None:
+        bundle.artifact_writer(out_dir)
     return engine_path, trt_out, trt_ms
 
 

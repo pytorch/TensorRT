@@ -69,6 +69,7 @@ def convert_llm_attention_plugin(ctx: ConversionContext, target, args, kwargs, n
     attention_mask = args[14] if len(args) > 14 else None
     position_ids = args[15] if len(args) > 15 else None
     qkv_scales = args[16] if len(args) > 16 else None
+    kv_page_table = args[17] if len(args) > 17 else None
 
     creator = get_trt_plugin_creator("AttentionPlugin", "1", "")
     if creator is None:
@@ -103,9 +104,25 @@ def convert_llm_attention_plugin(ctx: ConversionContext, target, args, kwargs, n
     if plugin is None:
         raise RuntimeError("Failed to create AttentionPlugin")
 
-    plugin_inputs = [q, k, v, kv, ctx_len, rope, kv_cache_start_idx]
-    if bool(enable_tree_attention):
-        plugin_inputs.extend([attention_mask, position_ids])
+    if kv_page_table is not None:
+        q_tensor = get_trt_tensor(ctx, q, f"{name}_q")
+        k_tensor = get_trt_tensor(ctx, k, f"{name}_k")
+        v_tensor = get_trt_tensor(ctx, v, f"{name}_v")
+        packed_qkv_layer = ctx.net.add_concatenation([q_tensor, k_tensor, v_tensor])
+        packed_qkv_layer.axis = 2
+        packed_qkv_layer.name = f"{name}_packed_qkv"
+        plugin_inputs = [
+            packed_qkv_layer.get_output(0),
+            kv,
+            ctx_len,
+            rope,
+            kv_cache_start_idx,
+            kv_page_table,
+        ]
+    else:
+        plugin_inputs = [q, k, v, kv, ctx_len, rope, kv_cache_start_idx]
+        if bool(enable_tree_attention):
+            plugin_inputs.extend([attention_mask, position_ids])
 
     inputs = [
         (
@@ -116,7 +133,7 @@ def convert_llm_attention_plugin(ctx: ConversionContext, target, args, kwargs, n
         for idx, tensor in enumerate(plugin_inputs)
     ]
 
-    kv_cache_start_idx_input_idx = 6
+    kv_cache_start_idx_input_idx = 4 if kv_page_table is not None else 6
     if (
         len(inputs[kv_cache_start_idx_input_idx].shape) == 2
         and inputs[kv_cache_start_idx_input_idx].shape[1] == 1

@@ -77,6 +77,10 @@ def main() -> None:
     program = exporter.export(model, sample_inputs, config=config)
 
     print("engines:", exporter.engines)
+    if program is None:
+        print_bench(exporter.bench)
+        return
+
     print("runtime keys:", sorted(exporter.sample))
     with torch.no_grad():
         result = program.module()(**exporter.sample)
