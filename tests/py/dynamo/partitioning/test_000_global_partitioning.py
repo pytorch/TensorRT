@@ -154,6 +154,46 @@ class TestGlobalPartitioning(TestCase):
                     cnt += 1
             self.assertEqual(cnt, trt_mod_cnt)
 
+    @parameterized.expand(
+        [
+            (
+                "torch_executed_modules_global",
+                {"torch_executed_modules": ["torch.nn.modules.container.Sequential"]},
+                False,
+            ),
+            (
+                "torch_executed_modules_fast",
+                {"torch_executed_modules": ["torch.nn.modules.container.Sequential"]},
+                True,
+            ),
+            (
+                "torch_executed_ops_global",
+                {"torch_executed_ops": {"torch.ops.aten.relu.default"}},
+                False,
+            ),
+            (
+                "torch_executed_ops_fast",
+                {"torch_executed_ops": {"torch.ops.aten.relu.default"}},
+                True,
+            ),
+        ]
+    )
+    def test_require_full_compilation_with_no_supported_ops(
+        self, _, exclusion_kwargs, use_fast_partitioner
+    ):
+        mod = torch.nn.Sequential(torch.nn.ReLU()).eval().to("cuda")
+        inputs = torch.rand((1, 3, 4, 4)).to("cuda")
+        with self.assertRaisesRegex(AssertionError, "require_full_compilation"):
+            torch_tensorrt.compile(
+                mod,
+                ir="dynamo",
+                inputs=[inputs],
+                min_block_size=1,
+                require_full_compilation=True,
+                use_fast_partitioner=use_fast_partitioner,
+                **exclusion_kwargs,
+            )
+
 
 if __name__ == "__main__":
     run_tests()
