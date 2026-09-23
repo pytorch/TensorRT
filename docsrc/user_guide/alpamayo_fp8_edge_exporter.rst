@@ -110,7 +110,7 @@ Clone the required repositories:
 
 .. code-block:: bash
 
-   git clone https://github.com/NVlabs/alpamayo.git "$ALPAMAYO_RECIPES"
+   git clone https://github.com/NVlabs/alpamayo-recipes.git "$ALPAMAYO_RECIPES"
    git clone https://github.com/pytorch/TensorRT.git "$TORCH_TRT_ROOT"
    git clone https://github.com/NVIDIA/TensorRT-Edge-LLM.git "$EDGE_LLM_ROOT"
 
@@ -178,8 +178,21 @@ Verify the important versions:
 The recipe is defined for Python 3.12, PyTorch 2.8, Transformers 4.57.1, and
 ModelOpt 0.43.
 
-2. Quantize Alpamayo with ModelOpt FP8
--------------------------------------
+2. Run the ModelOpt Alpamayo FP8 example
+----------------------------------------
+
+This workflow uses the public
+`Alpamayo 1.5 ModelOpt quantization example
+<https://github.com/NVlabs/alpamayo-recipes/tree/main/recipes/alpamayo1_5_quant>`_.
+Its ``quantize.py``, ``eval.py``, calibration parquet, and pinned ``uv``
+environment are the source of truth for checkpoint creation and evaluation.
+The steps below connect that example to Torch-TensorRT Edge export.
+
+For a compact code example that calibrates the isolated Alpamayo diffusion
+expert with synthetic tensors and compiles it directly with Torch-TensorRT, see
+:ref:`torch_export_alpamayo_modelopt_fp8`. Use that example to validate the
+ModelOpt Q/DQ conversion path; use this guide's PhysicalAI recipe for
+customer-quality calibration and checkpoint evaluation.
 
 The exporter consumes a Hugging Face checkpoint restored through ModelOpt's
 checkpoint integration. For the first TensorRT integration run, use
