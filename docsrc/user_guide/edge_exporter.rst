@@ -20,8 +20,8 @@ difference is what happens inside. Instead of tracing the whole policy as one
 graph, Edge compiles one TensorRT engine per component, then records a small
 outer graph that only *calls* those engines.
 
-The code is in ``tools/hf``. The entry points are ``tools/hf/run_pi05_export.py``,
-``run_groot_export.py``, and ``run_nemotron_export.py``.
+The code is in ``tools/hf``. Use ``tools/hf/run_export.py`` and select a model
+family such as ``pi05``, ``groot``, ``nemotron``, or ``alpamayo``.
 
 .. note::
 
@@ -49,6 +49,13 @@ The code is in ``tools/hf``. The entry points are ``tools/hf/run_pi05_export.py`
      - ``nemotron_h``
      - ``language``
      - ``nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16``
+   * - Alpamayo 1.5
+     - ``alpamayo``
+     - ``vision``, ``language``, ``action``
+     - ``nvidia/Alpamayo-1.5-10B`` or a ModelOpt FP8 checkpoint
+
+For the complete ModelOpt quantization and export workflow, see
+:ref:`alpamayo_fp8_edge_exporter`.
 
 Installation
 ------------
