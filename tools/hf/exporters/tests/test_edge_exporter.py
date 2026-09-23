@@ -155,7 +155,40 @@ def test_alpamayo_backend_registers_qwen_vision_language_and_action():
     assert any("Qwen3VLVisionAttention.forward" in path for path in paths)
     assert any("Qwen3VLTextAttention.forward" in path for path in paths)
     assert any("Qwen3VLForConditionalGeneration.forward" in path for path in paths)
-    assert any("Alpamayo1_5.forward" in path for path in paths)
+
+
+@pytest.mark.unit
+def test_alpamayo_action_module_forward_shape():
+    from types import SimpleNamespace
+
+    from exporters.models.alpamayo.helpers import StaticKVDiffusionStepModule
+
+    class ActionIn(nn.Module):
+        def forward(self, actions, timestep):
+            return actions + timestep
+
+    class Expert(nn.Module):
+        def forward(self, inputs_embeds, **kwargs):
+            del kwargs
+            return SimpleNamespace(last_hidden_state=inputs_embeds)
+
+    projection = nn.Linear(2, 2, bias=False)
+    projection.weight.data.copy_(torch.eye(2))
+    module = StaticKVDiffusionStepModule(
+        ActionIn(),
+        Expert(),
+        projection,
+        (4, 2),
+    )
+    output = module(
+        torch.zeros(1, 4, 2),
+        torch.ones(1, 1, 1),
+        torch.zeros(1, 1, 1, 3, 2),
+        torch.zeros(1, 1, 1, 3, 2),
+        torch.zeros(3, 1, 4, dtype=torch.long),
+        torch.zeros(1, 1, 4, 7),
+    )
+    assert output.shape == (1, 4, 2)
 
 
 @pytest.mark.unit

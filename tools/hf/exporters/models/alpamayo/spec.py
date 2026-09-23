@@ -7,7 +7,6 @@ import torch
 import torch.nn as nn
 
 from ...ops import call_engine, scatter_image_tokens
-from ...prefix_cache import PrefixKVCache
 from ...spec import ComponentBundle, EdgeSpec, register_edge_spec
 from ..common.helpers import (
     causal_lm_flat,
@@ -15,6 +14,8 @@ from ..common.helpers import (
     split_flat_to_kwargs,
 )
 from .helpers import (
+    StaticKVDiffusionStepModule,
+    VisualFixedGrid,
     alpamayo_language,
     alpamayo_visual,
     alpamayo_vlm,
@@ -162,25 +163,14 @@ class AlpamayoSpec(EdgeSpec):  # type: ignore[misc]
                 use_cache=False,
                 return_dict=True,
             )
-            action_embeds = model.action_in_proj(
+            velocity = sample["action_module"](
                 sample["step_actions"],
                 sample["step_timestep"],
+                sample["prefix_k"],
+                sample["prefix_v"],
+                sample["suffix_position_ids"],
+                sample["suffix_attention_mask"],
             )
-            expert = model.expert(
-                inputs_embeds=action_embeds,
-                position_ids=sample["suffix_position_ids"],
-                past_key_values=PrefixKVCache(
-                    sample["prefix_k"],
-                    sample["prefix_v"],
-                ),
-                attention_mask=sample["suffix_attention_mask"],
-                use_cache=False,
-                return_dict=True,
-                is_causal=not bool(model.config.expert_non_causal_attention),
-            )
-            velocity = model.action_out_proj(
-                expert.last_hidden_state[:, -int(sample["step_actions"].shape[1]) :]
-            ).reshape_as(sample["step_actions"])
 
         if bench is not None:
             bench["vision"] = cuda_ms(lambda: visual(px, grid)[0])
@@ -220,11 +210,17 @@ class AlpamayoSpec(EdgeSpec):  # type: ignore[misc]
         device = px.device
         dtype = px.dtype
 
+        visual.config.attn_implementation = "sdpa"
+        visual.config._attn_implementation = "sdpa"
+        fixed_visual = VisualFixedGrid(visual, grid).to(
+            device=device,
+            dtype=dtype,
+        )
         vision = ComponentBundle(
-            module=_export_module(visual, device, dtype),
-            trace_args=(px, grid),
-            save_args=(px, grid),
-            input_names=["pixel_values", "image_grid_thw"],
+            module=fixed_visual.eval(),
+            trace_args=(px,),
+            save_args=(px,),
+            input_names=["pixel_values"],
             output_names=["visual_embeds", "deepstack_visual_embeds"],
             parity_output="visual_embeds",
             model_type="qwen3_vl",
@@ -253,12 +249,24 @@ class AlpamayoSpec(EdgeSpec):  # type: ignore[misc]
         sample["image_token_mask"] = image_token_mask
         sample["inputs_embeds"] = inputs_embeds
 
-        position_ids, rope_deltas = vlm_core.get_rope_index(
-            sample["input_ids"],
-            sample["image_grid_thw"],
-            None,
-            attention_mask=sample["attention_mask"],
-        )
+        try:
+            position_ids, rope_deltas = vlm_core.get_rope_index(
+                sample["input_ids"],
+                sample["image_grid_thw"],
+                None,
+                attention_mask=sample["attention_mask"],
+            )
+        except (TypeError, IndexError):
+            image_token_types = (
+                sample["input_ids"] == int(vlm_core.config.image_token_id)
+            ).to(torch.int32)
+            position_ids, rope_deltas = vlm_core.get_rope_index(
+                sample["input_ids"],
+                mm_token_type_ids=image_token_types,
+                image_grid_thw=sample["image_grid_thw"],
+                video_grid_thw=None,
+                attention_mask=sample["attention_mask"],
+            )
         sample["position_ids"] = position_ids
         sample["rope_deltas"] = rope_deltas
 
@@ -343,16 +351,24 @@ class AlpamayoSpec(EdgeSpec):  # type: ignore[misc]
         sample["step_timestep"] = step_timestep
 
         language_cfg = language.config
-        num_kv_heads = int(language_cfg.num_key_value_heads)
+        expert_cfg = model.expert.config
+        for field in ("num_hidden_layers", "num_key_value_heads", "head_dim"):
+            if int(getattr(language_cfg, field)) != int(getattr(expert_cfg, field)):
+                raise ValueError(
+                    "Alpamayo language/expert KV layouts differ at "
+                    f"{field}: {getattr(language_cfg, field)} vs "
+                    f"{getattr(expert_cfg, field)}"
+                )
+        num_kv_heads = int(expert_cfg.num_key_value_heads)
         head_dim = int(
             getattr(
-                language_cfg,
+                expert_cfg,
                 "head_dim",
-                language_cfg.hidden_size // language_cfg.num_attention_heads,
+                expert_cfg.hidden_size // expert_cfg.num_attention_heads,
             )
         )
         prefix_k = torch.zeros(
-            len(decoder_layers),
+            int(expert_cfg.num_hidden_layers),
             batch_size,
             num_kv_heads,
             prompt_len,
@@ -382,6 +398,18 @@ class AlpamayoSpec(EdgeSpec):  # type: ignore[misc]
         sample["suffix_position_ids"] = suffix_position_ids
         sample["suffix_attention_mask"] = suffix_attention_mask
 
+        model.expert.config._attn_implementation = "sdpa"
+        action_module = (
+            StaticKVDiffusionStepModule(
+                model.action_in_proj,
+                model.expert,
+                model.action_out_proj,
+                action_dims,
+            )
+            .to(device=device, dtype=dtype)
+            .eval()
+        )
+        sample["action_module"] = action_module
         action_args = (
             step_actions,
             step_timestep,
@@ -391,7 +419,7 @@ class AlpamayoSpec(EdgeSpec):  # type: ignore[misc]
             suffix_attention_mask,
         )
         action = ComponentBundle(
-            module=_export_module(model, device, dtype),
+            module=action_module,
             trace_args=action_args,
             save_args=action_args,
             input_names=[
@@ -420,7 +448,6 @@ class AlpamayoSpec(EdgeSpec):  # type: ignore[misc]
             engines["vision"],
             "vision",
             sample["pixel_values"],
-            sample["image_grid_thw"],
         )
         inputs_embeds = scatter_image_tokens(
             visual,

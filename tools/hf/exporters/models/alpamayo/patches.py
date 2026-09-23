@@ -10,7 +10,6 @@ from ...plugin.attn_patches import (
     _patch_language_attention,
     register_patch,
 )
-from ...prefix_cache import PrefixKVCache
 from ..common.patches import causal_lm_plugin_forward
 
 ALPAMAYO = "alpamayo"
@@ -21,7 +20,7 @@ ALPAMAYO = "alpamayo"
     "transformers.models.qwen3_vl.modeling_qwen3_vl.Qwen3VLVisionAttention.forward",
 )
 def _patch_qwen3_vl_vision_attention(original: Callable) -> Callable:
-    """Route Qwen3-VL vision attention through the Edge ViT plugin."""
+    """Use static sequence splits baked by ``VisualFixedGrid``."""
 
     def forward(
         self,
@@ -31,17 +30,20 @@ def _patch_qwen3_vl_vision_attention(original: Callable) -> Callable:
         position_embeddings=None,
         **kwargs: Any,
     ) -> torch.Tensor:
-        del rotary_pos_emb, kwargs
-        if position_embeddings is None:
+        static_lengths = getattr(self, "_static_lengths", None)
+        if static_lengths is None or position_embeddings is None:
             return original(
                 self,
                 hidden_states,
                 cu_seqlens,
+                rotary_pos_emb=rotary_pos_emb,
                 position_embeddings=position_embeddings,
+                **kwargs,
             )
 
         from transformers.models.qwen3_vl.modeling_qwen3_vl import (
             apply_rotary_pos_emb_vision,
+            eager_attention_forward,
         )
 
         seq_len = int(hidden_states.shape[0])
@@ -53,46 +55,31 @@ def _patch_qwen3_vl_vision_attention(original: Callable) -> Callable:
         )
         cos, sin = position_embeddings
         q, k = apply_rotary_pos_emb_vision(q, k, cos, sin)
-        q = q.to(torch.float16).contiguous()
-        k = k.to(torch.float16).contiguous()
-        v = v.to(torch.float16).contiguous()
-
-        # The carrier's length communicates a safe maximum sequence length.
-        max_seqlen_carrier = torch.zeros(
-            hidden_states.shape[0],
-            device=hidden_states.device,
-            dtype=torch.int32,
+        q = q.transpose(0, 1).unsqueeze(0)
+        k = k.transpose(0, 1).unsqueeze(0)
+        v = v.transpose(0, 1).unsqueeze(0)
+        splits = [torch.split(tensor, static_lengths, dim=2) for tensor in (q, k, v)]
+        outputs = [
+            eager_attention_forward(
+                self,
+                q_part,
+                k_part,
+                v_part,
+                attention_mask=None,
+                scaling=self.scaling,
+                dropout=0.0,
+                is_causal=False,
+                **kwargs,
+            )[0]
+            for q_part, k_part, v_part in zip(*splits)
+        ]
+        output = (
+            torch.cat(outputs, dim=1)
+            .reshape(seq_len, -1)
+            .contiguous()
+            .to(hidden_states.dtype)
         )
-        output = torch.ops.trt.vit_attention_plugin.default(
-            q,
-            k,
-            v,
-            cu_seqlens.to(torch.int32),
-            max_seqlen_carrier,
-            int(self.num_heads),
-            int(q.shape[-1]),
-        )
-        output = output.reshape(seq_len, -1).to(hidden_states.dtype)
         return self.proj(output)
-
-    return forward
-
-
-@register_patch(
-    ALPAMAYO,
-    "transformers.models.qwen3_vl.modeling_qwen3_vl.Qwen3VLVisionModel.forward",
-)
-def _patch_qwen3_vl_vision_model(original: Callable) -> Callable:
-    """Return a tensor rather than a Python list for deepstack outputs."""
-
-    def forward(self, hidden_states, grid_thw, **kwargs: Any):
-        visual, deepstack = original(
-            self,
-            hidden_states,
-            grid_thw,
-            **kwargs,
-        )
-        return visual, torch.stack(tuple(deepstack), dim=0)
 
     return forward
 
@@ -140,46 +127,5 @@ def _patch_qwen3_vl_language(original: Callable) -> Callable:
             *past_key_values,
             lm_head=getattr(self, "lm_head", None),
         )
-
-    return forward
-
-
-@register_patch(
-    ALPAMAYO,
-    "alpamayo1_5.models.alpamayo1_5.Alpamayo1_5.forward",
-)
-def _patch_alpamayo_action_step(original: Callable) -> Callable:
-    """Compile one Alpamayo diffusion velocity step with prefix KV tensors."""
-
-    def forward(
-        self,
-        noisy_action,
-        timestep=None,
-        prefix_k=None,
-        prefix_v=None,
-        position_ids=None,
-        attention_mask=None,
-        *args,
-        **kwargs: Any,
-    ):
-        if prefix_k is None or getattr(prefix_k, "ndim", 0) != 5:
-            return original(self, noisy_action, timestep, *args, **kwargs)
-
-        action_embeds = self.action_in_proj(noisy_action, timestep)
-        expert_kwargs: dict[str, Any] = {}
-        if self.config.expert_non_causal_attention:
-            expert_kwargs["is_causal"] = False
-        expert = self.expert(
-            inputs_embeds=action_embeds,
-            position_ids=position_ids,
-            past_key_values=PrefixKVCache(prefix_k, prefix_v),
-            attention_mask=attention_mask,
-            use_cache=False,
-            return_dict=True,
-            **expert_kwargs,
-        )
-        hidden = expert.last_hidden_state
-        hidden = hidden[:, -int(noisy_action.shape[1]) :]
-        return self.action_out_proj(hidden).reshape_as(noisy_action)
 
     return forward
