@@ -26,9 +26,9 @@ Hardware requirements:
 * **FP8**: NVIDIA Hopper (H100) or newer.
 * **FP4 (NVFP4)**: NVIDIA Blackwell (B100/B200) or newer; requires TensorRT ≥ 10.8.
 
-For a large vision-language-action example, see
-:ref:`torch_export_alpamayo_modelopt_fp8`. For representative PhysicalAI
-calibration, checkpoint evaluation, and complete Edge export, see
+For full-model Alpamayo 1.5 quantization with representative PhysicalAI
+calibration and minADE evaluation, see :ref:`alpamayo_modelopt_fp8`. To
+continue from that checkpoint through TensorRT Edge export, see
 :ref:`alpamayo_fp8_edge_exporter`.
 
 ----

@@ -186,18 +186,10 @@ This workflow uses the public
 <https://github.com/NVlabs/alpamayo-recipes/tree/main/recipes/alpamayo1_5_quant>`_.
 Its ``quantize.py``, ``eval.py``, calibration parquet, and pinned ``uv``
 environment are the source of truth for checkpoint creation and evaluation.
-The steps below connect that example to Torch-TensorRT Edge export.
-
-For a compact code example that calibrates the isolated Alpamayo diffusion
-expert with synthetic tensors and compiles it directly with Torch-TensorRT, see
-:ref:`torch_export_alpamayo_modelopt_fp8`. Use that example to validate the
-ModelOpt Q/DQ conversion path; use this guide's PhysicalAI recipe for
-customer-quality calibration and checkpoint evaluation.
-
-The exporter consumes a Hugging Face checkpoint restored through ModelOpt's
-checkpoint integration. For the first TensorRT integration run, use
-``--fake_quant``. It preserves FP16 checkpoint weights while retaining the FP8
-Q/DQ graph that TensorRT lowers. This is the lowest-risk export format.
+The quantization procedure is also documented separately in
+:ref:`alpamayo_modelopt_fp8`. The steps below use the same full-model
+PhysicalAI calibration and compressed FP8 output, then continue into
+Torch-TensorRT Edge export.
 
 .. code-block:: bash
 
@@ -205,59 +197,61 @@ Q/DQ graph that TensorRT lowers. This is the lowest-risk export format.
    source am15_quant/bin/activate
 
    uv run --active quantize.py \
-     --ckpt nvidia/Alpamayo-1.5-10B \
-     --quant_format fp8 \
-     --num_of_calib_clips 100 \
-     --save_model_dir "$QUANT_OUTPUT" \
-     --fake_quant
+     --quant_format=fp8 \
+     --num_of_calib_clips=100 \
+     --save_model_dir=./outputs
 
 The expected output directory is:
 
 .. code-block:: text
 
-   outputs/alpamayo1.5_fp8_calib100_fakequant/
+   outputs/alpamayo1.5_fp8_calib100/
    ├── config.json
    ├── modelopt_state.pth
    ├── model*.safetensors
    └── tokenizer and processor assets
 
+The calibration loop exercises the full VLM rollout and diffusion path with
+the selected PhysicalAI clips. By default, ``quantize.py`` calls
+``mtq.compress(model)`` before saving, so this checkpoint contains real FP8
+weights.
+
 Confirm that ModelOpt state was saved:
 
 .. code-block:: bash
 
-   export ALPAMAYO_FP8_CKPT="$QUANT_OUTPUT/alpamayo1.5_fp8_calib100_fakequant"
+   export ALPAMAYO_FP8_CKPT="$QUANT_DIR/outputs/alpamayo1.5_fp8_calib100"
 
    test -f "$ALPAMAYO_FP8_CKPT/config.json"
    test -f "$ALPAMAYO_FP8_CKPT/modelopt_state.pth"
    ls -lh "$ALPAMAYO_FP8_CKPT"
 
-Real compressed FP8 checkpoint
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Omit ``--fake_quant`` to call ``mtq.compress`` and save a real FP8 parameter
-payload:
+For a long-running calibration, use the upstream background command:
 
 .. code-block:: bash
 
-   uv run --active quantize.py \
-     --quant_format fp8 \
-     --num_of_calib_clips 100 \
-     --save_model_dir "$QUANT_OUTPUT"
-
-This produces ``alpamayo1.5_fp8_calib100`` and reduces checkpoint and runtime
-weight memory. Real-quant restore and downstream compilation are still
-experimental in ModelOpt. Establish the fake-quant export first, then validate
-the compressed checkpoint separately.
+   nohup uv run --active quantize.py \
+     --quant_format=fp8 \
+     --num_of_calib_clips=100 \
+     --save_model_dir=./outputs \
+     > quantize_fp8.log 2>&1 &
 
 3. Evaluate the quantized checkpoint
 ------------------------------------
 
-Evaluate a small subset before compiling TensorRT engines:
+Run the official evaluation command:
 
 .. code-block:: bash
 
    cd "$QUANT_DIR"
    source am15_quant/bin/activate
+
+   uv run --active eval.py \
+     --ckpt ./outputs/alpamayo1.5_fp8_calib100
+
+For a shorter smoke test before the complete evaluation:
+
+.. code-block:: bash
 
    uv run --active eval.py \
      --ckpt "$ALPAMAYO_FP8_CKPT" \
