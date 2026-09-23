@@ -1636,6 +1636,8 @@ def compile_module(
             # than a tuple/list of Nodes.
             outputs = arg if isinstance(arg, (list, tuple)) else [arg]
             for output in outputs:
+                if not isinstance(output, torch.fx.Node):
+                    continue
                 target = output.target
                 if "_run_on_acc" not in str(target):
                     continue
