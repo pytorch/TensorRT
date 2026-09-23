@@ -42,7 +42,6 @@ _SITE_COORDINATES: dict[str, frozenset[str]] = {
     "docker/MODULE.bazel.docker": frozenset({"version", "commit"}),
     "docker/MODULE.bazel.ngc": frozenset({"version", "commit"}),
     "justfile": frozenset({"version"}),
-    "pyproject.toml": frozenset({"version"}),
     "py/torch-tensorrt-executorch-runtime/README.md": frozenset({"version"}),
     "py/torch-tensorrt-executorch-runtime/pyproject.toml": frozenset({"version"}),
     "toolchains/ci_workspaces/MODULE.bazel.tmpl": frozenset({"version", "commit"}),
