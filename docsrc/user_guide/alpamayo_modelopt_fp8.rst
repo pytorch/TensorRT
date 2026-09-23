@@ -83,7 +83,7 @@ Verify the pinned environment:
    PY
 
 2. Configure model, dataset, and cache paths
--------------------------------------------
+-----------------------------------------------
 
 .. code-block:: bash
 
@@ -107,7 +107,7 @@ For offline execution after the assets are cached:
    export TRANSFORMERS_OFFLINE=1
 
 3. Authenticate with Hugging Face
----------------------------------
+-------------------------------------
 
 Authenticate interactively so the token is not written into shell history:
 
@@ -117,7 +117,7 @@ Authenticate interactively so the token is not written into shell history:
    hf auth whoami
 
 4. Quantize the full model to FP8
---------------------------------
+-------------------------------------
 
 Run the upstream FP8 command:
 

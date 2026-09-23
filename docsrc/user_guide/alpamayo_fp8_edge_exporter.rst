@@ -323,7 +323,7 @@ Torch-TensorRT from the selected source revision. Confirm that importing
 the source tree in place.
 
 5. Build the TensorRT-Edge-LLM plugin
-------------------------------------
+---------------------------------------------
 
 The language engine contains TensorRT-Edge-LLM attention plugins. Build the
 plugin against the same CUDA and TensorRT major versions used by
