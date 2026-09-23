@@ -173,5 +173,17 @@ class TestWhereConverter(DispatchTestCase):
         self.run_test(Where(), (condition, x, y))
 
 
+class TestWhereBoolDtypePreservation(DispatchTestCase):
+    def test_where_bool_bool_output_is_bool_not_int32(self):
+        class Where(nn.Module):
+            def forward(self, cond, a, b):
+                return torch.ops.aten.where.self(cond, a, b)
+
+        cond = torch.tensor([True, False, True, False])
+        a = torch.tensor([True, True, False, False])
+        b = torch.tensor([False, False, True, True])
+        self.run_test(Where(), [cond, a, b])
+
+
 if __name__ == "__main__":
     run_tests()
