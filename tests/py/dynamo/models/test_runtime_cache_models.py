@@ -14,18 +14,7 @@ import torch_tensorrt as torchtrt
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
-from torch_tensorrt.runtime import RuntimeSettings
-
-
-def _apply_runtime_settings(compiled, rs):
-    """Walk a compiled module and apply RuntimeSettings to every TRT submodule."""
-    from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
-        TorchTensorRTModule,
-    )
-
-    for _, m in compiled.named_modules():
-        if isinstance(m, TorchTensorRTModule):
-            m.runtime_settings = rs
+from torch_tensorrt.runtime import RuntimeSettings, apply_runtime_settings
 
 
 @unittest.skipIf(
@@ -60,9 +49,7 @@ class TestRuntimeCacheModels(TestCase):
             use_python_runtime=True,
             min_block_size=1,
         )
-        _apply_runtime_settings(
-            compiled, RuntimeSettings(runtime_cache=self.cache_path)
-        )
+        apply_runtime_settings(compiled, RuntimeSettings(runtime_cache=self.cache_path))
 
         ref_output = model(input_tensor)
         trt_output = compiled(input_tensor)
@@ -99,7 +86,7 @@ class TestRuntimeCacheModels(TestCase):
 
         # First compilation — cold cache
         compiled1 = torchtrt.compile(model, **compile_kwargs)
-        _apply_runtime_settings(compiled1, rs)
+        apply_runtime_settings(compiled1, rs)
         _ = compiled1(input_tensor)
         del compiled1
         gc.collect()
@@ -109,7 +96,7 @@ class TestRuntimeCacheModels(TestCase):
 
         # Second compilation — warm cache
         compiled2 = torchtrt.compile(model, **compile_kwargs)
-        _apply_runtime_settings(compiled2, rs)
+        apply_runtime_settings(compiled2, rs)
         output2 = compiled2(input_tensor)
 
         cos_sim = cosine_similarity(ref_output, output2)
@@ -138,9 +125,7 @@ class TestRuntimeCacheModels(TestCase):
             use_python_runtime=True,
             min_block_size=1,
         )
-        _apply_runtime_settings(
-            compiled, RuntimeSettings(runtime_cache=self.cache_path)
-        )
+        apply_runtime_settings(compiled, RuntimeSettings(runtime_cache=self.cache_path))
 
         ref_output = model(input_tensor)
         trt_output = compiled(input_tensor)
@@ -197,9 +182,7 @@ class TestRuntimeCacheDynamicShapes(TestCase):
             use_python_runtime=True,
             min_block_size=1,
         )
-        _apply_runtime_settings(
-            compiled, RuntimeSettings(runtime_cache=self.cache_path)
-        )
+        apply_runtime_settings(compiled, RuntimeSettings(runtime_cache=self.cache_path))
 
         # Test with batch size 1
         input_bs1 = torch.randn(1, 3, 32, 32).cuda()
@@ -256,7 +239,7 @@ class TestRuntimeCacheDynamicShapes(TestCase):
 
         # First run with batch=2 — saves cache
         compiled1 = torchtrt.compile(model, **compile_kwargs)
-        _apply_runtime_settings(compiled1, rs)
+        apply_runtime_settings(compiled1, rs)
         input_bs2 = torch.randn(2, 3, 16, 16).cuda()
         _ = compiled1(input_bs2)
         del compiled1
@@ -266,7 +249,7 @@ class TestRuntimeCacheDynamicShapes(TestCase):
 
         # Second run with batch=3 — loads same cache
         compiled2 = torchtrt.compile(model, **compile_kwargs)
-        _apply_runtime_settings(compiled2, rs)
+        apply_runtime_settings(compiled2, rs)
         input_bs3 = torch.randn(3, 3, 16, 16).cuda()
         ref_bs3 = model(input_bs3)
         out_bs3 = compiled2(input_bs3)
@@ -319,7 +302,7 @@ class TestRuntimeCachePerformance(TestCase):
 
         # Cold cache compilation + inference
         compiled1 = torchtrt.compile(model, **compile_kwargs)
-        _apply_runtime_settings(compiled1, rs)
+        apply_runtime_settings(compiled1, rs)
         torch.cuda.synchronize()
         start = time.perf_counter()
         _ = compiled1(input_tensor)
@@ -331,7 +314,7 @@ class TestRuntimeCachePerformance(TestCase):
 
         # Warm cache compilation + inference
         compiled2 = torchtrt.compile(model, **compile_kwargs)
-        _apply_runtime_settings(compiled2, rs)
+        apply_runtime_settings(compiled2, rs)
         torch.cuda.synchronize()
         start = time.perf_counter()
         _ = compiled2(input_tensor)
