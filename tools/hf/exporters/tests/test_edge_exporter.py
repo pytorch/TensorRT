@@ -63,6 +63,9 @@ class DummySpec(EdgeSpec):
 @pytest.mark.unit
 def test_builtin_specs_are_registered():
     keys = registered_specs()
+    assert "alpamayo" in keys
+    assert "alpamayo_r1" in keys
+    assert "alpamayo1_5" in keys
     assert "pi05" in keys
     assert "groot" in keys
     assert "nemotron_h" in keys
@@ -141,6 +144,103 @@ def test_pi05_backend_registers_vision_and_language():
     assert any("GemmaAttention.forward" in p for p in paths)
     assert any("PiGemmaModel.forward" in p for p in paths)
     assert any("PI05Pytorch.forward" in p for p in paths)
+
+
+@pytest.mark.unit
+def test_alpamayo_backend_registers_qwen_vision_language_and_action():
+    from exporters.models.alpamayo.patches import ALPAMAYO
+    from exporters.plugin.attn_patches import _PATCHES
+
+    paths = [path for path, _ in _PATCHES[ALPAMAYO]]
+    assert any("Qwen3VLVisionAttention.forward" in path for path in paths)
+    assert any("Qwen3VLVisionModel.forward" in path for path in paths)
+    assert any("Qwen3VLTextAttention.forward" in path for path in paths)
+    assert any("Qwen3VLForConditionalGeneration.forward" in path for path in paths)
+    assert any("Alpamayo1_5.forward" in path for path in paths)
+
+
+@pytest.mark.unit
+def test_alpamayo_action_patch_uses_explicit_prefix_kv():
+    from types import SimpleNamespace
+
+    from exporters.models.alpamayo.patches import _patch_alpamayo_action_step
+
+    class ActionIn(nn.Module):
+        def forward(self, actions, timestep):
+            return actions + timestep
+
+    class Expert(nn.Module):
+        def forward(self, inputs_embeds, **kwargs):
+            del kwargs
+            return SimpleNamespace(last_hidden_state=inputs_embeds)
+
+    class Alpamayo(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.config = SimpleNamespace(expert_non_causal_attention=True)
+            self.action_in_proj = ActionIn()
+            self.expert = Expert()
+            self.action_out_proj = nn.Linear(2, 2, bias=False)
+            self.action_out_proj.weight.data.copy_(torch.eye(2))
+
+        def forward(self, noisy_action, timestep=None, *args, **kwargs):
+            del timestep, args, kwargs
+            return noisy_action - 1
+
+    Alpamayo.forward = _patch_alpamayo_action_step(Alpamayo.forward)
+    model = Alpamayo()
+    actions = torch.zeros(1, 4, 2)
+    torch.testing.assert_close(model(actions), actions - 1)
+
+    output = model(
+        torch.zeros(1, 4, 2),
+        torch.ones(1, 1, 1),
+        torch.zeros(1, 1, 1, 3, 2),
+        torch.zeros(1, 1, 1, 3, 2),
+        torch.zeros(3, 1, 4, dtype=torch.long),
+        torch.zeros(1, 1, 4, 7),
+    )
+    assert output.shape == (1, 4, 2)
+
+
+@pytest.mark.unit
+def test_alpamayo_scatter_visual_tokens():
+    from exporters.models.alpamayo.helpers import scatter_visual_tokens
+
+    text = torch.zeros(1, 5, 3)
+    visual = torch.arange(6, dtype=torch.float32).reshape(2, 3)
+    mask = torch.tensor([[False, True, False, True, False]])
+    result = scatter_visual_tokens(visual, text, mask)
+
+    torch.testing.assert_close(result[0, 1], visual[0])
+    torch.testing.assert_close(result[0, 3], visual[1])
+    torch.testing.assert_close(result[0, [0, 2, 4]], torch.zeros(3, 3))
+
+
+@pytest.mark.unit
+def test_alpamayo_generation_positions_extend_multimodal_prompt():
+    from exporters.models.alpamayo.spec import _append_generation_positions
+
+    positions = torch.tensor(
+        [
+            [[0, 1, 2]],
+            [[0, 4, 5]],
+            [[0, 7, 8]],
+        ],
+        dtype=torch.long,
+    )
+    result = _append_generation_positions(
+        positions,
+        torch.tensor([[10]], dtype=torch.long),
+        5,
+    )
+
+    assert result.shape == (3, 1, 5)
+    torch.testing.assert_close(result[:, :, :3], positions)
+    torch.testing.assert_close(
+        result[:, :, 3:],
+        torch.tensor([[[13, 14]], [[13, 14]], [[13, 14]]]),
+    )
 
 
 @pytest.mark.unit

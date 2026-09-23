@@ -15,6 +15,7 @@ def causal_lm_flat(
     device: torch.device,
     dtype: torch.dtype,
     seq_len: int | None = None,
+    position_ids: torch.Tensor | None = None,
 ) -> tuple[tuple[torch.Tensor, ...], dict[str, Any]]:
     """inputs_embeds, rope, ctx, kv_start, last_token_ids, ds_stack, *kvs.
 
@@ -32,7 +33,11 @@ def causal_lm_flat(
         from ...rope import make_rope_rotary_cos_sin
 
         rope = make_rope_rotary_cos_sin(
-            cfg, int(max_seq_len), device, language_model=language
+            cfg,
+            int(max_seq_len),
+            device,
+            language_model=language,
+            position_ids=position_ids,
         )
     except ImportError:
         rope = torch.zeros(int(max_seq_len), 2, 1, head_dim, device=device, dtype=dtype)
