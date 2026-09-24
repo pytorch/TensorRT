@@ -33,6 +33,7 @@ BF16 in this path.
     python quantize_linear_fp8_woq.py
     python quantize_linear_fp8_static.py
     python torch_export_flux_fp8_woq.py
+    python torch_export_alpamayo_fp8_woq.py
     python quantize_linear_int4_woq.py
     python torch_export_flux_int4_woq.py
     python torch_export_qwen3_int4_woq.py
