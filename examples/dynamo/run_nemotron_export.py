@@ -21,7 +21,9 @@ if _src_pkg not in list(torch_tensorrt.__path__):
     torch_tensorrt.__path__.append(_src_pkg)
 
 from torch_tensorrt.hf.exporters import EdgeConfig, EdgeExporter
-from torch_tensorrt.hf.exporters.mamba_stub import apply as apply_mamba_stub
+from torch_tensorrt.hf.exporters.models.nemotron.mamba_stub import (
+    apply as apply_mamba_stub,
+)
 from torch_tensorrt.hf.exporters.plugin.plugin_utils import load_plugins_for_trt
 from torch_tensorrt.hf.exporters.utils import configure_thor_pytorch
 from transformers import AutoModelForCausalLM, AutoTokenizer

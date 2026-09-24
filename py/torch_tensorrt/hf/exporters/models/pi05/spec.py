@@ -10,20 +10,14 @@ from torch_tensorrt.hf.exporters.models.common.helpers import (
     kv_kwargs,
     split_flat_to_kwargs,
 )
-from torch_tensorrt.hf.exporters.models.common.patches import (
-    CausalLMPatch,
-    GridVisionPatch,
-    StaticActionVelocityStepPatch,
-    language_decoder,
-)
+from torch_tensorrt.hf.exporters.models.common.patches import language_decoder
 from torch_tensorrt.hf.exporters.models.pi05.helpers import (
     _core,
-    _nchw_to_hwc,
     build_pi05_prefix_embs,
     make_pi05_suffix_position_and_mask,
     pi05_compact_index,
 )
-from torch_tensorrt.hf.exporters.models.pi05.patches import PI05PrefixKVStepEncoderPatch
+from torch_tensorrt.hf.exporters.models.pi05.patches import PI05
 from torch_tensorrt.hf.exporters.ops import call_engine, fuse_prefix
 from torch_tensorrt.hf.exporters.spec import (
     ComponentBundle,
@@ -35,6 +29,13 @@ from torch_tensorrt.hf.exporters.spec import (
 @register_edge_spec("pi05")
 class Pi05Spec(EdgeSpec):  # type: ignore[misc]
     components = ("vision", "language", "action")
+
+    def apply_patches(self, model=None):
+        """Install vision, language, and action setattr replacements."""
+        del model
+        from torch_tensorrt.hf.exporters.plugin.attn_patches import apply_patches
+
+        return apply_patches(PI05)
 
     def prepare_sample_inputs(
         self, model: nn.Module, raw: Mapping[str, Any], config: Any
@@ -87,37 +88,6 @@ class Pi05Spec(EdgeSpec):  # type: ignore[misc]
             "lang_embeds": lang_embeds.to(device=device, dtype=dtype).contiguous(),
         }
 
-    def wrap(
-        self, name: str, model: nn.Module, sample: Mapping[str, Any], config: Any
-    ) -> nn.Module:
-        core = _core(model)
-        paligemma = core.paligemma_with_expert.paligemma.model
-        if name == "vision":
-            px = sample["pixel_values"]
-            sample_px = px.float() if px.dtype != torch.float32 else px
-            return GridVisionPatch(
-                vision_model=paligemma.vision_tower.float(),
-                projector=paligemma.multi_modal_projector,
-                sample_pixel_values=sample_px,
-                select_layer=-1,
-                pixel_shuffle=False,
-                downsample_ratio=0.5,
-                force_float32_input=True,
-            ).eval()
-        if name == "language":
-            language = paligemma.language_model
-            lm_head = core.paligemma_with_expert.paligemma.lm_head
-            return CausalLMPatch(language_decoder(language), lm_head).eval()
-        if name == "action":
-            return StaticActionVelocityStepPatch(
-                step_encoder=PI05PrefixKVStepEncoderPatch(core),  # type: ignore[no-untyped-call]
-                action_expert=core.paligemma_with_expert.gemma_expert.model,
-                velocity_decoder=core.action_out_proj,
-                output_tokens=int(core.config.chunk_size),
-                cast_hidden_fp32=False,
-            ).eval()
-        raise KeyError(name)
-
     def prepare(
         self,
         name: str,
@@ -125,36 +95,24 @@ class Pi05Spec(EdgeSpec):  # type: ignore[misc]
         sample: MutableMapping[str, Any],
         upstream: Mapping[str, Any],
         config: Any,
-        module: nn.Module,
     ) -> ComponentBundle:
         from torch_tensorrt.hf.exporters.plugin.attention import (
             ContextAttentionMaskType,
         )
-        from torch_tensorrt.hf.exporters.plugin.plugin_utils import (
-            patch_language_attention,
-            patch_vision_attention,
-        )
 
         core = _core(model)
+        paligemma = core.paligemma_with_expert.paligemma.model
         device = sample["pixel_values"].device
         dtype = sample["pixel_values"].dtype
 
         if name == "vision":
             px = sample["pixel_values"]
-            seq_len = int(getattr(module, "seq_len", 1) or 1)
-            batch = int(getattr(module, "batch_size", 1) or 1)
-
-            def _patch(mod: nn.Module) -> Any:
-                return patch_vision_attention(
-                    mod.vision_model, batch_size=batch, seq_len=seq_len, name="SigLIP"
-                )
-
             return ComponentBundle(
+                module=paligemma.eval(),
                 trace_args=(px,),
-                save_args=(_nchw_to_hwc(px),),
+                save_args=(px,),
                 input_names=["pixel_values"],
                 output_names=["visual_embeds"],
-                patch_fn=_patch,
                 model_type="vit",
                 engine_file="visual.engine",
             )
@@ -196,28 +154,14 @@ class Pi05Spec(EdgeSpec):  # type: ignore[misc]
                 seq_len=compact_len,
             )
             sample.update(split_flat_to_kwargs(flat, meta["input_names"]))
-            cfg = language.config
-            head_dim = int(
-                getattr(cfg, "head_dim", cfg.hidden_size // cfg.num_attention_heads)
-            )
-
-            def _patch(mod: nn.Module) -> Any:
-                decoder = getattr(mod, "lm", mod)
-                return patch_language_attention(
-                    decoder,
-                    hidden_size=int(cfg.hidden_size),
-                    num_attention_heads=int(cfg.num_attention_heads),
-                    num_key_value_heads=int(cfg.num_key_value_heads),
-                    head_dim=head_dim,
-                    context_attention_mask_type=ContextAttentionMaskType.PADDING,
-                )
 
             return ComponentBundle(
+                module=language_decoder(language).eval(),
                 trace_args=flat,
                 save_args=flat,
                 input_names=meta["input_names"],
                 output_names=["logits", "lm_hidden_states", "prefix_k", "prefix_v"],
-                patch_fn=_patch,
+                context_attention_mask_type=int(ContextAttentionMaskType.PADDING),
                 extra_config={"prefix_pad_mask_len": compact_len},
                 model_type="language",
                 engine_file="language.engine",
@@ -250,6 +194,7 @@ class Pi05Spec(EdgeSpec):  # type: ignore[misc]
             sample["suffix_attention_mask"] = mask
             args = (step_actions, step_timestep, prefix_k, prefix_v, pos, mask)
             return ComponentBundle(
+                module=core.eval(),
                 trace_args=args,
                 save_args=args,
                 input_names=[
@@ -275,6 +220,9 @@ class Pi05Spec(EdgeSpec):  # type: ignore[misc]
     ) -> dict[str, Any]:
         if name == "vision":
             vis = outputs[0] if isinstance(outputs, tuple) else outputs
+            # Engine output is [B, S, H]. Language packing still uses [N, H].
+            if vis.ndim == 3:
+                vis = vis.reshape(-1, vis.shape[-1])
             return {"visual_embeds": vis}
         if name == "language":
             return {"prefix_k": outputs[2], "prefix_v": outputs[3]}
