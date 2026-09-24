@@ -5,11 +5,12 @@ from __future__ import annotations
 from contextlib import contextmanager
 from typing import Any, Callable, Iterator
 
+import torch
+
 from ...plugin.attn_patches import (
     apply_patches,
     register_patch,
 )
-from ..common.patches import gather_last_token_hidden
 from .helpers import _decoder, _kind
 
 NEMOTRON = "nemotron"
@@ -68,7 +69,13 @@ def _patch_nemotron_causal_lm(original: Callable) -> Callable:
                 hidden = mixer(hidden)
             hidden = residual + hidden
         hidden = decoder.norm_f(hidden)
-        last = gather_last_token_hidden(hidden, last_token_ids)
+        indices = (
+            last_token_ids if last_token_ids.ndim == 1 else last_token_ids.squeeze(-1)
+        )
+        last = hidden[
+            torch.arange(hidden.shape[0], device=hidden.device, dtype=torch.long),
+            indices,
+        ]
         logits = self.lm_head(last).float()
         return (logits, *present_kv, *present_conv, *present_ssm)
 
