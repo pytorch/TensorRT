@@ -1413,11 +1413,6 @@ def _write_external_tensor_data(executorch_program: Any, file_path: str) -> None
 
 def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None:
     """Save an engine-bearing ExportedProgram as an ExecuTorch program."""
-    if not ENABLED_FEATURES.torch_tensorrt_runtime:
-        raise RuntimeError(
-            "output_format='executorch' requires the Torch-TensorRT runtime "
-            "(torch_tensorrt_runtime). Reinstall torch_tensorrt with the runtime extension."
-        )
     try:
         from torch_tensorrt.executorch import export
     except ImportError:
@@ -1426,8 +1421,6 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
             "output_format='executorch'. This CUDA integration supports Linux. "
             "Setup: " + executorch_install_command()
         )
-    import torch_tensorrt.dynamo.runtime.meta_ops.register_meta_ops  # noqa: F401
-
     # save() only ever lowers a single method, so keep rejecting the per-method
     # mappings that torch_tensorrt.executorch.export() accepts.
     for option in ("partitioners", "compile_specs"):

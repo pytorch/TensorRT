@@ -276,8 +276,8 @@ def _apply_weight_streaming_budget(
     """
     from executorch.exir.backend.compile_spec_schema import CompileSpec
     from torch_tensorrt.executorch.partitioner import (
-        normalize_weight_streaming_budget_per_engine,
         WEIGHT_STREAMING_BUDGET_COMPILE_SPEC_KEY,
+        normalize_weight_streaming_budget_per_engine,
     )
 
     for name, specs in method_compile_specs.items():
@@ -448,15 +448,16 @@ def export(
             f"The executorch format is only supported on Linux, {platform.system()} "
             "is not a supported platform for this format"
         )
-    if not ENABLED_FEATURES.torch_tensorrt_runtime:
-        raise RuntimeError(
-            "ExecuTorch export requires the Torch-TensorRT runtime "
-            "(torch_tensorrt_runtime). Reinstall torch_tensorrt with the runtime extension."
-        )
     if inputs is not None and arg_inputs is not None:
         raise ValueError("inputs and arg_inputs are mutually exclusive.")
     arguments = inputs if inputs is not None else arg_inputs
 
+    # A Python-only wheel registers execute_engine from _TRTEngine. The C++
+    # runtime registers that schema itself. meta_ops supplies the shared
+    # ExecuTorch placeholder op in both configurations and conditionally adds
+    # only the C++ runtime's fake registrations.
+    if not ENABLED_FEATURES.torch_tensorrt_runtime:
+        import torch_tensorrt.dynamo.runtime._TRTEngine  # noqa: F401
     import torch_tensorrt.dynamo.runtime.meta_ops.register_meta_ops  # noqa: F401
     from executorch.exir import to_edge_transform_and_lower
     from torch_tensorrt.dynamo._exporter import _declare_aliased_kv_mutations_on_ep
