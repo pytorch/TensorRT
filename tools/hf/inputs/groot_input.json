@@ -1,0 +1,37 @@
+{
+  "batch_size": 1,
+  "temperature": 1.0,
+  "top_p": 1.0,
+  "top_k": 1,
+  "max_generate_length": 1,
+  "requests": [
+    {
+      "messages": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "image",
+              "image": "/path/to/camera_0.png"
+            },
+            {
+              "type": "image",
+              "image": "/path/to/camera_1.png"
+            },
+            {
+              "type": "text",
+              "text": "Pick up the object."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "groot": {
+    "state": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+    "embodiment_id": 0,
+    "hidden_layer": 12,
+    "num_inference_steps": 4,
+    "seed": 42
+  }
+}

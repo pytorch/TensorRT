@@ -50,6 +50,7 @@ def prepare_export(
         model_type="groot",
         engine_dir=args.engine_dir or "/tmp/groot_edge_exporter",
         max_seq_len=args.max_seq_len or 968,
+        runtime_export=False,
     )
     return (
         policy,

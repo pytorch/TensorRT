@@ -91,7 +91,7 @@ def compile_component(
                 dynamic_shapes[param_name] = get_dynamic_shapes(spec, dim_registry)
             else:
                 dynamic_shapes[param_name] = {}
-        if var_pos_name is not None:
+        if var_pos_name is not None and specs[leading:]:
             dynamic_shapes[var_pos_name] = tuple(
                 get_dynamic_shapes(spec, dim_registry) for spec in specs[leading:]
             )
@@ -118,7 +118,11 @@ def compile_component(
                 exported,
                 arg_inputs=arg_inputs,
                 arg_input_binding_names=tuple(bundle.input_names),
-                output_binding_names=tuple(bundle.output_names),
+                output_binding_names=(
+                    bundle.output_names[0]
+                    if len(bundle.output_names) == 1
+                    else tuple(bundle.output_names)
+                ),
                 **settings,
             )
         )

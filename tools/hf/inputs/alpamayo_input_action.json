@@ -1,0 +1,68 @@
+{
+  "batch_size": 1,
+  "temperature": 1.0,
+  "top_p": 1.0,
+  "top_k": 50,
+  "max_generate_length": 128,
+  "requests": [
+    {
+      "messages": [
+        {
+          "role": "system",
+          "content": [
+            {
+              "type": "text",
+              "text": "You are a driving assistant that generates safe and accurate actions."
+            }
+          ]
+        },
+        {
+          "role": "user",
+          "content": [
+            {"type": "image", "image": "/path/to/frame_00.png"},
+            {"type": "image", "image": "/path/to/frame_01.png"},
+            {"type": "image", "image": "/path/to/frame_02.png"},
+            {"type": "image", "image": "/path/to/frame_03.png"},
+            {"type": "image", "image": "/path/to/frame_04.png"},
+            {"type": "image", "image": "/path/to/frame_05.png"},
+            {"type": "image", "image": "/path/to/frame_06.png"},
+            {"type": "image", "image": "/path/to/frame_07.png"},
+            {"type": "image", "image": "/path/to/frame_08.png"},
+            {"type": "image", "image": "/path/to/frame_09.png"},
+            {"type": "image", "image": "/path/to/frame_10.png"},
+            {"type": "image", "image": "/path/to/frame_11.png"},
+            {"type": "image", "image": "/path/to/frame_12.png"},
+            {"type": "image", "image": "/path/to/frame_13.png"},
+            {"type": "image", "image": "/path/to/frame_14.png"},
+            {"type": "image", "image": "/path/to/frame_15.png"},
+            {
+              "type": "trajectory",
+              "trajectory": [
+                [-13.570470809936523, 0.06137955188751221, -0.021795138716697693],
+                [-12.617349624633789, 0.05502257123589516, -0.021485785022377968],
+                [-11.672354698181152, 0.04983367770910263, -0.019761288538575172],
+                [-10.733928680419922, 0.04469458386301994, -0.01891801320016384],
+                [-9.802403450012207, 0.03998061269521713, -0.019592544063925743],
+                [-8.87903118133545, 0.034502264112234116, -0.016824787482619286],
+                [-7.963467121124268, 0.03007129393517971, -0.011910118162631989],
+                [-7.054953098297119, 0.02519317716360092, -0.008388019166886806],
+                [-6.15440559387207, 0.020703254267573357, -0.003812047652900219],
+                [-5.261260032653809, 0.016889382153749466, 0.0007052596774883568],
+                [-4.374241828918457, 0.01248129393517971, 0.004680476617068052],
+                [-3.4911155700683594, 0.00914590060710907, 0.002923570329323411],
+                [-2.611931085586548, 0.005678099580109119, 0.00007799568793281913],
+                [-1.736931562423706, 0.003552841255441308, -0.0018224255181849003],
+                [-0.8664319515228271, 0.001968142343685031, -0.001738768769428134],
+                [0.0, 0.0, 0.0]
+              ]
+            },
+            {
+              "type": "text",
+              "text": "output the chain-of-thought reasoning of the driving process, then output the future trajectory."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
