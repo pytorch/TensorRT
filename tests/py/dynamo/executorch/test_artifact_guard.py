@@ -514,7 +514,18 @@ def _native_project(tmp_path, tools, *, mutation=None, static_cuda=False):
         # it, so a stub standing in for a well-formed delegate has to carry it too.
         'extern "C" bool torch_tensorrt_owns_executorch_registration() { return true; }\n'
     )
-    for name in ("TensorRTBlobHeader.cpp", "WeightStreamingBudget.cpp"):
+    # Every source the real add_library names, less the one written above with a body.
+    # Read from the CMake rather than listed here, so adding a backend source does not
+    # silently leave this fixture configuring against a file that does not exist.
+    for name in sorted(
+        set(
+            re.findall(
+                r"cpp/src/torch_tensorrt/executorch/(\w+\.cpp)",
+                (_NATIVE / "CMakeLists.txt").read_text(),
+            )
+        )
+        - {"TensorRTBackend.cpp"}
+    ):
         (sources / name).write_text("\n")
     runtime_dir = tmp_path / "executorch/lib"
     runtime_dir.mkdir(parents=True)
