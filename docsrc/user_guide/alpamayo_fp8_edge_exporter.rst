@@ -309,7 +309,7 @@ Torch-TensorRT from the selected source revision. Confirm that importing
 
    # tools/hf contains the experimental exporter. Do not add $TORCH_TRT_ROOT/py
    # unless the source tree has been built and generated _version.py.
-   export PYTHONPATH="$TORCH_TRT_ROOT/tools/hf"
+   export PYTHONPATH="$TORCH_TRT_ROOT/tools/hf:$EDGE_LLM_ROOT"
 
    python - <<'PY'
    import modelopt
@@ -451,7 +451,7 @@ Load the plugin and run the unified exporter:
    cd "$TORCH_TRT_ROOT"
    source /path/to/edge-export/bin/activate
 
-   export PYTHONPATH="$TORCH_TRT_ROOT/tools/hf"
+   export PYTHONPATH="$TORCH_TRT_ROOT/tools/hf:$EDGE_LLM_ROOT"
    export EDGE_LLM_PLUGIN_SO="$EDGE_LLM_ROOT/build-alpamayo-export/libNvInfer_edgellm_plugin.so.1.0"
    export LD_LIBRARY_PATH="$(dirname "$EDGE_LLM_PLUGIN_SO"):${LD_LIBRARY_PATH:-}"
 
