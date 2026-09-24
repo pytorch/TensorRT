@@ -5,23 +5,24 @@ from typing import Any
 
 import torch
 import torch.nn as nn
-from torch_tensorrt.hf.exporters.models.common.helpers import (
+
+from ...ops import call_engine
+from ...spec import (
+    ComponentBundle,
+    EdgeSpec,
+    register_edge_spec,
+)
+from ..common.helpers import (
     kv_kwargs,
     split_flat_to_kwargs,
 )
-from torch_tensorrt.hf.exporters.models.nemotron.helpers import (
+from .helpers import (
     _decoder,
     _kind,
     allocate_plugin_states,
 )
-from torch_tensorrt.hf.exporters.models.nemotron.patches import (
+from .patches import (
     apply_nemotron_patches,
-)
-from torch_tensorrt.hf.exporters.ops import call_engine
-from torch_tensorrt.hf.exporters.spec import (
-    ComponentBundle,
-    EdgeSpec,
-    register_edge_spec,
 )
 
 
@@ -72,7 +73,7 @@ class NemotronSpec(EdgeSpec):  # type: ignore[misc]
         upstream: Mapping[str, Any],
         config: Any,
     ) -> ComponentBundle:
-        from torch_tensorrt.hf.exporters.rope import make_rope_rotary_cos_sin
+        from ...rope import make_rope_rotary_cos_sin
 
         del name, upstream
         embeds = sample["inputs_embeds"]

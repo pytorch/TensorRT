@@ -5,12 +5,12 @@ from __future__ import annotations
 from contextlib import contextmanager
 from typing import Any, Callable, Iterator
 
-from torch_tensorrt.hf.exporters.models.common.patches import gather_last_token_hidden
-from torch_tensorrt.hf.exporters.models.nemotron.helpers import _decoder, _kind
-from torch_tensorrt.hf.exporters.plugin.attn_patches import (
+from ...plugin.attn_patches import (
     apply_patches,
     register_patch,
 )
+from ..common.patches import gather_last_token_hidden
+from .helpers import _decoder, _kind
 
 NEMOTRON = "nemotron"
 
@@ -78,7 +78,7 @@ def _patch_nemotron_causal_lm(original: Callable) -> Callable:
 @contextmanager
 def apply_nemotron_patches(model: Any | None = None) -> Iterator[None]:
     """Class setattr plus mixer plugin wrappers (MoE packing needs the instance)."""
-    from torch_tensorrt.hf.exporters.plugin.plugin_utils import (
+    from ...plugin.plugin_utils import (
         patch_nemotron_mixers,
         restore_attention,
     )
