@@ -187,7 +187,10 @@ cache-keys = [
     { file = "setup.cfg" },
     { file = "dev_dep_versions.yml" },
 ]
-environments = ["sys_platform == 'linux'", "sys_platform == 'win32'"]
+environments = [
+    "sys_platform == 'linux'",
+    "sys_platform == 'win32' and platform_machine == 'AMD64'",
+]
 required-environments = [
     "sys_platform == 'linux' and python_version >= '3.10' and python_version <= '3.13' and platform_machine == 'x86_64'",
     "sys_platform == 'linux' and python_version >= '3.10' and python_version <= '3.13' and platform_machine == 'aarch64'",
@@ -203,7 +206,6 @@ conflicts = [
 ]
 constraint-dependencies = [
     "transformers>=5.14.1",
-    "executorch==1.6.0.dev20260915",
 ]
 
 [tool.uv.sources]

@@ -2415,12 +2415,11 @@ def test_packaging_declares_executorch_extra():
         assert extra_name in extras_by_name
         requirements = extras_by_name[extra_name]
         assert isinstance(requirements, ast.List)
-        # Both halves, since finding the delegate by hand is what this extra saves.
+        # The delegate, since finding it by hand is what this extra saves. It carries the
+        # ExecuTorch version, so a range beside it would state that version twice and the
+        # two cannot agree on the day the pin moves.
         named = [e.id for e in requirements.elts if isinstance(e, ast.Name)]
-        assert named == [
-            "EXECUTORCH_REQUIREMENT",
-            "EXECUTORCH_RUNTIME_REQUIREMENT",
-        ], named
+        assert named == ["EXECUTORCH_RUNTIME_REQUIREMENT"], named
 
     setup_call = next(
         node

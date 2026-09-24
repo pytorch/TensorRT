@@ -450,31 +450,31 @@ def test_write_pins_preserves_yaml_formatting_and_other_fields(pin_repo):
 
 
 @pytest.mark.unit
-def test_write_pins_updates_the_development_constraint(pin_repo):
-    import tomllib
+def test_the_updater_does_not_pin_the_root_project():
+    """The companion carries the ExecuTorch version, so nothing here may name it.
 
-    path = pin_repo / "pyproject.toml"
-    assert updater.write_pins("9.0.0.dev1", _COMMIT)
-    constraints = tomllib.loads(path.read_text())["tool"]["uv"][
-        "constraint-dependencies"
-    ]
-    assert "executorch==9.0.0.dev1" in constraints
-
-
-@pytest.mark.unit
-def test_development_constraint_update_detects_removed_site(pin_repo, monkeypatch):
-    monkeypatch.setattr(
-        updater,
-        "_PIN_SITES",
-        tuple(name for name in updater._PIN_SITES if name != "pyproject.toml"),
+    The root project used to hold a constraint built from the pin. That stated the
+    version a second time, and on the day the pin moved it asked for a build no
+    published companion agreed with, which is what stopped the nightly bump.
+    """
+    assert "pyproject.toml" not in updater._PIN_SITES, (
+        "the root project is back on the list of files the updater writes. The "
+        "companion carries the ExecuTorch version, so nothing here should name it."
     )
-    with pytest.raises(AssertionError):
-        test_write_pins_updates_the_development_constraint(pin_repo)
+    assert "pyproject.toml" not in updater._SITE_COORDINATES, (
+        "the root project has pin coordinates again, so a bump would write a version "
+        "into it that no published companion can agree with."
+    )
 
 
 @pytest.mark.unit
 def test_write_pins_requires_a_separate_lock_refresh(tmp_path, monkeypatch):
-    """A history-free pin bump must pass source guards and fail only the stale lock."""
+    """A history-free pin bump must pass every guard, lock included.
+
+    It used to fail the lock check, because the lock mirrored the pin and a bump made it
+    stale at once. The companion carries the version now, so the lock stays valid across
+    a bump and the whole suite passes. That is the point of the change.
+    """
     import xml.etree.ElementTree as ET
 
     tracked = subprocess.run(
@@ -519,14 +519,12 @@ def test_write_pins_requires_a_separate_lock_refresh(tmp_path, monkeypatch):
         capture_output=True,
         text=True,
     )
-    assert result.returncode == 1, result.stdout + result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
     cases = ET.parse(report).findall(".//testcase")
     assert not [case for case in cases if case.find("error") is not None], result.stdout
-    assert [
-        case.attrib["name"] for case in cases if case.find("failure") is not None
-    ] == ["test_the_lockfile_executorch_matches_the_pin"], (
-        result.stdout + result.stderr
-    )
+    assert not [
+        case for case in cases if case.find("failure") is not None
+    ], result.stdout
 
 
 @pytest.mark.unit

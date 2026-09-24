@@ -68,7 +68,7 @@ jobs:
         # --pre would apply to every other requirement in the same command too.
         python -m pip install pyyaml "wheel>=0.40" \
           --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" \
-          "executorch==1.6.0.dev20260915"
+          "executorch==1.6.0.dev20260923"
 
         # The shared artifact carries the matching core and companion wheels.
         shopt -s nullglob
@@ -107,7 +107,7 @@ jobs:
         # Resolve the user-facing range without reusing the build's installed pin.
         python -m venv "${RUNNER_TEMP}/range-check-venv"
         # pin-check: range-ok
-        "${RUNNER_TEMP}/range-check-venv/bin/python" -m pip install --no-deps --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" "executorch>=1.6.0.dev20260915,<1.7"
+        "${RUNNER_TEMP}/range-check-venv/bin/python" -m pip install --no-deps --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" "executorch>=1.6.0.dev20260923,<1.7"
 
         source tests/py/utils/ci_helpers.sh
         trt_tier_executorch
