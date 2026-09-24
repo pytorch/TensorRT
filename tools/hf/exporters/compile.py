@@ -124,13 +124,32 @@ def compile_component(
     )
     engine_file = bundle.engine_file
 
-    serialized = (
-        torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_engine(
-            exported,
-            arg_inputs=arg_inputs,
-            **settings,
+    # ``dynamo.compile`` has already built and serialized the engine. Reuse
+    # those bytes instead of calling
+    # ``convert_exported_program_to_serialized_trt_engine`` and building the
+    # same engine a second time, which can exceed GPU memory for large models.
+    serialized_engines = [
+        submodule.serialized_engine
+        for submodule in compiled.modules()
+        if getattr(submodule, "serialized_engine", None) is not None
+    ]
+    if len(serialized_engines) == 1:
+        serialized = bytes(serialized_engines[0])
+    elif not serialized_engines:
+        # Test doubles and alternative compiler backends may not expose the
+        # runtime module. Preserve the public serialization API as a fallback.
+        serialized = (
+            torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_engine(
+                exported,
+                arg_inputs=arg_inputs,
+                **settings,
+            )
         )
-    )
+    else:
+        raise RuntimeError(
+            f"Expected one fully compiled TensorRT engine for {name}, "
+            f"found {len(serialized_engines)}"
+        )
     (out_dir / engine_file).write_bytes(serialized)
 
     _write_sidecar(out_dir, bundle, name, trt_out, engine_file=engine_file)

@@ -190,7 +190,9 @@ def _patch_alpamayo_action_step(original: Callable) -> Callable:
             return original(self, noisy_action, timestep, *args, **kwargs)
 
         n_diffusion_tokens = int(noisy_action.shape[1])
-        action_embeds = self.action_in_proj(noisy_action, timestep)
+        action_embeds = self.action_in_proj(noisy_action, timestep).to(
+            dtype=noisy_action.dtype
+        )
         if action_embeds.dim() == 2:
             action_embeds = action_embeds.view(
                 noisy_action.shape[0],

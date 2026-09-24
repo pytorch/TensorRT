@@ -48,6 +48,20 @@ def stack_deepstack_features(features: Any) -> torch.Tensor:
     return torch.stack(tuple(features), dim=0)
 
 
+def unpack_visual_output(output: Any) -> tuple[torch.Tensor, Any]:
+    """Return visual embeddings and DeepStack features across HF versions."""
+    pooler_output = getattr(output, "pooler_output", None)
+    deepstack_features = getattr(output, "deepstack_features", None)
+    if pooler_output is not None and deepstack_features is not None:
+        return pooler_output, deepstack_features
+    if isinstance(output, (tuple, list)) and len(output) >= 2:
+        return output[0], output[1]
+    raise TypeError(
+        "Unsupported Qwen3-VL vision output; expected a tuple or "
+        "BaseModelOutputWithDeepstackFeatures"
+    )
+
+
 def scatter_visual_tokens(
     visual: torch.Tensor,
     text_embeds: torch.Tensor,
