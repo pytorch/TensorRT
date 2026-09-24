@@ -59,8 +59,10 @@ repos:
       hooks:
           - id: typos
     - repo: https://github.com/astral-sh/uv-pre-commit
-      # uv version.
-      rev: 0.7.1
+      # Matches the version the lock-updating workflows use. A different version here
+      # resolves the tree differently, so a hook on an older uv either fails outright or
+      # rewrites the lock into a shape no workflow would produce.
+      rev: 0.12.5
       hooks:
           # Update the uv lockfile
           - id: uv-lock

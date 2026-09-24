@@ -153,6 +153,18 @@ jobs:
           fi
           python .github/scripts/update_executorch_pin.py "${args[@]}"
           PYTHON_ONLY=1 uv lock --refresh --prerelease=allow
+          # Same check uv-update.yml makes, for the same reason: this job rewrites the
+          # lock unattended and opens a pull request for it, so without this it can
+          # publish a lock that does not resolve and nothing notices until somebody
+          # installs from it. The flags have to match the lock step above, because uv
+          # records the resolution mode and --locked rejects a lock made under another.
+          # Built in a scratch directory outside the checkout, because the pull request
+          # step stages every untracked path and a .venv here would be committed.
+          if ! PYTHON_ONLY=1 UV_PROJECT_ENVIRONMENT="${RUNNER_TEMP}/lock-check-venv" \
+              uv sync --locked --prerelease=allow --no-install-project --all-extras; then
+            echo "::error::the refreshed lock does not resolve; refusing to open a pull request"
+            exit 1
+          fi
           if git diff --quiet; then
             echo "the pin and development lock are already current"
           else
