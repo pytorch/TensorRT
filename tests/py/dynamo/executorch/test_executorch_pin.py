@@ -1003,6 +1003,15 @@ def test_import_errors_preserve_context_and_install_guidance(
         "CudaGraphsTorchTensorRTModule": type("CudaGraphsStub", (), {}),
         "_parse_module_type": lambda value: None,
         "ENABLED_FEATURES": types.SimpleNamespace(torch_tensorrt_runtime=True),
+        # save() reads this table at module scope, and only the functions are compiled
+        # here, so it has to be supplied. Taken from the source rather than repeated,
+        # or a new option would leave this test asserting against a stale set.
+        "_EXECUTORCH_SAVE_OPTIONS": next(
+            ast.literal_eval(node.value)
+            for node in ast.parse(source.read_text()).body
+            if isinstance(node, ast.AnnAssign)
+            and getattr(node.target, "id", None) == "_EXECUTORCH_SAVE_OPTIONS"
+        ),
     }
     exec(
         compile(

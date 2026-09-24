@@ -314,7 +314,9 @@ def _assert_device_commands(tmp_path, workflow, failure=""):
         "elif tool == 'curl': pass\n"
         "elif tool == 'find': print(os.environ['RUNNER_TEMP'] + '/libs')\n"
         "elif tool == 'verify-executorch-reference-runner.sh':\n"
-        "    assert all(Path(a).read_text() == 'exported' for a in args)\n"
+        # Its coalesced model arrives as --coalesced=<path>, so strip the flag before
+        # reading. The rest are bare paths.
+        "    assert all(Path(a.split('=', 1)[-1]).read_text() == 'exported' for a in args)\n"
         "else: raise AssertionError((tool, args))\n"
     )
     dispatcher.chmod(0o755)
@@ -362,6 +364,11 @@ def _assert_device_commands(tmp_path, workflow, failure=""):
                 f"--model_path={runner}/torchtrt-kv-cache-decode.pte",
             ],
             [
+                "examples/torchtrt_executorch_example/export_kv_cache_decode.py",
+                f"--model_path={runner}/torchtrt-kv-cache-decode-zero-copy.pte",
+                "--zero_copy",
+            ],
+            [
                 "examples/torchtrt_executorch_example/export_coalesced.py",
                 f"--model_path={runner}/torchtrt-coalesced.pte",
             ],
@@ -379,7 +386,7 @@ def _assert_device_commands(tmp_path, workflow, failure=""):
                 f"--model_path={runner}/torchtrt-device-resident.pte",
                 "--num_runs=2",
             ],
-        ][: 4 if failure == "export_device_resident.py" else 6]
+        ][: 5 if failure == "export_device_resident.py" else 7]
     ), (
         result.stdout + result.stderr
     )
@@ -389,8 +396,10 @@ def _assert_device_commands(tmp_path, workflow, failure=""):
         if failure == "export_device_resident.py"
         else [
             [
-                str(runner / f"torchtrt-{name}.pte")
-                for name in ("python", "kv-cache-decode", "coalesced")
+                str(runner / "torchtrt-python.pte"),
+                f"--coalesced={runner / 'torchtrt-coalesced.pte'}",
+                str(runner / "torchtrt-kv-cache-decode.pte"),
+                str(runner / "torchtrt-kv-cache-decode-zero-copy.pte"),
             ]
         ]
     )
