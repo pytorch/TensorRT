@@ -110,8 +110,11 @@ void setup_input_tensors(
     const auto& binding = compiled_engine->input_binding_infos[i];
     const auto& name = binding.name;
 
+    // A shape-tensor input is read from host memory (see the shape-tensor branch below), so a
+    // host tensor is accepted for it. Every other input is expected to be on the device.
     TORCHTRT_CHECK(
-        inputs[i].is_cuda(), "Expected input tensors to have device cuda, found device " << inputs[i].device());
+        binding.is_shape_tensor || inputs[i].is_cuda(),
+        "Expected input tensors to have device cuda, found device " << inputs[i].device());
 
     TORCHTRT_CHECK(
         inputs[i].dtype() == binding.expected_type,
@@ -122,10 +125,15 @@ void setup_input_tensors(
     LOG_DEBUG("Input Name: " << name << " Shape: " << dims << " isShapeInferenceIO: " << binding.is_shape_tensor);
 
     if (binding.is_shape_tensor) {
-      // Shape tensor inputs are casted to int64 explicitly.
-      // Refer to
+      // TensorRT reads a shape tensor's values from host memory, so they are copied to the host
+      // and cast to int64. Refer to
       // https://github.com/NVIDIA/TensorRT/blob/d2f4ef789a9a6ffdf37b55c3f81b486225f6b380/samples/common/sampleInference.cpp#L435
-      auto input_cpu = inputs[i].clone().contiguous().cpu().to(torch::kInt64);
+      // A device tensor is copied back with .cpu(), which synchronizes the stream; a host tensor
+      // is used as is, which does not, so passing shape inputs on the host avoids a per-call sync.
+      // The values are deep-copied into active_shape_tensor_values below, so input_cpu is transient
+      // and no clone is needed.
+      auto input_cpu = inputs[i].is_cuda() ? inputs[i].contiguous().cpu().to(torch::kInt64)
+                                           : inputs[i].contiguous().to(torch::kInt64);
       std::vector<int64_t> inputs_cpu_vec(
           input_cpu.data_ptr<int64_t>(), input_cpu.data_ptr<int64_t>() + input_cpu.numel());
       compiled_engine->active_shape_tensor_values.emplace_back(std::move(inputs_cpu_vec));
@@ -254,15 +262,24 @@ void create_output_allocator(c10::intrusive_ptr<TRTEngine> compiled_engine) {
 }
 
 std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngine> compiled_engine) {
-  // All inputs are expected to be on CUDA. Warn and move any that are not.
-  for (auto& inp : inputs) {
-    if (inp.defined() && !inp.is_cuda()) {
-      LOG_WARNING(
-          "Input tensor is not on a CUDA device. Moving it to CUDA automatically. "
-          "For best performance, ensure all inputs are on the correct CUDA device before "
-          "calling the TensorRT engine (e.g. tensor.cuda() or tensor.to(device)).");
-      inp = inp.cuda();
+  // All inputs are expected to be on CUDA. Warn and move any that are not. A host-resident
+  // shape-tensor input is an exception: TensorRT reads it from host memory, so it is left where it
+  // is rather than moved to the device only for setup_input_tensors to copy it back. A shape tensor
+  // on any other non-CUDA device still falls through to the move below.
+  for (size_t i = 0; i < inputs.size(); i++) {
+    auto& inp = inputs[i];
+    if (!inp.defined() || inp.is_cuda()) {
+      continue;
     }
+    if (inp.is_cpu() && i < compiled_engine->input_binding_infos.size() &&
+        compiled_engine->input_binding_infos[i].is_shape_tensor) {
+      continue;
+    }
+    LOG_WARNING(
+        "Input tensor is not on a CUDA device. Moving it to CUDA automatically. "
+        "For best performance, ensure all inputs are on the correct CUDA device before "
+        "calling the TensorRT engine (e.g. tensor.cuda() or tensor.to(device)).");
+    inp = inp.cuda();
   }
 
 #ifdef ENABLE_TRT_NCCL_COLLECTIVES
