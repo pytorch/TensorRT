@@ -1,12 +1,16 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
+import hashlib
 import inspect
 import logging
+import os
 import warnings
+from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from enum import Enum, auto
-from typing import Any, Dict, Iterator, Optional, Union
+from itertools import islice
+from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
 import numpy as np
 import torch
@@ -17,13 +21,87 @@ from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._compiler import compile as dynamo_compile
 from torch_tensorrt.dynamo._refit import refit_module_weights
 from torch_tensorrt.dynamo.utils import (
-    check_output_equal,
     deallocate_module,
     to_torch_device,
     to_torch_tensorrt_device,
 )
 
 logger = logging.getLogger(__name__)
+
+# A tensor is hashed in chunks so that one large tensor can still occupy every thread.
+# GPU-resident weights must be copied to the host to be hashed, so they are grouped into
+# batches and released as they go rather than briefly duplicating the whole model.
+_DIGEST_CHUNK_BYTES = 4 * 1024 * 1024
+_DIGEST_COPY_BUDGET_BYTES = 256 * 1024 * 1024
+
+# One unit of hashing work: the chunked bytes of each tensor in it, in state_dict order.
+_ChunkBatch = List[Tuple[str, List[memoryview]]]
+
+
+def _sha256(data: Union[bytes, memoryview]) -> bytes:
+    return hashlib.sha256(data).digest()
+
+
+def _tensor_chunks(tensor: torch.Tensor) -> List[memoryview]:
+    """The tensor's raw bytes, split small enough that one tensor can fill the pool.
+
+    ``reshape(-1)`` because a 0-d tensor cannot be viewed as bytes. A tensor already on
+    the CPU is aliased here rather than copied.
+    """
+    data = memoryview(
+        tensor.detach().to("cpu").contiguous().reshape(-1).view(torch.uint8).numpy()
+    )
+    chunks = [
+        data[i : i + _DIGEST_CHUNK_BYTES]
+        for i in range(0, len(data), _DIGEST_CHUNK_BYTES)
+    ]
+    # An empty tensor has no chunks but still needs a digest.
+    return chunks or [data]
+
+
+def _chunk_batches(state_dict: Dict[str, torch.Tensor]) -> Iterator[_ChunkBatch]:
+    """Group tensors so at most ``_DIGEST_COPY_BUDGET_BYTES`` of copies are alive at once.
+
+    Only a tensor copied down from the GPU holds host memory until it is hashed, so only
+    those count against the budget. CPU-resident weights are aliased and can all go in a
+    single batch, which is where the parallelism pays off.
+    """
+    batch: _ChunkBatch = []
+    copied_bytes = 0
+
+    for name, tensor in state_dict.items():
+        batch.append((name, _tensor_chunks(tensor)))
+        if tensor.device.type == "cpu":
+            continue
+        copied_bytes += tensor.numel() * tensor.element_size()
+        if copied_bytes >= _DIGEST_COPY_BUDGET_BYTES:
+            yield batch
+            batch, copied_bytes = [], 0
+
+    if batch:
+        yield batch
+
+
+def _digest_state_dict(state_dict: Dict[str, torch.Tensor]) -> Dict[str, bytes]:
+    """SHA-256 every tensor in ``state_dict``, as a hash over its chunk digests.
+
+    Keeping 32 bytes per tensor rather than a copy of the weights is what lets
+    ``update_refit_condition`` compare weight *values* without holding a second copy of
+    the model. ``hashlib`` releases the GIL, so a whole batch of chunks hashes in
+    parallel at close to memcmp speed. Byte identity is stricter than ``torch.equal``,
+    which type-promotes: a dtype change is a different digest, and so is not LIVE.
+    """
+    digests: Dict[str, bytes] = {}
+
+    with ThreadPoolExecutor(min(32, os.cpu_count() or 1)) as pool:
+        for batch in _chunk_batches(state_dict):
+            hashed = iter(pool.map(_sha256, [c for _, cs in batch for c in cs]))
+            # pool.map preserves order, so each tensor takes its own chunk digests off
+            # the front of the shared iterator and commits to them in order.
+            for name, chunks in batch:
+                digests[name] = _sha256(b"".join(islice(hashed, len(chunks))))
+
+    return digests
 
 
 def _is_modelopt_quantized(model: torch.nn.Module) -> bool:
@@ -156,8 +234,11 @@ class MutableTorchTensorRTModule(object):
         self.arg_dynamic_shapes: Optional[tuple[Any]] = None
         self.kwarg_dynamic_shapes: Optional[dict[Any, Any]] = None
         self.serializable_dynamic_shapes_dims: dict[str, tuple[str, int, int]] = {}
-        self.run_info: Optional[tuple[Any, ...]] = None
         self.state_dict_metadata: dict[str, torch.Size] = {}
+        # Per-tensor weight digests at last compile/refit. Used by
+        # update_refit_condition so LIVE does not depend on TRT↔PyTorch
+        # numerical agreement (H100/B100 gaps exceed ATOL/RTOL; see #4153).
+        self._state_dict_digests: dict[str, bytes] = {}
         self._store_state_dict_metadata()
         self.enable_weight_streaming = (
             kwargs["enable_weight_streaming"]
@@ -240,8 +321,19 @@ class MutableTorchTensorRTModule(object):
         return total_dynamic_shape
 
     def _store_state_dict_metadata(self) -> None:
-        for k, v in self.original_model.state_dict().items():
-            self.state_dict_metadata[k] = v.shape
+        state_dict = self.original_model.state_dict()
+        self.state_dict_metadata = {k: v.shape for k, v in state_dict.items()}
+        self._state_dict_digests = _digest_state_dict(state_dict)
+
+    def _state_dict_values_match(self) -> bool:
+        # Modules pickled before digests existed have none; treat as changed and refit.
+        digests: Optional[Dict[str, bytes]] = getattr(self, "_state_dict_digests", None)
+        if not digests:
+            return False
+        state_dict = self.original_model.state_dict()
+        if state_dict.keys() != digests.keys():
+            return False
+        return _digest_state_dict(state_dict) == digests
 
     def load_state_dict(
         self, state_dict: Dict[str, Any], strict: bool = True, assign: bool = False
@@ -254,37 +346,28 @@ class MutableTorchTensorRTModule(object):
         return {k: torch.nn.Parameter(v, requires_grad=False) for k, v in sd.items()}
 
     def update_refit_condition(self) -> None:
-        # 2-stage check to determine whether the module should be intact, refitted, or recompiled.
+        # Decide whether the module should stay LIVE, be refitted, or be recompiled.
 
-        # Default refit
+        # Default: value-only weight change → refit.
         self.refit_state.set_state(RefitFlag.NEEDS_REFIT)
 
-        # Run the same inputs through pytorch model and compare the result to previous run of graph module
-        # to determine whether refit/recompilation is needed. If the output is the same, no further process needed.
-        if self.run_info:
-            args, kwargs, result = self.run_info
-            self.original_model.to(to_torch_device(self.trt_device))
-            new_result = self.original_model(*args, **kwargs)
-            deallocate_module(self.original_model)
-            if check_output_equal(result, new_result):
-                self.refit_state.set_state(RefitFlag.LIVE)
-                return
-
-        # Since we do not have access to the previous state_dict, we can only use state_dict_metadata
-        # to determine whether the keys or weight shape is changed.
+        # Structural changes (keys / shapes) require a full recompile.
         sd, sd_meta = self.original_model.state_dict(), self.state_dict_metadata
         if sd.keys() != sd_meta.keys():
-            # If keys are not identical, recompile.
             self.refit_state.set_state(RefitFlag.NEEDS_RECOMPILE)
             return
 
         for k in sd.keys():
             if sd[k].shape != sd_meta[k]:
-                # If weight shapes are not identical, recompile.
                 self.refit_state.set_state(RefitFlag.NEEDS_RECOMPILE)
                 return
 
-        return
+        # Exact weight match against the last compile/refit snapshot → nothing to do.
+        # Anything else changed the weights the engine was built from, so it needs a
+        # refit: comparing outputs instead would only prove the change was invisible
+        # for one cached input, and would depend on TRT↔PyTorch agreement (#4153).
+        if self._state_dict_values_match():
+            self.refit_state.set_state(RefitFlag.LIVE)
 
     def refit_gm(self) -> None:
         """
@@ -508,16 +591,13 @@ class MutableTorchTensorRTModule(object):
                 logger.error(e)
                 logger.error("Model refit failed. Recompiling the graph module.")
                 self.compile()
-                self._store_state_dict_metadata()
+            self._store_state_dict_metadata()
             self.refit_state.set_state(RefitFlag.LIVE)
 
         weight_streaming_ctx = (
             self.weight_streaming_ctx if self.enable_weight_streaming else None
         )
-        result = self.gm(*args, **kwargs)
-        # Storing inputs and outputs for verification when the state is unknown
-        self.run_info = (args, kwargs, result)
-        return result
+        return self.gm(*args, **kwargs)
 
     def to(self, *args: Any, **kwargs: Any) -> None:
         logger.warning(
