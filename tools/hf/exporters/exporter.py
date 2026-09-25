@@ -49,7 +49,7 @@ class EdgeExporter(DynamoExporter):  # type: ignore[misc]
         model: nn.Module,
         sample_inputs: MutableMapping[str, Any],
         config: EdgeConfig | dict[str, Any],
-    ) -> ExportedProgram:
+    ) -> ExportedProgram | None:
         if isinstance(config, dict):
             config = EdgeConfig(**config)
         elif not isinstance(config, EdgeConfig):
@@ -77,6 +77,8 @@ class EdgeExporter(DynamoExporter):  # type: ignore[misc]
                     trt_settings=config.trt_settings,
                 )
                 self.bench[name] = (eager_ms.get(name, 0.0), trt_ms)
+                if not trt_out:
+                    continue
                 out_name = bundle.parity_output or bundle.output_names[0]
                 trt = trt_out[bundle.output_names.index(out_name)]
                 ref = eager.get(name)
@@ -85,9 +87,13 @@ class EdgeExporter(DynamoExporter):  # type: ignore[misc]
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
 
+        self.engines = engines
+        if not config.runtime_export:
+            self.sample = {}
+            return None
+
         runtime = EdgeRuntimeModule(spec, engines)
         runtime_kwargs = _clone_export_kwargs(spec.runtime_kwargs(sample))
-        self.engines = engines
         self.sample = dict(runtime_kwargs)
 
         dynamic_shapes = config.dynamic_shapes

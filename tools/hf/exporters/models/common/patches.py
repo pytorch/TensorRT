@@ -33,6 +33,7 @@ def causal_lm_plugin_forward(
     rope_rotary_cos_sin: torch.Tensor,
     context_lengths: torch.Tensor,
     kvcache_start_index: torch.Tensor,
+    context_mask_selector: torch.Tensor,
     last_token_ids: torch.Tensor,
     ds_stack: torch.Tensor,
     *past_key_values: torch.Tensor,
@@ -59,6 +60,7 @@ def causal_lm_plugin_forward(
             past_key_value=past_key_values[i],
             ctx_len=context_lengths,
             kvcache_start_index=kvcache_start_index,
+            context_mask_selector=context_mask_selector,
         )
         hidden = _as_tensor(hidden)
         hidden = residual + hidden

@@ -23,3 +23,4 @@ class EdgeConfig:
     generation_reserve: int = 0
     trt_settings: dict[str, Any] = field(default_factory=dict)
     model_type: str | None = None
+    runtime_export: bool = True

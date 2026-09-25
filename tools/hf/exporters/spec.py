@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping, MutableMapping
 from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 import torch
@@ -44,6 +45,9 @@ class ComponentBundle:
     input_specs: tuple[Any, ...] | None = None
     model_type: str = "edge"
     engine_file: str = "engine.engine"
+    output_subdir: str | None = None
+    artifact_writer: Callable[[Path], None] | None = None
+    edge_runtime_bindings: bool = False
 
 
 class EdgeSpec(ABC):

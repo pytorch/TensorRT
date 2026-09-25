@@ -9,27 +9,33 @@ This guide walks through the complete workflow for:
 2. checking the quantized checkpoint with Alpamayo evaluation;
 3. building the TensorRT-Edge-LLM plugin;
 4. exporting Alpamayo's vision, language, and action components to TensorRT;
-5. checking eager-versus-TensorRT parity and the generated engine artifacts.
+5. checking eager-versus-TensorRT parity and the generated engine artifacts;
+6. running the engines with TensorRT-Edge-LLM ``action_inference``.
 
-The Edge exporter produces three engines and a small ``torch.export`` program
-that chains them:
+The Edge exporter produces three engines using the binding names, paged KV
+cache layout, sidecars, and tokenizer artifacts consumed by
+TensorRT-Edge-LLM:
 
 .. code-block:: text
 
    camera patches
         │
         ▼
-   vision.engine ──► visual token insertion + DeepStack packing
+   visual/visual.engine ──► visual token insertion + DeepStack packing
         │
         ▼
-   language.engine ──► prefix K/V cache
+   llm.engine ──► paged language K/V cache
         │
         ▼
-   action.engine ──► one diffusion velocity step [batch, 64, 2]
+   action/action.engine ──► ten denoising steps in action_inference
+        │
+        ▼
+   future trajectory [batch, 64, 2]
 
-The export smoke test compiles and checks one action-denoising step. Alpamayo's
-autoregressive reasoning loop and Python-controlled diffusion sampler remain
-host-side orchestration; they are not represented as one static graph.
+The action engine implements one Euler denoising step and aliases its per-layer
+KV cache outputs to the corresponding inputs. The C++ action runner performs
+the ten-step diffusion loop and copies each denoised result into the next
+step's input.
 
 .. warning::
 
@@ -66,10 +72,10 @@ different environments because their dependency requirements differ.
      - CUDA 12 or 13, matching PyTorch
      - Must match the plugin build
 
-The ModelOpt checkpoint format carries ``modelopt_state.pth`` so the newer
-export environment can reconstruct quantized modules when
-``mto.enable_huggingface_checkpointing()`` is enabled before
-``from_pretrained``.
+The exporter reads compressed FP8 weights and calibration scales directly from
+the checkpoint safetensors. It does not restore ModelOpt's version-specific
+``FP8QTensor`` Python wrappers. ``modelopt_state.pth`` remains useful for
+official eager evaluation in the recipe environment.
 
 Suggested source layout
 -----------------------
@@ -81,7 +87,6 @@ The commands below use this layout:
    /workspace/
    ├── alpamayo-recipes/
    │   └── recipes/alpamayo1_5_quant/
-   ├── TensorRT/
    ├── TensorRT-Edge-LLM/
    └── TensorRT-Torch/
 
@@ -304,7 +309,7 @@ Torch-TensorRT from the selected source revision. Confirm that importing
 
    # tools/hf contains the experimental exporter. Do not add $TORCH_TRT_ROOT/py
    # unless the source tree has been built and generated _version.py.
-   export PYTHONPATH="$TORCH_TRT_ROOT/tools/hf"
+   export PYTHONPATH="$TORCH_TRT_ROOT/tools/hf:$EDGE_LLM_ROOT"
 
    python - <<'PY'
    import modelopt
@@ -326,8 +331,10 @@ the source tree in place.
 ---------------------------------------------
 
 The language engine contains TensorRT-Edge-LLM attention plugins. Build the
-plugin against the same CUDA and TensorRT major versions used by
-Torch-TensorRT.
+plugin and ``action_inference`` against the same CUDA and TensorRT major
+versions used by Torch-TensorRT. Build engines on the GPU architecture where
+they will run; TensorRT plans are not portable between RTX 5090 (SM120) and
+DRIVE AGX Thor (SM110).
 
 Initialize dependencies:
 
@@ -336,7 +343,26 @@ Initialize dependencies:
    cd "$EDGE_LLM_ROOT"
    git submodule update --init --recursive
 
-Configure an x86 CUDA 13 / TensorRT 11 build:
+Install the CuTe DSL build dependencies required by the language prefill
+kernels:
+
+.. code-block:: bash
+
+   python -m pip install \
+     "nvidia-cutlass-dsl[cu13]==4.7.0" \
+     "cupy-cuda13x==13.6.0" \
+     cuda-python
+
+Generate the FMHA artifact for the current GPU. On Thor this auto-detects
+SM110:
+
+.. code-block:: bash
+
+   python kernelSrcs/build_cutedsl.py \
+     --kernels fmha \
+     --clean
+
+Configure the CUDA 13 / TensorRT 11 build:
 
 .. code-block:: bash
 
@@ -347,12 +373,12 @@ Configure an x86 CUDA 13 / TensorRT 11 build:
      -DCMAKE_BUILD_TYPE=Release \
      -DTRT_PACKAGE_DIR=/usr \
      -DCUDA_CTK_VERSION=13.0 \
-     -DENABLE_CUTE_DSL=OFF \
+     -DENABLE_CUTE_DSL=fmha \
      -DBUILD_UNIT_TESTS=OFF \
      -DBUILD_PYTHON_BINDINGS=OFF
 
    cmake --build build-alpamayo-export \
-     --target NvInfer_edgellm_plugin \
+     --target NvInfer_edgellm_plugin action_inference \
      -j"$(nproc)"
 
 If TensorRT headers and libraries are installed under a separate SDK root, use
@@ -379,6 +405,14 @@ Set and verify the plugin:
 
 Use the CUDA and TensorRT versions available on your target system rather than
 copying the example values blindly.
+
+.. warning::
+
+   Do not build the current plugin with ``ENABLE_CUTE_DSL=OFF`` when using
+   ``AttentionPlugin`` language prefill. Such a build may contain decode-only
+   XQA support and fail at runtime with ``selected prefill kernel is
+   unavailable``. The required FMHA variant must support both the model's
+   ``head_dim`` (128 for Alpamayo) and the target SM.
 
 6. Choose an export sample
 --------------------------
@@ -417,7 +451,7 @@ Load the plugin and run the unified exporter:
    cd "$TORCH_TRT_ROOT"
    source /path/to/edge-export/bin/activate
 
-   export PYTHONPATH="$TORCH_TRT_ROOT/tools/hf"
+   export PYTHONPATH="$TORCH_TRT_ROOT/tools/hf:$EDGE_LLM_ROOT"
    export EDGE_LLM_PLUGIN_SO="$EDGE_LLM_ROOT/build-alpamayo-export/libNvInfer_edgellm_plugin.so.1.0"
    export LD_LIBRARY_PATH="$(dirname "$EDGE_LLM_PLUGIN_SO"):${LD_LIBRARY_PATH:-}"
 
@@ -434,14 +468,17 @@ Load the plugin and run the unified exporter:
 
 During a successful run, the exporter:
 
-1. enables ModelOpt Hugging Face checkpoint restoration;
-2. loads the Alpamayo checkpoint and sample clip;
-3. captures unpatched eager outputs;
+1. loads 625 compressed FP8 linears and their ModelOpt calibration scales
+   directly from safetensors;
+2. loads the Alpamayo sample clip;
+3. captures eager vision embeddings, language logits, and one Edge-compatible
+   denoising step;
 4. temporarily patches the original Qwen3-VL and Alpamayo ``forward`` methods;
-5. compiles the vision, language, and action engines;
+5. compiles engines using the exact Edge runtime bindings;
 6. restores the original class methods;
-7. compares eager and TensorRT component outputs;
-8. exports and executes the outer engine-chaining graph.
+7. executes each serialized engine and prints eager-versus-TensorRT parity;
+8. writes the tokenizer, processed chat template, embedding table, visual
+   processor, and runtime configuration sidecars.
 
 TensorRT autotuning can remain silent for several minutes. High CPU or GPU
 utilization during this period usually means the build is still progressing.
@@ -452,23 +489,22 @@ utilization during this period usually means the build is still progressing.
 The runner prints:
 
 * the engine mapping;
-* runtime input keys;
 * eager-versus-TensorRT parity for each component;
 * eager and TensorRT timings;
-* the final action velocity shape and mean.
+* the one-step denoised action shape and statistics.
 
 The final tensor should have shape:
 
 .. code-block:: text
 
-   velocity (1, 64, 2)
+   denoised_trajectory (1, 64, 2)
 
 Inspect the output tree:
 
 .. code-block:: bash
 
-   ls -lh "$ENGINE_DIR"/vision
-   ls -lh "$ENGINE_DIR"/language
+   ls -lh "$ENGINE_DIR"
+   ls -lh "$ENGINE_DIR"/visual
    ls -lh "$ENGINE_DIR"/action
 
 Expected layout:
@@ -476,19 +512,23 @@ Expected layout:
 .. code-block:: text
 
    $ENGINE_DIR/
-   ├── vision/
+   ├── llm.engine
+   ├── config.json
+   ├── embedding.safetensors
+   ├── tokenizer.json
+   ├── tokenizer_config.json
+   ├── processed_chat_template.json
+   ├── visual/
    │   ├── visual.engine
-   │   └── config.json
-   ├── language/
-   │   ├── language.engine
-   │   └── config.json
+   │   ├── config.json
+   │   └── preprocessor_config.json
    └── action/
        ├── action.engine
        └── config.json
 
-The ``config.json`` files record logical input/output names, output shapes,
-dtypes, and engine filenames. The outer ``ExportedProgram`` calls these engines
-through ``torch.ops.edge_llm.execute_engine``.
+The root ``config.json`` follows ``LLMEngineConfig`` and records paged KV,
+DeepStack, RoPE, and optimization-profile metadata. The visual and action
+sidecars follow the corresponding C++ runner contracts.
 
 Parity interpretation
 ^^^^^^^^^^^^^^^^^^^^^
@@ -496,17 +536,67 @@ Parity interpretation
 Review component parity independently:
 
 * vision compares merged Qwen3-VL image features;
-* language compares the final hidden states from multimodal prefill;
-* action compares one velocity prediction with identical noisy actions,
-  timestep, position IDs, mask, and prefix K/V.
+* language compares final logits from multimodal prefill;
+* action compares one denoised trajectory step with identical noise, timestep
+  interval, position IDs, RoPE, and KV caches.
 
 Do not accept NaN/Inf values. Investigate large errors before measuring
 performance. FP8 tolerances are necessarily looser than FP16, but a result that
 is effectively uncorrelated with eager output indicates a packing, mRoPE,
 DeepStack, mask, or checkpoint-restore mismatch.
 
-9. Run focused tests
---------------------
+9. Run with action_inference
+----------------------------
+
+Set the plugin loaded by the C++ runtime:
+
+.. code-block:: bash
+
+   cd "$EDGE_LLM_ROOT"
+
+   export EDGELLM_PLUGIN_PATH="$EDGE_LLM_ROOT/build-alpamayo-export/libNvInfer_edgellm_plugin.so.1.0"
+   export LD_LIBRARY_PATH="$(dirname "$EDGELLM_PLUGIN_PATH"):${LD_LIBRARY_PATH:-}"
+
+Prepare an input JSON containing:
+
+* the same number of camera images supported by the visual engine profile;
+* a trajectory history;
+* the Alpamayo system and user prompts;
+* generation settings such as ``max_generate_length`` and ``temperature``.
+
+Set its path and run:
+
+.. code-block:: bash
+
+   export INPUT_JSON=/path/to/input_action.json
+   export OUTPUT_JSON="$ENGINE_DIR/output.json"
+
+   ./build-alpamayo-export/examples/multimodal/action_inference \
+     --engineDir="$ENGINE_DIR" \
+     --multimodalEngineDir="$ENGINE_DIR" \
+     --checkpointDir="$ALPAMAYO_FP8_CKPT" \
+     --inputFile="$INPUT_JSON" \
+     --outputFile="$OUTPUT_JSON" \
+     --maxGenerateLength=128 \
+     --noiseSeed=42 \
+     --dumpOutput
+
+The runtime:
+
+1. loads ``llm.engine`` and the paged KV configuration;
+2. preprocesses images and executes ``visual/visual.engine``;
+3. runs language prefill and autoregressive decode;
+4. gathers the language paged KV cache into the action runner's head-major
+   cache layout;
+5. executes ``action/action.engine`` for ten denoising steps;
+6. writes the future trajectory to ``OUTPUT_JSON``.
+
+Use the same clip, generation parameters, trajectory sample count, and random
+seed as eager evaluation when comparing accuracy. Compare final trajectories
+or minADE rather than requiring bitwise equality.
+
+10. Run focused tests
+---------------------
 
 From the Torch-TensorRT checkout:
 
@@ -521,9 +611,10 @@ From the Torch-TensorRT checkout:
      -k alpamayo \
      -q
 
-These tests cover registration, fixed-grid and action patch wiring, visual-token
-packing, and multimodal generation-position extension. They do not replace the
-GPU export and parity run.
+These tests cover registration, Edge action and KV-cache patch wiring,
+visual-token packing, ModelOpt checkpoint loading, and multimodal
+generation-position extension. They do not replace the GPU export, parity run,
+or target ``action_inference`` test.
 
 End-to-end checklist
 --------------------
@@ -541,7 +632,10 @@ End-to-end checklist
 10. [ ] A valid PhysicalAI clip ID and ``t0_us`` are selected.
 11. [ ] Vision, language, and action engines are written.
 12. [ ] Component parity is finite and within the acceptance threshold.
-13. [ ] Final velocity output has shape ``[1, 64, 2]``.
+13. [ ] ``action_inference`` initializes the language, visual, and action
+    runners.
+14. [ ] Final denoised trajectory output has shape ``[1, 64, 2]``.
+15. [ ] Target minADE is within the customer acceptance threshold.
 
 Troubleshooting
 ---------------
@@ -554,8 +648,9 @@ Troubleshooting
      - Resolution
    * - ``No module named torch_tensorrt._version``
      - An unbuilt source ``py/`` directory is shadowing the installed package.
-       Set ``PYTHONPATH=$TORCH_TRT_ROOT/tools/hf`` and verify
-       ``torch_tensorrt.__file__`` points to the intended installation.
+       Use the installed package with
+       ``PYTHONPATH=$TORCH_TRT_ROOT/tools/hf``, or build/install the source tree
+       before adding ``$TORCH_TRT_ROOT/py``.
    * - ``Set EDGE_LLM_PLUGIN_SO ...``
      - Build the Edge-LLM plugin, set the environment variable to the real
        ``.so`` file, and add its directory to ``LD_LIBRARY_PATH``.
@@ -568,10 +663,10 @@ Troubleshooting
    * - ``No module named transformers.exporters``
      - Upgrade the Edge environment to Transformers 5.4 or newer. Do not use
        the recipe's Transformers 4.57 environment for Edge export.
-   * - ModelOpt state is ignored or quantizers are absent
-     - Ensure ``modelopt_state.pth`` is beside the checkpoint and ModelOpt is
-       installed. The Alpamayo loader enables ModelOpt checkpointing before
-       ``from_pretrained``.
+   * - Compressed checkpoint reports no FP8 linears
+     - Confirm the safetensors contain ``torch.float8_e4m3fn`` weights,
+       ``weight_quantizer._scale``, and ``input_quantizer._amax`` tensors. The
+       Edge loader reads these tensors directly.
    * - Real FP8 checkpoint fails to restore or export
      - Retry with the ``--fake_quant`` checkpoint first. Real compressed
        checkpoint restore is experimental.
@@ -585,8 +680,19 @@ Troubleshooting
      - Check multimodal position IDs, RoPE delta extension, image-token masks,
        and dense DeepStack insertion.
    * - Action parity is poor
-     - Check prefix K/V layer/head layout, non-causal expert mask, timestep
-       dtype, and action dimensions ``[64, 2]``.
+     - Check the per-layer K/V aliases, non-causal length mask, FP32
+       ``time_steps_t0/t1``, RoPE positions, and action dimensions
+       ``[64, 2]``.
+   * - ``selected prefill kernel is unavailable``
+     - The loaded Edge plugin has decode support but no FMHA prefill kernel for
+       the model ``head_dim`` and target SM. Rebuild with the matching CuTe DSL
+       FMHA artifact, use a supported prebuilt plugin, or select a supported
+       TensorRT-native attention path. An ``ENABLE_CUTE_DSL=OFF`` build is not
+       sufficient for this language engine.
+   * - Runtime initializes but rejects an optimization profile
+     - Rebuild the language engine with both prefill and decode profiles.
+       Initial prefill requires the zero-length
+       ``kvcache_start_index`` sentinel; decode uses shape ``[batch]``.
    * - CUDA out of memory during compile
      - Stop unrelated GPU workloads, use a larger-memory GPU, and keep
        checkpoint/cache/build directories off the root filesystem.

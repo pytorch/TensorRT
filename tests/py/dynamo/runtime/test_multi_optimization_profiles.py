@@ -74,13 +74,11 @@ class TestInputProfilesValidation(TestCase):
         self.assertEqual(inp.profiles[DECODE_IDX]["max_shape"], (4, 1, 16))
         self.assertEqual(inp.profiles[PREFILL_IDX]["opt_shape"], (4, 48, 16))
 
-    def test_min_zero_rejected(self):
-        with self.assertRaises(ValueError):
-            Input(
-                profiles=[
-                    {"min_shape": (0, 1), "opt_shape": (1, 1), "max_shape": (2, 1)}
-                ]
-            )
+    def test_min_zero_supported(self):
+        inp = Input(
+            profiles=[{"min_shape": (0, 1), "opt_shape": (1, 1), "max_shape": (2, 1)}]
+        )
+        self.assertEqual(inp.profiles[0]["min_shape"], (0, 1))
 
     def test_min_opt_max_ordering(self):
         with self.assertRaises(ValueError):
