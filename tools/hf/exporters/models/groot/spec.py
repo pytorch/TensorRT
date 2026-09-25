@@ -280,6 +280,7 @@ class GrootSpec(EdgeSpec):  # type: ignore[misc]
             output_names=["logits", "lm_hidden_states", "prefix_k", "prefix_v"],
             parity_output="lm_hidden_states",
             context_attention_mask_type=int(ContextAttentionMaskType.CAUSAL),
+            extra_config={"context_mask_selector_enabled": True},
             model_type="language",
             engine_file="language.engine",
             trt_settings={
@@ -372,6 +373,7 @@ class GrootSpec(EdgeSpec):  # type: ignore[misc]
             sample["rope_rotary_cos_sin"],
             sample["context_lengths"],
             sample["kvcache_start_index"],
+            sample["context_mask_selector"],
             sample["last_token_ids"],
             sample["ds_stack"],
             *kv_kwargs(sample),

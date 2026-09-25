@@ -322,6 +322,8 @@ class AlpamayoSpec(EdgeSpec):  # type: ignore[misc]
                     return_dict=True,
                 ).last_hidden_state
             )
+            with self.apply_patches(model):
+                bench["action"] = cuda_ms(lambda: model(*sample["edge_action_args"])[0])
         return {
             "vision": visual_embeds,
             "language": logits,
@@ -345,8 +347,6 @@ class AlpamayoSpec(EdgeSpec):  # type: ignore[misc]
         device = px.device
         dtype = px.dtype
 
-        visual.config.attn_implementation = "sdpa"
-        visual.config._attn_implementation = "sdpa"
         prepare_fixed_grid_vision(visual, grid)
         visual_args = prepare_edge_visual_inputs(visual, px, grid)
         num_deepstack_features = len(visual.deepstack_visual_indexes)
@@ -516,6 +516,7 @@ class AlpamayoSpec(EdgeSpec):  # type: ignore[misc]
             "rope_rotary_cos_sin",
             "context_lengths",
             "kvcache_start_index",
+            "context_mask_selector",
             "last_token_ids",
             *[f"deepstack_embeds_{i}" for i in range(num_deepstack)],
             "kv_page_table",
@@ -527,6 +528,7 @@ class AlpamayoSpec(EdgeSpec):  # type: ignore[misc]
             flat[2],
             torch.zeros(batch_size, device=device, dtype=torch.int32),
             flat[4],
+            flat[5],
             *deepstack_inputs,
             kv_page_table,
             *paged_kvs,
@@ -560,6 +562,7 @@ class AlpamayoSpec(EdgeSpec):  # type: ignore[misc]
             extra_config={
                 "engine_role": "llm",
                 "model": "qwen3_vl_text",
+                "context_mask_selector_enabled": True,
                 "num_hidden_layers": num_layers,
                 "num_attention_heads": int(language.config.num_attention_heads),
                 "num_key_value_heads": int(language.config.num_key_value_heads),
@@ -781,6 +784,7 @@ class AlpamayoSpec(EdgeSpec):  # type: ignore[misc]
             sample["rope_rotary_cos_sin"],
             sample["context_lengths"],
             sample["kvcache_start_index"],
+            sample["context_mask_selector"],
             sample["last_token_ids"],
             ds_stack,
             *kv_kwargs(sample),

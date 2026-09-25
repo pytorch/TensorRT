@@ -419,15 +419,126 @@ def test_language_attn_plugin_when_rope_present():
     kv = torch.zeros(1, 2, 2, 8, 4)
     ctx = torch.tensor([3], dtype=torch.int32)
     start = torch.empty(0, dtype=torch.int32)
+    selector = torch.zeros(1, dtype=torch.int32)
     out, present = Dummy()(
         hidden,
         rope_rotary_cos_sin=rope,
         past_key_value=kv,
         ctx_len=ctx,
         kvcache_start_index=start,
+        context_mask_selector=selector,
     )
     assert out.shape == hidden.shape
     assert present.shape == kv.shape
+
+
+@pytest.mark.unit
+def test_attention_selector_controls_eager_mask():
+    from exporters.plugin.attention import ContextAttentionMaskType
+    from exporters.plugin.plugin_utils import _attention_plugin_eager
+
+    q = torch.tensor([[[1.0, 0.0], [0.0, 1.0]]])
+    k = q.clone()
+    v = torch.tensor([[[1.0, 0.0], [0.0, 3.0]]])
+    kv = torch.zeros(1, 2, 1, 2, 2)
+    ctx = torch.tensor([2], dtype=torch.int32)
+    rope = torch.tensor([[[1.0, 0.0], [1.0, 0.0]]], dtype=torch.float32)
+    start = torch.empty(0, dtype=torch.int32)
+
+    causal, _ = _attention_plugin_eager(
+        q,
+        k,
+        v,
+        kv,
+        ctx,
+        rope,
+        start,
+        1,
+        1,
+        2,
+        int(ContextAttentionMaskType.CAUSAL),
+        True,
+        torch.empty(0, dtype=torch.int32),
+    )
+    padding, _ = _attention_plugin_eager(
+        q,
+        k,
+        v,
+        kv,
+        ctx,
+        rope,
+        start,
+        1,
+        1,
+        2,
+        int(ContextAttentionMaskType.CAUSAL),
+        True,
+        torch.zeros(1, dtype=torch.int32),
+    )
+    legacy_padding, _ = _attention_plugin_eager(
+        q,
+        k,
+        v,
+        kv,
+        ctx,
+        rope,
+        start,
+        1,
+        1,
+        2,
+        int(ContextAttentionMaskType.PADDING),
+    )
+    assert not torch.allclose(causal, padding)
+    torch.testing.assert_close(causal[:, 0, 0], v[:, 0])
+    torch.testing.assert_close(padding, legacy_padding)
+
+
+@pytest.mark.unit
+def test_causal_lm_flat_context_selector_shapes():
+    from exporters.models.common.helpers import causal_lm_flat
+
+    class Config:
+        num_key_value_heads = 1
+        num_attention_heads = 1
+        hidden_size = 4
+        head_dim = 4
+
+        def to_dict(self):
+            return {
+                "num_key_value_heads": 1,
+                "num_attention_heads": 1,
+                "hidden_size": 4,
+                "head_dim": 4,
+                "rope_theta": 10_000.0,
+            }
+
+    class Language(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.config = Config()
+            self.layers = nn.ModuleList([nn.Identity()])
+
+    language = Language()
+    embeds = torch.zeros(2, 3, 4)
+    causal, causal_meta = causal_lm_flat(
+        language,
+        embeds,
+        max_seq_len=8,
+        device=torch.device("cpu"),
+        dtype=torch.float32,
+    )
+    padding, padding_meta = causal_lm_flat(
+        language,
+        embeds,
+        max_seq_len=8,
+        device=torch.device("cpu"),
+        dtype=torch.float32,
+        enable_context_mask_selector=True,
+    )
+    selector_index = causal_meta["input_names"].index("context_mask_selector")
+    assert padding_meta["input_names"] == causal_meta["input_names"]
+    assert causal[selector_index].shape == (0,)
+    assert padding[selector_index].shape == (2,)
 
 
 @pytest.mark.unit

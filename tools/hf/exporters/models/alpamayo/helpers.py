@@ -100,7 +100,7 @@ def prepare_edge_visual_inputs(
         rotary_pos_emb.to(device=pixel_values.device, dtype=torch.float32),
         cu_seqlens.to(device=pixel_values.device, dtype=torch.int32),
         fast_indices.to(device=pixel_values.device, dtype=torch.int64),
-        fast_weights.to(device=pixel_values.device, dtype=pixel_values.dtype),
+        fast_weights.to(device=pixel_values.device, dtype=torch.float32),
         max_seqlen_carrier,
     )
 

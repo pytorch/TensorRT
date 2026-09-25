@@ -25,6 +25,11 @@ def _creator_is_v3(creator) -> bool:
     return "V3" in type(creator).__name__
 
 
+def _creator_field_names(creator) -> set[str]:
+    fields = getattr(creator, "field_names", ())
+    return {str(field.name) for field in fields}
+
+
 def _create_trt_plugin(
     creator, name: str, field_list: list
 ) -> trt.IPluginV2 | trt.IPluginV3:
@@ -70,11 +75,16 @@ def convert_llm_attention_plugin(ctx: ConversionContext, target, args, kwargs, n
     position_ids = args[15] if len(args) > 15 else None
     qkv_scales = args[16] if len(args) > 16 else None
     kv_page_table = args[17] if len(args) > 17 else None
+    enable_context_mask_selector = bool(args[18]) if len(args) > 18 else False
+    context_mask_selector = args[19] if len(args) > 19 else None
 
     creator = get_trt_plugin_creator("AttentionPlugin", "1", "")
     if creator is None:
         raise RuntimeError("AttentionPlugin not found in TensorRT plugin registry")
 
+    creator_fields = _creator_field_names(creator)
+    uses_selector_api = "enable_context_mask_selector" in creator_fields
+    uses_static_mask_api = "context_attention_mask_type" in creator_fields
     field_list = [
         trt.PluginField(
             field_name,
@@ -88,9 +98,29 @@ def convert_llm_attention_plugin(ctx: ConversionContext, target, args, kwargs, n
             ("enable_tree_attention", int(enable_tree_attention)),
             ("enable_fp8_kv_cache", int(enable_fp8_kv_cache)),
             ("sliding_window_size", int(sliding_window_size)),
-            ("context_attention_mask_type", context_attention_mask_type),
         ]
     ]
+    if uses_selector_api:
+        field_list.append(
+            trt.PluginField(
+                "enable_context_mask_selector",
+                np.array([int(enable_context_mask_selector)], dtype=np.int32),
+                trt.PluginFieldType.INT32,
+            )
+        )
+    elif uses_static_mask_api:
+        field_list.append(
+            trt.PluginField(
+                "context_attention_mask_type",
+                np.array([context_attention_mask_type], dtype=np.int32),
+                trt.PluginFieldType.INT32,
+            )
+        )
+    elif context_attention_mask_type != int(ContextAttentionMaskType.CAUSAL):
+        raise RuntimeError(
+            "AttentionPlugin exposes neither enable_context_mask_selector nor "
+            "context_attention_mask_type for non-causal prefill"
+        )
     if bool(enable_fp8_kv_cache) and qkv_scales is not None:
         field_list.append(
             trt.PluginField(
@@ -119,7 +149,19 @@ def convert_llm_attention_plugin(ctx: ConversionContext, target, args, kwargs, n
             kv_cache_start_idx,
             kv_page_table,
         ]
+        if uses_selector_api and enable_context_mask_selector:
+            if context_mask_selector is None:
+                raise RuntimeError(
+                    "context_mask_selector tensor is required when "
+                    "enable_context_mask_selector is true"
+                )
+            plugin_inputs.append(context_mask_selector)
     else:
+        if uses_selector_api and enable_context_mask_selector:
+            raise RuntimeError(
+                "Current AttentionPlugin context-mask selector requires the "
+                "packed paged-KV input contract"
+            )
         plugin_inputs = [q, k, v, kv, ctx_len, rope, kv_cache_start_idx]
         if bool(enable_tree_attention):
             plugin_inputs.extend([attention_mask, position_ids])

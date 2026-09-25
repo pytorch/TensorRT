@@ -16,8 +16,9 @@ def causal_lm_flat(
     dtype: torch.dtype,
     seq_len: int | None = None,
     position_ids: torch.Tensor | None = None,
+    enable_context_mask_selector: bool = False,
 ) -> tuple[tuple[torch.Tensor, ...], dict[str, Any]]:
-    """inputs_embeds, rope, ctx, kv_start, last_token_ids, ds_stack, *kvs.
+    """inputs_embeds, rope, ctx, kv_start, mask selector, last ids, ds, *kvs.
 
     ``ds_stack`` is ``[num_layers, B, S, H]`` for every family. PI05 fills it
     with zeros so the per-layer add is a no-op; GR00T writes residuals.
@@ -45,6 +46,11 @@ def causal_lm_flat(
     ctx_len = torch.full((bsz,), seq_len, device=device, dtype=torch.int32)
     last_token_ids = torch.full((bsz, 1), seq_len - 1, device=device, dtype=torch.int64)
     kv_start = torch.empty(0, dtype=torch.int32, device=device)
+    context_mask_selector = torch.empty(
+        bsz if enable_context_mask_selector else 0,
+        dtype=torch.int32,
+        device=device,
+    )
     ds_stack = torch.zeros(num_layers, bsz, seq_len, hidden, device=device, dtype=dtype)
     kvs = [
         torch.zeros(
@@ -52,12 +58,22 @@ def causal_lm_flat(
         )
         for _ in range(num_layers)
     ]
-    flat = (inputs_embeds, rope, ctx_len, kv_start, last_token_ids, ds_stack, *kvs)
+    flat = (
+        inputs_embeds,
+        rope,
+        ctx_len,
+        kv_start,
+        context_mask_selector,
+        last_token_ids,
+        ds_stack,
+        *kvs,
+    )
     names = [
         "inputs_embeds",
         "rope_rotary_cos_sin",
         "context_lengths",
         "kvcache_start_index",
+        "context_mask_selector",
         "last_token_ids",
         "ds_stack",
         *[f"past_key_values_{i}" for i in range(num_layers)],

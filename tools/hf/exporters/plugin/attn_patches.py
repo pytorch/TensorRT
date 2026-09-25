@@ -40,6 +40,10 @@ def language_mask_type() -> int:
     return _LANGUAGE_MASK_TYPE
 
 
+def language_uses_context_mask_selector() -> bool:
+    return True
+
+
 @contextlib.contextmanager
 def patch_attribute(obj: Any, attribute: str, factory: Callable):
     original = getattr(obj, attribute)
@@ -240,6 +244,7 @@ def _patch_language_attention(original: Callable) -> Callable:
         past_key_value=None,
         ctx_len=None,
         kvcache_start_index=None,
+        context_mask_selector=None,
         kv_page_table=None,
         **kwargs,
     ):
@@ -296,6 +301,8 @@ def _patch_language_attention(original: Callable) -> Callable:
             None,
             None,
             kv_page_table,
+            language_uses_context_mask_selector(),
+            (context_mask_selector if language_uses_context_mask_selector() else None),
         )
         attn_hidden = num_heads * head_dim
         attn_out = attn_out.reshape(batch_size, seq_len, attn_hidden).to(dtype)

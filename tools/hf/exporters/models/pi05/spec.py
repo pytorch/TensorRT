@@ -346,10 +346,11 @@ class Pi05Spec(EdgeSpec):  # type: ignore[misc]
             device=device,
             dtype=dtype,
             seq_len=compact_len,
+            enable_context_mask_selector=True,
         )
         sample.update(split_flat_to_kwargs(flat, meta["input_names"]))
 
-        embs_t, rope, ctx, kv_start, last, ds, *kvs = flat
+        embs_t, rope, ctx, kv_start, mask_selector, last, ds, *kvs = flat
         opt_prefill = max(max_seq_len // 2, 1)
         trace_len = min(int(embs_t.shape[1]), opt_prefill)
         trace_args = (
@@ -357,6 +358,7 @@ class Pi05Spec(EdgeSpec):  # type: ignore[misc]
             rope,
             torch.full_like(ctx, trace_len),
             kv_start,
+            mask_selector,
             torch.full_like(last, trace_len - 1),
             ds[:, :, :trace_len].contiguous(),
             *kvs,
@@ -375,7 +377,10 @@ class Pi05Spec(EdgeSpec):  # type: ignore[misc]
             output_names=["logits", "lm_hidden_states", "prefix_k", "prefix_v"],
             parity_output="lm_hidden_states",
             context_attention_mask_type=int(ContextAttentionMaskType.PADDING),
-            extra_config={"prefix_pad_mask_len": compact_len},
+            extra_config={
+                "prefix_pad_mask_len": compact_len,
+                "context_mask_selector_enabled": True,
+            },
             model_type="language",
             engine_file="language.engine",
             trt_settings={
@@ -460,6 +465,7 @@ class Pi05Spec(EdgeSpec):  # type: ignore[misc]
             sample["rope_rotary_cos_sin"],
             sample["context_lengths"],
             sample["kvcache_start_index"],
+            sample["context_mask_selector"],
             sample["last_token_ids"],
             sample["ds_stack"],
             *kv_kwargs(sample),

@@ -126,6 +126,8 @@ def _attention_plugin_eager(
     num_kv_heads: int,
     head_size: int,
     context_attention_mask_type: int,
+    enable_context_mask_selector: bool = False,
+    context_mask_selector: Optional[torch.Tensor] = None,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """Eager SDPA stand-in for ``AttentionPlugin`` (prefill, linear KV)."""
     del kvcache_start_index
@@ -151,7 +153,12 @@ def _attention_plugin_eager(
         k = k.repeat_interleave(repeats, dim=1)
         v = v.repeat_interleave(repeats, dim=1)
 
-    is_causal = int(context_attention_mask_type) == int(ContextAttentionMaskType.CAUSAL)
+    if enable_context_mask_selector and context_mask_selector is not None:
+        is_causal = int(context_mask_selector.numel()) == 0
+    else:
+        is_causal = int(context_attention_mask_type) == int(
+            ContextAttentionMaskType.CAUSAL
+        )
     attn = F.scaled_dot_product_attention(q, k, v, is_causal=is_causal and seq_len > 1)
     attn = attn.permute(0, 2, 1, 3).contiguous()
     if context_lengths is not None:
@@ -196,6 +203,8 @@ def _register_attention_plugin_op() -> None:
         position_ids: Optional[torch.Tensor] = None,
         qkv_scales: Optional[Sequence[float]] = None,
         kv_page_table: Optional[torch.Tensor] = None,
+        enable_context_mask_selector: bool = False,
+        context_mask_selector: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         del enable_tree_attention, enable_fp8_kv_cache, sliding_window_size
         del attention_mask, position_ids, qkv_scales
@@ -224,6 +233,8 @@ def _register_attention_plugin_op() -> None:
             int(num_kv_heads),
             int(head_size),
             int(context_attention_mask_type),
+            bool(enable_context_mask_selector),
+            context_mask_selector,
         )
 
     @attention_plugin.register_fake
@@ -246,6 +257,8 @@ def _register_attention_plugin_op() -> None:
         position_ids: Optional[torch.Tensor] = None,
         qkv_scales: Optional[Sequence[float]] = None,
         kv_page_table: Optional[torch.Tensor] = None,
+        enable_context_mask_selector: bool = False,
+        context_mask_selector: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         del k, v, context_lengths, rope_rotary_cos_sin, kvcache_start_index
         del num_kv_heads, enable_tree_attention, enable_fp8_kv_cache
@@ -256,6 +269,8 @@ def _register_attention_plugin_op() -> None:
             position_ids,
             qkv_scales,
             kv_page_table,
+            enable_context_mask_selector,
+            context_mask_selector,
         )
         batch_size, seq_len, _ = q.shape
         attn_output = torch.empty(

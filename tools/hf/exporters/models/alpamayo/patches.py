@@ -215,6 +215,7 @@ def _patch_qwen3_vl_language(original: Callable) -> Callable:
         rope_rotary_cos_sin=None,
         context_lengths=None,
         kvcache_start_index=None,
+        context_mask_selector=None,
         last_token_ids=None,
         deepstack_embeds_0=None,
         deepstack_embeds_1=None,
@@ -251,6 +252,7 @@ def _patch_qwen3_vl_language(original: Callable) -> Callable:
                     past_key_value=past_key_values[layer_index],
                     ctx_len=context_lengths,
                     kvcache_start_index=kvcache_start_index,
+                    context_mask_selector=context_mask_selector,
                     kv_page_table=kv_page_table,
                 )
                 hidden = residual + hidden
@@ -285,6 +287,7 @@ def _patch_qwen3_vl_language(original: Callable) -> Callable:
             rope_rotary_cos_sin,
             context_lengths,
             kvcache_start_index,
+            context_mask_selector,
             last_token_ids,
             deepstack_embeds_0,
             *past_key_values,
