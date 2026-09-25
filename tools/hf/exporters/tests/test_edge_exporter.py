@@ -547,7 +547,6 @@ def test_groot_backend_registers_components():
     from exporters.plugin.attn_patches import _PATCHES
 
     paths = [p for p, _ in _PATCHES[GROOT]]
-    assert any("SiglipAttention.forward" in p for p in paths)
     assert any("Qwen3Attention.forward" in p for p in paths)
     assert any("Eagle25VLForConditionalGeneration.forward" in p for p in paths)
     assert any("Qwen3ForCausalLM.forward" in p for p in paths)
@@ -585,7 +584,7 @@ def test_eagle_vision_patch_extracts_features():
 
 @pytest.mark.unit
 def test_groot_patches_live_eagle_class():
-    from exporters.models.groot.patches import apply_groot_patches
+    from exporters.models.groot.spec import GrootSpec
 
     class Eagle(nn.Module):
         def extract_feature(self, pixel_values):
@@ -606,8 +605,11 @@ def test_groot_patches_live_eagle_class():
     policy = Policy()
     eagle = policy._groot_model.backbone.eagle_model
     pixel_values = torch.zeros(1, 3, 4, 4)
-    with apply_groot_patches(policy):
-        torch.testing.assert_close(eagle(pixel_values), pixel_values + 1)
+    with GrootSpec().apply_patches(policy):
+        torch.testing.assert_close(
+            eagle(pixel_values),
+            (pixel_values + 1).reshape(-1, pixel_values.shape[-1]),
+        )
 
 
 @pytest.mark.unit

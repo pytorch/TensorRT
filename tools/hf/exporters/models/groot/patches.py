@@ -9,20 +9,11 @@ import torch
 
 from ...plugin.attn_patches import (
     _patch_language_attention,
-    _patch_vision_attention,
     register_patch,
 )
 from ..common.patches import causal_lm_plugin_forward
 
 GROOT = "groot"
-
-register_patch(
-    GROOT,
-    "transformers.models.internvl.modeling_internvl.InternVLVisionAttention.forward",
-    "transformers.models.siglip.modeling_siglip.SiglipAttention.forward",
-    "transformers.models.siglip.modeling_siglip.SiglipSdpaAttention.forward",
-    "transformers.models.siglip.modeling_siglip.SiglipFlashAttention2.forward",
-)(_patch_vision_attention)
 
 register_patch(
     GROOT,
@@ -41,7 +32,8 @@ def _patch_eagle_image_features(original: Callable) -> Callable:
 
     def forward(self, pixel_values, input_ids=None, **kwargs: Any):
         if input_ids is None:
-            return self.extract_feature(pixel_values)
+            features = self.extract_feature(pixel_values)
+            return features.reshape(-1, features.shape[-1])
         return original(self, pixel_values, input_ids, **kwargs)
 
     return forward
@@ -67,13 +59,60 @@ def _patch_groot_language_model(original: Callable) -> Callable:
         kvcache_start_index=None,
         context_mask_selector=None,
         last_token_ids=None,
-        ds_stack=None,
+        kv_page_table=None,
         *past_key_values,
         **kwargs: Any,
     ):
         if rope_rotary_cos_sin is None:
             return original(self, inputs_embeds=inputs_embeds, **kwargs)
         decoder = self if hasattr(self, "layers") else self.model
+        if kv_page_table is not None:
+            hidden = inputs_embeds.to(dtype=next(decoder.parameters()).dtype)
+            present_key_values = []
+            for layer_index, layer in enumerate(decoder.layers):
+                residual = hidden
+                hidden = layer.input_layernorm(hidden)
+                hidden, present = layer.self_attn(
+                    hidden_states=hidden,
+                    rope_rotary_cos_sin=rope_rotary_cos_sin,
+                    past_key_value=past_key_values[layer_index],
+                    ctx_len=context_lengths,
+                    kvcache_start_index=kvcache_start_index,
+                    kv_page_table=kv_page_table,
+                )
+                hidden = residual + hidden
+
+                residual = hidden
+                hidden = layer.post_attention_layernorm(hidden)
+                hidden = residual + layer.mlp(hidden)
+                present_key_values.append(present)
+
+            hidden = decoder.norm(hidden)
+            token_indices = (
+                last_token_ids
+                if last_token_ids.ndim == 1
+                else last_token_ids.squeeze(-1)
+            )
+            last_hidden = hidden[
+                torch.arange(
+                    hidden.shape[0],
+                    device=hidden.device,
+                    dtype=torch.long,
+                ),
+                token_indices,
+            ]
+            lm_head = getattr(self, "lm_head", None)
+            if lm_head is None:
+                lm_head = getattr(decoder, "lm_head", None)
+            if lm_head is None:
+                logits = torch.nn.functional.linear(
+                    last_hidden,
+                    decoder.embed_tokens.weight,
+                ).float()
+            else:
+                logits = lm_head(last_hidden).float()
+            return logits, hidden, *present_key_values
+
         return causal_lm_plugin_forward(
             decoder,
             inputs_embeds,
@@ -82,7 +121,14 @@ def _patch_groot_language_model(original: Callable) -> Callable:
             kvcache_start_index,
             context_mask_selector,
             last_token_ids,
-            ds_stack,
+            torch.zeros(
+                len(decoder.layers),
+                inputs_embeds.shape[0],
+                inputs_embeds.shape[1],
+                inputs_embeds.shape[2],
+                device=inputs_embeds.device,
+                dtype=inputs_embeds.dtype,
+            ),
             *past_key_values,
             lm_head=getattr(self, "lm_head", None),
         )

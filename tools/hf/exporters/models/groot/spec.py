@@ -1,12 +1,18 @@
 from __future__ import annotations
 
+import json
+import math
+import tempfile
 from collections.abc import Mapping, MutableMapping
+from contextlib import contextmanager
+from pathlib import Path
 from typing import Any
 
 import torch
 import torch.nn as nn
 
 from ...ops import call_engine, scatter_image_tokens
+from ...rope import export_rope_fields
 from ...spec import (
     ComponentBundle,
     EdgeSpec,
@@ -21,6 +27,103 @@ from .helpers import (
     _groot,
     make_embodiment_id,
 )
+from .patches import GROOT, _patch_eagle_image_features
+
+
+def _write_groot_language_artifacts(
+    sample: Mapping[str, Any],
+    language: nn.Module,
+    out_dir: Path,
+) -> None:
+    from safetensors.torch import save_file
+    from tensorrt_edgellm.chat_template import (
+        process_chat_template,
+        write_fallback_processed_chat_template,
+    )
+
+    processor = sample["_groot_processor"]
+    processor.save_pretrained(out_dir)
+    decoder = getattr(language, "model", language)
+    embedding = decoder.embed_tokens.weight.detach().to("cpu").contiguous()
+    save_file({"embedding": embedding}, out_dir / "embedding.safetensors")
+
+    with tempfile.TemporaryDirectory() as template_source:
+        processor.save_pretrained(template_source)
+        process_chat_template(template_source, str(out_dir))
+    if not (out_dir / "processed_chat_template.json").is_file():
+        write_fallback_processed_chat_template(str(out_dir), str(out_dir))
+    template_path = out_dir / "processed_chat_template.json"
+    template = json.loads(template_path.read_text())
+    template["content_types"] = {
+        "image": {"format": "<IMG_CONTEXT>"},
+        "video": {"format": "<video>"},
+    }
+    template_path.write_text(json.dumps(template, indent=2) + "\n")
+
+
+def _edge_language_input_specs(
+    input_names: list[str],
+    trace_args: tuple[Any, ...],
+    *,
+    max_seq_len: int,
+) -> tuple[Any, ...]:
+    import torch_tensorrt
+
+    named = dict(zip(input_names, trace_args))
+    embeds = named["inputs_embeds"]
+    batch_size = int(embeds.shape[0])
+    hidden_size = int(embeds.shape[-1])
+    prompt_len = int(embeds.shape[1])
+    specs = []
+    for name, tensor in zip(input_names, trace_args):
+        profiles = None
+        if name == "inputs_embeds":
+            profiles = [
+                {
+                    "min_shape": (1, 1, hidden_size),
+                    "opt_shape": (batch_size, prompt_len, hidden_size),
+                    "max_shape": (batch_size, max_seq_len, hidden_size),
+                },
+                {
+                    "min_shape": (1, 1, hidden_size),
+                    "opt_shape": (batch_size, 1, hidden_size),
+                    "max_shape": (batch_size, 1, hidden_size),
+                },
+            ]
+        elif name == "kvcache_start_index":
+            profiles = [
+                {
+                    "min_shape": (0,),
+                    "opt_shape": (batch_size,),
+                    "max_shape": (batch_size,),
+                },
+                {
+                    "min_shape": (batch_size,),
+                    "opt_shape": (batch_size,),
+                    "max_shape": (batch_size,),
+                },
+            ]
+
+        if profiles is None:
+            specs.append(
+                torch_tensorrt.Input(
+                    shape=tuple(tensor.shape),
+                    dtype=tensor.dtype,
+                    format=torch.contiguous_format,
+                    name=name,
+                )
+            )
+        else:
+            specs.append(
+                torch_tensorrt.Input(
+                    profiles=profiles,
+                    shared_dims={1: "seq_len"} if name == "inputs_embeds" else None,
+                    dtype=tensor.dtype,
+                    format=torch.contiguous_format,
+                    name=name,
+                )
+            )
+    return tuple(specs)
 
 
 def _export_module(module: nn.Module, sample: Mapping[str, Any]) -> nn.Module:
@@ -41,6 +144,7 @@ def _causal_lm(language: nn.Module) -> nn.Module:
 
 @register_edge_spec("groot", "gr00t")
 class GrootSpec(EdgeSpec):  # type: ignore[misc]
+    @contextmanager
     def apply_patches(self, model=None):
         from ...plugin.attn_patches import apply_patches, patch_attribute
         from .helpers import _groot
@@ -122,6 +226,7 @@ class GrootSpec(EdgeSpec):  # type: ignore[misc]
             ),
             "state": state,
             "embodiment_id": make_embodiment_id(policy, state, device, torch.long),
+            "_groot_processor": proc,
         }
 
     def capture_eager_outputs(
@@ -133,13 +238,14 @@ class GrootSpec(EdgeSpec):  # type: ignore[misc]
         found = _groot(model)
         eagle = found.backbone.eagle_model
         language = _causal_lm(eagle.language_model)
+        decoder = getattr(language, "model", language)
         px = sample["pixel_values"]
         lm_hidden = sample["lm_hidden"]
         action_head = found.action_head
 
         with torch.no_grad():
             visual_embeds = eagle.extract_feature(px)
-            lm = language(
+            lm = decoder(
                 inputs_embeds=sample["inputs_embeds"],
                 attention_mask=sample.get("attention_mask"),
                 return_dict=True,
@@ -194,7 +300,7 @@ class GrootSpec(EdgeSpec):  # type: ignore[misc]
         if bench is not None:
             bench["vision"] = cuda_ms(lambda: eagle.extract_feature(px))
             bench["language"] = cuda_ms(
-                lambda: language(
+                lambda: decoder(
                     inputs_embeds=sample["inputs_embeds"],
                     attention_mask=sample.get("attention_mask"),
                     return_dict=True,
@@ -225,14 +331,54 @@ class GrootSpec(EdgeSpec):  # type: ignore[misc]
         device = px.device
         dtype = px.dtype
 
+        import torch_tensorrt
+
+        num_blocks = int(px.shape[0])
+        vision_config = eagle.vision_model.config.to_dict()
+        vision_config["patch_size"] = [
+            int(eagle.vision_model.config.patch_size),
+            int(eagle.vision_model.config.patch_size),
+        ]
+        vision_config["image_size"] = [
+            int(eagle.vision_model.config.image_size),
+            int(eagle.vision_model.config.image_size),
+        ]
+        text_config = _causal_lm(eagle.language_model).config.to_dict()
+        tokenizer = sample["_groot_processor"].tokenizer
         vision = ComponentBundle(
             module=_export_module(eagle, sample),
             trace_args=(px,),
             save_args=(px,),
-            input_names=["pixel_values"],
-            output_names=["visual_embeds"],
-            model_type="vit",
+            input_specs=(
+                torch_tensorrt.Input(
+                    min_shape=(1, *tuple(px.shape[1:])),
+                    opt_shape=tuple(px.shape),
+                    max_shape=tuple(px.shape),
+                    dtype=px.dtype,
+                    format=torch.contiguous_format,
+                    name="input",
+                ),
+            ),
+            input_names=["input"],
+            output_names=["output"],
+            model_type="internvl",
             engine_file="visual.engine",
+            output_subdir="visual",
+            edge_runtime_bindings=True,
+            extra_config={
+                "image_token_id": int(
+                    getattr(eagle, "image_token_index", eagle.config.image_token_index)
+                ),
+                "img_start_token_id": int(tokenizer.convert_tokens_to_ids("<img>")),
+                "img_end_token_id": int(tokenizer.convert_tokens_to_ids("</img>")),
+                "text_config": text_config,
+                "vision_config": vision_config,
+                "builder_config": {
+                    "min_image_tokens": 256,
+                    "max_image_tokens": num_blocks * 256,
+                    "max_image_tokens_per_image": 256,
+                },
+            },
             trt_settings={
                 "disable_tf32": False,
                 "use_fp32_acc": False,
@@ -263,46 +409,152 @@ class GrootSpec(EdgeSpec):  # type: ignore[misc]
         )
         sample["lang_embeds"] = input_embs.to(device=device, dtype=dtype)
         max_seq_len = max(int(config.max_seq_len), int(inputs_embeds.shape[1]))
-        packed, meta = causal_lm_flat(
+        max_seq_len = math.ceil(max_seq_len / 128) * 128
+        packed_base, meta = causal_lm_flat(
             language,
             inputs_embeds,
             max_seq_len=max_seq_len,
             device=device,
             dtype=dtype,
         )
-        sample.update(split_flat_to_kwargs(packed, meta["input_names"]))
+        bsz, seq_len, hidden_size = inputs_embeds.shape
+        num_layers = int(meta["num_layers"])
+        max_pages_per_seq = max_seq_len // 128
+        num_pages = int(bsz) * max_pages_per_seq
+        kv_pool_shape = (
+            2,
+            num_pages,
+            128,
+            int(meta["num_key_value_heads"]),
+            int(meta["head_dim"]),
+        )
+        paged_kvs = tuple(
+            torch.zeros(kv_pool_shape, device=device, dtype=dtype)
+            for _ in range(num_layers)
+        )
+        k_pages = torch.arange(
+            num_pages,
+            device=device,
+            dtype=torch.int32,
+        ).reshape(int(bsz), max_pages_per_seq)
+        kv_page_table = torch.stack((k_pages, k_pages + num_pages), dim=1)
+        language_input_names = [
+            "inputs_embeds",
+            "rope_rotary_cos_sin",
+            "context_lengths",
+            "kvcache_start_index",
+            "last_token_ids",
+            "kv_page_table",
+            *[f"past_key_values_{i}" for i in range(num_layers)],
+        ]
+        packed = (
+            packed_base[0],
+            packed_base[1],
+            packed_base[2],
+            torch.zeros(int(bsz), device=device, dtype=torch.int32),
+            packed_base[4],
+            kv_page_table,
+            *paged_kvs,
+        )
+        sample.update(split_flat_to_kwargs(packed, language_input_names))
+
+        language_config = language.config
+        rope_fields = export_rope_fields(language_config.to_dict())
 
         language_bundle = ComponentBundle(
             module=_export_module(language, sample),
             trace_args=packed,
             save_args=packed,
-            input_names=meta["input_names"],
-            output_names=["logits", "lm_hidden_states", "prefix_k", "prefix_v"],
-            parity_output="lm_hidden_states",
+            input_specs=_edge_language_input_specs(
+                language_input_names,
+                packed,
+                max_seq_len=max_seq_len,
+            ),
+            input_names=language_input_names,
+            output_names=[
+                "logits",
+                "accept_hidden_states",
+                *[f"present_key_values_{i}" for i in range(num_layers)],
+            ],
+            parity_output="accept_hidden_states",
             context_attention_mask_type=int(ContextAttentionMaskType.CAUSAL),
             extra_config={"context_mask_selector_enabled": True},
             model_type="language",
-            engine_file="language.engine",
+            engine_file="llm.engine",
+            output_subdir="",
+            edge_runtime_bindings=True,
+            artifact_writer=lambda out_dir: _write_groot_language_artifacts(
+                sample,
+                language,
+                out_dir,
+            ),
+            extra_config={
+                "engine_role": "llm",
+                "model": str(language_config.model_type),
+                "num_hidden_layers": num_layers,
+                "num_attention_heads": int(language_config.num_attention_heads),
+                "num_key_value_heads": int(language_config.num_key_value_heads),
+                "head_dim": int(meta["head_dim"]),
+                "hidden_size": int(language_config.hidden_size),
+                "intermediate_size": int(language_config.intermediate_size),
+                "vocab_size": int(language_config.vocab_size),
+                "max_position_embeddings": int(language_config.max_position_embeddings),
+                "rope_theta": float(rope_fields["rope_theta"]),
+                "rope_scaling": rope_fields["rope_scaling"],
+                "partial_rotary_factor": float(
+                    getattr(language_config, "partial_rotary_factor", 1.0)
+                ),
+                "kv_cache_dtype": "fp16",
+                "num_deepstack_features": 0,
+                "image_token_id": int(
+                    getattr(eagle, "image_token_index", eagle.config.image_token_index)
+                ),
+                "spec_decode_type": "none",
+                "accept_hidden_layer": int(found.backbone.select_layer),
+                "builder_config": {
+                    "max_batch_size": int(bsz),
+                    "max_input_len": int(seq_len),
+                    "max_kv_cache_capacity": max_seq_len,
+                    "max_kv_pool_pages": num_pages,
+                    "max_lora_rank": 0,
+                    "spec_base": False,
+                    "spec_draft": False,
+                    "trt_native_ops": False,
+                },
+            },
             trt_settings={
                 "disable_tf32": True,
                 "use_fp32_acc": True,
                 "use_explicit_typing": True,
                 "decompose_attention": True,
                 "assume_dynamic_shape_support": True,
+                "offload_module_to_cpu": True,
             },
         )
 
-        bsz, seq_len, hidden_size = inputs_embeds.shape
         lm_hidden = torch.zeros(bsz, seq_len, hidden_size, device=device, dtype=dtype)
         sample["lm_hidden"] = lm_hidden
+
+        context_input_specs = (
+            torch_tensorrt.Input(
+                min_shape=(1, 1, hidden_size),
+                opt_shape=(int(bsz), int(seq_len), hidden_size),
+                max_shape=(int(bsz), max_seq_len, hidden_size),
+                dtype=dtype,
+                format=torch.contiguous_format,
+                name="lm_hidden_states",
+            ),
+        )
         context_projection = ComponentBundle(
             module=_export_module(found, sample),
             trace_args=(lm_hidden,),
             save_args=(lm_hidden,),
+            input_specs=context_input_specs,
             input_names=["lm_hidden_states"],
             output_names=["vl_embs"],
             model_type="context_projection",
             engine_file="context_projection.engine",
+            edge_runtime_bindings=True,
             trt_settings={
                 "disable_tf32": True,
                 "use_fp32_acc": True,
@@ -311,7 +563,13 @@ class GrootSpec(EdgeSpec):  # type: ignore[misc]
             },
         )
 
-        out_dim = int(found.backbone.eagle_linear.out_features)
+        out_dim = int(
+            getattr(
+                found.backbone.eagle_linear,
+                "out_features",
+                found.action_head.config.backbone_embedding_dim,
+            )
+        )
         context_embs = torch.zeros(bsz, seq_len, out_dim, device=device, dtype=dtype)
         horizon = int(found.action_head.config.action_horizon)
         action_dim = int(found.action_head.config.action_dim)
@@ -333,10 +591,37 @@ class GrootSpec(EdgeSpec):  # type: ignore[misc]
             sample["state"],
             sample["embodiment_id"],
         )
+        action_input_specs = tuple(
+            torch_tensorrt.Input(
+                **(
+                    {
+                        "min_shape": (1, 1, out_dim),
+                        "opt_shape": (int(bsz), int(seq_len), out_dim),
+                        "max_shape": (int(bsz), max_seq_len, out_dim),
+                    }
+                    if name == "context_embs"
+                    else {"shape": tuple(tensor.shape)}
+                ),
+                dtype=tensor.dtype,
+                format=torch.contiguous_format,
+                name=name,
+            )
+            for name, tensor in zip(
+                [
+                    "actions",
+                    "timestep",
+                    "context_embs",
+                    "state",
+                    "embodiment_id",
+                ],
+                args,
+            )
+        )
         action = ComponentBundle(
             module=_export_module(found.action_head, sample),
             trace_args=args,
             save_args=args,
+            input_specs=action_input_specs,
             input_names=[
                 "actions",
                 "timestep",
@@ -347,6 +632,8 @@ class GrootSpec(EdgeSpec):  # type: ignore[misc]
             output_names=["velocity"],
             model_type="action",
             engine_file="action.engine",
+            output_subdir="groot_action",
+            edge_runtime_bindings=True,
             trt_settings={
                 "disable_tf32": True,
                 "use_fp32_acc": True,
