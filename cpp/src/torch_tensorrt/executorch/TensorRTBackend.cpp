@@ -28,6 +28,7 @@
 #include <cuda_runtime.h>
 
 #include <executorch/extension/cuda/caller_stream.h>
+#include <executorch/extension/cuda/device_guard.h>
 #include <executorch/runtime/backend/interface.h>
 #include <executorch/runtime/core/exec_aten/util/tensor_util.h>
 #include <executorch/runtime/platform/log.h>
@@ -78,7 +79,11 @@ void TRTLogger::log(Severity severity, const char* msg) noexcept {
 }
 
 EngineHandle::~EngineHandle() {
-  cudaSetDevice(device_id);
+  // Freeing runs on the engine's device. Borrowed rather than selected outright,
+  // because this can run from arena teardown on a thread that was working
+  // elsewhere, and a destructor has no way to report a failure.
+  const auto guard = ::executorch::extension::cuda::CUDAGuard::create(device_id);
+  (void)guard;
   // No wait here: execute already waited, and a device-wide one blocks unrelated work.
   for (void* p : cached_input_ptrs) {
     if (p != nullptr) {
@@ -328,16 +333,15 @@ Result<DelegateHandle*> TensorRTBackend::init(
   handle->output_binding_names = std::move(header.output_binding_names);
   handle->device_id = header.device_id;
 
-  cudaError_t cuda_err = cudaSetDevice(handle->device_id);
-  if (cuda_err != cudaSuccess) {
-    ET_LOG(
-        Error, "TensorRTBackend::init: cudaSetDevice(%d) failed: %s", handle->device_id, cudaGetErrorString(cuda_err));
+  auto device_guard = ::executorch::extension::cuda::CUDAGuard::create(handle->device_id);
+  if (!device_guard.ok()) {
+    ET_LOG(Error, "TensorRTBackend::init: cannot select device %d", handle->device_id);
     return Error::InvalidProgram;
   }
 
   // Whether this device can reach pageable host memory at all. Speed is the query below.
   int pageable_access = 0;
-  cuda_err = cudaDeviceGetAttribute(&pageable_access, cudaDevAttrPageableMemoryAccess, handle->device_id);
+  cudaError_t cuda_err = cudaDeviceGetAttribute(&pageable_access, cudaDevAttrPageableMemoryAccess, handle->device_id);
   if (cuda_err != cudaSuccess) {
     ET_LOG(
         Info,
@@ -649,36 +653,15 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     return Error::InvalidArgument;
   }
 
-  int entry_device = -1;
-  cudaError_t cuda_err = cudaGetDevice(&entry_device);
-  if (cuda_err != cudaSuccess) {
-    ET_LOG(Error, "TensorRTBackend::execute: cudaGetDevice failed: %s", cudaGetErrorString(cuda_err));
-    return Error::InvalidProgram;
-  }
   // Put the engine on its own device for multi-GPU correctness, restoring the
   // caller's device on exit; green-context confinement rides the selected stream,
   // independent of the current device/context.
-  const bool switch_device = (entry_device != engine->device_id);
-  if (switch_device) {
-    cuda_err = cudaSetDevice(engine->device_id);
-    if (cuda_err != cudaSuccess) {
-      ET_LOG(
-          Error,
-          "TensorRTBackend::execute: cudaSetDevice(%d) failed: %s",
-          engine->device_id,
-          cudaGetErrorString(cuda_err));
-      return Error::InvalidProgram;
-    }
+  auto device_guard = ::executorch::extension::cuda::CUDAGuard::create(engine->device_id);
+  if (!device_guard.ok()) {
+    ET_LOG(Error, "TensorRTBackend::execute: cannot select device %d", engine->device_id);
+    return Error::InvalidProgram;
   }
-  struct DeviceRestore {
-    int device;
-    bool active;
-    ~DeviceRestore() {
-      if (active) {
-        cudaSetDevice(device);
-      }
-    }
-  } device_restore{entry_device, switch_device};
+  cudaError_t cuda_err = cudaSuccess;
 
   std::unique_lock<std::mutex> lock(engine->mu);
 
