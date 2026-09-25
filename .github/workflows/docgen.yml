@@ -10,7 +10,7 @@ on:
 
 jobs:
     build-docs:
-        runs-on: linux.g5.4xlarge.nvidia.gpu
+        runs-on: mt-l-x86aavx2-11-41-a10g
         if: ${{ ! contains(github.actor, 'pytorchbot') }}
         environment: pytorchbot-env
         container:
