@@ -4437,6 +4437,15 @@ wheels = [
 ]
 
 [[package]]
+name = "tensorrt"
+version = "11.3.0.99"
+source = { registry = "https://pypi.nvidia.com/" }
+dependencies = [
+    { name = "tensorrt-cu13", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+]
+sdist = { url = "https://pypi.nvidia.com/tensorrt/tensorrt-11.3.0.99.tar.gz", hash = "sha256:ce458d7e613126179a0389b8485295050d3c96d3fad8205386f4a475c935a40b" }
+
+[[package]]
 name = "tensorrt-cu13"
 version = "11.3.0.99"
 source = { registry = "https://pypi.nvidia.com/" }
@@ -4718,9 +4727,10 @@ dependencies = [
     { name = "numpy", version = "2.5.2", source = { registry = "https://download.pytorch.org/whl/nightly/cu130" }, marker = "python_full_version >= '3.12' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
     { name = "packaging" },
     { name = "psutil" },
-    { name = "tensorrt-cu13" },
-    { name = "tensorrt-cu13-bindings" },
-    { name = "tensorrt-cu13-libs" },
+    { name = "tensorrt", marker = "(platform_machine == 'aarch64' and sys_platform != 'win32') or (platform_machine != 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "tensorrt-cu13", marker = "platform_machine != 'aarch64' or sys_platform == 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "tensorrt-cu13-bindings", marker = "platform_machine != 'aarch64' or sys_platform == 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "tensorrt-cu13-libs", marker = "platform_machine != 'aarch64' or sys_platform == 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
     { name = "torch" },
     { name = "typing-extensions" },
 ]
@@ -4822,9 +4832,10 @@ requires-dist = [
     { name = "numpy" },
     { name = "packaging", specifier = ">=23" },
     { name = "psutil" },
-    { name = "tensorrt-cu13", specifier = ">=11.3.0,<11.4.0" },
-    { name = "tensorrt-cu13-bindings", specifier = ">=11.3.0,<11.4.0" },
-    { name = "tensorrt-cu13-libs", specifier = ">=11.3.0,<11.4.0" },
+    { name = "tensorrt", marker = "platform_machine == 'aarch64' and sys_platform == 'linux'", specifier = ">=11.3.0,<11.4.0" },
+    { name = "tensorrt-cu13", marker = "platform_machine != 'aarch64' or sys_platform != 'linux'", specifier = ">=11.3.0,<11.4.0" },
+    { name = "tensorrt-cu13-bindings", marker = "platform_machine != 'aarch64' or sys_platform != 'linux'", specifier = ">=11.3.0,<11.4.0" },
+    { name = "tensorrt-cu13-libs", marker = "platform_machine != 'aarch64' or sys_platform != 'linux'", specifier = ">=11.3.0,<11.4.0" },
     { name = "torch", specifier = ">=2.15.0.dev0,<2.16.0", index = "https://download.pytorch.org/whl/nightly/cu130" },
     { name = "torch-tensorrt-executorch-runtime", marker = "sys_platform == 'linux' and extra == 'all'" },
     { name = "torch-tensorrt-executorch-runtime", marker = "sys_platform == 'linux' and extra == 'executorch'" },
