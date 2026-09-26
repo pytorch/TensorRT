@@ -2427,6 +2427,88 @@ def test_lock_workflow_checks_detect_removed_fix(
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize("lock_rc", [0, 1])
+def test_pull_request_lock_check_reads_the_committed_lock(tmp_path, lock_rc):
+    workflow = yaml.safe_load(
+        (REPO_ROOT / ".github/workflows/uv-lock-check.yml").read_text()
+    )
+    step = next(
+        s for s in workflow["jobs"]["check-uv-lock"]["steps"] if s.get("id") == "check"
+    )
+    stubs = r"""
+uv() { printf 'lock:%s:%s\n' "$PYTHON_ONLY" "$*"; return "$LOCK_RC"; }
+"""
+    result = subprocess.run(
+        ["bash"],
+        input=stubs + step["run"],
+        capture_output=True,
+        text=True,
+        cwd=tmp_path,
+        env={**os.environ, "LOCK_RC": str(lock_rc)},
+    )
+    # --check and not --refresh: the point of this job is to read the lock as committed,
+    # which is the one thing the two writing jobs cannot do.
+    assert "lock:1:lock --check --prerelease=allow" in result.stdout, (
+        result.stdout + result.stderr
+    )
+    assert (result.returncode == 0) is (lock_rc == 0)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("removed", ["check", "metadata-mode", "failure-stop"])
+def test_pull_request_lock_check_detects_removed_fix(tmp_path, monkeypatch, removed):
+    path = REPO_ROOT / ".github/workflows/uv-lock-check.yml"
+    workflow = yaml.safe_load(path.read_text())
+    step = next(
+        s for s in workflow["jobs"]["check-uv-lock"]["steps"] if s.get("id") == "check"
+    )
+    old = step["run"]
+    if removed == "check":
+        step["run"] = old.replace("--check", "")
+    elif removed == "metadata-mode":
+        step["run"] = old.replace("PYTHON_ONLY=1", "PYTHON_ONLY=0")
+    else:
+        step["run"] = old.replace("set -euo pipefail", "set -uo pipefail").replace(
+            "exit 1", "true"
+        )
+    assert step["run"] != old
+    original = Path.read_text
+    monkeypatch.setattr(
+        Path,
+        "read_text",
+        lambda p, *a, **kw: (
+            yaml.safe_dump(workflow) if p == path else original(p, *a, **kw)
+        ),
+    )
+    with pytest.raises(AssertionError):
+        test_pull_request_lock_check_reads_the_committed_lock(
+            tmp_path, 1 if removed == "failure-stop" else 0
+        )
+
+
+@pytest.mark.unit
+def test_lock_inputs_agree_between_the_hook_and_the_pull_request_check():
+    workflow = yaml.safe_load(
+        (REPO_ROOT / ".github/workflows/uv-lock-check.yml").read_text()
+    )
+    # PyYAML reads the `on:` key as the boolean True.
+    triggers = workflow.get("on", workflow.get(True))
+    paths = set(triggers["pull_request"]["paths"])
+    config = yaml.safe_load((REPO_ROOT / ".pre-commit-config.yaml").read_text())
+    hook = next(
+        h for repo in config["repos"] for h in repo["hooks"] if h["id"] == "uv-lock"
+    )
+    pattern = re.compile(hook["files"])
+    # One set of inputs. A file that makes the hook rewrite the lock but does not start
+    # the pull request check is a lock that lands unverified, which is how this began.
+    assert {p for p in paths if not pattern.match(p)} == set(), (
+        f"the pull request check watches {sorted(paths)}, which the hook's files pattern "
+        f"{hook['files']} does not cover"
+    )
+    assert "uv.lock" in paths and "setup.py" in paths
+
+
+@pytest.mark.unit
 def test_uv_cache_tracks_pin_metadata():
     import tomllib
 
