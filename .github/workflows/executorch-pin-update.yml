@@ -159,8 +159,11 @@ jobs:
           # installs from it. The flags have to match the lock step above, because uv
           # records the resolution mode and --locked rejects a lock made under another.
           # Built in a scratch directory outside the checkout, because the pull request
-          # step stages every untracked path and a .venv here would be committed.
-          if ! PYTHON_ONLY=1 UV_PROJECT_ENVIRONMENT="${RUNNER_TEMP}/lock-check-venv" \
+          # step stages every untracked path and a .venv here would be committed
+          # (.venv is not in .gitignore). Falls back to TMPDIR so the workflow tests,
+          # which run this script with `set -u` and no RUNNER_TEMP, still work.
+          if ! PYTHON_ONLY=1 \
+              UV_PROJECT_ENVIRONMENT="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/lock-check-venv" \
               uv sync --locked --prerelease=allow --no-install-project --all-extras; then
             echo "::error::the refreshed lock does not resolve; refusing to open a pull request"
             exit 1

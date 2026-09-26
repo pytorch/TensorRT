@@ -80,8 +80,10 @@ jobs:
           # pyproject.toml declares test_ext and quantization as conflicting.
           # Built outside the checkout: the auto-commit step matches on uv.lock only,
           # but keeping the environment out of the tree avoids any chance of it being
-          # swept into a commit, and keeps `git diff` about the lock alone.
-          if ! PYTHON_ONLY=1 UV_PROJECT_ENVIRONMENT="${RUNNER_TEMP}/lock-check-venv" \
+          # swept into a commit, and keeps `git diff` about the lock alone. Falls back
+          # to TMPDIR so this runs the same way outside a GitHub runner.
+          if ! PYTHON_ONLY=1 \
+              UV_PROJECT_ENVIRONMENT="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/lock-check-venv" \
               uv sync --locked --prerelease=allow --no-install-project --all-extras; then
             echo "Error: Failed to run uv sync --locked --prerelease=allow --no-install-project --all-extras"
             exit 1

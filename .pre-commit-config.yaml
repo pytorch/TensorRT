@@ -64,8 +64,11 @@ repos:
       # rewrites the lock into a shape no workflow would produce.
       rev: 0.12.5
       hooks:
-          # Update the uv lockfile
+          # Update the uv lockfile. The prerelease flag has to match what the workflows
+          # run, or this hook rewrites their output: without it uv re-resolves under the
+          # project default and drops the recorded mode from the lock.
           - id: uv-lock
+            args: [--prerelease=allow]
     - repo: local
       hooks:
           - id: dont-commit-upstream
