@@ -1004,6 +1004,26 @@ def get_jetpack_requirements(base_requirements):
         return requirements + ["torch>=2.8.0,<2.9.0", "tensorrt>=10.3.0,<10.4.0"]
 
 
+# The TensorRT requirement is the only part of this metadata that differs between an
+# x86_64 host and an SBSA aarch64 one. uv records the answer of whichever machine ran
+# `uv lock` and applies it to every platform, so a lock written on one architecture is
+# stale on the other. Naming both behind environment markers makes the metadata the same
+# everywhere, which is what lets a single uv.lock stay valid on both.
+SBSA_MARKER = "platform_machine == 'aarch64' and sys_platform == 'linux'"
+NON_SBSA_MARKER = "platform_machine != 'aarch64' or sys_platform != 'linux'"
+
+
+def get_tensorrt_requirements():
+    # TensorRT does not build wheels for Tegra, so SBSA takes the plain `tensorrt`
+    # package from the tarball install; everywhere else takes the CUDA 13 trio.
+    return [
+        f"tensorrt>=11.3.0,<11.4.0; {SBSA_MARKER}",
+        f"tensorrt-cu13>=11.3.0,<11.4.0; {NON_SBSA_MARKER}",
+        f"tensorrt-cu13-bindings>=11.3.0,<11.4.0; {NON_SBSA_MARKER}",
+        f"tensorrt-cu13-libs>=11.3.0,<11.4.0; {NON_SBSA_MARKER}",
+    ]
+
+
 def get_sbsa_requirements(base_requirements):
     requirements = base_requirements + ["numpy"]
     if IS_DLFW_CI:
@@ -1017,12 +1037,15 @@ def get_sbsa_requirements(base_requirements):
             return requirements + [
                 "tensorrt_rtx>=1.6.1.120,<1.7.0.0",
             ]
-        # TensorRT does not currently build wheels for Tegra, so we need to use the local tensorrt install from the tarball for thor
-        # also due to we use sbsa torch_tensorrt wheel for thor, so when we build sbsa wheel, we need to only include tensorrt dependency.
-        return requirements + [
-            "torch>=2.15.0.dev,<2.16.0",
-            "tensorrt>=11.3.0,<11.4.0",
-        ]
+        # The sbsa torch_tensorrt wheel is the one thor uses, so the sbsa build takes the
+        # plain tensorrt dependency; get_tensorrt_requirements carries that split.
+        return (
+            requirements
+            + [
+                "torch>=2.15.0.dev,<2.16.0",
+            ]
+            + get_tensorrt_requirements()
+        )
 
 
 def get_x86_64_requirements(base_requirements):
@@ -1041,12 +1064,7 @@ def get_x86_64_requirements(base_requirements):
         else:
             cuda_version = torch.version.cuda
             if cuda_version.startswith("13"):
-                tensorrt_prefix = "tensorrt-cu13"
-                requirements = requirements + [
-                    f"{tensorrt_prefix}>=11.3.0,<11.4.0",
-                    f"{tensorrt_prefix}-bindings>=11.3.0,<11.4.0",
-                    f"{tensorrt_prefix}-libs>=11.3.0,<11.4.0",
-                ]
+                requirements = requirements + get_tensorrt_requirements()
             else:
                 raise ValueError(f"Unsupported CUDA version: {cuda_version}")
 

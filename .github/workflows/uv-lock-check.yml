@@ -1,0 +1,56 @@
+name: Check uv.lock
+
+# The lock that broke main arrived in an ordinary pull request. The two jobs that write
+# the lock only ever validate a file they wrote seconds earlier, on the same runner with
+# the same flags, so neither can catch a committed lock that no longer matches
+# pyproject.toml, setup.py or the pins. This runs the one check they cannot: it reads the
+# lock exactly as committed.
+
+on:
+  pull_request:
+    paths:
+      - 'pyproject.toml'
+      - 'setup.py'
+      - 'dev_dep_versions.yml'
+      - 'uv.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-uv-lock:
+    # A plain runner. Resolving a lockfile is pure metadata work: no GPU, no CUDA
+    # toolkit, no Bazel.
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          # The same pin every other place that writes or checks this lock uses. uv
+          # resolves differently between versions, so "latest" here would reject locks
+          # the writers produce. See the note in executorch-pin-update.yml for why 0.12.5.
+          version: "0.12.5"
+
+      - name: The committed lock is up to date
+        id: check
+        run: |
+          set -euo pipefail
+          set -x
+          # --check re-resolves from pyproject.toml and setup.py and compares against the
+          # committed uv.lock, writing nothing. --prerelease=allow has to match the
+          # writers: uv records the resolution mode in the lock and rejects a file made
+          # under another. PYTHON_ONLY=1 keeps setup.py from shelling out to Bazel for
+          # metadata, which is the only reason this needs no build toolchain.
+          if ! PYTHON_ONLY=1 uv lock --check --prerelease=allow; then
+            echo "::error::uv.lock does not match pyproject.toml, setup.py and the pins. Run 'PYTHON_ONLY=1 uv lock --prerelease=allow' and commit the result."
+            exit 1
+          fi
