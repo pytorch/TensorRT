@@ -196,7 +196,12 @@ required-environments = [
     "sys_platform == 'linux' and python_version >= '3.10' and python_version <= '3.13' and platform_machine == 'aarch64'",
     "sys_platform == 'win32' and python_version >= '3.10' and python_version <= '3.13' and platform_machine == 'AMD64'"
 ]
-prerelease = "if-necessary-or-explicit"
+# The lock records this mode, so every writer has to agree on it or the next one
+# re-resolves and rewrites the file. CI passes --prerelease=allow, and the pinned
+# nightlies this project builds against are prereleases, so allow is the real policy.
+# Declaring it here means a plain `uv lock`, including the pre-commit hook, produces
+# the same lock CI does.
+prerelease = "allow"
 index-strategy = "unsafe-best-match"
 conflicts = [
     [
