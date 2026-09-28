@@ -215,6 +215,36 @@ class TestIndexCopyKVFastPath(TestCase):
         eager = torch.ops.aten.index_copy.default(cache.clone(), 2, index, update)
         self.assertTrue(torch.allclose(out_val, eager))
 
+    def test_one_element_offset_aliased(self):
+        """``arange(n) + start`` with ``start`` shaped ``[1]``, not 0-d.
+
+        HF's static cache keeps ``cumulative_length`` as a ``[1]`` tensor, so this
+        is the cache position every Gemma-3 layer writes at; one element
+        broadcasts to a uniform shift just as a 0-d tensor does.
+        """
+
+        class M(torch.nn.Module):
+            def forward(self, cache, start, update):
+                index = torch.arange(update.shape[2], device=cache.device) + start
+                return torch.ops.aten.index_copy.default(cache, 2, index, update)
+
+        cache = torch.zeros(1, 4, 16, 8, device="cuda")
+        start = torch.tensor([3], dtype=torch.int64, device="cuda")
+        update = torch.randn(1, 4, 4, 8, device="cuda")
+
+        compiled = _compile_dynamic_write(M().cuda(), cache, start, update)
+
+        aliased = _aliased_io(compiled)
+        self.assertEqual(len(aliased), 1)
+        _, kind = next(iter(aliased.values()))
+        self.assertEqual(kind, "kv_cache_update")
+
+        index = torch.arange(4, device="cuda") + start
+        out = compiled(cache.clone(), start, update)
+        out_val = out[0] if isinstance(out, tuple) else out
+        eager = torch.ops.aten.index_copy.default(cache.clone(), 2, index, update)
+        self.assertTrue(torch.allclose(out_val, eager))
+
 
 class TestIndexCopyFallback(TestCase):
     """Cases where the validator denies the KV fast path. The fallback

@@ -1523,10 +1523,17 @@ def _materialised_ascending_run(node: Argument) -> Optional[bool]:
 
 def _is_uniform_shift(node: Argument) -> bool:
     """Whether adding ``node`` moves a range without restriding it -- one value
-    for the whole range, i.e. a Python scalar or a 0-d tensor."""
+    for the whole range, i.e. a Python scalar or a 0-d / ``[1]`` tensor. HF's
+    ``cumulative_length`` is ``[1]``; anything wider would raise the index rank."""
     if isinstance(node, Node):
         val = node.meta.get("val")
-        return val is not None and getattr(val, "ndim", None) == 0
+        shape = getattr(val, "shape", None)
+        # isinstance first so a SymInt extent is never compared (that guards).
+        return (
+            shape is not None
+            and all(isinstance(s, int) and s == 1 for s in shape)
+            and len(shape) <= 1
+        )
     return isinstance(node, (int, float))
 
 
