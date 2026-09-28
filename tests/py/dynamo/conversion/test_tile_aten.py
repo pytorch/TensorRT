@@ -118,6 +118,37 @@ class TestTileConverterDynamicShape(DispatchTestCase):
             input_specs,
         )
 
+    @parameterized.expand(
+        [
+            # The tiled tensor has a static shape, only the count is symbolic.
+            # "n" stands for the dynamic dim of x.
+            ("same_rank", (1, 1, 4), (1, "n", 1)),
+            ("fewer_dims_than_rank", (2, 3, 4), ("n",)),
+            ("more_dims_than_rank", (3, 4), ("n", 2, 1)),
+        ]
+    )
+    def test_tile_static_input_dynamic_dims(self, _, weight_shape, dims):
+        class Tile(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.weight = nn.Parameter(torch.randn(weight_shape))
+
+            def forward(self, x):
+                n = x.shape[1]
+                return torch.ops.aten.tile.default(
+                    self.weight, [n if d == "n" else d for d in dims]
+                )
+
+        input_specs = [
+            Input(
+                min_shape=(1, 1, 4),
+                opt_shape=(1, 3, 4),
+                max_shape=(1, 8, 4),
+                dtype=torch.float32,
+            ),
+        ]
+        self.run_test_with_dynamic_shape(Tile(), input_specs, use_dynamo_tracer=True)
+
 
 if __name__ == "__main__":
     run_tests()
