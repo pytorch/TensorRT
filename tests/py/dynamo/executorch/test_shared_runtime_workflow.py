@@ -227,6 +227,13 @@ def test_shared_build_provisions_tensorrt_metadata(tmp_path, arch, cuda, release
     (runtime / "version.txt").write_text("7.4.1\n")
     scripts = tmp_path / ".github/scripts"
     scripts.mkdir(parents=True)
+    # pip reads the pinned requirement from this file, so the sandbox needs the real one: a stub
+    # would let a wrong or missing pin pass here.
+    packaging = tmp_path / "packaging"
+    packaging.mkdir(parents=True)
+    shutil.copy2(
+        ROOT / "packaging/executorch_pin.txt", packaging / "executorch_pin.txt"
+    )
     step = next(
         s
         for s in _workflow("build_linux.yml")["jobs"]["build"]["steps"]
@@ -346,6 +353,12 @@ def _assert_device_commands(tmp_path, workflow, failure=""):
     helpers = tmp_path / "tests/py/utils/ci_helpers.sh"
     helpers.parent.mkdir(parents=True)
     helpers.write_text("trt_tier_executorch() { :; }\n")
+    # Copy the real requirement files rather than stubs, so a wrong or missing pin fails here
+    # instead of being mocked away. This script installs both the exact pin and the range.
+    packaging = tmp_path / "packaging"
+    packaging.mkdir(parents=True)
+    for name in ("executorch_pin.txt", "executorch_range.txt"):
+        shutil.copy2(ROOT / "packaging" / name, packaging / name)
     dispatcher = bin_dir / "dispatch"
     dispatcher.write_text(
         f"#!{sys.executable}\n"

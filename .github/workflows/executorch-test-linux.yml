@@ -65,10 +65,11 @@ jobs:
 
         # ExecuTorch's CUDA wheels live only on the PyTorch nightly index, so the channel is
         # needed. No --pre: a specifier naming a prerelease admits prereleases by itself, and
-        # --pre would apply to every other requirement in the same command too.
+        # --pre would apply to every other requirement in the same command too. The version
+        # comes from the requirement file so a bump changes no file in this directory.
         python -m pip install pyyaml "wheel>=0.40" \
           --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" \
-          "executorch==1.6.0.dev20260925"
+          -r packaging/executorch_pin.txt
 
         # The shared artifact carries the matching core and companion wheels.
         shopt -s nullglob
@@ -107,7 +108,7 @@ jobs:
         # Resolve the user-facing range without reusing the build's installed pin.
         python -m venv "${RUNNER_TEMP}/range-check-venv"
         # pin-check: range-ok
-        "${RUNNER_TEMP}/range-check-venv/bin/python" -m pip install --no-deps --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" "executorch>=1.6.0.dev20260925,<1.7"
+        "${RUNNER_TEMP}/range-check-venv/bin/python" -m pip install --no-deps --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" -r packaging/executorch_range.txt
 
         source tests/py/utils/ci_helpers.sh
         trt_tier_executorch
