@@ -180,6 +180,29 @@ jobs:
         with:
           name: ${{ inputs.additional-artifact }}-${{ env.ARTIFACT_NAME_SUFFIX }}
           path: /opt/torch-tensorrt-builds/
+      - name: Point the HuggingFace cache somewhere writable
+        # An OSDC runner mounts the shared model cache read-only at
+        # /mnt/hf_cache and exports HF_HOME pointing at it. huggingface_hub
+        # writes inside HF_HOME/hub whatever it is doing -- hf_hub_download
+        # calls os.makedirs on the repo directory before it looks anything up,
+        # and takes a .locks/ file -- so jobs fail with
+        # "OSError: [Errno 30] Read-only file system" even for a model that is
+        # already cached. Split the two: everything HF writes goes to a
+        # writable dir, while the seeded blobs are still read from the mount.
+        # Same shape as pytorch's .ci/pytorch/test.sh and test-infra's
+        # linux_job_v3.yml.
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -d /mnt/hf_cache ]]; then
+            mkdir -p "${RUNNER_TEMP}/hf_home" "${RUNNER_TEMP}/hf_datasets"
+            {
+              echo "HF_HOME=${RUNNER_TEMP}/hf_home"
+              echo "HF_HUB_CACHE=/mnt/hf_cache/hub"
+              echo "HF_DATASETS_CACHE=${RUNNER_TEMP}/hf_datasets"
+            } >> "${GITHUB_ENV}"
+          fi
+
       - name: Pack script
         continue-on-error: ${{ inputs.continue-on-error }}
         working-directory: ${{ inputs.repository }}
