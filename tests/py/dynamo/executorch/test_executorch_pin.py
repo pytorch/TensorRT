@@ -345,7 +345,9 @@ def test_shared_workflows_export_the_row_cuda_channel() -> None:
         setup = next(
             s
             for s in job["steps"]
-            if s.get("uses", "").endswith("/setup-binary-builds")
+            # split off any @ref: these actions are referenced by repo
+            # (pytorch/test-infra/...@main), not by a relative path.
+            if s.get("uses", "").split("@")[0].endswith("/setup-binary-builds")
         )
         assert setup["with"]["cuda-version"] == "${{ env.CU_VERSION }}", filename
         assert all("CU_VERSION" not in s.get("env", {}) for s in job["steps"]), filename
