@@ -60,9 +60,17 @@ jobs:
     # Automatically detect TensorRT default versions for Torch-TRT build
     - name: Detect the TensorRT version
       id: trt
+      # Read the pin straight out of the yaml rather than through versions.py.
+      # That module imports pyyaml, and the runner image has python3 but no
+      # pip, so `python3 -m pip install pyyaml` fails with "No module named
+      # pip". The file is flat `key: "value"`, so one sed needs nothing at all.
       run: |
-        python3 -m pip install pyyaml
-        TRT_VERSION=$(python3 -c "import versions; versions.tensorrt_version()")
+        set -euo pipefail
+        TRT_VERSION=$(sed -n 's/^__tensorrt_version__: *"\{0,1\}\([^"]*\)"\{0,1\}.*/\1/p' dev_dep_versions.yml)
+        if [[ -z "${TRT_VERSION}" ]]; then
+          echo "could not read __tensorrt_version__ from dev_dep_versions.yml" >&2
+          exit 1
+        fi
         echo "TRT VERSION = ${TRT_VERSION}"
         echo "version=${TRT_VERSION}" >> "$GITHUB_OUTPUT"
 
