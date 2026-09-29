@@ -9,6 +9,12 @@ on:
       - release/*
     paths-ignore:
       - 'docs/**'
+  # TEMPORARY: remove before merging. Present only so this pull request can
+  # prove the docker build still works on the OSDC runner; the workflow is
+  # otherwise push-only, so the change would land untested.
+  pull_request:
+    paths:
+      - '.github/workflows/docker_builder.yml'
   workflow_dispatch:
 
 # If pushes to main are made in rapid succession,
@@ -73,6 +79,10 @@ jobs:
 
     # Clean up all untagged containers in registry
     - name: Container Registry Cleanup
+      # Not from a pull request: this deletes untagged versions from the shared
+      # registry, which is a side effect a test run should not have. Goes away
+      # with the temporary pull_request trigger.
+      if: github.event_name != 'pull_request'
       uses: actions/delete-package-versions@v4
       with:
         package-name: "tensorrt/torch_tensorrt"
