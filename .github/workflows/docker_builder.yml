@@ -32,6 +32,10 @@ jobs:
     # streams the build context and waits.
     runs-on: mt-l-x86iavx512-16-128
     container:
+      # Needs the docker CLI: docker/login-action shells out to it, and
+      # docker-build-remote-buildkit runs `docker buildx build`. The
+      # manylinux builder images have python and pip but no docker, so they
+      # cannot host this job.
       image: ghcr.io/actions/actions-runner:latest
 
     # Define key environment variables
@@ -58,19 +62,17 @@ jobs:
         password: ${{ secrets.GITHUB_TOKEN }}
 
     # Automatically detect TensorRT default versions for Torch-TRT build
+    # versions.py imports pyyaml, and this image has python3 but no pip (nor
+    # ensurepip). It is still the right image -- docker/login-action and the
+    # buildkit action both need the docker CLI, which the manylinux builder
+    # images do not have -- so bring an interpreter with uv instead.
+    - uses: astral-sh/setup-uv@94527f2e458b27549849d47d273a16bec83a01e9 # v7
+
     - name: Detect the TensorRT version
       id: trt
-      # Read the pin straight out of the yaml rather than through versions.py.
-      # That module imports pyyaml, and the runner image has python3 but no
-      # pip, so `python3 -m pip install pyyaml` fails with "No module named
-      # pip". The file is flat `key: "value"`, so one sed needs nothing at all.
       run: |
-        set -euo pipefail
-        TRT_VERSION=$(sed -n 's/^__tensorrt_version__: *"\{0,1\}\([^"]*\)"\{0,1\}.*/\1/p' dev_dep_versions.yml)
-        if [[ -z "${TRT_VERSION}" ]]; then
-          echo "could not read __tensorrt_version__ from dev_dep_versions.yml" >&2
-          exit 1
-        fi
+        set -eu
+        TRT_VERSION=$(uv run --no-project --with pyyaml python -c "import versions; versions.tensorrt_version()")
         echo "TRT VERSION = ${TRT_VERSION}"
         echo "version=${TRT_VERSION}" >> "$GITHUB_OUTPUT"
 
