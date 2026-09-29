@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Union
 
 import torch
+
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import ConverterRegistry
 from torch_tensorrt.dynamo.conversion.converter_utils import get_node_name
@@ -293,13 +294,22 @@ def input_formatter(shapes: Any, dtypes: Any) -> str:
 
 
 def parse_non_trt_nodes(graph_module: torch.fx.GraphModule) -> List[str]:
-    """Parses call_function and call_method nodes from a GraphModule
+    """Parses ordinary computations and explicit PyTorch regions from a GraphModule.
     Excludes getitem nodes
 
     Returns a string representation of the nodes
     """
+    from torch_tensorrt.dynamo.regions import is_torch_region_node
+
     to_run_in_torch = []
     for node in graph_module.graph.nodes:
+        if is_torch_region_node(graph_module, node):
+            region_id = node.meta["torch_tensorrt_region"]["id"]
+            to_run_in_torch.append(
+                f"Region: {region_id}, explicit execute_in_torch region, "
+                f"with layer location: {get_node_name(node)}"
+            )
+            continue
         # getitem nodes are excluded since they are a Tensor-collection op
         if (
             node.op in ("call_function", "call_method")
