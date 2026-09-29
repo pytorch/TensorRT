@@ -10,12 +10,16 @@ on:
 
 jobs:
     build-docs:
-        runs-on: mt-l-x86aavx2-11-41-a10g
+        # A CPU runner: nothing here runs on a GPU. The CUDA toolkit this needs
+        # to build the extension comes from the builder image, and the only use
+        # of torch_tensorrt is importing it so sphinx autodoc can read
+        # docstrings. `--gpus all` is dropped with the GPU, since a CPU pod has
+        # no nvidia container runtime and the container would fail to start.
+        runs-on: mt-l-x86iavx512-16-128
         if: ${{ ! contains(github.actor, 'pytorchbot') }}
         environment: pytorchbot-env
         container:
             image: docker.io/pytorch/manylinux2_28-builder:cuda13.0
-            options: --gpus all
         env:
             CUDA_HOME: /usr/local/cuda-13.0
             VERSION_SUFFIX: cu130
