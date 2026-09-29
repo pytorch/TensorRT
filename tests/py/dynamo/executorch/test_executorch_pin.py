@@ -90,8 +90,10 @@ NO_NIGHTLY_MARKER = "pin-check: no-nightly"
 # Minimum live pin sites, independent of the writer: a removed version no longer matches
 # discovery. Additional documentation matches cannot replace these required sites.
 _EXPECTED_REQUIREMENT_SITES = {
-    ".github/workflows/build_linux.yml": 1,
-    ".github/workflows/executorch-test-linux.yml": 2,
+    # The workflows read the version from these files rather than naming it: the exact pin, and
+    # the user-facing range whose lower bound is the pin.
+    "packaging/executorch_pin.txt": 1,
+    "packaging/executorch_range.txt": 1,
     "MODULE.bazel": 1,
     "docker/MODULE.bazel.docker": 1,
     "docker/MODULE.bazel.ngc": 1,
@@ -277,6 +279,22 @@ def _without_trailing_comment(path: str, text: str) -> str:
     return text
 
 
+def _pip_command_around(path: str, number: int) -> str:
+    """The whole pip invocation containing line ``number``, following backslash continuations.
+
+    A pip command in a workflow is wrapped across lines, so the index flag and the ``-r`` flag
+    usually sit on different ones. Reading a single line would miss the index.
+    """
+    lines = (REPO_ROOT / path).read_text().splitlines()
+    start = number - 1
+    while start > 0 and lines[start - 1].rstrip().endswith("\\"):
+        start -= 1
+    end = number - 1
+    while end + 1 < len(lines) and lines[end].rstrip().endswith("\\"):
+        end += 1
+    return "\n".join(lines[start : end + 1])
+
+
 def _counts_toward_minimum(path: str, number: int) -> bool:
     """Whether a requirement at this line counts toward the per-file minimum.
 
@@ -382,7 +400,9 @@ def test_runtime_callers_use_the_shared_pinned_build(caller, job):
         if s.get("name") == "Build the ExecuTorch runtime wheel"
     )
     assert step["if"].startswith("${{ inputs.build-executorch-runtime")
-    assert f'executorch=={_versions()["__executorch_version__"]}' in step["run"]
+    # The version arrives through the requirement file, so the pin moves without touching this
+    # workflow. Everything else about the install is still asserted here.
+    assert "-r packaging/executorch_pin.txt" in step["run"]
     assert "${CONDA_RUN} python -m pip install pyyaml" in step["run"]
     assert "nightly/${CU_VERSION}" in step["run"]
     assert "release-executorch-runtime-wheel-artifacts" not in workflow["jobs"]
@@ -1003,6 +1023,15 @@ def test_import_errors_preserve_context_and_install_guidance(
         "CudaGraphsTorchTensorRTModule": type("CudaGraphsStub", (), {}),
         "_parse_module_type": lambda value: None,
         "ENABLED_FEATURES": types.SimpleNamespace(torch_tensorrt_runtime=True),
+        # save() reads this table at module scope, and only the functions are compiled
+        # here, so it has to be supplied. Taken from the source rather than repeated,
+        # or a new option would leave this test asserting against a stale set.
+        "_EXECUTORCH_SAVE_OPTIONS": next(
+            ast.literal_eval(node.value)
+            for node in ast.parse(source.read_text()).body
+            if isinstance(node, ast.AnnAssign)
+            and getattr(node.target, "id", None) == "_EXECUTORCH_SAVE_OPTIONS"
+        ),
     }
     exec(
         compile(
@@ -1820,6 +1849,7 @@ def test_the_range_install_runs_in_a_fresh_venv():
     install = next(line for line in after.splitlines() if line.strip())
     argv = shlex.split(install, comments=True)
     assert argv[:5] == [venv + "/bin/python", "-m", "pip", "install", "--no-deps"], argv
+    assert "-r" in argv and "packaging/executorch_range.txt" in argv, argv
 
 
 @pytest.mark.unit
@@ -1963,12 +1993,13 @@ def test_review_cuda_export_is_required(monkeypatch, workflow_name):
 
 
 @pytest.mark.unit
-def test_review_venv_name_in_comment_does_not_count(monkeypatch):
+def test_the_range_install_must_name_the_fresh_venv(monkeypatch):
     path = REPO_ROOT / ".github/workflows/executorch-test-linux.yml"
     text = path.read_text().replace(
-        '"${RUNNER_TEMP}/range-check-venv/bin/python" -m pip install --no-deps',
-        "python -m pip install --no-deps # range-check-venv",
+        '"${RUNNER_TEMP}/range-check-venv/bin/python" -m pip install',
+        "python -m pip install",
     )
+    assert text != path.read_text(), "the decoy changed nothing, so this proves nothing"
     original = Path.read_text
     monkeypatch.setattr(
         Path,
@@ -2427,6 +2458,88 @@ def test_lock_workflow_checks_detect_removed_fix(
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize("lock_rc", [0, 1])
+def test_pull_request_lock_check_reads_the_committed_lock(tmp_path, lock_rc):
+    workflow = yaml.safe_load(
+        (REPO_ROOT / ".github/workflows/uv-lock-check.yml").read_text()
+    )
+    step = next(
+        s for s in workflow["jobs"]["check-uv-lock"]["steps"] if s.get("id") == "check"
+    )
+    stubs = r"""
+uv() { printf 'lock:%s:%s\n' "$PYTHON_ONLY" "$*"; return "$LOCK_RC"; }
+"""
+    result = subprocess.run(
+        ["bash"],
+        input=stubs + step["run"],
+        capture_output=True,
+        text=True,
+        cwd=tmp_path,
+        env={**os.environ, "LOCK_RC": str(lock_rc)},
+    )
+    # --check and not --refresh: the point of this job is to read the lock as committed,
+    # which is the one thing the two writing jobs cannot do.
+    assert "lock:1:lock --check --prerelease=allow" in result.stdout, (
+        result.stdout + result.stderr
+    )
+    assert (result.returncode == 0) is (lock_rc == 0)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("removed", ["check", "metadata-mode", "failure-stop"])
+def test_pull_request_lock_check_detects_removed_fix(tmp_path, monkeypatch, removed):
+    path = REPO_ROOT / ".github/workflows/uv-lock-check.yml"
+    workflow = yaml.safe_load(path.read_text())
+    step = next(
+        s for s in workflow["jobs"]["check-uv-lock"]["steps"] if s.get("id") == "check"
+    )
+    old = step["run"]
+    if removed == "check":
+        step["run"] = old.replace("--check", "")
+    elif removed == "metadata-mode":
+        step["run"] = old.replace("PYTHON_ONLY=1", "PYTHON_ONLY=0")
+    else:
+        step["run"] = old.replace("set -euo pipefail", "set -uo pipefail").replace(
+            "exit 1", "true"
+        )
+    assert step["run"] != old
+    original = Path.read_text
+    monkeypatch.setattr(
+        Path,
+        "read_text",
+        lambda p, *a, **kw: (
+            yaml.safe_dump(workflow) if p == path else original(p, *a, **kw)
+        ),
+    )
+    with pytest.raises(AssertionError):
+        test_pull_request_lock_check_reads_the_committed_lock(
+            tmp_path, 1 if removed == "failure-stop" else 0
+        )
+
+
+@pytest.mark.unit
+def test_lock_inputs_agree_between_the_hook_and_the_pull_request_check():
+    workflow = yaml.safe_load(
+        (REPO_ROOT / ".github/workflows/uv-lock-check.yml").read_text()
+    )
+    # PyYAML reads the `on:` key as the boolean True.
+    triggers = workflow.get("on", workflow.get(True))
+    paths = set(triggers["pull_request"]["paths"])
+    config = yaml.safe_load((REPO_ROOT / ".pre-commit-config.yaml").read_text())
+    hook = next(
+        h for repo in config["repos"] for h in repo["hooks"] if h["id"] == "uv-lock"
+    )
+    pattern = re.compile(hook["files"])
+    # One set of inputs. A file that makes the hook rewrite the lock but does not start
+    # the pull request check is a lock that lands unverified, which is how this began.
+    assert {p for p in paths if not pattern.match(p)} == set(), (
+        f"the pull request check watches {sorted(paths)}, which the hook's files pattern "
+        f"{hook['files']} does not cover"
+    )
+    assert "uv.lock" in paths and "setup.py" in paths
+
+
+@pytest.mark.unit
 def test_uv_cache_tracks_pin_metadata():
     import tomllib
 
@@ -2634,3 +2747,31 @@ def test_the_install_script_leaves_the_companion_out(tmp_path, branch):
     assert not any("executorch_runtime" in name for name in selected), selected
     # Both of the others, including the variant a prefix match would have missed.
     assert len(selected) == 2, selected
+
+
+@pytest.mark.unit
+def test_every_requirement_file_install_names_the_nightly_channel():
+    """A ``-r`` install carries no requirement literal, so the channel scan cannot see it.
+
+    That scan walks requirement literals inside pip commands, which is how it checks the index.
+    Passing the pin through a file removes the literal from the command, so without this the
+    nightly channel could be dropped or pointed at another index and every other guard here
+    would still pass. ExecuTorch's CUDA wheels exist only on the nightly index, so an install
+    that names another one resolves to a processor-only build.
+    """
+    wrong = []
+    for line in _git("grep", "-nI", "-e", "-r packaging/executorch_").splitlines():
+        path, number, text = line.split(":", 2)
+        if _is_source_test(path):
+            continue
+        command = _pip_command_around(path, int(number))
+        if not re.search(
+            r"download\.pytorch\.org/whl/nightly/\$\{CU_VERSION\}", command
+        ):
+            wrong.append(
+                f"{path}:{number} installs a pinned requirement file without the nightly channel"
+            )
+    assert not wrong, wrong
+    assert _git(
+        "grep", "-lI", "-e", "-r packaging/executorch_"
+    ).strip(), "no requirement-file install found, so this test is not looking"

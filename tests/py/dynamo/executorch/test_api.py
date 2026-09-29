@@ -277,17 +277,57 @@ def test_save_executorch_error_when_executorch_missing(monkeypatch, tmp_path):
         )
 
 
+_PUBLIC_API_SYMBOLS = (
+    "get_edge_compile_config",
+    "TensorRTPartitioner",
+    "TensorRTBackend",
+    "export",
+    "zero_copy_backend_config",
+    "check_zero_copy_kv",
+)
+
+
 @_needs_torch_tensorrt
 @pytest.mark.unit
 def test_public_api_symbols_present():
     module = importlib.import_module("torch_tensorrt.executorch")
-    assert "get_edge_compile_config" in module.__all__
-    assert "TensorRTPartitioner" in module.__all__
-    assert "TensorRTBackend" in module.__all__
-    assert "export" in module.__all__
+    assert set(module.__all__) == set(_PUBLIC_API_SYMBOLS)
     assert "Program" not in module.__all__
     assert "load" not in module.__all__
     assert "to_executorch" not in module.__all__
+
+
+@_needs_torch_tensorrt
+@pytest.mark.unit
+def test_public_api_symbols_are_bound_not_just_advertised():
+    # __all__ is a literal written out in both branches of the
+    # _has_executorch_exir() guard, so reading it cannot tell whether the
+    # package binds what it advertises. Resolve each name instead.
+    module = importlib.import_module("torch_tensorrt.executorch")
+    if module._has_executorch_exir():
+        for name in _PUBLIC_API_SYMBOLS:
+            assert getattr(module, name) is not None
+    else:
+        for name in _PUBLIC_API_SYMBOLS:
+            with pytest.raises(ImportError, match=name):
+                getattr(module, name)
+
+
+@pytest.mark.unit
+def test_python_only_wheel_packages_the_executorch_export_ops():
+    """The placeholder registration module must not live in the C++-only arm."""
+    tree = ast.parse(_SETUP_PY.read_text(encoding="utf-8"))
+    assignments = {
+        node.targets[0].id: ast.literal_eval(node.value)
+        for node in tree.body
+        if isinstance(node, ast.Assign)
+        and len(node.targets) == 1
+        and isinstance(node.targets[0], ast.Name)
+        and node.targets[0].id in {"dynamo_packages", "dynamo_package_dir"}
+    }
+    package = "torch_tensorrt.dynamo.runtime.meta_ops"
+    assert package in assignments["dynamo_packages"]
+    assert package in assignments["dynamo_package_dir"]
 
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
@@ -2736,6 +2776,10 @@ def _patch_executorch_lowering(monkeypatch, captured):
             return _FakeETRecord()
 
     class _FakeEdge:
+        # export() reorders each method's mutations after lowering, over every
+        # method the manager holds. No method here holds a program to reorder.
+        methods = ()
+
         def to_executorch(self, config=None):
             captured["backend_config"] = config
             return _FakeExec()
@@ -2838,6 +2882,24 @@ def test_save_executorch_defaults_when_lowering_kwargs_omitted(monkeypatch, tmp_
     assert captured["generate_etrecord"] is False
     # No etrecord written when generate_etrecord is falsy.
     assert not (tmp_path / "model_etrecord.bin").exists()
+
+
+@pytest.mark.unit
+def test_save_executorch_does_not_require_the_cpp_runtime(monkeypatch, tmp_path):
+    pytest.importorskip("executorch.exir")
+    import torch_tensorrt._compile as tc
+
+    captured = {}
+    _patch_executorch_lowering(monkeypatch, captured)
+    monkeypatch.setattr(
+        tc, "ENABLED_FEATURES", types.SimpleNamespace(torch_tensorrt_runtime=False)
+    )
+
+    ep = torch.export.export(_AddOne(), (torch.randn(2, 2),))
+    tc._save_as_executorch(ep, str(tmp_path / "python-only.pte"))
+
+    assert "export_kwargs" in captured
+    assert (tmp_path / "python-only.pte").is_file()
 
 
 # --- the same lowering kwargs flow through the *public* torch_tensorrt.save() -----

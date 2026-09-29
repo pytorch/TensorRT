@@ -7,6 +7,7 @@ from typing import Any, Dict, List
 
 import sympy
 import torch
+from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
 
 logger = logging.getLogger(__name__)
@@ -212,15 +213,16 @@ def _apply_symbolic_shape_expressions(
         for symbol in in_compile_namespace(expr).free_symbols
         if symbol not in compile_input_symbols
     }
-    if output_only_symbols and shape_env is None:
-        raise RuntimeError(
-            "[torch.ops.tensorrt.execute_engine]: No shape_env available during meta kernel execution"
-        )
-    for symbol in sorted(output_only_symbols, key=str):
-        runtime_symint = shape_env.create_unbacked_symint()
-        shape_env._constrain_range_for_size(runtime_symint.node.expr)
-        compile_to_runtime[symbol] = runtime_symint.node.expr
-        runtime_expr_to_symint[runtime_symint.node.expr] = runtime_symint
+    if output_only_symbols:
+        if shape_env is None:
+            raise RuntimeError(
+                "[torch.ops.tensorrt.execute_engine]: No shape_env available during meta kernel execution"
+            )
+        for symbol in sorted(output_only_symbols, key=str):
+            runtime_symint = shape_env.create_unbacked_symint()
+            shape_env._constrain_range_for_size(runtime_symint.node.expr)
+            compile_to_runtime[symbol] = runtime_symint.node.expr
+            runtime_expr_to_symint[runtime_symint.node.expr] = runtime_symint
 
     # Create output fake tensors with symbolic shapes
     logger.debug(f"Deserialized output shape expressions: {output_info}")
@@ -256,6 +258,11 @@ def _apply_symbolic_shape_expressions(
                     elif runtime_expr in runtime_expr_to_symint:
                         output_shape.append(runtime_expr_to_symint[runtime_expr])
                     else:
+                        if shape_env is None:
+                            raise RuntimeError(
+                                "[torch.ops.tensorrt.execute_engine]: No shape_env "
+                                "available during meta kernel execution"
+                            )
                         try:
                             output_shape.append(
                                 shape_env.create_symintnode(runtime_expr, hint=None)
@@ -303,7 +310,6 @@ def fake_aten_cudnn_grid_sampler(
     return torch.empty(out_shape, dtype=input.dtype, device=input.device)
 
 
-@torch.library.register_fake("tensorrt::execute_engine")  # type: ignore
 def fake_tensorrt_execute_engine(
     inputs: List[torch.Tensor], fake_trt_engine: Any
 ) -> Any:
@@ -340,7 +346,6 @@ def fake_tensorrt_execute_engine(
         )
 
 
-@torch._library.register_fake_class("tensorrt::Engine")
 class FakeTRTEngine:
     def __init__(self, engine_info: List[str]) -> None:
         self.version = engine_info[torch.ops.tensorrt.ABI_TARGET_IDX()]
@@ -417,6 +422,17 @@ class FakeTRTEngine:
 
     def __getstate__(self) -> Any:
         pass
+
+
+# The C++ runtime owns the execute_engine schema and Engine TorchScript class, so
+# their Python fake implementations must be registered here. In a Python-only
+# build, _TRTEngine owns both the custom op and its fake implementation instead;
+# registering either one a second time raises before ExecuTorch lowering starts.
+if ENABLED_FEATURES.torch_tensorrt_runtime:
+    torch.library.register_fake("tensorrt::execute_engine")(
+        fake_tensorrt_execute_engine
+    )
+    torch._library.register_fake_class("tensorrt::Engine")(FakeTRTEngine)
 
 
 @torch.library.custom_op(  # type: ignore[misc]

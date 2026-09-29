@@ -60,6 +60,56 @@ def test_manifest_suite_provisions_wheel(monkeypatch, cuda):
     _assert_test_wheel_dependency(command)
 
 
+@pytest.mark.parametrize(
+    "environment,expected",
+    [
+        (
+            {"platform_machine": "aarch64", "sys_platform": "linux"},
+            {"tensorrt"},
+        ),
+        (
+            {"platform_machine": "x86_64", "sys_platform": "linux"},
+            {"tensorrt-cu13", "tensorrt-cu13-bindings", "tensorrt-cu13-libs"},
+        ),
+        (
+            {"platform_machine": "AMD64", "sys_platform": "win32"},
+            {"tensorrt-cu13", "tensorrt-cu13-bindings", "tensorrt-cu13-libs"},
+        ),
+        (
+            # Windows on Arm reports an Arm machine but is not SBSA, and takes the
+            # CUDA 13 packages like every other Windows build.
+            {"platform_machine": "aarch64", "sys_platform": "win32"},
+            {"tensorrt-cu13", "tensorrt-cu13-bindings", "tensorrt-cu13-libs"},
+        ),
+    ],
+)
+def test_tensorrt_markers_select_one_package_per_machine(environment, expected):
+    """setup.py names every TensorRT package; the markers decide which ones install.
+
+    The names used to be chosen by an `if` on the building machine, which is why a
+    uv.lock written on one architecture was stale on the other. Now that the choice
+    happens at install time, these markers are what keeps each machine correct.
+    """
+    source = ast.parse((ROOT / "setup.py").read_text())
+    wanted = {"get_tensorrt_requirements", "SBSA_MARKER", "NON_SBSA_MARKER"}
+    body = [
+        n
+        for n in source.body
+        if (isinstance(n, ast.FunctionDef) and n.name in wanted)
+        or (
+            isinstance(n, ast.Assign)
+            and any(isinstance(t, ast.Name) and t.id in wanted for t in n.targets)
+        )
+    ]
+    scope = {}
+    exec(compile(ast.Module(body=body, type_ignores=[]), "<markers>", "exec"), scope)
+    requirements = [Requirement(r) for r in scope["get_tensorrt_requirements"]()]
+    # Every requirement carries a marker, so none of them installs everywhere.
+    assert all(r.marker is not None for r in requirements)
+    chosen = {r.name for r in requirements if r.marker.evaluate(dict(environment))}
+    assert chosen == expected
+
+
 @pytest.mark.parametrize("arch", ["x86_64", "aarch64"])
 @pytest.mark.parametrize("cuda", ["cu130", "cu132"])
 @pytest.mark.parametrize("release", [True, False])
@@ -70,9 +120,22 @@ def test_shared_build_provisions_tensorrt_metadata(tmp_path, arch, cuda, release
     selector = (
         "get_sbsa_requirements" if arch == "aarch64" else "get_x86_64_requirements"
     )
-    function = next(
-        n for n in source.body if isinstance(n, ast.FunctionDef) and n.name == selector
-    )
+    # The selector delegates the TensorRT names to a shared helper, and that helper
+    # reads the marker constants, so all three have to come across for the real code
+    # to run here rather than a copy of it.
+    wanted = {selector, "get_tensorrt_requirements", "SBSA_MARKER", "NON_SBSA_MARKER"}
+    body = [
+        n
+        for n in source.body
+        if (isinstance(n, ast.FunctionDef) and n.name in wanted)
+        or (
+            isinstance(n, ast.Assign)
+            and any(isinstance(t, ast.Name) and t.id in wanted for t in n.targets)
+        )
+    ]
+    assert {
+        n.name if isinstance(n, ast.FunctionDef) else n.targets[0].id for n in body
+    } == wanted
     scope = {
         "IS_DLFW_CI": False,
         "USE_TRT_RTX": False,
@@ -81,11 +144,21 @@ def test_shared_build_provisions_tensorrt_metadata(tmp_path, arch, cuda, release
         ),
     }
     exec(
-        compile(ast.Module(body=[function], type_ignores=[]), "<requirements>", "exec"),
+        compile(ast.Module(body=body, type_ignores=[]), "<requirements>", "exec"),
         scope,
     )
     requirements = scope[selector]([])
-    expected = [r for r in requirements if Requirement(r).name.startswith("tensorrt")]
+    # The metadata now names every TensorRT package and lets markers choose, so filter
+    # them the way the build step does: against the machine actually running. The arch
+    # parameter drives the step's own inputs, not this selection, because a marker is
+    # evaluated where the build happens, and this suite runs on one machine.
+    # test_tensorrt_markers_select_one_package_per_machine covers the choice itself.
+    expected = [
+        r
+        for r in requirements
+        if Requirement(r).name.startswith("tensorrt")
+        and (Requirement(r).marker is None or Requirement(r).marker.evaluate())
+    ]
     assert expected
 
     site = tmp_path / "site"
@@ -154,6 +227,13 @@ def test_shared_build_provisions_tensorrt_metadata(tmp_path, arch, cuda, release
     (runtime / "version.txt").write_text("7.4.1\n")
     scripts = tmp_path / ".github/scripts"
     scripts.mkdir(parents=True)
+    # pip reads the pinned requirement from this file, so the sandbox needs the real one: a stub
+    # would let a wrong or missing pin pass here.
+    packaging = tmp_path / "packaging"
+    packaging.mkdir(parents=True)
+    shutil.copy2(
+        ROOT / "packaging/executorch_pin.txt", packaging / "executorch_pin.txt"
+    )
     step = next(
         s
         for s in _workflow("build_linux.yml")["jobs"]["build"]["steps"]
@@ -273,6 +353,12 @@ def _assert_device_commands(tmp_path, workflow, failure=""):
     helpers = tmp_path / "tests/py/utils/ci_helpers.sh"
     helpers.parent.mkdir(parents=True)
     helpers.write_text("trt_tier_executorch() { :; }\n")
+    # Copy the real requirement files rather than stubs, so a wrong or missing pin fails here
+    # instead of being mocked away. This script installs both the exact pin and the range.
+    packaging = tmp_path / "packaging"
+    packaging.mkdir(parents=True)
+    for name in ("executorch_pin.txt", "executorch_range.txt"):
+        shutil.copy2(ROOT / "packaging" / name, packaging / name)
     dispatcher = bin_dir / "dispatch"
     dispatcher.write_text(
         f"#!{sys.executable}\n"
@@ -314,7 +400,9 @@ def _assert_device_commands(tmp_path, workflow, failure=""):
         "elif tool == 'curl': pass\n"
         "elif tool == 'find': print(os.environ['RUNNER_TEMP'] + '/libs')\n"
         "elif tool == 'verify-executorch-reference-runner.sh':\n"
-        "    assert all(Path(a).read_text() == 'exported' for a in args)\n"
+        # Its coalesced model arrives as --coalesced=<path>, so strip the flag before
+        # reading. The rest are bare paths.
+        "    assert all(Path(a.split('=', 1)[-1]).read_text() == 'exported' for a in args)\n"
         "else: raise AssertionError((tool, args))\n"
     )
     dispatcher.chmod(0o755)
@@ -362,6 +450,11 @@ def _assert_device_commands(tmp_path, workflow, failure=""):
                 f"--model_path={runner}/torchtrt-kv-cache-decode.pte",
             ],
             [
+                "examples/torchtrt_executorch_example/export_kv_cache_decode.py",
+                f"--model_path={runner}/torchtrt-kv-cache-decode-zero-copy.pte",
+                "--zero_copy",
+            ],
+            [
                 "examples/torchtrt_executorch_example/export_coalesced.py",
                 f"--model_path={runner}/torchtrt-coalesced.pte",
             ],
@@ -379,7 +472,7 @@ def _assert_device_commands(tmp_path, workflow, failure=""):
                 f"--model_path={runner}/torchtrt-device-resident.pte",
                 "--num_runs=2",
             ],
-        ][: 4 if failure == "export_device_resident.py" else 6]
+        ][: 5 if failure == "export_device_resident.py" else 7]
     ), (
         result.stdout + result.stderr
     )
@@ -389,8 +482,10 @@ def _assert_device_commands(tmp_path, workflow, failure=""):
         if failure == "export_device_resident.py"
         else [
             [
-                str(runner / f"torchtrt-{name}.pte")
-                for name in ("python", "kv-cache-decode", "coalesced")
+                str(runner / "torchtrt-python.pte"),
+                f"--coalesced={runner / 'torchtrt-coalesced.pte'}",
+                str(runner / "torchtrt-kv-cache-decode.pte"),
+                str(runner / "torchtrt-kv-cache-decode-zero-copy.pte"),
             ]
         ]
     )

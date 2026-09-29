@@ -312,9 +312,15 @@ def test_write_pins_updates_real_sites_and_is_idempotent(pin_repo):
     assert updater.write_pins(new, _COMMIT)
     assert updater.read_pin("__executorch_version__") == new
     assert updater.read_pin("__executorch_commit__") == _COMMIT
-    workflow = (pin_repo / ".github/workflows/executorch-test-linux.yml").read_text()
-    assert f"executorch=={new}" in workflow
-    assert f"executorch>={new},<{Version(new).major}.1" in workflow
+    # The pin lives in the requirement files the workflows pass to pip, not in the workflows
+    # themselves, so a bump rewrites no file under .github/workflows.
+    assert (
+        f"executorch=={new}" in (pin_repo / "packaging/executorch_pin.txt").read_text()
+    )
+    assert (
+        f"executorch>={new},<{Version(new).major}.1"
+        in (pin_repo / "packaging/executorch_range.txt").read_text()
+    )
     before = _contents(pin_repo)
     assert not updater.write_pins(new, _COMMIT)
     assert _contents(pin_repo) == before
@@ -703,3 +709,30 @@ def test_the_stable_track_warns_that_its_pin_will_not_build(monkeypatch, capsys)
     monkeypatch.setattr(updater, "write_pins", lambda version, commit: True)
     updater.main(["--track", "stable"])
     assert "no CUDA build of ExecuTorch" in capsys.readouterr().err
+
+
+@pytest.mark.unit
+def test_a_bump_rewrites_no_workflow_file(pin_repo):
+    """The reason this indirection exists at all.
+
+    GitHub refuses a workflow-file push from a credential without workflow permission, and the
+    token the daily bump runs with does not have it. So a bump that touches any file under
+    .github/workflows cannot be published, however correct its contents are. Naming the sites
+    is not enough: a later edit could move the pin back into a workflow and every other test
+    here would still pass.
+    """
+    assert not [
+        site for site in updater._PIN_SITES if site.startswith(".github/workflows/")
+    ]
+    old = updater.read_pin("__executorch_version__")
+    new = f"{Version(old).major + 1}.0.0.dev1"
+    assert updater.write_pins(new, _COMMIT)
+    rewritten = [
+        str(path.relative_to(pin_repo))
+        for path in pin_repo.rglob("*")
+        if path.is_file() and new in path.read_text(errors="ignore")
+    ]
+    assert rewritten, "the bump wrote nothing, so this proves nothing"
+    assert not [
+        path for path in rewritten if path.startswith(".github/workflows/")
+    ], rewritten

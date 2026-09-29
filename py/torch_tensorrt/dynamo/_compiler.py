@@ -219,7 +219,8 @@ def cross_compile_for_windows(
             Torch-TensorRT rules to disable. Rules are registered by lowering
             implementations and enabled by default; compilation users do not
             need to register them. Disabling a rule makes its matching nodes
-            foldable. Default is empty.
+            foldable. Supported IDs: ``"attention_mask_arange"``.
+            Default is empty.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
         fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.
         **kwargs: Any,
@@ -613,7 +614,8 @@ def compile(
             Torch-TensorRT rules to disable. Rules are registered by lowering
             implementations and enabled by default; compilation users do not
             need to register them. Disabling a rule makes its matching nodes
-            foldable. Default is empty.
+            foldable. Supported IDs: ``"attention_mask_arange"``.
+            Default is empty.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
         fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.
         **kwargs: Any,
@@ -1310,10 +1312,24 @@ def compile_module(
         )
 
     # If the number of supported operations is 0 or less than the block size, skip the subgraph
-    # TODO: Add condition to second expression below when require_full_compilation is added
     if num_supported_ops == 0 or (
         num_supported_ops < settings.min_block_size and not settings.dryrun
     ):
+        # Only refuse when an operator genuinely has no converter. A graph whose every
+        # operator converts is fully supported however few of them there are, and all
+        # three partitioners deliberately disregard min_block_size in that case, so
+        # raising here would contradict them. dryrun is documented as the way to inspect
+        # what would fall back, so it stays non fatal.
+        if (
+            settings.require_full_compilation
+            and num_supported_ops < total_ops
+            and not settings.dryrun
+        ):
+            raise AssertionError(
+                f"require_full_compilation=True was specified, but "
+                f"{total_ops - num_supported_ops} of {total_ops} operations in this "
+                f"subgraph have no TensorRT converter"
+            )
         logger.warning(
             f"{num_supported_ops} supported operations detected in subgraph containing {total_ops} computational nodes. "
             f"Skipping this subgraph, since min_block_size was detected to be {settings.min_block_size}"
@@ -1440,7 +1456,20 @@ def compile_module(
             cpu_memory_budget=settings.cpu_memory_budget,
         )
 
-    dryrun_tracker.unsupported_ops = supported_ops.unsupported_operators
+    dryrun_tracker.unsupported_ops = supported_ops.fallback_operators
+
+    if supported_ops.fallback_operators:
+        named = "; ".join(
+            f"{node_name} + Operator Count: {count} "
+            f"(Reasons: {', '.join(sorted(supported_ops.fallback_reasons[node_name]))})"
+            for node_name, count in sorted(supported_ops.fallback_operators.items())
+        )
+        logger.info(
+            "%d operator(s) will run in PyTorch: %s. "
+            "Compile with dryrun=True for the full report.",
+            len(supported_ops.fallback_operators),
+            named,
+        )
 
     # The global partitioner leaves non-TRT nodes as-is
     if not settings.use_fast_partitioner:
@@ -1989,7 +2018,8 @@ def convert_exported_program_to_serialized_trt_engine(
             Torch-TensorRT rules to disable. Rules are registered by lowering
             implementations and enabled by default; compilation users do not
             need to register them. Disabling a rule makes its matching nodes
-            foldable. Default is empty.
+            foldable. Supported IDs: ``"attention_mask_arange"``.
+            Default is empty.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
         **kwargs: Any,
     Returns:

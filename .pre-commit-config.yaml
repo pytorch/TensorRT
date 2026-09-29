@@ -58,14 +58,30 @@ repos:
       rev: typos-dict-v0.12.4
       hooks:
           - id: typos
-    - repo: https://github.com/astral-sh/uv-pre-commit
-      # uv version.
-      rev: 0.7.1
-      hooks:
-          # Update the uv lockfile
-          - id: uv-lock
     - repo: local
       hooks:
+          - id: uv-lock
+            name: uv lock
+            # A local hook rather than uv-pre-commit, because that one runs uv with the
+            # environment it inherits and offers no way to add to it. Without
+            # PYTHON_ONLY=1, setup.py shells out to Bazel to compute the project
+            # metadata, so the hook fails with "Could not find bazel in PATH" on any
+            # machine that has not built the native library. `just lint` runs this on
+            # every commit, so that is most machines.
+            #
+            # uv is pinned to the version the lock-updating workflows use. A different
+            # version resolves the tree differently, so a hook on another uv either fails
+            # outright or rewrites the lock into a shape no workflow would produce.
+            #
+            # --prerelease=allow matches the workflows. pyproject.toml declares the same
+            # mode, so this is belt and braces rather than the only thing holding it.
+            entry: env PYTHON_ONLY=1 uv lock --prerelease=allow
+            language: python
+            additional_dependencies: ["uv==0.12.5"]
+            # The inputs uv reads when it resolves, so the hook runs when any of them
+            # move. Kept in step with the paths filter in uv-lock-check.yml.
+            files: ^(uv\.lock|pyproject\.toml|setup\.py|dev_dep_versions\.yml)$
+            pass_filenames: false
           - id: dont-commit-upstream
             name: NVIDIA-INTERNAL check
             entry: "!NVIDIA-INTERNAL"

@@ -1,16 +1,117 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
+from unittest.mock import patch
+
+import tensorrt as trt
 import torch
 import torch.nn as nn
 import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo._SourceIR import SourceIR
+from torch_tensorrt.dynamo.conversion import impl
+from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 
 from .harness import DispatchTestCase
 
 
 class TestArangeConverter(DispatchTestCase):
+    def test_sequence_dtype_checks_all_operands(self):
+        self.assertEqual(
+            impl.arange._sequence_dtype(None, 1, 5.0, 1.3), trt.DataType.FLOAT
+        )
+
+    @parameterized.expand([(0, 5, 1), (5, -2, -2), (0, 0, 1), (0, 1000000, 1)])
+    def test_static_arange_uses_linspace_fill(self, start, end, step):
+        logger = trt.Logger(trt.Logger.ERROR)
+        builder = trt.Builder(logger)
+        network = builder.create_network(
+            1 << int(trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED)
+        )
+        ctx = ConversionContext(network)
+
+        # Integer mask ranges must not allocate their values just to get a shape.
+        with patch.object(impl.arange.np, "arange", side_effect=AssertionError):
+            output = impl.arange.arange(
+                ctx,
+                torch.ops.aten.arange.start_step,
+                SourceIR.ATEN,
+                "arange",
+                start=start,
+                end=end,
+                step=step,
+            )
+
+        fill_layers = [
+            network.get_layer(index)
+            for index in range(network.num_layers)
+            if network.get_layer(index).type == trt.LayerType.FILL
+        ]
+        self.assertEqual(len(fill_layers), 1)
+        self.assertEqual(
+            fill_layers[0].name,
+            "[FILL]-[aten_ops.arange.start_step]-[arange_arange_fill]",
+        )
+        self.assertIsNone(fill_layers[0].get_input(0))
+        self.assertEqual(tuple(output.shape), (len(range(start, end, step)),))
+
+    @parameterized.expand(
+        [
+            (torch.float16, 0, 5, 1),
+            (torch.float16, 1.2, 5, 1.3),
+            (torch.bfloat16, 0, 5, 1),
+            (torch.bfloat16, 1.2, 5, 1.3),
+            (torch.float64, 0, 5, 1),
+            (torch.float64, 1.2, 5, 1.3),
+            (torch.int32, 0, 0, 1),
+            (torch.int64, 5, -2, -2),
+        ]
+    )
+    def test_static_arange_dtype_compatibility(self, dtype, start, end, step):
+        class Arange(nn.Module):
+            def forward(self, x):
+                return torch.ops.aten.arange.start_step(
+                    start, end, step, dtype=dtype, device=x.device
+                )
+
+        # The converter harness enables truncate_double. Only FP64 output is
+        # intentionally FP32; FP16/BF16 outputs must retain their requested dtype.
+        self.run_test(
+            Arange(),
+            [torch.randn(1, 1)],
+            use_dynamo_tracer=True,
+            check_dtype=dtype != torch.float64,
+        )
+
+    @parameterized.expand([(False,), (True,)])
+    def test_static_arange_float64_truncation(self, truncate_double):
+        logger = trt.Logger(trt.Logger.ERROR)
+        builder = trt.Builder(logger)
+        network = builder.create_network(0)
+        ctx = ConversionContext(
+            network, CompilationSettings(truncate_double=truncate_double)
+        )
+
+        def convert():
+            return impl.arange.arange(
+                ctx,
+                torch.ops.aten.arange.start_step,
+                SourceIR.ATEN,
+                "arange",
+                start=0,
+                end=5,
+                step=1,
+                dtype=torch.float64,
+            )
+
+        if truncate_double:
+            self.assertEqual(convert().dtype, trt.DataType.FLOAT)
+        else:
+            with self.assertRaisesRegex(ValueError, "truncate_double=True"):
+                convert()
+
     @parameterized.expand(
         [
             (0, 5, 1),

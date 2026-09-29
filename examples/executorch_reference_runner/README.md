@@ -44,7 +44,7 @@ torch_tensorrt/bin/example_executorch_runner
 ```bash
 # Get the ExecuTorch source snapshot this package is built against. Keep this in sync
 # with the executorch commit pinned in MODULE.bazel.
-EXECUTORCH_REF="${EXECUTORCH_REF:-7677aa22a4cf0298db9783b37e808e9350c2c59d}"
+EXECUTORCH_REF="${EXECUTORCH_REF:-4a7ba6e148f5f04f72010ea4518752f9367c4f21}"
 git clone --filter=blob:none --no-checkout \
   https://github.com/pytorch/executorch.git executorch
 pushd executorch
@@ -236,3 +236,11 @@ Because the causal attention at position 1 covers positions 0..1, the two logits
 differ only if the KV written at position 0 persisted across `execute()` calls.
 The runner prints `[kv-check] PASS` and returns 0 on success, or fails if the
 two are identical (the update did not persist). It requires a CUDA device.
+
+That pair runs twice over, printing `caller stream: none` and then `caller
+stream: own`. The second scopes a `CallerStreamGuard` over the decode loop on a
+stream the runner creates, so the engine runs on that stream; the first leaves the
+caller stream unset, so it runs on `cudaStreamPerThread` instead. Both are streams
+a caller can put the backend on, and a `.pte` whose KV writes persist on one but
+not the other is still broken, so both have to pass. `execute()` waits for the
+engine before returning in either case.
