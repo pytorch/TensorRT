@@ -4,6 +4,8 @@
 import base64
 import gc
 import importlib
+import sys
+import types
 import weakref
 from types import SimpleNamespace
 from typing import NamedTuple
@@ -260,15 +262,9 @@ def _use_cpu_default_device(monkeypatch):
 
 def _patch_lowering(monkeypatch, engine_counts=None):
     import executorch.exir
-    import torch_tensorrt._features as features
     import torch_tensorrt.executorch as executorch_api
     import torch_tensorrt.executorch._export_utils as export_utils
 
-    monkeypatch.setattr(
-        features,
-        "ENABLED_FEATURES",
-        features.ENABLED_FEATURES._replace(torch_tensorrt_runtime=True),
-    )
     export_module = importlib.import_module("torch_tensorrt.executorch._export")
     engine_counts = engine_counts or {}
     lower = MagicMock(return_value=FakeEdgeProgramManager())
@@ -800,6 +796,65 @@ def test_export_warns_when_zero_copy_kv_has_nothing_to_do(monkeypatch, caplog):
         export_module.export(FakeExportedProgram(), zero_copy_kv=True)
 
     assert "no aliased buffer mutation was found" in caplog.text
+
+
+@pytest.mark.unit
+def test_export_does_not_require_the_cpp_runtime(monkeypatch):
+    """Python-only builds own execute_engine in _TRTEngine, not libtorchtrt."""
+    export_module, lower = _patch_lowering(monkeypatch)
+    import torch_tensorrt._features as features
+
+    monkeypatch.setattr(
+        features,
+        "ENABLED_FEATURES",
+        features.ENABLED_FEATURES._replace(torch_tensorrt_runtime=False),
+    )
+    # The installed Python-only wheel supplies this real module. Stub it here so
+    # this regression test can also run in a process where the C++ runtime has
+    # already registered the identically named operator.
+    monkeypatch.setitem(
+        sys.modules,
+        "torch_tensorrt.dynamo.runtime._TRTEngine",
+        types.ModuleType("torch_tensorrt.dynamo.runtime._TRTEngine"),
+    )
+
+    program = FakeExportedProgram()
+    result = export_module.export(program)
+
+    assert result is lower.return_value
+    assert lower.call_args.args == (("rewritten", program),)
+
+
+@pytest.mark.unit
+@pytest.mark.skipif(
+    torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    reason="specifically validates a Python-only wheel",
+)
+def test_python_only_build_can_export_a_pte(tmp_path):
+    """Compile one engine and exercise the public Python-only save path end to end."""
+
+    class AddOne(torch.nn.Module):
+        def forward(self, value):
+            return value + 1
+
+    example = (torch.randn(2, 3, 4, 4, device="cuda"),)
+    exported = torch.export.export(AddOne().eval().cuda(), example)
+    compiled = torch_tensorrt.dynamo.compile(
+        exported,
+        arg_inputs=[torch_tensorrt.Input(example[0].shape, dtype=torch.float32)],
+        min_block_size=1,
+    )
+    output = tmp_path / "python-only.pte"
+
+    torch_tensorrt.save(
+        compiled,
+        str(output),
+        output_format="executorch",
+        arg_inputs=example,
+        retrace=False,
+    )
+
+    assert output.stat().st_size > 0
 
 
 @pytest.mark.unit
@@ -1498,7 +1553,7 @@ def test_export_rejects_a_partitioner_naming_another_method(monkeypatch):
 
 @pytest.mark.unit
 def test_export_rejects_a_mismatched_partitioner_for_a_single_method(monkeypatch):
-    """One method can be mis-wired too, so the check must not need two methods."""
+    """One method can be wired incorrectly too, so the check must not need two methods."""
     export_module, lower = _patch_lowering(monkeypatch)
     wrong = SimpleNamespace(
         delegation_spec=SimpleNamespace(

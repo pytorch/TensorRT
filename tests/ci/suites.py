@@ -447,6 +447,16 @@ _PYTHON_ONLY: list[Suite] = [
         # Runs for BOTH backends: the PYTHON_ONLY=1 wheel is validated against
         # standard TensorRT and TensorRT-RTX (variants default to both).
     ),
+    Suite(
+        "python-only-executorch-export",
+        tier="l1",
+        lanes=("python-only",),
+        paths=("executorch/test_export.py",),
+        setup=("executorch",),
+        variants=("standard",),
+        platforms=("linux-x86_64",),
+        jobs=_HEAVY,
+    ),
 ]
 
 SUITES: tuple[Suite, ...] = tuple(_L0 + _L1 + _L2 + _PYTHON_ONLY)
