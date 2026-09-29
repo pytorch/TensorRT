@@ -111,7 +111,13 @@ jobs:
         run: |
           set -euxo pipefail
           echo "::group::Cleanup debug output"
-          rm -rfv "${GITHUB_WORKSPACE}"
+          # Clear the workspace without removing the directory itself. On an OSDC
+          # runner GITHUB_WORKSPACE is a bind mount into the job container, and
+          # deleting it detaches the mount: later steps fail with "getcwd: cannot
+          # access parent directories" and local actions resolve against a host
+          # path that no longer matches what the container sees. EC2 runners reuse
+          # the workspace between jobs, so its contents still need clearing.
+          find "${GITHUB_WORKSPACE}" -mindepth 1 -delete 2>/dev/null || true
           mkdir -p "${GITHUB_WORKSPACE}"
           echo "::endgroup::"
       - uses: actions/checkout@v6
