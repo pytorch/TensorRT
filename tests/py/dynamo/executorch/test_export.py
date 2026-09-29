@@ -235,15 +235,9 @@ def _use_cpu_default_device(monkeypatch):
 
 def _patch_lowering(monkeypatch, engine_counts=None):
     import executorch.exir
-    import torch_tensorrt._features as features
     import torch_tensorrt.executorch as executorch_api
     import torch_tensorrt.executorch._export_utils as export_utils
 
-    monkeypatch.setattr(
-        features,
-        "ENABLED_FEATURES",
-        features.ENABLED_FEATURES._replace(torch_tensorrt_runtime=True),
-    )
     export_module = importlib.import_module("torch_tensorrt.executorch._export")
     engine_counts = engine_counts or {}
     lower = MagicMock(return_value=object())
