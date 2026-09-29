@@ -12,6 +12,7 @@ from torch.fx.passes.infra.partitioner import CapabilityBasedPartitioner, Partit
 from torch.fx.passes.operator_support import OperatorSupport, SupportDict
 from torch.fx.passes.tools_common import CALLABLE_NODE_OPS
 from torch.utils._pytree import tree_flatten
+
 from torch_tensorrt._utils import trt_rtx_targets_turing
 from torch_tensorrt.dynamo._defaults import (
     MIN_BLOCK_SIZE,
@@ -237,7 +238,7 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
 
         def _value_exceeds_limit(value: object) -> bool:
             if isinstance(value, torch.Tensor):
-                return value.ndim > trt.Dims.MAX_DIMS
+                return bool(value.ndim > trt.Dims.MAX_DIMS)
             if isinstance(value, (tuple, list)):
                 return any(_value_exceeds_limit(item) for item in value)
             if isinstance(value, dict):
@@ -296,7 +297,16 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
     def is_node_supported(
         self, submodules: Mapping[str, torch.nn.Module], node: torch.fx.Node
     ) -> bool:
+        from torch_tensorrt.dynamo.regions import is_torch_region_node
+
         node_name = ConverterRegistry.qualified_name_or_str(node.target)
+
+        if is_torch_region_node(submodules, node):
+            self.unsupported_operators[node_name] = (
+                self.unsupported_operators.get(node_name, 0) + 1
+            )
+            self._record_fallback(node, node_name, "explicit execute_in_torch region")
+            return False
 
         settings = CONVERTERS.compilation_settings
         if settings is not None and self._is_explicit_non_target_region(

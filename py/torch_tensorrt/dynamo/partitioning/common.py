@@ -8,6 +8,7 @@ import sympy
 import torch
 from torch._subclasses.fake_tensor import FakeTensor
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
+
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo.utils import (
     COMPLEX_TO_REAL_DTYPE,
@@ -457,18 +458,23 @@ def get_graph_converter_support_overview(
     """As get_graph_converter_support, but also returns the operator support object,
     which holds *which* operators are unsupported rather than just how many
     """
+    from torch_tensorrt.dynamo.regions import is_torch_region_node
+
     from ._global_partitioner import TorchTensorRTOperatorSupport
 
     # Instantiate operator support object and module dictionary
-    op_support = TorchTensorRTOperatorSupport(torch_executed_ops=torch_executed_ops)
+    op_support = TorchTensorRTOperatorSupport(
+        torch_executed_ops=torch_executed_ops if torch_executed_ops is not None else ()
+    )
     module_dict = dict(graph_module.named_modules())
 
     number_of_supported_nodes = 0
     total_functional_nodes = 0
 
-    # Iterate over all nodes in the graph, enumerating call_function nodes
+    # Opaque region calls count as unsupported computation, even when every
+    # visible call_function has a converter. Full-support shortcuts use this total.
     for node in graph_module.graph.nodes:
-        if node.op == "call_function":
+        if node.op == "call_function" or is_torch_region_node(graph_module, node):
             total_functional_nodes += 1
 
             if op_support.is_node_supported(module_dict, node):
