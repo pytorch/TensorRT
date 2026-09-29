@@ -24,6 +24,7 @@ find_package(CUDAToolkit REQUIRED)
 find_package(Threads REQUIRED)
 
 set(_executorch_backend_tensorrt_sources
+    "${CMAKE_CURRENT_LIST_DIR}/PooledScratchInstall.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/TensorRTBackend.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/TensorRTBlobHeader.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/WeightStreamingBudget.cpp"
@@ -39,6 +40,13 @@ set_target_properties(executorch_trt_backend
 target_include_directories(executorch_trt_backend
     PUBLIC
         "${CMAKE_CURRENT_LIST_DIR}/../../../include"
+    PRIVATE
+        # SharedScratchPool.h and PooledScratchInstall.h are implementation
+        # details, so they sit beside the sources instead of in the installed
+        # include tree. This directory is
+        # .../torch_tensorrt/executorch in both the repository and the released
+        # package, so two levels up is the root its #include path is relative to.
+        "${CMAKE_CURRENT_LIST_DIR}/../.."
 )
 
 get_filename_component(_torchtrt_repo_root "${CMAKE_CURRENT_LIST_DIR}/../../../.." ABSOLUTE)
