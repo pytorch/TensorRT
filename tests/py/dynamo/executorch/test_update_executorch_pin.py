@@ -312,9 +312,15 @@ def test_write_pins_updates_real_sites_and_is_idempotent(pin_repo):
     assert updater.write_pins(new, _COMMIT)
     assert updater.read_pin("__executorch_version__") == new
     assert updater.read_pin("__executorch_commit__") == _COMMIT
-    workflow = (pin_repo / ".github/workflows/executorch-test-linux.yml").read_text()
-    assert f"executorch=={new}" in workflow
-    assert f"executorch>={new},<{Version(new).major}.1" in workflow
+    # The pin lives in the requirement files the workflows pass to pip, not in the workflows
+    # themselves, so a bump rewrites no file under .github/workflows.
+    assert (
+        f"executorch=={new}" in (pin_repo / "packaging/executorch_pin.txt").read_text()
+    )
+    assert (
+        f"executorch>={new},<{Version(new).major}.1"
+        in (pin_repo / "packaging/executorch_range.txt").read_text()
+    )
     before = _contents(pin_repo)
     assert not updater.write_pins(new, _COMMIT)
     assert _contents(pin_repo) == before
@@ -450,31 +456,31 @@ def test_write_pins_preserves_yaml_formatting_and_other_fields(pin_repo):
 
 
 @pytest.mark.unit
-def test_write_pins_updates_the_development_constraint(pin_repo):
-    import tomllib
+def test_the_updater_does_not_pin_the_root_project():
+    """The companion carries the ExecuTorch version, so nothing here may name it.
 
-    path = pin_repo / "pyproject.toml"
-    assert updater.write_pins("9.0.0.dev1", _COMMIT)
-    constraints = tomllib.loads(path.read_text())["tool"]["uv"][
-        "constraint-dependencies"
-    ]
-    assert "executorch==9.0.0.dev1" in constraints
-
-
-@pytest.mark.unit
-def test_development_constraint_update_detects_removed_site(pin_repo, monkeypatch):
-    monkeypatch.setattr(
-        updater,
-        "_PIN_SITES",
-        tuple(name for name in updater._PIN_SITES if name != "pyproject.toml"),
+    The root project used to hold a constraint built from the pin. That stated the
+    version a second time, and on the day the pin moved it asked for a build no
+    published companion agreed with, which is what stopped the nightly bump.
+    """
+    assert "pyproject.toml" not in updater._PIN_SITES, (
+        "the root project is back on the list of files the updater writes. The "
+        "companion carries the ExecuTorch version, so nothing here should name it."
     )
-    with pytest.raises(AssertionError):
-        test_write_pins_updates_the_development_constraint(pin_repo)
+    assert "pyproject.toml" not in updater._SITE_COORDINATES, (
+        "the root project has pin coordinates again, so a bump would write a version "
+        "into it that no published companion can agree with."
+    )
 
 
 @pytest.mark.unit
 def test_write_pins_requires_a_separate_lock_refresh(tmp_path, monkeypatch):
-    """A history-free pin bump must pass source guards and fail only the stale lock."""
+    """A history-free pin bump must pass every guard, lock included.
+
+    It used to fail the lock check, because the lock mirrored the pin and a bump made it
+    stale at once. The companion carries the version now, so the lock stays valid across
+    a bump and the whole suite passes. That is the point of the change.
+    """
     import xml.etree.ElementTree as ET
 
     tracked = subprocess.run(
@@ -519,14 +525,12 @@ def test_write_pins_requires_a_separate_lock_refresh(tmp_path, monkeypatch):
         capture_output=True,
         text=True,
     )
-    assert result.returncode == 1, result.stdout + result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
     cases = ET.parse(report).findall(".//testcase")
     assert not [case for case in cases if case.find("error") is not None], result.stdout
-    assert [
-        case.attrib["name"] for case in cases if case.find("failure") is not None
-    ] == ["test_the_lockfile_executorch_matches_the_pin"], (
-        result.stdout + result.stderr
-    )
+    assert not [
+        case for case in cases if case.find("failure") is not None
+    ], result.stdout
 
 
 @pytest.mark.unit
@@ -705,3 +709,30 @@ def test_the_stable_track_warns_that_its_pin_will_not_build(monkeypatch, capsys)
     monkeypatch.setattr(updater, "write_pins", lambda version, commit: True)
     updater.main(["--track", "stable"])
     assert "no CUDA build of ExecuTorch" in capsys.readouterr().err
+
+
+@pytest.mark.unit
+def test_a_bump_rewrites_no_workflow_file(pin_repo):
+    """The reason this indirection exists at all.
+
+    GitHub refuses a workflow-file push from a credential without workflow permission, and the
+    token the daily bump runs with does not have it. So a bump that touches any file under
+    .github/workflows cannot be published, however correct its contents are. Naming the sites
+    is not enough: a later edit could move the pin back into a workflow and every other test
+    here would still pass.
+    """
+    assert not [
+        site for site in updater._PIN_SITES if site.startswith(".github/workflows/")
+    ]
+    old = updater.read_pin("__executorch_version__")
+    new = f"{Version(old).major + 1}.0.0.dev1"
+    assert updater.write_pins(new, _COMMIT)
+    rewritten = [
+        str(path.relative_to(pin_repo))
+        for path in pin_repo.rglob("*")
+        if path.is_file() and new in path.read_text(errors="ignore")
+    ]
+    assert rewritten, "the bump wrote nothing, so this proves nothing"
+    assert not [
+        path for path in rewritten if path.startswith(".github/workflows/")
+    ], rewritten

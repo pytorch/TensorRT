@@ -514,7 +514,18 @@ def _native_project(tmp_path, tools, *, mutation=None, static_cuda=False):
         # it, so a stub standing in for a well-formed delegate has to carry it too.
         'extern "C" bool torch_tensorrt_owns_executorch_registration() { return true; }\n'
     )
-    for name in ("TensorRTBlobHeader.cpp", "WeightStreamingBudget.cpp"):
+    # Every source the real add_library names, less the one written above with a body.
+    # Read from the CMake rather than listed here, so adding a backend source does not
+    # silently leave this fixture configuring against a file that does not exist.
+    for name in sorted(
+        set(
+            re.findall(
+                r"cpp/src/torch_tensorrt/executorch/(\w+\.cpp)",
+                (_NATIVE / "CMakeLists.txt").read_text(),
+            )
+        )
+        - {"TensorRTBackend.cpp"}
+    ):
         (sources / name).write_text("\n")
     runtime_dir = tmp_path / "executorch/lib"
     runtime_dir.mkdir(parents=True)
@@ -1019,7 +1030,17 @@ def _assert_wrong_device_buffers_are_refused(source: str) -> None:
     assert (
         "attrs.devicePointer != nullptr" in code
     ), "the usability check is gone, so a buffer reachable from here is refused"
-    assert "cudaMemoryTypeDevice" in code, "the managed-memory exemption is gone"
+    # Read the accessibility helper's own body. cudaMemoryTypeDevice is also the foreign-device
+    # check's own token, so asserting it against the whole file says nothing about the exemption:
+    # the managed arm could go and the file would still mention the type.
+    accessible = _definition_body(code, "bool is_cuda_accessible_ptr(")
+    assert (
+        "attrs.type == cudaMemoryTypeManaged" in accessible
+    ), "the managed-memory exemption is gone"
+    foreign = _definition_body(code, "int cuda_foreign_device_of_ptr(")
+    assert (
+        "attrs.type != cudaMemoryTypeDevice" in foreign
+    ), "the foreign-device helper no longer gates on the buffer being device memory"
 
 
 def _assert_one_shared_runtime(source: str, header: str) -> None:
@@ -1054,6 +1075,7 @@ def _assert_one_shared_runtime(source: str, header: str) -> None:
         "drop-output-check",
         "drop-alias-check",
         "drop-helper",
+        "drop-managed-exemption",
         "input-check-outside-execute",
         "peer-capability-back",
     ],
@@ -1110,6 +1132,7 @@ def test_the_backend_refuses_a_buffer_on_another_device(mutation) -> None:
             "drop-output-check": "const int output_device = cuda_foreign_device_of_ptr(",
             "drop-alias-check": "const int foreign_alias_device = cuda_foreign_device_of_ptr(",
             "drop-helper": "int cuda_foreign_device_of_ptr(",
+            "drop-managed-exemption": " || attrs.type == cudaMemoryTypeManaged",
         }[mutation]
         assert removed in source, f"mutation {mutation} has nothing to remove"
         source = source.replace(removed, "")

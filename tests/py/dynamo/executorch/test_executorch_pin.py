@@ -90,13 +90,14 @@ NO_NIGHTLY_MARKER = "pin-check: no-nightly"
 # Minimum live pin sites, independent of the writer: a removed version no longer matches
 # discovery. Additional documentation matches cannot replace these required sites.
 _EXPECTED_REQUIREMENT_SITES = {
-    ".github/workflows/build_linux.yml": 1,
-    ".github/workflows/executorch-test-linux.yml": 2,
+    # The workflows read the version from these files rather than naming it: the exact pin, and
+    # the user-facing range whose lower bound is the pin.
+    "packaging/executorch_pin.txt": 1,
+    "packaging/executorch_range.txt": 1,
     "MODULE.bazel": 1,
     "docker/MODULE.bazel.docker": 1,
     "docker/MODULE.bazel.ngc": 1,
     "justfile": 1,
-    "pyproject.toml": 1,
     # Require the fenced install command; prose cannot replace it.
     "py/torch-tensorrt-executorch-runtime/README.md": 1,
     "py/torch-tensorrt-executorch-runtime/pyproject.toml": 1,
@@ -278,6 +279,22 @@ def _without_trailing_comment(path: str, text: str) -> str:
     return text
 
 
+def _pip_command_around(path: str, number: int) -> str:
+    """The whole pip invocation containing line ``number``, following backslash continuations.
+
+    A pip command in a workflow is wrapped across lines, so the index flag and the ``-r`` flag
+    usually sit on different ones. Reading a single line would miss the index.
+    """
+    lines = (REPO_ROOT / path).read_text().splitlines()
+    start = number - 1
+    while start > 0 and lines[start - 1].rstrip().endswith("\\"):
+        start -= 1
+    end = number - 1
+    while end + 1 < len(lines) and lines[end].rstrip().endswith("\\"):
+        end += 1
+    return "\n".join(lines[start : end + 1])
+
+
 def _counts_toward_minimum(path: str, number: int) -> bool:
     """Whether a requirement at this line counts toward the per-file minimum.
 
@@ -383,7 +400,9 @@ def test_runtime_callers_use_the_shared_pinned_build(caller, job):
         if s.get("name") == "Build the ExecuTorch runtime wheel"
     )
     assert step["if"].startswith("${{ inputs.build-executorch-runtime")
-    assert f'executorch=={_versions()["__executorch_version__"]}' in step["run"]
+    # The version arrives through the requirement file, so the pin moves without touching this
+    # workflow. Everything else about the install is still asserted here.
+    assert "-r packaging/executorch_pin.txt" in step["run"]
     assert "${CONDA_RUN} python -m pip install pyyaml" in step["run"]
     assert "nightly/${CU_VERSION}" in step["run"]
     assert "release-executorch-runtime-wheel-artifacts" not in workflow["jobs"]
@@ -519,9 +538,15 @@ def test_derived_requirements_match_the_pin(monkeypatch) -> None:
             for element in getattr(value, "elts", [])
             if isinstance(element, ast.Name)
         ]
-        assert named.count("EXECUTORCH_REQUIREMENT") == 1, (
+        assert named.count("EXECUTORCH_RUNTIME_REQUIREMENT") == 1, (
             f"extra {getattr(key, 'value', key)!r} does not reference "
-            f"EXECUTORCH_REQUIREMENT exactly once: {named}"
+            f"EXECUTORCH_RUNTIME_REQUIREMENT exactly once: {named}. The companion "
+            "carries the ExecuTorch version, so every published extra has to name it."
+        )
+        assert "EXECUTORCH_REQUIREMENT" not in named, (
+            f"extra {getattr(key, 'value', key)!r} states the ExecuTorch version a second "
+            f"time: {named}. The companion pins the exact build it was compiled against, and "
+            "a range here cannot agree with it on the day the pin moves."
         )
 
     # The doc build reads the pin through shell substitution, outside the literal scan.
@@ -998,6 +1023,15 @@ def test_import_errors_preserve_context_and_install_guidance(
         "CudaGraphsTorchTensorRTModule": type("CudaGraphsStub", (), {}),
         "_parse_module_type": lambda value: None,
         "ENABLED_FEATURES": types.SimpleNamespace(torch_tensorrt_runtime=True),
+        # save() reads this table at module scope, and only the functions are compiled
+        # here, so it has to be supplied. Taken from the source rather than repeated,
+        # or a new option would leave this test asserting against a stale set.
+        "_EXECUTORCH_SAVE_OPTIONS": next(
+            ast.literal_eval(node.value)
+            for node in ast.parse(source.read_text()).body
+            if isinstance(node, ast.AnnAssign)
+            and getattr(node.target, "id", None) == "_EXECUTORCH_SAVE_OPTIONS"
+        ),
     }
     exec(
         compile(
@@ -1204,47 +1238,51 @@ def test_a_failed_setup_step_stops_the_suite(monkeypatch, tmp_path, setup_rc):
 
 
 def _assert_development_lock_matches_pin(lock: dict, version: str) -> None:
-    from packaging.markers import Marker
-    from packaging.specifiers import SpecifierSet
-    from packaging.version import Version
+    """The lock must leave the ExecuTorch version to the companion.
 
-    refresh = (
-        "Regenerate uv.lock with PYTHON_ONLY=1 uv lock --refresh --prerelease=allow."
-    )
-    constraints = [
+    It deliberately does not have to match the pin. The companion carries the exact
+    ExecuTorch it was compiled against, and on the day the pin moves no published
+    companion carries the new one yet, so requiring the pin here is what stopped the
+    nightly bump from ever landing. Agreement on the version is enforced by the
+    resolution itself: the companion asks for one build, so that is the one recorded.
+    """
+    constrained = [
         entry
         for entry in lock.get("manifest", {}).get("constraints", [])
         if entry["name"] == "executorch"
     ]
-    assert constraints == [{"name": "executorch", "specifier": f"=={version}"}], refresh
+    assert constrained == [], (
+        f"the lock constrains the ExecuTorch version: {constrained}. The companion "
+        "carries that version, so a constraint here cannot agree with it on a bump day."
+    )
+
     resolved = [p for p in lock.get("package", []) if p["name"] == "executorch"]
-    assert resolved and all(
-        Version(p["version"]).public == version for p in resolved
-    ), refresh
+    assert resolved, "the lock records no ExecuTorch at all"
+
+    companions = [
+        p
+        for p in lock.get("package", [])
+        if p["name"] == "torch-tensorrt-executorch-runtime"
+    ]
+    assert companions, "the lock records no companion, so nothing carries the version"
+    assert all(
+        any(d["name"] == "executorch" for d in c.get("dependencies", []))
+        for c in companions
+    ), "a companion in the lock does not depend on ExecuTorch"
+
     roots = [p for p in lock["package"] if p["name"] == "torch-tensorrt"]
-    assert len(roots) == 1, refresh
+    assert len(roots) == 1, "the lock does not record this project exactly once"
     recorded = [
         r
         for r in roots[0].get("metadata", {}).get("requires-dist", [])
         if r["name"] == "executorch"
     ]
-    major, minor = _release_line(version)
-    expected = SpecifierSet(f">={version},<{major}.{int(minor) + 1}")
-    assert len(recorded) == 2 and all(
-        SpecifierSet(r["specifier"]) == expected for r in recorded
-    ), refresh
-    for platform in ("linux", "win32", "darwin"):
-        for extra in ("all", "executorch", ""):
-            selected = sum(
-                Marker(r.get("marker", "")).evaluate(
-                    {"sys_platform": platform, "extra": extra}
-                )
-                for r in recorded
-            )
-            assert selected == int(platform == "linux" and extra != ""), refresh
+    assert recorded == [], (
+        f"the project records an ExecuTorch requirement of its own: {recorded}. The "
+        "companion is the only place that version belongs."
+    )
 
 
-@pytest.mark.unit
 def test_the_lockfile_executorch_matches_the_pin():
     import tomllib
 
@@ -1259,42 +1297,31 @@ def test_the_lockfile_executorch_matches_the_pin():
 )
 def test_development_lock_guard_rejects_drift(local, mutation):
     version = "1.5.0.dev1"
-    constraint = {"name": "executorch", "specifier": f"=={version}"}
     package = {"name": "executorch", "version": version + local}
-    requirements = [
-        {
-            "name": "executorch",
-            "specifier": f">={version},<1.6",
-            "marker": f"sys_platform == 'linux' and extra == '{extra}'",
-        }
-        for extra in ("all", "executorch")
-    ]
-    lock = {
-        "manifest": {"constraints": [constraint]},
-        "package": [
-            package,
-            {
-                "name": "torch-tensorrt",
-                "metadata": {
-                    "requires-dist": requirements,
-                },
-            },
-        ],
+    companion = {
+        "name": "torch-tensorrt-executorch-runtime",
+        "dependencies": [{"name": "executorch"}],
     }
+    root = {"name": "torch-tensorrt", "metadata": {"requires-dist": []}}
+    lock = {"manifest": {"constraints": []}, "package": [package, companion, root]}
     if mutation == "constraint":
-        constraint["specifier"] = ">=1.4.1"
+        lock["manifest"]["constraints"] = [
+            {"name": "executorch", "specifier": f"=={version}"}
+        ]
     elif mutation == "resolved":
-        package["version"] = "1.4.1"
-    elif mutation == "missing":
         lock["package"].remove(package)
+    elif mutation == "missing":
+        lock["package"].remove(companion)
     elif mutation == "range":
-        requirements[0]["specifier"] = ">=1.4.1,<1.5"
+        root["metadata"]["requires-dist"] = [
+            {"name": "executorch", "specifier": f">={version},<1.6"}
+        ]
     elif mutation == "marker":
-        requirements[0]["marker"] = "extra == 'all'"
+        companion["dependencies"] = []
     if mutation is None:
         _assert_development_lock_matches_pin(lock, version)
     else:
-        with pytest.raises(AssertionError, match="Regenerate uv.lock"):
+        with pytest.raises(AssertionError):
             _assert_development_lock_matches_pin(lock, version)
 
 
@@ -1822,6 +1849,7 @@ def test_the_range_install_runs_in_a_fresh_venv():
     install = next(line for line in after.splitlines() if line.strip())
     argv = shlex.split(install, comments=True)
     assert argv[:5] == [venv + "/bin/python", "-m", "pip", "install", "--no-deps"], argv
+    assert "-r" in argv and "packaging/executorch_range.txt" in argv, argv
 
 
 @pytest.mark.unit
@@ -1965,12 +1993,13 @@ def test_review_cuda_export_is_required(monkeypatch, workflow_name):
 
 
 @pytest.mark.unit
-def test_review_venv_name_in_comment_does_not_count(monkeypatch):
+def test_the_range_install_must_name_the_fresh_venv(monkeypatch):
     path = REPO_ROOT / ".github/workflows/executorch-test-linux.yml"
     text = path.read_text().replace(
-        '"${RUNNER_TEMP}/range-check-venv/bin/python" -m pip install --no-deps',
-        "python -m pip install --no-deps # range-check-venv",
+        '"${RUNNER_TEMP}/range-check-venv/bin/python" -m pip install',
+        "python -m pip install",
     )
+    assert text != path.read_text(), "the decoy changed nothing, so this proves nothing"
     original = Path.read_text
     monkeypatch.setattr(
         Path,
@@ -2321,16 +2350,19 @@ def test_update_workflow_requires_manual_downgrade_authority(tmp_path, allow):
 
 
 @pytest.mark.unit
-def test_development_lock_constraint_matches_the_pin():
+def test_development_lock_does_not_constrain_executorch():
     import tomllib
 
     config = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text())
     requirements = [
         Requirement(value) for value in config["tool"]["uv"]["constraint-dependencies"]
     ]
-    constraints = [r for r in requirements if r.name == "executorch"]
-    assert len(constraints) == 1
-    assert str(constraints[0].specifier) == f'=={_versions()["__executorch_version__"]}'
+    named = [r.name for r in requirements if r.name == "executorch"]
+    assert named == [], (
+        f"a constraint names the ExecuTorch version a second time: {named}. The companion "
+        "carries that version, and a constraint here cannot agree with it on the day the "
+        "pin moves."
+    )
 
 
 @pytest.mark.unit
@@ -2423,6 +2455,88 @@ def test_lock_workflow_checks_detect_removed_fix(
             7 if removed == "failure-stop" else 0,
             False,
         )
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("lock_rc", [0, 1])
+def test_pull_request_lock_check_reads_the_committed_lock(tmp_path, lock_rc):
+    workflow = yaml.safe_load(
+        (REPO_ROOT / ".github/workflows/uv-lock-check.yml").read_text()
+    )
+    step = next(
+        s for s in workflow["jobs"]["check-uv-lock"]["steps"] if s.get("id") == "check"
+    )
+    stubs = r"""
+uv() { printf 'lock:%s:%s\n' "$PYTHON_ONLY" "$*"; return "$LOCK_RC"; }
+"""
+    result = subprocess.run(
+        ["bash"],
+        input=stubs + step["run"],
+        capture_output=True,
+        text=True,
+        cwd=tmp_path,
+        env={**os.environ, "LOCK_RC": str(lock_rc)},
+    )
+    # --check and not --refresh: the point of this job is to read the lock as committed,
+    # which is the one thing the two writing jobs cannot do.
+    assert "lock:1:lock --check --prerelease=allow" in result.stdout, (
+        result.stdout + result.stderr
+    )
+    assert (result.returncode == 0) is (lock_rc == 0)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("removed", ["check", "metadata-mode", "failure-stop"])
+def test_pull_request_lock_check_detects_removed_fix(tmp_path, monkeypatch, removed):
+    path = REPO_ROOT / ".github/workflows/uv-lock-check.yml"
+    workflow = yaml.safe_load(path.read_text())
+    step = next(
+        s for s in workflow["jobs"]["check-uv-lock"]["steps"] if s.get("id") == "check"
+    )
+    old = step["run"]
+    if removed == "check":
+        step["run"] = old.replace("--check", "")
+    elif removed == "metadata-mode":
+        step["run"] = old.replace("PYTHON_ONLY=1", "PYTHON_ONLY=0")
+    else:
+        step["run"] = old.replace("set -euo pipefail", "set -uo pipefail").replace(
+            "exit 1", "true"
+        )
+    assert step["run"] != old
+    original = Path.read_text
+    monkeypatch.setattr(
+        Path,
+        "read_text",
+        lambda p, *a, **kw: (
+            yaml.safe_dump(workflow) if p == path else original(p, *a, **kw)
+        ),
+    )
+    with pytest.raises(AssertionError):
+        test_pull_request_lock_check_reads_the_committed_lock(
+            tmp_path, 1 if removed == "failure-stop" else 0
+        )
+
+
+@pytest.mark.unit
+def test_lock_inputs_agree_between_the_hook_and_the_pull_request_check():
+    workflow = yaml.safe_load(
+        (REPO_ROOT / ".github/workflows/uv-lock-check.yml").read_text()
+    )
+    # PyYAML reads the `on:` key as the boolean True.
+    triggers = workflow.get("on", workflow.get(True))
+    paths = set(triggers["pull_request"]["paths"])
+    config = yaml.safe_load((REPO_ROOT / ".pre-commit-config.yaml").read_text())
+    hook = next(
+        h for repo in config["repos"] for h in repo["hooks"] if h["id"] == "uv-lock"
+    )
+    pattern = re.compile(hook["files"])
+    # One set of inputs. A file that makes the hook rewrite the lock but does not start
+    # the pull request check is a lock that lands unverified, which is how this began.
+    assert {p for p in paths if not pattern.match(p)} == set(), (
+        f"the pull request check watches {sorted(paths)}, which the hook's files pattern "
+        f"{hook['files']} does not cover"
+    )
+    assert "uv.lock" in paths and "setup.py" in paths
 
 
 @pytest.mark.unit
@@ -2633,3 +2747,31 @@ def test_the_install_script_leaves_the_companion_out(tmp_path, branch):
     assert not any("executorch_runtime" in name for name in selected), selected
     # Both of the others, including the variant a prefix match would have missed.
     assert len(selected) == 2, selected
+
+
+@pytest.mark.unit
+def test_every_requirement_file_install_names_the_nightly_channel():
+    """A ``-r`` install carries no requirement literal, so the channel scan cannot see it.
+
+    That scan walks requirement literals inside pip commands, which is how it checks the index.
+    Passing the pin through a file removes the literal from the command, so without this the
+    nightly channel could be dropped or pointed at another index and every other guard here
+    would still pass. ExecuTorch's CUDA wheels exist only on the nightly index, so an install
+    that names another one resolves to a processor-only build.
+    """
+    wrong = []
+    for line in _git("grep", "-nI", "-e", "-r packaging/executorch_").splitlines():
+        path, number, text = line.split(":", 2)
+        if _is_source_test(path):
+            continue
+        command = _pip_command_around(path, int(number))
+        if not re.search(
+            r"download\.pytorch\.org/whl/nightly/\$\{CU_VERSION\}", command
+        ):
+            wrong.append(
+                f"{path}:{number} installs a pinned requirement file without the nightly channel"
+            )
+    assert not wrong, wrong
+    assert _git(
+        "grep", "-lI", "-e", "-r packaging/executorch_"
+    ).strip(), "no requirement-file install found, so this test is not looking"

@@ -65,10 +65,11 @@ jobs:
 
         # ExecuTorch's CUDA wheels live only on the PyTorch nightly index, so the channel is
         # needed. No --pre: a specifier naming a prerelease admits prereleases by itself, and
-        # --pre would apply to every other requirement in the same command too.
+        # --pre would apply to every other requirement in the same command too. The version
+        # comes from the requirement file so a bump changes no file in this directory.
         python -m pip install pyyaml "wheel>=0.40" \
           --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" \
-          "executorch==1.6.0.dev20260915"
+          -r packaging/executorch_pin.txt
 
         # The shared artifact carries the matching core and companion wheels.
         shopt -s nullglob
@@ -107,7 +108,7 @@ jobs:
         # Resolve the user-facing range without reusing the build's installed pin.
         python -m venv "${RUNNER_TEMP}/range-check-venv"
         # pin-check: range-ok
-        "${RUNNER_TEMP}/range-check-venv/bin/python" -m pip install --no-deps --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" "executorch>=1.6.0.dev20260915,<1.7"
+        "${RUNNER_TEMP}/range-check-venv/bin/python" -m pip install --no-deps --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" -r packaging/executorch_range.txt
 
         source tests/py/utils/ci_helpers.sh
         trt_tier_executorch
@@ -129,9 +130,6 @@ jobs:
           fi
           export LD_LIBRARY_PATH="${_dir}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
         done
-        bazel test //tests/cpp/executorch:executorch_backend_tests \
-          --compilation_mode opt --config=linux --test_output=errors \
-          --test_env=LD_LIBRARY_PATH
         executorch_cmake_location="$(bazel query @executorch//:executorch/CMakeLists.txt --output=location)"
         export EXECUTORCH_SOURCE_DIR="$(dirname "${executorch_cmake_location%%:*}")"
         export EXECUTORCH_ROOT="${EXECUTORCH_SOURCE_DIR}"
@@ -139,14 +137,18 @@ jobs:
           --model_path="${RUNNER_TEMP}/torchtrt-python.pte"
         python examples/torchtrt_executorch_example/export_kv_cache_decode.py \
           --model_path="${RUNNER_TEMP}/torchtrt-kv-cache-decode.pte"
+        python examples/torchtrt_executorch_example/export_kv_cache_decode.py \
+          --model_path="${RUNNER_TEMP}/torchtrt-kv-cache-decode-zero-copy.pte" \
+          --zero_copy
         python examples/torchtrt_executorch_example/export_coalesced.py \
           --model_path="${RUNNER_TEMP}/torchtrt-coalesced.pte"
         python examples/torchtrt_executorch_example/export_device_resident.py \
           --model_path="${RUNNER_TEMP}/torchtrt-device-resident.pte"
         .github/scripts/verify-executorch-reference-runner.sh \
           "${RUNNER_TEMP}/torchtrt-python.pte" \
+          --coalesced="${RUNNER_TEMP}/torchtrt-coalesced.pte" \
           "${RUNNER_TEMP}/torchtrt-kv-cache-decode.pte" \
-          "${RUNNER_TEMP}/torchtrt-coalesced.pte"
+          "${RUNNER_TEMP}/torchtrt-kv-cache-decode-zero-copy.pte"
         python examples/executorch_reference_runner/load_model.py \
           --model_path="${RUNNER_TEMP}/torchtrt-python.pte" --num_runs=1
         # The device-resident program is deliberately NOT handed to the C++
@@ -170,3 +172,33 @@ jobs:
         # Device outputs: the program leaves them to the caller, so one is supplied first.
         "${RUNNER_TEMP}/module-consumer/executorch_module_consumer" \
           --model_path="${RUNNER_TEMP}/torchtrt-device-resident.pte" --device_io --num_runs=2
+        # The backend C++ suite runs here, at the end, and not next to the Bazel
+        # build above, because `set -e` ends this script at the first failure and
+        # everything between the two would be traded away for it: the three
+        # exports, verify-executorch-reference-runner.sh -- which unpacks the
+        # release archive and builds the packaged CMake backend out of it, and so
+        # is what says the archive still carries every header that backend needs
+        # -- and load_model.py. Run last, a suite that fails because the device
+        # went missing or flaky costs none of them.
+        #
+        # --test_summary=detailed names every case that skipped, in Bazel's own
+        # summary rather than in the test log, which --test_output=errors prints
+        # nothing of for a target that passes. Cases in that suite skip for reasons
+        # the variable below does not cover -- its own coverage note lists them --
+        # and without those names a run in which the pool's growth and
+        # allocation-failure paths never executed looks like one in which they did.
+        #
+        # TORCHTRT_EXECUTORCH_REQUIRE_CUDA turns a case that skips for want of a
+        # CUDA device into a failure. Every row of this job's matrix is a CUDA row
+        # -- filter-matrix.py drops any whose desired_cuda is not a TensorRT CUDA
+        # version -- and linux-test.yml starts the container with `--gpus all` for
+        # those, so a skip here means the device went missing rather than that the
+        # runner never had one. Without the variable every case that needs a
+        # device skips, its target exits zero and is reported as a passing target
+        # that covered nothing -- 27 of the suite's 96 cases, the whole of
+        # test_shared_scratch_backend.
+        bazel test //tests/cpp/executorch:executorch_backend_tests \
+          --compilation_mode opt --config=linux --test_output=errors \
+          --test_summary=detailed \
+          --test_env=LD_LIBRARY_PATH \
+          --test_env=TORCHTRT_EXECUTORCH_REQUIRE_CUDA=1

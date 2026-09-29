@@ -60,19 +60,23 @@ cmake(
 # build the implementation once as a cc_binary(linkshared=True), re-import the
 # .so via cc_import, and expose it through a srcs-less cc_library that also
 # carries the headers (with include remap) and the cudart dep. Consumers depend
-# on ":extension_cuda"; caller_stream.cpp is only ever linked into the one .so.
+# on ":extension_cuda"; the sources are only ever linked into the one .so.
 
 # Private implementation. It carries hdrs + include_prefix/strip_include_prefix
-# so caller_stream.cpp can find its own <executorch/extension/cuda/...> header
+# so each source can find its own <executorch/extension/cuda/...> header
 # (the physical tree has an extra executorch/ dir; a cc_binary's srcs headers
-# get no such remap). alwayslink=True guarantees the object -- and thus
-# getCallerStream/CallerStreamGuard -- is pulled into the shared object below,
-# even though that source-less cc_binary references none of its symbols.
+# get no such remap). alwayslink=True guarantees the objects -- and thus the
+# caller-stream and device-guard symbols -- are pulled into the shared object
+# below, even though that source-less cc_binary references none of them.
 cc_library(
     name = "extension_cuda_impl",
-    srcs = ["executorch/extension/cuda/caller_stream.cpp"],
+    srcs = [
+        "executorch/extension/cuda/caller_stream.cpp",
+        "executorch/extension/cuda/device_guard.cpp",
+    ],
     hdrs = [
         "executorch/extension/cuda/caller_stream.h",
+        "executorch/extension/cuda/device_guard.h",
         "executorch/extension/cuda/export.h",
     ],
     local_defines = [
@@ -84,7 +88,15 @@ cc_library(
     alwayslink = True,
     linkstatic = True,
     visibility = ["//visibility:private"],
-    deps = ["@cuda//:cudart"],
+    # device_guard.cpp returns an Error and logs, so it needs the runtime's headers,
+    # which caller_stream.cpp beside it does not. Only the headers: the logging symbols
+    # themselves resolve at load time from the runtime the consumer already loads.
+    # Linking the static core here instead would give the process a second copy of
+    # every registry it carries.
+    deps = [
+        ":executorch_headers",
+        "@cuda//:cudart",
+    ],
 )
 
 # The single shared object. The explicit -soname pins DT_SONAME to the bare
@@ -115,12 +127,18 @@ cc_library(
     name = "extension_cuda",
     hdrs = [
         "executorch/extension/cuda/caller_stream.h",
+        "executorch/extension/cuda/device_guard.h",
         "executorch/extension/cuda/export.h",
     ],
     include_prefix = "executorch",
     strip_include_prefix = "executorch",
     deps = [
         ":extension_cuda_shared",
+        # The device guard logs, so the shared object above leaves the runtime's
+        # logging symbols undefined. Listed here rather than by each consumer so the
+        # runtime always lands after that shared object on a link line, which is the
+        # only order in which a static archive can satisfy it.
+        ":executorch_core",
         "@cuda//:cudart",
     ],
 )

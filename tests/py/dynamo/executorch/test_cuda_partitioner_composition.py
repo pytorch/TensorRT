@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
+import gc
 import importlib.util
 import os
 import shutil
@@ -390,3 +391,73 @@ def test_the_partitioner_refuses_a_device_it_cannot_run_on(requested, accepted):
     else:
         with pytest.raises(ValueError, match="not a device this delegate runs on"):
             TensorRTPartitioner(compile_specs=specs)
+
+
+def test_the_caller_keeps_its_device_across_load_run_and_free(tmp_path):
+    """A program whose engine sits on another card must not move the caller.
+
+    Loading, running and freeing all select the engine's device. Each one has to put
+    the caller's device back, because a coalesced program holds several delegates on
+    several cards and the thread that loads one is not doing that delegate's work.
+    Needs two cards: with one there is nothing to switch to, so nothing to restore.
+    """
+    if torch.cuda.device_count() < 2:
+        pytest.skip(
+            "needs two CUDA devices to tell a restored device from an unchanged one"
+        )
+
+    import torch_tensorrt
+
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            return torch.cos(torch.erfinv(torch.tanh(x)))
+
+    engine_device = 1
+    caller_device = 0
+
+    with torch.cuda.device(engine_device):
+        model = Model().eval().to(f"cuda:{engine_device}")
+        inputs = (torch.randn(64, 64, device=f"cuda:{engine_device}"),)
+        exported = torch.export.export(model, inputs)
+        trt_gm = torch_tensorrt.dynamo.compile(
+            exported, inputs=list(inputs), min_block_size=1, truncate_double=True
+        )
+        out = tmp_path / "other_card.pte"
+        torch_tensorrt.save(
+            trt_gm,
+            str(out),
+            output_format="executorch",
+            retrace=False,
+            arg_inputs=list(inputs),
+            partitioners=[_cuda_partitioner()],
+        )
+
+    delegate_ids = _delegate_ids(out)
+    assert (
+        "TensorRTBackend" in delegate_ids
+    ), f"nothing went to TensorRT; {delegate_ids}"
+
+    import torch_tensorrt_executorch_runtime  # noqa: F401
+    from executorch.runtime import Runtime
+
+    torch.cuda.set_device(caller_device)
+
+    program = Runtime.get().load_program(out)
+    assert (
+        torch.cuda.current_device() == caller_device
+    ), "loading moved the caller's device"
+
+    method = program.load_method("forward")
+    assert torch.cuda.current_device() == caller_device, "preparing the method moved it"
+
+    method.execute((torch.randn(64, 64, device=f"cuda:{engine_device}"),))
+    assert (
+        torch.cuda.current_device() == caller_device
+    ), "running moved the caller's device"
+
+    del method
+    del program
+    gc.collect()
+    assert (
+        torch.cuda.current_device() == caller_device
+    ), "freeing moved the caller's device"

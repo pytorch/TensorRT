@@ -277,17 +277,40 @@ def test_save_executorch_error_when_executorch_missing(monkeypatch, tmp_path):
         )
 
 
+_PUBLIC_API_SYMBOLS = (
+    "get_edge_compile_config",
+    "TensorRTPartitioner",
+    "TensorRTBackend",
+    "export",
+    "zero_copy_backend_config",
+    "check_zero_copy_kv",
+)
+
+
 @_needs_torch_tensorrt
 @pytest.mark.unit
 def test_public_api_symbols_present():
     module = importlib.import_module("torch_tensorrt.executorch")
-    assert "get_edge_compile_config" in module.__all__
-    assert "TensorRTPartitioner" in module.__all__
-    assert "TensorRTBackend" in module.__all__
-    assert "export" in module.__all__
+    assert set(module.__all__) == set(_PUBLIC_API_SYMBOLS)
     assert "Program" not in module.__all__
     assert "load" not in module.__all__
     assert "to_executorch" not in module.__all__
+
+
+@_needs_torch_tensorrt
+@pytest.mark.unit
+def test_public_api_symbols_are_bound_not_just_advertised():
+    # __all__ is a literal written out in both branches of the
+    # _has_executorch_exir() guard, so reading it cannot tell whether the
+    # package binds what it advertises. Resolve each name instead.
+    module = importlib.import_module("torch_tensorrt.executorch")
+    if module._has_executorch_exir():
+        for name in _PUBLIC_API_SYMBOLS:
+            assert getattr(module, name) is not None
+    else:
+        for name in _PUBLIC_API_SYMBOLS:
+            with pytest.raises(ImportError, match=name):
+                getattr(module, name)
 
 
 @pytest.mark.unit
@@ -821,12 +844,50 @@ def test_the_delegate_is_built_for_every_architecture_the_main_wheel_ships():
     assert not (workflows / "executorch-build-linux.yml").exists()
 
 
+def _cmake_code_only(source: str) -> str:
+    """CMake source with its comments removed, so a reading cannot be satisfied by one.
+
+    A hash starts a comment unless it sits inside a quoted string, and a hash followed by an open
+    bracket starts a block that runs to the matching close. Both forms hid a deleted argument from
+    this file's checks while they stayed green.
+    """
+    out: list[str] = []
+    rest = source
+    while True:
+        start = -1
+        quoted = False
+        for i, ch in enumerate(rest):
+            if ch == '"' and (i == 0 or rest[i - 1] != "\\"):
+                quoted = not quoted
+            elif ch == "#" and not quoted:
+                start = i
+                break
+            elif ch == "\n":
+                quoted = False
+        if start < 0:
+            out.append(rest)
+            break
+        out.append(rest[:start])
+        after = rest[start + 1 :]
+        if after.startswith("[["):
+            end = after.find("]]")
+            rest = after[end + 2 :] if end >= 0 else ""
+        else:
+            nl = after.find("\n")
+            rest = after[nl:] if nl >= 0 else ""
+    return "".join(out)
+
+
 @pytest.mark.unit
 def test_the_guard_is_given_the_platform_it_must_compare_against():
     """Production passes the full architecture-specific tag to the artifact guard."""
-    cmake = (
-        _REPO_ROOT / "py/torch-tensorrt-executorch-runtime/native/CMakeLists.txt"
-    ).read_text(encoding="utf-8")
+    # Stripped once, here, so every reading below sees code. Stripping the slice instead left the
+    # set() search twelve lines down reading raw text, where a commented-out assignment matched.
+    cmake = _cmake_code_only(
+        (
+            _REPO_ROOT / "py/torch-tensorrt-executorch-runtime/native/CMakeLists.txt"
+        ).read_text(encoding="utf-8")
+    )
     guard = (
         _REPO_ROOT
         / "py/torch-tensorrt-executorch-runtime/native/check_imports_executorch_runtime.sh"
@@ -2394,12 +2455,11 @@ def test_packaging_declares_executorch_extra():
         assert extra_name in extras_by_name
         requirements = extras_by_name[extra_name]
         assert isinstance(requirements, ast.List)
-        # Both halves, since finding the delegate by hand is what this extra saves.
+        # The delegate, since finding it by hand is what this extra saves. It carries the
+        # ExecuTorch version, so a range beside it would state that version twice and the
+        # two cannot agree on the day the pin moves.
         named = [e.id for e in requirements.elts if isinstance(e, ast.Name)]
-        assert named == [
-            "EXECUTORCH_REQUIREMENT",
-            "EXECUTORCH_RUNTIME_REQUIREMENT",
-        ], named
+        assert named == ["EXECUTORCH_RUNTIME_REQUIREMENT"], named
 
     setup_call = next(
         node
@@ -2716,6 +2776,10 @@ def _patch_executorch_lowering(monkeypatch, captured):
             return _FakeETRecord()
 
     class _FakeEdge:
+        # export() reorders each method's mutations after lowering, over every
+        # method the manager holds. No method here holds a program to reorder.
+        methods = ()
+
         def to_executorch(self, config=None):
             captured["backend_config"] = config
             return _FakeExec()

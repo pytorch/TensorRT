@@ -36,13 +36,15 @@ _PROVENANCE_LIMIT = 64 * 1024
 # would leave the version stale while the commit moves. That split is the whole thing these two pins
 # exist to prevent, so each site declares what it must contain and each is verified on its own.
 _SITE_COORDINATES: dict[str, frozenset[str]] = {
-    ".github/workflows/build_linux.yml": frozenset({"version"}),
-    ".github/workflows/executorch-test-linux.yml": frozenset({"version"}),
+    # The workflows read the version from these files instead of naming it, so a bump rewrites
+    # no file under .github/workflows. GitHub refuses a workflow-file push from a credential
+    # without workflow permission, which is why the daily job could never publish one.
+    "packaging/executorch_pin.txt": frozenset({"version"}),
+    "packaging/executorch_range.txt": frozenset({"version"}),
     "MODULE.bazel": frozenset({"version", "commit"}),
     "docker/MODULE.bazel.docker": frozenset({"version", "commit"}),
     "docker/MODULE.bazel.ngc": frozenset({"version", "commit"}),
     "justfile": frozenset({"version"}),
-    "pyproject.toml": frozenset({"version"}),
     "py/torch-tensorrt-executorch-runtime/README.md": frozenset({"version"}),
     "py/torch-tensorrt-executorch-runtime/pyproject.toml": frozenset({"version"}),
     "toolchains/ci_workspaces/MODULE.bazel.tmpl": frozenset({"version", "commit"}),
