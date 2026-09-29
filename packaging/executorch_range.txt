@@ -1,0 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+# The user-facing ExecuTorch requirement, whose lower bound is the pin. One job resolves this in
+# a fresh environment to check the published wheel's own requirement is satisfiable. It lives here
+# for the same reason as the exact pin: a bump must not touch a workflow file.
+# pin-check: range-ok
+executorch>=1.6.0.dev20260925,<1.7
