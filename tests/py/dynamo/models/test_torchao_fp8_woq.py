@@ -243,6 +243,9 @@ def test_linear_int4_woq():
 def _has_nvfp4_support() -> bool:
     if not torch.cuda.is_available():
         return False
+    major, _ = torch.cuda.get_device_capability()
+    if major < 10:
+        return False
     try:
         import tensorrt as trt
         from torchao.prototype.mx_formats.nvfp4_tensor import NVFP4Tensor  # noqa: F401
@@ -319,6 +322,9 @@ def test_linear_nvfp4_woq():
 
 def _has_mxfp4_support() -> bool:
     if not torch.cuda.is_available():
+        return False
+    major, _ = torch.cuda.get_device_capability()
+    if major < 10:
         return False
     try:
         import tensorrt as trt
