@@ -182,15 +182,19 @@ jobs:
           path: /opt/torch-tensorrt-builds/
       - name: Point the HuggingFace cache somewhere writable
         # An OSDC runner mounts the shared model cache read-only at
-        # /mnt/hf_cache and exports HF_HOME pointing at it. huggingface_hub
-        # writes inside HF_HOME/hub whatever it is doing -- hf_hub_download
-        # calls os.makedirs on the repo directory before it looks anything up,
-        # and takes a .locks/ file -- so jobs fail with
-        # "OSError: [Errno 30] Read-only file system" even for a model that is
-        # already cached. Split the two: everything HF writes goes to a
-        # writable dir, while the seeded blobs are still read from the mount.
-        # Same shape as pytorch's .ci/pytorch/test.sh and test-infra's
-        # linux_job_v3.yml.
+        # /mnt/hf_cache and exports HF_HOME pointing at it, so anything HF
+        # writes fails with "OSError: [Errno 30] Read-only file system".
+        #
+        # Pointing only HF_HOME at a writable dir is not enough: the hub's
+        # lock directory lives under HF_HUB_CACHE, so keeping that on the
+        # mount still fails in WeakFileLock on `.locks/models--<repo>/*.lock`
+        # -- even for a model that is already seeded there.
+        #
+        # So put the whole cache in RUNNER_TEMP. The trade is that models are
+        # downloaded per job instead of read from the shared mount; these
+        # suites pull a handful of small ones (bert-base-uncased,
+        # timm/efficientnet_b0), so that is cheap enough to prefer over
+        # splitting the paths.
         shell: bash
         run: |
           set -euo pipefail
@@ -198,7 +202,7 @@ jobs:
             mkdir -p "${RUNNER_TEMP}/hf_home" "${RUNNER_TEMP}/hf_datasets"
             {
               echo "HF_HOME=${RUNNER_TEMP}/hf_home"
-              echo "HF_HUB_CACHE=/mnt/hf_cache/hub"
+              echo "HF_HUB_CACHE=${RUNNER_TEMP}/hf_home/hub"
               echo "HF_DATASETS_CACHE=${RUNNER_TEMP}/hf_datasets"
             } >> "${GITHUB_ENV}"
           fi
