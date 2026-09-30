@@ -503,8 +503,8 @@ def get_graph_converter_support_overview(
 
     # Instantiate operator support object and module dictionary
     op_support = TorchTensorRTOperatorSupport(
-        torch_executed_ops=torch_executed_ops,
-        torch_executed_modules=torch_executed_modules,
+        torch_executed_ops=torch_executed_ops or set(),
+        torch_executed_modules=torch_executed_modules or set(),
     )
     module_dict = dict(graph_module.named_modules())
 
