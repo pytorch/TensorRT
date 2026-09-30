@@ -1,0 +1,8 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+# The pinned ExecuTorch build. This file holds the version so that moving the pin to a newer
+# nightly changes no file under .github/workflows: GitHub refuses a workflow-file push from a
+# credential without workflow permission, which is why the daily pin update could never publish
+# a bump. The workflows pass this with -r and keep their own pip flags, so the index they install
+# from stays visible where they call pip.
+executorch==1.6.0.dev20260925

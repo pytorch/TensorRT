@@ -437,9 +437,11 @@ jobs:
           # there. What refuses that is the delegate's own build, which reads the installed
           # ExecuTorch's local label and stops unless it names a CUDA build, so the failure is a clear
           # message rather than a configure error about a missing extension.
+          # The version itself comes from the requirement file, so moving the pin to a newer
+          # nightly changes no file in this directory.
           ${CONDA_RUN} python -m pip install pyyaml patchelf "wheel>=0.40" \
             --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" \
-            "executorch==1.6.0.dev20260925"
+            -r packaging/executorch_pin.txt
           # Give the companion wheel the same channel/date and CUDA local-version
           # suffix as torch-tensorrt, while retaining its independent base version.
           main_version="$(sed 's/a0$//' version.txt)"

@@ -52,13 +52,17 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 # process; linking the shipped shared library is what guarantees that, since a static copy
 # would give this library a second, invisibly separate stream.
 add_library(executorch_backend_tensorrt SHARED
+  "${TORCH_TENSORRT_SOURCE_DIR}/cpp/src/torch_tensorrt/executorch/PooledScratchInstall.cpp"
   "${TORCH_TENSORRT_SOURCE_DIR}/cpp/src/torch_tensorrt/executorch/TensorRTBackend.cpp"
   "${TORCH_TENSORRT_SOURCE_DIR}/cpp/src/torch_tensorrt/executorch/TensorRTBlobHeader.cpp"
   "${TORCH_TENSORRT_SOURCE_DIR}/cpp/src/torch_tensorrt/executorch/WeightStreamingBudget.cpp")
 
 target_include_directories(executorch_backend_tensorrt PRIVATE
   "${TORCH_TENSORRT_SOURCE_DIR}"
-  "${TORCH_TENSORRT_SOURCE_DIR}/cpp/include")
+  "${TORCH_TENSORRT_SOURCE_DIR}/cpp/include"
+  # Headers the backend sources include but that are not part of the installed
+  # API, such as SharedScratchPool.h.
+  "${TORCH_TENSORRT_SOURCE_DIR}/cpp/src")
 
 # Compile definitions come from the package rather than being repeated here.
 # ET_EVENT_TRACER_ENABLED in particular has to match how the runtime was built: it

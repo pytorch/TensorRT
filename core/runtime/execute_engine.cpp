@@ -110,28 +110,39 @@ void setup_input_tensors(
     const auto& binding = compiled_engine->input_binding_infos[i];
     const auto& name = binding.name;
 
+    // A shape-tensor input is read from host memory (see the shape-tensor branch below), so a
+    // host tensor is accepted for it. Every other input is expected to be on the device.
     TORCHTRT_CHECK(
-        inputs[i].is_cuda(), "Expected input tensors to have device cuda, found device " << inputs[i].device());
+        binding.is_shape_tensor || inputs[i].is_cuda(),
+        "Input " << i << " (\"" << name << "\") of engine " << compiled_engine->name
+                 << " must be on a CUDA device, found device " << inputs[i].device());
 
     TORCHTRT_CHECK(
         inputs[i].dtype() == binding.expected_type,
-        "Expected input tensors to have type " << binding.expected_type << ", found type " << inputs[i].dtype());
+        "Input " << i << " (\"" << name << "\") of engine " << compiled_engine->name << " expects type "
+                 << binding.expected_type << ", found type " << inputs[i].dtype());
 
     auto dims = core::util::toDims(inputs[i].sizes());
     auto shape = core::util::toVec(dims);
     LOG_DEBUG("Input Name: " << name << " Shape: " << dims << " isShapeInferenceIO: " << binding.is_shape_tensor);
 
     if (binding.is_shape_tensor) {
-      // Shape tensor inputs are casted to int64 explicitly.
-      // Refer to
+      // TensorRT reads a shape tensor's values from host memory, so they are copied to the host
+      // and cast to int64. Refer to
       // https://github.com/NVIDIA/TensorRT/blob/d2f4ef789a9a6ffdf37b55c3f81b486225f6b380/samples/common/sampleInference.cpp#L435
-      auto input_cpu = inputs[i].clone().contiguous().cpu().to(torch::kInt64);
+      // A device tensor is copied back with .cpu(), which synchronizes the stream; a host tensor
+      // is used as is, which does not, so passing shape inputs on the host avoids a per-call sync.
+      // The values are deep-copied into active_shape_tensor_values below, so input_cpu is transient
+      // and no clone is needed.
+      auto input_cpu = inputs[i].is_cuda() ? inputs[i].contiguous().cpu().to(torch::kInt64)
+                                           : inputs[i].contiguous().to(torch::kInt64);
       std::vector<int64_t> inputs_cpu_vec(
           input_cpu.data_ptr<int64_t>(), input_cpu.data_ptr<int64_t>() + input_cpu.numel());
       compiled_engine->active_shape_tensor_values.emplace_back(std::move(inputs_cpu_vec));
       TORCHTRT_CHECK(
           ctx->setTensorAddress(name.c_str(), compiled_engine->active_shape_tensor_values.back().data()),
-          "Error while setting the tensor address for shape inputs");
+          "Error while setting the tensor address for shape input " << i << " (\"" << name << "\") of engine "
+                                                                    << compiled_engine->name);
 
       if (cudagraphs_enabled) {
         // @peri044 I dont know if this makes sense since they are supposed to be GPU buffers
@@ -139,7 +150,8 @@ void setup_input_tensors(
       }
       TORCHTRT_CHECK(
           ctx->setTensorAddress(name.c_str(), compiled_engine->active_shape_tensor_values.back().data()),
-          "Error while setting the tensor address for shape inputs");
+          "Error while setting the tensor address for shape input " << i << " (\"" << name << "\") of engine "
+                                                                    << compiled_engine->name);
 
     } else {
       compiled_engine->active_input_tensors[i] = inputs[i].view(shape).contiguous();
@@ -160,7 +172,11 @@ void setup_input_tensors(
         compiled_engine->cudagraph_input_staging_buffers[i] = compiled_engine->active_input_tensors[i].clone();
       }
 
-      TORCHTRT_CHECK(ctx->setInputShape(name.c_str(), dims), "Error while setting the input shape");
+      TORCHTRT_CHECK(
+          ctx->setInputShape(name.c_str(), dims),
+          "Error while setting the input shape for input "
+              << i << " (\"" << name << "\") of engine " << compiled_engine->name << ". TensorRT refused shape " << dims
+              << ", the engine declares " << compiled_engine->cuda_engine->getTensorShape(name.c_str()));
 
       at::Tensor final_input;
       if (cudagraphs_enabled && !is_aliased_input) {
@@ -177,7 +193,10 @@ void setup_input_tensors(
       // empty_tensor_placeholder is pre-allocated in TRTEngine constructor
       void* input_addr = final_input.numel() == 0 ? compiled_engine->empty_tensor_placeholder : final_input.data_ptr();
 
-      TORCHTRT_CHECK(ctx->setTensorAddress(name.c_str(), input_addr), "Failed to bind tensor address for " << name);
+      TORCHTRT_CHECK(
+          ctx->setTensorAddress(name.c_str(), input_addr),
+          "Failed to bind the tensor address for input " << i << " (\"" << name << "\") of engine "
+                                                         << compiled_engine->name);
 
       // Record the bound tensor by binding name so the output-binding loop
       // can resolve aliased outputs to their source input's storage.
@@ -230,7 +249,21 @@ std::vector<at::Tensor> create_output_tensors(
                        .layout(at::kStrided)
                        .device(at::kCUDA, compiled_engine->device_info.id)
                        .requires_grad(false);
-    outputs[pyt_idx] = std::move(at::empty(dims, options).contiguous());
+    try {
+      outputs[pyt_idx] = std::move(at::empty(dims, options).contiguous());
+    } catch (c10::Error& e) {
+      TORCH_RETHROW(
+          e,
+          "Failed to allocate output \"",
+          name,
+          "\" of engine ",
+          compiled_engine->name,
+          " with shape ",
+          dims,
+          " and dtype ",
+          type,
+          ".");
+    }
   }
 
   return outputs;
@@ -254,15 +287,24 @@ void create_output_allocator(c10::intrusive_ptr<TRTEngine> compiled_engine) {
 }
 
 std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngine> compiled_engine) {
-  // All inputs are expected to be on CUDA. Warn and move any that are not.
-  for (auto& inp : inputs) {
-    if (inp.defined() && !inp.is_cuda()) {
-      LOG_WARNING(
-          "Input tensor is not on a CUDA device. Moving it to CUDA automatically. "
-          "For best performance, ensure all inputs are on the correct CUDA device before "
-          "calling the TensorRT engine (e.g. tensor.cuda() or tensor.to(device)).");
-      inp = inp.cuda();
+  // All inputs are expected to be on CUDA. Warn and move any that are not. A host-resident
+  // shape-tensor input is an exception: TensorRT reads it from host memory, so it is left where it
+  // is rather than moved to the device only for setup_input_tensors to copy it back. A shape tensor
+  // on any other non-CUDA device still falls through to the move below.
+  for (size_t i = 0; i < inputs.size(); i++) {
+    auto& inp = inputs[i];
+    if (!inp.defined() || inp.is_cuda()) {
+      continue;
     }
+    if (inp.is_cpu() && i < compiled_engine->input_binding_infos.size() &&
+        compiled_engine->input_binding_infos[i].is_shape_tensor) {
+      continue;
+    }
+    LOG_WARNING(
+        "Input tensor is not on a CUDA device. Moving it to CUDA automatically. "
+        "For best performance, ensure all inputs are on the correct CUDA device before "
+        "calling the TensorRT engine (e.g. tensor.cuda() or tensor.to(device)).");
+    inp = inp.cuda();
   }
 
 #ifdef ENABLE_TRT_NCCL_COLLECTIVES
@@ -285,8 +327,18 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
   torch::Tensor dynamic_workspace;
   if (compiled_engine->resource_allocation_strategy == TRTEngine::ResourceAllocationStrategy::kDynamic) {
     const auto workspace_bytes = compiled_engine->cuda_engine->getDeviceMemorySizeV2();
-    dynamic_workspace =
-        torch::empty({workspace_bytes}, torch::TensorOptions().dtype(torch::kUInt8).device(torch::kCUDA));
+    try {
+      dynamic_workspace =
+          torch::empty({workspace_bytes}, torch::TensorOptions().dtype(torch::kUInt8).device(torch::kCUDA));
+    } catch (c10::Error& e) {
+      TORCH_RETHROW(
+          e,
+          "Failed to allocate the ",
+          workspace_bytes,
+          "-byte activation workspace of engine ",
+          compiled_engine->name,
+          ".");
+    }
     ctx->setDeviceMemoryV2(dynamic_workspace.data_ptr(), workspace_bytes);
   }
 
@@ -394,9 +446,9 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       int32_t const nbNames = ctx->inferShapes(names.size(), names.data());
       TORCHTRT_CHECK(
           nbNames == 0,
-          "The shapes of the inputs: "
-              << names
-              << " cannot be inferred. This could happen if the input tensor addresses/shapes haven't been configured correctly");
+          "The shapes of the inputs: " << names << " of engine " << compiled_engine->name
+                                       << " cannot be inferred. This could happen if the input tensor "
+                                          "addresses/shapes haven't been configured correctly");
     }
 
     { // Output Setup
@@ -444,11 +496,13 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
           TORCHTRT_CHECK(
               ctx->setTensorAddress(
                   name.c_str(), compiled_engine->cudagraph_output_staging_buffers[pyt_idx].data_ptr()),
-              "Error while setting the output tensor address");
+              "Error while setting the tensor address for output \"" << name << "\" of engine "
+                                                                     << compiled_engine->name);
         } else {
           TORCHTRT_CHECK(
               ctx->setTensorAddress(name.c_str(), outputs[pyt_idx].data_ptr()),
-              "Error while setting the output tensor address");
+              "Error while setting the tensor address for output \"" << name << "\" of engine "
+                                                                     << compiled_engine->name);
         }
       }
     }
@@ -593,9 +647,9 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       int32_t const nbNames = ctx->inferShapes(names.size(), names.data());
       TORCHTRT_CHECK(
           nbNames == 0,
-          "The shapes of the inputs: "
-              << names
-              << " cannot be inferred. This could happen if the input tensor addresses/shapes haven't been configured correctly");
+          "The shapes of the inputs: " << names << " of engine " << compiled_engine->name
+                                       << " cannot be inferred. This could happen if the input tensor "
+                                          "addresses/shapes haven't been configured correctly");
     }
 
     { // OutputAllocator Setup

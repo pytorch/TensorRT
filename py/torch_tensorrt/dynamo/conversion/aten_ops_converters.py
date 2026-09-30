@@ -38,6 +38,7 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     ConverterPriority,
     dynamo_tensorrt_converter,
     has_static_shapes_in_args,
+    node_has_dynamic_shapes,
 )
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     args_bounds_check,
@@ -1616,8 +1617,46 @@ def aten_ops_index_copy_fallback(
     )
 
 
+def slice_scatter_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    """Reject a write on a dynamic dim: with no size to clamp to, no bound resolves,
+    concrete ones included (see ``resolve_slice_scatter_write``). These raise in the
+    converter, so they run in PyTorch until it gains dynamic bounds.
+
+    Missing metadata is passed, not rejected: the KV-cache classifier in
+    ``lowering/_buffer_lifting.py`` reads the same metadata, and vetoing a write it
+    classified as engine-aliased fails ``assert_predicted_kv_aliased``.
+    """
+    input_meta = getattr(node.args[0], "meta", {})
+    input_val = input_meta.get("val", input_meta.get("tensor_meta"))
+    if input_val is None:
+        _LOGGER.debug(
+            f"slice_scatter node {node.name} has no shape metadata; leaving its bounds "
+            "for the converter to resolve against the TensorRT shape."
+        )
+        return True
+
+    _start, _end, _step, status = impl.slice_scatter.resolve_slice_scatter_write(
+        tuple(input_val.shape),
+        args_bounds_check(node.args, 2, 0),
+        args_bounds_check(node.args, 3),
+        args_bounds_check(node.args, 4),
+        args_bounds_check(node.args, 5),
+    )
+    if status is impl.slice_scatter.KVWriteStatus.DYNAMIC_DIM_SIZE:
+        _LOGGER.debug(
+            f"slice_scatter node {node.name} needs the size of a dynamic dim to "
+            "resolve its bounds; falling back to PyTorch operation."
+        )
+        return False
+    return True
+
+
 @dynamo_tensorrt_converter(
-    torch.ops.aten.slice_scatter.default, supports_dynamic_shapes=True
+    torch.ops.aten.slice_scatter.default,
+    capability_validator=slice_scatter_validator,
+    supports_dynamic_shapes=True,
 )
 @enforce_tensor_types({0: (TRTTensor,), 1: (TRTTensor,)})
 def aten_ops_slice_scatter(
@@ -1794,12 +1833,46 @@ def aten_ops_slice(
     )
 
 
+# The cumulative layer accepts these and nothing else. A dtype outside the set would abort
+# the whole compile from inside the cast, with a message naming neither cumsum nor the dtype.
+_CUMSUM_ACCUMULATOR_DTYPES = {
+    torch.float32,
+    torch.float16,
+    torch.bfloat16,
+    torch.int32,
+    torch.int64,
+}
+
+
 def cumsum_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
-    # TensorRT-RTX before 1.7 cannot build a refittable cumsum when its loop
-    # trip count is a constant. Standard TensorRT and TensorRT-RTX 1.7+ do not
-    # have this limitation.
+    requested_dtype = node.kwargs.get("dtype", None)
+    # Below 10.8 there is no cumulative layer, so cumsum runs on the loop path, which has no
+    # dtype parameter and accumulates in float32. It cannot honour an explicit dtype, so
+    # refuse it and let PyTorch handle the request instead of returning a wrong result.
+    if requested_dtype is not None and not is_tensorrt_version_supported("10.8.0"):
+        _LOGGER.debug("cumsum dtype= needs the cumulative layer (TensorRT >= 10.8)")
+        return False
+    if (
+        requested_dtype is not None
+        and requested_dtype not in _CUMSUM_ACCUMULATOR_DTYPES
+    ):
+        # float64 is the exception: truncate_double already means the caller accepts
+        # float32, and the converter maps it. Everything else has to fall back.
+        if not (
+            requested_dtype is torch.float64
+            and settings is not None
+            and settings.truncate_double
+        ):
+            _LOGGER.debug(
+                f"cumsum with dtype={requested_dtype} is not supported by the cumulative "
+                "layer, falling back to PyTorch"
+            )
+            return False
+
+    # TensorRT-RTX before 1.7 cannot build a refittable cumsum when its trip count is a
+    # constant. Standard TensorRT and TensorRT-RTX 1.7+ do not have this limitation.
     if (
         is_tensorrt_rtx_version_supported("1.7")
         or settings is None
@@ -1833,7 +1906,7 @@ def cumsum_validator(
     if isinstance(axis_size, int) and axis_size >= 0:
         _LOGGER.debug(
             f"cumsum node {node.name} has a static axis {dim} of size {axis_size}; "
-            "TensorRT-RTX < 1.7 cannot build its refittable constant loop trip count."
+            "TensorRT-RTX < 1.7 cannot build a refittable cumsum with a constant extent."
         )
         return False
 
@@ -1868,6 +1941,7 @@ def aten_ops_cumsum(
         name,
         args[0],
         args[1],
+        kwargs.get("dtype", None),
     )
 
 
@@ -2116,13 +2190,103 @@ def aten_ops_clone_copy_dtype(
     )
 
 
+def _dynamic_placeholder_copy_supported(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    """Reject the cases this converter cannot serve once it accepts a dynamic input.
+
+    Each of these ran correctly in PyTorch before the placeholder path declared dynamic
+    shape support, so they fall back rather than fail:
+
+    A memory_format the copy cannot preserve. The layer produces standard contiguous
+    strides, so a channels-last copy would return the right values with the wrong layout,
+    silently.
+
+    An input dtype the engine cannot bind. float64 needs truncate_double, and without it
+    the binding expects float32 and rejects the caller's tensor at the first call. uint8
+    aborts the build outright.
+
+    A non-contiguous input with no memory_format. Default clone preserves the input strides,
+    so a channels-last or transposed input keeps its layout in eager, but the copy the layer
+    builds is contiguous. That returns the right values with the wrong strides, silently.
+    """
+    # These restrictions only matter on the dynamic-shape path this PR newly enables. With
+    # static shapes the placeholder copy compiled before, so keep accepting it unchanged.
+    if not node_has_dynamic_shapes(node):
+        return True
+
+    if node.kwargs.get("memory_format") is not None:
+        _LOGGER.debug(
+            f"{node.target} with memory_format={node.kwargs['memory_format']} cannot "
+            "preserve strides, falling back"
+        )
+        return False
+
+    input_node = node.args[0] if node.args else None
+    input_meta = input_node.meta.get("val") if isinstance(input_node, Node) else None
+    if not isinstance(input_meta, torch.Tensor):
+        return True
+
+    # is_contiguous() can force a guard on a data-dependent stride and raise. Validators
+    # are not wrapped for that, so an undecidable case falls back to PyTorch rather than
+    # aborting the whole compile.
+    try:
+        is_contiguous = input_meta.is_contiguous()
+    except Exception:
+        _LOGGER.debug(
+            f"{node.target} contiguity is data-dependent and cannot be decided, falling back"
+        )
+        return False
+    if not is_contiguous:
+        # No memory_format was given (checked above), so this is a preserve-format copy of a
+        # non-contiguous input, which the contiguous layer cannot reproduce.
+        _LOGGER.debug(
+            f"{node.target} preserves the strides of a non-contiguous input, which the "
+            "copy cannot, falling back"
+        )
+        return False
+
+    if input_meta.dtype == torch.uint8:
+        _LOGGER.debug(
+            f"{node.target} with a uint8 input is not supported, falling back"
+        )
+        return False
+    if input_meta.dtype == torch.float64 and not (
+        settings is not None and settings.truncate_double
+    ):
+        _LOGGER.debug(
+            f"{node.target} with a float64 input needs truncate_double=True, falling back"
+        )
+        return False
+
+    return True
+
+
+def _clone_placeholder_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    return is_only_operator_on_placeholder(
+        node, settings
+    ) and _dynamic_placeholder_copy_supported(node, settings)
+
+
+def _to_copy_placeholder_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    return to_copy_dtype_validator(placeholder_only=True)(
+        node, settings
+    ) and _dynamic_placeholder_copy_supported(node, settings)
+
+
 @dynamo_tensorrt_converter(
     torch.ops.aten.clone.default,
-    capability_validator=is_only_operator_on_placeholder,
+    capability_validator=_clone_placeholder_validator,
+    supports_dynamic_shapes=True,
 )
 @dynamo_tensorrt_converter(
     torch.ops.aten._to_copy.default,
-    capability_validator=to_copy_dtype_validator(placeholder_only=True),
+    capability_validator=_to_copy_placeholder_validator,
+    supports_dynamic_shapes=True,
 )
 def aten_ops_clone_copy_placeholder(
     ctx: ConversionContext,
@@ -2431,7 +2595,26 @@ def aten_ops_log10(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.log1p.default)
+def log1p_validator(node: Node, settings: Optional[CompilationSettings] = None) -> bool:
+    input_node = node.args[0]
+    input_meta = input_node.meta.get("tensor_meta")
+    if input_meta is None:
+        input_meta = input_node.meta.get("val")
+    if input_meta is None:
+        return True
+    # Casting inside the engine cannot repair an unsupported input binding.
+    if input_meta.dtype in (torch.int8, torch.uint8):
+        return False
+    return input_meta.dtype != torch.float64 or (
+        settings is not None and settings.truncate_double
+    )
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.log1p.default,
+    capability_validator=log1p_validator,
+    supports_dynamic_shapes=True,
+)
 def aten_ops_log1p(
     ctx: ConversionContext,
     target: Target,

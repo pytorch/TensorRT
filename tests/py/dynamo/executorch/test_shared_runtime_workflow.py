@@ -227,6 +227,13 @@ def test_shared_build_provisions_tensorrt_metadata(tmp_path, arch, cuda, release
     (runtime / "version.txt").write_text("7.4.1\n")
     scripts = tmp_path / ".github/scripts"
     scripts.mkdir(parents=True)
+    # pip reads the pinned requirement from this file, so the sandbox needs the real one: a stub
+    # would let a wrong or missing pin pass here.
+    packaging = tmp_path / "packaging"
+    packaging.mkdir(parents=True)
+    shutil.copy2(
+        ROOT / "packaging/executorch_pin.txt", packaging / "executorch_pin.txt"
+    )
     step = next(
         s
         for s in _workflow("build_linux.yml")["jobs"]["build"]["steps"]
@@ -346,6 +353,12 @@ def _assert_device_commands(tmp_path, workflow, failure=""):
     helpers = tmp_path / "tests/py/utils/ci_helpers.sh"
     helpers.parent.mkdir(parents=True)
     helpers.write_text("trt_tier_executorch() { :; }\n")
+    # Copy the real requirement files rather than stubs, so a wrong or missing pin fails here
+    # instead of being mocked away. This script installs both the exact pin and the range.
+    packaging = tmp_path / "packaging"
+    packaging.mkdir(parents=True)
+    for name in ("executorch_pin.txt", "executorch_range.txt"):
+        shutil.copy2(ROOT / "packaging" / name, packaging / name)
     dispatcher = bin_dir / "dispatch"
     dispatcher.write_text(
         f"#!{sys.executable}\n"
@@ -387,7 +400,9 @@ def _assert_device_commands(tmp_path, workflow, failure=""):
         "elif tool == 'curl': pass\n"
         "elif tool == 'find': print(os.environ['RUNNER_TEMP'] + '/libs')\n"
         "elif tool == 'verify-executorch-reference-runner.sh':\n"
-        "    assert all(Path(a).read_text() == 'exported' for a in args)\n"
+        # Its coalesced model arrives as --coalesced=<path>, so strip the flag before
+        # reading. The rest are bare paths.
+        "    assert all(Path(a.split('=', 1)[-1]).read_text() == 'exported' for a in args)\n"
         "else: raise AssertionError((tool, args))\n"
     )
     dispatcher.chmod(0o755)
@@ -435,6 +450,11 @@ def _assert_device_commands(tmp_path, workflow, failure=""):
                 f"--model_path={runner}/torchtrt-kv-cache-decode.pte",
             ],
             [
+                "examples/torchtrt_executorch_example/export_kv_cache_decode.py",
+                f"--model_path={runner}/torchtrt-kv-cache-decode-zero-copy.pte",
+                "--zero_copy",
+            ],
+            [
                 "examples/torchtrt_executorch_example/export_coalesced.py",
                 f"--model_path={runner}/torchtrt-coalesced.pte",
             ],
@@ -452,7 +472,7 @@ def _assert_device_commands(tmp_path, workflow, failure=""):
                 f"--model_path={runner}/torchtrt-device-resident.pte",
                 "--num_runs=2",
             ],
-        ][: 4 if failure == "export_device_resident.py" else 6]
+        ][: 5 if failure == "export_device_resident.py" else 7]
     ), (
         result.stdout + result.stderr
     )
@@ -462,8 +482,10 @@ def _assert_device_commands(tmp_path, workflow, failure=""):
         if failure == "export_device_resident.py"
         else [
             [
-                str(runner / f"torchtrt-{name}.pte")
-                for name in ("python", "kv-cache-decode", "coalesced")
+                str(runner / "torchtrt-python.pte"),
+                f"--coalesced={runner / 'torchtrt-coalesced.pte'}",
+                str(runner / "torchtrt-kv-cache-decode.pte"),
+                str(runner / "torchtrt-kv-cache-decode-zero-copy.pte"),
             ]
         ]
     )

@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import logging
-from typing import Collection, Dict, List, Optional, Tuple
+from typing import Collection, Dict, List, Optional, Set, Tuple
 
 import torch
 import torch.fx.passes.operator_support as ops
@@ -42,8 +42,21 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
         # Initialize sets of supported/unsupported operators
         self.supported_operators: Dict[str, int] = {}
         self.unsupported_operators: Dict[str, int] = {}
+        # Keep impure refusals out of the counters used to decide full support.
+        self.fallback_operators: Dict[str, int] = {}
+        self.fallback_reasons: Dict[str, Set[str]] = {}
         self.torch_executed_ops = torch_executed_ops
         self._non_target_device_cache: Dict[torch.fx.Node, bool] = {}
+
+    def _record_fallback(
+        self, node: torch.fx.Node, node_name: str, reason: str
+    ) -> None:
+        # Structural nodes must not make a fully supported graph report fallback.
+        if node.op in CALLABLE_NODE_OPS:
+            self.fallback_operators[node_name] = (
+                self.fallback_operators.get(node_name, 0) + 1
+            )
+            self.fallback_reasons.setdefault(node_name, set()).add(reason)
 
     def is_node_supported(
         self, submodules: Dict[str, torch.nn.Module], node: torch.fx.Node
@@ -68,6 +81,7 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
                 "non-target device region",
                 node_name,
             )
+            self._record_fallback(node, node_name, "explicit non-target device region")
             return False
 
         if TorchTensorRTOperatorSupport._exceeds_max_tensor_rank(node):
@@ -76,6 +90,7 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
                 self.unsupported_operators[node_name] = (
                     self.unsupported_operators.get(node_name, 0) + 1
                 )
+            self._record_fallback(node, node_name, "tensor rank exceeds TensorRT limit")
             return False
 
         if TorchTensorRTOperatorSupport._has_complex_dtype(node):
@@ -84,6 +99,7 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
                 self.unsupported_operators[node_name] = (
                     self.unsupported_operators.get(node_name, 0) + 1
                 )
+            self._record_fallback(node, node_name, "complex tensor dtype")
             return False
 
         if TorchTensorRTOperatorSupport._has_bf16_on_turing(node, settings):
@@ -106,6 +122,11 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
                 self.unsupported_operators[node_name] = (
                     self.unsupported_operators.get(node_name, 0) + 1
                 )
+            self._record_fallback(
+                node,
+                node_name,
+                "data-dependent output shape (fallback_data_dependent_ops=True)",
+            )
             return False
 
         if (
@@ -128,6 +149,16 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
                 else:
                     self.unsupported_operators[node_name] += 1
 
+            self._record_fallback(
+                node,
+                node_name,
+                (
+                    "excluded by torch_executed_ops"
+                    if node_name in self.torch_executed_ops
+                    or node.target in self.torch_executed_ops
+                    else "no validated TensorRT converter"
+                ),
+            )
             return False
 
     def print_support_overview(self, num_trt_blocks: Optional[int] = None) -> None:
@@ -276,10 +307,14 @@ class TRTPartitioner(_SplitterBase):  # type: ignore
         Returns a GraphModule with submodules for each segment
         """
         unsupported = getattr(self.operator_support, "unsupported_operators", None)
+        # unsupported_operators leaves out operators with side effects, so also check
+        # fallback_operators, which records every refusal including random and in-place ops.
+        # Without it a model that must run such an op in PyTorch would pass as fully supported.
+        fallback = getattr(self.operator_support, "fallback_operators", None)
         # The explicit assumption comes from the compiler's earlier support walk.
         # Otherwise, an empty dict means AccNodesFinder found no unsupported ops.
         fully_supported = self.assume_full_support or (
-            isinstance(unsupported, dict) and len(unsupported) == 0
+            isinstance(unsupported, dict) and len(unsupported) == 0 and not fallback
         )
 
         # Fast path: user demanded a single TRT engine and every op is convertible.
@@ -312,9 +347,13 @@ class TRTPartitioner(_SplitterBase):  # type: ignore
         # Delegate nodes based on operator coverage
         subgraphs = self.put_nodes_into_subgraphs()
 
-        # A graph is fully supported if there is a single partition and all operators are supported/convertible
-        full_support = len([s for s in subgraphs if s.is_acc]) == 1 and not getattr(
-            self.operator_support, "unsupported_operators", True
+        # A graph is fully supported if there is a single partition and all operators are
+        # supported/convertible. As above, unsupported_operators excludes side-effecting ops,
+        # so also require fallback_operators to be empty.
+        full_support = (
+            len([s for s in subgraphs if s.is_acc]) == 1
+            and not getattr(self.operator_support, "unsupported_operators", True)
+            and not getattr(self.operator_support, "fallback_operators", False)
         )
 
         if not full_support and self.require_full_compilation:

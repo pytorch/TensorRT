@@ -236,3 +236,11 @@ Because the causal attention at position 1 covers positions 0..1, the two logits
 differ only if the KV written at position 0 persisted across `execute()` calls.
 The runner prints `[kv-check] PASS` and returns 0 on success, or fails if the
 two are identical (the update did not persist). It requires a CUDA device.
+
+That pair runs twice over, printing `caller stream: none` and then `caller
+stream: own`. The second scopes a `CallerStreamGuard` over the decode loop on a
+stream the runner creates, so the engine runs on that stream; the first leaves the
+caller stream unset, so it runs on `cudaStreamPerThread` instead. Both are streams
+a caller can put the backend on, and a `.pte` whose KV writes persist on one but
+not the other is still broken, so both have to pass. `execute()` waits for the
+engine before returning in either case.
