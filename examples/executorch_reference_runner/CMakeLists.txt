@@ -90,3 +90,17 @@ target_link_libraries(
     executorch::kernels
     executorch::backend_tensorrt
     CUDA::cudart)
+
+if(TORCHTRT_BUILD_EDGE_LLM_EXECUTORCH_BACKEND)
+  add_executable(edge_llm_prefill_decode_check edge_llm_prefill_decode_check.cpp)
+  target_link_libraries(
+    edge_llm_prefill_decode_check
+    PRIVATE
+      executorch
+      executorch::backends
+      executorch::extensions
+      executorch::kernels
+      executorch::backend_tensorrt
+      torchtrt::edge_llm_executorch_backend
+      CUDA::cudart)
+endif()

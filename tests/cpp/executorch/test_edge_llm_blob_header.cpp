@@ -78,6 +78,18 @@ TEST(ExecuTorchEdgeLLMBlobHeader, ParsesLanguagePrefillPayload) {
   EXPECT_EQ(header.blob_offset % BLOB_ALIGNMENT, 0);
 }
 
+TEST(ExecuTorchEdgeLLMBlobHeader, ParsesLanguageDecodePayload) {
+  auto metadata = language_metadata();
+  metadata.replace(metadata.find("\"runner\":\"llm_prefill\""), 22, "\"runner\":\"llm_decode\"");
+  const auto payload = make_payload(metadata);
+
+  EdgeLLMBlobHeader header;
+  ASSERT_TRUE(EdgeLLMBlobHeader::parse(payload.data(), payload.size(), header));
+
+  EXPECT_EQ(header.component, "language");
+  EXPECT_EQ(header.runner, "llm_decode");
+}
+
 TEST(ExecuTorchEdgeLLMBlobHeader, RejectsInvalidMagic) {
   auto payload = make_payload(valid_metadata());
   payload[0] = 'X';

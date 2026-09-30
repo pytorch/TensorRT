@@ -5,11 +5,17 @@ from pathlib import Path
 
 import torch
 from exporters.compile import compile_component
-from exporters.executorch import build_language_artifact, save_language_prefill_pte
+from exporters.executorch import (
+    EdgeOutputSpec,
+    build_language_artifact,
+    save_language_decode_pte,
+    save_language_prefill_pte,
+)
 from exporters.models.common.helpers import causal_lm_flat
 from exporters.models.common.patches import language_decoder
 from exporters.models.pi05.patches import PI05
 from exporters.models.pi05.spec import Pi05Spec
+from exporters.ops import call_engine
 from exporters.plugin.attention import ContextAttentionMaskType
 from exporters.plugin.attn_patches import apply_patches
 from exporters.plugin.plugin_utils import load_plugins_for_trt
@@ -34,6 +40,11 @@ def main() -> None:
         "--pte-path",
         type=Path,
         default=Path("/tmp/pi05_language_edge.pte"),
+    )
+    parser.add_argument(
+        "--decode-pte-path",
+        type=Path,
+        default=Path("/tmp/pi05_language_decode_edge.pte"),
     )
     parser.add_argument("--device-id", type=int, default=0)
     parser.add_argument("--max-seq-len", type=int, default=968)
@@ -67,6 +78,11 @@ def main() -> None:
         device=device,
         dtype=dtype,
         seq_len=args.prefill_len,
+    )
+    flat_inputs = (
+        *flat_inputs[:3],
+        torch.zeros(1, device=device, dtype=torch.int32),
+        *flat_inputs[4:],
     )
     input_names = list(metadata["input_names"])
     input_specs = Pi05Spec().create_dynamic_shapes(
@@ -103,9 +119,48 @@ def main() -> None:
 
     artifact = build_language_artifact(engine_path, device_id=args.device_id)
     save_language_prefill_pte(artifact, flat_inputs, args.pte_path)
+
+    decode_inputs = (
+        torch.randn(1, 1, hidden_size, device=device, dtype=dtype),
+        flat_inputs[1],
+        torch.full((1,), args.prefill_len + 1, device=device, dtype=torch.int32),
+        torch.full((1,), args.prefill_len, device=device, dtype=torch.int32),
+        torch.zeros(1, 1, device=device, dtype=torch.int64),
+        torch.zeros(
+            int(metadata["num_layers"]),
+            1,
+            1,
+            hidden_size,
+            device=device,
+            dtype=dtype,
+        ),
+        *flat_inputs[6:],
+    )
+    decode_outputs = call_engine(engine_path, "language", *decode_inputs)
+    decode_specs = tuple(
+        EdgeOutputSpec(
+            shape=tuple(output.shape),
+            dtype=str(output.dtype).removeprefix("torch."),
+        )
+        for output in decode_outputs
+    )
+    decode_artifact = build_language_artifact(
+        engine_path,
+        device_id=args.device_id,
+        runner="llm_decode",
+        output_specs=decode_specs,
+    )
+    save_language_decode_pte(
+        decode_artifact,
+        decode_inputs,
+        args.decode_pte_path,
+    )
+
     print(f"Saved fresh language engine under {engine_path}")
-    print(f"Saved EdgeLLMBackend program to {args.pte_path}")
-    print("Output shapes:", [tuple(output.shape) for output in outputs])
+    print(f"Saved prefill EdgeLLMBackend program to {args.pte_path}")
+    print(f"Saved decode EdgeLLMBackend program to {args.decode_pte_path}")
+    print("Prefill output shapes:", [tuple(output.shape) for output in outputs])
+    print("Decode output shapes:", [tuple(output.shape) for output in decode_outputs])
 
 
 if __name__ == "__main__":

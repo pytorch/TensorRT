@@ -15,6 +15,7 @@ class EdgeLLMOperatorSupport(OperatorSupportBase):  # type: ignore[misc]
         {
             "edge_llm::vision_tower",
             "edge_llm::language_prefill",
+            "edge_llm::language_decode",
         }
     )
 

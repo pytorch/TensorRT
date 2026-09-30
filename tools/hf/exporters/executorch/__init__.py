@@ -19,8 +19,10 @@ __all__ = [
     "build_language_artifact",
     "build_vision_artifact",
     "deserialize_edge_component",
+    "lower_language_decode_to_executorch",
     "lower_language_prefill_to_executorch",
     "lower_vision_to_executorch",
+    "save_language_decode_pte",
     "save_language_prefill_pte",
     "save_vision_pte",
     "serialize_edge_component",
@@ -44,6 +46,13 @@ def __getattr__(name: str) -> Any:
         from . import artifact
 
         return getattr(artifact, name)
+    if name in {
+        "lower_language_decode_to_executorch",
+        "save_language_decode_pte",
+    }:
+        from . import decode
+
+        return getattr(decode, name)
     if name in {
         "lower_language_prefill_to_executorch",
         "save_language_prefill_pte",
