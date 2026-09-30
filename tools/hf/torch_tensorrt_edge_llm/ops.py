@@ -223,6 +223,103 @@ def call_vision_tower(
     return tuple(out)
 
 
+def _pi05_metadata(
+    metadata_json: str, component: str, runner: str, outputs: int
+) -> EdgeComponentMetadata:
+    metadata = EdgeComponentMetadata.from_json(metadata_json)
+    if metadata.component != component or metadata.runner != runner:
+        raise ValueError(
+            f"Expected Edge component {component!r}/{runner!r}, got {metadata.component!r}/{metadata.runner!r}"
+        )
+    if len(metadata.outputs) != outputs:
+        raise ValueError(
+            f"{runner} requires {outputs} outputs, got {len(metadata.outputs)}"
+        )
+    return metadata
+
+
+def _fake_component_outputs(
+    metadata: EdgeComponentMetadata, reference: torch.Tensor
+) -> list[torch.Tensor]:
+    result = []
+    for spec in metadata.outputs:
+        dtype = getattr(torch, spec.dtype, None)
+        if not isinstance(dtype, torch.dtype):
+            raise ValueError(f"Unsupported Edge output dtype {spec.dtype!r}")
+        result.append(torch.empty(spec.shape, dtype=dtype, device=reference.device))
+    return result
+
+
+@torch.library.custom_op("tensorrt_edge_llm::llm_prefill", mutates_args=())
+def llm_prefill(
+    inputs_embeds: torch.Tensor,
+    attention_mask: torch.Tensor,
+    position_ids: torch.Tensor,
+    trt_blob: torch.Tensor,
+    metadata_json: str,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """PI0.5 bidirectional prefix prefill; returns hidden states and stacked K/V.
+
+    Each invocation creates a fresh prefix. The input tensors are read-only and
+    the returned [layers,batch,kv_heads,prefix_tokens,head_dim] caches are explicit
+    outputs consumed by the action expert. No autoregressive session is hidden
+    in the native handle.
+    """
+    metadata = _pi05_metadata(metadata_json, "language", "pi05_prefill", 3)
+    compiled = _get_embedded_engine(trt_blob, metadata)
+    return tuple(_as_tuple(compiled(inputs_embeds, attention_mask, position_ids)))
+
+
+@llm_prefill.register_fake
+def _(
+    inputs_embeds: torch.Tensor,
+    attention_mask: torch.Tensor,
+    position_ids: torch.Tensor,
+    trt_blob: torch.Tensor,
+    metadata_json: str,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    return tuple(
+        _fake_component_outputs(
+            _pi05_metadata(metadata_json, "language", "pi05_prefill", 3), inputs_embeds
+        )
+    )
+
+
+@torch.library.custom_op("tensorrt_edge_llm::action_expert", mutates_args=())
+def action_expert(
+    x_t: torch.Tensor,
+    timestep: torch.Tensor,
+    prefix_k: torch.Tensor,
+    prefix_v: torch.Tensor,
+    position_ids: torch.Tensor,
+    attention_mask: torch.Tensor,
+    trt_blob: torch.Tensor,
+    metadata_json: str,
+) -> torch.Tensor:
+    """PI0.5 action velocity at one timestep, with read-only prefix K/V."""
+    metadata = _pi05_metadata(metadata_json, "action", "pi05_action", 1)
+    compiled = _get_embedded_engine(trt_blob, metadata)
+    return _as_tuple(
+        compiled(x_t, timestep, prefix_k, prefix_v, position_ids, attention_mask)
+    )[0]
+
+
+@action_expert.register_fake
+def _(
+    x_t: torch.Tensor,
+    timestep: torch.Tensor,
+    prefix_k: torch.Tensor,
+    prefix_v: torch.Tensor,
+    position_ids: torch.Tensor,
+    attention_mask: torch.Tensor,
+    trt_blob: torch.Tensor,
+    metadata_json: str,
+) -> torch.Tensor:
+    return _fake_component_outputs(
+        _pi05_metadata(metadata_json, "action", "pi05_action", 1), x_t
+    )[0]
+
+
 @torch.library.custom_op("tensorrt_edge_llm::fuse_prefix", mutates_args=())  # type: ignore[misc]
 def fuse_prefix(
     vision_tokens: torch.Tensor,

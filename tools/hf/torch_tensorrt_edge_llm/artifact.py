@@ -24,6 +24,86 @@ def _dtype_name(value: Any) -> str:
     return str(value).removeprefix("torch.")
 
 
+PI05_COMPONENT_INPUTS = {
+    "language": ("inputs_embeds", "attention_mask", "position_ids"),
+    "action": (
+        "x_t",
+        "timestep",
+        "prefix_k",
+        "prefix_v",
+        "position_ids",
+        "attention_mask",
+    ),
+}
+
+PI05_COMPONENT_OUTPUTS = {
+    "language": ("lm_hidden_states", "prefix_k", "prefix_v"),
+    "action": ("velocity",),
+}
+
+
+def build_pi05_component_artifact(
+    engine_dir: str | Path, *, component: str, device_id: int = 0
+) -> EdgeExecuTorchArtifact:
+    """Embed one PI0.5 component with fixed semantic and engine binding order."""
+    if component not in PI05_COMPONENT_INPUTS:
+        raise ValueError(f"Unsupported PI0.5 component {component!r}")
+    directory = Path(engine_dir)
+    try:
+        config = json.loads((directory / "config.json").read_text())
+        if config["component"] != component:
+            raise ValueError(f"Expected {component} component at {directory}")
+        if tuple(config["input_names"]) != PI05_COMPONENT_INPUTS[component]:
+            raise ValueError(f"Invalid PI0.5 {component} input contract")
+        if tuple(config["output_names"]) != PI05_COMPONENT_OUTPUTS[component]:
+            raise ValueError(f"Invalid PI0.5 {component} output contract")
+        outputs = tuple(
+            EdgeOutputSpec.from_dict(
+                {"shape": item["shape"], "dtype": _dtype_name(item["dtype"])}
+            )
+            for item in config["outputs"]
+        )
+        if len(outputs) != len(PI05_COMPONENT_OUTPUTS[component]):
+            raise ValueError(f"Invalid PI0.5 {component} output specifications")
+        input_bindings = config.get("trt_input_names", config["input_names"])
+        output_bindings = config.get("trt_output_names", config["output_names"])
+        if len(input_bindings) != len(PI05_COMPONENT_INPUTS[component]) or len(
+            output_bindings
+        ) != len(outputs):
+            raise ValueError(f"Invalid PI0.5 {component} engine binding counts")
+        engine = (directory / config["engine_file"]).read_bytes()
+    except (OSError, KeyError, TypeError, json.JSONDecodeError) as error:
+        raise ValueError(f"Invalid PI0.5 component at {directory}") from error
+    metadata = TensorRTBlobMetadata(
+        io_bindings=[
+            *[TensorRTIOBinding(name=name, is_input=True) for name in input_bindings],
+            *[
+                TensorRTIOBinding(
+                    name=name,
+                    dtype=output.dtype,
+                    shape=list(output.shape),
+                    is_input=False,
+                )
+                for name, output in zip(output_bindings, outputs)
+            ],
+        ],
+        device_id=device_id,
+    )
+    return EdgeExecuTorchArtifact(
+        serialize_engine(engine, metadata),
+        EdgeComponentMetadata(
+            component=component,
+            runner=f"pi05_{'prefill' if component == 'language' else 'action'}",
+            outputs=outputs,
+            runner_config={
+                "policy": "pi05",
+                "input_names": list(PI05_COMPONENT_INPUTS[component]),
+                "output_names": list(PI05_COMPONENT_OUTPUTS[component]),
+            },
+        ).to_json(),
+    )
+
+
 def build_vision_artifact(
     engine_dir: str | Path,
     *,
