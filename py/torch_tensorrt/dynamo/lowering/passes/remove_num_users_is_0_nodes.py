@@ -16,6 +16,10 @@ def remove_num_users_is_0_nodes(
     gm: torch.fx.GraphModule, settings: CompilationSettings
 ) -> torch.fx.GraphModule:
     """Remove ops that [num_users=0] in the graph"""
+    from torch_tensorrt.dynamo.conversion.plugins._auto_functionalized_converter import (
+        _is_matching_writeback,
+    )
+
     nodes = list(gm.graph.nodes)
     output_node = nodes[-1]
 
@@ -24,13 +28,10 @@ def remove_num_users_is_0_nodes(
             node != output_node
             and len(node.users) == 0
             and len(node.all_input_nodes) > 0
-            # Mutable operators can write graph inputs even when their result
-            # is unused. Keep these writes for auto-functionalized plugins.
-            and not (
-                node.op == "call_function"
-                and isinstance(node.target, torch._ops.OpOverload)
-                and node.target._schema.is_mutable
-            )
+            # Functionalized custom ops write back to their inputs even when
+            # the model returns None. Other unused writes (e.g. to buffers
+            # baked into a standalone engine) retain the existing removal.
+            and not _is_matching_writeback(node)
         ):
             gm.graph.erase_node(node)
 
