@@ -307,10 +307,14 @@ class TRTPartitioner(_SplitterBase):  # type: ignore
         Returns a GraphModule with submodules for each segment
         """
         unsupported = getattr(self.operator_support, "unsupported_operators", None)
+        # unsupported_operators leaves out operators with side effects, so also check
+        # fallback_operators, which records every refusal including random and in-place ops.
+        # Without it a model that must run such an op in PyTorch would pass as fully supported.
+        fallback = getattr(self.operator_support, "fallback_operators", None)
         # The explicit assumption comes from the compiler's earlier support walk.
         # Otherwise, an empty dict means AccNodesFinder found no unsupported ops.
         fully_supported = self.assume_full_support or (
-            isinstance(unsupported, dict) and len(unsupported) == 0
+            isinstance(unsupported, dict) and len(unsupported) == 0 and not fallback
         )
 
         # Fast path: user demanded a single TRT engine and every op is convertible.
@@ -343,9 +347,13 @@ class TRTPartitioner(_SplitterBase):  # type: ignore
         # Delegate nodes based on operator coverage
         subgraphs = self.put_nodes_into_subgraphs()
 
-        # A graph is fully supported if there is a single partition and all operators are supported/convertible
-        full_support = len([s for s in subgraphs if s.is_acc]) == 1 and not getattr(
-            self.operator_support, "unsupported_operators", True
+        # A graph is fully supported if there is a single partition and all operators are
+        # supported/convertible. As above, unsupported_operators excludes side-effecting ops,
+        # so also require fallback_operators to be empty.
+        full_support = (
+            len([s for s in subgraphs if s.is_acc]) == 1
+            and not getattr(self.operator_support, "unsupported_operators", True)
+            and not getattr(self.operator_support, "fallback_operators", False)
         )
 
         if not full_support and self.require_full_compilation:
