@@ -27,6 +27,7 @@ from torch._ops import OpOverloadPacket
 from torch.fx.node import Argument, Node, Target, _get_qualified_name
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
+from torch_tensorrt.dynamo.partitioning.common import node_in_torch_executed_module
 
 import tensorrt as trt
 
@@ -448,6 +449,13 @@ class ConverterRegistry:
         ):
             raise KeyError(
                 f"A converter exists for {key}, but it was " "explicitly disallowed"
+            )
+        if self.compilation_settings and node_in_torch_executed_module(
+            node, self.compilation_settings.torch_executed_modules
+        ):
+            raise KeyError(
+                f"Node {node.name} is in a module listed in torch_executed_modules, "
+                "so its converter is disallowed"
             )
 
         # Iterate over all registries, validating the converter on the input node
