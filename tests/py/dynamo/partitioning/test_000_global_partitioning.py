@@ -10,6 +10,9 @@ import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo import partitioning
+from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
+    UnsupportedOperatorException,
+)
 
 
 class TestGlobalPartitioning(TestCase):
@@ -193,6 +196,24 @@ class TestGlobalPartitioning(TestCase):
                 use_fast_partitioner=use_fast_partitioner,
                 **exclusion_kwargs,
             )
+
+    def test_convert_to_trt_engine_rejects_torch_executed_modules(self):
+        mod = (
+            torch.nn.Sequential(torch.nn.Conv2d(3, 8, 3, padding=1), torch.nn.ReLU())
+            .eval()
+            .to("cuda")
+        )
+        inputs = torch.rand((1, 3, 4, 4)).to("cuda")
+        exp_program = torch.export.export(mod, (inputs,))
+        with self.assertRaises(UnsupportedOperatorException) as ctx:
+            torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_engine(
+                exp_program,
+                arg_inputs=[inputs],
+                min_block_size=1,
+                torch_executed_modules=["torch.nn.modules.conv.Conv2d"],
+            )
+        # Convolution is normally convertible, so its rejection comes from the exclusion
+        self.assertIn("convolution", str(ctx.exception.__cause__))
 
 
 if __name__ == "__main__":
