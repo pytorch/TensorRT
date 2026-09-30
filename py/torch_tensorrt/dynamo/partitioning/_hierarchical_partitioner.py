@@ -60,6 +60,10 @@ class BackendOpSupportTester(ops.OperatorSupportBase):  # type: ignore
         # Initialize sets of supported/unsupported operators
         self.supported_operators: Dict[str, int] = {}
         self.unsupported_operators: Dict[str, int] = {}
+        # unsupported_operators skips operators with side effects, so it cannot tell whether
+        # a random or in-place op was refused. Record those here so require_full_compilation
+        # can reject them.
+        self.fallback_operators: Dict[str, int] = {}
         self.torch_executed_ops = torch_executed_ops
         # Map of backend names to sets of supported operators
         self.backend_support_map = backend_support_map
@@ -96,6 +100,15 @@ class BackendOpSupportTester(ops.OperatorSupportBase):  # type: ignore
                         self.unsupported_operators[node_name] = 1
                     else:
                         self.unsupported_operators[node_name] += 1
+                # Record impure refusals separately, since the gate above skips them.
+                if (
+                    i == len(self.backend_priority) - 1
+                    and node.is_impure()
+                    and node.op in CALLABLE_NODE_OPS
+                ):
+                    self.fallback_operators[node_name] = (
+                        self.fallback_operators.get(node_name, 0) + 1
+                    )
 
         return False, NON_ACC_BACKEND_NAME
 
@@ -248,9 +261,13 @@ class HierarchicalAdjacencyPartitioner(_SplitterBase):  # type: ignore
         # Delegate nodes based on operator coverage
         subgraphs = self.put_nodes_into_subgraphs()
 
-        # A graph is fully supported if there is a single partition and all operators are supported/convertible
-        full_support = len([s for s in subgraphs if s.is_acc]) == 1 and not getattr(
-            self.operator_support, "unsupported_operators", True
+        # A graph is fully supported if there is a single partition and all operators are
+        # supported/convertible. unsupported_operators leaves out operators with side effects,
+        # so also check fallback_operators, which records refused random and in-place ops.
+        full_support = (
+            len([s for s in subgraphs if s.is_acc]) == 1
+            and not getattr(self.operator_support, "unsupported_operators", True)
+            and not getattr(self.operator_support, "fallback_operators", False)
         )
 
         if not full_support and self.require_full_compilation:

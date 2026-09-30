@@ -69,9 +69,15 @@ class TRTPartitioner(CapabilityBasedPartitioner):  # type: ignore[misc]
         initial_proposed_partitions = super().propose_partitions()
         partitions = dict(enumerate(initial_proposed_partitions))
 
-        # A graph is fully supported if there is a single partition and all operators are supported/convertible
-        full_support = len(partitions) == 1 and not getattr(
-            self.operator_support, "unsupported_operators", True
+        # A graph is fully supported if there is a single partition and all operators are
+        # supported/convertible. unsupported_operators does not include operators with side
+        # effects, such as random or in-place ops, so also check fallback_operators, which
+        # records every refusal including those. Otherwise a model that must run a random op
+        # in PyTorch would pass require_full_compilation.
+        full_support = (
+            len(partitions) == 1
+            and not getattr(self.operator_support, "unsupported_operators", True)
+            and not getattr(self.operator_support, "fallback_operators", False)
         )
 
         if not full_support and self.require_full_compilation:
