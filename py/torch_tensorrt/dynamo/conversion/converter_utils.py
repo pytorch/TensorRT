@@ -46,7 +46,8 @@ def get_node_name(node: torch.fx.Node) -> str:
     # network architecture.
     stack_item = node.meta.get("nn_module_stack", None)
     # The current node is the last item in the stack
-    mod_stack = stack_item.popitem() if stack_item else ""
+    # Read without popping: mutating node.meta would drop the innermost module from the stack
+    mod_stack = next(reversed(stack_item.items())) if stack_item else ""
     node_name = str(node)
     if mod_stack:
         mod_name = mod_stack[1][0]
