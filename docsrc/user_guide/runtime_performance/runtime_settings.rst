@@ -30,20 +30,24 @@ emits a ``UserWarning``.
 ----
 
 The three ways to apply settings
---------------------------------
+---------------------------------
 
-Direct assignment — permanent
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``apply_runtime_settings(...)`` — permanent apply
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Use for any permanent assignment on in-process compiled models:
 
 .. code-block:: python
 
     import torch_tensorrt
-    from torch_tensorrt.runtime import RuntimeSettings
+    from torch_tensorrt.runtime import RuntimeSettings, apply_runtime_settings
 
     mod = torch_tensorrt.compile(model, inputs=inputs)
-    mod.runtime_settings = RuntimeSettings(runtime_cache="/var/cache/jit.bin")
+    apply_runtime_settings(mod, RuntimeSettings(runtime_cache="/var/cache/jit.bin"))
 
-Use when you want the setting to apply for the module's lifetime.
+:func:`apply_runtime_settings` walks all TRT subgraphs under ``mod`` and
+applies ``settings`` to each one. It returns the number of engines updated and
+raises :exc:`RuntimeError` if no TRT engines are found.
 
 ``runtime_config(...)`` context manager — scoped override
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -283,10 +287,10 @@ Construct your own handle if you want full lifetime control:
 
 .. code-block:: python
 
-    from torch_tensorrt.runtime import RuntimeCache, RuntimeSettings
+    from torch_tensorrt.runtime import RuntimeCache, RuntimeSettings, apply_runtime_settings
 
     handle = RuntimeCache(path="/var/cache/jit.bin", autosave_on_del=True)
-    mod.runtime_settings = RuntimeSettings(runtime_cache=handle)
+    apply_runtime_settings(mod, RuntimeSettings(runtime_cache=handle))
     out = mod(x)
     # handle.save() will fire when handle goes out of scope (autosave_on_del=True)
 
@@ -296,9 +300,48 @@ Or with explicit save/load:
 
     handle = RuntimeCache(path="/var/cache/jit.bin")  # autosave_on_del=False default
     handle.load()
-    mod.runtime_settings = RuntimeSettings(runtime_cache=handle)
+    apply_runtime_settings(mod, RuntimeSettings(runtime_cache=handle))
     out = mod(x)
     handle.save()
+
+AOT-loaded artifacts (``ExportedProgram`` / ``GraphModule``)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Engines loaded with :func:`torch_tensorrt.load` have no
+:class:`TorchTensorRTModule`, so the context managers cannot restore settings
+on exit and will raise. Use :func:`apply_runtime_settings` with a caller-owned
+:class:`RuntimeCache` instead:
+
+.. code-block:: python
+
+    import torch_tensorrt
+    from torch_tensorrt.runtime import RuntimeCache, RuntimeSettings, apply_runtime_settings
+
+    ep = torch_tensorrt.load("model.ep")
+    gm = ep.module()
+
+    cache = RuntimeCache(path="/var/cache/jit.bin")
+    cache.load()  # caller's responsibility — no module to auto-warm the cache
+
+    apply_runtime_settings(gm, RuntimeSettings(runtime_cache=cache))
+    out = gm(x)
+    cache.save()
+
+``settings.runtime_cache`` must be ``None`` or a :class:`RuntimeCache` you own
+for module-less engines — a path string raises :exc:`TypeError` because there
+is no module to build and save the handle.
+
+:func:`apply_runtime_settings` also accepts the :class:`~torch.export.ExportedProgram`
+directly, which is equivalent to passing ``ep.module()``:
+
+.. code-block:: python
+
+    apply_runtime_settings(ep, RuntimeSettings(runtime_cache=cache))
+
+.. note::
+
+   Runtime settings are never serialized.  They do not survive
+   :func:`torch_tensorrt.save`; re-apply after each :func:`torch_tensorrt.load`.
 
 ----
 
@@ -314,7 +357,7 @@ before that and you get **one** context create:
 .. code-block:: python
 
     mod = torch_tensorrt.compile(...)
-    mod.runtime_settings = RuntimeSettings(cuda_graph_strategy="whole_graph_capture")
+    apply_runtime_settings(mod, RuntimeSettings(cuda_graph_strategy="whole_graph_capture"))
     out = mod(x)  # single createExecutionContext call here
 
 Apply settings *after* first execute and you get **two**:
@@ -323,7 +366,7 @@ Apply settings *after* first execute and you get **two**:
 
     mod = torch_tensorrt.compile(...)
     out = mod(x)  # context created with defaults
-    mod.runtime_settings = RuntimeSettings(cuda_graph_strategy="whole_graph_capture")
+    apply_runtime_settings(mod, RuntimeSettings(cuda_graph_strategy="whole_graph_capture"))
     out = mod(x)  # context invalidated + recreated
 
 On RTX, each ``createExecutionContext`` JIT-compiles the specialized kernel
@@ -333,8 +376,8 @@ NCCL engines pay the extra create
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 NCCL-collective engines eagerly materialize the context at setup (cross-rank
-barrier ordering). Any subsequent ``mod.runtime_settings = ...`` triggers a
-second create. This is a documented trade-off — apply settings before any
+barrier ordering). Any subsequent :func:`apply_runtime_settings` call triggers
+a second create. This is a documented trade-off — apply settings before any
 inference if you can, but the eager bind is non-negotiable for NCCL safety.
 
 Default ``runtime_cache`` is shared per-user — concurrent processes can lose kernels
@@ -354,10 +397,10 @@ matter:
 .. code-block:: python
 
     # Option 1: per-worker path
-    mod.runtime_settings = RuntimeSettings(runtime_cache=f"/var/cache/jit-worker-{worker_id}.bin")
+    apply_runtime_settings(mod, RuntimeSettings(runtime_cache=f"/var/cache/jit-worker-{worker_id}.bin"))
 
     # Option 2: opt out
-    mod.runtime_settings = RuntimeSettings(runtime_cache=None)
+    apply_runtime_settings(mod, RuntimeSettings(runtime_cache=None))
 
 Don't nest ``runtime_cache(...)`` CMs with the same path
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -376,22 +419,14 @@ re-attached (different ``IRuntimeCache`` from ``rc2``), and ``rc1.save()``
 overwrites ``/p`` with the now-stale ``rc1`` state. **Last writer wins;
 mid-block kernels are silently lost.**
 
-Setter is per-``TorchTensorRTModule``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``apply_runtime_settings`` reaches all subgraphs automatically
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-``mod.runtime_settings = rs`` only affects ``self``. If you compile a model
-with multiple TRT subgraphs, walk the submodules:
-
-.. code-block:: python
-
-    from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
-
-    for _, sub in compiled.named_modules():
-        if isinstance(sub, TorchTensorRTModule):
-            sub.runtime_settings = RuntimeSettings(...)
-
-``runtime_config(...)`` and ``runtime_cache(...)`` do this walk automatically
-— that is the easier API for compound models.
+A compiled model with multiple TRT subgraphs has one
+:class:`TorchTensorRTModule` per subgraph. Calling
+:func:`apply_runtime_settings` on the top-level module (or an
+:class:`~torch.export.ExportedProgram`) walks all of them in one call — you do
+not need to iterate submodules manually. The context managers do the same walk.
 
 Non-TensorRT-RTX builds emit a warning, do nothing
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -413,8 +448,8 @@ Quick reference
 
    * - Goal
      - API
-   * - Set a runtime knob permanently on one module
-     - ``mod.runtime_settings = RuntimeSettings(...)``
+   * - Set a runtime knob permanently (compiled or AOT-loaded)
+     - ``apply_runtime_settings(mod_or_ep, RuntimeSettings(...))``
    * - Temporary override for one call site
      - ``with runtime_config(mod, **overrides):``
    * - Just the dynamic-shapes kernel strategy
