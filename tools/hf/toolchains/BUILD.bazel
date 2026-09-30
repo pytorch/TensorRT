@@ -1,1 +1,1 @@
-exports_files(["local_edge_llm.bzl"])
+exports_files(["native_sdk.bzl"])

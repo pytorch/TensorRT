@@ -11,7 +11,13 @@ from torch.fx.passes.operator_support import OperatorSupportBase
 class EdgeLLMOperatorSupport(OperatorSupportBase):  # type: ignore[misc]
     """Recognizes named Edge component operators, starting with vision."""
 
-    _SUPPORTED_OPS = frozenset({"tensorrt_edge_llm::vision_tower"})
+    _SUPPORTED_OPS = frozenset(
+        {
+            "tensorrt_edge_llm::vision_tower",
+            "tensorrt_edge_llm::llm_prefill",
+            "tensorrt_edge_llm::action_expert",
+        }
+    )
 
     def is_node_supported(
         self, submodules: Dict[str, torch.nn.Module], node: torch.fx.Node

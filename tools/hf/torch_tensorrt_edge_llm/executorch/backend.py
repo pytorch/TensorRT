@@ -12,13 +12,16 @@ from executorch.exir.backend.backend_details import (
     PreprocessResult,
 )
 from torch.export import ExportedProgram
-
 from torch_tensorrt_edge_llm.serialization import (
     EdgeComponentMetadata,
     serialize_edge_component,
 )
 
-_VISION_SCHEMA = "tensorrt_edge_llm::vision_tower"
+_COMPONENT_SCHEMAS = {
+    "tensorrt_edge_llm::vision_tower": (1, 2, "vision", "vit", 1),
+    "tensorrt_edge_llm::llm_prefill": (3, 4, "language", "pi05_prefill", 3),
+    "tensorrt_edge_llm::action_expert": (6, 7, "action", "pi05_action", 1),
+}
 
 
 def _schema_name(target: Any) -> str:
@@ -27,11 +30,12 @@ def _schema_name(target: Any) -> str:
     return ""
 
 
-def _vision_nodes(program: ExportedProgram) -> list[torch.fx.Node]:
+def _component_nodes(program: ExportedProgram) -> list[torch.fx.Node]:
     return [
         node
         for node in program.graph_module.graph.nodes
-        if node.op == "call_function" and _schema_name(node.target) == _VISION_SCHEMA
+        if node.op == "call_function"
+        and _schema_name(node.target) in _COMPONENT_SCHEMAS
     ]
 
 
@@ -74,31 +78,39 @@ class EdgeLLMBackend(BackendDetails):  # type: ignore[misc]
         compile_specs: list[CompileSpec],
     ) -> PreprocessResult:
         del compile_specs
-        nodes = _vision_nodes(edge_program)
+        nodes = _component_nodes(edge_program)
         if len(nodes) != 1:
             raise RuntimeError(
-                "EdgeLLMBackend expects exactly one vision_tower node per "
+                "EdgeLLMBackend expects exactly one component node per "
                 f"partition, found {len(nodes)}"
             )
 
         node = nodes[0]
-        if len(node.args) != 3:
+        payload_index, metadata_index, component, runner, num_outputs = (
+            _COMPONENT_SCHEMAS[_schema_name(node.target)]
+        )
+        if len(node.args) != metadata_index + 1:
             raise RuntimeError(
-                "tensorrt_edge_llm::vision_tower must receive tensors, trt_blob, and "
+                f"{_schema_name(node.target)} must receive its inputs, trt_blob, and "
                 f"metadata_json; found {len(node.args)} arguments"
             )
-        trt_blob_node = node.args[1]
-        metadata_json = node.args[2]
+        trt_blob_node = node.args[payload_index]
+        metadata_json = node.args[metadata_index]
         if not isinstance(trt_blob_node, torch.fx.Node):
-            raise ValueError("vision_tower trt_blob argument is not a graph value")
+            raise ValueError("Component trt_blob argument is not a graph value")
         if not isinstance(metadata_json, str):
-            raise ValueError("vision_tower metadata_json argument must be a string")
+            raise ValueError("Component metadata_json argument must be a string")
 
         metadata = EdgeComponentMetadata.from_json(metadata_json)
-        if metadata.component != "vision" or metadata.runner != "vit":
+        if (
+            metadata.component != component
+            or metadata.runner != runner
+            or len(metadata.outputs) != num_outputs
+        ):
             raise ValueError(
-                "vision_tower payload must select component='vision' and "
-                f"runner='vit', got {metadata.component!r}/{metadata.runner!r}"
+                f"Operator payload must select component={component!r}, runner={runner!r}, "
+                f"and {num_outputs} outputs; got {metadata.component!r}/{metadata.runner!r} "
+                f"with {len(metadata.outputs)} outputs"
             )
 
         trt_blob = _resolve_tensor_constant(edge_program, trt_blob_node)

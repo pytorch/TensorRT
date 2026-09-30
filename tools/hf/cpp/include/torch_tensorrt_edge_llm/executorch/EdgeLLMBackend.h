@@ -1,25 +1,10 @@
 #pragma once
 
-#include <cuda_runtime.h>
 #include <executorch/runtime/backend/interface.h>
-
-#include <executorch/vitExecutorchAdapter.h>
-
-#include <memory>
-#include <mutex>
+#include <torch_tensorrt/executorch/TensorRTBackend.h>
 
 namespace torch_tensorrt_edge_llm {
 namespace executorch_backend {
-
-struct EdgeLLMHandle {
-  int device_id = 0;
-  std::unique_ptr<trt_edgellm::executorch::VitExecutorchAdapter> vision_runner;
-  std::mutex mu;
-  cudaEvent_t inflight_event = nullptr;
-  bool inflight_pending = false;
-
-  ~EdgeLLMHandle();
-};
 
 class EdgeLLMBackend final : public ::executorch::runtime::BackendInterface {
  public:
@@ -36,6 +21,9 @@ class EdgeLLMBackend final : public ::executorch::runtime::BackendInterface {
       ::executorch::runtime::Span<::executorch::runtime::EValue*> args) const override;
 
   void destroy(::executorch::runtime::DelegateHandle* handle) const override;
+
+ private:
+  ::torch_tensorrt::executorch_backend::TensorRTBackend engine_backend_;
 };
 
 } // namespace executorch_backend

@@ -17,8 +17,7 @@ cc_library(
     target_compatible_with = ["@platforms//os:linux"],
     deps = [
         ":blob_header",
-        "@tensorrt_edge_llm//:executorch_adapter",
-        "@torch_tensorrt//cpp:tensorrt_executorch_backend",
+        "@torchtrt_native//:backend",
     ],
     linkopts = ["-pthread"],
     alwayslink = True,

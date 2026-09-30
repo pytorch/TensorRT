@@ -98,6 +98,20 @@ TEST(ExecuTorchEdgeLLMBlobHeader, RejectsNestedBlobPastPayload) {
   EXPECT_FALSE(EdgeLLMBlobHeader::parse(payload.data(), payload.size(), header));
 }
 
+TEST(ExecuTorchEdgeLLMBlobHeader, ParsesPi05PrefillAndActionContracts) {
+  for (const auto& role : std::vector<std::pair<std::string, std::string>>{
+           {"language", "pi05_prefill"}, {"action", "pi05_action"}}) {
+    auto metadata = valid_metadata();
+    metadata.replace(metadata.find("\"component\":\"vision\""), 20, "\"component\":\"" + role.first + "\"");
+    metadata.replace(metadata.find("\"runner\":\"vit\""), 14, "\"runner\":\"" + role.second + "\"");
+    const auto payload = make_payload(metadata);
+    EdgeLLMBlobHeader header;
+    ASSERT_TRUE(EdgeLLMBlobHeader::parse(payload.data(), payload.size(), header));
+    EXPECT_EQ(header.component, role.first);
+    EXPECT_EQ(header.runner, role.second);
+  }
+}
+
 } // namespace
 } // namespace executorch_backend
 } // namespace torch_tensorrt_edge_llm

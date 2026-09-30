@@ -75,3 +75,105 @@ def test_prefill_rejects_other_runtime_contract():
             torch.zeros(1, dtype=torch.uint8),
             metadata("language", "autoregressive", [(1, 3, 2)]),
         )
+
+
+def test_pi05_components_lower_with_constants_consumed_by_delegate(tmp_path):
+    pytest.importorskip("executorch.exir")
+    from executorch.exir._serialize._program import deserialize_pte_binary
+    from torch_tensorrt import save
+    from torch_tensorrt.executorch.serialization import (
+        TensorRTBlobMetadata,
+        TensorRTIOBinding,
+        serialize_engine,
+    )
+    from torch_tensorrt_edge_llm import EdgeLLMPartitioner
+    from torch_tensorrt_edge_llm.serialization import deserialize_edge_component
+
+    class PrefixAndAction(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.prefill_metadata = metadata(
+                "language",
+                "pi05_prefill",
+                [(1, 3, 2), (1, 1, 1, 3, 2), (1, 1, 1, 3, 2)],
+            )
+            self.action_metadata = metadata("action", "pi05_action", [(1, 2, 2)])
+            for name, inputs, outputs in [("prefill", 3, 3), ("action", 6, 1)]:
+                payload = serialize_engine(
+                    b"test-engine",
+                    TensorRTBlobMetadata(
+                        io_bindings=[
+                            *[
+                                TensorRTIOBinding(f"in{i}", is_input=True)
+                                for i in range(inputs)
+                            ],
+                            *[
+                                TensorRTIOBinding(f"out{i}", is_input=False)
+                                for i in range(outputs)
+                            ],
+                        ]
+                    ),
+                )
+                self.register_buffer(
+                    name, torch.frombuffer(bytearray(payload), dtype=torch.uint8)
+                )
+
+        def forward(
+            self,
+            embeds,
+            prefix_mask,
+            prefix_positions,
+            noise,
+            time,
+            action_positions,
+            action_mask,
+        ):
+            _, k, v = ops.llm_prefill(
+                embeds,
+                prefix_mask,
+                prefix_positions,
+                self.prefill,
+                self.prefill_metadata,
+            )
+            return ops.action_expert(
+                noise,
+                time,
+                k,
+                v,
+                action_positions,
+                action_mask,
+                self.action,
+                self.action_metadata,
+            )
+
+    args = (
+        torch.randn(1, 3, 2),
+        torch.zeros(1, 1, 3, 3),
+        torch.arange(3).unsqueeze(0),
+        torch.randn(1, 2, 2),
+        torch.ones(1),
+        torch.arange(2).unsqueeze(0),
+        torch.zeros(1, 1, 2, 5),
+    )
+    exported = torch.export.export(PrefixAndAction(), args)
+    path = tmp_path / "pi05_step.pte"
+    save(
+        exported,
+        str(path),
+        output_format="executorch",
+        partitioners=[EdgeLLMPartitioner()],
+    )
+    restored = deserialize_pte_binary(path.read_bytes()).program
+    plan = restored.execution_plan[0]
+    assert [delegate.id for delegate in plan.delegates] == [
+        "EdgeLLMBackend",
+        "EdgeLLMBackend",
+    ]
+    roles = []
+    for delegate in plan.delegates:
+        _, spec = deserialize_edge_component(
+            restored.backend_delegate_data[delegate.processed.index].data
+        )
+        roles.append(spec.runner)
+    assert roles == ["pi05_prefill", "pi05_action"]
+    assert len(plan.inputs) == 7

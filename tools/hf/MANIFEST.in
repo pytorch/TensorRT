@@ -1,4 +1,4 @@
 include README.rst MODULE.bazel BUILD.bazel .bazelversion .bazelrc
 recursive-include cpp *.cpp *.h BUILD.bazel CMakeLists.txt
 recursive-include toolchains *.bzl BUILD.bazel
-recursive-include examples *.cpp CMakeLists.txt
+recursive-include examples *.cpp *.py CMakeLists.txt
