@@ -211,6 +211,11 @@ _L0: list[Suite] = [
         paths=("api/",),
         setup=("hub",),
         variants=("standard",),
+        # g5.8xlarge rather than the default g5.4xlarge validation runner:
+        # this suite was dying on the smaller pod without surfacing a test
+        # failure -- in one run the container hook reported the RPC server
+        # process dying mid-step. Same single A10G, more CPU and RAM.
+        runner="mt-l-x86aavx2-29-113-a10g",
     ),
 ]
 
@@ -245,6 +250,11 @@ _L1: list[Suite] = [
         lanes=("full", "nightly"),
         paths=("models/",),
         markers="critical",
+        # g5.8xlarge rather than the default g5.4xlarge validation runner:
+        # this suite was dying on the smaller pod without surfacing a test
+        # failure -- in one run the container hook reported the RPC server
+        # process dying mid-step. Same single A10G, more CPU and RAM.
+        runner="mt-l-x86aavx2-29-113-a10g",
     ),
     Suite(
         "torch-compile-backend",
