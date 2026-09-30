@@ -1,0 +1,27 @@
+cmake_minimum_required(VERSION 3.19)
+project(edge_llm_executorch_runner LANGUAGES CXX)
+
+set(EXECUTORCH_SOURCE_DIR "" CACHE PATH "ExecuTorch checkout")
+set(TORCHTRT_EXECUTORCH_SOURCE_DIR "" CACHE PATH "Torch-TensorRT cpp/src/torch_tensorrt/executorch")
+set(EXECUTORCH_BUILD_CUDA ON CACHE BOOL "" FORCE)
+set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+set(EXECUTORCH_BUILD_PYBIND OFF CACHE BOOL "" FORCE)
+set(EXECUTORCH_BUILD_EXTENSION_MODULE ON CACHE BOOL "" FORCE)
+set(EXECUTORCH_BUILD_EXTENSION_DATA_LOADER ON CACHE BOOL "" FORCE)
+set(EXECUTORCH_BUILD_EXTENSION_TENSOR ON CACHE BOOL "" FORCE)
+set(EXECUTORCH_BUILD_EXTENSION_FLAT_TENSOR ON CACHE BOOL "" FORCE)
+set(EXECUTORCH_BUILD_EXTENSION_NAMED_DATA_MAP ON CACHE BOOL "" FORCE)
+foreach(source_dir IN ITEMS "${EXECUTORCH_SOURCE_DIR}" "${TORCHTRT_EXECUTORCH_SOURCE_DIR}")
+    if(NOT EXISTS "${source_dir}/CMakeLists.txt")
+        message(FATAL_ERROR "Set EXECUTORCH_SOURCE_DIR and TORCHTRT_EXECUTORCH_SOURCE_DIR to source directories")
+    endif()
+endforeach()
+
+add_subdirectory("${EXECUTORCH_SOURCE_DIR}" executorch)
+add_subdirectory("${TORCHTRT_EXECUTORCH_SOURCE_DIR}" torch_tensorrt)
+add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/../../cpp" edge_llm)
+add_executable(edge_llm_executorch_runner main.cpp)
+target_compile_features(edge_llm_executorch_runner PRIVATE cxx_std_17)
+target_link_libraries(edge_llm_executorch_runner PRIVATE
+    ${CMAKE_DL_LIBS} executorch executorch::backends executorch::extensions executorch::kernels
+    tensorrt_edge_llm::executorch_backend)

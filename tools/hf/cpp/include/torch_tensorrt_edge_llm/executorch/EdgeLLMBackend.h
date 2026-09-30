@@ -8,7 +8,7 @@
 #include <memory>
 #include <mutex>
 
-namespace torch_tensorrt {
+namespace torch_tensorrt_edge_llm {
 namespace executorch_backend {
 
 struct EdgeLLMHandle {
@@ -39,4 +39,4 @@ class EdgeLLMBackend final : public ::executorch::runtime::BackendInterface {
 };
 
 } // namespace executorch_backend
-} // namespace torch_tensorrt
+} // namespace torch_tensorrt_edge_llm

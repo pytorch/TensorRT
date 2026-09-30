@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "torch-tensorrt-edge-llm"
+version = "0.1.0a0"
+description = "Edge-LLM exporters, operators, and ExecuTorch lowering on Torch-TensorRT"
+readme = "README.rst"
+requires-python = ">=3.10"
+dependencies = ["torch", "torch-tensorrt>=2.15.0a0"]
+
+[project.optional-dependencies]
+executorch = ["executorch==1.4.1"]
+exporters = ["transformers>=5.4.0", "accelerate", "safetensors"]
+test = ["pytest"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["torch_tensorrt_edge_llm*", "exporters*"]
+exclude = ["exporters.tests*"]
+namespaces = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["unit: unit tests"]
+
+[tool.ruff]
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E501"]

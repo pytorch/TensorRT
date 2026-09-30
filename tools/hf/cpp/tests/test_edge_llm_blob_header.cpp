@@ -1,4 +1,4 @@
-#include "torch_tensorrt/executorch/EdgeLLMBlobHeader.h"
+#include "torch_tensorrt_edge_llm/executorch/EdgeLLMBlobHeader.h"
 
 #include "gtest/gtest.h"
 
@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-namespace torch_tensorrt {
+namespace torch_tensorrt_edge_llm {
 namespace executorch_backend {
 namespace {
 
@@ -100,4 +100,4 @@ TEST(ExecuTorchEdgeLLMBlobHeader, RejectsNestedBlobPastPayload) {
 
 } // namespace
 } // namespace executorch_backend
-} // namespace torch_tensorrt
+} // namespace torch_tensorrt_edge_llm

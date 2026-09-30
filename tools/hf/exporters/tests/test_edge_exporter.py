@@ -8,12 +8,12 @@ import torch
 import torch.nn as nn
 import torch_tensorrt
 import torch_tensorrt.dynamo.runtime as trt_runtime
-from exporters import EdgeConfig, EdgeExporter
-from exporters import ops as exporter_ops
-from exporters import register_edge_spec
+from torch.export import ExportedProgram
+
+from exporters import EdgeConfig, EdgeExporter, register_edge_spec
 from exporters.ops import call_engine
 from exporters.spec import ComponentBundle, EdgeSpec, registered_specs
-from torch.export import ExportedProgram
+from torch_tensorrt_edge_llm import ops as exporter_ops
 
 
 def _install_fake_trt(monkeypatch) -> None:

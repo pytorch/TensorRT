@@ -117,7 +117,7 @@ Export Program
 ``EdgeExporter.export`` returns an ``ExportedProgram``. Each policy
 component (vision, language, action, …) is compiled into its own TensorRT
 engine under ``engine_dir/<name>/``. The exported graph is the runtime that
-calls those engines in order through ``torch.ops.edge_llm.execute_engine``.
+calls those engines in order through ``torch.ops.tensorrt_edge_llm.execute_engine``.
 A packing op sits between vision and language so image tokens land in the
 text embeddings. ``print(program.graph)`` prints that FX graph: each
 ``execute_engine`` node is one component, and the path in its args is the
@@ -142,17 +142,17 @@ Here is a GR00T outer graph (``vision`` → ``scatter_image_tokens`` →
         %step_timestep : [num_users=1] = placeholder[target=step_timestep]
         %state : [num_users=1] = placeholder[target=state]
         %embodiment_id : [num_users=1] = placeholder[target=embodiment_id]
-        %execute_engine : [num_users=1] = call_function[target=torch.ops.edge_llm.execute_engine.default](args = (edge_engines/vision, vision, [%pixel_values]), kwargs = {})
+        %execute_engine : [num_users=1] = call_function[target=torch.ops.tensorrt_edge_llm.execute_engine.default](args = (edge_engines/vision, vision, [%pixel_values]), kwargs = {})
         %getitem : [num_users=1] = call_function[target=operator.getitem](args = (%execute_engine, 0), kwargs = {})
-        %scatter_image_tokens : [num_users=1] = call_function[target=torch.ops.edge_llm.scatter_image_tokens.default](args = (%getitem, %lang_embeds, %image_token_mask), kwargs = {})
-        %execute_engine_1 : [num_users=4] = call_function[target=torch.ops.edge_llm.execute_engine.default](args = (edge_engines/language, language, [%scatter_image_tokens, %rope_rotary_cos_sin, %context_lengths, %kvcache_start_index, %last_token_ids, %ds_stack, %past_key_values_0]), kwargs = {})
+        %scatter_image_tokens : [num_users=1] = call_function[target=torch.ops.tensorrt_edge_llm.scatter_image_tokens.default](args = (%getitem, %lang_embeds, %image_token_mask), kwargs = {})
+        %execute_engine_1 : [num_users=4] = call_function[target=torch.ops.tensorrt_edge_llm.execute_engine.default](args = (edge_engines/language, language, [%scatter_image_tokens, %rope_rotary_cos_sin, %context_lengths, %kvcache_start_index, %last_token_ids, %ds_stack, %past_key_values_0]), kwargs = {})
         %getitem_1 : [num_users=0] = call_function[target=operator.getitem](args = (%execute_engine_1, 0), kwargs = {})
         %getitem_2 : [num_users=1] = call_function[target=operator.getitem](args = (%execute_engine_1, 1), kwargs = {})
         %getitem_3 : [num_users=0] = call_function[target=operator.getitem](args = (%execute_engine_1, 2), kwargs = {})
         %getitem_4 : [num_users=0] = call_function[target=operator.getitem](args = (%execute_engine_1, 3), kwargs = {})
-        %execute_engine_2 : [num_users=1] = call_function[target=torch.ops.edge_llm.execute_engine.default](args = (edge_engines/context_projection, context_projection, [%getitem_2]), kwargs = {})
+        %execute_engine_2 : [num_users=1] = call_function[target=torch.ops.tensorrt_edge_llm.execute_engine.default](args = (edge_engines/context_projection, context_projection, [%getitem_2]), kwargs = {})
         %getitem_5 : [num_users=1] = call_function[target=operator.getitem](args = (%execute_engine_2, 0), kwargs = {})
-        %execute_engine_3 : [num_users=1] = call_function[target=torch.ops.edge_llm.execute_engine.default](args = (edge_engines/action, action, [%step_actions, %step_timestep, %getitem_5, %state, %embodiment_id]), kwargs = {})
+        %execute_engine_3 : [num_users=1] = call_function[target=torch.ops.tensorrt_edge_llm.execute_engine.default](args = (edge_engines/action, action, [%step_actions, %step_timestep, %getitem_5, %state, %embodiment_id]), kwargs = {})
         %getitem_6 : [num_users=1] = call_function[target=operator.getitem](args = (%execute_engine_3, 0), kwargs = {})
         return (getitem_6,)
 
@@ -166,9 +166,9 @@ node per engine**. Matching ``register_fake`` kernels give Dynamo the output
 shapes. Two packing ops live in the same file
 (``tools/hf/exporters/ops.py``):
 
-* ``edge_llm::fuse_prefix`` — PI05: concat vision tokens with language
+* ``tensorrt_edge_llm::fuse_prefix`` — PI05: concat vision tokens with language
   embeddings and gather the compact prefix.
-* ``edge_llm::scatter_image_tokens`` — GR00T: write vision tokens into the
+* ``tensorrt_edge_llm::scatter_image_tokens`` — GR00T: write vision tokens into the
   ``<image>`` slots of the language embeddings.
 
 These appear in the **outer** ExportedProgram. They are not TensorRT plugins.
@@ -471,7 +471,7 @@ There are two different custom-op namespaces. Do not mix them up.
      - Ops
      - What you see
    * - Outer ``ExportedProgram``
-     - ``edge_llm::execute_engine``, ``fuse_prefix``, ``scatter_image_tokens``
+     - ``tensorrt_edge_llm::execute_engine``, ``fuse_prefix``, ``scatter_image_tokens``
      - ``print(program.graph)`` after ``EdgeExporter.export``
    * - Inside one component engine
      - ``trt::attention_plugin``, ``trt::vit_attention_plugin``,

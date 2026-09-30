@@ -1,0 +1,5 @@
+build --cxxopt=-std=c++20
+build --cxxopt=-fPIC
+build --define=abi=cxx11_abi
+test --test_output=errors
+try-import %workspace%/.bazelrc.user

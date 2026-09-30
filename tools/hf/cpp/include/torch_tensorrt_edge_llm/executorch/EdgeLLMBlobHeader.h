@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <string>
 
-namespace torch_tensorrt {
+namespace torch_tensorrt_edge_llm {
 namespace executorch_backend {
 
 struct EdgeLLMBlobHeader {
@@ -23,4 +23,4 @@ struct EdgeLLMBlobHeader {
 };
 
 } // namespace executorch_backend
-} // namespace torch_tensorrt
+} // namespace torch_tensorrt_edge_llm

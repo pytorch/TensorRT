@@ -1,5 +1,5 @@
-#include "torch_tensorrt/executorch/EdgeLLMBackend.h"
-#include "torch_tensorrt/executorch/EdgeLLMBlobHeader.h"
+#include "torch_tensorrt_edge_llm/executorch/EdgeLLMBackend.h"
+#include "torch_tensorrt_edge_llm/executorch/EdgeLLMBlobHeader.h"
 #include "torch_tensorrt/executorch/TensorRTBlobHeader.h"
 
 #include <cuda_runtime.h>
@@ -12,9 +12,10 @@
 #include <utility>
 #include <vector>
 
-namespace torch_tensorrt {
+namespace torch_tensorrt_edge_llm {
 namespace executorch_backend {
 
+using ::torch_tensorrt::executorch_backend::TensorRTBlobHeader;
 using ::executorch::runtime::ArrayRef;
 using ::executorch::runtime::BackendExecutionContext;
 using ::executorch::runtime::BackendInitContext;
@@ -210,9 +211,9 @@ void EdgeLLMBackend::destroy(DelegateHandle* handle) const {
 }
 
 } // namespace executorch_backend
-} // namespace torch_tensorrt
+} // namespace torch_tensorrt_edge_llm
 
-namespace torch_tensorrt {
+namespace torch_tensorrt_edge_llm {
 namespace executorch_backend {
 namespace {
 
@@ -226,4 +227,4 @@ const Error kEdgeLLMRegistrationResult = ::executorch::runtime::register_backend
 
 } // namespace
 } // namespace executorch_backend
-} // namespace torch_tensorrt
+} // namespace torch_tensorrt_edge_llm

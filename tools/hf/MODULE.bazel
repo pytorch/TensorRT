@@ -1,0 +1,11 @@
+module(name = "torch_tensorrt_edge_llm", version = "0.1.0a0")
+
+# Torch-TensorRT is supplied by the consumer, e.g. with
+# --override_module=torch_tensorrt=/path/to/Torch-TensorRT.
+bazel_dep(name = "torch_tensorrt", version = "2.15.0a0")
+bazel_dep(name = "rules_cc", version = "0.1.1")
+bazel_dep(name = "platforms", version = "0.0.11")
+bazel_dep(name = "googletest", version = "1.16.0")
+
+local_edge_llm = use_repo_rule("//toolchains:local_edge_llm.bzl", "local_edge_llm")
+local_edge_llm(name = "tensorrt_edge_llm")

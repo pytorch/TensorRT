@@ -1,0 +1,35 @@
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "blob_header",
+    srcs = ["src/EdgeLLMBlobHeader.cpp"],
+    hdrs = ["include/torch_tensorrt_edge_llm/executorch/EdgeLLMBlobHeader.h"],
+    strip_include_prefix = "include",
+)
+
+cc_library(
+    name = "executorch_backend",
+    srcs = ["src/EdgeLLMBackend.cpp"],
+    hdrs = ["include/torch_tensorrt_edge_llm/executorch/EdgeLLMBackend.h"],
+    strip_include_prefix = "include",
+    target_compatible_with = ["@platforms//os:linux"],
+    deps = [
+        ":blob_header",
+        "@tensorrt_edge_llm//:executorch_adapter",
+        "@torch_tensorrt//cpp:tensorrt_executorch_backend",
+    ],
+    linkopts = ["-pthread"],
+    alwayslink = True,
+    tags = ["manual"],
+)
+
+cc_test(
+    name = "test_blob_header",
+    srcs = ["tests/test_edge_llm_blob_header.cpp"],
+    deps = [
+        ":blob_header",
+        "@googletest//:gtest_main",
+    ],
+)

@@ -1,0 +1,6 @@
+/bazel-*
+/build/
+/dist/
+/*.egg-info/
+/.bazelrc.user
+/MODULE.bazel.lock

@@ -1,38 +1,24 @@
 from __future__ import annotations
 
-import sys
-import types
-from pathlib import Path
-
 import pytest
 import torch
 import torch.nn as nn
 
 pytest.importorskip("executorch.exir")
 
-# The regular exporters package eagerly registers optional model families. These
-# focused lowering tests need only the package-local ops and must not require
-# LeRobot or other model stacks.
-if "exporters" not in sys.modules:
-    exporters_package = types.ModuleType("exporters")
-    exporters_package.__path__ = [
-        str(Path(__file__).resolve().parents[4] / "tools/hf/exporters")
-    ]
-    sys.modules["exporters"] = exporters_package
+from torch_tensorrt.executorch.operator_support import TensorRTOperatorSupport
+from torch_tensorrt.executorch.serialization import deserialize_engine
 
-from exporters import ops as edge_ops
-from exporters.executorch.artifact import build_vision_artifact
-from exporters.executorch.backend import EdgeLLMBackend
-from exporters.executorch.partitioner import EdgeLLMPartitioner
-from exporters.executorch.serialization import (
+from torch_tensorrt_edge_llm import ops as edge_ops
+from torch_tensorrt_edge_llm.artifact import build_vision_artifact
+from torch_tensorrt_edge_llm.executorch import EdgeLLMBackend, EdgeLLMPartitioner
+from torch_tensorrt_edge_llm.serialization import (
     EdgeComponentMetadata,
     EdgeOutputSpec,
     deserialize_edge_component,
     serialize_edge_component,
 )
-from exporters.executorch.vision import save_vision_pte
-from torch_tensorrt.executorch.operator_support import TensorRTOperatorSupport
-from torch_tensorrt.executorch.serialization import deserialize_engine
+from torch_tensorrt_edge_llm.vision import save_vision_pte
 
 
 def _vision_metadata() -> EdgeComponentMetadata:
@@ -75,7 +61,7 @@ def test_vision_tower_fake_uses_embedded_output_spec():
     metadata = _vision_metadata()
     fake_mode = torch._subclasses.fake_tensor.FakeTensorMode()
     with fake_mode:
-        outputs = torch.ops.edge_llm.vision_tower.default(
+        outputs = torch.ops.tensorrt_edge_llm.vision_tower.default(
             [torch.empty(1, 16, 16, 3, device="cuda")],
             torch.empty(16, dtype=torch.uint8),
             metadata.to_json(),
@@ -103,7 +89,7 @@ def test_edge_llm_partitioner_tags_only_vision_operator():
         for node in result.tagged_exported_program.graph_module.graph.nodes
         if node.op == "call_function"
         and hasattr(node.target, "_schema")
-        and node.target._schema.name == "edge_llm::vision_tower"
+        and node.target._schema.name == "tensorrt_edge_llm::vision_tower"
     )
     assert vision_node.meta["delegation_tag"] in result.partition_tags
     assert not TensorRTOperatorSupport().is_node_supported({}, vision_node)
@@ -203,3 +189,49 @@ def test_save_vision_pte_contains_edge_backend(tmp_path):
         delegate.id for plan in program.execution_plan for delegate in plan.delegates
     ]
     assert delegate_ids == ["EdgeLLMBackend"]
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("sequential", [True, False])
+def test_multiple_vision_operators_get_separate_delegates(tmp_path, sequential):
+    metadata = EdgeComponentMetadata(
+        component="vision",
+        runner="vit",
+        outputs=(EdgeOutputSpec(shape=(1, 16, 16, 3), dtype="float16"),),
+    )
+
+    class TwoVisionModules(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.first = _VisionModule(metadata.to_json(), b"TR01-first-engine")
+            self.second = _VisionModule(metadata.to_json(), b"TR01-second-engine")
+
+        def forward(self, pixels):
+            if sequential:
+                return self.second(self.first(pixels))
+            return self.first(pixels), self.second(pixels)
+
+    exported = torch.export.export(
+        TwoVisionModules(),
+        (torch.randn(1, 16, 16, 3, device="cuda", dtype=torch.float16),),
+    )
+    result = EdgeLLMPartitioner().partition(exported)
+    assert len(result.partition_tags) == 2
+
+    from executorch.exir._serialize._program import deserialize_pte_binary
+    from torch_tensorrt import save
+
+    path = tmp_path / "two_vision.pte"
+    save(
+        exported,
+        str(path),
+        output_format="executorch",
+        partitioners=[EdgeLLMPartitioner()],
+    )
+    program = deserialize_pte_binary(path.read_bytes()).program
+    assert [
+        delegate.id for plan in program.execution_plan for delegate in plan.delegates
+    ] == [
+        "EdgeLLMBackend",
+        "EdgeLLMBackend",
+    ]

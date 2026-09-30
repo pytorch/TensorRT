@@ -1,0 +1,28 @@
+package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "python_sources",
+    srcs = glob(["torch_tensorrt_edge_llm/**/*.py", "exporters/**/*.py"]),
+)
+
+# Build compiled deployment artifacts with Bazel. CMake is for applications
+# embedding these sources alongside Torch-TensorRT and ExecuTorch.
+genrule(
+    name = "executorch_backend_archive",
+    srcs = ["//cpp:executorch_backend", "//cpp:blob_header"],
+    outs = ["libexecutorch_edge_llm_backend.a"],
+    cmd = """
+set -e
+mri=$(@D)/edge_llm_archive.mri
+printf 'CREATE %s\n' '$@' > "$$mri"
+for f in $(locations //cpp:executorch_backend) $(locations //cpp:blob_header); do
+  case "$$f" in
+    *.lo|*.a) printf 'ADDLIB %s\n' "$$f" >> "$$mri" ;;
+  esac
+done
+printf 'SAVE\nEND\n' >> "$$mri"
+ar -M < "$$mri"
+rm "$$mri"
+""",
+    tags = ["manual"],
+)
