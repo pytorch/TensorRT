@@ -1952,6 +1952,31 @@ wheels = [
 ]
 
 [[package]]
+name = "mslk"
+version = "2026.9.9+cu130"
+source = { registry = "https://download.pytorch.org/whl/nightly/cu130" }
+dependencies = [
+    { name = "numpy", version = "2.2.6", source = { registry = "https://download.pytorch.org/whl/nightly/cu130" }, marker = "(python_full_version < '3.11' and extra == 'group-14-torch-tensorrt-quantization') or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://download.pytorch.org/whl/nightly/cu130" }, marker = "(python_full_version == '3.11.*' and extra == 'group-14-torch-tensorrt-quantization') or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "numpy", version = "2.5.2", source = { registry = "https://download.pytorch.org/whl/nightly/cu130" }, marker = "(python_full_version >= '3.12' and extra == 'group-14-torch-tensorrt-quantization') or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+]
+wheels = [
+    { url = "https://download.pytorch.org/whl/nightly/cu130/mslk-2026.9.9%2Bcu130-cp310-cp310-manylinux_2_28_aarch64.whl", upload-time = "2026-09-09T14:12:49Z" },
+    { url = "https://download.pytorch.org/whl/nightly/cu130/mslk-2026.9.9%2Bcu130-cp310-cp310-manylinux_2_28_x86_64.whl", upload-time = "2026-09-09T15:12:53Z" },
+    { url = "https://download.pytorch.org/whl/nightly/cu130/mslk-2026.9.9%2Bcu130-cp311-cp311-manylinux_2_28_aarch64.whl", upload-time = "2026-09-09T14:12:58Z" },
+    { url = "https://download.pytorch.org/whl/nightly/cu130/mslk-2026.9.9%2Bcu130-cp311-cp311-manylinux_2_28_x86_64.whl", upload-time = "2026-09-09T15:12:52Z" },
+    { url = "https://download.pytorch.org/whl/nightly/cu130/mslk-2026.9.9%2Bcu130-cp312-cp312-manylinux_2_28_aarch64.whl", upload-time = "2026-09-09T14:12:55Z" },
+    { url = "https://download.pytorch.org/whl/nightly/cu130/mslk-2026.9.9%2Bcu130-cp312-cp312-manylinux_2_28_x86_64.whl", upload-time = "2026-09-09T15:12:53Z" },
+    { url = "https://download.pytorch.org/whl/nightly/cu130/mslk-2026.9.9%2Bcu130-cp313-cp313-manylinux_2_28_aarch64.whl", upload-time = "2026-09-09T14:12:49Z" },
+    { url = "https://download.pytorch.org/whl/nightly/cu130/mslk-2026.9.9%2Bcu130-cp313-cp313-manylinux_2_28_x86_64.whl", upload-time = "2026-09-09T15:12:53Z" },
+    { url = "https://download.pytorch.org/whl/nightly/cu130/mslk-2026.9.9%2Bcu130-cp314-cp314-manylinux_2_28_aarch64.whl", upload-time = "2026-09-09T14:12:47Z" },
+    { url = "https://download.pytorch.org/whl/nightly/cu130/mslk-2026.9.9%2Bcu130-cp314-cp314-manylinux_2_28_x86_64.whl", upload-time = "2026-09-09T15:12:53Z" },
+    { url = "https://download.pytorch.org/whl/nightly/cu130/mslk-2026.9.9%2Bcu130-cp314-cp314t-manylinux_2_28_aarch64.whl", upload-time = "2026-09-09T14:12:50Z" },
+    { url = "https://download.pytorch.org/whl/nightly/cu130/mslk-2026.9.9%2Bcu130-cp314-cp314t-manylinux_2_28_x86_64.whl", upload-time = "2026-09-09T15:13:02Z" },
+    { url = "https://download.pytorch.org/whl/nightly/cu130/mslk-2026.9.9%2Bcu130-py3-none-win_amd64.whl", upload-time = "2026-09-09T12:05:58Z" },
+]
+
+[[package]]
 name = "multidict"
 version = "6.7.1"
 source = { registry = "https://pypi.org/simple" }
@@ -4800,7 +4825,9 @@ lint = [
     { name = "wheel" },
 ]
 quantization = [
+    { name = "mslk" },
     { name = "nvidia-modelopt", extra = ["hf"], marker = "(python_full_version < '3.13' and extra == 'group-14-torch-tensorrt-quantization') or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "torchao" },
 ]
 test = [
     { name = "expecttest" },
@@ -4898,7 +4925,11 @@ lint = [
     { name = "setuptools", specifier = ">=77.0.0" },
     { name = "wheel", specifier = ">=0.40.0" },
 ]
-quantization = [{ name = "nvidia-modelopt", extras = ["hf"], marker = "python_full_version >= '3.10' and python_full_version < '3.13'", specifier = ">=0.44.0" }]
+quantization = [
+    { name = "mslk", specifier = ">=1.0.0" },
+    { name = "nvidia-modelopt", extras = ["hf"], marker = "python_full_version >= '3.10' and python_full_version < '3.13'", specifier = ">=0.44.0" },
+    { name = "torchao" },
+]
 test = [
     { name = "expecttest", specifier = "==0.1.6" },
     { name = "networkx" },
