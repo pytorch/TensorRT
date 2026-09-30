@@ -37,6 +37,13 @@ std::string language_metadata() {
          R"("runner_config":{"model_type":"language"}})";
 }
 
+std::string action_metadata() {
+  return R"({"abi_version":1,"component":"action",)"
+         R"("outputs":[{"dtype":"float32","shape":[1,50,32]}],)"
+         R"("runner":"flow_step",)"
+         R"("runner_config":{"model_type":"action"}})";
+}
+
 std::vector<uint8_t> make_payload(const std::string& metadata, const std::string& nested = "TR01nested") {
   const auto metadata_offset = static_cast<uint32_t>(HEADER_SIZE);
   const auto metadata_size = static_cast<uint32_t>(metadata.size());
@@ -88,6 +95,16 @@ TEST(ExecuTorchEdgeLLMBlobHeader, ParsesLanguageDecodePayload) {
 
   EXPECT_EQ(header.component, "language");
   EXPECT_EQ(header.runner, "llm_decode");
+}
+
+TEST(ExecuTorchEdgeLLMBlobHeader, ParsesActionPayload) {
+  const auto payload = make_payload(action_metadata());
+
+  EdgeLLMBlobHeader header;
+  ASSERT_TRUE(EdgeLLMBlobHeader::parse(payload.data(), payload.size(), header));
+
+  EXPECT_EQ(header.component, "action");
+  EXPECT_EQ(header.runner, "flow_step");
 }
 
 TEST(ExecuTorchEdgeLLMBlobHeader, RejectsInvalidMagic) {

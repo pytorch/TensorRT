@@ -21,7 +21,9 @@ if "exporters" not in sys.modules:
     sys.modules["exporters"] = exporters_package
 
 from exporters import ops as edge_ops
+from exporters.executorch.action import save_action_pte
 from exporters.executorch.artifact import (
+    build_action_artifact,
     build_language_artifact,
     build_vision_artifact,
 )
@@ -59,6 +61,14 @@ def _language_metadata() -> EdgeComponentMetadata:
             EdgeOutputSpec(shape=(18, 1, 1, 32, 256), dtype="float16"),
             EdgeOutputSpec(shape=(18, 1, 1, 32, 256), dtype="float16"),
         ),
+    )
+
+
+def _action_metadata() -> EdgeComponentMetadata:
+    return EdgeComponentMetadata(
+        component="action",
+        runner="flow_step",
+        outputs=(EdgeOutputSpec(shape=(1, 50, 32), dtype="float32"),),
     )
 
 
@@ -101,6 +111,22 @@ class _VisionModule(nn.Module):
         )[0]
 
 
+class _ActionModule(nn.Module):
+    def __init__(self, metadata_json: str, trt_blob: bytes) -> None:
+        super().__init__()
+        self.metadata_json = metadata_json
+        self.register_buffer(
+            "trt_blob", torch.tensor(list(trt_blob), dtype=torch.uint8)
+        )
+
+    def forward(self, x_t):
+        return edge_ops.call_action(
+            self.trt_blob,
+            self.metadata_json,
+            x_t,
+        )[0]
+
+
 @pytest.mark.unit
 def test_edge_component_payload_round_trip():
     metadata = _vision_metadata()
@@ -131,6 +157,22 @@ def test_vision_tower_fake_uses_embedded_output_spec():
 
 
 @pytest.mark.unit
+def test_action_fake_uses_embedded_output_spec():
+    fake_mode = torch._subclasses.fake_tensor.FakeTensorMode()
+    with fake_mode:
+        outputs = torch.ops.edge_llm.action.default(
+            [torch.empty(1, 50, 32, device="cuda")],
+            torch.empty(16, dtype=torch.uint8),
+            _action_metadata().to_json(),
+        )
+
+    assert len(outputs) == 1
+    assert tuple(outputs[0].shape) == (1, 50, 32)
+    assert outputs[0].dtype == torch.float32
+    assert outputs[0].device.type == "cuda"
+
+
+@pytest.mark.unit
 def test_edge_llm_partitioner_tags_only_vision_operator():
     metadata = _vision_metadata()
     module = _VisionModule(metadata.to_json(), b"TR01-test-engine").eval()
@@ -153,12 +195,52 @@ def test_edge_llm_partitioner_tags_only_vision_operator():
 
 
 @pytest.mark.unit
+def test_edge_llm_partitioner_tags_action_operator():
+    module = _ActionModule(
+        _action_metadata().to_json(),
+        b"TR01-test-engine",
+    ).eval()
+    exported = torch.export.export(
+        module,
+        (torch.randn(1, 50, 32, device="cuda"),),
+    )
+    result = EdgeLLMPartitioner().partition(exported)
+
+    action_node = next(
+        node
+        for node in result.tagged_exported_program.graph_module.graph.nodes
+        if node.op == "call_function"
+        and hasattr(node.target, "_schema")
+        and node.target._schema.name == "edge_llm::action"
+    )
+    assert action_node.meta["delegation_tag"] in result.partition_tags
+
+
+@pytest.mark.unit
 def test_edge_llm_backend_wraps_vision_component():
     metadata = _vision_metadata()
     trt_blob = b"TR01-test-engine"
     module = _VisionModule(metadata.to_json(), trt_blob).eval()
     exported = torch.export.export(module, (torch.randn(1, 16, 16, 3, device="cuda"),))
 
+    result = EdgeLLMBackend.preprocess(exported, [])
+    restored_blob, restored_metadata = deserialize_edge_component(
+        result.processed_bytes
+    )
+
+    assert restored_blob == trt_blob
+    assert restored_metadata == metadata
+
+
+@pytest.mark.unit
+def test_edge_llm_backend_wraps_action_component():
+    metadata = _action_metadata()
+    trt_blob = b"TR01-action-engine"
+    module = _ActionModule(metadata.to_json(), trt_blob).eval()
+    exported = torch.export.export(
+        module,
+        (torch.randn(1, 50, 32, device="cuda"),),
+    )
     result = EdgeLLMBackend.preprocess(exported, [])
     restored_blob, restored_metadata = deserialize_edge_component(
         result.processed_bytes
@@ -212,6 +294,74 @@ def test_build_vision_artifact_wraps_saved_engine(tmp_path):
         "pixel_values",
         "visual_embeds",
     ]
+
+
+@pytest.mark.unit
+def test_build_action_artifact_wraps_saved_engine(tmp_path):
+    engine_dir = tmp_path / "action"
+    engine_dir.mkdir()
+    (engine_dir / "action.engine").write_bytes(b"serialized-action-engine")
+    (engine_dir / "config.json").write_text("""{
+  "model_type": "action",
+  "component": "action",
+  "engine_file": "action.engine",
+  "input_names": [
+    "x_t", "timestep", "prefix_k", "prefix_v", "position_ids", "attention_mask"
+  ],
+  "output_names": ["velocity"],
+  "outputs": [{"shape": [1, 50, 32], "dtype": "torch.float32"}],
+  "chunk_size": 50,
+  "max_action_dim": 32
+}
+""")
+
+    artifact = build_action_artifact(engine_dir, device_id=2)
+    nested_blob, edge_metadata = deserialize_edge_component(
+        serialize_edge_component(
+            artifact.trt_blob,
+            EdgeComponentMetadata.from_json(artifact.edge_metadata_json),
+        )
+    )
+    engine, trt_metadata = deserialize_engine(nested_blob)
+
+    assert engine == b"serialized-action-engine"
+    assert edge_metadata.runner == "flow_step"
+    assert edge_metadata.runner_config["chunk_size"] == 50
+    assert trt_metadata.device_id == 2
+    assert len(trt_metadata.io_bindings) == 7
+
+
+@pytest.mark.unit
+def test_save_action_pte_contains_edge_backend(tmp_path):
+    engine_dir = tmp_path / "action"
+    engine_dir.mkdir()
+    (engine_dir / "action.engine").write_bytes(b"serialized-action-engine")
+    (engine_dir / "config.json").write_text("""{
+  "model_type": "action",
+  "component": "action",
+  "engine_file": "action.engine",
+  "input_names": [
+    "x_t", "timestep", "prefix_k", "prefix_v", "position_ids", "attention_mask"
+  ],
+  "output_names": ["velocity"],
+  "outputs": [{"shape": [1, 4, 8], "dtype": "torch.float16"}]
+}
+""")
+    artifact = build_action_artifact(engine_dir)
+    inputs = tuple(
+        torch.randn(1, 4, 8, device="cuda", dtype=torch.float16) for _ in range(6)
+    )
+    pte = tmp_path / "action.pte"
+
+    save_action_pte(artifact, inputs, pte)
+
+    from executorch.exir._serialize._program import deserialize_pte_binary
+
+    program = deserialize_pte_binary(pte.read_bytes()).program
+    delegate_ids = [
+        delegate.id for plan in program.execution_plan for delegate in plan.delegates
+    ]
+    assert delegate_ids == ["EdgeLLMBackend"]
 
 
 @pytest.mark.unit
