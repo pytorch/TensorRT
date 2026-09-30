@@ -12,6 +12,7 @@ the Mutable Torch-TensorRT Module.
    compile_hf_models
    Example: Compiling Stable Diffusion with torch.compile <../_rendered_examples/dynamo/torch_compile_stable_diffusion>
    Example: Compiling FLUX.1-dev with the dynamo backend <../_rendered_examples/dynamo/torch_export_flux_dev>
+   Example: Alpamayo 1.5 FP8 WOQ <../_rendered_examples/dynamo/torchao/torch_export_alpamayo_fp8_woq>
    Example: FLUX.1-dev INT4 WOQ <../_rendered_examples/dynamo/torchao/torch_export_flux_int4_woq>
    Example: FLUX.1-dev NVFP4 WOQ <../_rendered_examples/dynamo/torchao/torch_export_flux_nvfp4_woq>
    Example: FLUX.1-dev MXFP4 <../_rendered_examples/dynamo/torchao/torch_export_flux_mxfp4>

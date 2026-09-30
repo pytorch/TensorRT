@@ -194,7 +194,9 @@ DQ + GEMM may run as two kernels — that is still correct as long as the FP8
 weight is not constant-folded into a dense high-precision weight.
 
 See :ref:`quantize_linear_fp8_woq` for a toy Linear model and
-:ref:`torch_export_flux_fp8_woq` for FLUX.1-dev.
+:ref:`torch_export_flux_fp8_woq` for FLUX.1-dev. See
+:ref:`torch_export_alpamayo_fp8_woq` for Alpamayo 1.5's cache-independent
+diffusion expert path.
 
 ----
 
