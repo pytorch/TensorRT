@@ -139,6 +139,8 @@ def _tensor_bytes(value: torch.Tensor) -> bytes:
 def _get_embedded_engine(
     trt_blob: torch.Tensor, metadata: EdgeComponentMetadata
 ) -> torch.nn.Module:
+    from torch_tensorrt import Device
+    from torch_tensorrt.dynamo import CompilationSettings
     from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
     from torch_tensorrt.executorch.serialization import deserialize_engine
 
@@ -167,6 +169,9 @@ def _get_embedded_engine(
                 input_binding_names=input_names,
                 output_binding_names=output_names,
                 name=f"edge_llm_{metadata.component}",
+                settings=CompilationSettings(
+                    device=Device(gpu_id=trt_metadata.device_id)
+                ),
             )
             _EMBEDDED_MODULES[cache_key] = compiled
         return compiled

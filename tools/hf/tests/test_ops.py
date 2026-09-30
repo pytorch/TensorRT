@@ -6,7 +6,6 @@ import sys
 import pytest
 import torch
 from torch import nn
-
 from torch_tensorrt_edge_llm import ops
 from torch_tensorrt_edge_llm.artifact import EdgeExecuTorchArtifact
 from torch_tensorrt_edge_llm.serialization import EdgeComponentMetadata, EdgeOutputSpec
@@ -147,3 +146,38 @@ def test_embedded_vision_loads_real_engine_in_fresh_process(tmp_path):
         ],
         check=True,
     )
+
+
+def test_embedded_loader_honors_blob_device(monkeypatch):
+    import torch_tensorrt.dynamo.runtime as runtime
+    from torch_tensorrt.executorch.serialization import (
+        TensorRTBlobMetadata,
+        TensorRTIOBinding,
+        serialize_engine,
+    )
+
+    captured = {}
+
+    def module(**kwargs):
+        captured.update(kwargs)
+        return nn.Identity()
+
+    monkeypatch.setattr(runtime, "TorchTensorRTModule", module)
+    blob = serialize_engine(
+        b"device-test",
+        TensorRTBlobMetadata(
+            device_id=2,
+            io_bindings=[
+                TensorRTIOBinding("input", is_input=True),
+                TensorRTIOBinding("output", is_input=False),
+            ],
+        ),
+    )
+    metadata = EdgeComponentMetadata(
+        component="vision",
+        runner="vit",
+        outputs=(EdgeOutputSpec(shape=(1, 2, 3), dtype="float32"),),
+    )
+    payload = torch.frombuffer(bytearray(blob), dtype=torch.uint8)
+    ops._get_embedded_engine(payload, metadata)
+    assert captured["settings"].device.gpu_id == 2

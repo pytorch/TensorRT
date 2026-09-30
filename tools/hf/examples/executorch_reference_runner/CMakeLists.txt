@@ -3,7 +3,13 @@ project(edge_llm_executorch_runner LANGUAGES CXX)
 
 set(EXECUTORCH_SOURCE_DIR "" CACHE PATH "ExecuTorch checkout")
 set(TORCHTRT_EXECUTORCH_SOURCE_DIR "" CACHE PATH "Torch-TensorRT cpp/src/torch_tensorrt/executorch")
-set(EXECUTORCH_BUILD_CUDA ON CACHE BOOL "" FORCE)
+# Only the caller-stream extension is needed for TensorRT. ExecuTorch's CUDA
+# AOTI backend additionally links libTorch and is not part of this application.
+option(EDGELLM_BUILD_CUDA_AOTI_BACKEND "Include ExecuTorch CUDA allocator/copy support for device-planned programs" OFF)
+set(EXECUTORCH_BUILD_CUDA ${EDGELLM_BUILD_CUDA_AOTI_BACKEND} CACHE BOOL "" FORCE)
+set(EXECUTORCH_BUILD_CPUINFO OFF CACHE BOOL "" FORCE)
+set(EXECUTORCH_BUILD_PTHREADPOOL OFF CACHE BOOL "" FORCE)
+set(EXECUTORCH_ENABLE_LOGGING ON CACHE BOOL "" FORCE)
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 set(EXECUTORCH_BUILD_PYBIND OFF CACHE BOOL "" FORCE)
 set(EXECUTORCH_BUILD_EXTENSION_MODULE ON CACHE BOOL "" FORCE)
@@ -18,10 +24,22 @@ foreach(source_dir IN ITEMS "${EXECUTORCH_SOURCE_DIR}" "${TORCHTRT_EXECUTORCH_SO
 endforeach()
 
 add_subdirectory("${EXECUTORCH_SOURCE_DIR}" executorch)
+if(NOT TARGET extension_cuda)
+    add_subdirectory("${EXECUTORCH_SOURCE_DIR}/extension/cuda" extension_cuda)
+    target_link_libraries(extension_cuda PUBLIC executorch_core)
+endif()
 add_subdirectory("${TORCHTRT_EXECUTORCH_SOURCE_DIR}" torch_tensorrt)
 add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/../../cpp" edge_llm)
 add_executable(edge_llm_executorch_runner main.cpp)
 target_compile_features(edge_llm_executorch_runner PRIVATE cxx_std_17)
 target_link_libraries(edge_llm_executorch_runner PRIVATE
-    ${CMAKE_DL_LIBS} executorch executorch::backends executorch::extensions executorch::kernels
+    ${CMAKE_DL_LIBS} executorch executorch::backends executorch::extensions
     tensorrt_edge_llm::executorch_backend)
+if(EXECUTORCH_BUILD_PORTABLE_OPS)
+    target_link_libraries(edge_llm_executorch_runner PRIVATE executorch::kernels)
+endif()
+
+add_executable(pi05_executorch_runner pi05.cpp)
+target_compile_features(pi05_executorch_runner PRIVATE cxx_std_17)
+target_link_libraries(pi05_executorch_runner PRIVATE
+    executorch executorch::extensions tensorrt_edge_llm::executorch_backend)

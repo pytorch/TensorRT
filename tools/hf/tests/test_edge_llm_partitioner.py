@@ -8,9 +8,11 @@ pytest.importorskip("executorch.exir")
 
 from torch_tensorrt.executorch.operator_support import TensorRTOperatorSupport
 from torch_tensorrt.executorch.serialization import deserialize_engine
-
 from torch_tensorrt_edge_llm import ops as edge_ops
-from torch_tensorrt_edge_llm.artifact import build_vision_artifact
+from torch_tensorrt_edge_llm.artifact import (
+    EdgeExecuTorchArtifact,
+    build_vision_artifact,
+)
 from torch_tensorrt_edge_llm.executorch import EdgeLLMBackend, EdgeLLMPartitioner
 from torch_tensorrt_edge_llm.serialization import (
     EdgeComponentMetadata,
@@ -150,6 +152,7 @@ def test_build_vision_artifact_wraps_saved_engine(tmp_path):
 
     assert engine == b"serialized-vision-engine"
     assert edge_metadata.runner_config["input_layout"] == "hwc"
+    assert edge_metadata.runner_config["device_id"] == 2
     assert trt_metadata.device_id == 2
     assert [binding.name for binding in trt_metadata.io_bindings] == [
         "pixel_values",
@@ -235,3 +238,43 @@ def test_multiple_vision_operators_get_separate_delegates(tmp_path, sequential):
         "EdgeLLMBackend",
         "EdgeLLMBackend",
     ]
+
+
+def test_partitioner_uses_component_device():
+    from torch_tensorrt.executorch.serialization import (
+        TensorRTBlobMetadata,
+        TensorRTIOBinding,
+        serialize_engine,
+    )
+    from torch_tensorrt_edge_llm.vision import EdgeVisionModule
+
+    payload = serialize_engine(
+        b"device-test",
+        TensorRTBlobMetadata(
+            device_id=2,
+            io_bindings=[
+                TensorRTIOBinding("input", is_input=True),
+                TensorRTIOBinding("output", is_input=False),
+            ],
+        ),
+    )
+    metadata = EdgeComponentMetadata(
+        component="vision",
+        runner="vit",
+        outputs=(EdgeOutputSpec(shape=(1, 2, 3), dtype="float16"),),
+        runner_config={"device_id": 2},
+    )
+    module = EdgeVisionModule(EdgeExecuTorchArtifact(payload, metadata.to_json()))
+    exported = torch.export.export(
+        module, (torch.zeros(1, 2, 4, 3, dtype=torch.float16),)
+    )
+    result = EdgeLLMPartitioner().partition(exported)
+    delegation = next(iter(result.partition_tags.values()))
+    assert (
+        next(
+            spec.value
+            for spec in delegation.compile_specs
+            if spec.key == "target_device"
+        )
+        == b"cuda:2"
+    )

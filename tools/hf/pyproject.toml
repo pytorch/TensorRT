@@ -13,6 +13,7 @@ dependencies = ["torch", "torch-tensorrt>=2.15.0a0"]
 [project.optional-dependencies]
 executorch = ["executorch==1.4.1"]
 exporters = ["transformers>=5.4.0", "accelerate", "safetensors"]
+pi05 = ["transformers>=5.4.0,<5.6.0", "safetensors", "einops"]
 test = ["pytest"]
 
 [tool.setuptools.packages.find]
@@ -23,7 +24,7 @@ namespaces = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-markers = ["unit: unit tests"]
+markers = ["unit: unit tests", "gpu: TensorRT integration tests requiring CUDA"]
 
 [tool.ruff]
 target-version = "py310"

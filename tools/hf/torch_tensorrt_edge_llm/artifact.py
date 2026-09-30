@@ -97,6 +97,7 @@ def build_pi05_component_artifact(
             outputs=outputs,
             runner_config={
                 "policy": "pi05",
+                "device_id": device_id,
                 "input_names": list(PI05_COMPONENT_INPUTS[component]),
                 "output_names": list(PI05_COMPONENT_OUTPUTS[component]),
             },
@@ -153,9 +154,11 @@ def build_vision_artifact(
     )
     trt_metadata = TensorRTBlobMetadata(
         io_bindings=[
-            TensorRTIOBinding(name=input_names[0], is_input=True),
             TensorRTIOBinding(
-                name=output_names[0],
+                name=config.get("trt_input_names", input_names)[0], is_input=True
+            ),
+            TensorRTIOBinding(
+                name=config.get("trt_output_names", output_names)[0],
                 dtype=output_spec.dtype,
                 shape=list(output_spec.shape),
                 is_input=False,
@@ -169,6 +172,7 @@ def build_vision_artifact(
         outputs=(output_spec,),
         runner_config={
             "model_type": "vit",
+            "device_id": device_id,
             "input_layout": "hwc",
             "input_dtype": _dtype_name(
                 config.get("input_dtype", input_config.get("dtype", "float16"))
