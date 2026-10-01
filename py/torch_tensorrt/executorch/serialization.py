@@ -13,7 +13,7 @@ import dataclasses
 import json
 import struct
 from dataclasses import dataclass, field
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Union
 
 # A blob carrying aliased_io means something different to a parser that ignores it:
 # the runtime would bind each aliased output to its own allocation instead of the
@@ -106,7 +106,10 @@ class TensorRTBlobMetadata:
         )
 
 
-def serialize_engine(engine_bytes: bytes, metadata: TensorRTBlobMetadata) -> bytes:
+def serialize_engine(
+    engine_bytes: Union[bytes, bytearray, memoryview],
+    metadata: TensorRTBlobMetadata,
+) -> bytes:
     metadata_json = metadata.to_json()
     metadata_offset = HEADER_SIZE
     engine_offset = _align_to_16(metadata_offset + len(metadata_json))
@@ -117,7 +120,7 @@ def serialize_engine(engine_bytes: bytes, metadata: TensorRTBlobMetadata) -> byt
         metadata_offset,
         len(metadata_json),
         engine_offset,
-        len(engine_bytes),
+        memoryview(engine_bytes).nbytes,
         reserved,
     )
     padding = b"\x00" * (engine_offset - metadata_offset - len(metadata_json))
