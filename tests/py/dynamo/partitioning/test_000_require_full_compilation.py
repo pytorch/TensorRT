@@ -108,11 +108,17 @@ class TestRequireFullCompilation(TestCase):
         compiled = self._compile(Identity().eval().cuda(), inputs)
         torch.testing.assert_close(compiled(*inputs), inputs[0])
 
-    def test_dryrun_reports_instead_of_raising(self):
+    @parameterized.expand([("fast", True), ("global", False)])
+    def test_dryrun_reports_instead_of_raising(self, _, use_fast_partitioner):
         """dryrun is documented as the way to inspect what would fall back, so it must
         not become fatal."""
         inputs = [torch.randn(8, 64, device="cuda")]
-        compiled = self._compile(self._no_converter_module(), inputs, dryrun=True)
+        compiled = self._compile(
+            self._no_converter_module(),
+            inputs,
+            dryrun=True,
+            use_fast_partitioner=use_fast_partitioner,
+        )
         self.assertIsNotNone(compiled)
 
     @parameterized.expand(
