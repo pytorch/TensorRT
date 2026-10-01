@@ -1415,6 +1415,11 @@ def compile_module(
             target_module._out_spec = out_spec
 
     # Partition module into components that can be TRT-accelerated
+    # dryrun is diagnostic: report full-compilation violations without making
+    # partitioning itself fatal.
+    partition_require_full_compilation = (
+        settings.require_full_compilation and not settings.dryrun
+    )
     fast_partitioner_failed = False
     # If specified, try using the fast partitioner and fall back to the global one on failure
     if settings.use_fast_partitioner:
@@ -1424,10 +1429,10 @@ def compile_module(
                 gm,
                 min_block_size=settings.min_block_size,
                 torch_executed_ops=settings.torch_executed_ops,
-                require_full_compilation=settings.require_full_compilation,
+                require_full_compilation=partition_require_full_compilation,
                 skip_fusion=(num_supported_ops == total_ops),
                 assume_full_support=(
-                    settings.require_full_compilation and num_supported_ops == total_ops
+                    partition_require_full_compilation and num_supported_ops == total_ops
                 ),
             )
 
@@ -1447,7 +1452,7 @@ def compile_module(
             gm,
             min_block_size=settings.min_block_size,
             torch_executed_ops=settings.torch_executed_ops,
-            require_full_compilation=settings.require_full_compilation,
+            require_full_compilation=partition_require_full_compilation,
         )
 
     if settings.enable_resource_partitioning:

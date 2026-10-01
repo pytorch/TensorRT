@@ -2,6 +2,7 @@ from unittest.mock import patch
 
 import tensorrt as trt
 import torch
+import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo._settings import CompilationSettings
@@ -47,6 +48,11 @@ class TestFallbackReasons(TestCase):
         x = torch.empty(2, device="cuda")
         high_rank = torch.empty((1,) * (trt.Dims.MAX_DIMS + 1), device="cuda")
         complex_value = torch.empty(2, dtype=torch.complex64, device="cuda")
+        nonzero_reason = (
+            "no validated TensorRT converter"
+            if torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx
+            else "data-dependent output shape (fallback_data_dependent_ops=True)"
+        )
         cases = [
             (
                 torch.ops.aten._to_copy.default,
@@ -70,7 +76,7 @@ class TestFallbackReasons(TestCase):
                 torch.ops.aten.nonzero.default,
                 x,
                 torch.empty(1, 1, dtype=torch.int64, device="cuda"),
-                "data-dependent output shape (fallback_data_dependent_ops=True)",
+                nonzero_reason,
             ),
             (torch.ops.aten.rand_like.default, x, x, "no validated TensorRT converter"),
         ]
@@ -81,9 +87,12 @@ class TestFallbackReasons(TestCase):
                 node = self._node(target, input_value, output_value)
                 name = ConverterRegistry.qualified_name_or_str(target)
                 if target == torch.ops.aten.nonzero.default:
-                    self.assertTrue(
-                        DYNAMO_CONVERTERS[node][2]["requires_output_allocator"]
-                    )
+                    if torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx:
+                        self.assertNotIn(node, DYNAMO_CONVERTERS)
+                    else:
+                        self.assertTrue(
+                            DYNAMO_CONVERTERS[node][2]["requires_output_allocator"]
+                        )
                 self.assertFalse(support.is_node_supported({}, node))
                 self.assertEqual(support.fallback_operators, {name: 1})
                 self.assertEqual(support.fallback_reasons, {name: {reason}})
