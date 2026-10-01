@@ -929,16 +929,21 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
     def setup_nccl_comm(self) -> None:
         """Set up NCCL communicator from the active ProcessGroup.
 
-        Uses the process group set by torch_tensorrt.distributed.distributed_context() if
-        active, otherwise falls back to the default world group.
+        Native engines use global rank IDs and require the WORLD communicator.
+        An active subgroup is rejected before any NCCL warm-up or TRT binding.
         Called lazily on first forward pass for distributed engines.
         """
-        from torch_tensorrt.distributed._distributed import get_active_group
+        from torch_tensorrt.distributed._distributed import (
+            _require_world_group,
+            get_active_group,
+        )
 
         if not self.is_distributed:
             return
 
         pg = get_active_group()
+        if self.requires_native_multidevice:
+            _require_world_group(pg)
         if pg is None or dist.get_backend(pg) != "nccl":
             raise RuntimeError(
                 "Active ProcessGroup must use NCCL backend. "
