@@ -109,6 +109,7 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
                 self.unsupported_operators[node_name] = (
                     self.unsupported_operators.get(node_name, 0) + 1
                 )
+            self._record_fallback(node, node_name, "bfloat16 not supported on Turing")
             return False
 
         if (

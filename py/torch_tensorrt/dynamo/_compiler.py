@@ -1328,14 +1328,19 @@ def compile_module(
             raise AssertionError(
                 f"require_full_compilation=True was specified, but "
                 f"{total_ops - num_supported_ops} of {total_ops} operations in this "
-                f"subgraph have no TensorRT converter"
+                f"subgraph could not be assigned to TensorRT. An operation is kept in "
+                f"PyTorch when it has no converter, when its inputs are not supported, "
+                f"or when it was excluded on purpose. Compile with dryrun=True to see "
+                f"the operators that will run in PyTorch"
             )
         logger.warning(
             f"{num_supported_ops} supported operations detected in subgraph containing {total_ops} computational nodes. "
             f"Skipping this subgraph, since min_block_size was detected to be {settings.min_block_size}"
         )
 
-        dryrun_tracker.unsupported_ops = op_support.unsupported_operators
+        # fallback_operators counts every refused operator, including ones with side
+        # effects that unsupported_operators leaves out, and never a buffer or a parameter.
+        dryrun_tracker.unsupported_ops = op_support.fallback_operators
         dryrun_tracker.to_run_in_torch.extend(parse_non_trt_nodes(gm))
         parse_graph_io(gm, dryrun_tracker)
         dryrun_stats_display(dryrun_tracker, settings.dryrun)
@@ -1469,7 +1474,7 @@ def compile_module(
         logger.info(
             "%d operator(s) will run in PyTorch: %s. "
             "Compile with dryrun=True for the full report.",
-            len(supported_ops.fallback_operators),
+            sum(supported_ops.fallback_operators.values()),
             named,
         )
 

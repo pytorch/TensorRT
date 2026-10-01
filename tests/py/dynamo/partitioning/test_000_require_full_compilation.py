@@ -71,7 +71,9 @@ class TestRequireFullCompilation(TestCase):
     def test_operator_without_converter_raises(self):
         """The case the flag exists for: something in the graph cannot be converted."""
         inputs = [torch.randn(8, 64, device="cuda")]
-        with self.assertRaisesRegex(AssertionError, "have no TensorRT converter"):
+        with self.assertRaisesRegex(
+            AssertionError, "could not be assigned to TensorRT"
+        ):
             self._compile(self._no_converter_module(), inputs)
 
     def test_message_counts_the_unconvertible_operators(self):
@@ -84,7 +86,12 @@ class TestRequireFullCompilation(TestCase):
         message = str(raised.exception)
         self.assertIn("require_full_compilation=True", message)
         self.assertIn("1 of 2 operations", message)
-        self.assertIn("have no TensorRT converter", message)
+        self.assertIn("could not be assigned to TensorRT", message)
+        # The message must not promise reasons the dry-run report does not print. The
+        # report lists operator names and counts only, so the hint stays about which
+        # operators run in PyTorch, not why.
+        self.assertIn("operators that will run in PyTorch", message)
+        self.assertNotIn("why", message)
 
     def test_small_fully_convertible_module_is_not_rejected(self):
         """The existing early return for a supported graph is still allowed."""
