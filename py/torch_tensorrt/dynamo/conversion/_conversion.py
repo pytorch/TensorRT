@@ -45,6 +45,7 @@ class SerializedInterpreterResult(NamedTuple):
     # from "user" (Torch-TensorRT-declared; runtime must enforce shape match
     # and bind the same device pointer).
     aliased_io: Dict[str, Tuple[str, str]] = {}
+    native_collective_parent: str = ""
 
 
 def infer_module_output_dtypes(
@@ -233,6 +234,24 @@ def interpret_module_to_result(
             "Failed to extract symbolic shape expressions from source FX graph partition"
         )
 
+    from torch_tensorrt.distributed._distributed import _active_native_parent
+
+    has_native_collectives = ENABLED_FEATURES.native_trt_collectives and any(
+        str(node.target).startswith("tensorrt.fused_nccl_")
+        for node in module.graph.nodes
+        if node.op == "call_function"
+    )
+    if (
+        has_native_collectives
+        and _active_native_parent()
+        and (settings.cache_built_engines or settings.reuse_cached_engines)
+    ):
+        raise RuntimeError(
+            "Subgroup-parent compilation does not support engine caching yet. "
+            "Disable cache_built_engines and reuse_cached_engines; the cache key "
+            "does not describe the parent communicator's ordered membership."
+        )
+
     # engine_cache could be None if:
     # 1) engine_cache is not passed in when calling this function like convert_exported_program_to_serialized_trt_engine etc., or
     # 2) both cache_built_engines and reuse_cached_engines are False
@@ -338,6 +357,7 @@ def interpret_module_to_result(
         requires_native_multidevice=interpreter_result.requires_native_multidevice,
         symbolic_shape_expressions=symbolic_shape_expressions,
         aliased_io=interpreter_result.aliased_io,
+        native_collective_parent=interpreter_result.native_collective_parent,
     )
 
     return serialized_interpreter_result
@@ -395,4 +415,5 @@ def convert_module(
         requires_native_multidevice=serialized_interpreter_result.requires_native_multidevice,
         symbolic_shape_expressions=serialized_interpreter_result.symbolic_shape_expressions,
         aliased_io=serialized_interpreter_result.aliased_io,
+        native_collective_parent=serialized_interpreter_result.native_collective_parent,
     )

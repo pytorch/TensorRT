@@ -638,7 +638,12 @@ class TestNativeCollectiveWorldContract(unittest.TestCase):
 
         world = _FakeGroup("world")
         subgroup = _FakeGroup("tp_2_3")
-        engine = MagicMock(is_distributed=True, requires_native_multidevice=True)
+        engine = MagicMock(
+            is_distributed=True,
+            requires_native_multidevice=True,
+            native_collective_parent="",
+            group_name="",
+        )
         with (
             patch.object(dist, "is_available", return_value=True),
             patch.object(dist, "is_initialized", return_value=True),
@@ -937,6 +942,7 @@ class TestNativeCollectiveNumRanks(unittest.TestCase):
         layer = self._RecordingLayer()
         ctx = mock.MagicMock()
         ctx.net.add_dist_collective.return_value = layer
+        ctx.native_collective_parent = None
 
         converter = getattr(nccl_ops, converter_name)
         # The converters are wrapped in @needs_native_collectives, which raises unless the
@@ -3036,6 +3042,87 @@ class TestMultirankNccl4GPU(MultirankNcclBase):
     """
 
     world_size = 4
+
+    @unittest.skipIf(not has_nccl_collectives(), "No NCCL collective support available")
+    @requires_nccl()
+    @skip_if_lt_x_gpu(4)
+    def test_subgroup_parent_roundtrip(self) -> None:
+        """Nonzero-based parents execute and retain their mapping through save/load."""
+        import importlib
+        import tempfile
+
+        import torch_tensorrt
+        from torch_tensorrt.distributed import distributed_context
+        from torch_tensorrt.distributed._nccl_utils import setup_nccl_for_torch_tensorrt
+        from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
+
+        wrapper_module = importlib.import_module(
+            "torch_tensorrt.dynamo.runtime._TorchTensorRTModule"
+        )
+
+        if not torch_tensorrt.ENABLED_FEATURES.native_trt_collectives:
+            self.skipTest("Requires native TRT collectives")
+        device = self._init_dist()
+        setup_nccl_for_torch_tensorrt()
+        parents = [dist.new_group(ranks=ranks) for ranks in ([0, 1], [2, 3])]
+        parent = parents[self.rank // 2]
+        ranks = dist.get_process_group_ranks(parent)
+        # C++ needs the communicator materialized before its first lazy bind.
+        dist.all_reduce(torch.zeros(1, device=device), group=parent)
+
+        class GatherAndReduce(nn.Module):
+            def forward(self, x: torch.Tensor) -> torch.Tensor:
+                gathered = torch.ops._c10d_functional.all_gather_into_tensor.default(
+                    x, 2, parent.group_name
+                )
+                gathered = torch.ops._c10d_functional.wait_tensor.default(gathered)
+                reduced = torch.ops._c10d_functional.all_reduce.default(
+                    gathered, "sum", parent.group_name
+                )
+                return torch.ops._c10d_functional.wait_tensor.default(reduced)
+
+        inp = torch.full((2, 4), float(self.rank + 1), device=device)
+        expected = torch.cat([torch.full_like(inp, float(r + 1) * 2) for r in ranks])
+        for python_runtime in (False, True):
+            features = torch_tensorrt.ENABLED_FEATURES._replace(
+                torch_tensorrt_runtime=not python_runtime
+            )
+            with (
+                self.subTest(python_runtime=python_runtime),
+                tempfile.TemporaryDirectory() as tmp,
+                patch.object(wrapper_module, "ENABLED_FEATURES", features),
+                patch.object(torch_tensorrt, "ENABLED_FEATURES", features),
+            ):
+                with distributed_context(parent):
+                    exported = torch.export.export(GatherAndReduce().to(device), (inp,))
+                    compiled = torch_tensorrt.dynamo.compile(
+                        exported,
+                        inputs=[inp],
+                        min_block_size=1,
+                        require_full_compilation=True,
+                        use_distributed_mode_trace=True,
+                    )
+                    engines = [
+                        m
+                        for m in compiled.modules()
+                        if hasattr(m, "native_collective_parent")
+                    ]
+                    self.assertEqual(len(engines), 1)
+                    self.assertEqual(
+                        isinstance(engines[0].engine, TRTEngine), python_runtime
+                    )
+                    self.assertEqual(
+                        engines[0].native_collective_parent, ",".join(map(str, ranks))
+                    )
+                    _check_close(compiled(inp), expected, "subgroup parent")
+                    path = f"{tmp}/rank{self.rank}.pt2"
+                    torch_tensorrt.save(compiled, path, arg_inputs=[inp])
+                    loaded = torch_tensorrt.load(path).module()
+                with self.assertRaisesRegex(RuntimeError, "compiled for parent"):
+                    with distributed_context(dist.group.WORLD, loaded):
+                        pass
+                with distributed_context(parent, loaded):
+                    _check_close(loaded(inp), expected, "loaded subgroup parent")
 
     @unittest.skipIf(not has_nccl_collectives(), "No NCCL collective support available")
     @unittest.skipUnless(
