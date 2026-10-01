@@ -217,6 +217,14 @@ TORCH_LIBRARY(tensorrt, m) {
   m.def("set_cudagraphs_mode", [](int64_t cudagraphs_mode) -> void {
     CUDAGRAPHS_MODE = CudaGraphsMode(cudagraphs_mode);
   });
+  m.def("get_profile_execution", []() -> bool { return get_profile_execution(); });
+  m.def("set_profile_execution", [](bool enabled) -> void { set_profile_execution(enabled); });
+  m.def("get_profile_format", []() -> std::string { return get_profile_format(); });
+  m.def("set_profile_format", [](std::string profile_format) -> void { set_profile_format(profile_format); });
+  m.def("get_profile_path_prefix", []() -> std::string { return get_profile_path_prefix(); });
+  m.def("set_profile_path_prefix", [](std::string profile_path_prefix) -> void {
+    set_profile_path_prefix(profile_path_prefix);
+  });
   m.def("set_logging_level", [](int64_t level) -> void {
     util::logging::get_logger().set_reportable_log_level(util::logging::LogLevel(level));
   });

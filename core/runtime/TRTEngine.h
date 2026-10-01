@@ -252,6 +252,9 @@ struct TRTEngine : torch::CustomClassHolder {
   void enable_profiling();
   void set_profile_format(std::string profile_format);
   void disable_profiling();
+  // Apply process-global profiling settings when their generation changes.
+  // Called under ``mu`` before materializing the execution context.
+  void sync_global_profiling_state();
   std::string get_engine_layer_info();
   std::string get_serialized_metadata();
 
@@ -427,6 +430,7 @@ struct TRTEngine : torch::CustomClassHolder {
   std::string enqueue_profile_path;
   std::string trt_engine_profile_path;
   std::string cuda_graph_debug_path;
+  uint64_t global_profiling_generation = 0;
   std::mutex mu;
   std::unique_ptr<TRTEngineProfiler> trt_engine_profiler;
   ResourceAllocationStrategy resource_allocation_strategy = kStatic;

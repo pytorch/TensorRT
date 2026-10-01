@@ -431,6 +431,27 @@ void TRTEngine::enable_profiling() {
   exec_ctx()->setProfiler(trt_engine_profiler.get());
 }
 
+void TRTEngine::sync_global_profiling_state() {
+  // The unchanged path is one atomic load. Copy the string-bearing snapshot
+  // under its mutex only after a global setter publishes a new generation.
+  if (get_global_profiling_generation() == global_profiling_generation) {
+    return;
+  }
+  const auto config = get_global_profiling_config();
+
+  profile_path_prefix = config.profile_path_prefix;
+  if (config.enabled) {
+    if (!profile_execution || trt_engine_profiler == nullptr) {
+      enable_profiling();
+    }
+    set_profile_format(config.profile_format);
+  } else if (profile_execution) {
+    disable_profiling();
+  }
+
+  global_profiling_generation = config.generation;
+}
+
 void TRTEngine::set_output_tensors_as_unowned(bool enable) {
   this->output_tensors_are_unowned = enable;
 }
