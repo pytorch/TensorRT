@@ -4,6 +4,7 @@ import tensorrt as trt
 import torch
 from parameterized import parameterized
 from torch.testing._internal.common_utils import TestCase, run_tests
+from torch_tensorrt import ENABLED_FEATURES
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     DYNAMO_CONVERTERS,
@@ -70,7 +71,13 @@ class TestFallbackReasons(TestCase):
                 torch.ops.aten.nonzero.default,
                 x,
                 torch.empty(1, 1, dtype=torch.int64, device="cuda"),
-                "data-dependent output shape (fallback_data_dependent_ops=True)",
+                # TensorRT-RTX has no nonzero layer, so its validator refuses the node
+                # before the data-dependent check is reached.
+                (
+                    "no validated TensorRT converter"
+                    if ENABLED_FEATURES.tensorrt_rtx
+                    else "data-dependent output shape (fallback_data_dependent_ops=True)"
+                ),
             ),
             (torch.ops.aten.rand_like.default, x, x, "no validated TensorRT converter"),
         ]
@@ -80,7 +87,10 @@ class TestFallbackReasons(TestCase):
                 support = support_class()
                 node = self._node(target, input_value, output_value)
                 name = ConverterRegistry.qualified_name_or_str(target)
-                if target == torch.ops.aten.nonzero.default:
+                if (
+                    target == torch.ops.aten.nonzero.default
+                    and not ENABLED_FEATURES.tensorrt_rtx
+                ):
                     self.assertTrue(
                         DYNAMO_CONVERTERS[node][2]["requires_output_allocator"]
                     )
