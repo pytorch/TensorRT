@@ -267,7 +267,7 @@ def nccl_reduce_scatter(
     return layer.get_output(0)
 
 
-@needs_native_collectives
+@needs_native_collectives  # type: ignore[misc]
 def nccl_all_gather_native(
     ctx: ConversionContext,
     target: Union[Target, str],
@@ -307,8 +307,6 @@ def nccl_all_gather_native(
         # Use native TensorRT DistCollective API for ALL_GATHER
         # For ALL_GATHER, the reduce operation and root rank parameters are ignored
         # The last parameter (group) can be None to include all ranks
-        import numpy as np
-
         # Create array of all participating rank IDs [0, 1, 2, ..., world_size-1]
         groups = _collective_group_ranks(group_name, world_size)
 
@@ -344,7 +342,7 @@ def nccl_all_gather_native(
         raise
 
 
-@needs_native_collectives
+@needs_native_collectives  # type: ignore[misc]
 def nccl_reduce_scatter_native(
     ctx: ConversionContext,
     target: Union[Target, str],
@@ -429,7 +427,7 @@ def nccl_reduce_scatter_native(
         raise
 
 
-@needs_native_collectives
+@needs_native_collectives  # type: ignore[misc]
 def nccl_all_reduce_native(
     ctx: ConversionContext,
     target: Union[Target, str],
@@ -518,7 +516,7 @@ def nccl_all_reduce_native(
         raise
 
 
-@needs_native_collectives
+@needs_native_collectives  # type: ignore[misc]
 def nccl_all_to_all_native(
     ctx: ConversionContext,
     target: Union[Target, str],
@@ -559,8 +557,6 @@ def nccl_all_to_all_native(
         # Use native TensorRT DistCollective API for ALL_TO_ALL
         # For ALL_TO_ALL, the reduce operation and root rank parameters are ignored
         # The last parameter (group) can be None to include all ranks
-        import numpy as np
-
         # Create array of all participating rank IDs [0, 1, 2, ..., world_size-1]
         groups = _collective_group_ranks(group_name, world_size)
 
@@ -596,7 +592,7 @@ def nccl_all_to_all_native(
         raise
 
 
-@needs_native_collectives
+@needs_native_collectives  # type: ignore[misc]
 def nccl_scatter_native(
     ctx: ConversionContext,
     target: Union[Target, str],
@@ -637,8 +633,6 @@ def nccl_scatter_native(
         # Use native TensorRT DistCollective API for SCATTER
         # For SCATTER, the reduce operation parameter is ignored
         # The last parameter (group) can be None to include all ranks
-        import numpy as np
-
         # Create array of all participating rank IDs [0, 1, 2, ..., world_size-1]
         groups = _collective_group_ranks(group_name, world_size)
 
@@ -674,7 +668,7 @@ def nccl_scatter_native(
         raise
 
 
-@needs_native_collectives
+@needs_native_collectives  # type: ignore[misc]
 def nccl_gather_native(
     ctx: ConversionContext,
     target: Union[Target, str],
@@ -715,8 +709,6 @@ def nccl_gather_native(
         # Use native TensorRT DistCollective API for GATHER
         # For GATHER, the reduce operation parameter is ignored
         # The last parameter (group) can be None to include all ranks
-        import numpy as np
-
         # Create array of all participating rank IDs [0, 1, 2, ..., world_size-1]
         groups = _collective_group_ranks(group_name, world_size)
 
