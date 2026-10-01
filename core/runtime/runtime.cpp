@@ -5,6 +5,10 @@
 
 #include "cuda_runtime.h"
 
+#include <atomic>
+#include <filesystem>
+#include <mutex>
+
 #include "core/runtime/runtime.h"
 #include "core/util/prelude.h"
 
@@ -14,6 +18,59 @@ namespace runtime {
 
 bool MULTI_DEVICE_SAFE_MODE = false;
 CudaGraphsMode CUDAGRAPHS_MODE = STANDARD;
+
+namespace {
+std::mutex global_profiling_mutex;
+GlobalProfilingConfig global_profiling_config{false, "perfetto", std::filesystem::temp_directory_path().string(), 0};
+std::atomic<uint64_t> global_profiling_generation{0};
+
+void publish_global_profiling_update() {
+  global_profiling_config.generation = global_profiling_generation.fetch_add(1, std::memory_order_release) + 1;
+}
+} // namespace
+
+GlobalProfilingConfig get_global_profiling_config() {
+  std::lock_guard<std::mutex> lock(global_profiling_mutex);
+  return global_profiling_config;
+}
+
+uint64_t get_global_profiling_generation() noexcept {
+  return global_profiling_generation.load(std::memory_order_acquire);
+}
+
+bool get_profile_execution() {
+  return get_global_profiling_config().enabled;
+}
+
+void set_profile_execution(bool enabled) {
+  std::lock_guard<std::mutex> lock(global_profiling_mutex);
+  global_profiling_config.enabled = enabled;
+  publish_global_profiling_update();
+}
+
+std::string get_profile_format() {
+  return get_global_profiling_config().profile_format;
+}
+
+void set_profile_format(const std::string& profile_format) {
+  TORCHTRT_CHECK(
+      profile_format == "perfetto" || profile_format == "trex",
+      "Invalid global profile format: " << profile_format << ". Expected 'perfetto' or 'trex'.");
+  std::lock_guard<std::mutex> lock(global_profiling_mutex);
+  global_profiling_config.profile_format = profile_format;
+  publish_global_profiling_update();
+}
+
+std::string get_profile_path_prefix() {
+  return get_global_profiling_config().profile_path_prefix;
+}
+
+void set_profile_path_prefix(const std::string& profile_path_prefix) {
+  TORCHTRT_CHECK(!profile_path_prefix.empty(), "Global profile path prefix must not be empty.");
+  std::lock_guard<std::mutex> lock(global_profiling_mutex);
+  global_profiling_config.profile_path_prefix = profile_path_prefix;
+  publish_global_profiling_update();
+}
 
 c10::optional<RTDevice> get_most_compatible_device(
     const RTDevice& target_device,

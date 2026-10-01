@@ -307,6 +307,13 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     inp = inp.cuda();
   }
 
+  // Serialize all context and runtime-state mutation from this point onward.
+  // In particular, a newly published global profiling configuration may attach
+  // a profiler or invalidate the current context, so it must be applied before
+  // any context pointer is materialized for this invocation.
+  std::unique_lock<std::mutex> lock(compiled_engine->mu);
+  compiled_engine->sync_global_profiling_state();
+
 #ifdef ENABLE_TRT_NCCL_COLLECTIVES
   // Lazy one-shot NCCL bind: fires on the first real execute_engine call when
   // the constructor-time bind was deferred (e.g. no collective had been issued
@@ -320,8 +327,8 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
   // Materialize the IExecutionContext once for this call. Holding the raw
   // pointer locally avoids paying the null-check + virtual dispatch through
   // ``compiled_engine->exec_ctx()`` at every TRT API call below; the lock on
-  // ``compiled_engine->mu`` (acquired further down) keeps the pointer stable
-  // for the remainder of the call.
+  // ``compiled_engine->mu`` keeps the pointer stable for the remainder of the
+  // call.
   auto* ctx = compiled_engine->exec_ctx();
 
   torch::Tensor dynamic_workspace;
@@ -730,9 +737,6 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
   LOG_DEBUG(
       "Attempting to run engine (ID: " << compiled_engine->name
                                        << "); Hardware Compatible: " << compiled_engine->hardware_compatible);
-  // nvinfer1::IExecutionContext::enqueue is not thread safe and we need a mutex for it.
-  // Other IExecutionContext methods and runtime states should be in same scope as well
-  std::unique_lock<std::mutex> lock(compiled_engine->mu);
   if (compiled_engine->profile_execution) {
     std::stringstream ss;
     ss << "Execution profiling is enabled, find results here:" << std::endl;
