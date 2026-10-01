@@ -56,10 +56,9 @@ except ImportError:
     # Fallback shim: the wrapper only needs set_config / all_to_all / all_gather,
     # which are thin wrappers over the standard torch functional collectives
     # (torch.ops._c10d_functional.*, present in any recent PyTorch). This lets the
-    # EAGER self-test run on a machine without the dev-branch torch-tensorrt.
-    # NOTE: export + TRT compile (moe_ep_a2a_export.py) still requires the
-    # dev-branch torch-tensorrt (native DistCollective converters + distributed
-    # runtime) — the shim only unblocks stage-1 logic validation.
+    # eager self-test run without torch-tensorrt and supports current builds
+    # that no longer provide md_conversion. Export + TRT compile still needs
+    # torch-tensorrt's native collective converters and distributed runtime.
     import types
 
     md = types.SimpleNamespace(world_size=None, rank=None, group_name=None)
@@ -220,24 +219,33 @@ def shard_moe_block(
     """Replace a Qwen3MoeSparseMoeBlock with an ExpertParallelMoE that keeps only
     this rank's slice of experts (the rest are dropped -> the memory win).
 
-    Handles Qwen3MoeExperts (fused 3-D weight tensors) by slicing per-expert
-    weights into individual _Qwen3ExpertSlice modules.
+    Handles ModuleList experts and Qwen3MoeExperts (fused 3-D weight tensors).
+    Packed weights are sliced into individual _Qwen3ExpertSlice modules.
     """
-    num_experts = block.experts.num_experts
-    top_k = block.experts.config.num_experts_per_tok
-    norm_topk_prob = getattr(block.experts.config, "norm_topk_prob", True)
+    if isinstance(block.experts, nn.ModuleList):
+        num_experts = len(block.experts)
+        top_k = block.top_k
+        norm_topk_prob = getattr(block, "norm_topk_prob", True)
+    else:
+        num_experts = block.experts.num_experts
+        top_k = block.experts.config.num_experts_per_tok
+        norm_topk_prob = getattr(block.experts.config, "norm_topk_prob", True)
+    assert num_experts % world_size == 0, "E must be divisible by world_size"
     El = num_experts // world_size
     lo = rank * El
-    local = nn.ModuleList(
-        [
-            _Qwen3ExpertSlice(
-                block.experts.gate_up_proj[lo + i].detach(),
-                block.experts.down_proj[lo + i].detach(),
-                block.experts.act_fn,
-            )
-            for i in range(El)
-        ]
-    )
+    if isinstance(block.experts, nn.ModuleList):
+        local = block.experts[lo : lo + El]
+    else:
+        local = nn.ModuleList(
+            [
+                _Qwen3ExpertSlice(
+                    block.experts.gate_up_proj[lo + i].detach(),
+                    block.experts.down_proj[lo + i].detach(),
+                    block.experts.act_fn,
+                )
+                for i in range(El)
+            ]
+        )
     return ExpertParallelMoE(
         gate=block.gate,
         local_experts=local,

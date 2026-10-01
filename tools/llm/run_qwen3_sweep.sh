@@ -7,7 +7,7 @@
 #       -e LD_PRELOAD=/opt/new-trt/libnvinfer.so.11.3.0 \
 #       -e LD_LIBRARY_PATH=/opt/new-trt \
 #       trtparallel \
-#       bash -c "cd /code/trtparallel/torchTRT_llama_export/TensorRT/tools/llm && bash run_qwen3_ep.sh"
+#       bash -c "cd /code/trtparallel/torchTRT_llama_export/TensorRT/tools/llm && bash run_qwen3_sweep.sh"
 #
 # Knobs (env vars, optional):
 #   E, K, H, INTER   model dims           (default Qwen3-30B-A3B: 128 / 8 / 2048 / 768)
@@ -42,14 +42,14 @@ echo "======================================================================"
 # ---- 1. CORRECTNESS: bit-exact vs the dropless reference (f = E/k) --------
 # Random weights at real Qwen3 dims -> no download; proves TRT == reference.
 echo; echo ">>> [correctness] f=$NODROP (dropless), 2 GPUs  -- expect TRT==reference 5/5"
-torchtrtrun --nproc_per_node=2 qwen3_moe_ep_export.py $DIMS \
+torchtrtrun --nproc_per_node=2 expert_parallel_qwen_export.py $DIMS \
     --tokens 64 --capacity-factor "$NODROP"
 
 # Optional: REAL pretrained weights (the R5 datapoint). Needs local-disk HF cache.
 if [ "${RUN_HF:-0}" = "1" ]; then
   export HF_HOME=${HF_HOME:-/tmp/hf-$USER}
   echo; echo ">>> [correctness] REAL Qwen/Qwen3-30B-A3B weights, f=$NODROP  (HF_HOME=$HF_HOME)"
-  torchtrtrun --nproc_per_node=2 qwen3_moe_ep_export.py \
+  torchtrtrun --nproc_per_node=2 expert_parallel_qwen_export.py \
       --hf-model Qwen/Qwen3-30B-A3B --capacity-factor "$NODROP"
 fi
 
@@ -66,7 +66,7 @@ for T in $BENCH_TOKENS; do
       continue
     fi
     echo; echo ">>> [benchmark] f=$CF, ${NP} GPU(s), T=$T  -- read the [5] line"
-    torchtrtrun --nproc_per_node="$NP" qwen3_moe_ep_export.py $DIMS \
+    torchtrtrun --nproc_per_node="$NP" expert_parallel_qwen_export.py $DIMS \
         --tokens "$T" --capacity-factor "$CF" --benchmark
   done
 done

@@ -2240,7 +2240,6 @@ def _multirank_two_dimensional_mesh_routing(
             f"got {world_size}"
         )
         return
-    import torch_tensorrt
     from torch_tensorrt.distributed._distributed import distributed_context
     from torch_tensorrt.distributed._nccl_utils import setup_nccl_for_torch_tensorrt
 

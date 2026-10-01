@@ -9,7 +9,7 @@ the "plug in the real block" step: shard_moe_block reads .gate/.top_k/
 NOTE: HF migrated Qwen3MoeSparseMoeBlock to the FUSED ``Qwen3MoeExperts`` (packed
 weight tensors gate_up_proj [E,2*inter,H] / down_proj [E,H,inter]), not a
 ModuleList. shard_moe_block handles this by slicing the packed tensors for this
-rank and running a batched bmm (_PackedExperts); the old ModuleList layout still
+rank and creating individual expert modules; the old ModuleList layout still
 works too. So a wrapper change WAS needed -- it lives in moe_ep_a2a_wrapper.py.
 
 PHASE 1 ONLY: one WORLD group, experts sharded across ranks, all_to_all routing.
@@ -21,16 +21,16 @@ so TRT / eager-wrapper should match the block's native output bit-for-bit.
 
 RUN (from tools/llm/, on the GPU box, via the torch-tensorrt launcher):
   # eager parity + export + build + run, 2 ranks:
-  torchtrtrun --nproc_per_node=2 qwen3_moe_ep_export.py
+  torchtrtrun --nproc_per_node=2 expert_parallel_qwen_export.py
 
   # real pretrained weights (the full R5 datapoint):
-  torchtrtrun --nproc_per_node=2 qwen3_moe_ep_export.py --hf-model Qwen/Qwen3-30B-A3B
+  torchtrtrun --nproc_per_node=2 expert_parallel_qwen_export.py --hf-model Qwen/Qwen3-30B-A3B
 
   # smaller/larger block:
-  torchtrtrun --nproc_per_node=2 qwen3_moe_ep_export.py --experts 8 --hidden 64 --inter 128
+  torchtrtrun --nproc_per_node=2 expert_parallel_qwen_export.py --experts 8 --hidden 64 --inter 128
 
   # export + build only:
-  torchtrtrun --nproc_per_node=2 qwen3_moe_ep_export.py --build-only
+  torchtrtrun --nproc_per_node=2 expert_parallel_qwen_export.py --build-only
 """
 
 import argparse
@@ -39,8 +39,7 @@ import os
 import torch
 import torch.distributed as dist
 import torch_tensorrt
-import torch_tensorrt.distributed.md_conversion as md
-from moe_ep_a2a_wrapper import shard_moe_block
+from moe_ep_a2a_wrapper import md, shard_moe_block
 from torch_tensorrt.distributed import setup_nccl_for_torch_tensorrt
 
 
@@ -72,6 +71,8 @@ def build_qwen3_block(hidden, inter, experts, topk, device, dtype):
     # Qwen3MoeExperts uses torch.empty (uninitialized) — init explicitly
     torch.nn.init.normal_(block.experts.gate_up_proj, std=0.02)
     torch.nn.init.normal_(block.experts.down_proj, std=0.02)
+    # Standalone block construction skips the model's router initialization.
+    torch.nn.init.normal_(block.gate.weight, std=0.02)
     return block, cfg.hidden_size
 
 
