@@ -613,6 +613,54 @@ def test_construct_dynamic_input_uses_profile_midpoint():
 
 
 @pytest.mark.unit
+def test_construct_dynamic_input_unbounded_zero_min_uses_nonzero_max():
+    """An unbounded data-dependent extent must not collapse to [0, 0, 0]."""
+
+    class UnboundedDynamicRows(torch.nn.Module):
+        def forward(self, x):
+            return torch.ops.torchtrt_profile_test.dynamic_rows(x)
+
+    exported = torch.export.export(UnboundedDynamicRows(), (torch.ones(4, 4),))
+    dynamic_rows = next(
+        node
+        for node in exported.graph.nodes
+        if node.target == torch.ops.torchtrt_profile_test.dynamic_rows.default
+    )
+    symbolic_shape = dynamic_rows.meta["val"].shape
+    range_info = extract_var_range_info(symbolic_shape[0])
+
+    assert range_info["min"] == 0
+    assert range_info["max"] is None
+
+    input_spec = construct_dynamic_input(
+        symbolic_shape, torch.float32, name="dynamic_rows"
+    )
+    assert input_spec.shape["min_shape"] == (0, 4)
+    assert input_spec.shape["opt_shape"] == (2048, 4)
+    assert input_spec.shape["max_shape"] == (4096, 4)
+
+
+@pytest.mark.unit
+def test_construct_dynamic_input_rejects_invalid_profile(monkeypatch):
+    """Generated profiles are validated before reaching the TensorRT builder."""
+
+    symbolic_shape = _constrained_dynamic_shape(1, 8)
+    monkeypatch.setattr(
+        "torch_tensorrt.dynamo.partitioning.common.extract_var_range_info",
+        lambda *_args, **_kwargs: {"min": 1, "opt": 9, "max": 8},
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "Invalid optimization profile for input 'dynamic_rows' at dimension 0: "
+            "expected min <= opt <= max, but got min=1, opt=9, max=8"
+        ),
+    ):
+        construct_dynamic_input(symbolic_shape, torch.float32, name="dynamic_rows")
+
+
+@pytest.mark.unit
 def test_largest_size_symbol_bound_is_treated_as_unbounded():
     symbolic_shape = _constrained_dynamic_shape(1, sys.maxsize - 1)
     range_info = extract_var_range_info(symbolic_shape[0])
