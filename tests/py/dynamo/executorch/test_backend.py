@@ -225,6 +225,27 @@ def test_preprocess_serializes_only_the_engine_tensors_extent():
 
 
 @pytest.mark.unit
+def test_preprocess_copy_shares_tensors_and_copies_the_graph():
+    # The engine reaches preprocess as a state-dict tensor, so copying every
+    # tensor before preprocess would hold a second copy of a multi-gigabyte engine.
+    class Module(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.register_buffer("engine", torch.arange(16, dtype=torch.uint8))
+
+        def forward(self, x):
+            return x + self.engine.sum()
+
+    program = torch.export.export(Module(), (torch.ones(2),), strict=True)
+
+    copied = TensorRTBackend.copy_exported_program_for_preprocess(program, [])
+
+    assert copied.state_dict["engine"] is program.state_dict["engine"]
+    assert copied.state_dict is not program.state_dict
+    assert copied.graph_module is not program.graph_module
+
+
+@pytest.mark.unit
 def test_preprocess_single_input_is_identity():
     # Single-input engines have zero ordering ambiguity: the one binding maps to
     # the one placeholder regardless of name (TRT name may be semantic, the
