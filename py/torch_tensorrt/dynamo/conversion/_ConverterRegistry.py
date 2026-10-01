@@ -21,6 +21,7 @@ from typing import (
     cast,
 )
 
+import tensorrt as trt
 import torch
 from torch import SymBool, SymFloat, SymInt
 from torch._ops import OpOverloadPacket
@@ -28,8 +29,6 @@ from torch.fx.node import Argument, Node, Target, _get_qualified_name
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.partitioning.common import node_in_torch_executed_module
-
-import tensorrt as trt
 
 logger = logging.getLogger(__name__)
 
@@ -134,7 +133,7 @@ def has_static_shapes_in_args(
 
 def _has_dynamic_shapes(
     node: torch.fx.Node,
-    compilation_settings: CompilationSettings = None,
+    compilation_settings: Optional[CompilationSettings] = None,
     arg_positions_to_check: Optional[List[int]] = None,
 ) -> bool:
     # Validate that none of the inputs to the node have Dynamic shapes
@@ -340,7 +339,7 @@ class ConverterRegistry:
                 CallingConvention.CTX for _ in range(len(self.registries))
             ]
 
-        self.compilation_settings: CompilationSettings = None
+        self.compilation_settings: Optional[CompilationSettings] = None
         self.disallowed_targets: Collection[Target] = set()
         self.validate_invariants()
 

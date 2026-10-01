@@ -246,7 +246,7 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
 
         def _value_exceeds_limit(value: object) -> bool:
             if isinstance(value, torch.Tensor):
-                return value.ndim > trt.Dims.MAX_DIMS
+                return bool(value.ndim > trt.Dims.MAX_DIMS)
             if isinstance(value, (tuple, list)):
                 return any(_value_exceeds_limit(item) for item in value)
             if isinstance(value, dict):

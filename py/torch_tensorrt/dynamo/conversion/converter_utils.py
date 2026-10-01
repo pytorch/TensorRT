@@ -133,7 +133,7 @@ def get_node_io(
 
 
 def is_only_operator_on_placeholder(
-    node: torch.fx.Node, settings: CompilationSettings = None
+    node: torch.fx.Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
     """Detects whether a call_function node is the only operator on a placeholder"""
     # Returns true if the node operates on a placeholder and is a direct output
