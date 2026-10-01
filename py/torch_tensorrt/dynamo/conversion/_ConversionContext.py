@@ -57,6 +57,7 @@ class ConversionContext:
     )
     requires_output_allocator: bool = False
     requires_native_multidevice: bool = False
+    native_collective_parent: Optional[str] = None
     weight_refit_map: dict[str, torch.Tensor] = field(default_factory=dict)
     cpu_weights_reference_holder: list[torch.Tensor] = field(default_factory=list)
     current_node: Optional[torch.fx.Node] = field(default=None)

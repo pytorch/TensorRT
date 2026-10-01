@@ -84,17 +84,11 @@ def _get_distributed_rank_and_world_size() -> Tuple[int, int]:
 
 
 def _collective_group_ranks(group_name: Optional[str], world_size: int) -> np.ndarray:
-    """Ranks that participate in this collective, as IDs in the bound communicator.
+    """Resolve a collective's ordered global participants.
 
-    ``addDistCollective`` documents ``groups`` as "a flat array of rank IDs in the
-    communicator", selecting the subset that takes part and defining each one's group-local
-    rank by position. The runtime binds one communicator per engine, so these are that
-    communicator's rank IDs -- global ranks when the world communicator is bound, which is
-    what lets a single engine host collectives on several different subgroups (e.g. context
-    parallel on one mesh axis and tensor parallel on the other).
-
-    Resolving the op's ``group_name`` is what lets a collective target a subgroup at all;
-    without it every collective is built over the whole world.
+    WORLD-built engines use these IDs directly. ``_native_collective_ranks``
+    translates them into parent-local IDs for subgroup-built engines. Keeping
+    the operation's order is essential for all_gather and reduce_scatter.
     """
     if group_name:
         try:
@@ -124,6 +118,53 @@ def _collective_group_ranks(group_name: Optional[str], world_size: int) -> np.nd
         return np.array(dist.get_process_group_ranks(pg), dtype=np.int64)
     # No group named: the collective is over the world group by construction.
     return np.arange(world_size, dtype=np.int64)
+
+
+def _native_collective_ranks(
+    ctx: ConversionContext, group_name: Optional[str], world_size: int
+) -> np.ndarray:
+    """Translate global participants into the compile-time parent's rank space."""
+    from torch_tensorrt._features import ENABLED_FEATURES
+    from torch_tensorrt.distributed._distributed import _active_native_parent
+
+    parent = _active_native_parent()
+    if ctx.native_collective_parent is None:
+        ctx.native_collective_parent = parent
+    elif ctx.native_collective_parent != parent:
+        raise RuntimeError(
+            "The parent communicator changed while building one TRT engine"
+        )
+
+    ranks = _collective_group_ranks(group_name, world_size)
+    if not parent:
+        return ranks
+
+    parent_ranks = [int(rank) for rank in parent.split(",")]
+    parent_ids = {rank: index for index, rank in enumerate(parent_ranks)}
+    outside = [int(rank) for rank in ranks if int(rank) not in parent_ids]
+    if outside:
+        raise RuntimeError(
+            f"Collective ranks {outside} are outside parent {parent_ranks}. "
+            "Compile and run with WORLD for collectives spanning these groups."
+        )
+    local = np.array([parent_ids[int(rank)] for rank in ranks], dtype=np.int64)
+    if local.tolist() != list(range(len(parent_ranks))) and not (
+        ENABLED_FEATURES.native_trt_collective_subgroups
+    ):
+        raise RuntimeError(
+            "Selecting or reordering ranks within a subgroup parent requires "
+            "native_trt_collective_subgroups (standard TensorRT >= 11.4)."
+        )
+    return local
+
+
+def _native_collective_root(ctx: ConversionContext, root: int) -> int:
+    if not ctx.native_collective_parent:
+        return root
+    parent_ranks = [int(rank) for rank in ctx.native_collective_parent.split(",")]
+    if root not in parent_ranks:
+        raise RuntimeError(f"Root rank {root} is outside parent {parent_ranks}")
+    return parent_ranks.index(root)
 
 
 def nccl_all_gather(
@@ -308,7 +349,9 @@ def nccl_all_gather_native(
         # For ALL_GATHER, the reduce operation and root rank parameters are ignored
         # The last parameter (group) can be None to include all ranks
         # Create array of all participating rank IDs [0, 1, 2, ..., world_size-1]
-        groups = _collective_group_ranks(group_name, world_size)
+        groups = _native_collective_ranks(ctx, group_name, world_size)
+        if len(groups) == 1:
+            return plug_inputs[0]
 
         logger.debug(
             f"Creating ALL_GATHER layer: groups={groups.tolist()}, groupSize={world_size}"
@@ -399,7 +442,9 @@ def nccl_reduce_scatter_native(
     trt_reduce_op = reduce_op_map[reduce_op.lower()]
 
     try:
-        groups = _collective_group_ranks(group_name, world_size)
+        groups = _native_collective_ranks(ctx, group_name, world_size)
+        if len(groups) == 1:
+            return plug_inputs[0]
 
         layer = ctx.net.add_dist_collective(
             input_tensor,
@@ -488,7 +533,9 @@ def nccl_all_reduce_native(
         # Create array of all participating rank IDs [0, 1, ..., world_size-1]
         # Passing None for groups can be treated as a no-op by TRT; use an explicit
         # rank array (same as ALL_GATHER) to ensure the reduction is performed.
-        groups = _collective_group_ranks(group_name, world_size)
+        groups = _native_collective_ranks(ctx, group_name, world_size)
+        if len(groups) == 1:
+            return plug_inputs[0]
 
         layer = ctx.net.add_dist_collective(
             input_tensor,
@@ -558,7 +605,9 @@ def nccl_all_to_all_native(
         # For ALL_TO_ALL, the reduce operation and root rank parameters are ignored
         # The last parameter (group) can be None to include all ranks
         # Create array of all participating rank IDs [0, 1, 2, ..., world_size-1]
-        groups = _collective_group_ranks(group_name, world_size)
+        groups = _native_collective_ranks(ctx, group_name, world_size)
+        if len(groups) == 1:
+            return plug_inputs[0]
 
         logger.debug(
             f"Creating ALL_TO_ALL layer: groups={groups.tolist()}, groupSize={world_size}"
@@ -634,7 +683,14 @@ def nccl_scatter_native(
         # For SCATTER, the reduce operation parameter is ignored
         # The last parameter (group) can be None to include all ranks
         # Create array of all participating rank IDs [0, 1, 2, ..., world_size-1]
-        groups = _collective_group_ranks(group_name, world_size)
+        groups = _native_collective_ranks(ctx, group_name, world_size)
+        root = _native_collective_root(ctx, root)
+        if root not in groups:
+            raise RuntimeError(
+                f"Root rank {root} does not participate in this collective"
+            )
+        if len(groups) == 1:
+            return plug_inputs[0]
 
         logger.debug(
             f"Creating scatter layer: groups={groups.tolist()}, groupSize={world_size}"
@@ -710,7 +766,14 @@ def nccl_gather_native(
         # For GATHER, the reduce operation parameter is ignored
         # The last parameter (group) can be None to include all ranks
         # Create array of all participating rank IDs [0, 1, 2, ..., world_size-1]
-        groups = _collective_group_ranks(group_name, world_size)
+        groups = _native_collective_ranks(ctx, group_name, world_size)
+        root = _native_collective_root(ctx, root)
+        if root not in groups:
+            raise RuntimeError(
+                f"Root rank {root} does not participate in this collective"
+            )
+        if len(groups) == 1:
+            return plug_inputs[0]
 
         logger.debug(
             f"Creating gather layer: groups={groups.tolist()}, groupSize={world_size}"

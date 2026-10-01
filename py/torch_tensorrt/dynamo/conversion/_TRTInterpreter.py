@@ -86,6 +86,7 @@ class TRTInterpreterResult(NamedTuple):
     # — see ``user_output_count`` in the runtime module — and hides the
     # side-effect outputs from the caller's return tuple.
     aliased_io: dict[str, tuple[str, str]] = {}
+    native_collective_parent: str = ""
 
 
 def _named_compute_capability(major: int, minor: int) -> "trt.ComputeCapability":
@@ -603,6 +604,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             self.ctx.requires_output_allocator,
             self.ctx.requires_native_multidevice,
             engine_aliased_io,
+            self.ctx.native_collective_parent or "",
         )
 
     def run_node(self, n: torch.fx.Node) -> torch.fx.Node:
