@@ -734,6 +734,66 @@ def test_save_load_aoti(ir, tmp_path):
 
 
 @pytest.mark.unit
+@unittest.skipIf(
+    platform.system() != "Linux",
+    "Save and load in AOT Inductor format is only supported on Linux",
+)
+@unittest.skipIf(
+    not torchtrt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    "Torch-TensorRT C++ runtime is not available",
+)
+def test_aoti_global_engine_profiling(ir, tmp_path):
+    """Global profiling reaches engines hidden inside an AOTI package."""
+
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            return torch.sigmoid(x * 2.0 + 1.0)
+
+    model = Model().eval().cuda()
+    input_tensor = torch.randn((8, 16), device="cuda")
+    trt_gm = torchtrt.compile(
+        model,
+        ir=ir,
+        inputs=[input_tensor],
+        min_block_size=1,
+        cache_built_engines=False,
+        reuse_cached_engines=False,
+    )
+
+    package_path = tmp_path / "profiled_trt.pt2"
+    torchtrt.save(
+        trt_gm,
+        str(package_path),
+        output_format="aot_inductor",
+        arg_inputs=[input_tensor],
+        retrace=True,
+    )
+    runner = torch._inductor.aoti_load_package(str(package_path))
+
+    original_enabled = torch.ops.tensorrt.get_profile_execution()
+    original_format = torch.ops.tensorrt.get_profile_format()
+    original_path = torch.ops.tensorrt.get_profile_path_prefix()
+    try:
+        # Configure profiling after loading the opaque runner. The next engine
+        # execution must observe the new global generation without requiring an
+        # engine handle from the package.
+        torch.ops.tensorrt.set_profile_path_prefix(str(tmp_path))
+        torch.ops.tensorrt.set_profile_format("perfetto")
+        torch.ops.tensorrt.set_profile_execution(True)
+
+        runner(input_tensor)
+
+        assert list(tmp_path.glob("*_engine_execution_profile.trace"))
+        assert list(tmp_path.glob("*_input_profile.trace"))
+        assert list(tmp_path.glob("*_output_profile.trace"))
+        assert list(tmp_path.glob("*_enqueue_profile.trace"))
+    finally:
+        torch.ops.tensorrt.set_profile_execution(original_enabled)
+        torch.ops.tensorrt.set_profile_format(original_format)
+        torch.ops.tensorrt.set_profile_path_prefix(original_path)
+
+
+@pytest.mark.unit
 def test_save_load_extra_files(ir, tmpdir):
     """
     This tests save/load API on Torchscript format (model still compiled using dynamo workflow)
