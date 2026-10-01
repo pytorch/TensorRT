@@ -163,7 +163,13 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
                     "excluded by torch_executed_ops"
                     if node_name in self.torch_executed_ops
                     or node.target in self.torch_executed_ops
-                    else "no validated TensorRT converter"
+                    else (
+                        "excluded by torch_executed_modules"
+                        if node_in_torch_executed_module(
+                            node, self.torch_executed_modules
+                        )
+                        else "no validated TensorRT converter"
+                    )
                 ),
             )
             return False
