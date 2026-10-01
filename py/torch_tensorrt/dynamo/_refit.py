@@ -285,7 +285,7 @@ def refit_module_weights(
 
     # Check the number of supported operations in the graph
     num_supported_ops, total_ops = partitioning.get_graph_converter_support(
-        new_gm, settings.torch_executed_ops
+        new_gm, settings.torch_executed_ops, settings.torch_executed_modules
     )
 
     if num_supported_ops == 0 or (
@@ -309,6 +309,7 @@ def refit_module_weights(
                 new_gm,
                 min_block_size=settings.min_block_size,
                 torch_executed_ops=settings.torch_executed_ops,
+                torch_executed_modules=settings.torch_executed_modules,
                 require_full_compilation=settings.require_full_compilation,
                 skip_fusion=(num_supported_ops == total_ops),
             )
@@ -328,6 +329,7 @@ def refit_module_weights(
             new_gm,
             min_block_size=settings.min_block_size,
             torch_executed_ops=settings.torch_executed_ops,
+            torch_executed_modules=settings.torch_executed_modules,
             require_full_compilation=settings.require_full_compilation,
         )
 

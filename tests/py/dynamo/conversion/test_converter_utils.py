@@ -8,6 +8,7 @@ from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     enforce_tensor_types,
     flatten_dims,
+    get_node_name,
 )
 from torch_tensorrt.dynamo.types import TRTTensor
 
@@ -76,6 +77,21 @@ class TestFlattenDimsEnforcement(TestCase):
         inputs = torch.randn(input_shape)
         new_shape = flatten_dims(inputs, start_dim, end_dim)
         self.assertEqual(new_shape, true_shape)
+
+
+class TestGetNodeName(TestCase):
+    def test_does_not_mutate_nn_module_stack(self):
+        mod = torch.nn.Sequential(torch.nn.ReLU())
+        ep = torch.export.export(mod, (torch.rand(2, 3),))
+        node = next(n for n in ep.graph.nodes if n.op == "call_function")
+        stack_before = dict(node.meta["nn_module_stack"])
+
+        first_name = get_node_name(node)
+        second_name = get_node_name(node)
+
+        self.assertEqual(first_name, "0/relu")
+        self.assertEqual(second_name, first_name)
+        self.assertEqual(node.meta["nn_module_stack"], stack_before)
 
 
 if __name__ == "__main__":
