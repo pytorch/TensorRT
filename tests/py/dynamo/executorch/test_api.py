@@ -2512,15 +2512,22 @@ def test_executorch_is_not_base_install_requirement():
 
 
 @pytest.mark.unit
-def test_driveos_packaging_requires_tensorrt_10_16():
-    tree = _setup_tree()
-    requirement = _assignment_value(tree, "DRIVEOS_TENSORRT_REQUIREMENT")
-    assert isinstance(requirement, ast.Constant)
-    assert requirement.value == "tensorrt>=10.16.1,<10.17.0"
+@pytest.mark.parametrize(
+    "installed",
+    ["10.16.1.11", "10.16.1.11+vendor.1", "10.17.0", "11.3.0"],
+)
+def test_driveos_packaging_pins_installed_tensorrt(monkeypatch, installed):
+    function = _function_def(_setup_tree(), "get_driveos_requirements")
+    queries = []
 
-    function = _function_def(tree, "get_driveos_requirements")
+    def installed_version(name):
+        queries.append(name)
+        assert name == "tensorrt"
+        return installed
+
+    monkeypatch.setattr(importlib.metadata, "version", installed_version)
     namespace = {
-        "DRIVEOS_TENSORRT_REQUIREMENT": requirement.value,
+        "importlib": importlib,
         "IS_DLFW_CI": False,
     }
     exec(
@@ -2533,29 +2540,53 @@ def test_driveos_packaging_requires_tensorrt_10_16():
         "base",
         "numpy",
         "torch>=2.15.0.dev,<2.16.0",
-        "tensorrt>=10.16.1,<10.17.0",
+        f"tensorrt=={installed.partition('+')[0]}",
     ]
+    assert queries == ["tensorrt"]
+
+
+@pytest.mark.unit
+def test_driveos_packaging_requires_installed_tensorrt(monkeypatch):
+    function = _function_def(_setup_tree(), "get_driveos_requirements")
+
+    def missing_version(name):
+        raise importlib.metadata.PackageNotFoundError(name)
+
+    monkeypatch.setattr(importlib.metadata, "version", missing_version)
+    namespace = {"importlib": importlib, "IS_DLFW_CI": False}
+    exec(
+        compile(ast.Module(body=[function], type_ignores=[]), "<setup.py>", "exec"),
+        namespace,
+    )
+
+    with pytest.raises(RuntimeError, match="--no-build-isolation"):
+        namespace["get_driveos_requirements"](["base"])
+
+    # DLFW CI keeps managing these dependencies separately, as before.
+    namespace["IS_DLFW_CI"] = True
+    assert namespace["get_driveos_requirements"](["base"]) == ["base", "numpy"]
 
 
 @pytest.mark.unit
 def test_runtime_wheel_uses_platform_tensorrt_on_driveos():
-    function = _function_def(_runtime_setup_tree(), "get_tensorrt_requirement")
+    function = _function_def(_runtime_setup_tree(), "tensorrt_distribution")
     namespace = {
         "TARGET_PLATFORM": "driveos",
-        "torch": types.SimpleNamespace(version=types.SimpleNamespace(cuda="13.2")),
     }
     exec(
         compile(ast.Module(body=[function], type_ignores=[]), "<setup.py>", "exec"),
         namespace,
     )
 
-    assert namespace["get_tensorrt_requirement"]() == "tensorrt>=10.16.1,<10.17.0"
+    assert namespace["tensorrt_distribution"]() == "tensorrt"
+    namespace["TARGET_PLATFORM"] = ""
+    assert namespace["tensorrt_distribution"]() == "tensorrt-cu13"
 
 
 @pytest.mark.unit
 def test_driveos_packaging_selects_driveos_bazel_config():
     source = ast.unparse(_function_def(_setup_tree(), "build_libtorchtrt_cxx11_abi"))
-    assert 'cmd.append("--config=driveos")' in source
+    assert "cmd.append('--config=driveos')" in source
 
 
 @pytest.mark.unit
@@ -2583,7 +2614,7 @@ def test_driveos_sdk_discovery_has_no_absolute_path_dependency():
 @pytest.mark.unit
 def test_runtime_wheel_selects_driveos_bazel_config():
     source = ast.unparse(
-        _class_method_def(_runtime_setup_tree(), "BazelBuild", "build_extension")
+        _class_method_def(_runtime_setup_tree(), "BazelBuild", "_build")
     )
     assert "build_config = 'driveos' if TARGET_PLATFORM == 'driveos' else 'linux'" in source
 

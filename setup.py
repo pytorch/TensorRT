@@ -5,6 +5,7 @@
 
 import atexit
 import glob
+import importlib.metadata
 import os
 import platform
 import re
@@ -1062,17 +1063,25 @@ def get_sbsa_requirements(base_requirements):
         )
 
 
-DRIVEOS_TENSORRT_REQUIREMENT = "tensorrt>=10.16.1,<10.17.0"
-
-
 def get_driveos_requirements(base_requirements):
     """Dependencies for a native DRIVE OS build using the platform TensorRT."""
     requirements = base_requirements + ["numpy"]
     if IS_DLFW_CI:
         return requirements
+    try:
+        tensorrt_version = importlib.metadata.version("tensorrt")
+    except importlib.metadata.PackageNotFoundError as error:
+        raise RuntimeError(
+            "The platform TensorRT Python package (tensorrt) must be installed "
+            "to build Torch-TensorRT for DRIVE OS. Build in the SDK environment "
+            "with --no-build-isolation."
+        ) from error
+    # Match the runtime wheel: pin the installed SDK's public version, without
+    # a vendor-local suffix that may not be available on package indexes.
+    tensorrt_version = tensorrt_version.partition("+")[0]
     return requirements + [
         "torch>=2.15.0.dev,<2.16.0",
-        DRIVEOS_TENSORRT_REQUIREMENT,
+        f"tensorrt=={tensorrt_version}",
     ]
 
 
