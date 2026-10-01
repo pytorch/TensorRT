@@ -68,7 +68,7 @@ _NATIVE_TRT_COLLECTIVES_AVAIL = check_native_trt_collectives(
     linked_file_full_path, linked_file_runtime_full_path
 )
 
-# Subgroup routing requires TensorRT MR !49040, included in standard TRT 11.4.
+# Subgroup routing requires changes in standard TRT 11.4.
 # TensorRT-RTX has separate version numbers; leave this disabled for RTX until
 # the first release containing the routing fix has been verified.
 _NATIVE_TRT_COLLECTIVE_SUBGROUPS_AVAIL = False
