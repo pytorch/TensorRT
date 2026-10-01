@@ -70,6 +70,15 @@ class TRTPartitioner(CapabilityBasedPartitioner):  # type: ignore[misc]
         initial_proposed_partitions = super().propose_partitions()
         partitions = dict(enumerate(initial_proposed_partitions))
 
+        # Keep a get_attr (parameter/buffer/constant) in a partition only if a node in that
+        # partition uses it; otherwise leave it in the parent graph with its consumers.
+        for partition in partitions.values():
+            for node in list(partition.nodes):
+                if node.op == "get_attr" and not any(
+                    user in partition.nodes for user in node.users
+                ):
+                    partition.remove_node(node)
+
         # A graph is fully supported if there is a single partition and all operators are
         # supported/convertible. unsupported_operators does not include operators with side
         # effects, such as random or in-place ops, so also check fallback_operators, which

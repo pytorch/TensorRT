@@ -198,6 +198,10 @@ def refit_module_weights(
             if isinstance(submodule, torch.export._unlift.GuardsFn):
                 guard_fn_modules.append(name)
                 continue
+
+            # Torch-executed children have no engine to read settings from
+            if "_run_on_acc" not in name:
+                continue
             # Obtain the settings
 
             compiled_submodules = [
@@ -343,6 +347,10 @@ def refit_module_weights(
             compiled_submodules_map.keys()
         ), "New weights module is not compatible with previously compiled Torch-TensorRT module"
     else:
+        # Match compiled_module, whose guard fn modules were deleted above
+        for name, submodule in list(new_partitioned_module.named_children()):
+            if isinstance(submodule, torch.export._unlift.GuardsFn):
+                new_partitioned_module.delete_submodule(name)
         assert {sm[0] for sm in new_partitioned_module.named_children()} == {
             sm[0] for sm in compiled_module.named_children()
         }, "New weights module is not compatible with previously compiled Torch-TensorRT module"
