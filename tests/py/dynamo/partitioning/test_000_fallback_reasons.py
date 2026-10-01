@@ -4,6 +4,7 @@ import tensorrt as trt
 import torch
 from parameterized import parameterized
 from torch.testing._internal.common_utils import TestCase, run_tests
+from torch_tensorrt import ENABLED_FEATURES
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     DYNAMO_CONVERTERS,
@@ -70,7 +71,11 @@ class TestFallbackReasons(TestCase):
                 torch.ops.aten.nonzero.default,
                 x,
                 torch.empty(1, 1, dtype=torch.int64, device="cuda"),
-                "data-dependent output shape (fallback_data_dependent_ops=True)",
+                (
+                    "no validated TensorRT converter"
+                    if ENABLED_FEATURES.tensorrt_rtx
+                    else "data-dependent output shape (fallback_data_dependent_ops=True)"
+                ),
             ),
             (torch.ops.aten.rand_like.default, x, x, "no validated TensorRT converter"),
         ]
@@ -81,15 +86,60 @@ class TestFallbackReasons(TestCase):
                 node = self._node(target, input_value, output_value)
                 name = ConverterRegistry.qualified_name_or_str(target)
                 if target == torch.ops.aten.nonzero.default:
-                    self.assertTrue(
-                        DYNAMO_CONVERTERS[node][2]["requires_output_allocator"]
-                    )
+                    if ENABLED_FEATURES.tensorrt_rtx:
+                        self.assertIsNone(DYNAMO_CONVERTERS.get(node))
+                    else:
+                        self.assertTrue(
+                            DYNAMO_CONVERTERS[node][2]["requires_output_allocator"]
+                        )
                 self.assertFalse(support.is_node_supported({}, node))
                 self.assertEqual(support.fallback_operators, {name: 1})
                 self.assertEqual(support.fallback_reasons, {name: {reason}})
                 if target == torch.ops.aten.rand_like.default:
                     self.assertTrue(node.is_impure())
                     self.assertEqual(support.unsupported_operators, {})
+
+    @parameterized.expand(SUPPORT_CLASSES)
+    def test_data_dependent_fallback(self, _, support_class):
+        # Isolate the output-allocator policy from backend capability validation.
+        x = torch.empty(2, device="cuda")
+        target = torch.ops.aten.nonzero.default
+        node = self._node(
+            target, x, torch.empty(1, 1, dtype=torch.int64, device="cuda")
+        )
+        converters = {
+            target: [
+                ConverterSupport(
+                    converter_implementation=lambda *args: None,
+                    requires_output_allocator=True,
+                )
+            ]
+        }
+        with patch.object(DYNAMO_CONVERTERS, "registries", [converters]):
+            self.assertTrue(DYNAMO_CONVERTERS[node][2]["requires_output_allocator"])
+            name = ConverterRegistry.qualified_name_or_str(target)
+            for fallback in (False, True):
+                with self.subTest(fallback=fallback):
+                    DYNAMO_CONVERTERS.compilation_settings.fallback_data_dependent_ops = (
+                        fallback
+                    )
+                    support = support_class()
+                    self.assertEqual(support.is_node_supported({}, node), not fallback)
+                    self.assertEqual(
+                        support.fallback_operators, {name: 1} if fallback else {}
+                    )
+                    self.assertEqual(
+                        support.fallback_reasons,
+                        (
+                            {
+                                name: {
+                                    "data-dependent output shape (fallback_data_dependent_ops=True)"
+                                }
+                            }
+                            if fallback
+                            else {}
+                        ),
+                    )
 
     @parameterized.expand(SUPPORT_CLASSES)
     def test_requested_fallback(self, _, support_class):
