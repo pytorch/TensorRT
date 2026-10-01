@@ -8,10 +8,10 @@ The active process group controls which NCCL communicator TRT engines use.
 For the common case (default world group) no setup is needed — engines pick it
 up automatically after dist.init_process_group().
 
-For advanced parallelism strategies (e.g. TP inside a DP job) where TRT engines
-should use a subgroup communicator, wrap compilation and execution with the
-distributed_context() context manager, or call set_distributed_mode() to pin
-the group on all engines in a loaded module before the first forward pass.
+Native TRT collective converters emit global rank IDs, so their engines must
+bind WORLD. Individual collective operations can still select TP/CP subgroups.
+Use distributed_context(dist.group.WORLD, model) for loaded native engines; this
+also makes WORLD's identity available to the C++ runtime before its first bind.
 """
 
 import threading
@@ -24,6 +24,49 @@ import torch.nn as nn
 M = TypeVar("M", bound=nn.Module)
 
 _state = threading.local()
+_world_group_registry_lock = threading.Lock()
+
+# Runtime-only alias of the actual WORLD object; never serialize a c10d group name.
+# The C++ runtime uses this identity to validate engines loaded without a Python
+# TorchTensorRTModule wrapper. Keep in sync with TRTEngine.cpp.
+_WORLD_GROUP_REGISTRY_ALIAS = "__torch_tensorrt_world__"
+
+
+def _register_world_group() -> None:
+    """Make the current WORLD identity available to the C++ runtime."""
+    if not dist.is_available() or not dist.is_initialized():
+        return
+    from torch._C._distributed_c10d import (
+        _register_process_group,
+        _resolve_process_group,
+        _unregister_process_group,
+    )
+
+    with _world_group_registry_lock:
+        world = dist.group.WORLD
+        try:
+            previous = _resolve_process_group(_WORLD_GROUP_REGISTRY_ALIAS)
+        except RuntimeError:
+            previous = None
+        if previous is world:
+            return
+        if previous is not None:
+            _unregister_process_group(_WORLD_GROUP_REGISTRY_ALIAS)
+        _register_process_group(_WORLD_GROUP_REGISTRY_ALIAS, world)
+
+
+def _require_world_group(group: Any) -> None:
+    """Validate the parent communicator for native converters' global rank IDs."""
+    if not dist.is_available() or not dist.is_initialized():
+        raise RuntimeError(
+            "Initialize torch.distributed before binding a native TRT engine"
+        )
+    if group is not dist.group.WORLD:
+        raise RuntimeError(
+            "Native TRT engines use global rank IDs and require the WORLD communicator. "
+            "Use distributed_context(dist.group.WORLD, model); select subgroups on "
+            "the collective operations, not as the engine's parent communicator."
+        )
 
 
 def register_md_engine(engine: object) -> None:
@@ -75,9 +118,10 @@ def distributed_context(
     """Context manager: run TRT engines using *group* for NCCL.
 
     Sets the active process group for the duration of the ``with`` block.
-    Only needed when the TRT engine's NCCL collective should use a non-default
-    process group (e.g. tensor-parallel subgroup inside a data-parallel job).
-    For the default world group, no context manager is required.
+    Native TRT engines require ``dist.group.WORLD`` because their collective
+    rank arrays use global IDs. Select TP/CP subgroups on the model's collective
+    operations. Use this context for loaded engines to register WORLD with the
+    C++ runtime; a newly compiled module registers it during engine setup.
 
     When *module* is supplied the group is also pre-pinned on all TRT engines
     in the module via :func:`set_distributed_mode`, and the configured module
@@ -98,18 +142,18 @@ def distributed_context(
 
     Example::
 
-        tp_group = dist.new_group(ranks=[0, 1])
+        parent_group = dist.group.WORLD
 
         # Single module:
-        with torch_tensorrt.distributed.distributed_context(tp_group, model_a) as m:
+        with torch_tensorrt.distributed.distributed_context(parent_group, model_a) as m:
             output = m(inp)
 
         # Multiple modules — yields a list in the same order:
-        with torch_tensorrt.distributed.distributed_context(tp_group, [encoder, decoder]) as (enc, dec):
+        with torch_tensorrt.distributed.distributed_context(parent_group, [encoder, decoder]) as (enc, dec):
             output = dec(enc(inp))
 
         # Without module — use for compile-time wrapping:
-        with torch_tensorrt.distributed.distributed_context(tp_group):
+        with torch_tensorrt.distributed.distributed_context(parent_group):
             trt_model = torch.compile(model, backend="torch_tensorrt", ...)
             output = trt_model(inp)
 
@@ -124,6 +168,7 @@ def distributed_context(
         *module* when a single module is supplied, a list when multiple modules
         are supplied, or ``None`` when no module is given.
     """
+    _register_world_group()
     old = getattr(_state, "pg", None)
     _state.pg = group
 
@@ -180,7 +225,15 @@ def set_distributed_mode(group: Any, module: nn.Module) -> None:
     if not group_name:
         return
 
+    _register_world_group()
     seen: set[int] = set()
+
+    def pin_engine(engine: Any) -> None:
+        _require_world_group(group)
+        # The Python runtime reads WORLD from the active/default context and
+        # needs no persistent group-name update. C++ engines keep a registry name.
+        if hasattr(engine, "set_group_name"):
+            engine.set_group_name(group_name)
 
     # Walk the module tree for direct submodules and inlined engines.
     for submod in module.modules():
@@ -189,7 +242,7 @@ def set_distributed_mode(group: Any, module: nn.Module) -> None:
             if engine is not None and id(engine) not in seen:
                 seen.add(id(engine))
                 if engine.requires_native_multidevice:
-                    engine.set_group_name(group_name)
+                    pin_engine(engine)
             continue
 
         for attr_val in vars(submod).values():
@@ -200,11 +253,11 @@ def set_distributed_mode(group: Any, module: nn.Module) -> None:
                 and attr_val.requires_native_multidevice
             ):
                 seen.add(id(attr_val))
-                attr_val.set_group_name(group_name)
+                pin_engine(attr_val)
 
     # Also pin on any engines in the thread-local registry (handles torch.compile).
     for engine in getattr(_state, "md_engines", None) or []:
         if id(engine) not in seen:
             seen.add(id(engine))
             if getattr(engine, "requires_native_multidevice", False):
-                engine.set_group_name(group_name)
+                pin_engine(engine)

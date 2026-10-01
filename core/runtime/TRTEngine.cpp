@@ -855,6 +855,30 @@ void TRTEngine::set_resource_allocation_strategy(TRTEngine::ResourceAllocationSt
 }
 
 #ifdef ENABLE_TRT_NCCL_COLLECTIVES
+void TRTEngine::validate_nccl_group(const std::string& name) const {
+  if (!requires_native_multidevice) {
+    return;
+  }
+  // Python registers the actual WORLD object, rather than assuming its numeric
+  // registry name is "0". The alias is runtime-only and is not serialized.
+  c10::intrusive_ptr<c10d::ProcessGroup> world;
+  try {
+    world = c10d::resolve_process_group("__torch_tensorrt_world__");
+  } catch (const c10::Error&) {
+    // Report the required setup below instead of trusting an unverified group.
+  }
+  TORCHTRT_CHECK(
+      world != nullptr,
+      "Native TRT engines require the WORLD communicator. Register the current WORLD with "
+      "distributed_context(dist.group.WORLD, model) before executing a loaded engine.");
+  auto selected = c10d::resolve_process_group(name);
+  TORCHTRT_CHECK(
+      selected == world,
+      "Native TRT engines use global rank IDs and require the WORLD communicator. "
+      "Use distributed_context(dist.group.WORLD, model); select subgroups on the collective operations, "
+      "not as the engine's parent communicator.");
+}
+
 bool TRTEngine::bind_nccl_comm() {
   // When group_name is empty (e.g. engine loaded from a serialized
   // ExportedProgram where the Python TorchTensorRTModule wrapper was
@@ -933,6 +957,7 @@ bool TRTEngine::bind_nccl_comm() {
     return false;
   }
 
+  validate_nccl_group(this->group_name);
   this->rank = pg->getRank();
   this->world_size = pg->getSize();
 

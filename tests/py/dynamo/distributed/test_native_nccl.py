@@ -208,6 +208,11 @@ class TestDistributedGroupContextManager(unittest.TestCase):
         self.get_active_group = get_active_group
         self.get_active_group_name = get_active_group_name
         self.distributed_context = distributed_context
+        # These tests isolate context bookkeeping with fake groups/engines.
+        # The real parent-communicator validation is covered separately below.
+        guard = patch("torch_tensorrt.distributed._distributed._require_world_group")
+        guard.start()
+        self.addCleanup(guard.stop)
 
     # -- default / no-dist cases --------------------------------------------
 
@@ -568,6 +573,73 @@ class TestDistributedGroupContextManager(unittest.TestCase):
         self.assertEqual(eng.group_name_calls, ["tp0"])
 
 
+class TestNativeCollectiveWorldContract(unittest.TestCase):
+    """Reject incompatible parents before a collective or communicator mutation."""
+
+    def test_world_identity_required(self) -> None:
+        from torch_tensorrt.distributed._distributed import _require_world_group
+
+        world = _FakeGroup("world_after_reinit")
+        duplicate = _FakeGroup(world.group_name)
+        with (
+            patch.object(dist, "is_available", return_value=True),
+            patch.object(dist, "is_initialized", return_value=True),
+            patch.object(dist, "group", MagicMock(WORLD=world)),
+        ):
+            _require_world_group(world)
+            with self.assertRaisesRegex(RuntimeError, "require the WORLD communicator"):
+                _require_world_group(duplicate)
+
+    def test_uninitialized_dist_rejected(self) -> None:
+        from torch_tensorrt.distributed._distributed import _require_world_group
+
+        with patch.object(dist, "is_initialized", return_value=False):
+            with self.assertRaisesRegex(RuntimeError, "Initialize torch.distributed"):
+                _require_world_group(None)
+
+    def test_rejected_pin_does_not_change_engine(self) -> None:
+        from torch_tensorrt.distributed._distributed import _state, set_distributed_mode
+
+        world = _FakeGroup("world_after_reinit")
+        subgroup = _FakeGroup("tp_2_3")
+        engine = _FakeEngine(requires_native_multidevice=True)
+        module = nn.Module()
+        module.engine = engine
+        with (
+            patch.object(dist, "is_available", return_value=True),
+            patch.object(dist, "is_initialized", return_value=True),
+            patch.object(dist, "group", MagicMock(WORLD=world)),
+            patch.object(_state, "md_engines", [], create=True),
+            patch("torch_tensorrt.distributed._distributed._register_world_group"),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "require the WORLD communicator"):
+                set_distributed_mode(subgroup, module)
+            self.assertEqual(engine.group_name_calls, [])
+            set_distributed_mode(world, module)
+            self.assertEqual(engine.group_name_calls, [world.group_name])
+
+    def test_python_runtime_rejects_before_nccl_warmup(self) -> None:
+        from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
+
+        world = _FakeGroup("world")
+        subgroup = _FakeGroup("tp_2_3")
+        engine = MagicMock(is_distributed=True, requires_native_multidevice=True)
+        with (
+            patch.object(dist, "is_available", return_value=True),
+            patch.object(dist, "is_initialized", return_value=True),
+            patch.object(dist, "group", MagicMock(WORLD=world)),
+            patch(
+                "torch_tensorrt.distributed._distributed.get_active_group",
+                return_value=subgroup,
+            ),
+            patch.object(dist, "all_reduce") as warmup,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "require the WORLD communicator"):
+                TRTEngine.setup_nccl_comm(engine)
+            warmup.assert_not_called()
+            engine.context.set_communicator.assert_not_called()
+
+
 # ============================================================================
 # Section 2 — set_distributed_mode() (no GPU / no dist init)
 # ============================================================================
@@ -588,6 +660,9 @@ class TestSetDistributedGroup(unittest.TestCase):
         if hasattr(_state, "pg"):
             del _state.pg
         self._state = _state
+        guard = patch("torch_tensorrt.distributed._distributed._require_world_group")
+        guard.start()
+        self.addCleanup(guard.stop)
 
     def _call(self, module: nn.Module, group: Any) -> None:
         from torch_tensorrt.distributed import set_distributed_mode
@@ -2387,10 +2462,10 @@ def _multirank_two_dimensional_mesh_routing(
 def _multirank_distributed_mode_subgroup(
     rank: int, world_size: int, device: torch.device
 ) -> None:
-    """distributed_context() with a TP subgroup (not the world group) routes NCCL correctly.
+    """A collective can name a subgroup while its native engine binds WORLD.
 
-    We create a subgroup containing all ranks (same topology as world, but a
-    distinct process group object). The all_reduce result must still be correct.
+    The subgroup here has all ranks; true subset routing is covered by the
+    four-GPU mesh test. Plugin engines retain their existing group selection.
     """
     if world_size < 2:
         print(f"[SKIP] _multirank_distributed_mode_subgroup requires world_size >= 2")
@@ -2421,11 +2496,13 @@ def _multirank_distributed_mode_subgroup(
     inp = torch.full((1, 8), float(rank + 1), device=device)
     expected_sum = sum(r + 1 for r in range(world_size))
 
-    with distributed_context(subgroup):
-        # Verify get_active_group_name returns the subgroup name inside context
-        assert get_active_group_name() == sg_name, (
-            f"Expected group name {sg_name!r}, " f"got {get_active_group_name()!r}"
-        )
+    parent = (
+        dist.group.WORLD
+        if torch_tensorrt.ENABLED_FEATURES.native_trt_collectives
+        else subgroup
+    )
+    with distributed_context(parent):
+        assert get_active_group_name() == parent.group_name
 
         trt_model = torch.compile(
             model,
@@ -2494,7 +2571,7 @@ def _multirank_cpp_runtime_bind_nccl(
 def _multirank_distributed_mode_context_switch(
     rank: int, world_size: int, device: torch.device
 ) -> None:
-    """Switching distributed_context context between two subgroups routes to the correct communicator."""
+    """Different collective groups share the WORLD parent for native engines."""
     import torch_tensorrt
     from torch_tensorrt.distributed._distributed import distributed_context
     from torch_tensorrt.distributed._nccl_utils import setup_nccl_for_torch_tensorrt
@@ -2530,7 +2607,12 @@ def _multirank_distributed_mode_context_switch(
 
     for i, (sg, sg_name) in enumerate([(sg1, sg1_name), (sg2, sg2_name)]):
         model = AllReduceModel(sg_name).to(device).eval()
-        with distributed_context(sg):
+        parent = (
+            dist.group.WORLD
+            if torch_tensorrt.ENABLED_FEATURES.native_trt_collectives
+            else sg
+        )
+        with distributed_context(parent):
             trt_model = torch.compile(
                 model,
                 backend="torch_tensorrt",
@@ -2555,8 +2637,8 @@ def _multirank_pg_migration(rank: int, world_size: int, device: torch.device) ->
     Tests both the C++ runtime (set_group_name resets nccl_initialized) and the
     Python runtime (setup_nccl_comm re-runs on next forward after _nccl_comm reset).
 
-    Covers the API contract: a compiled/loaded TRT model can be migrated from one
-    process group to another without recompilation.
+    Native engines reject migration away from WORLD without changing their
+    binding. Plugin engines retain their existing migration behavior.
     """
     if world_size < 2:
         print(f"[SKIP] _multirank_pg_migration requires world_size >= 2")
@@ -2606,6 +2688,23 @@ def _multirank_pg_migration(rank: int, world_size: int, device: torch.device) ->
             out_world = trt_model(inp)
 
     _check_close(out_world, expected, f"world group rank={rank}")
+
+    if torch_tensorrt.ENABLED_FEATURES.native_trt_collectives:
+        # Global IDs are baked into this engine. Reject replacing its WORLD
+        # parent even when a different group happens to have identical members.
+        case = unittest.TestCase()
+        with case.assertRaisesRegex(RuntimeError, "require the WORLD communicator"):
+            with distributed_context(subgroup, trt_model):
+                pass
+        with case.assertRaisesRegex(RuntimeError, "require the WORLD communicator"):
+            torch_tensorrt.distributed.set_distributed_mode(subgroup, trt_model)
+        with distributed_context(world_group, trt_model):
+            with torch.no_grad():
+                out_after_rejection = trt_model(inp)
+        _check_close(
+            out_after_rejection, expected, f"WORLD after rejected migration rank={rank}"
+        )
+        return
 
     # ---- Step 2: migrate to subgroup via distributed_context(subgroup, model) ----
     # set_distributed_mode() resets nccl_initialized on the C++ engine so

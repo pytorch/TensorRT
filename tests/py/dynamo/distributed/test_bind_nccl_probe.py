@@ -60,7 +60,7 @@ Test structure
   TestBindNcclProbeBinding
     Verifies binding produces numerically correct output. Uses torch.compile
     (no save/load) so probe loop is never entered — pure binding path.
-    Covers: auto-resolve, explicit world group pin, explicit subgroup pin.
+    Covers: auto-resolve, explicit world group pin, rejection of subgroup pinning.
 
   TestBindNcclProbeE2E
     Covers both parts together via the save→load cycle:
@@ -363,43 +363,30 @@ def _bind_explicit_pin_world_group(rank, world_size, device):
 
 
 def _bind_explicit_pin_subgroup(rank, world_size, device):
-    """Explicit pin to a TP subgroup — correct subgroup comm bound, not world comm.
-
-    Creates world group "0" and TP subgroup "1". Pins TP subgroup explicitly.
-    Verifies the TP subgroup all_reduce produces the same result as world
-    all_reduce (since both contain all ranks in this 2-rank test) — confirming
-    the engine used the pinned subgroup comm, not the world comm or nothing.
-    """
+    """A loaded global-ID engine rejects subgroup binding and still accepts WORLD."""
     from torch_tensorrt.distributed._distributed import distributed_context
     from torch_tensorrt.distributed._nccl_utils import setup_nccl_for_torch_tensorrt
 
     setup_nccl_for_torch_tensorrt()
-
     tp_group = dist.new_group(ranks=list(range(world_size)))
-    dist.barrier(group=tp_group)
-    tp_name = tp_group.group_name
-
-    model = _AllReduceModel(tp_name).to(device).eval()
+    model = _AllReduceModel(_world_group_name()).to(device).eval()
     inp = torch.full((1, 4), float(rank + 1), device=device)
     expected = torch.full(
         (1, 4), float(world_size * (world_size + 1) // 2), device=device
     )
-
-    with distributed_context(tp_group):
-        trt_model = torch.compile(
-            model,
-            backend="torch_tensorrt",
-            dynamic=False,
-            options={
-                "use_python_runtime": False,
-                "min_block_size": 1,
-                "use_distributed_mode_trace": True,
-            },
-        )
-        with torch.no_grad():
-            out = trt_model(inp)
-
-    _check_close(out, expected, f"bind_explicit_pin_subgroup rank={rank}")
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with distributed_context(dist.group.WORLD):
+            _compile_and_save(model, inp, f"{tmpdir}/r{rank}.pt2")
+        loaded = _load(f"{tmpdir}/r{rank}.pt2")
+        with unittest.TestCase().assertRaisesRegex(
+            RuntimeError, "require the WORLD communicator"
+        ):
+            with distributed_context(tp_group, loaded):
+                pass
+        with distributed_context(dist.group.WORLD, loaded):
+            with torch.no_grad():
+                out = loaded(inp)
+    _check_close(out, expected, f"WORLD after rejected subgroup pin rank={rank}")
 
 
 # ---------------------------------------------------------------------------
@@ -573,7 +560,7 @@ class TestBindNcclProbeBinding(MultiProcessTestCase):
     @requires_nccl()
     @skip_if_lt_x_gpu(2)
     def test_explicit_pin_subgroup(self) -> None:
-        """Explicit pin to TP subgroup — subgroup comm bound, correct output."""
+        """A loaded native engine rejects a subgroup parent and accepts WORLD."""
         device = self._init_dist()
         _bind_explicit_pin_subgroup(self.rank, self.world_size, device)
 

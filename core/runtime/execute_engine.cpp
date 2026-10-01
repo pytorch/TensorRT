@@ -313,7 +313,10 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
   // at construction time, or for serialized programs loaded inline where there
   // is no Python _TorchTensorRTModule.forward wrapper).
   if (compiled_engine->requires_native_multidevice && !compiled_engine->nccl_initialized) {
-    compiled_engine->bind_nccl_comm();
+    TORCHTRT_CHECK(
+        compiled_engine->bind_nccl_comm(),
+        "Native TRT engine has no initialized WORLD communicator. Use "
+        "distributed_context(dist.group.WORLD, model) and initialize its NCCL communicator before inference.");
   }
 #endif
 
