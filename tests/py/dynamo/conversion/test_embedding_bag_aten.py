@@ -526,6 +526,119 @@ class TestEmbeddingBagConverter(DispatchTestCase):
                     check_dtype=True,
                 )
 
+    @parameterized.expand(
+        [
+            param(
+                test_name="traversable_offsets_int32_indices",
+                weight=torch.randn((10, 4), dtype=torch.float32),
+                indices=torch.tensor([1, 2, 4, 5, 4, 3, 2, 9], dtype=torch.int32),
+                offsets=torch.tensor([0, 2, 5], dtype=torch.int32),
+                per_sample_weights=torch.randn((8,), dtype=torch.float32),
+                include_last_offset=False,
+                offsets_as_input=False,
+            ),
+            param(
+                test_name="traversable_offsets_int64_indices_include_last_offset",
+                weight=torch.randn((10, 4), dtype=torch.float32),
+                indices=torch.tensor([1, 2, 4, 5, 4, 3, 2, 9], dtype=torch.int64),
+                offsets=torch.tensor([0, 2, 5, 8], dtype=torch.int64),
+                per_sample_weights=torch.randn((8,), dtype=torch.float32),
+                include_last_offset=True,
+                offsets_as_input=False,
+            ),
+            param(
+                test_name="ITensor_offsets_int32_indices",
+                weight=torch.randn((10, 4), dtype=torch.float32),
+                indices=torch.tensor([1, 2, 4, 5, 4, 3, 2, 9], dtype=torch.int32),
+                offsets=torch.tensor([0, 2, 5], dtype=torch.int32),
+                per_sample_weights=torch.randn((8,), dtype=torch.float32),
+                include_last_offset=False,
+                offsets_as_input=True,
+            ),
+        ]
+    )
+    def test_embedding_bag_with_ITensor_per_sample_weights(
+        self,
+        test_name,
+        weight,
+        indices,
+        offsets,
+        per_sample_weights,
+        include_last_offset,
+        offsets_as_input,
+    ):
+        # per_sample_weights is a module input here, so the converter receives it
+        # as a TensorRT tensor rather than a captured constant (issue #3263)
+        class ConstOffsets(torch.nn.Module):
+            def forward(self, weight, indices, per_sample_weights):
+                return torch.ops.aten._embedding_bag.default(
+                    weight,
+                    indices,
+                    offsets,
+                    False,
+                    0,
+                    False,
+                    per_sample_weights,
+                    include_last_offset,
+                    -1,
+                )[0]
+
+        class ITensorOffsets(torch.nn.Module):
+            def forward(self, weight, indices, offsets, per_sample_weights):
+                return torch.ops.aten._embedding_bag.default(
+                    weight,
+                    indices,
+                    offsets,
+                    False,
+                    0,
+                    False,
+                    per_sample_weights,
+                    include_last_offset,
+                    -1,
+                )[0]
+
+        if offsets_as_input:
+            mod = ITensorOffsets()
+            inputs = [weight, indices, offsets, per_sample_weights]
+        else:
+            mod = ConstOffsets()
+            inputs = [weight, indices, per_sample_weights]
+
+        self.run_test(
+            mod,
+            inputs=inputs,
+            precision=weight.dtype,
+            enable_passes=True,
+            propagate_shapes=True,
+            immutable_weights=True,
+        )
+
+    def test_embedding_bag_with_const_indices_and_ITensor_per_sample_weights(self):
+        # The model from issue #3263: indices are a buffer that constant folding
+        # turns into a frozen parameter, per_sample_weights is the module input
+        class EmbeddingBagConstIndices(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.embedding_bag = torch.nn.EmbeddingBag(16, 4, mode="sum")
+                self.register_buffer(
+                    "index_tensor", torch.arange(16, dtype=torch.int64)
+                )
+
+            def forward(self, per_sample_weights):
+                return self.embedding_bag(
+                    self.index_tensor.broadcast_to(per_sample_weights.shape),
+                    per_sample_weights=per_sample_weights,
+                )
+
+        self.run_test(
+            EmbeddingBagConstIndices(),
+            inputs=[torch.randn((3, 16), dtype=torch.float32)],
+            use_dynamo_tracer=True,
+            enable_passes=True,
+            propagate_shapes=True,
+            immutable_weights=True,
+        )
+
 
 if __name__ == "__main__":
     run_tests()
