@@ -114,10 +114,16 @@ def trt_supports_collective_subgroups() -> bool:
                        whole communicator (36 instead of 10); a subset without rank 0 fails
                        with "Did not properly set the child communicator".
 
-    Detecting this needs a real multi-rank run, so it cannot be probed from a skipIf. Opt in
-    with ``TORCHTRT_TEST_COLLECTIVE_SUBGROUPS=1`` once building against TensorRT >= 11.4.
+    Capability detection lives in ``torch_tensorrt._features`` and requires native
+    collectives with standard TensorRT >= 11.4. TensorRT-RTX remains disabled until
+    its first release containing the fix has been verified.
     """
-    return os.environ.get("TORCHTRT_TEST_COLLECTIVE_SUBGROUPS") == "1"
+    try:
+        from torch_tensorrt._features import ENABLED_FEATURES
+
+        return bool(ENABLED_FEATURES.native_trt_collective_subgroups)
+    except Exception:
+        return False
 
 
 def has_nccl_collectives() -> bool:
@@ -2920,8 +2926,8 @@ class TestMultirankNccl4GPU(MultirankNcclBase):
     @unittest.skipIf(not has_nccl_collectives(), "No NCCL collective support available")
     @unittest.skipUnless(
         trt_supports_collective_subgroups(),
-        "needs TensorRT subgroup routing (TRT MR !49040, in main and rel-11.4; absent from "
-        "11.2.1.x) — set TORCHTRT_TEST_COLLECTIVE_SUBGROUPS=1 when building against it",
+        "requires native TRT subgroup routing (standard TensorRT >= 11.4 with NCCL; "
+        "TensorRT-RTX support is not enabled)",
     )
     @requires_nccl()
     @skip_if_lt_x_gpu(4)
