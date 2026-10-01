@@ -753,10 +753,9 @@ class TestCollectiveGroupRanks(unittest.TestCase):
 
     def _resolve_with(self, ranks, group_name="pg_under_test"):
         """Run _collective_group_ranks with the process-group lookup stubbed to *ranks*."""
-        from torch_tensorrt.dynamo.conversion.impl import nccl_ops
-
         import torch.distributed as dist
         from torch.distributed import distributed_c10d
+        from torch_tensorrt.dynamo.conversion.impl import nccl_ops
 
         real_resolve = getattr(distributed_c10d, "_resolve_process_group", None)
         real_get = dist.get_process_group_ranks
@@ -833,9 +832,9 @@ class TestNativeCollectiveNumRanks(unittest.TestCase):
 
     def _num_ranks_for(self, converter_name: str, group_size: int) -> object:
         """Return the num_ranks a converter set, given a group of ``group_size`` ranks."""
-        import numpy as np
         from unittest import mock
 
+        import numpy as np
         from torch_tensorrt import _features
         from torch_tensorrt.dynamo.conversion.impl import nccl_ops
 
