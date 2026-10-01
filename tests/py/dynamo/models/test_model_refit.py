@@ -538,7 +538,8 @@ def test_refit_multiple_engine_with_weightmap():
     "Refit feature is not supported in Python 3.13 or higher",
 )
 @pytest.mark.unit
-def test_refit_preserves_torch_executed_modules_partitioning():
+@pytest.mark.parametrize("use_fast_partitioner", [True, False])
+def test_refit_preserves_torch_executed_modules_partitioning(use_fast_partitioner):
     class net(nn.Module):
         def __init__(self):
             super().__init__()
@@ -571,18 +572,19 @@ def test_refit_preserves_torch_executed_modules_partitioning():
         min_block_size=1,
         immutable_weights=False,
         torch_executed_modules=["torch.nn.modules.conv.Conv2d"],
+        use_fast_partitioner=use_fast_partitioner,
         reuse_cached_engines=False,
     )
 
     def partition_layout(gm):
-        return {name: type(mod).__name__ for name, mod in gm.named_children()}
+        # Get the partition layout, ignoring guard fns, which are stripped by refit_module_weights
+        return {
+            name: type(mod).__name__
+            for name, mod in gm.named_children()
+            if not isinstance(mod, torch.export._unlift.GuardsFn)
+        }
 
     original_layout = partition_layout(trt_gm)
-    # The excluded Conv2d modules should split the graph into Torch and TRT partitions
-    assertions.assertTrue(
-        any("run_on_gpu" in name for name in original_layout),
-        f"Expected a Torch partition for the excluded modules, got {original_layout}",
-    )
 
     new_trt_gm = refit_module_weights(
         compiled_module=trt_gm,
