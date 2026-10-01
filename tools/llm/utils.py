@@ -72,7 +72,7 @@ def export_llm(model, inputs, min_seq_len=1, max_seq_len=16):
 
 def get_zeroed_static_cache_inputs(
     model: "torch.fx.GraphModule",
-    device: str = "cuda:0",
+    device: str | torch.device = "cuda:0",
     has_position_ids: bool = True,
 ):
     """
@@ -212,14 +212,16 @@ def generate_with_static_cache(model, input_seq, max_output_seq_length, eos_toke
     """
     start_idx = 0
     end_idx = input_seq.shape[1]
-    position_ids = torch.arange(input_seq.shape[1]).unsqueeze(0).cuda()
+    position_ids = torch.arange(
+        input_seq.shape[1], device=input_seq.device
+    ).unsqueeze(0)
     output_seq = input_seq.clone()
     # TODO: Confirm this: When end_idx = max_output_seq_length-1, number of tokens generated = OSL
     num_tokens_generated = 0
-    kv_cache = get_zeroed_static_cache_inputs(model)
+    kv_cache = get_zeroed_static_cache_inputs(model, device=input_seq.device)
     while end_idx < max_output_seq_length:
         position_ids = (
-            torch.tensor([[start_idx]], dtype=torch.int64).cuda()
+            torch.tensor([[start_idx]], dtype=torch.int64, device=input_seq.device)
             if input_seq.shape[1] == 1
             else position_ids
         )
@@ -328,8 +330,10 @@ def _timed_generate_static_cache(
     start_idx = 0
     end_idx = input_seq.shape[1]
     prefill_tokens = end_idx
-    position_ids = torch.arange(input_seq.shape[1]).unsqueeze(0).cuda()
-    kv_cache = get_zeroed_static_cache_inputs(model)
+    position_ids = torch.arange(
+        input_seq.shape[1], device=input_seq.device
+    ).unsqueeze(0)
+    kv_cache = get_zeroed_static_cache_inputs(model, device=input_seq.device)
 
     torch.cuda.synchronize()
     prefill_start = timeit.default_timer()
@@ -348,7 +352,9 @@ def _timed_generate_static_cache(
     decode_tokens = 0
     decode_start = timeit.default_timer()
     while end_idx < max_output_seq_length:
-        position_ids = torch.tensor([[start_idx]], dtype=torch.int64).cuda()
+        position_ids = torch.tensor(
+            [[start_idx]], dtype=torch.int64, device=input_seq.device
+        )
         input_signature = (input_seq, position_ids, *kv_cache, start_idx, end_idx)
         logits_keys_values = model(*input_signature)
         logits = logits_keys_values[0]
