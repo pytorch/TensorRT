@@ -855,92 +855,14 @@ void TRTEngine::set_resource_allocation_strategy(TRTEngine::ResourceAllocationSt
 }
 
 #ifdef ENABLE_TRT_NCCL_COLLECTIVES
-void TRTEngine::validate_nccl_group(const std::string& name) const {
-  if (!requires_native_multidevice) {
-    return;
-  }
-  // Python registers the actual WORLD object, rather than assuming its numeric
-  // registry name is "0". The alias is runtime-only and is not serialized.
-  c10::intrusive_ptr<c10d::ProcessGroup> world;
-  try {
-    world = c10d::resolve_process_group("__torch_tensorrt_world__");
-  } catch (const c10::Error&) {
-    // Report the required setup below instead of trusting an unverified group.
-  }
-  TORCHTRT_CHECK(
-      world != nullptr,
-      "Native TRT engines require the WORLD communicator. Register the current WORLD with "
-      "distributed_context(dist.group.WORLD, model) before executing a loaded engine.");
-  auto selected = c10d::resolve_process_group(name);
-  TORCHTRT_CHECK(
-      selected == world,
-      "Native TRT engines use global rank IDs and require the WORLD communicator. "
-      "Use distributed_context(dist.group.WORLD, model); select subgroups on the collective operations, "
-      "not as the engine's parent communicator.");
-}
-
 bool TRTEngine::bind_nccl_comm() {
-  // When group_name is empty (e.g. engine loaded from a serialized
-  // ExportedProgram where the Python TorchTensorRTModule wrapper was
-  // inlined and set_group_name() was never called), auto-resolve the
-  // process group from the c10d registry.
-  if (this->group_name.empty() && this->requires_native_multidevice) {
-    // PyTorch assigns numeric names ("0", "1", ...) via a monotonically
-    // increasing group_count counter:
-    //   - init_process_group()                      → always numeric
-    //   - new_group(use_local_synchronization=False) → numeric (default)
-    //   - new_group(use_local_synchronization=True)  → hashed name, but
-    //     still increments group_count, leaving a gap in numeric names
-    //     (e.g. "0", gap at "1", "2" for the next new_group()).
-    //
-    // In PyTorch 2.x, resolve_process_group throws c10::Error for missing
-    // group names instead of returning nullptr (previous behaviour). We catch
-    // and continue (not break) so gaps from use_local_synchronization=True
-    // don't stop us from finding numeric groups beyond the gap.
-    //
-    // We collect all numeric groups with an NCCL backend. Auto-resolution
-    // is only possible when exactly one is found. If multiple exist (e.g.
-    // world group + TP subgroup in a TP+DP setup), we cannot know which
-    // group this engine's collectives belong to — the caller must pin
-    // explicitly via distributed_context(group, model).
-    std::vector<std::string> nccl_groups;
-    for (int i = 0; i < 20; ++i) {
-      auto candidate = std::to_string(i);
-      c10::intrusive_ptr<c10d::ProcessGroup> probe;
-      try {
-        probe = c10d::resolve_process_group(candidate);
-      } catch (const c10::Error&) {
-        continue; // gap in numeric names — keep probing
-      }
-      if (probe != nullptr && probe->getBackendType() == c10d::ProcessGroup::BackendType::NCCL) {
-        nccl_groups.push_back(candidate);
-      }
-    }
-
-    if (nccl_groups.size() == 1) {
-      this->group_name = nccl_groups[0];
-      LOG_INFO("Auto-resolved distributed group name to '" << this->group_name << "'");
-    } else if (nccl_groups.size() > 1) {
-      std::string names;
-      for (const auto& n : nccl_groups) {
-        if (!names.empty())
-          names += ", ";
-        names += "'" + n + "'";
-      }
-      LOG_WARNING(
-          "This TRT engine requires NCCL but multiple NCCL process groups are registered ("
-          << names
-          << "). Cannot auto-select a group — NCCL bind deferred. "
-             "Use the recommended workflow: "
-             "with torch_tensorrt.distributed.distributed_context(group, model) as m: m(inp)");
-    } else {
-      LOG_WARNING(
-          "This TRT engine requires NCCL (requires_native_multidevice=true) but no NCCL process group "
-          "was found in the c10d registry. Ensure dist.init_process_group(backend='nccl') "
-          "has been called before loading the engine. You can also set the group name "
-          "manually via: torch_tensorrt.distributed.distributed_context(group, model)");
-    }
-  }
+  // Python validates the parent before setting its actual c10d group name.
+  // Loaded engines have no group name: require explicit setup instead of
+  // guessing from the registered groups, which could select a subgroup.
+  TORCHTRT_CHECK(
+      !requires_native_multidevice || !group_name.empty(),
+      "Native TRT engine has no process group configured. Use "
+      "distributed_context(dist.group.WORLD, model) before inference.");
 
   // Soft-return when the process group isn't available yet (e.g. at engine
   // construction time when the caller hasn't called dist.init_process_group()).
@@ -957,7 +879,6 @@ bool TRTEngine::bind_nccl_comm() {
     return false;
   }
 
-  validate_nccl_group(this->group_name);
   this->rank = pg->getRank();
   this->world_size = pg->getSize();
 

@@ -2,80 +2,18 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 """
-Tests for TRTEngine.bind_nccl_comm() — probe loop (detection) and binding.
+Native NCCL binding tests for fresh and saved TensorRT engines.
 
-Background
-----------
-bind_nccl_comm() has two distinct responsibilities that this file tests
-independently:
+Python validates WORLD before passing its actual process-group name to C++.
+Newly compiled wrappers perform this setup automatically. Loaded C++ engines
+must be configured with distributed_context(dist.group.WORLD, loaded_model)
+before execution; they never choose a group by scanning the registry.
 
-  PART 1 — DETECTION (probe loop)
-  --------------------------------
-  Triggered when: group_name is empty — i.e. the save→load path where
-  torch.export.load() deserializes the engine but bypasses
-  _TorchTensorRTModule.__init__(), so set_group_name() is never called.
+Tests cover missing setup with one or several groups, arbitrary registry gaps,
+WORLD binding, subgroup rejection, and save/load followed by explicit setup.
 
-  The probe loop iterates numeric group names "0".."19" and collects all
-  groups with an NCCL backend. PyTorch assigns numeric names via a monotonic
-  group_count counter:
-    - init_process_group()                       → always numeric
-    - new_group(use_local_synchronization=False)  → numeric (default)
-    - new_group(use_local_synchronization=True)   → hashed name, but still
-                                                    increments group_count,
-                                                    leaving a gap in numerics
-  In PyTorch 2.x, resolve_process_group throws c10::Error for missing names
-  instead of returning nullptr. The probe catches and continues (not breaks)
-  so gaps don't stop it from finding groups beyond them (PR #4428).
-
-  Outcomes:
-    nccl_groups.size() == 1 → auto-resolve: group_name set, binding proceeds
-    nccl_groups.size() >  1 → ambiguous: warns, defers — user must pin via
-                               distributed_context(group, model)
-    nccl_groups.size() == 0 → warns, defers — dist not initialized
-
-  PART 2 — BINDING
-  ----------------
-  Triggered when: group_name is non-empty (either auto-resolved by the probe,
-  or pre-set by distributed_context() / set_group_name() before first execute).
-
-  On the torch.compile path, _TorchTensorRTModule.__init__() runs and calls
-  get_active_group_name() → set_group_name() — so group_name is set BEFORE
-  the first forward. The probe loop is never entered. bind_nccl_comm() goes
-  straight to resolve_process_group(group_name) → extract ncclComm_t → bind
-  to IExecutionContext.
-
-  Key difference from detection:
-    - Detection tests: probe loop RUNS (save→load path, group_name empty)
-    - Binding tests:   probe loop NEVER RUNS (torch.compile path or explicit
-                       pin via distributed_context, group_name pre-set)
-
-Test structure
---------------
-  TestBindNcclProbeDetection
-    Verifies probe loop behavior: whether auto-resolve fires (single group)
-    or deferral fires (multiple groups requiring explicit pin). Asserts on
-    output correctness as a proxy — correct output confirms probe resolved
-    and bound the right communicator.
-
-  TestBindNcclProbeBinding
-    Verifies binding produces numerically correct output. Uses torch.compile
-    (no save/load) so probe loop is never entered — pure binding path.
-    Covers: auto-resolve, explicit world group pin, rejection of subgroup pinning.
-
-  TestBindNcclProbeE2E
-    Covers both parts together via the save→load cycle:
-    compile → save → load → first forward (probe fires → auto-resolve → bind).
-    Asserts on output correctness end-to-end.
-
-Run
----
-    pytest distributed/test_bind_nccl_probe.py -v
-    pytest distributed/test_bind_nccl_probe.py::TestBindNcclProbeDetection -v
-    pytest distributed/test_bind_nccl_probe.py::TestBindNcclProbeBinding -v
-    pytest distributed/test_bind_nccl_probe.py::TestBindNcclProbeE2E -v
-
-    # via torchrun (2 GPUs):
-    torchrun --nproc_per_node=2 distributed/test_bind_nccl_probe.py --multirank
+Run: pytest distributed/test_bind_nccl_probe.py -v
+Or:  torchrun --nproc_per_node=2 distributed/test_bind_nccl_probe.py --multirank
 """
 
 from __future__ import annotations
@@ -104,9 +42,7 @@ def _has_nccl_collectives() -> bool:
     try:
         from torch_tensorrt._features import ENABLED_FEATURES
 
-        return bool(ENABLED_FEATURES.native_trt_collectives) or bool(
-            ENABLED_FEATURES.trtllm_for_nccl
-        )
+        return bool(ENABLED_FEATURES.native_trt_collectives)
     except Exception:
         return False
 
@@ -158,7 +94,7 @@ def _compile_and_save(model, inp, save_path):
 
 
 def _load(save_path):
-    """Load saved TRT engine. group_name will be empty — probe fires on first execute."""
+    """Load an engine whose C++ process-group name is not configured."""
     import torch_tensorrt
     from torch_tensorrt.distributed._nccl_utils import initialize_nccl_comm
 
@@ -167,19 +103,13 @@ def _load(save_path):
 
 
 # ---------------------------------------------------------------------------
-# PART 1 — DETECTION test functions
+# PART 1 — LOADED ENGINE SETUP test functions
 # ---------------------------------------------------------------------------
 
 
 def _detect_single_group_probe_resolves(rank, world_size, device):
-    """Only world group "0" exists — probe auto-resolves and binding succeeds.
-
-    Group state: only "0" (world NCCL).
-    Probe: i=0 found, i=1 throws (c10::Error) → nccl_groups=["0"] → auto-resolve.
-
-    Assert: output after load matches output at compile time — confirms probe
-    correctly resolved "0" and bound the communicator.
-    """
+    """A loaded native engine requires explicit setup even when only WORLD exists."""
+    from torch_tensorrt.distributed import distributed_context
     from torch_tensorrt.distributed._nccl_utils import setup_nccl_for_torch_tensorrt
 
     setup_nccl_for_torch_tensorrt()
@@ -193,26 +123,19 @@ def _detect_single_group_probe_resolves(rank, world_size, device):
             out_compile = trt_model(inp)
 
         trt_loaded = _load(f"{tmpdir}/r{rank}.pt2")
-        with torch.no_grad():
-            out_load = trt_loaded(inp)
+        with unittest.TestCase().assertRaisesRegex(
+            RuntimeError, "no process group configured"
+        ):
+            trt_loaded(inp)
+        with distributed_context(dist.group.WORLD, trt_loaded):
+            with torch.no_grad():
+                out_load = trt_loaded(inp)
 
     _check_close(out_compile, out_load, f"detect_single_group rank={rank}")
 
 
 def _detect_gap_from_local_sync(rank, world_size, device):
-    """Probe skips gap from use_local_synchronization=True, finds both "0" and "2".
-
-    Group state:
-      "0" → world NCCL
-      gap at "1" (use_local_sync consumed group_count, hashed name)
-      "2" → new_group() numeric NCCL
-
-    Probe must use continue (not break) at "1" to find both "0" and "2".
-    Result: nccl_groups=["0","2"] → size=2 → deferred.
-
-    Assert: with explicit distributed_context pin, output is correct — confirms
-    probe found both groups (didn't stop at gap) and deferred correctly.
-    """
+    """Explicit WORLD setup works with hashed groups and gaps in numeric names."""
     from torch_tensorrt.distributed._distributed import distributed_context
     from torch_tensorrt.distributed._nccl_utils import setup_nccl_for_torch_tensorrt
 
@@ -233,9 +156,12 @@ def _detect_gap_from_local_sync(rank, world_size, device):
         with distributed_context(group):
             _compile_and_save(model, inp, f"{tmpdir}/r{rank}.pt2")
 
-        # Explicit pin needed because probe finds multiple groups → deferred.
-        # Without this pin, forward would crash (no comm bound).
+        # Registry contents do not establish which group is WORLD.
         trt_loaded = _load(f"{tmpdir}/r{rank}.pt2")
+        with unittest.TestCase().assertRaisesRegex(
+            RuntimeError, "no process group configured"
+        ):
+            trt_loaded(inp)
         with distributed_context(group, trt_loaded):
             with torch.no_grad():
                 out = trt_loaded(inp)
@@ -244,18 +170,7 @@ def _detect_gap_from_local_sync(rank, world_size, device):
 
 
 def _detect_multiple_groups_defers(rank, world_size, device):
-    """Probe finds two NCCL groups ("0","1") → defers, requires explicit pin.
-
-    Group state:
-      "0" → world NCCL
-      "1" → new_group() numeric NCCL
-
-    Probe finds both → nccl_groups.size()==2 → cannot auto-select → deferred.
-    Without explicit pin, forward crashes (TRT assertion comm != nullptr).
-
-    Assert: with explicit distributed_context(group, module) pin, output correct.
-    This confirms probe found both groups and correctly required the user to pin.
-    """
+    """A loaded engine never guesses a parent when multiple groups exist."""
     from torch_tensorrt.distributed._distributed import distributed_context
     from torch_tensorrt.distributed._nccl_utils import setup_nccl_for_torch_tensorrt
 
@@ -275,10 +190,12 @@ def _detect_multiple_groups_defers(rank, world_size, device):
         with distributed_context(group):
             _compile_and_save(model, inp, f"{tmpdir}/r{rank}.pt2")
 
-        # Explicit pin required — probe finds "0" and "1" → defers.
-        # distributed_context(group, module) calls set_group_name before
-        # first execute → probe skipped → comm bound → correct output.
+        # Configure the validated WORLD name before execution.
         trt_loaded = _load(f"{tmpdir}/r{rank}.pt2")
+        with unittest.TestCase().assertRaisesRegex(
+            RuntimeError, "no process group configured"
+        ):
+            trt_loaded(inp)
         with distributed_context(group, trt_loaded):
             with torch.no_grad():
                 out = trt_loaded(inp)
@@ -292,11 +209,7 @@ def _detect_multiple_groups_defers(rank, world_size, device):
 
 
 def _bind_auto_resolved_single_group(rank, world_size, device):
-    """Single NCCL group — probe auto-resolves, binding produces correct output.
-
-    Tests the full binding path without save/load:
-    distributed_context not needed — probe auto-resolves at first execute.
-    """
+    """A newly compiled wrapper validates and pins the default WORLD group."""
     from torch_tensorrt.distributed._nccl_utils import (
         initialize_nccl_comm,
         setup_nccl_for_torch_tensorrt,
@@ -328,11 +241,7 @@ def _bind_auto_resolved_single_group(rank, world_size, device):
 
 
 def _bind_explicit_pin_world_group(rank, world_size, device):
-    """Explicit distributed_context pin — binding correct, probe skipped.
-
-    distributed_context(group) calls set_group_name() before first execute,
-    so group_name is non-empty and the probe loop condition is false.
-    """
+    """Explicit WORLD setup passes the actual group name to the C++ engine."""
     from torch_tensorrt.distributed._distributed import distributed_context
     from torch_tensorrt.distributed._nccl_utils import setup_nccl_for_torch_tensorrt
 
@@ -395,11 +304,8 @@ def _bind_explicit_pin_subgroup(rank, world_size, device):
 
 
 def _e2e_single_group_save_load(rank, world_size, device):
-    """Regression test for PR #4428: save→load with single world group.
-
-    At load time group_name="" → probe fires → auto-resolves "0" → binding
-    produces correct output. Without the fix, probe threw on i=1.
-    """
+    """A saved engine executes correctly after explicit WORLD setup."""
+    from torch_tensorrt.distributed import distributed_context
     from torch_tensorrt.distributed._nccl_utils import setup_nccl_for_torch_tensorrt
 
     setup_nccl_for_torch_tensorrt()
@@ -413,19 +319,15 @@ def _e2e_single_group_save_load(rank, world_size, device):
     with tempfile.TemporaryDirectory() as tmpdir:
         _compile_and_save(model, inp, f"{tmpdir}/r{rank}.pt2")
         trt_loaded = _load(f"{tmpdir}/r{rank}.pt2")
-        with torch.no_grad():
-            out_load = trt_loaded(inp)
+        with distributed_context(dist.group.WORLD, trt_loaded):
+            with torch.no_grad():
+                out_load = trt_loaded(inp)
 
     _check_close(out_load, expected, f"e2e_single_group load rank={rank}")
 
 
 def _e2e_multi_group_save_load_with_pin(rank, world_size, device):
-    """Multi-group save→load requires explicit distributed_context at load time.
-
-    At save time: world "0" + tp_group "1" exist → probe would be ambiguous.
-    Use distributed_context(world) at both save and load to pin explicitly.
-    Verifies explicit pin resolves ambiguity end-to-end.
-    """
+    """Explicit WORLD setup works after save/load with several registered groups."""
     from torch_tensorrt.distributed._distributed import distributed_context
     from torch_tensorrt.distributed._nccl_utils import setup_nccl_for_torch_tensorrt
 
@@ -446,7 +348,7 @@ def _e2e_multi_group_save_load_with_pin(rank, world_size, device):
             _compile_and_save(model, inp, f"{tmpdir}/r{rank}.pt2")
 
         # Pass module to distributed_context so set_group_name() pre-pins
-        # the engine before first execute, bypassing the ambiguous probe.
+        # the engine before its first execution.
         trt_loaded = _load(f"{tmpdir}/r{rank}.pt2")
         with distributed_context(group, trt_loaded):
             with torch.no_grad():
@@ -462,16 +364,10 @@ def _e2e_multi_group_save_load_with_pin(rank, world_size, device):
 
 @unittest.skipIf(
     not _has_nccl_collectives(),
-    "Skipped: No NCCL collective support.",
+    "Skipped: No native NCCL collective support.",
 )
 class TestBindNcclProbeDetection(MultiProcessTestCase):
-    """Part 1 — probe loop finds the right groups.
-
-    Tests verify that the probe correctly detects process groups without
-    asserting on output correctness (that's Part 2 / E2E).
-
-        pytest distributed/test_bind_nccl_probe.py::TestBindNcclProbeDetection -v
-    """
+    """Loaded native engines require explicit setup, regardless of registry contents."""
 
     world_size = 2
 
@@ -494,36 +390,31 @@ class TestBindNcclProbeDetection(MultiProcessTestCase):
     @requires_nccl()
     @skip_if_lt_x_gpu(2)
     def test_single_group_probe_resolves(self) -> None:
-        """Single world group — probe finds "0", auto-resolves."""
+        """A loaded engine requires WORLD setup even with only one group."""
         device = self._init_dist()
         _detect_single_group_probe_resolves(self.rank, self.world_size, device)
 
     @requires_nccl()
     @skip_if_lt_x_gpu(2)
     def test_gap_from_local_sync(self) -> None:
-        """Probe continues past gap from use_local_synchronization=True."""
+        """Explicit WORLD setup is independent of gaps in registry names."""
         device = self._init_dist()
         _detect_gap_from_local_sync(self.rank, self.world_size, device)
 
     @requires_nccl()
     @skip_if_lt_x_gpu(2)
     def test_multiple_groups_defers(self) -> None:
-        """Probe finds multiple NCCL groups — defers, explicit pin required."""
+        """Multiple registered groups never trigger automatic selection."""
         device = self._init_dist()
         _detect_multiple_groups_defers(self.rank, self.world_size, device)
 
 
 @unittest.skipIf(
     not _has_nccl_collectives(),
-    "Skipped: No NCCL collective support.",
+    "Skipped: No native NCCL collective support.",
 )
 class TestBindNcclProbeBinding(MultiProcessTestCase):
-    """Part 2 — correct communicator gets bound, output is numerically correct.
-
-    Tests use torch.compile (no save/load) to focus on binding behavior.
-
-        pytest distributed/test_bind_nccl_probe.py::TestBindNcclProbeBinding -v
-    """
+    """Newly compiled and loaded engines bind the validated WORLD communicator."""
 
     world_size = 2
 
@@ -546,14 +437,14 @@ class TestBindNcclProbeBinding(MultiProcessTestCase):
     @requires_nccl()
     @skip_if_lt_x_gpu(2)
     def test_auto_resolved_single_group(self) -> None:
-        """Auto-resolved world group — binding produces correct output."""
+        """A newly compiled wrapper configures WORLD without an explicit context."""
         device = self._init_dist()
         _bind_auto_resolved_single_group(self.rank, self.world_size, device)
 
     @requires_nccl()
     @skip_if_lt_x_gpu(2)
     def test_explicit_pin_world_group(self) -> None:
-        """Explicit pin to world group — probe skipped, correct output."""
+        """Explicit WORLD setup produces correct output."""
         device = self._init_dist()
         _bind_explicit_pin_world_group(self.rank, self.world_size, device)
 
@@ -585,17 +476,10 @@ class TestBindNcclProbeBinding(MultiProcessTestCase):
 
 @unittest.skipIf(
     not _has_nccl_collectives(),
-    "Skipped: No NCCL collective support.",
+    "Skipped: No native NCCL collective support.",
 )
 class TestBindNcclProbeE2E(MultiProcessTestCase):
-    """Part 1 + 2 — save→load path end-to-end.
-
-    Tests the full cycle: compile → save → load → first execute.
-    group_name is empty on load (torch.export.load bypasses __init__),
-    so probe fires on first execute.
-
-        pytest distributed/test_bind_nccl_probe.py::TestBindNcclProbeE2E -v
-    """
+    """Save/load retains engine contents; execution requires fresh parent setup."""
 
     world_size = 2
 
@@ -618,7 +502,7 @@ class TestBindNcclProbeE2E(MultiProcessTestCase):
     @requires_nccl()
     @skip_if_lt_x_gpu(2)
     def test_single_group_save_load(self) -> None:
-        """Regression test for PR #4428: save→load, probe auto-resolves world group."""
+        """Save/load followed by explicit WORLD setup produces correct output."""
         device = self._init_dist()
         _e2e_single_group_save_load(self.rank, self.world_size, device)
 

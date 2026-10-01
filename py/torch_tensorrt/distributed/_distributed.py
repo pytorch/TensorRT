@@ -10,8 +10,8 @@ up automatically after dist.init_process_group().
 
 Native TRT collective converters emit global rank IDs, so their engines must
 bind WORLD. Individual collective operations can still select TP/CP subgroups.
-Use distributed_context(dist.group.WORLD, model) for loaded native engines; this
-also makes WORLD's identity available to the C++ runtime before its first bind.
+Use distributed_context(dist.group.WORLD, model) for loaded native engines.
+Python checks the group identity before passing its actual registry name to C++.
 """
 
 import threading
@@ -24,35 +24,6 @@ import torch.nn as nn
 M = TypeVar("M", bound=nn.Module)
 
 _state = threading.local()
-_world_group_registry_lock = threading.Lock()
-
-# Runtime-only alias of the actual WORLD object; never serialize a c10d group name.
-# The C++ runtime uses this identity to validate engines loaded without a Python
-# TorchTensorRTModule wrapper. Keep in sync with TRTEngine.cpp.
-_WORLD_GROUP_REGISTRY_ALIAS = "__torch_tensorrt_world__"
-
-
-def _register_world_group() -> None:
-    """Make the current WORLD identity available to the C++ runtime."""
-    if not dist.is_available() or not dist.is_initialized():
-        return
-    from torch._C._distributed_c10d import (
-        _register_process_group,
-        _resolve_process_group,
-        _unregister_process_group,
-    )
-
-    with _world_group_registry_lock:
-        world = dist.group.WORLD
-        try:
-            previous = _resolve_process_group(_WORLD_GROUP_REGISTRY_ALIAS)
-        except RuntimeError:
-            previous = None
-        if previous is world:
-            return
-        if previous is not None:
-            _unregister_process_group(_WORLD_GROUP_REGISTRY_ALIAS)
-        _register_process_group(_WORLD_GROUP_REGISTRY_ALIAS, world)
 
 
 def _require_world_group(group: Any) -> None:
@@ -120,8 +91,9 @@ def distributed_context(
     Sets the active process group for the duration of the ``with`` block.
     Native TRT engines require ``dist.group.WORLD`` because their collective
     rank arrays use global IDs. Select TP/CP subgroups on the model's collective
-    operations. Use this context for loaded engines to register WORLD with the
-    C++ runtime; a newly compiled module registers it during engine setup.
+    operations. For loaded C++ engines, pass the loaded module to this context
+    before inference to validate and configure its group. Newly compiled modules
+    do this during engine setup; C++ does not auto-select a group.
 
     When *module* is supplied the group is also pre-pinned on all TRT engines
     in the module via :func:`set_distributed_mode`, and the configured module
@@ -168,7 +140,6 @@ def distributed_context(
         *module* when a single module is supplied, a list when multiple modules
         are supplied, or ``None`` when no module is given.
     """
-    _register_world_group()
     old = getattr(_state, "pg", None)
     _state.pg = group
 
@@ -225,7 +196,6 @@ def set_distributed_mode(group: Any, module: nn.Module) -> None:
     if not group_name:
         return
 
-    _register_world_group()
     seen: set[int] = set()
 
     def pin_engine(engine: Any) -> None:

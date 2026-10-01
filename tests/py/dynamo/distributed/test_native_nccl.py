@@ -610,13 +610,28 @@ class TestNativeCollectiveWorldContract(unittest.TestCase):
             patch.object(dist, "is_initialized", return_value=True),
             patch.object(dist, "group", MagicMock(WORLD=world)),
             patch.object(_state, "md_engines", [], create=True),
-            patch("torch_tensorrt.distributed._distributed._register_world_group"),
         ):
             with self.assertRaisesRegex(RuntimeError, "require the WORLD communicator"):
                 set_distributed_mode(subgroup, module)
             self.assertEqual(engine.group_name_calls, [])
             set_distributed_mode(world, module)
             self.assertEqual(engine.group_name_calls, [world.group_name])
+
+    def test_actual_world_registry_name_is_pinned(self) -> None:
+        from torch_tensorrt.distributed._distributed import _state, set_distributed_mode
+
+        world = _FakeGroup("world_after_reinit")
+        engine = _FakeEngine(requires_native_multidevice=True)
+        module = nn.Module()
+        module.engine = engine
+        with (
+            patch.object(dist, "is_available", return_value=True),
+            patch.object(dist, "is_initialized", return_value=True),
+            patch.object(dist, "group", MagicMock(WORLD=world)),
+            patch.object(_state, "md_engines", [], create=True),
+        ):
+            set_distributed_mode(world, module)
+        self.assertEqual(engine.group_name_calls, ["world_after_reinit"])
 
     def test_python_runtime_rejects_before_nccl_warmup(self) -> None:
         from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine

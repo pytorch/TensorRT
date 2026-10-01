@@ -478,7 +478,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         # requires_native_multidevice is set by the C++ constructor from the serialized REQUIRES_NATIVE_MULTIDEVICE_IDX field.
         if self.engine.requires_native_multidevice:
             from torch_tensorrt.distributed._distributed import (
-                _register_world_group,
                 _require_world_group,
                 get_active_group,
             )
@@ -486,7 +485,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                 check_nccl_engine_requirements,
             )
 
-            _register_world_group()
             active_group = get_active_group()
             if active_group is not None:
                 _require_world_group(active_group)
