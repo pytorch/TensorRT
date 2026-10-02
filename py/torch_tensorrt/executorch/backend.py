@@ -3,6 +3,7 @@
 
 # ExecuTorch TensorRT backend: serialize engines to a libtorch-free runtime blob.
 
+import copy
 import json
 import operator
 from typing import Any, Container, Iterable, List, Optional, Set, final
@@ -499,6 +500,20 @@ class TensorRTBackend(BackendDetails):  # type: ignore[misc]
     and metadata and encode them as a standalone blob. The C++ runtime
     backend parses that blob directly without the legacy Torch-TensorRT C++ runtime.
     """
+
+    @classmethod
+    def copy_exported_program_for_preprocess(
+        cls, edge_program: ExportedProgram, compile_specs: List[CompileSpec]
+    ) -> ExportedProgram:
+        # The default deep copy also copies the engine tensor, which can be several
+        # gigabytes. preprocess only reads tensors, so share them and copy the rest.
+        tensor_memo = {
+            id(tensor): tensor
+            for values in (edge_program.state_dict, edge_program.constants)
+            for tensor in values.values()
+            if isinstance(tensor, torch.Tensor)
+        }
+        return copy.deepcopy(edge_program, tensor_memo)
 
     @staticmethod
     def preprocess(
