@@ -8,6 +8,7 @@ Conceptual guides and how-tos for Torch-TensorRT.
 
    torch_tensorrt_explained
    compilation/index
+   edge_exporter
    shapes_precision/index
    runtime_performance/index
    performance_tuning
