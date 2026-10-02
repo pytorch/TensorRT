@@ -523,10 +523,14 @@ def tile(
     source_ir: Optional[SourceIR],
     name: str,
     input: TRTTensor,
-    dims: Sequence[int],
+    dims: Sequence[Union[int, TRTTensor]],
 ) -> TRTTensor:
     diff = len(dims) - len(input.shape)
-    has_dynamic_shape_input = has_dynamic_shape(input.shape)
+    # A symbolic repeat count (ITensor) needs the dynamic path as well, even
+    # when the input shape itself is static.
+    is_dynamic = has_dynamic_shape(input.shape) or any(
+        isinstance(dim, TRTTensor) for dim in dims
+    )
     if diff > 0:
         # prepend 1 to input.shape
         new_shape = (1,) * diff + tuple(input.shape)
@@ -540,7 +544,7 @@ def tile(
     starts = tuple([0] * len(dims))
     strides = tuple([1] * len(dims))
     # layer = ctx.net.add_slice(input, tuple(starts), tuple(shapes), tuple(strides))
-    if not (has_dynamic_shape_input):
+    if not is_dynamic:
         shapes = [i * j for i, j in zip(input.shape, dims)]
         layer = ctx.net.add_slice(input, tuple(starts), tuple(shapes), tuple(strides))
     else:
@@ -555,7 +559,7 @@ def tile(
                 ctx,
                 target,
                 source_ir,
-                name + "_prod",
+                name + f"_prod_{index}",
                 trt.ElementWiseOperation.PROD,
                 i,
                 j,
