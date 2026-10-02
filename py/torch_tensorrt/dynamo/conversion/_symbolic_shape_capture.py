@@ -94,12 +94,17 @@ def extract_symbolic_shape_expressions(
                 }
             )
         elif isinstance(input_val, (torch.SymInt, torch.SymFloat, int, float, bool)):
-            if isinstance(input_val, (torch.SymInt, int)):
-                default_scalar_dtype = torch.int64
-            elif isinstance(input_val, (torch.SymFloat, float)):
-                default_scalar_dtype = torch.float32
-            else:
+            # bool subclasses int, so test it first. The rank has to match the engine
+            # binding: an integer is a rank 1 shape tensor, anything else is rank 0.
+            if isinstance(input_val, bool):
                 default_scalar_dtype = torch.bool
+                binding_rank = 0
+            elif isinstance(input_val, (torch.SymInt, int)):
+                default_scalar_dtype = torch.int64
+                binding_rank = 1
+            else:
+                default_scalar_dtype = torch.float32
+                binding_rank = 0
             # Prefer the engine's actual binding dtype over the guess above.
             scalar_dtype = input_dtypes_by_name.get(
                 input_node.name, default_scalar_dtype
@@ -110,6 +115,7 @@ def extract_symbolic_shape_expressions(
                     "dtype": scalar_dtype,
                     "name": input_node.name,
                     "is_scalar": True,
+                    "binding_rank": binding_rank,
                 }
             )
         else:

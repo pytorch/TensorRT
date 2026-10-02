@@ -36,7 +36,7 @@ def select(
     name: str,
     input: ITensor,
     dim: int,
-    index: int,
+    index: Union[int, ITensor],
 ) -> ITensor:
     if not isinstance(input, ITensor):
         raise RuntimeError(
@@ -47,10 +47,29 @@ def select(
     ranks = len(input.shape)
     dim = get_positive_dim(dim, ranks)
 
-    indices_tensor = get_trt_tensor(
-        ctx, np.array(index, dtype=np.int32), f"{name}_indices_tensor"
-    )
+    if isinstance(index, ITensor):
+        # The index was computed at runtime, so it cannot be folded into a constant.
+        indices_tensor = cast_trt_tensor(
+            ctx, index, trt.int32, f"{name}_cast_index_tensor", target, source_ir
+        )
+        # Gather keeps every index dimension in its output, so eager's shape needs a rank 0
+        # index. Only a shape made of static 1s is known to hold exactly one element.
+        index_shape = tuple(indices_tensor.shape)
+        if any(d != 1 for d in index_shape):
+            raise RuntimeError(
+                "select needs an index with exactly one element and a static "
+                f"shape, got shape {index_shape}"
+            )
+        if index_shape:
+            indices_tensor = impl.shuffle.reshape(
+                ctx, target, source_ir, f"{name}_index_rank0", indices_tensor, ()
+            )
+    else:
+        indices_tensor = get_trt_tensor(
+            ctx, np.array(index, dtype=np.int32), f"{name}_indices_tensor"
+        )
     layer = ctx.net.add_gather(input, indices_tensor, dim)
+    set_layer_name(layer, target, f"{name}_gather", source_ir)
 
     return layer.get_output(0)
 

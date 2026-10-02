@@ -228,7 +228,6 @@ Error initialize_engine_io(EngineHandle& handle) {
     return Error::InvalidProgram;
   }
 
-  handle.exec_ctx.reset(handle.engine->createExecutionContext());
   // kSTATIC gives the context its own activation scratch; kUSER_MANAGED makes it
   // allocate none and take a buffer from execute() instead. The strategy is fixed
   // at creation, so it is captured on the handle here rather than read per call.

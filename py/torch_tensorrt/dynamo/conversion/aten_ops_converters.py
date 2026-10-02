@@ -1476,7 +1476,60 @@ def aten_ops_clamp(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.gather.default)
+def gather_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    """Keep cases the TensorRT gather cannot serve on the PyTorch path.
+
+    Element gather needs the index and the data to have the same rank, so a scalar index
+    fails the engine build. An empty index gives the engine a zero size output binding,
+    which TensorRT refuses to enqueue, and every other output of that engine comes back
+    unwritten. A length that comes from the data, such as the output of nonzero, can be
+    zero at run time, so only an index known to be non-empty converts. An engine built for
+    a float64 input expects float32 and rejects the caller's tensor at run time unless
+    truncate_double is set, and a uint8 output fails the engine build outright. All of
+    these run correctly in PyTorch.
+    """
+
+    def meta_of(arg: Argument) -> Any:
+        meta = getattr(arg, "meta", {})
+        return meta.get("val", meta.get("tensor_meta"))
+
+    data_meta = meta_of(args_bounds_check(node.args, 0))
+    index_meta = meta_of(args_bounds_check(node.args, 2))
+    # A plain `size > 0` raises when the size depends on the data; this never guards.
+    if index_meta is not None and not all(
+        statically_known_true(size > 0) for size in index_meta.shape
+    ):
+        _LOGGER.debug(
+            "gather with an index that may be empty is not supported, falling back"
+        )
+        return False
+    if data_meta is None:
+        return True
+    if index_meta is not None and len(index_meta.shape) != len(data_meta.shape):
+        _LOGGER.debug(
+            "gather needs the index and the data to have the same rank, falling back"
+        )
+        return False
+    if data_meta.dtype == torch.uint8:
+        _LOGGER.debug("gather with a uint8 input is not supported, falling back")
+        return False
+    if data_meta.dtype == torch.float64 and not (
+        settings is not None and settings.truncate_double
+    ):
+        _LOGGER.debug(
+            "gather with a float64 input needs truncate_double=True, falling back"
+        )
+        return False
+    return True
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.gather.default,
+    capability_validator=gather_validator,
+    supports_dynamic_shapes=True,
+)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),

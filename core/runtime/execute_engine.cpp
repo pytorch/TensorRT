@@ -97,6 +97,12 @@ bool _validate_shapes(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngi
   return false;
 }
 
+// TensorRT rejects a null address even for a tensor with no elements, and an empty tensor has
+// one, so bind the engine's placeholder instead.
+void* tensor_address(const at::Tensor& tensor, const c10::intrusive_ptr<TRTEngine>& compiled_engine) {
+  return tensor.numel() == 0 ? compiled_engine->empty_tensor_placeholder : tensor.data_ptr();
+}
+
 void setup_input_tensors(
     std::vector<at::Tensor> inputs,
     c10::intrusive_ptr<TRTEngine> compiled_engine,
@@ -188,10 +194,7 @@ void setup_input_tensors(
         final_input = compiled_engine->active_input_tensors[i];
       }
 
-      // Get tensor address, using placeholder for empty tensors
-      // TensorRT requires non-null address even if numel() = 0
-      // empty_tensor_placeholder is pre-allocated in TRTEngine constructor
-      void* input_addr = final_input.numel() == 0 ? compiled_engine->empty_tensor_placeholder : final_input.data_ptr();
+      void* input_addr = tensor_address(final_input, compiled_engine);
 
       TORCHTRT_CHECK(
           ctx->setTensorAddress(name.c_str(), input_addr),
@@ -482,7 +485,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
               in_it != bound_inputs_by_name.end(),
               "Aliased output " << name << " references unbound input " << alias_it->second.input_binding_name);
           TORCHTRT_CHECK(
-              ctx->setTensorAddress(name.c_str(), in_it->second.data_ptr()),
+              ctx->setTensorAddress(name.c_str(), tensor_address(in_it->second, compiled_engine)),
               "Failed to bind aliased output " << name << " to input " << alias_it->second.input_binding_name);
           continue;
         }
@@ -495,12 +498,13 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
         if (effective_cudagraphs) {
           TORCHTRT_CHECK(
               ctx->setTensorAddress(
-                  name.c_str(), compiled_engine->cudagraph_output_staging_buffers[pyt_idx].data_ptr()),
+                  name.c_str(),
+                  tensor_address(compiled_engine->cudagraph_output_staging_buffers[pyt_idx], compiled_engine)),
               "Error while setting the tensor address for output \"" << name << "\" of engine "
                                                                      << compiled_engine->name);
         } else {
           TORCHTRT_CHECK(
-              ctx->setTensorAddress(name.c_str(), outputs[pyt_idx].data_ptr()),
+              ctx->setTensorAddress(name.c_str(), tensor_address(outputs[pyt_idx], compiled_engine)),
               "Error while setting the tensor address for output \"" << name << "\" of engine "
                                                                      << compiled_engine->name);
         }
@@ -530,14 +534,18 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
         // Direct execution uses the caller buffers directly. On TRT-RTX with a
         // cuda_graph_strategy set, the engine captures/replays internally during
         // this enqueueV3 call.
-        ctx->enqueueV3(compiled_engine->engine_stream);
+        TORCHTRT_CHECK(
+            ctx->enqueueV3(compiled_engine->engine_stream),
+            "TensorRT failed to run engine " << compiled_engine->name << ", see the TensorRT error above");
       } else {
         if (need_cudagraphs_record) {
           // If cudagraphs needs to record a graph, capture the enqueueV3 call in a graph
           c10::cuda::CUDAStream recording_stream = compiled_engine->engine_stream;
           compiled_engine->cudagraph.capture_begin();
-          ctx->enqueueV3(recording_stream);
+          bool enqueued = ctx->enqueueV3(recording_stream);
           compiled_engine->cudagraph.capture_end();
+          TORCHTRT_CHECK(
+              enqueued, "TensorRT failed to run engine " << compiled_engine->name << ", see the TensorRT error above");
           compiled_engine->cudagraph.instantiate();
           if (compiled_engine->profile_execution) {
             cudaError_t debug_dump_err = cudaGraphDebugDotPrint(
@@ -680,7 +688,9 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       }
 
       // Direct execution uses the caller buffers directly
-      ctx->enqueueV3(compiled_engine->engine_stream);
+      TORCHTRT_CHECK(
+          ctx->enqueueV3(compiled_engine->engine_stream),
+          "TensorRT failed to run engine " << compiled_engine->name << ", see the TensorRT error above");
 
     } // End engine exeuction (resets to caller stream)
 

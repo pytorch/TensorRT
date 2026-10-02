@@ -210,7 +210,7 @@ def _kv_write_will_alias(
         # converter, so the compile aborts and the output is never reached; the
         # dynamic-dim one is validated away to PyTorch and keeps its copy-back.
         dim = args[2] if len(args) > 2 else 0
-        start, end, _step, status = resolve_slice_scatter_write(
+        start, end, step, status = resolve_slice_scatter_write(
             tuple(cache_shape),
             dim,
             args[3] if len(args) > 3 else None,
@@ -220,8 +220,10 @@ def _kv_write_will_alias(
         if status is not KVWriteStatus.OK:
             return False
         # OK is the only status that resolves all three bounds to Python ints.
-        assert start is not None and end is not None
-        eligible, _reason = _kv_eligible(tuple(cache_shape), dim, start, end - start)
+        assert start is not None and end is not None and step is not None
+        eligible, _reason = _kv_eligible(
+            tuple(cache_shape), dim, start, end - start, step
+        )
         return bool(eligible)
 
     return False
