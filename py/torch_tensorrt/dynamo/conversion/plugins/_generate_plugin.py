@@ -6,7 +6,7 @@ import itertools
 import logging
 import re
 from types import FunctionType
-from typing import Any, Callable, Tuple
+from typing import Any, Callable, Optional, Tuple
 
 import numpy as np
 import sympy
@@ -15,8 +15,15 @@ from sympy import lambdify
 from torch._dynamo.source import LocalSource
 from torch._subclasses.fake_tensor import FakeTensorMode
 from torch.fx.experimental.symbolic_shapes import DimDynamic, ShapeEnv
-
 from torch_tensorrt._features import needs_qdp_plugin
+from torch_tensorrt.dynamo.conversion.plugins._alias_utils import (
+    detect_and_validate_output_aliases,
+    is_tensor_arg,
+    mutated_tensor_indices,
+    plugin_output_count,
+    plugin_outputs,
+    returns_none,
+)
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -78,6 +85,18 @@ _TORCH_SCHEMA_TYPE_TO_PLUGIN_ATTR_TYPE = {
 }
 
 
+def _validate_mutating_schema(schema: Any, plugin_name: str) -> None:
+    if (
+        mutated_tensor_indices(schema)
+        and not returns_none(schema)
+        and not all(is_tensor_arg(ret) for ret in schema.returns)
+    ):
+        raise ValueError(
+            f"In-place QDP plugin {plugin_name} must return Tensor(s) or None; "
+            "non-Tensor returns are not supported."
+        )
+
+
 def _identifier_from_plugin_name(plugin_name: str) -> str:
     """Return a valid Python identifier fragment for generated plugin functions."""
     return re.sub(r"\W|^(?=\d)", "_", plugin_name)
@@ -124,12 +143,18 @@ def _generate_plugin(plugin_name: str) -> None:
 
     # retrieve the corresponding torch operation using the passed in string
     torch_op = getattr(getattr(torch.ops, namespace), name)
+    default_schema = torch_op.default._schema
+    _validate_mutating_schema(default_schema, plugin_name)
+
+    # Aliased output indices, set by the desc func at build time so the
+    # runtime impl skips the per-call probe.
+    _aliased_out_indices: Optional[frozenset[int]] = None
 
     # helper function that generates the required signature based on the torch operation
     def generate_signature(
         torch_op: Callable[[Any], Any],
     ) -> Tuple[str, str, str, dict[str, Any], dict[str, Any]]:
-        schema = torch_op._schemas[""]
+        schema = torch_op.default._schema
 
         arg_list = []
 
@@ -187,7 +212,7 @@ def _generate_plugin(plugin_name: str) -> None:
         # then ``issubclass`` on each element. Variadic ``Tuple[X, ...]`` would
         # surface ``Ellipsis`` (not a class) and raise. Build an exact-arity
         # tuple instead, one TensorDesc/Tensor per schema return.
-        num_outputs = len(schema.returns)
+        num_outputs = plugin_output_count(schema)
         register_func_annotation["return"] = Tuple[(trtp.TensorDesc,) * num_outputs]
         impl_func_annotation["outputs"] = Tuple[(trtp.Tensor,) * num_outputs]
         impl_func_annotation["stream"] = int
@@ -210,6 +235,7 @@ def _generate_plugin(plugin_name: str) -> None:
     ) = generate_signature(torch_op)
 
     def _generic_plugin_desc(*args: Any, **kwargs: Any) -> Tuple[trtp.TensorDesc, ...]:
+        nonlocal _aliased_out_indices
         shape_env = ShapeEnv()
         syms_args = []
         tensor_args = [elem for elem in args if isinstance(elem, trtp.TensorDesc)]
@@ -228,17 +254,22 @@ def _generate_plugin(plugin_name: str) -> None:
             ]
             syms_args.append(syms_arg)
 
-        with FakeTensorMode(shape_env=shape_env) as fake_mode:
+        with FakeTensorMode(shape_env=shape_env):
             fake_args = []
             for syms_arg in syms_args:
-                fake_arg = torch.randn(syms_arg)
+                # QDP kernels execute on CUDA. Preserve that contract in the fake
+                # run so valid fake kernels may assert ``tensor.is_cuda``.
+                fake_arg = torch.randn(syms_arg, device="cuda")
                 fake_args.append(fake_arg)
 
             output = torch_op(*fake_args, *non_tensor_args, **torch_kwargs)
 
-        # Normalize to a list of fake outputs. Multi-output torch ops return
-        # a tuple; single-output ops return a bare Tensor.
-        outputs_list = list(output) if isinstance(output, (tuple, list)) else [output]
+        outputs_list = plugin_outputs(torch_op.default, output, fake_args)
+
+        alias_map = detect_and_validate_output_aliases(
+            torch_op.default, outputs_list, fake_args
+        )
+        _aliased_out_indices = frozenset(alias_map)
 
         input_node_expr = list(
             itertools.chain.from_iterable(
@@ -261,6 +292,14 @@ def _generate_plugin(plugin_name: str) -> None:
 
         out_descs = []
         for out_idx, fake_out in enumerate(outputs_list):
+            if out_idx in alias_map:
+                # Aliased output: shares the mutated input's buffer/shape/dtype.
+                # TRT limitation (ALIASED_PLUGIN_IO_10_03): a defensive copy
+                # breaks aliasing when a multi-output plugin's aliased output
+                # feeds another layer; single-output plugins work end-to-end.
+                out_descs.append(tensor_args[alias_map[out_idx]].aliased())
+                continue
+
             shape_calc_fns: list[Any] = [None] * fake_out.ndim
             for i in range(fake_out.ndim):
                 out_dim = fake_out.shape[i]
@@ -327,12 +366,27 @@ def _generate_plugin(plugin_name: str) -> None:
 
         dest_tensors = [torch.as_tensor(o, device="cuda") for o in outputs]
 
+        # Aliased outputs share storage with the input the eager op already
+        # mutated — copying would no-op or clobber the in-place result.
+        aliased_outputs = _aliased_out_indices
+        if aliased_outputs is None:
+            aliased_outputs = frozenset(
+                i for i, o in enumerate(outputs) if o.get_aliased() is not None
+            )
+
         stream = torch.cuda.ExternalStream(stream)
         with torch.cuda.stream(stream):
             out_tensors = torch_op(*in_tensors, *non_tensor_args, **torch_kwargs)
+            if returns_none(default_schema):
+                # The op already wrote to the input/output buffers. Synthetic
+                # alias outputs represent that side effect, not PyTorch returns.
+                return
             if isinstance(out_tensors, torch.Tensor):
                 out_tensors = (out_tensors,)
-            [d.copy_(o) for (d, o) in zip(dest_tensors, out_tensors)]
+            for i, (d, o) in enumerate(zip(dest_tensors, out_tensors)):
+                if i in aliased_outputs:
+                    continue
+                d.copy_(o)
 
     plugin_impl_func = f"""
 {plugin_impl_signature}
@@ -365,5 +419,12 @@ def generate_plugin(plugin_name: str) -> None:
     Args:
         plugin_name: the plugin name that is used to generate the plugin automatically.
             There should be existing kernels and pytorch custom operation for this plugin name.
+
+            For a mutating custom op, its fake kernel must return each mutated input
+            by object identity so the generated plugin can declare aliased I/O. The
+            real kernel must continue to follow PyTorch's custom-op contract and
+            return non-aliasing tensors. Operators returning ``None`` get synthetic
+            aliased outputs for each mutated tensor, without changing their
+            PyTorch return value.
     """
     _generate_plugin(plugin_name)
