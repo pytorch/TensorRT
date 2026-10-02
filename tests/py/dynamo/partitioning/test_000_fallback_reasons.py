@@ -171,6 +171,23 @@ class TestFallbackReasons(TestCase):
         self.assertEqual(support.fallback_operators, {})
         self.assertEqual(support.fallback_reasons, {})
 
+    @parameterized.expand(SUPPORT_CLASSES)
+    def test_bfloat16_on_turing_is_recorded(self, _, support_class):
+        """Turing has no bfloat16, so these nodes are refused. The refusal must be recorded
+        like every other one, or the summary says nothing about why the graph split."""
+        x = torch.empty(2, dtype=torch.bfloat16, device="cuda")
+        node = self._node(torch.ops.aten.relu.default, x, x)
+        name = ConverterRegistry.qualified_name_or_str(torch.ops.aten.relu.default)
+        support = support_class()
+        with patch.object(
+            TorchTensorRTOperatorSupport, "_has_bf16_on_turing", return_value=True
+        ):
+            self.assertFalse(support.is_node_supported({}, node))
+        self.assertEqual(support.fallback_operators, {name: 1})
+        self.assertEqual(
+            support.fallback_reasons, {name: {"bfloat16 not supported on Turing"}}
+        )
+
 
 if __name__ == "__main__":
     run_tests()
