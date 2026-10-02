@@ -351,7 +351,7 @@ int main(int argc, char** argv) {
   ET_LOG(Info, "Method loaded. inputs=%zu outputs=%zu", method->inputs_size(), method->outputs_size());
 
   const size_t num_inputs = method_meta->num_inputs();
-  std::vector<std::vector<float>> input_data(num_inputs);
+  std::vector<std::vector<uint8_t>> input_data(num_inputs);
   std::vector<std::vector<exec_aten::SizesType>> input_sizes(num_inputs);
   std::vector<std::vector<exec_aten::DimOrderType>> input_dim_order(num_inputs);
   std::vector<std::vector<exec_aten::StridesType>> input_strides(num_inputs);
@@ -378,8 +378,18 @@ int main(int argc, char** argv) {
       stride *= static_cast<exec_aten::StridesType>(input_sizes[i][d]);
     }
 
-    const size_t numel = static_cast<size_t>(tensor_info->nbytes() / sizeof(float));
-    input_data[i].assign(numel, 1.0f);
+    size_t numel = 1;
+    for (const auto size : input_sizes[i]) {
+      numel *= static_cast<size_t>(size);
+    }
+
+    input_data[i].assign(tensor_info->nbytes(), 0);
+    if (tensor_info->scalar_type() == exec_aten::ScalarType::Float) {
+      constexpr float one = 1.0f;
+      for (size_t value = 0; value < numel; ++value) {
+        std::memcpy(input_data[i].data() + value * sizeof(float), &one, sizeof(float));
+      }
+    }
 
     fprintf(stderr, "  input[%zu] shape=[", i);
     for (ssize_t d = 0; d < ndim; ++d) {
