@@ -3,6 +3,7 @@
 #include "torch_tensorrt/executorch/TensorRTBlobHeader.h"
 
 #include <cuda_runtime.h>
+#include <executorch/actionExecutorchAdapter.h>
 #include <executorch/extension/cuda/caller_stream.h>
 #include <executorch/languageExecutorchAdapter.h>
 #include <executorch/runtime/backend/interface.h>
@@ -188,6 +189,9 @@ Result<DelegateHandle*> EdgeLLMBackend::init(
     const int32_t profile_index = edge_header.runner == "llm_decode" ? 1 : 0;
     handle->runner = trt_edgellm::executorch::LanguageExecutorchAdapter::create(
         engine_view, trt_header.input_binding_names, trt_header.output_binding_names, stream, profile_index);
+  } else if (edge_header.component == "action") {
+    handle->runner = trt_edgellm::executorch::ActionExecutorchAdapter::create(
+        engine_view, trt_header.input_binding_names, trt_header.output_binding_names, stream);
   }
   if (!handle->runner) {
     ET_LOG(Error, "EdgeLLMBackend::init: failed to create %s adapter", edge_header.component.c_str());

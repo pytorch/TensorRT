@@ -283,6 +283,64 @@ def call_language_decode(
     )
 
 
+def _action_metadata(metadata_json: str) -> EdgeComponentMetadata:
+    metadata = EdgeComponentMetadata.from_json(metadata_json)
+    if metadata.component != "action" or metadata.runner != "flow_step":
+        raise ValueError(
+            "edge_llm::action requires component='action' and runner='flow_step', "
+            f"got component={metadata.component!r}, runner={metadata.runner!r}"
+        )
+    return metadata
+
+
+@torch.library.custom_op(
+    "edge_llm::action",
+    mutates_args=(),
+)
+def action(
+    tensors: list[torch.Tensor],
+    trt_blob: torch.Tensor,
+    metadata_json: str,
+) -> list[torch.Tensor]:
+    metadata = _action_metadata(metadata_json)
+    compiled = _get_embedded_engine(trt_blob, metadata)
+    return list(_as_tuple(compiled(*tensors)))
+
+
+@action.register_fake
+def _(
+    tensors: list[torch.Tensor],
+    trt_blob: torch.Tensor,
+    metadata_json: str,
+) -> list[torch.Tensor]:
+    del trt_blob
+    metadata = _action_metadata(metadata_json)
+    device = tensors[0].device if tensors else torch.device("cpu")
+
+    return [
+        torch.empty(
+            output.shape,
+            dtype=getattr(torch, output.dtype),
+            device=device,
+        )
+        for output in metadata.outputs
+    ]
+
+
+def call_action(
+    trt_blob: torch.Tensor,
+    metadata_json: str,
+    *tensors: torch.Tensor,
+) -> tuple[torch.Tensor, ...]:
+    return tuple(
+        torch.ops.edge_llm.action.default(
+            list(tensors),
+            trt_blob,
+            metadata_json,
+        )
+    )
+
+
 def _vision_metadata(metadata_json: str) -> EdgeComponentMetadata:
     metadata = EdgeComponentMetadata.from_json(metadata_json)
     if metadata.component != "vision" or metadata.runner != "vit":
