@@ -1132,6 +1132,23 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
                 )
         return outputs
 
+    def _tensor_address(self, tensor: torch.Tensor) -> int:
+        # TensorRT rejects a null address even for a tensor with no elements, and an empty
+        # tensor has one, so bind a one element placeholder instead.
+        if tensor.numel() != 0:
+            return int(tensor.data_ptr())
+        if self._empty_tensor_placeholder is None:
+            self._empty_tensor_placeholder = torch.empty(
+                1, dtype=torch.uint8, device=torch.cuda.current_device()
+            )
+        return int(self._empty_tensor_placeholder.data_ptr())
+
+    def _enqueue(self, engine_stream: torch.cuda.Stream) -> None:
+        if not self.context.execute_async_v3(engine_stream.cuda_stream):
+            raise RuntimeError(
+                f"TensorRT failed to run engine {self.name}, see the TensorRT error above"
+            )
+
     def setup_input_tensors(
         self,
         contiguous_inputs: List[torch.Tensor],
@@ -1164,20 +1181,13 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
                     input_name, tuple(contiguous_inputs[i].shape)
                 )
                 tensor_to_bind = contiguous_inputs[i]
-                if tensor_to_bind.numel() == 0:
-                    if self._empty_tensor_placeholder is None:
-                        self._empty_tensor_placeholder = torch.empty(
-                            1,
-                            dtype=tensor_to_bind.dtype,
-                            device=torch.cuda.current_device(),
-                        )
-                    tensor_to_bind = self._empty_tensor_placeholder
-
                 if cudagraphs_enabled and not binding.is_aliased_input:
                     self._input_buffers[i].copy_(contiguous_inputs[i])
                     tensor_to_bind = self._input_buffers[i]
 
-                self.context.set_tensor_address(input_name, tensor_to_bind.data_ptr())
+                self.context.set_tensor_address(
+                    input_name, self._tensor_address(tensor_to_bind)
+                )
                 self._bound_inputs_by_name[input_name] = tensor_to_bind
 
     def _profile_section(self, label: str) -> ContextManager[None]:
@@ -1343,16 +1353,20 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
                 # directly to it and bypass the cudagraph persistent-output-buffer
                 # path (no separate buffer to sync; staging would defeat aliasing).
                 if output_name in self.aliased_io:
-                    self.context.set_tensor_address(output_name, outputs[o].data_ptr())
+                    self.context.set_tensor_address(
+                        output_name, self._tensor_address(outputs[o])
+                    )
                     continue
                 if need_cudagraphs_record:
                     self._output_buffers[o] = outputs[o].clone()
                 if effective_cudagraphs:
                     self.context.set_tensor_address(
-                        output_name, self._output_buffers[o].data_ptr()
+                        output_name, self._tensor_address(self._output_buffers[o])
                     )
                 else:
-                    self.context.set_tensor_address(output_name, outputs[o].data_ptr())
+                    self.context.set_tensor_address(
+                        output_name, self._tensor_address(outputs[o])
+                    )
 
         with self._profile_section("TRTEngine:TensorRTRuntime"):
             if caller_on_default:
@@ -1375,14 +1389,14 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
                         if self._profile_execution:
                             self.cudagraph.enable_debug_mode()
                         with torch.cuda.graph(self.cudagraph, stream=engine_stream):
-                            self.context.execute_async_v3(engine_stream.cuda_stream)
+                            self._enqueue(engine_stream)
                         if self._profile_execution:
                             self.cudagraph.debug_dump(
                                 f"{DEBUG_LOGGING_DIR}/{self.name}_cudagraph.dot"
                             )
                     self.cudagraph.replay()  # type: ignore[union-attr]
                 else:
-                    self.context.execute_async_v3(engine_stream.cuda_stream)
+                    self._enqueue(engine_stream)
 
             if caller_on_default:
                 caller_stream.wait_stream(engine_stream)
@@ -1459,7 +1473,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             if caller_on_default:
                 engine_stream.wait_stream(caller_stream)
             with torch.cuda.stream(engine_stream):
-                self.context.execute_async_v3(engine_stream.cuda_stream)
+                self._enqueue(engine_stream)
             if caller_on_default:
                 caller_stream.wait_stream(engine_stream)
 
