@@ -161,7 +161,7 @@ class TestAccuracyMetrics(unittest.TestCase):
 
 class TestSettingsAndValidation(unittest.TestCase):
     def test_build_route_engine_invariant(self) -> None:
-        a = CompilationSettings(build_route="")
+        a = CompilationSettings()
         b = CompilationSettings(build_route="-slice_fusion=off")
         ok, incompatible = settings_are_compatible(a, b)
         self.assertFalse(ok)

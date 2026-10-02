@@ -697,7 +697,7 @@ def tune_subgraph(
         trial_settings = replace(
             effective_settings,
             build_route=route,
-            tune_build_routes="",
+            tune_build_routes=None,
             tune_build_route_file=None,
             tuning_continue=False,
             tuning_dry_run=False,

@@ -286,16 +286,16 @@ def load_tuning_expr_from_file(path: str) -> str:
 
 
 def resolve_tuning_expression(
-    tune_build_routes: str = "",
+    tune_build_routes: Optional[str] = None,
     tune_build_route_file: Optional[str] = None,
-) -> str:
+) -> Optional[str]:
     if tune_build_routes and tune_build_route_file:
         raise ValueError(
             "Cannot specify both tune_build_routes and tune_build_route_file."
         )
     if tune_build_route_file:
         return load_tuning_expr_from_file(tune_build_route_file)
-    return tune_build_routes or ""
+    return tune_build_routes
 
 
 def expand_build_routes(

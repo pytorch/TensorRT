@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, cast
 
 import tensorrt as trt
 
@@ -20,8 +20,8 @@ def is_global_perf_tuning_available() -> bool:
     try:
         builder = trt.Builder(trt.Logger(trt.Logger.WARNING))
         config = builder.create_builder_config()
-        routes = getattr(config, "all_build_routes", "") or ""
-        return bool(routes.strip())
+        routes = getattr(config, "all_build_routes", None)
+        return bool(routes and routes.strip())
     except Exception as exc:  # pragma: no cover - depends on local TRT/CUDA
         _LOGGER.debug(f"Global Performance Tuning probe failed: {exc}")
         return False
@@ -42,7 +42,7 @@ def get_all_build_routes_raw() -> str:
     require_global_perf_tuning("Querying build routes")
     builder = trt.Builder(trt.Logger(trt.Logger.WARNING))
     config = builder.create_builder_config()
-    return config.all_build_routes or ""
+    return cast(str, config.all_build_routes)
 
 
 def get_all_build_routes(knob: Optional[str] = None) -> Dict[str, Any]:
@@ -89,9 +89,9 @@ def get_all_build_routes(knob: Optional[str] = None) -> Dict[str, Any]:
 
 def gpt_settings_requested(settings: Any) -> bool:
     """True if CompilationSettings requests any GPT feature."""
-    if getattr(settings, "build_route", ""):
+    if getattr(settings, "build_route", None):
         return True
-    if getattr(settings, "tune_build_routes", ""):
+    if getattr(settings, "tune_build_routes", None):
         return True
     if getattr(settings, "tune_build_route_file", None):
         return True

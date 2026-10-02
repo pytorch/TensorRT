@@ -85,8 +85,8 @@ ATTN_BIAS_IS_CAUSAL = True
 FALLBACK_DATA_DEPENDENT_OPS = False
 
 # Global Performance Tuning (TensorRT build-route knobs)
-BUILD_ROUTE = ""
-TUNE_BUILD_ROUTES = ""
+BUILD_ROUTE = None
+TUNE_BUILD_ROUTES = None
 TUNE_BUILD_ROUTE_FILE = None
 TUNING_SEARCH = "fast"
 TUNING_TIMEOUT_S = -1

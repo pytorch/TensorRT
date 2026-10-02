@@ -459,7 +459,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 builder_config, self.compilation_settings.target_compute_capabilities
             )
 
-        build_route = getattr(self.compilation_settings, "build_route", "") or ""
+        build_route = self.compilation_settings.build_route
         if build_route:
             if not hasattr(builder_config, "build_route"):
                 raise RuntimeError(
@@ -468,8 +468,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                     "(Global Performance Tuning unavailable). This feature is available "
                     "since TensorRT 11.1 and is currently not available in TensorRT-RTX or Windows."
                 )
-            all_routes = getattr(builder_config, "all_build_routes", "") or ""
-            if not all_routes.strip():
+            all_routes = getattr(builder_config, "all_build_routes", None)
+            if not all_routes or not all_routes.strip():
                 raise RuntimeError(
                     f"build_route={build_route} was requested, but "
                     "IBuilderConfig.all_build_routes is empty "
