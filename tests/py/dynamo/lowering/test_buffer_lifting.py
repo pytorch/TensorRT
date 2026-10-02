@@ -512,6 +512,25 @@ class TestCopyBackClassification(TestCase):
         self.assertEqual(len(lifted), 1)
         self.assertEqual(new_gm.meta["_copyback_mutation_buffers"], ["cache"])
 
+    def test_strided_slice_scatter_is_copyback(self):
+        """A strided write cannot use the contiguous KV-cache layer, so buffer
+        lifting must preserve it through copy-back instead of predicting an alias."""
+
+        class M(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("cache", torch.zeros(2, 4, 16, 8))
+
+            def forward(self, x):
+                self.cache[:, :, 0:16:2, :] = x
+                return self.cache.sum()
+
+        gm = _ep_module_decomposed(M(), (torch.ones(2, 4, 8, 8),))
+        new_gm, lifted = lift_mutated_buffers(gm)
+        self.assertEqual(len(lifted), 1)
+        self.assertEqual(new_gm.meta["_copyback_mutation_buffers"], ["cache"])
+        self.assertEqual(new_gm.meta["_predicted_kv_bindings"], [])
+
     def test_torch_executed_write_is_copyback_not_kv(self):
         """A KV-shaped write whose op the caller excluded from TensorRT cannot reach a
         converter, so no IKVCacheUpdateLayer can alias it.
@@ -620,16 +639,9 @@ class TestSliceScatterDerivationIsShared(TestCase):
 
     def test_step_is_returned_unchanged(self):
         """``step`` passes through the shared derivation untouched, which is what
-        both sides need: the derivation reads it for the full-overwrite shortcut, and
-        on the converter side only the scatter fallback reads it.
-
-        This deliberately says nothing about how a strided write is *classified*. One
-        the KV fast path accepts is lowered wrong, because that path ignores ``step``
-        -- ``cache[:, :, 0:8:2, :]`` writes slots 0, 1, 2, 3 rather than 0, 2, 4, 6 --
-        and that is a known, unfixed bug. One that falls through to the scatter
-        fallback is lowered correctly (``test_fallback_step_two``). Asserting the
-        current classification would make the eventual fix arrive looking like a
-        regression and force whoever lands it to delete a passing test."""
+        both sides need: the derivation reads it for the full-overwrite shortcut, the
+        shared eligibility predicate rejects non-unit steps, and the scatter fallback
+        uses the stride to build its indices."""
         from torch_tensorrt.dynamo.conversion.impl.slice_scatter import (
             KVWriteStatus,
             resolve_slice_scatter_write,
@@ -641,6 +653,13 @@ class TestSliceScatterDerivationIsShared(TestCase):
                 resolve_slice_scatter_write(shape, 2, 0, 8, step),
                 (0, 8, step, KVWriteStatus.OK),
             )
+
+    def test_strided_write_is_not_kv_eligible(self):
+        """Only the contiguous write is classified for KV aliasing; strided writes
+        must use the scatter fallback, which writes the requested non-adjacent slots."""
+        self.assertTrue(self._classify((2, 4, 16, 8), (2, 4, 8, 8), 2, 0, 8, 1))
+        self.assertFalse(self._classify((2, 4, 16, 8), (2, 4, 4, 8), 2, 0, 8, 2))
+        self.assertFalse(self._classify((2, 4, 16, 8), (2, 4, 3, 8), 2, 0, 8, 3))
 
     def test_resolve_reports_the_converter_early_exits(self):
         """Each status comes back with the bounds its contract promises, since a

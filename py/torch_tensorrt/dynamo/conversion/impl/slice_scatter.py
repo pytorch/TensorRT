@@ -48,7 +48,11 @@ logger = logging.getLogger(__name__)
 
 
 def _kv_eligible(
-    cache_shape: Tuple[int, ...], dim: int, start: int, update_len: int
+    cache_shape: Tuple[int, ...],
+    dim: int,
+    start: int,
+    update_len: int,
+    step: int,
 ) -> Tuple[bool, str]:
     """Apply IKVCacheUpdateLayer's invariants.
 
@@ -63,6 +67,8 @@ def _kv_eligible(
         )
     if dim != 2:
         return False, f"write dim is {dim}; KVCacheUpdate requires dim=2"
+    if step != 1:
+        return False, f"write step is {step}; KVCacheUpdate requires contiguous step=1"
     s_max = cache_shape[2]
     if start + update_len > s_max:
         return (
@@ -102,7 +108,7 @@ def resolve_slice_scatter_write(
     of:
 
     * ``OK`` — the bounds are concrete, and the caller goes on to
-      ``_kv_eligible(cache_shape, dim, start, end - start)``.
+      ``_kv_eligible(cache_shape, dim, start, end - start, step)``.
     * ``FULL_OVERWRITE`` — the slice spans the whole dim with a step equal to 1, so
       the converter returns ``src`` and emits no KV layer. ``step`` comes back as the
       integer 1, which is all this branch establishes: the caller's own step may be a
@@ -124,9 +130,9 @@ def resolve_slice_scatter_write(
     dropped on the strength of that prediction, so if the two derivations disagree
     the aliasing never materializes and the write-back is lost.
 
-    ``step`` is read here for the full-overwrite shortcut and, on the converter side,
-    only by the scatter fallback; the KV fast path never reads it. See the note on the
-    ``OK`` return for what that costs a strided write the KV path accepts.
+    ``step`` is read here for the full-overwrite shortcut and returned for the shared
+    KV eligibility check. Only contiguous writes can use ``IKVCacheUpdateLayer``;
+    strided writes continue through the scatter fallback.
     """
     if not isinstance(dim, int) or not -len(cache_shape) <= dim < len(cache_shape):
         return None, None, None, KVWriteStatus.BAD_DIM
@@ -170,11 +176,8 @@ def resolve_slice_scatter_write(
     if not (isinstance(start, int) and isinstance(end, int) and isinstance(step, int)):
         return None, None, None, KVWriteStatus.DYNAMIC_BOUNDS
 
-    # `step` is passed through untouched, and `try_emit_kv_cache_update` never reads
-    # it: a strided write the KV fast path accepts is classified and lowered as if it
-    # were contiguous, so `cache[:, :, 0:8:2, :]` lands in slots 0, 1, 2, 3 rather than
-    # 0, 2, 4, 6, silently. Known wrong and unfixed. The scatter fallback below does
-    # honour `step` (`test_fallback_step_two`), so only the KV path miscompiles.
+    # Preserve `step` for both the KV eligibility check and scatter fallback. The KV
+    # layer only supports a contiguous write; the fallback honours arbitrary strides.
     return start, end, step, KVWriteStatus.OK
 
 
@@ -241,6 +244,7 @@ def try_emit_kv_cache_update(
     dim: int,
     start: int,
     update_len: int,
+    step: int,
 ) -> Optional[TRTTensor]:
     """Emit IKVCacheUpdateLayer if all constraints are met. None otherwise.
 
@@ -251,7 +255,7 @@ def try_emit_kv_cache_update(
     its output is recorded as aliased to the cache input.
     """
     cache_shape = tuple(cache.shape)
-    eligible, reason = _kv_eligible(cache_shape, dim, start, update_len)
+    eligible, reason = _kv_eligible(cache_shape, dim, start, update_len, step)
     if not eligible:
         logger.debug("slice_scatter: KV fast path skipped — %s", reason)
         return None
@@ -326,7 +330,9 @@ def slice_scatter(
     kv_out = (
         None
         if kv_forbidden
-        else try_emit_kv_cache_update(ctx, name, input, src, dim, start, update_len)
+        else try_emit_kv_cache_update(
+            ctx, name, input, src, dim, start, update_len, step
+        )
     )
     if kv_out is not None:
         return kv_out
