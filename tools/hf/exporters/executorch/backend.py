@@ -18,6 +18,7 @@ from .serialization import EdgeComponentMetadata, serialize_edge_component
 _COMPONENT_SCHEMAS = {
     "edge_llm::vision_tower": ("vision", "vit"),
     "edge_llm::language_prefill": ("language", "llm_prefill"),
+    "edge_llm::language_decode": ("language", "llm_decode"),
 }
 
 

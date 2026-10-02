@@ -140,7 +140,7 @@ bool parse_metadata(const std::string& json, EdgeLLMBlobHeader& out) {
     return false;
   }
   return (out.component == "vision" && out.runner == "vit") ||
-      (out.component == "language" && out.runner == "llm_prefill");
+      (out.component == "language" && (out.runner == "llm_prefill" || out.runner == "llm_decode"));
 }
 
 } // namespace
