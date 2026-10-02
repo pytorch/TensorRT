@@ -30,6 +30,13 @@ std::string valid_metadata() {
          R"("runner":"vit","runner_config":{"model_type":"vit"}})";
 }
 
+std::string language_metadata() {
+  return R"({"abi_version":1,"component":"language",)"
+         R"("outputs":[{"dtype":"float16","shape":[1,1,8]}],)"
+         R"("runner":"llm_prefill",)"
+         R"("runner_config":{"model_type":"language"}})";
+}
+
 std::vector<uint8_t> make_payload(const std::string& metadata, const std::string& nested = "TR01nested") {
   const auto metadata_offset = static_cast<uint32_t>(HEADER_SIZE);
   const auto metadata_size = static_cast<uint32_t>(metadata.size());
@@ -56,6 +63,19 @@ TEST(ExecuTorchEdgeLLMBlobHeader, ParsesVisionPayload) {
   EXPECT_EQ(header.runner_config_json, R"({"model_type":"vit"})");
   EXPECT_EQ(header.blob_offset % BLOB_ALIGNMENT, 0);
   EXPECT_EQ(EdgeLLMBlobHeader::nested_blob_data(payload.data(), header), payload.data() + header.blob_offset);
+}
+
+TEST(ExecuTorchEdgeLLMBlobHeader, ParsesLanguagePrefillPayload) {
+  const auto payload = make_payload(language_metadata());
+
+  EdgeLLMBlobHeader header;
+  ASSERT_TRUE(EdgeLLMBlobHeader::parse(payload.data(), payload.size(), header));
+
+  EXPECT_EQ(header.abi_version, 1);
+  EXPECT_EQ(header.component, "language");
+  EXPECT_EQ(header.runner, "llm_prefill");
+  EXPECT_EQ(header.runner_config_json, R"({"model_type":"language"})");
+  EXPECT_EQ(header.blob_offset % BLOB_ALIGNMENT, 0);
 }
 
 TEST(ExecuTorchEdgeLLMBlobHeader, RejectsInvalidMagic) {

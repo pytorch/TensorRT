@@ -4,11 +4,14 @@
 
 #include <cuda_runtime.h>
 #include <executorch/extension/cuda/caller_stream.h>
+#include <executorch/languagePrefillExecutorchAdapter.h>
 #include <executorch/runtime/backend/interface.h>
 #include <executorch/runtime/platform/log.h>
+#include <executorch/vitExecutorchAdapter.h>
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -61,6 +64,30 @@ std::vector<int64_t> tensor_shape(const ::executorch::aten::Tensor& tensor) {
   return shape;
 }
 
+std::optional<nvinfer1::DataType> to_trt_dtype(::executorch::aten::ScalarType dtype) {
+  using ScalarType = ::executorch::aten::ScalarType;
+  switch (dtype) {
+    case ScalarType::Byte:
+      return nvinfer1::DataType::kUINT8;
+    case ScalarType::Char:
+      return nvinfer1::DataType::kINT8;
+    case ScalarType::Int:
+      return nvinfer1::DataType::kINT32;
+    case ScalarType::Long:
+      return nvinfer1::DataType::kINT64;
+    case ScalarType::Half:
+      return nvinfer1::DataType::kHALF;
+    case ScalarType::Float:
+      return nvinfer1::DataType::kFLOAT;
+    case ScalarType::Bool:
+      return nvinfer1::DataType::kBOOL;
+    case ScalarType::BFloat16:
+      return nvinfer1::DataType::kBF16;
+    default:
+      return std::nullopt;
+  }
+}
+
 struct HandleDeleter {
   void operator()(EdgeLLMHandle* handle) const {
     if (handle != nullptr) {
@@ -79,7 +106,7 @@ EdgeLLMHandle::~EdgeLLMHandle() {
     (void)cudaEventSynchronize(inflight_event);
     inflight_pending = false;
   }
-  vision_runner.reset();
+  runner.reset();
   if (inflight_event != nullptr) {
     (void)cudaEventDestroy(inflight_event);
     inflight_event = nullptr;
@@ -117,8 +144,8 @@ Result<DelegateHandle*> EdgeLLMBackend::init(
     ET_LOG(Error, "EdgeLLMBackend::init: invalid nested TensorRT payload");
     return Error::InvalidProgram;
   }
-  if (trt_header.input_binding_names.size() != 1 || trt_header.output_binding_names.size() != 1) {
-    ET_LOG(Error, "EdgeLLMBackend::init: vision runner requires exactly one input and one output");
+  if (trt_header.input_binding_names.empty() || trt_header.output_binding_names.empty()) {
+    ET_LOG(Error, "EdgeLLMBackend::init: component requires at least one input and one output");
     return Error::InvalidProgram;
   }
 
@@ -133,6 +160,8 @@ Result<DelegateHandle*> EdgeLLMBackend::init(
   new (handle) EdgeLLMHandle();
   std::unique_ptr<EdgeLLMHandle, HandleDeleter> handle_guard(handle);
   handle->device_id = trt_header.device_id;
+  handle->input_count = trt_header.input_binding_names.size();
+  handle->output_count = trt_header.output_binding_names.size();
 
   if (cudaSetDevice(handle->device_id) != cudaSuccess) {
     ET_LOG(Error, "EdgeLLMBackend::init: failed to select CUDA device %d", handle->device_id);
@@ -147,10 +176,20 @@ Result<DelegateHandle*> EdgeLLMBackend::init(
   const auto caller_stream = ::executorch::extension::cuda::getCallerStream();
   cudaStream_t stream = caller_stream.value_or(cudaStreamPerThread);
   const void* engine_data = TensorRTBlobHeader::engine_data(nested_blob, trt_header);
-  handle->vision_runner = trt_edgellm::executorch::VitExecutorchAdapter::create(
-      {engine_data, static_cast<std::size_t>(trt_header.engine_size)}, stream);
-  if (!handle->vision_runner) {
-    ET_LOG(Error, "EdgeLLMBackend::init: failed to create VitRunner adapter");
+  const trt_edgellm::executorch::SerializedEngineView engine_view{
+      engine_data, static_cast<std::size_t>(trt_header.engine_size)};
+  if (edge_header.component == "vision") {
+    if (handle->input_count != 1 || handle->output_count != 1) {
+      ET_LOG(Error, "EdgeLLMBackend::init: vision runner requires exactly one input and one output");
+      return Error::InvalidProgram;
+    }
+    handle->runner = trt_edgellm::executorch::VitExecutorchAdapter::create(engine_view, stream);
+  } else if (edge_header.component == "language") {
+    handle->runner = trt_edgellm::executorch::LanguagePrefillExecutorchAdapter::create(
+        engine_view, trt_header.input_binding_names, trt_header.output_binding_names, stream);
+  }
+  if (!handle->runner) {
+    ET_LOG(Error, "EdgeLLMBackend::init: failed to create %s adapter", edge_header.component.c_str());
     return Error::InvalidProgram;
   }
 
@@ -162,12 +201,20 @@ Result<DelegateHandle*> EdgeLLMBackend::init(
 Error EdgeLLMBackend::execute(BackendExecutionContext& context, DelegateHandle* delegate_handle, Span<EValue*> args)
     const {
   (void)context;
-  if (delegate_handle == nullptr || args.size() != 2 || args[0] == nullptr || args[1] == nullptr ||
-      !args[0]->isTensor() || !args[1]->isTensor()) {
-    ET_LOG(Error, "EdgeLLMBackend::execute: expected one tensor input and one tensor output");
+  if (delegate_handle == nullptr) {
+    ET_LOG(Error, "EdgeLLMBackend::execute: null delegate handle");
     return Error::InvalidArgument;
   }
   auto* handle = static_cast<EdgeLLMHandle*>(delegate_handle);
+  if (!handle->runner || args.size() != handle->input_count + handle->output_count) {
+    ET_LOG(
+        Error,
+        "EdgeLLMBackend::execute: expected %zu inputs and %zu outputs, got %zu arguments",
+        handle->input_count,
+        handle->output_count,
+        args.size());
+    return Error::InvalidArgument;
+  }
   std::lock_guard<std::mutex> lock(handle->mu);
   if (handle->inflight_pending) {
     if (cudaEventSynchronize(handle->inflight_event) != cudaSuccess) {
@@ -176,22 +223,33 @@ Error EdgeLLMBackend::execute(BackendExecutionContext& context, DelegateHandle* 
     handle->inflight_pending = false;
   }
 
-  auto input = args[0]->toTensor();
-  auto output = args[1]->toTensor();
-  if (input.scalar_type() != ::executorch::aten::ScalarType::Half ||
-      output.scalar_type() != ::executorch::aten::ScalarType::Half || !is_cuda_accessible(input.const_data_ptr()) ||
-      !is_cuda_accessible(output.mutable_data_ptr())) {
-    ET_LOG(Error, "EdgeLLMBackend::execute: prepared vision input/output must be device-resident FP16 tensors");
-    return Error::InvalidArgument;
+  std::vector<trt_edgellm::executorch::TensorView> inputs;
+  std::vector<trt_edgellm::executorch::TensorView> outputs;
+  inputs.reserve(handle->input_count);
+  outputs.reserve(handle->output_count);
+  for (std::size_t index = 0; index < args.size(); ++index) {
+    if (args[index] == nullptr || !args[index]->isTensor()) {
+      ET_LOG(Error, "EdgeLLMBackend::execute: argument %zu is not a tensor", index);
+      return Error::InvalidArgument;
+    }
+    auto tensor = args[index]->toTensor();
+    const auto dtype = to_trt_dtype(tensor.scalar_type());
+    void* data = tensor.mutable_data_ptr();
+    if (!dtype.has_value() || !is_cuda_accessible(data)) {
+      ET_LOG(Error, "EdgeLLMBackend::execute: argument %zu has unsupported dtype or is not CUDA-accessible", index);
+      return Error::InvalidArgument;
+    }
+    trt_edgellm::executorch::TensorView view{data, tensor_shape(tensor), *dtype};
+    if (index < handle->input_count) {
+      inputs.push_back(std::move(view));
+    } else {
+      outputs.push_back(std::move(view));
+    }
   }
 
   const auto caller_stream = ::executorch::extension::cuda::getCallerStream();
   cudaStream_t stream = caller_stream.value_or(cudaStreamPerThread);
-  const bool ok = handle->vision_runner->execute(
-      {input.mutable_data_ptr(), tensor_shape(input), nvinfer1::DataType::kHALF},
-      {output.mutable_data_ptr(), tensor_shape(output), nvinfer1::DataType::kHALF},
-      stream);
-  if (!ok) {
+  if (!handle->runner->execute(inputs, outputs, stream)) {
     return Error::InvalidProgram;
   }
 

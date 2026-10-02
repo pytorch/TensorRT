@@ -3,8 +3,9 @@
 #include <cuda_runtime.h>
 #include <executorch/runtime/backend/interface.h>
 
-#include <executorch/vitExecutorchAdapter.h>
+#include <executorch/executorchAdapterTypes.h>
 
+#include <cstddef>
 #include <memory>
 #include <mutex>
 
@@ -13,11 +14,12 @@ namespace executorch_backend {
 
 struct EdgeLLMHandle {
   int device_id = 0;
-  std::unique_ptr<trt_edgellm::executorch::VitExecutorchAdapter> vision_runner;
+  std::size_t input_count = 0;
+  std::size_t output_count = 0;
+  std::unique_ptr<trt_edgellm::executorch::ExecutorchComponentAdapter> runner;
   std::mutex mu;
   cudaEvent_t inflight_event = nullptr;
   bool inflight_pending = false;
-
   ~EdgeLLMHandle();
 };
 

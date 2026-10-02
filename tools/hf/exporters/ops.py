@@ -174,6 +174,65 @@ def _get_embedded_engine(
         return compiled
 
 
+def _language_metadata(metadata_json: str) -> EdgeComponentMetadata:
+    metadata = EdgeComponentMetadata.from_json(metadata_json)
+    if metadata.component != "language" or metadata.runner != "llm_prefill":
+        raise ValueError(
+            "edge_llm::language_prefill requires component='language' and "
+            "runner='llm_prefill', "
+            f"got component={metadata.component!r}, runner={metadata.runner!r}"
+        )
+    return metadata
+
+
+@torch.library.custom_op(
+    "edge_llm::language_prefill",
+    mutates_args=(),
+)
+def language_prefill(
+    tensors: list[torch.Tensor],
+    trt_blob: torch.Tensor,
+    metadata_json: str,
+) -> list[torch.Tensor]:
+    metadata = _language_metadata(metadata_json)
+    compiled = _get_embedded_engine(trt_blob, metadata)
+    return list(_as_tuple(compiled(*tensors)))
+
+
+@language_prefill.register_fake
+def _(
+    tensors: list[torch.Tensor],
+    trt_blob: torch.Tensor,
+    metadata_json: str,
+) -> list[torch.Tensor]:
+    del trt_blob
+    metadata = _language_metadata(metadata_json)
+    device = tensors[0].device if tensors else torch.device("cpu")
+
+    return [
+        torch.empty(
+            output.shape,
+            dtype=getattr(torch, output.dtype),
+            device=device,
+        )
+        for output in metadata.outputs
+    ]
+
+
+def call_language_prefill(
+    trt_blob: torch.Tensor,
+    metadata_json: str,
+    *tensors: torch.Tensor,
+) -> tuple[torch.Tensor, ...]:
+    return tuple(
+        torch.ops.edge_llm.language_prefill.default(
+            list(tensors),
+            trt_blob,
+            metadata_json,
+        )
+    )
+
+
 def _vision_metadata(metadata_json: str) -> EdgeComponentMetadata:
     metadata = EdgeComponentMetadata.from_json(metadata_json)
     if metadata.component != "vision" or metadata.runner != "vit":

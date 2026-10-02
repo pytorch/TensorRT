@@ -21,8 +21,12 @@ if "exporters" not in sys.modules:
     sys.modules["exporters"] = exporters_package
 
 from exporters import ops as edge_ops
-from exporters.executorch.artifact import build_vision_artifact
+from exporters.executorch.artifact import (
+    build_language_artifact,
+    build_vision_artifact,
+)
 from exporters.executorch.backend import EdgeLLMBackend
+from exporters.executorch.language import save_language_prefill_pte
 from exporters.executorch.partitioner import EdgeLLMPartitioner
 from exporters.executorch.serialization import (
     EdgeComponentMetadata,
@@ -42,6 +46,35 @@ def _vision_metadata() -> EdgeComponentMetadata:
         outputs=(EdgeOutputSpec(shape=(1, 4, 8), dtype="float16"),),
         runner_config={"model_type": "vit"},
     )
+
+
+def _language_metadata() -> EdgeComponentMetadata:
+    return EdgeComponentMetadata(
+        component="language",
+        runner="llm_prefill",
+        outputs=(
+            EdgeOutputSpec(shape=(1, 1, 257152), dtype="float16"),
+            EdgeOutputSpec(shape=(1, 32, 2048), dtype="float16"),
+            EdgeOutputSpec(shape=(18, 1, 1, 32, 256), dtype="float16"),
+            EdgeOutputSpec(shape=(18, 1, 1, 32, 256), dtype="float16"),
+        ),
+    )
+
+
+class _LanguageModule(nn.Module):
+    def __init__(self, metadata_json: str, trt_blob: bytes) -> None:
+        super().__init__()
+        self.metadata_json = metadata_json
+        self.register_buffer(
+            "trt_blob", torch.tensor(list(trt_blob), dtype=torch.uint8)
+        )
+
+    def forward(self, inputs_embeds):
+        return edge_ops.call_language_prefill(
+            self.trt_blob,
+            self.metadata_json,
+            inputs_embeds,
+        )[0]
 
 
 class _VisionModule(nn.Module):
@@ -193,6 +226,146 @@ def test_save_vision_pte_contains_edge_backend(tmp_path):
     save_vision_pte(
         artifact,
         torch.randn(1, 16, 16, 3, device="cuda", dtype=torch.float16),
+        pte,
+    )
+
+    from executorch.exir._serialize._program import deserialize_pte_binary
+
+    program = deserialize_pte_binary(pte.read_bytes()).program
+    delegate_ids = [
+        delegate.id for plan in program.execution_plan for delegate in plan.delegates
+    ]
+    assert delegate_ids == ["EdgeLLMBackend"]
+
+
+@pytest.mark.unit
+def test_language_prefill_fake_uses_embedded_output_specs():
+    metadata = _language_metadata()
+    fake_mode = torch._subclasses.fake_tensor.FakeTensorMode()
+    with fake_mode:
+        outputs = torch.ops.edge_llm.language_prefill.default(
+            [torch.empty(1, 32, 2048, device="cuda")],
+            torch.empty(16, dtype=torch.uint8),
+            metadata.to_json(),
+        )
+    assert len(outputs) == 4
+    assert tuple(outputs[0].shape) == (1, 1, 257152)
+    assert tuple(outputs[1].shape) == (1, 32, 2048)
+    assert outputs[0].dtype == torch.float16
+    assert outputs[0].device.type == "cuda"
+
+
+@pytest.mark.unit
+def test_edge_llm_partitioner_tags_language_prefill():
+    module = _LanguageModule(
+        _language_metadata().to_json(),
+        b"TR01-test-engine",
+    ).eval()
+
+    exported = torch.export.export(
+        module,
+        (torch.randn(1, 32, 2048, device="cuda", dtype=torch.float16),),
+    )
+    result = EdgeLLMPartitioner().partition(exported)
+
+    assert len(result.partition_tags) == 1
+
+    language_node = next(
+        node
+        for node in result.tagged_exported_program.graph_module.graph.nodes
+        if node.op == "call_function"
+        and hasattr(node.target, "_schema")
+        and node.target._schema.name == "edge_llm::language_prefill"
+    )
+    assert language_node.meta["delegation_tag"] in result.partition_tags
+
+
+@pytest.mark.unit
+def test_edge_llm_backend_wraps_language_component():
+    metadata = _language_metadata()
+    trt_blob = b"TR01-language-engine"
+    module = _LanguageModule(metadata.to_json(), trt_blob).eval()
+    exported = torch.export.export(
+        module,
+        (torch.randn(1, 32, 2048, device="cuda", dtype=torch.float16),),
+    )
+    result = EdgeLLMBackend.preprocess(exported, [])
+    restored_blob, restored_metadata = deserialize_edge_component(
+        result.processed_bytes
+    )
+    assert restored_blob == trt_blob
+    assert restored_metadata == metadata
+
+
+@pytest.mark.unit
+def test_build_language_artifact_wraps_saved_engine(tmp_path):
+    engine_dir = tmp_path / "language"
+    engine_dir.mkdir()
+    (engine_dir / "language.engine").write_bytes(b"serialized-language-engine")
+    (engine_dir / "config.json").write_text("""{
+  "model_type": "language",
+  "component": "language",
+  "engine_file": "language.engine",
+  "input_names": ["inputs_embeds"],
+  "output_names": ["logits", "lm_hidden_states", "prefix_k", "prefix_v"],
+  "outputs": [
+    {"shape": [1, 1, 8], "dtype": "torch.float16"},
+    {"shape": [1, 4, 8], "dtype": "torch.float16"},
+    {"shape": [2, 1, 1, 4, 4], "dtype": "torch.float16"},
+    {"shape": [2, 1, 1, 4, 4], "dtype": "torch.float16"}
+  ],
+  "context_attention_mask_type": 1,
+  "prefix_pad_mask_len": 4
+}
+""")
+
+    artifact = build_language_artifact(engine_dir, device_id=2)
+    nested_blob, edge_metadata = deserialize_edge_component(
+        serialize_edge_component(
+            artifact.trt_blob,
+            EdgeComponentMetadata.from_json(artifact.edge_metadata_json),
+        )
+    )
+    engine, trt_metadata = deserialize_engine(nested_blob)
+
+    assert engine == b"serialized-language-engine"
+    assert edge_metadata.runner == "llm_prefill"
+    assert edge_metadata.runner_config["prefix_pad_mask_len"] == 4
+    assert trt_metadata.device_id == 2
+    assert [binding.name for binding in trt_metadata.io_bindings] == [
+        "inputs_embeds",
+        "logits",
+        "lm_hidden_states",
+        "prefix_k",
+        "prefix_v",
+    ]
+
+
+@pytest.mark.unit
+def test_save_language_prefill_pte_contains_edge_backend(tmp_path):
+    engine_dir = tmp_path / "language"
+    engine_dir.mkdir()
+    (engine_dir / "language.engine").write_bytes(b"serialized-language-engine")
+    (engine_dir / "config.json").write_text("""{
+  "model_type": "language",
+  "component": "language",
+  "engine_file": "language.engine",
+  "input_names": ["inputs_embeds"],
+  "output_names": ["logits", "lm_hidden_states", "prefix_k", "prefix_v"],
+  "outputs": [
+    {"shape": [1, 1, 8], "dtype": "torch.float16"},
+    {"shape": [1, 4, 8], "dtype": "torch.float16"},
+    {"shape": [2, 1, 1, 4, 4], "dtype": "torch.float16"},
+    {"shape": [2, 1, 1, 4, 4], "dtype": "torch.float16"}
+  ]
+}
+""")
+    artifact = build_language_artifact(engine_dir)
+    pte = tmp_path / "language.pte"
+
+    save_language_prefill_pte(
+        artifact,
+        (torch.randn(1, 4, 8, device="cuda", dtype=torch.float16),),
         pte,
     )
 

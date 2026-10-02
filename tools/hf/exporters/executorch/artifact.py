@@ -99,3 +99,77 @@ def build_vision_artifact(
         trt_blob=serialize_engine(engine_bytes, trt_metadata),
         edge_metadata_json=edge_metadata.to_json(),
     )
+
+
+def build_language_artifact(
+    engine_dir: str | Path,
+    *,
+    device_id: int = 0,
+) -> EdgeExecuTorchArtifact:
+    component_dir = Path(engine_dir)
+    config_path = component_dir / "config.json"
+
+    try:
+        config = json.loads(config_path.read_text())
+        if config["component"] != "language" or config["model_type"] != "language":
+            raise ValueError(
+                "Language artifact requires component='language' "
+                "and model_type='language'"
+            )
+
+        input_names = list(config["input_names"])
+        output_names = list(config["output_names"])
+        outputs = list(config["outputs"])
+        engine_file = str(config["engine_file"])
+    except (FileNotFoundError, json.JSONDecodeError, KeyError, TypeError) as exc:
+        raise ValueError(f"Invalid Edge language config at {config_path}") from exc
+
+    if not input_names:
+        raise ValueError("Language artifact requires at least one input")
+
+    if len(output_names) != len(outputs):
+        raise ValueError("Language output names and output specifications must match")
+
+    engine_path = component_dir / engine_file
+    engine_bytes = engine_path.read_bytes()
+
+    output_specs = tuple(
+        EdgeOutputSpec.from_dict(
+            {
+                "shape": output["shape"],
+                "dtype": _dtype_name(output["dtype"]),
+            }
+        )
+        for output in outputs
+    )
+
+    bindings = [TensorRTIOBinding(name=name, is_input=True) for name in input_names]
+    bindings.extend(
+        TensorRTIOBinding(
+            name=name,
+            dtype=spec.dtype,
+            shape=list(spec.shape),
+            is_input=False,
+        )
+        for name, spec in zip(output_names, output_specs)
+    )
+
+    trt_metadata = TensorRTBlobMetadata(
+        io_bindings=bindings,
+        device_id=device_id,
+    )
+    edge_metadata = EdgeComponentMetadata(
+        component="language",
+        runner="llm_prefill",
+        outputs=output_specs,
+        runner_config={
+            "model_type": "language",
+            "context_attention_mask_type": config.get("context_attention_mask_type"),
+            "prefix_pad_mask_len": config.get("prefix_pad_mask_len"),
+        },
+    )
+
+    return EdgeExecuTorchArtifact(
+        trt_blob=serialize_engine(engine_bytes, trt_metadata),
+        edge_metadata_json=edge_metadata.to_json(),
+    )
