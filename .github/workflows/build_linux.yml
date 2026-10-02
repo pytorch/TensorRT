@@ -209,7 +209,13 @@ jobs:
         run: |
           set -euxo pipefail
           echo "::group::Cleanup debug output"
-          rm -rf "${GITHUB_WORKSPACE}"
+          # Clear the workspace without removing the directory itself. On an OSDC
+          # runner GITHUB_WORKSPACE is a bind mount into the job container, and
+          # deleting it detaches the mount: later steps fail with "getcwd: cannot
+          # access parent directories" and local actions resolve against a host
+          # path that no longer matches what the container sees. EC2 runners reuse
+          # the workspace between jobs, so its contents still need clearing.
+          find "${GITHUB_WORKSPACE}" -mindepth 1 -delete 2>/dev/null || true
           mkdir -p "${GITHUB_WORKSPACE}"
 
           if [[ "${{ inputs.architecture }}" = "aarch64" ]]; then
@@ -255,14 +261,14 @@ jobs:
           source /opt/conda/etc/profile.d/conda.sh
           conda config --set ssl_verify False
           echo "/opt/conda/bin" >> $GITHUB_PATH
-      - uses: ./test-infra/.github/actions/set-channel
+      - uses: pytorch/test-infra/.github/actions/set-channel@main
       - name: Set PYTORCH_VERSION
         if: ${{ env.CHANNEL == 'test' }}
         run: |
           # When building RC, set the version to be the current candidate version,
           # otherwise, leave it alone so nightly will pick up the latest
           echo "PYTORCH_VERSION=${{ matrix.stable_version }}" >> "${GITHUB_ENV}"
-      - uses: ./test-infra/.github/actions/setup-binary-builds
+      - uses: pytorch/test-infra/.github/actions/setup-binary-builds@main
         env:
           PLATFORM: ${{ inputs.architecture == 'aarch64'  && 'linux-aarch64' || ''}}
         with:
@@ -311,7 +317,7 @@ jobs:
           ${CONDA_RUN} ${PIP_INSTALL_TORCH} ${{ inputs.pip-install-torch-extra-args }}
       - name: Run Pre-Script with Caching
         if: ${{ inputs.pre-script != '' }}
-        uses: ./test-infra/.github/actions/run-script-with-cache
+        uses: pytorch/test-infra/.github/actions/run-script-with-cache@main
         with:
           cache-path: ${{ inputs.cache-path }}
           cache-key: ${{ inputs.cache-key }}
@@ -494,7 +500,7 @@ jobs:
           done
       - name: Run Post-Script
         if: ${{ inputs.post-script != '' }}
-        uses: ./test-infra/.github/actions/run-script-with-cache
+        uses: pytorch/test-infra/.github/actions/run-script-with-cache@main
         with:
           repository: ${{ inputs.repository  }}
           script: ${{ inputs.post-script }}
