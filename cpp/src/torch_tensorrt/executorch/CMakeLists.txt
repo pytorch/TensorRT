@@ -274,16 +274,34 @@ if(TORCHTRT_BUILD_EDGE_LLM_EXECUTORCH_BACKEND)
         endif()
     endforeach()
 
+    get_filename_component(_edgellm_build_dir "${EDGELLM_EXECUTORCH_LIBRARY}" DIRECTORY)
+    set(_edgellm_core_library "${_edgellm_build_dir}/cpp/libedgellmCore.a")
+    if(NOT EXISTS "${_edgellm_core_library}")
+        message(FATAL_ERROR
+            "Vendored adapters require ${_edgellm_core_library}; "
+            "EDGELLM_EXECUTORCH_LIBRARY must come from a full Edge-LLM build")
+    endif()
+
     add_library(edgellm_executorch SHARED IMPORTED)
     set_target_properties(edgellm_executorch PROPERTIES IMPORTED_LOCATION "${EDGELLM_EXECUTORCH_LIBRARY}")
+    add_library(edgellm_core STATIC IMPORTED)
+    set_target_properties(edgellm_core PROPERTIES IMPORTED_LOCATION "${_edgellm_core_library}")
 
     add_library(executorch_edge_llm_backend STATIC
         "${CMAKE_CURRENT_LIST_DIR}/EdgeLLMBackend.cpp"
+        # Temporary local adapter copies for the ExecuTorch demo. The imported
+        # Edge-LLM library still supplies VitRunner and common runtime symbols.
+        "${CMAKE_CURRENT_LIST_DIR}/edge_llm/actionExecutorchAdapter.cpp"
+        "${CMAKE_CURRENT_LIST_DIR}/edge_llm/languageExecutorchAdapter.cpp"
+        "${CMAKE_CURRENT_LIST_DIR}/edge_llm/vitExecutorchAdapter.cpp"
     )
     target_include_directories(executorch_edge_llm_backend
         PUBLIC
             "${CMAKE_CURRENT_LIST_DIR}/../../../include"
+            "${CMAKE_CURRENT_LIST_DIR}"
             "${EDGELLM_INCLUDE_DIR}"
+        PRIVATE
+            "${EDGELLM_INCLUDE_DIR}/../3rdParty/nlohmannJson/single_include"
     )
     target_compile_definitions(executorch_edge_llm_backend
         PUBLIC
@@ -292,6 +310,7 @@ if(TORCHTRT_BUILD_EDGE_LLM_EXECUTORCH_BACKEND)
     target_link_libraries(executorch_edge_llm_backend
         PUBLIC
             executorch_trt_backend
+            edgellm_core
             edgellm_executorch
             ${_torchtrt_executorch_link_libraries}
             ${CMAKE_DL_LIBS}
@@ -302,11 +321,15 @@ if(TORCHTRT_BUILD_EDGE_LLM_EXECUTORCH_BACKEND)
     add_dependencies(torchtrt_edge_llm_executorch_backend executorch_edge_llm_backend)
     if(MSVC)
         target_link_libraries(torchtrt_edge_llm_executorch_backend
-            INTERFACE executorch_edge_llm_backend edgellm_executorch)
+            INTERFACE
+                executorch_edge_llm_backend
+                edgellm_core
+                edgellm_executorch)
     else()
         target_link_libraries(torchtrt_edge_llm_executorch_backend
             INTERFACE
                 "-Wl,--whole-archive,$<TARGET_FILE:executorch_edge_llm_backend>,--no-whole-archive"
+                edgellm_core
                 edgellm_executorch
         )
     endif()

@@ -196,6 +196,11 @@ class Pi05Spec(EdgeSpec):  # type: ignore[misc]
             tower_out = paligemma.vision_tower(px)
             hidden = getattr(tower_out, "last_hidden_state", tower_out)
             visual_embeds = paligemma.multi_modal_projector(hidden)
+            if visual_embeds.ndim == 3:
+                visual_embeds = visual_embeds.reshape(
+                    -1,
+                    visual_embeds.shape[-1],
+                )
             lm_dtype = next(language.parameters()).dtype
             prefix_embs = sample["prefix_embs"].to(dtype=lm_dtype)
             lm = language(
