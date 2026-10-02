@@ -5,6 +5,8 @@ import logging
 from typing import Any, Set
 
 import torch
+
+from packaging import version
 from torch_tensorrt._utils import sanitized_torch_version
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.constant_fold_exclusions import (
@@ -13,8 +15,6 @@ from torch_tensorrt.dynamo.lowering.constant_fold_exclusions import (
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     clean_up_graph_after_modifications,
 )
-
-from packaging import version
 
 # Modify import location of utilities based on Torch version
 if version.parse(sanitized_torch_version()) < version.parse("2.1.1"):
@@ -167,9 +167,25 @@ class _TorchTensorRTConstantFolder(ConstantFolder):  # type: ignore[misc]
         except Exception:
             pass
 
+    def run_node(self, node: torch.fx.Node) -> Any:
+        from torch_tensorrt.dynamo.regions import is_torch_region_node
+
+        # Upstream checks is_impure only after evaluating Tensor-valued nodes.
+        # Region children can return tuples: propagating that concrete tuple
+        # would let getitem fold its outputs and dead-code elimination erase the
+        # entire region. Stop before execution, for every output structure.
+        if is_torch_region_node(self.module, node):
+            return self.unknown_value
+        return super().run_node(node)
+
     # TODO: Update this function when quantization is added
     def is_impure(self, node: torch.fx.node.Node) -> bool:
+        from torch_tensorrt.dynamo.regions import is_torch_region_node
 
+        # Placement is an explicit semantic requirement, not an optional folding
+        # exclusion. In particular, constant-input regions must still execute in Torch.
+        if is_torch_region_node(self.module, node):
+            return True
         if node.target in self.quantization_ops:
             return True
         # The meta value holds the IDs of the rules that marked this node; it is

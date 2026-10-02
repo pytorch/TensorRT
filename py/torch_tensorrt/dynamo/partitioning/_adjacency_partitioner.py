@@ -15,6 +15,7 @@ from torch.fx.passes.splitter_base import (
     _SplitterSettingBase,
 )
 from torch.fx.passes.tools_common import CALLABLE_NODE_OPS, NodeSet
+
 from torch_tensorrt.dynamo._defaults import (
     MIN_BLOCK_SIZE,
     REQUIRE_FULL_COMPILATION,
@@ -61,7 +62,16 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
     def is_node_supported(
         self, submodules: Dict[str, torch.nn.Module], node: torch.fx.Node
     ) -> bool:
+        from torch_tensorrt.dynamo.regions import is_torch_region_node
+
         node_name = ConverterRegistry.qualified_name_or_str(node.target)
+
+        if is_torch_region_node(submodules, node):
+            self.unsupported_operators[node_name] = (
+                self.unsupported_operators.get(node_name, 0) + 1
+            )
+            self._record_fallback(node, node_name, "explicit execute_in_torch region")
+            return False
 
         settings = CONVERTERS.compilation_settings
         if (
@@ -231,6 +241,14 @@ class TRTPartitioner(_SplitterBase):  # type: ignore
         )
         self.operator_support = operator_support
         self.assume_full_support = assume_full_support
+
+        if self.assume_full_support:
+            from torch_tensorrt.dynamo.regions import is_torch_region_node
+
+            if any(is_torch_region_node(module, node) for node in module.graph.nodes):
+                raise ValueError(
+                    "assume_full_support cannot bypass an execute_in_torch region"
+                )
 
         if self.assume_full_support:
             # The caller already walked the graph and verified converter support.

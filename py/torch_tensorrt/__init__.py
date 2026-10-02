@@ -9,12 +9,12 @@ import sys
 from typing import Dict, List
 
 import torch
+
+from packaging import version
 from torch_tensorrt._version import (  # noqa: F401
     __cuda_version__,
     __version__,
 )
-
-from packaging import version
 
 if sys.version_info < (3,):
     raise Exception(
@@ -99,14 +99,14 @@ if ENABLED_FEATURES.fx_frontend:
     from torch_tensorrt import fx
 
 if ENABLED_FEATURES.dynamo_frontend:
+    from torch_tensorrt import dynamo, region  # noqa: F401
     from torch_tensorrt.dynamo import backend  # noqa: F401
-    from torch_tensorrt import dynamo  # noqa: F401
 
 if ENABLED_FEATURES.qdp_plugin:
     from torch_tensorrt import kernels  # noqa: F401
 
-from torch_tensorrt._compile import *  # noqa: F403
 from torch_tensorrt import distributed  # noqa: F401
+from torch_tensorrt._compile import *  # noqa: F403
 from torch_tensorrt.dynamo.runtime._MutableTorchTensorRTModule import (
     MutableTorchTensorRTModule,
 )
