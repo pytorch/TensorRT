@@ -186,7 +186,7 @@ def test_main_rejects_unsupported_channels(monkeypatch, channel):
     assert error.value.code == 2
 
 
-@pytest.mark.parametrize("channel", ["cu130", "cu132", "cu134"])
+@pytest.mark.parametrize("channel", ["cu132", "cu134"])
 @pytest.mark.unit
 def test_main_uses_selected_channel(monkeypatch, channel):
     calls = []

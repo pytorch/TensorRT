@@ -16,9 +16,11 @@ disabled_cuda_versions: List[str] = []
 # jetpack 6.2 only officially supports python 3.10 and cu126
 jetpack_python_versions: List[str] = ["3.10"]
 jetpack_cuda_versions: List[str] = ["cu126"]
-# CUDA 13 wheels are supported on x86_64 and Arm, including Windows Arm/AArch64.
-x86_cuda_versions: List[str] = ["cu130", "cu132", "cu134"]
-arm_cuda_versions: List[str] = ["cu130", "cu132", "cu134"]
+# CUDA 13 wheels are supported on x86_64 and Arm, including Windows Arm/AArch64. PyTorch has
+# stopped publishing cu130 nightlies, and the delegate's ExecuTorch dependency follows PyTorch,
+# so cu130 is dropped here to keep this matrix aligned with what PyTorch actually ships.
+x86_cuda_versions: List[str] = ["cu132", "cu134"]
+arm_cuda_versions: List[str] = ["cu132", "cu134"]
 
 # For PRs we build/test a single representative config to keep cycle time short.
 # Full matrix runs on main / nightly / release branches.
