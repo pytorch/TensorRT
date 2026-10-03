@@ -22,15 +22,19 @@
 #
 set(_TensorRT_SEARCHES)
 
+if(NOT TensorRT_ROOT AND DEFINED ENV{TORCHTRT_TENSORRT_ROOT})
+  set(TensorRT_ROOT "$ENV{TORCHTRT_TENSORRT_ROOT}")
+endif()
+
 if(TensorRT_ROOT)
-  set(_TensorRT_SEARCH_ROOT PATHS ${TensorRT_ROOT} NO_DEFAULT_PATH)
+  set(_TensorRT_SEARCH_ROOT PATHS "${TensorRT_ROOT}" NO_DEFAULT_PATH)
   list(APPEND _TensorRT_SEARCHES _TensorRT_SEARCH_ROOT)
 endif()
 
-# appends some common paths
-set(_TensorRT_SEARCH_NORMAL
-  PATHS "/usr"
-)
+# An empty option set makes find_path/find_library use CMake's standard system
+# prefixes. Callers can add non-system installations through TensorRT_ROOT or
+# the shared TORCHTRT_TENSORRT_ROOT environment variable above.
+set(_TensorRT_SEARCH_NORMAL)
 list(APPEND _TensorRT_SEARCHES _TensorRT_SEARCH_NORMAL)
 
 if(WIN32)
@@ -41,34 +45,88 @@ else()
   set(_TensorRT_NVINFER_PLUGIN_NAMES nvinfer_plugin)
 endif()
 
+# Debian-style installations, including DRIVE OS, place development files in
+# architecture-qualified directories such as include/aarch64-linux-gnu and
+# lib/aarch64-linux-gnu. Preserve the flat TensorRT tarball layout while also
+# searching the active compiler's multiarch tuple.
+set(_TensorRT_INCLUDE_PATH_SUFFIXES include)
+set(_TensorRT_LIBRARY_PATH_SUFFIXES lib lib64)
+if(CMAKE_LIBRARY_ARCHITECTURE)
+  list(APPEND _TensorRT_INCLUDE_PATH_SUFFIXES
+    "include/${CMAKE_LIBRARY_ARCHITECTURE}"
+  )
+  list(APPEND _TensorRT_LIBRARY_PATH_SUFFIXES
+    "lib/${CMAKE_LIBRARY_ARCHITECTURE}"
+  )
+endif()
+
 # Include dir
 foreach(search ${_TensorRT_SEARCHES})
-  find_path(TensorRT_INCLUDE_DIR NAMES NvInfer.h ${${search}} PATH_SUFFIXES include)
+  find_path(TensorRT_INCLUDE_DIR
+    NAMES NvInfer.h
+    ${${search}}
+    PATH_SUFFIXES ${_TensorRT_INCLUDE_PATH_SUFFIXES}
+  )
 endforeach()
 
 if(NOT TensorRT_LIBRARY)
   foreach(search ${_TensorRT_SEARCHES})
-    find_library(TensorRT_LIBRARY NAMES ${_TensorRT_NVINFER_NAMES} ${${search}} PATH_SUFFIXES lib)
+    find_library(TensorRT_LIBRARY
+      NAMES ${_TensorRT_NVINFER_NAMES}
+      ${${search}}
+      PATH_SUFFIXES ${_TensorRT_LIBRARY_PATH_SUFFIXES}
+    )
   endforeach()
 endif()
 
 if(NOT TensorRT_nvinfer_plugin_LIBRARY)
   foreach(search ${_TensorRT_SEARCHES})
-    find_library(TensorRT_nvinfer_plugin_LIBRARY NAMES ${_TensorRT_NVINFER_PLUGIN_NAMES} ${${search}} PATH_SUFFIXES lib)
+    find_library(TensorRT_nvinfer_plugin_LIBRARY
+      NAMES ${_TensorRT_NVINFER_PLUGIN_NAMES}
+      ${${search}}
+      PATH_SUFFIXES ${_TensorRT_LIBRARY_PATH_SUFFIXES}
+    )
   endforeach()
 endif()
 
 mark_as_advanced(TensorRT_INCLUDE_DIR)
 
-if(TensorRT_INCLUDE_DIR AND EXISTS "${TensorRT_INCLUDE_DIR}/NvInfer.h")
-  file(STRINGS "${TensorRT_INCLUDE_DIR}/NvInfer.h" TensorRT_MAJOR REGEX "^#define NV_TENSORRT_MAJOR [0-9]+.*$")
-  file(STRINGS "${TensorRT_INCLUDE_DIR}/NvInfer.h" TensorRT_MINOR REGEX "^#define NV_TENSORRT_MINOR [0-9]+.*$")
-  file(STRINGS "${TensorRT_INCLUDE_DIR}/NvInfer.h" TensorRT_PATCH REGEX "^#define NV_TENSORRT_PATCH [0-9]+.*$")
+if(TensorRT_INCLUDE_DIR)
+  # TensorRT publishes its version macros in NvInferVersion.h. Older SDKs may
+  # expose them directly from NvInfer.h, so retain that file as a fallback.
+  set(_TensorRT_VERSION_HEADER "${TensorRT_INCLUDE_DIR}/NvInferVersion.h")
+  if(NOT EXISTS "${_TensorRT_VERSION_HEADER}")
+    set(_TensorRT_VERSION_HEADER "${TensorRT_INCLUDE_DIR}/NvInfer.h")
+  endif()
 
-  string(REGEX REPLACE "^#define NV_TENSORRT_MAJOR ([0-9]+).*$" "\\1" TensorRT_VERSION_MAJOR "${TensorRT_MAJOR}")
-  string(REGEX REPLACE "^#define NV_TENSORRT_MINOR ([0-9]+).*$" "\\1" TensorRT_VERSION_MINOR "${TensorRT_MINOR}")
-  string(REGEX REPLACE "^#define NV_TENSORRT_PATCH ([0-9]+).*$" "\\1" TensorRT_VERSION_PATCH "${TensorRT_PATCH}")
-  set(TensorRT_VERSION_STRING "${TensorRT_VERSION_MAJOR}.${TensorRT_VERSION_MINOR}.${TensorRT_VERSION_PATCH}")
+  if(EXISTS "${_TensorRT_VERSION_HEADER}")
+    foreach(component MAJOR MINOR PATCH)
+      # Some SDKs use a numeric NV_TENSORRT_* definition. DRIVE and recent
+      # enterprise headers instead alias NV_TENSORRT_* to a numeric
+      # TRT_*_ENTERPRISE definition in the same file.
+      file(STRINGS "${_TensorRT_VERSION_HEADER}" _TensorRT_VERSION_LINE
+        REGEX "^#define[ \t]+NV_TENSORRT_${component}[ \t]+[0-9]+.*$"
+      )
+      if(NOT _TensorRT_VERSION_LINE)
+        file(STRINGS "${_TensorRT_VERSION_HEADER}" _TensorRT_VERSION_LINE
+          REGEX "^#define[ \t]+TRT_${component}_ENTERPRISE[ \t]+[0-9]+.*$"
+        )
+      endif()
+
+      if(_TensorRT_VERSION_LINE)
+        string(REGEX MATCH "[0-9]+" TensorRT_VERSION_${component} "${_TensorRT_VERSION_LINE}")
+      endif()
+      unset(_TensorRT_VERSION_LINE)
+    endforeach()
+
+    if(DEFINED TensorRT_VERSION_MAJOR
+       AND DEFINED TensorRT_VERSION_MINOR
+       AND DEFINED TensorRT_VERSION_PATCH)
+      set(TensorRT_VERSION_STRING
+        "${TensorRT_VERSION_MAJOR}.${TensorRT_VERSION_MINOR}.${TensorRT_VERSION_PATCH}"
+      )
+    endif()
+  endif()
 endif()
 
 include(FindPackageHandleStandardArgs)
