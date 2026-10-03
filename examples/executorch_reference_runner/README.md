@@ -102,7 +102,7 @@ same channel:
 
 ```bash
 pip install --pre "torch-tensorrt[executorch]" \
-  --extra-index-url https://download.pytorch.org/whl/nightly/cu130 \
+  --extra-index-url https://download.pytorch.org/whl/nightly/cu132 \
   --extra-index-url https://pypi.nvidia.com
 ```
 

@@ -173,7 +173,7 @@ and the resulting Torch-TensorRT wheel target CPython 3.13.
       python -m pip install numpy packaging pyyaml setuptools==72.1.0 wheel fmt build
 
       # only for run the setup.py, not use this torch wheelto build windows on arm
-      python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu130
+      python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu132
       
       # cross-build the ARM64 TensorRT-RTX wheel
       python setup.py bdist_wheel --use-rtx --windows-on-arm

@@ -19,11 +19,11 @@ jobs:
         if: ${{ ! contains(github.actor, 'pytorchbot') }}
         environment: pytorchbot-env
         container:
-            image: docker.io/pytorch/manylinux2_28-builder:cuda13.0
+            image: docker.io/pytorch/manylinux2_28-builder:cuda13.2
         env:
-            CUDA_HOME: /usr/local/cuda-13.0
-            VERSION_SUFFIX: cu130
-            CU_VERSION: cu130
+            CUDA_HOME: /usr/local/cuda-13.2
+            VERSION_SUFFIX: cu132
+            CU_VERSION: cu132
             CHANNEL: nightly
             CI_BUILD: 1
         steps:
@@ -39,7 +39,7 @@ jobs:
             - name: Install base deps
               run: |
                   python3 -m pip install pip --upgrade
-                  python3 -m pip install pyyaml numpy torch --pre --extra-index-url https://download.pytorch.org/whl/nightly/cu130
+                  python3 -m pip install pyyaml numpy torch --pre --extra-index-url https://download.pytorch.org/whl/nightly/cu132
                   ./packaging/pre_build_script.sh
             - name: Get HEAD SHA
               id: vars
@@ -49,7 +49,7 @@ jobs:
                   # Use the source-paired wheel, not a newer member of the authoring range.
                   python3 -m pip install ".[executorch]" \
                     "executorch==$(python3 -c 'import yaml;print(yaml.safe_load(open("dev_dep_versions.yml"))["__executorch_version__"])')" \
-                    --extra-index-url https://download.pytorch.org/whl/nightly/cu130
+                    --extra-index-url https://download.pytorch.org/whl/nightly/cu132
             - name: Install uv
               run: |
                   curl -LsSf https://astral.sh/uv/install.sh | sh

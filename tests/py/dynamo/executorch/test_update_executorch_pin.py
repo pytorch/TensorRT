@@ -175,7 +175,7 @@ def test_upper_bound(version, expected):
     assert updater._upper_bound(version) == expected
 
 
-@pytest.mark.parametrize("channel", ["cu126", "cu128", "cu14", "cpu", "cu13"])
+@pytest.mark.parametrize("channel", ["cu126", "cu128", "cu130", "cu14", "cpu", "cu13"])
 @pytest.mark.unit
 def test_main_rejects_unsupported_channels(monkeypatch, channel):
     monkeypatch.setattr(
@@ -186,7 +186,7 @@ def test_main_rejects_unsupported_channels(monkeypatch, channel):
     assert error.value.code == 2
 
 
-@pytest.mark.parametrize("channel", ["cu130", "cu132", "cu134"])
+@pytest.mark.parametrize("channel", ["cu132", "cu134"])
 @pytest.mark.unit
 def test_main_uses_selected_channel(monkeypatch, channel):
     calls = []
@@ -236,8 +236,8 @@ def test_main_refuses_a_version_missing_from_an_accepted_channel(monkeypatch):
 def test_main_adopts_a_version_present_in_every_channel_despite_its_label(monkeypatch):
     """The channels label the same build differently, so comparison must ignore the label.
 
-    This is the case the index actually produces: one version, three spellings. Comparing the
-    raw strings finds no overlap at all and rejects every candidate.
+    This is the case the index actually produces: one version, one spelling per channel. Comparing
+    the raw strings finds no overlap at all and rejects every candidate.
     """
     accepted = updater.delegate_channels()
     per_channel = {ch: [f"1.0.dev1+{ch}", f"1.0.dev2+{ch}"] for ch in accepted}
