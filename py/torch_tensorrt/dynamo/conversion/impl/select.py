@@ -551,8 +551,7 @@ def scatter(
     input_shape = input.shape
     index_shape = index.shape
     index_shape_list = list(index_shape)
-    if index.dtype == trt.int64:
-        index = cast_trt_tensor(ctx, index, trt.int32, name + "_cast_index_tensor")
+    # TensorRT Scatter supports both INT32 and INT64 indices.
     dim = get_positive_dim(dim, len(input_shape))
     src_tensor = src
     # scatter.value - need to create a tensor filled with the scalar value
@@ -608,7 +607,9 @@ def gather(
 ) -> ITensor:
     input_shape = input.shape
     dim = get_positive_dim(dim, len(input_shape))
-    index = cast_trt_tensor(ctx, index, trt.int32, name + "_cast_index_tensor")
+    # Note: TensorRT's Gather layer supports both int32 and int64 indices
+    # https://docs.nvidia.com/deeplearning/tensorrt/latest/_static/c-api/classnvinfer1_1_1_i_gather_layer.html
+    index = get_trt_tensor(ctx, index, name + "_index_tensor")
     gather_layer = ctx.net.add_gather(input, index, axis=dim)
     gather_layer.mode = trt.GatherMode.ELEMENT
     set_layer_name(gather_layer, target, name + "_gather_layer_element", source_ir)
@@ -1152,7 +1153,6 @@ def index_put_converter(
             input_tensor.dtype,
             f"{name}_values_cast",
         )
-    indices_cat = cast_trt_tensor(ctx, indices_cat, trt.int32, f"{name}_idx_int32")
     scatter_layer = ctx.net.add_scatter(
         input_tensor,
         indices_cat,

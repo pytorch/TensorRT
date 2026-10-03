@@ -246,6 +246,39 @@ def test_preprocess_copy_shares_tensors_and_copies_the_graph():
 
 
 @pytest.mark.unit
+def test_preprocess_hands_the_engine_to_the_blob_without_copying_it(monkeypatch):
+    # The blob concatenation is the one copy of the engine preprocess needs. Turning
+    # the engine tensor into bytes first would hold one more copy at the same time,
+    # and an engine can be several gigabytes.
+    import numpy as np
+
+    from torch_tensorrt.executorch import backend as backend_module
+
+    engine_tensor = _engine_tensor(b"engine-bytes")
+    engine_info = [""] * SERIALIZATION_LEN
+    engine_info[ENGINE_IDX] = engine_tensor
+    engine_info[DEVICE_IDX] = "0%8%0%0%GPU"
+    engine_info[INPUT_BINDING_NAMES_IDX] = "x"
+    engine_info[OUTPUT_BINDING_NAMES_IDX] = "y"
+    edge_program = _build_edge_program(engine_info)
+
+    received = []
+    real_serialize_engine = backend_module.serialize_engine
+
+    def recording_serialize_engine(engine_bytes, metadata):
+        received.append(engine_bytes)
+        return real_serialize_engine(engine_bytes, metadata)
+
+    monkeypatch.setattr(backend_module, "serialize_engine", recording_serialize_engine)
+    result = TensorRTBackend.preprocess(edge_program, [])
+
+    assert len(received) == 1
+    assert np.shares_memory(np.asarray(received[0]), engine_tensor.numpy())
+    engine, _ = deserialize_engine(result.processed_bytes)
+    assert engine == b"engine-bytes"
+
+
+@pytest.mark.unit
 def test_preprocess_single_input_is_identity():
     # Single-input engines have zero ordering ambiguity: the one binding maps to
     # the one placeholder regardless of name (TRT name may be semantic, the

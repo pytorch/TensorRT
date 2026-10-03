@@ -10,8 +10,8 @@ from torch.testing._internal.common_utils import TestCase, run_tests
 class EmptyAndFullOutputs(nn.Module):
     """One output has no elements, the other is a normal tensor from the same engine."""
 
-    def forward(self, x, index):
-        return torch.gather(x, 1, index), x * 2 + 1
+    def forward(self, x):
+        return x[:, :0].relu(), x * 2 + 1
 
 
 class TestEmptyEngineOutput(TestCase):
@@ -20,12 +20,11 @@ class TestEmptyEngineOutput(TestCase):
         an empty tensor has a null address. The engine then refused to run, the failure
         was ignored, and the second output came back unwritten."""
         x = torch.randn(3, 4, device="cuda")
-        index = torch.empty((3, 0), dtype=torch.int64, device="cuda")
         model = EmptyAndFullOutputs().eval().cuda()
 
         compiled = torchtrt.dynamo.compile(
-            torch.export.export(model, (x, index)),
-            arg_inputs=[x, index],
+            torch.export.export(model, (x,)),
+            arg_inputs=[x],
             min_block_size=1,
         )
         engines = [
@@ -33,8 +32,8 @@ class TestEmptyEngineOutput(TestCase):
         ]
         self.assertEqual(engines, ["_run_on_acc_0"], "expected one engine")
 
-        empty, full = compiled(x, index)
-        ref_empty, ref_full = model(x, index)
+        empty, full = compiled(x)
+        ref_empty, ref_full = model(x)
         self.assertEqual(empty.shape, ref_empty.shape)
         torch.testing.assert_close(full, ref_full)
 

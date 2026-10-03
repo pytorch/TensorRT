@@ -530,12 +530,12 @@ class TensorRTBackend(BackendDetails):  # type: ignore[misc]
             # the storage element by element in Python, costing about two seconds
             # per megabyte, and it returns the whole backing allocation rather than
             # the tensor's own extent, so a view of a larger buffer serializes too
-            # many bytes. `memoryview` is not redundant here: on a 0-dim uint8
-            # tensor numpy alone goes through `__index__` and yields that many zero
-            # bytes instead of the value. `.view(torch.uint8)` keeps `.numpy()` from
+            # many bytes. A view and not a bytes copy, because serialize_engine
+            # already copies the engine into the blob once, and an engine can be
+            # several gigabytes. `.view(torch.uint8)` keeps `.numpy()` from
             # rejecting a dtype it has no equivalent for.
             engine_bytes = serialized_engine.cpu().contiguous().view(torch.uint8)
-            engine_info[ENGINE_IDX] = bytes(memoryview(engine_bytes.numpy()))
+            engine_info[ENGINE_IDX] = memoryview(engine_bytes.numpy())
         elif not isinstance(serialized_engine, (bytes, bytearray)):
             engine_info[ENGINE_IDX] = bytes(serialized_engine)
         input_names = _reorder_input_names_for_executorch(
@@ -588,5 +588,5 @@ class TensorRTBackend(BackendDetails):  # type: ignore[misc]
             serialized_metadata=_get_str(engine_info, SERIALIZED_METADATA_IDX),
             target_platform=_get_str(engine_info, TARGET_PLATFORM_IDX),
         )
-        blob = serialize_engine(bytes(engine_info[ENGINE_IDX]), metadata)
+        blob = serialize_engine(engine_info[ENGINE_IDX], metadata)
         return PreprocessResult(processed_bytes=blob)

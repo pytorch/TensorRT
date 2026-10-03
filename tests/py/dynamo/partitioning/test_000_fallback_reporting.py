@@ -155,6 +155,8 @@ class TestFallbackIsReported(TestCase):
         self.assertEqual(len(messages), 1)
         self.assertIn("torch.ops.aten.relu.default + Operator Count: 6", messages[0])
         self.assertIn("excluded by torch_executed_ops", messages[0])
+        # Six calls of one operator are six operators, not one name.
+        self.assertTrue(messages[0].startswith("6 operator(s)"), messages[0])
 
     def test_global_partitioner_reports_too(self):
         """The global partitioner is the automatic fallback when the fast one raises, so a
