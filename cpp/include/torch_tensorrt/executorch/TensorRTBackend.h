@@ -50,7 +50,10 @@ struct InputProfileBounds {
 };
 
 struct EngineHandle {
-  TRTUniquePtr<nvinfer1::ICudaEngine> engine;
+  // Shared with every other handle loaded with kSharedEnginesKey on from the same engine bytes, for
+  // the same device and weight streaming request, so the weights are on the device once. The context
+  // and everything below it stay this handle's own.
+  std::shared_ptr<nvinfer1::ICudaEngine> engine;
   TRTUniquePtr<nvinfer1::IExecutionContext> exec_ctx;
   std::vector<std::string> input_binding_names;
   std::vector<std::string> output_binding_names;
@@ -85,7 +88,7 @@ struct EngineHandle {
   // only by faulting pages in one at a time, so it takes the staged-copy path instead.
   bool pageable_host_access = false;
   // Whether exec_ctx was created kUSER_MANAGED, because
-  // kSharedActivationScratchKey was on at this engine's load. Such a context takes
+  // kSharedActivationScratchKey was on at this handle's load. Such a context takes
   // its activation scratch from the shared per-device pool on every call, unless
   // claims_pooled_scratch below is false, in which case the engine needs none and
   // never claims from the pool at all.
@@ -111,9 +114,19 @@ struct EngineHandle {
 // default false. Read by TensorRTBackend::set_option below, and delivered as
 //   executorch::runtime::set_option("TensorRTBackend", options.view())
 // A context's allocation strategy is fixed when the context is created, so a
-// later call governs only the engines loaded after it, and a pooled context and
+// later call governs only the methods loaded after it, and a pooled context and
 // a private-scratch one coexist in one process.
 inline constexpr char kSharedActivationScratchKey[] = "use_shared_activation_scratch";
+
+// Load-time backend option that shares one deserialized engine when the engine bytes have the same
+// std::hash and size, for the same device and weight streaming request. The bytes are not compared,
+// and the hash is not collision resistant: every program in the process must be trusted.
+// Boolean, default true. It is a property of one load: init reads it from that load's runtime
+// specs, passed to Module::load in a LoadBackendOptionsMap like the weight streaming budget, and a
+// load with it false neither uses nor publishes a shared engine. Each handle still creates its own
+// execution context, so handles of a shared engine can run at the same time, unless both were loaded
+// with kSharedActivationScratchKey on and the engine needs activation scratch.
+inline constexpr char kSharedEnginesKey[] = "use_shared_engines";
 
 class TensorRTBackend final : public ::executorch::runtime::BackendInterface {
  public:
@@ -160,12 +173,16 @@ class TensorRTBackend final : public ::executorch::runtime::BackendInterface {
 
   // Applies the runtime backend options a caller passes to
   // executorch::runtime::set_option("TensorRTBackend", ...). The only key read is
-  // kSharedActivationScratchKey, a boolean.
+  // kSharedActivationScratchKey, a boolean. kSharedEnginesKey is load-only and is rejected here.
   ::executorch::runtime::Error set_option(
       ET_UNUSED ::executorch::runtime::BackendOptionContext& context,
       const ::executorch::runtime::Span<::executorch::runtime::BackendOption>& backend_options) override;
 
   void destroy(::executorch::runtime::DelegateHandle* handle) const override;
+
+ private:
+  static nvinfer1::IRuntime* shared_runtime();
+  friend nvinfer1::IRuntime* shared_runtime_for_testing();
 };
 
 } // namespace executorch_backend

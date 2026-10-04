@@ -315,6 +315,73 @@ requirements, which previously lived on the removed `CudaStreamGuard`:
   context is only exercised where the device has the SMs for one.
 
 
+## Shared engines
+
+Loading the same program twice in one process, for example once per robot arm, used to
+deserialize its TensorRT engine twice, so its weights sat in device memory twice. Now handles
+loaded from the same engine bytes, for the same device and the same weight streaming request,
+share one engine. Each handle still creates its own execution context, I/O buffers and lock. From
+C++, two handles of one engine can run at the same time on two threads, unless both handles
+were loaded with shared activation scratch enabled and the engine needs scratch. Those two
+handles then take turns, like all pooled calls on one device. From Python
+they take turns anyway, because ExecuTorch's Python `execute` holds the interpreter lock for the
+whole call.
+
+A second load still allocates its own context and buffers. In measurements on an 8 GB Jetson
+Orin Nano, loading one robot policy twice increased CUDA-reported memory usage by 806 MiB for
+the second load without sharing, compared with 122 MiB with sharing. Loading two methods that
+carry the same engine in one program gave 742 MiB versus 120 MiB. These are whole-load changes in the board's shared
+memory, not separate engine and context allocations. Serialized plan size is a different measure.
+Inference speed was unchanged in those runs. To find a match, every load with sharing on hashes
+the engine bytes, even a load that ends up sharing nothing. That takes about 0.15 s per GB of
+engine on a Jetson AGX Thor and about 0.25 s per GB on the Orin Nano.
+
+- The weight streaming budget belongs to the engine, and TensorRT refuses to change it once a
+  context exists. Sharing uses the requested budget, not the value after TensorRT clamps or
+  ignores it. A different request gets its own engine. With no budget requested, the automatic
+  budget from the load that publishes first is kept. Racing loads can size that budget while
+  another copy occupies device memory. Pass an explicit budget for a predictable value.
+- A match is found by hashing the engine bytes, because the bytes are freed after loading and
+  keeping a copy to compare would cost the memory being saved. The hash is not collision
+  resistant, so this relies on every program in the process being trusted input, as the
+  section on corrupted engines above already asks.
+- The engine is freed when the last handle that uses it is destroyed.
+
+Set the `use_shared_engines` load option (a boolean, true by default) to false to keep one
+module's engines private. Pass it through `Module::load`, like `weight_streaming_budget`.
+It changes nothing for other modules loading at the same time. Private loads neither look up
+nor publish an engine, and do not hash the bytes. A value of the wrong type is rejected with
+`Error::InvalidArgument`. Passing this load-only key to `executorch::runtime::set_option`
+also returns `Error::InvalidArgument`; pass it to `Module::load` instead.
+
+The ExecuTorch Python bindings do not expose load options, so every Python load hashes the
+engine bytes and uses sharing. The C++ example below sets options before any method is loaded:
+
+```cpp
+#include <executorch/extension/module/module.h>
+
+using namespace executorch::extension;
+using namespace executorch::runtime;
+
+Error load_with_private_engines(Module& module) {
+  BackendOptions<1> options;
+  const Error stored = options.set_option("use_shared_engines", false);
+  if (stored != Error::Ok) {
+    return stored;
+  }
+  LoadBackendOptionsMap by_backend;
+  const Error mapped = by_backend.set_options("TensorRTBackend", options.view());
+  if (mapped != Error::Ok) {
+    return mapped;
+  }
+  return module.load(by_backend);
+}
+```
+
+Turn it off when two loads of one program must not share an engine, for example to compare
+their memory, or when the loads run under different CUDA driver contexts on one device, which
+sharing does not tell apart.
+
 ## Shared activation scratch
 
 A TensorRT execution context allocates its own activation scratch and holds it
@@ -350,10 +417,10 @@ binary that has not linked the backend archive gets. Nothing forces the check: t
 free `executorch::runtime::set_option` is not `ET_NODISCARD`, so dropping its
 return compiles.
 
-N per-engine copies collapse to one, so the reclaimed memory is the sum of the N
+N per-context copies collapse to one, so the reclaimed memory is the sum of the N
 requirements less the largest of them. Set the option before loading the methods
-whose engines should use the pool, and read the `use_shared_activation_scratch`
-bullet of the caller-stream contract above: engines sharing a buffer do not run
+whose contexts should use the pool, and read the `use_shared_activation_scratch`
+bullet of the caller-stream contract above: contexts sharing a buffer do not run
 concurrently on the device. The pool never shrinks, so the largest scratch it was
 ever asked for stays allocated until the process exits.
 

@@ -219,6 +219,16 @@ cc_library(
     }),
 )
 
+# Implementation detail of :tensorrt_executorch_backend, under src/ like the pool
+# header above. Its own target so the sharing key can be tested without a GPU.
+cc_library(
+    name = "tensorrt_executorch_shared_engine_key",
+    hdrs = [
+        "src/torch_tensorrt/executorch/SharedEngineKey.h",
+    ],
+    strip_include_prefix = "src",
+)
+
 # The one internal entry point of :tensorrt_executorch_backend that its test calls
 # directly. Under src/ for the same reason as the pool header above: it is an
 # implementation detail of execute(), and an installed header declaring it would
@@ -310,6 +320,22 @@ cc_library(
     }),
 )
 
+# Kept out of release archives and source packages, like the scratch pool hooks.
+cc_library(
+    name = "tensorrt_executorch_shared_engine_test_hooks",
+    testonly = True,
+    srcs = [
+        "src/torch_tensorrt/executorch/SharedEngineTestHooks.cpp",
+    ],
+    hdrs = [
+        "src/torch_tensorrt/executorch/SharedEngineTestHooks.h",
+    ],
+    strip_include_prefix = "src",
+    deps = [
+        ":tensorrt_executorch_backend",
+    ],
+)
+
 cc_library(
     name = "tensorrt_executorch_backend",
     srcs = [
@@ -331,6 +357,7 @@ cc_library(
         ":tensorrt_executorch_binding_names",
         ":tensorrt_executorch_blob_header",
         ":tensorrt_executorch_pooled_scratch_install",
+        ":tensorrt_executorch_shared_engine_key",
         ":tensorrt_executorch_shared_scratch_pool",
         ":tensorrt_executorch_weight_streaming_budget",
     ] + select({
@@ -358,6 +385,7 @@ filegroup(
         "src/torch_tensorrt/executorch/PooledScratchInstall.cpp",
         "src/torch_tensorrt/executorch/PooledScratchInstall.h",
         "src/torch_tensorrt/executorch/README.md",
+        "src/torch_tensorrt/executorch/SharedEngineKey.h",
         "src/torch_tensorrt/executorch/SharedScratchPool.h",
         "src/torch_tensorrt/executorch/TensorRTBackend.cpp",
         "src/torch_tensorrt/executorch/TensorRTBlobHeader.cpp",
