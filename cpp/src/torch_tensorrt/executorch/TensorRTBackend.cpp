@@ -202,6 +202,58 @@ bool infer_binding_names(
 // created. initialize_engine_io below is the one place this is read.
 std::atomic<bool> scratch_enabled{false};
 
+// TensorRT forbids moving the budget while any execution context exists, so this must run before
+// the engine's first context.
+Error apply_weight_streaming_budget(nvinfer1::ICudaEngine& engine, const WsBudget& request, bool is_explicit) {
+  const int64_t streamable = engine.getStreamableWeightsSize();
+  if (streamable > 0) {
+    // getStreamableWeightsSize is > 0 only when the engine was built with
+    // BuilderFlag::kWEIGHT_STREAMING.
+    int64_t budget;
+    if (is_explicit) {
+      // An explicit budget is a non-negative byte count, clamped to the
+      // streamable size (TensorRT also caps it, but clamp for a clear log).
+      budget = request.bytes > streamable ? streamable : request.bytes;
+    } else {
+      budget = engine.getWeightStreamingAutomaticBudget();
+    }
+    if (!engine.setWeightStreamingBudgetV2(budget)) {
+      if (!is_explicit && engine.setWeightStreamingBudgetV2(0)) {
+        // The automatic budget could not be applied; fall back to budget 0, which
+        // streams all weights (minimum resident memory) and always fits.
+        ET_LOG(
+            Info,
+            "TensorRTBackend::init: automatic weight streaming budget failed; falling back to budget 0 (stream all weights)");
+      } else {
+        ET_LOG(
+            Error,
+            "TensorRTBackend::init: setWeightStreamingBudgetV2 failed (requested=%lld%s)",
+            (long long)budget,
+            is_explicit ? "" : ", and fallback to 0 also failed");
+        return Error::InvalidProgram;
+      }
+    }
+    ET_LOG(
+        Info,
+        "TensorRTBackend::init: weight streaming budget=%lld streamable=%lld scratch=%lld",
+        (long long)engine.getWeightStreamingBudgetV2(),
+        (long long)streamable,
+        (long long)engine.getWeightStreamingScratchMemorySize());
+  } else if (is_explicit) {
+    // A budget was requested but the engine has no streamable weights (it was not
+    // built with enable_weight_streaming=True, or nothing is streamable). The
+    // engine is still valid and runs fully resident, so log and continue rather
+    // than fail; failing here would break mixed multi-engine programs where only
+    // some engines were built for streaming. Logged at Error because the caller
+    // asked for a memory setting that will not take effect, and ExecuTorch has no
+    // Warning level.
+    ET_LOG(
+        Error,
+        "TensorRTBackend::init: weight_streaming_budget ignored; engine has no streamable weights (it was not built with enable_weight_streaming=True, or none of its weights are streamable). The engine runs with all weights resident.");
+  }
+  return Error::Ok;
+}
+
 Error initialize_engine_io(EngineHandle& handle) {
   if (handle.input_binding_names.empty() && handle.output_binding_names.empty() &&
       !infer_binding_names(handle.engine.get(), handle.input_binding_names, handle.output_binding_names)) {
@@ -915,54 +967,12 @@ Result<DelegateHandle*> TensorRTBackend::init(
     }
   }
 
-  const int64_t streamable = handle->engine->getStreamableWeightsSize();
-  if (streamable > 0) {
-    // getStreamableWeightsSize is > 0 only when the engine was built with
-    // BuilderFlag::kWEIGHT_STREAMING.
-    int64_t budget;
-    if (is_explicit) {
-      // An explicit budget is a non-negative byte count, clamped to the
-      // streamable size (TensorRT also caps it, but clamp for a clear log).
-      budget = ws_request.bytes > streamable ? streamable : ws_request.bytes;
-    } else {
-      budget = handle->engine->getWeightStreamingAutomaticBudget();
-    }
-    if (!handle->engine->setWeightStreamingBudgetV2(budget)) {
-      if (!is_explicit && handle->engine->setWeightStreamingBudgetV2(0)) {
-        // The automatic budget could not be applied; fall back to budget 0, which
-        // streams all weights (minimum resident memory) and always fits.
-        ET_LOG(
-            Info,
-            "TensorRTBackend::init: automatic weight streaming budget failed; falling back to budget 0 (stream all weights)");
-      } else {
-        ET_LOG(
-            Error,
-            "TensorRTBackend::init: setWeightStreamingBudgetV2 failed (requested=%lld%s)",
-            (long long)budget,
-            is_explicit ? "" : ", and fallback to 0 also failed");
-        return Error::InvalidProgram;
-      }
-    }
-    ET_LOG(
-        Info,
-        "TensorRTBackend::init: weight streaming budget=%lld streamable=%lld scratch=%lld",
-        (long long)handle->engine->getWeightStreamingBudgetV2(),
-        (long long)streamable,
-        (long long)handle->engine->getWeightStreamingScratchMemorySize());
-  } else if (is_explicit) {
-    // A budget was requested but the engine has no streamable weights (it was not
-    // built with enable_weight_streaming=True, or nothing is streamable). The
-    // engine is still valid and runs fully resident, so log and continue rather
-    // than fail; failing here would break mixed multi-engine programs where only
-    // some engines were built for streaming. Logged at Error because the caller
-    // asked for a memory setting that will not take effect, and ExecuTorch has no
-    // Warning level.
-    ET_LOG(
-        Error,
-        "TensorRTBackend::init: weight_streaming_budget ignored; engine has no streamable weights (it was not built with enable_weight_streaming=True, or none of its weights are streamable). The engine runs with all weights resident.");
+  Error err = apply_weight_streaming_budget(*handle->engine, ws_request, is_explicit);
+  if (err != Error::Ok) {
+    return err;
   }
 
-  Error err = initialize_engine_io(*handle);
+  err = initialize_engine_io(*handle);
   if (err != Error::Ok) {
     return err;
   }
