@@ -110,8 +110,24 @@ region provenance. Reloading executes the already partitioned model; it does not
 recreate a user annotation for a new optimization pass.
 
 For compiler development, inspect `compiled.graph` and the internal
-`torch_tensorrt.dynamo.regions.get_region_records(compiled)` manifest. Run the
-focused tests with:
+`torch_tensorrt.dynamo.regions.get_region_records(compiled)` manifest.
+
+Start with [test_execute_in_torch.py](../../../tests/py/dynamo/regions/test_execute_in_torch.py).
+It uses one small model and follows three steps: normal PyTorch execution,
+extracting the region, and building surrounding TensorRT engines. It deliberately
+omits names, shared weights, loops, and multiple outputs.
+
+The more involved cases are preserved in `test_execute_in_torch_regressions.py`.
+Its names such as `"shared"`, `"repeated"`, and `"branches"` are arbitrary
+diagnostic labels describing those examples, not different region policies.
+
+Run the starting example with:
+
+```bash
+python -m pytest -n 0 -q tests/py/dynamo/regions/test_execute_in_torch.py
+```
+
+Run all region tests with:
 
 ```bash
 python -m pytest -n 0 tests/py/dynamo/regions
