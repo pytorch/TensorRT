@@ -163,12 +163,12 @@ cc_library(
     }),
     deps = select({
         ":linux_x86_64": [
-            "@executorch//:executorch_cuda_allocator",
             "@executorch//:executorch_headers",
+            "@executorch//:extension_cuda",
         ],
         ":sbsa": [
-            "@executorch//:executorch_cuda_allocator",
             "@executorch//:executorch_headers",
+            "@executorch//:extension_cuda",
         ],
         "//conditions:default": [],
     }),

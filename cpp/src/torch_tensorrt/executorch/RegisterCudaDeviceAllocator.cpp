@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <executorch/backends/cuda/runtime/cuda_allocator.h>
+#include <executorch/extension/cuda/cuda_allocator.h>
 #include <executorch/runtime/core/device_allocator.h>
 
 namespace {
