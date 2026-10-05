@@ -641,6 +641,7 @@ dynamo_packages = [
     "torch_tensorrt.dynamo.runtime",
     "torch_tensorrt.dynamo.runtime.meta_ops",
     "torch_tensorrt.dynamo.tools",
+    "torch_tensorrt.dynamo.tuning",
     "torch_tensorrt.executorch",
     "torch_tensorrt.runtime",
 ]
@@ -681,6 +682,7 @@ dynamo_package_dir = {
     "torch_tensorrt.dynamo.runtime": "py/torch_tensorrt/dynamo/runtime",
     "torch_tensorrt.dynamo.runtime.meta_ops": "py/torch_tensorrt/dynamo/runtime/meta_ops",
     "torch_tensorrt.dynamo.tools": "py/torch_tensorrt/dynamo/tools",
+    "torch_tensorrt.dynamo.tuning": "py/torch_tensorrt/dynamo/tuning",
     "torch_tensorrt.executorch": "py/torch_tensorrt/executorch",
     "torch_tensorrt.runtime": "py/torch_tensorrt/runtime",
 }
