@@ -6,6 +6,7 @@ import operator
 from typing import Any, Callable, Optional, Sequence, Union
 
 import torch
+
 from torch_tensorrt._utils import is_tegra_platform
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes._FakeTensorUpdater import FakeTensorUpdater
@@ -186,6 +187,26 @@ def pre_export_lowering(
         f"Invoking DynamoPassManager and applying lowering passes: {ATEN_PRE_LOWERING_PASSES}"
     )
 
+    from torch_tensorrt.dynamo.regions import (
+        RegionError,
+        is_region_hop,
+        normalize_region_scopes,
+        region_hop_records,
+        validate_region_settings,
+    )
+
+    # Consume effectful capture markers before any decomposition, calibration,
+    # or user lowering pass can erase or move the annotated operations.
+    ep = normalize_region_scopes(ep)
+    records = region_hop_records(ep.graph_module)
+    try:
+        validate_region_settings(settings, records)
+    except RegionError as error:
+        if not settings.dryrun:
+            raise
+        logger.warning("Region dry-run skips incompatible lowering: %s", error)
+        return ep
+
     # Only for rule-based autocast to collect the intermediate node outputs
     if settings.enable_autocast:
         settings.autocast_intermediate_node_outputs = trace_intermediate_node_outputs(
@@ -194,6 +215,13 @@ def pre_export_lowering(
             [torch.ops.higher_order.wrap_with_autocast, operator.getitem],
         )
     gm = ep.graph_module
+    # Regions remain structured through decomposition. Only the pre-export
+    # passes run inside the child; post-lowering sees an opaque PyTorch leaf.
+    for node in gm.graph.nodes:
+        if is_region_hop(node):
+            body_target = str(node.args[0].target)
+            child = gm.get_submodule(body_target)
+            gm.set_submodule(body_target, ATEN_PRE_LOWERING_PASSES(child, settings))
     gm = ATEN_PRE_LOWERING_PASSES(gm, settings)
     return ep
 

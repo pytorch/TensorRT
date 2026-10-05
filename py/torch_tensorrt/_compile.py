@@ -22,10 +22,11 @@ from typing import (
     Set,
     Tuple,
     Union,
-    cast,
 )
 
 import torch
+from typing_extensions import TypeGuard
+
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES, needs_cross_compile
 from torch_tensorrt._Input import Input
@@ -33,10 +34,10 @@ from torch_tensorrt._utils import executorch_install_command
 from torch_tensorrt.dynamo.runtime._CudaGraphsTorchTensorRTModule import (
     CudaGraphsTorchTensorRTModule,
 )
-from typing_extensions import TypeGuard
 
 if ENABLED_FEATURES.fx_frontend:
     import torch.fx
+
     from torch_tensorrt.fx import InputTensorSpec
     from torch_tensorrt.fx.lower import compile as fx_compile
     from torch_tensorrt.fx.utils import LowerPrecision
@@ -54,6 +55,7 @@ if ENABLED_FEATURES.torchscript_frontend:
 
 if ENABLED_FEATURES.dynamo_frontend:
     from torch.export import ExportedProgram
+
     from torch_tensorrt.dynamo._compiler import compile as dynamo_compile
     from torch_tensorrt.dynamo._compiler import (
         convert_exported_program_to_serialized_trt_engine as dynamo_convert_exported_program_to_serialized_trt_engine,
@@ -337,20 +339,35 @@ def compile(
         torchtrt_arg_inputs = prepare_inputs(arg_inputs)
         torchtrt_kwarg_inputs = prepare_inputs(kwarg_inputs)
 
-        if module_type == _ModuleType.ep:
-            exp_program = module
-        else:
-            exp_program = dynamo_trace(
-                module,
-                torchtrt_arg_inputs,
+        from torch_tensorrt.region._session import RegionCompilationSession
+
+        # Scope capture belongs to this trace, not to global Dynamo state. In
+        # eager execution and unrelated exports the public annotation is a no-op.
+        with RegionCompilationSession(strict=kwargs.get("strict", False)):
+            if module_type == _ModuleType.ep:
+                exp_program = module
+            else:
+                exp_program = dynamo_trace(
+                    module,
+                    torchtrt_arg_inputs,
+                    kwarg_inputs=torchtrt_kwarg_inputs,
+                    **kwargs,
+                )
+                from torch_tensorrt.dynamo.regions._capture import _marker_kind
+                from torch_tensorrt.region._errors import RegionCaptureError
+
+                if any(_marker_kind(n) for n in exp_program.graph.nodes) and any(
+                    child.training for child in module.modules()
+                ):
+                    raise RegionCaptureError(
+                        "execute_in_torch currently requires model.eval()"
+                    )
+            trt_graph_module = dynamo_compile(
+                exp_program,
+                arg_inputs=torchtrt_arg_inputs,
                 kwarg_inputs=torchtrt_kwarg_inputs,
                 **kwargs,
             )
-        trt_graph_module = dynamo_compile(
-            exp_program,
-            arg_inputs=torchtrt_arg_inputs,
-            **kwargs,
-        )
         return trt_graph_module
     elif target_ir == _IRType.torch_compile:
         return torch_compile(module, **kwargs)
@@ -435,9 +452,14 @@ def cross_compile_for_windows(
     torchtrt_arg_inputs = prepare_inputs(arg_inputs)
     torchtrt_kwarg_inputs = prepare_inputs(kwarg_inputs)
 
-    exp_program = dynamo_trace(
-        module, torchtrt_arg_inputs, kwarg_inputs=torchtrt_kwarg_inputs, **kwargs
-    )
+    from torch_tensorrt.dynamo.regions._capture import reject_region_capture
+    from torch_tensorrt.region._session import RegionCompilationSession
+
+    with RegionCompilationSession(strict=kwargs.get("strict", False)):
+        exp_program = dynamo_trace(
+            module, torchtrt_arg_inputs, kwarg_inputs=torchtrt_kwarg_inputs, **kwargs
+        )
+    reject_region_capture(exp_program, "cross-compilation")
     logger.debug("successfully exported the module")
 
     # Compile and save the module
@@ -561,18 +583,23 @@ def convert_method_to_trt_engine(
         torchtrt_arg_inputs = prepare_inputs(normalized_arg_inputs)
         torchtrt_kwarg_inputs = prepare_inputs(kwarg_inputs)
 
-        exp_program = dynamo_trace(
-            module, torchtrt_arg_inputs, kwarg_inputs=torchtrt_kwarg_inputs, **kwargs
-        )
+        from torch_tensorrt.dynamo.regions._capture import reject_region_capture
+        from torch_tensorrt.region._session import RegionCompilationSession
 
-        return cast(
-            bytes,
-            dynamo_convert_exported_program_to_serialized_trt_engine(
-                exp_program,
-                arg_inputs=tuple(normalized_arg_inputs),
+        with RegionCompilationSession(strict=kwargs.get("strict", False)):
+            exp_program = dynamo_trace(
+                module,
+                torchtrt_arg_inputs,
                 kwarg_inputs=torchtrt_kwarg_inputs,
                 **kwargs,
-            ),
+            )
+        reject_region_capture(exp_program, "serialized-engine-only output")
+
+        return dynamo_convert_exported_program_to_serialized_trt_engine(
+            exp_program,
+            arg_inputs=tuple(normalized_arg_inputs),
+            kwarg_inputs=torchtrt_kwarg_inputs,
+            **kwargs,
         )
     elif target_ir == _IRType.torch_compile:
         raise RuntimeError(
@@ -862,6 +889,19 @@ def save(
     """
     if isinstance(module, CudaGraphsTorchTensorRTModule):
         module = module.compiled_module
+    if isinstance(module, torch.fx.GraphModule):
+        from torch_tensorrt.dynamo.regions import RegionError, get_region_records
+
+        if get_region_records(module) and (
+            output_format != "exported_program"
+            or retrace
+            or use_legacy_exporter is False
+        ):
+            raise RegionError(
+                "Saving execute_in_torch regions currently requires "
+                "output_format='exported_program', retrace=False, "
+                "use_legacy_exporter=True"
+            )
     module_type = _parse_module_type(module)
     accepted_formats = {"exported_program", "torchscript", "aot_inductor", "executorch"}
     if arg_inputs is not None and not all(

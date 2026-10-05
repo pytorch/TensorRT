@@ -25,6 +25,7 @@ from torch.export.exported_program import (
     TensorArgument,
 )
 from torch.fx.graph import _PyTreeCodeGen
+
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import ENGINE_IDX, NAME_IDX
 
@@ -78,6 +79,15 @@ def export(
         inputs (torch.Tensor): Torch input tensors
         cross_compile_module (bool): Flag to indicated whether it is cross_compilation enabled or not
     """
+    if gm.meta.get("torch_tensorrt_regions") and (
+        not use_legacy_exporter or cross_compile_module
+    ):
+        from torch_tensorrt.region._errors import RegionError
+
+        raise RegionError(
+            "execute_in_torch serialization requires the legacy exported_program "
+            "path: retrace=False, use_legacy_exporter=True, without cross-compilation"
+        )
     patched_module = transform(
         gm, cross_compile_module, expose_aliased_mutations=bool(use_legacy_exporter)
     )
@@ -121,7 +131,28 @@ def transform(
     """
     # Make a copy the graph since this function transforms the input graph and changes it's attributes.
     # This transformed graph is meant to be consumed by `create_trt_exp_program`
+    region_children = {}
+    if gm.meta.get("torch_tensorrt_regions"):
+        from torch_tensorrt.dynamo.regions import (
+            audit_region_placement,
+            get_region_records,
+        )
+
+        # Audit without changing the caller's records. GraphModule deepcopy drops
+        # arbitrary module attributes, including the verified region identity.
+        audit_region_placement(gm, [copy.copy(r) for r in get_region_records(gm)])
+        region_children = {
+            name: child._torch_tensorrt_region_id
+            for name, child in gm.named_modules()
+            if hasattr(child, "_torch_tensorrt_region_id")
+        }
     gm = copy.deepcopy(gm)
+    for name, region_id in region_children.items():
+        gm.get_submodule(name)._torch_tensorrt_region_id = region_id
+
+    # A region may be a direct child or nested inside an ordinary fallback
+    # partition. Expand it before that partition is copied into the parent.
+    inline_torch_region_modules(gm)
 
     # Inline TensorRT submodules
     inline_trt_modules(gm, cross_compile_module, expose_aliased_mutations)
@@ -133,6 +164,7 @@ def transform(
     gm.delete_all_unused_submodules()
     gm.graph.eliminate_dead_code()
     gm.graph.lint()
+    gm.recompile()
 
     return gm
 
@@ -295,6 +327,126 @@ def lift(
     return gm, graph_signature, state_dict, constants
 
 
+def inline_torch_region_modules(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
+    """Inline verified PyTorch regions on a serialization clone, bottom-up.
+
+    The compiled module retains opaque region calls. Only its export clone is
+    flattened, preserving engine boundaries and storing JSON-safe provenance.
+    """
+    if not gm.meta.get("torch_tensorrt_regions"):
+        return gm
+
+    from torch_tensorrt.dynamo.regions import (
+        audit_region_placement,
+        get_region_records,
+        is_torch_region_node,
+    )
+    from torch_tensorrt.dynamo.regions._types import RECORDS_META_KEY, REGION_META_KEY
+    from torch_tensorrt.region._errors import RegionError
+
+    records = get_region_records(gm)
+    audit_region_placement(gm, records)
+    # Fallback inlining later promotes attributes into the top-level namespace.
+    # Allocate state names uniquely across the entire module tree to avoid an
+    # unrelated parameter being overwritten during that promotion.
+    reserved = {name for module in gm.modules() for name in vars(module)}
+    for module in gm.modules():
+        reserved.update(module._parameters)
+        reserved.update(module._buffers)
+        reserved.update(module._modules)
+    next_state_index = 0
+
+    def visit(parent: torch.fx.GraphModule) -> None:
+        nonlocal next_state_index
+        state_bindings: Dict[int, str] = {}
+        for call in list(parent.graph.nodes):
+            if call.op != "call_module":
+                continue
+            child = parent.get_submodule(str(call.target))
+            if not isinstance(child, torch.fx.GraphModule):
+                continue
+            if not is_torch_region_node(parent, call):
+                visit(child)
+                continue
+
+            placeholders = [n for n in child.graph.nodes if n.op == "placeholder"]
+            if call.kwargs or len(placeholders) != len(call.args):
+                raise RegionError("Region input bindings changed before serialization")
+            values = dict(zip(placeholders, call.args))
+            outputs = None
+            with parent.graph.inserting_before(call):
+                for node in child.graph.nodes:
+                    if node.op == "placeholder":
+                        continue
+                    if node.op == "output":
+                        outputs = torch.fx.map_arg(node.args[0], lambda n: values[n])
+                        continue
+                    if node.op == "call_module":
+                        raise RegionError(
+                            "Region serialization requires a normalized child"
+                        )
+                    copied = parent.graph.node_copy(node, lambda n: values[n])
+                    copied.meta = copy.copy(node.meta)
+                    copied.meta.pop(REGION_META_KEY, None)
+                    if node.op == "get_attr":
+                        value = child
+                        for component in str(node.target).split("."):
+                            value = getattr(value, component)
+                        if not isinstance(value, torch.Tensor):
+                            raise RegionError("Region state must be a read-only Tensor")
+                        state_name = state_bindings.get(id(value))
+                        if state_name is None:
+                            state_name = f"_ttrt_region_export_state_{next_state_index}"
+                            while state_name in reserved:
+                                next_state_index += 1
+                                state_name = (
+                                    f"_ttrt_region_export_state_{next_state_index}"
+                                )
+                            reserved.add(state_name)
+                            next_state_index += 1
+                            if isinstance(value, torch.nn.Parameter):
+                                parent.register_parameter(state_name, value)
+                            else:
+                                # Export snapshots all read-only tensor constants,
+                                # including originally non-persistent buffers.
+                                parent.register_buffer(state_name, value)
+                            state_bindings[id(value)] = state_name
+                        copied.target = state_name
+                    values[node] = copied
+            if outputs is None:
+                raise RegionError("Region child has no outputs during serialization")
+            for user in list(call.users):
+                if (
+                    isinstance(outputs, (tuple, list))
+                    and user.op == "call_function"
+                    and user.target is operator.getitem
+                    and user.args[0] is call
+                    and isinstance(user.args[1], int)
+                ):
+                    user.replace_all_uses_with(outputs[user.args[1]])
+                    parent.graph.erase_node(user)
+                else:
+                    user.args = torch.fx.map_arg(
+                        user.args, lambda n: outputs if n is call else n
+                    )
+                    user.kwargs = torch.fx.map_arg(
+                        user.kwargs, lambda n: outputs if n is call else n
+                    )
+            parent.graph.erase_node(call)
+        parent.meta.pop(RECORDS_META_KEY, None)
+        parent.graph.lint()
+        parent.recompile()
+
+    visit(gm)
+    custom = dict(gm.meta.get("custom", {}))
+    custom[RECORDS_META_KEY] = [
+        {"id": r.id, "name": r.name, "route": r.route, "owner": r.owner}
+        for r in records
+    ]
+    gm.meta["custom"] = custom
+    return gm
+
+
 def inline_torch_modules(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
     """
     Inline a submodule within the parent graph (gm). All `call_module` nodes
@@ -356,6 +508,18 @@ def inline_torch_modules(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
                         user.replace_all_uses_with(submodule_output[idx])
                         # Erase the getitem node since it's no longer needed
                         gm.graph.erase_node(user)
+                    # A fallback partition can return the tuple directly (for
+                    # example an all-Torch graph containing a multi-output region).
+                    # Preserve aggregate consumers as well as getitem consumers.
+                    for user in list(gm_node.users):
+                        user.args = torch.fx.map_arg(
+                            user.args,
+                            lambda n: submodule_output if n is gm_node else n,
+                        )
+                        user.kwargs = torch.fx.map_arg(
+                            user.kwargs,
+                            lambda n: submodule_output if n is gm_node else n,
+                        )
                 else:
                     # Single output - normal replacement
                     gm_node.replace_all_uses_with(submodule_output)

@@ -7,6 +7,7 @@ from typing import Any, Callable, List, Optional
 import torch
 from torch.fx import passes
 from torch.fx.passes.pass_manager import PassManager
+
 from torch_tensorrt.dynamo._defaults import DEBUG_LOGGING_DIR
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
@@ -29,6 +30,10 @@ def _generate_draw_fx_graph_pass(
 
 
 class DynamoPassManager(PassManager):  # type: ignore[misc]
+    passes: List[
+        Callable[[torch.fx.GraphModule, CompilationSettings], torch.fx.GraphModule]
+    ]
+
     def __init__(
         self,
         passes: Optional[
@@ -38,8 +43,8 @@ class DynamoPassManager(PassManager):  # type: ignore[misc]
                 ]
             ]
         ] = None,
-        constraints: Optional[List[Callable]] = None,
-    ):
+        constraints: Optional[List[Callable[..., Any]]] = None,
+    ) -> None:
         super().__init__(passes, constraints)
 
     @classmethod
@@ -132,10 +137,32 @@ class DynamoPassManager(PassManager):  # type: ignore[misc]
             ), f"{name} is not a valid pass! Passes: {pass_names_str}"
 
     def __call__(self, gm: Any, settings: CompilationSettings) -> Any:
+        from torch_tensorrt.dynamo.regions import (
+            RegionError,
+            attach_region_records,
+            audit_region_placement,
+            get_region_records,
+            region_hop_records,
+        )
+
         self.validate()
         out = gm
+        records = get_region_records(gm)
+        captured_ids = [record.id for record in region_hop_records(gm)]
         for _pass in self.passes:
             out = _pass(out, settings)
+            if captured_ids != [record.id for record in region_hop_records(out)]:
+                raise RegionError(
+                    f"Lowering pass {_pass.__name__!r} changed or lost a region boundary"
+                )
+            if records:
+                try:
+                    audit_region_placement(out, records)
+                except RegionError as error:
+                    raise RegionError(
+                        f"Lowering pass {_pass.__name__!r} invalidated a region: {error}"
+                    ) from error
+                attach_region_records(out, records)
         return out
 
     def __str__(self) -> str:
