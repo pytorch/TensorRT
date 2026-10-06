@@ -10,7 +10,6 @@ import operator
 import pytest
 import torch
 from torch._subclasses.fake_tensor import FakeTensorMode
-from torch.fx.experimental.symbolic_shapes import ShapeEnv
 from torch.export.graph_signature import (
     ExportGraphSignature,
     InputKind,
@@ -19,6 +18,7 @@ from torch.export.graph_signature import (
     OutputSpec,
     TensorArgument,
 )
+from torch.fx.experimental.symbolic_shapes import ShapeEnv
 from torch_tensorrt.dynamo._exporter import (
     create_trt_exp_program,
     inline_torch_modules,
@@ -383,6 +383,68 @@ def test_create_trt_exp_program_handles_get_attrs_before_placeholders():
     out = ep.module()(torch.randn(3, 10))
     out = out[0] if isinstance(out, (tuple, list)) else out
     assert out.shape == (3, 5)
+
+
+@pytest.mark.unit
+def test_create_trt_exp_program_handles_write_only_copyback_buffer():
+    """create_trt_exp_program must build range_constraints after the copy-back
+    block adds a get_attr for a write-only buffer.
+
+    Regression: no node reads a write-only buffer, so transform() removes its
+    get_attr. The copy-back block then adds a get_attr before the first node of
+    the graph. When create_trt_exp_program ordered the placeholders before that
+    step, the get_attr stayed ahead of the user input, and make_constraints()
+    raised IndexError.
+    """
+
+    class WriteOnlyState(torch.nn.Module):
+        def forward(self, x):
+            return x + 1, x.sum(0)
+
+    batch = torch.export.Dim("batch", min=2, max=8)
+    gm = torch.export.export(
+        WriteOnlyState().eval(),
+        (torch.randn(4, 3),),
+        dynamic_shapes={"x": {0: batch}},
+    ).module()
+    # Force the plain-CodeGen fallback branch (see the no-input test above).
+    for node in list(gm.graph.nodes):
+        if node.op == "call_module" and node.target == "_guards_fn":
+            gm.graph.erase_node(node)
+            break
+    gm.graph.set_codegen(torch.fx.graph.CodeGen())
+    gm.graph.lint()
+    gm.recompile()
+    # The trailing output is the new value of "state". No node reads "state".
+    gm.register_buffer("state", torch.zeros(3))
+    gm.meta["_copyback_mutation_buffers"] = ["state"]
+
+    nodes = list(gm.graph.nodes)
+    assert nodes[0].op == "placeholder"
+    assert all(n.op != "get_attr" for n in nodes)
+
+    ep = create_trt_exp_program(
+        gm, arg_inputs=(torch.randn(4, 3),), dynamic_shapes={"x": {0: batch}}
+    )
+
+    # The user-specified Dim bound survived, so path 1 (make_constraints) ran.
+    assert [str(vr) for vr in ep.range_constraints.values()] == ["VR[2, 8]"]
+    assert [(s.kind.name, s.target) for s in ep.graph_signature.input_specs] == [
+        ("BUFFER", "state"),
+        ("USER_INPUT", "x"),
+    ]
+    assert [s.kind.name for s in ep.graph_signature.output_specs] == [
+        "BUFFER_MUTATION",
+        "USER_OUTPUT",
+    ]
+
+    # The program runs at another batch size, and it writes the buffer.
+    module = ep.module()
+    x = torch.randn(3, 3)
+    out = module(x)
+    out = out[0] if isinstance(out, (tuple, list)) else out
+    assert torch.allclose(out, x + 1)
+    assert torch.allclose(module.state, x.sum(0))
 
 
 @pytest.mark.unit

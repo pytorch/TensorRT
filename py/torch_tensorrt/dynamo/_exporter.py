@@ -435,8 +435,6 @@ def create_trt_exp_program(
     and constructs an Exported Program object with the new IO node names and state_dict
     """
 
-    _order_placeholders_first(gm)
-
     input_nodes = [node for node in gm.graph.nodes if node.op == "placeholder"]
     output_nodes = [node for node in gm.graph.nodes if node.op == "output"]
     assert output_nodes
@@ -564,6 +562,10 @@ def create_trt_exp_program(
             ),
         )
     ]
+
+    # make_constraints() needs the placeholders to lead the graph. Keep this call
+    # after the copy-back block, because that block can put a get_attr ahead of them.
+    _order_placeholders_first(gm)
 
     # Compute range_constraints from the placeholder SymInt shapes before lift(),
     # while the graph still has only user-input placeholders (num_lifted=0).
