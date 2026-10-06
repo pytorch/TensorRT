@@ -88,6 +88,12 @@ jobs:
           python3 $GITHUB_WORKSPACE/.github/scripts/run_py_linter.py
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+      - name: Test the CI suite runner
+        if: always()
+        run: |
+          cd $GITHUB_WORKSPACE
+          python3 -m pytest tests/ci/test_runner.py \
+            -q --no-header -p no:cacheprovider --noconftest -o addopts=""
       # These source checks need no GPU; --noconftest avoids importing torch.
       - name: Check the ExecuTorch pin is consistent
         if: always()

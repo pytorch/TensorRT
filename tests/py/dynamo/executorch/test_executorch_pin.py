@@ -779,22 +779,6 @@ def test_the_executorch_setup_step_builds_without_pyyaml_installed(monkeypatch) 
 
 
 @pytest.mark.unit
-def test_only_the_executorch_setup_step_fails_its_suite(monkeypatch) -> None:
-    """A failed ExecuTorch install must fail the suite; other steps keep warning.
-
-    The ExecuTorch files gate on importorskip, so a failed install would report success with the
-    thing under test absent. The other steps fail visibly on their own, so a flaky download there
-    should not fail a suite that would otherwise report honestly.
-    """
-    source = (REPO_ROOT / "tests/ci/runner.py").read_text(encoding="utf-8")
-    body = source[source.index('    for step in v["setup"]:') :]
-    body = body[: body.index('\n    print(f"==>')]
-    assert 'if step == "executorch":' in body, body
-    assert body.count("return rc") == 1, body
-    assert "::warning::setup step" in body, body
-
-
-@pytest.mark.unit
 def test_the_supported_cuda_major_is_declared_once_per_place_that_needs_it():
     """Every declaration of the supported CUDA major must agree with the repository's own.
 
@@ -1202,39 +1186,6 @@ def test_source_pin_check_detects_removed_name_boundary(tmp_path, monkeypatch, p
     monkeypatch.setitem(globals(), "NAMED_COMMIT", re.compile(pattern, re.IGNORECASE))
     with pytest.raises(AssertionError if pinned else pytest.fail.Exception):
         test_source_pin_guard_ignores_other_names(tmp_path, monkeypatch, "MY_", pinned)
-
-
-@pytest.mark.unit
-@pytest.mark.parametrize("setup_rc", [0, 7])
-def test_a_failed_setup_step_stops_the_suite(monkeypatch, tmp_path, setup_rc):
-    """A failed setup must stop before import-skipped tests can report a false pass."""
-    monkeypatch.syspath_prepend(str(REPO_ROOT / "tests"))
-    from ci import runner
-
-    monkeypatch.setenv("RUNNER_TEST_RESULTS_DIR", str(tmp_path))
-    calls: list[list[str]] = []
-
-    class Completed:
-        def __init__(self, argv):
-            # The setup step is the pip install; anything else is pytest, which must not run
-            # at all once setup has failed.
-            self.returncode = setup_rc if "pip" in argv else 0
-
-    def record(argv, **kwargs):
-        calls.append(argv)
-        return Completed(argv)
-
-    monkeypatch.setattr(runner.subprocess, "run", record)
-    suite = next(s for s in runner.SUITES if s.name == "executorch")
-    rc = runner.run_suite(suite, "standard")
-
-    assert rc == setup_rc, f"run_suite returned {rc}, expected {setup_rc}"
-    ran_pytest = any("pytest" in " ".join(argv) for argv in calls)
-    assert ran_pytest is (setup_rc == 0), (
-        "pytest ran even though a setup step failed"
-        if ran_pytest
-        else "pytest never ran even though every setup step succeeded"
-    )
 
 
 def _assert_development_lock_matches_pin(lock: dict, version: str) -> None:
