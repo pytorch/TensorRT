@@ -432,6 +432,11 @@ def _save_load(compiled, inputs):
     return loaded_ep, loaded_gm
 
 
+def _traced_linear():
+    """Return a TorchScript module with no TRT engine."""
+    return torch.jit.trace(torch.nn.Linear(3, 3).cuda(), torch.randn(1, 3).cuda())
+
+
 class TestApplyRuntimeSettingsTypeErrors(TestCase):
     """Rejection of bad arguments; no engine compile required."""
 
@@ -447,6 +452,33 @@ class TestApplyRuntimeSettingsTypeErrors(TestCase):
 
     def test_zero_engines_raises(self):
         model = torch.nn.Linear(3, 3).cuda()
+        with self.assertRaises(RuntimeError) as cm:
+            apply_runtime_settings(model, RuntimeSettings(runtime_cache=None))
+        self.assertIn("no TRT engines", str(cm.exception))
+
+    # The FX walk used to iterate a TorchScript graph and crash with an
+    # unrelated TypeError, so each check below also asserts on the message.
+    def test_torchscript_target_raises(self):
+        with self.assertRaises(TypeError) as cm:
+            apply_runtime_settings(
+                _traced_linear(), RuntimeSettings(runtime_cache=None)
+            )
+        self.assertIn("TorchScript", str(cm.exception))
+
+    def test_runtime_config_rejects_torchscript_target(self):
+        with self.assertRaises(TypeError) as cm:
+            with runtime_config(_traced_linear(), runtime_cache=None):
+                pass
+        self.assertIn("TorchScript", str(cm.exception))
+
+    def test_runtime_cache_rejects_torchscript_target(self):
+        with self.assertRaises(TypeError) as cm:
+            with runtime_cache(_traced_linear(), io.BytesIO()):
+                pass
+        self.assertIn("TorchScript", str(cm.exception))
+
+    def test_nested_torchscript_module_is_skipped(self):
+        model = torch.nn.Sequential(_traced_linear())
         with self.assertRaises(RuntimeError) as cm:
             apply_runtime_settings(model, RuntimeSettings(runtime_cache=None))
         self.assertIn("no TRT engines", str(cm.exception))
