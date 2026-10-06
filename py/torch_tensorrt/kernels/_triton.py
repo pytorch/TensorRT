@@ -14,6 +14,7 @@ from typing import Any, Callable, Dict, Iterable, List, NamedTuple, Optional, Tu
 import torch
 
 from packaging.version import InvalidVersion, Version
+from torch_tensorrt.kernels import _common
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -383,19 +384,6 @@ def validate_triton_config(
     return layout
 
 
-def _constant_int(value: Any) -> Optional[int]:
-    if isinstance(value, int):
-        return value
-    # SymInt32's public constant helpers access an unset _is_dummy in TRT 11.2.
-    # Read the underlying expression; fake-shape evaluation has no expression.
-    expr = value._expr
-    return (
-        int(expr.get_constant_value())
-        if expr is not None and expr.is_constant()
-        else None
-    )
-
-
 def make_symint32_args(
     op_name: str,
     scalar_params: Tuple[SignatureParam, ...],
@@ -419,7 +407,6 @@ def make_symint32_args(
             f"parameter(s) {names}."
         )
 
-    extra_args = trtp.SymIntExprs(len(materialized))
     for index, (param, value) in enumerate(zip(scalar_params, materialized)):
         if isinstance(value, bool) or not isinstance(value, (int, trtp.SymInt32)):
             raise TypeError(
@@ -427,18 +414,13 @@ def make_symint32_args(
                 f"'{param.name}' must be an int or trtp.SymInt32; got "
                 f"{type(value).__name__}."
             )
-        constant = _constant_int(value)
+        constant = _common.constant_int(value)
         if constant is not None and not -(2**31) <= constant < 2**31:
             raise ValueError(
                 f"triton_op '{op_name}' extra_args_fn value {index} for "
                 f"'{param.name}' is outside the signed i32 range: {constant}."
             )
-        # SymIntExprs turns a bare int into the untyped SymIntExpr base, but
-        # TensorRT's AOT loader specifically requires SymInt32 for every slot.
-        extra_args[index] = (
-            value if isinstance(value, trtp.SymInt32) else trtp.SymInt32(value)
-        )
-    return extra_args
+    return _common.pack_symint32_args(materialized, trtp)
 
 
 def validate_launch_grid(op_name: str, value: Any) -> Tuple[Any, ...]:
@@ -463,7 +445,7 @@ def validate_launch_grid(op_name: str, value: Any) -> Tuple[Any, ...]:
                 f"triton_op '{op_name}' grid dimension {index} must be an int or "
                 f"TensorRT symbolic integer; got {type(dim).__name__}."
             )
-        constant = _constant_int(dim)
+        constant = _common.constant_int(dim)
         limit = 2**31 - 1 if index == 0 else 65535
         if constant is not None and not 1 <= constant <= limit:
             raise ValueError(
@@ -480,81 +462,24 @@ def make_dtype_capability_validator(
     *,
     artifact: Optional[CompiledTritonArtifact] = None,
 ) -> Callable[..., bool]:
-    """Build a converter capability validator enforcing the compiled dtypes.
-
-    The registered PTX is specialized for the dtypes named in ``signature``.
-    Feeding the op tensors of any other dtype reinterprets their bytes and returns
-    wrong numbers, so decline the conversion instead: TensorRT then leaves the
-    op to PyTorch rather than embedding a kernel that cannot read its inputs.
-    """
-    expected_inputs = [p.dtype for p in layout.inputs]
-    expected_outputs = [p.dtype for p in layout.outputs]
-
-    def _tensor_meta(value: Any) -> Optional[torch.Tensor]:
-        meta = getattr(value, "meta", None)
-        if not isinstance(meta, dict):
-            return None
-        val = meta.get("val")
-        return val if isinstance(val, torch.Tensor) else None
-
-    def _reject(reason: str, *args: Any) -> bool:
-        # Warn, not debug: the op silently leaves the engine and runs in
-        # PyTorch, and if no eager_fn was registered the eventual failure is an
-        # opaque "not implemented for the CUDA backend" from the dispatcher.
-        _LOGGER.warning(
-            "Not lowering '%s' to its Triton plugin: " + reason,
-            op_name,
-            *args,
-        )
-        return False
+    """Check tensor dtypes before enforcing Triton's compiled device target."""
+    validate_dtypes = _common.make_dtype_capability_validator(
+        op_name,
+        "Triton",
+        [param.dtype for param in layout.inputs],
+        [param.dtype for param in layout.outputs],
+        user_validator,
+    )
+    if artifact is None:
+        return validate_dtypes
 
     def _validator(node: Any, settings: Any = None) -> bool:
-        if user_validator is not None and not user_validator(node, settings):
+        if not validate_dtypes(node, settings):
             return False
-
-        node_args = getattr(node, "args", None)
-        if not isinstance(node_args, (tuple, list)):
-            return _reject("FX node has no positional argument metadata.")
-        actual_inputs = [_tensor_meta(arg) for arg in node_args]
-        node_meta = getattr(node, "meta", None)
-        produced = node_meta.get("val") if isinstance(node_meta, dict) else None
-        actual_outputs = (
-            list(produced) if isinstance(produced, (tuple, list)) else [produced]
+        device = getattr(getattr(settings, "device", None), "gpu_id", None)
+        validate_target(
+            artifact, device if device is not None and device >= 0 else None
         )
-        for kind, actual, expected in (
-            ("input", actual_inputs, expected_inputs),
-            ("output", actual_outputs, expected_outputs),
-        ):
-            if len(actual) != len(expected):
-                return _reject(
-                    "expected %d tensor %s(s), but metadata describes %d.",
-                    len(expected),
-                    kind,
-                    len(actual),
-                )
-            for index, (got, want) in enumerate(zip(actual, expected)):
-                if not isinstance(got, torch.Tensor):
-                    return _reject(
-                        "%s %d has no Tensor metadata; refusing an unchecked "
-                        "pointer binding.",
-                        kind,
-                        index,
-                    )
-                if got.dtype != want:
-                    return _reject(
-                        "%s %d is %s but the kernel was compiled for %s.",
-                        kind,
-                        index,
-                        got.dtype,
-                        want,
-                    )
-
-        if artifact is not None:
-            device = getattr(getattr(settings, "device", None), "gpu_id", None)
-            validate_target(
-                artifact, device if device is not None and device >= 0 else None
-            )
-
         return True
 
     return _validator
@@ -627,6 +552,8 @@ def _require_supported_triton_version(triton: Any) -> None:
     """Reject Triton releases without the compiler metadata contract we use."""
     raw_version = getattr(triton, "__version__", None)
     try:
+        if not isinstance(raw_version, str):
+            raise TypeError("Triton version must be a string")
         installed_version = Version(raw_version)
     except (InvalidVersion, TypeError):
         raise ImportError(

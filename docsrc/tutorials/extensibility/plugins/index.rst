@@ -1,8 +1,8 @@
 Plugins
 =======
 
-Register custom CUDA and Triton kernels as TensorRT plugins — from
-auto-generated Python plugins to AOT-compiled C++ plugins for use
+Register custom CUDA, Triton, and cuTile kernels as TensorRT plugins —
+from auto-generated Python plugins to AOT-compiled C++ plugins for use
 in serialized engines.
 
 .. toctree::
@@ -16,3 +16,4 @@ in serialized engines.
    Example: Auto-derived CUDA Kernel Plugins via cuda_kernel_op <../../_rendered_examples/dynamo/cuda_kernel_op>
    Example: Pre-compiled PTX Kernels via ptx_op <../../_rendered_examples/dynamo/ptx_op>
    Example: Triton Kernel AOT Plugins via triton_op <../../_rendered_examples/dynamo/triton_op>
+   Example: cuTile Kernel AOT Plugins via cutile_op <../../_rendered_examples/dynamo/cutile_op>

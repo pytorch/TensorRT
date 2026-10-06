@@ -37,7 +37,26 @@ _LOGGER = logging.getLogger(__name__)
 
 _PYTHON_IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _PTX_ENTRY_IDENTIFIER = re.compile(r"^[A-Za-z_$][A-Za-z0-9_$.]*$")
-_GENERATED_PARAMETER_NAMES = frozenset({"outputs", "stream", "tactic"})
+# Parameters of generated callbacks must not shadow their helper functions,
+# captured kernel artifacts, or builtins. Local temporaries such as ``inputs``
+# are safe: the callback reads every input before assigning those temporaries.
+_GENERATED_PARAMETER_NAMES = frozenset(
+    {
+        "outputs",
+        "stream",
+        "tactic",
+        "_fn",  # CUDA's generated positional meta/eager wrappers.
+        "_generic_plugin_desc",
+        "_generic_plugin_impl",
+        "_user_aot_fn",
+        "_kernel_name",
+        "_ptx_str",
+        "_trtp",
+        "isinstance",
+        "tuple",
+        "len",
+    }
+)
 # Registration spans several process-global Torch, TensorRT QDP, native plugin,
 # and converter registries. Keep the availability check, mutations, and any
 # rollback in one critical section so a losing same-name registration cannot
@@ -128,7 +147,7 @@ def _infer_schema(
             missing.append("return")
         if missing:
             raise ValueError(
-                "triton_op requires complete meta_fn type hints to determine its "
+                "Kernel registration requires complete meta_fn type hints to determine its "
                 f"pointer ABI; missing annotations for {missing}. Pass schema= "
                 "explicitly if the function cannot be annotated."
             )
@@ -184,6 +203,12 @@ def analyze_op_schema(
     )
     if not isinstance(schema_str, str):
         raise ValueError(f"schema must be a string; got {type(schema_str).__name__}.")
+    schema_str = schema_str.strip()
+    if not schema_str.startswith("("):
+        raise ValueError(
+            f"could not parse schema {schema_str!r}; expected an operator schema "
+            "suffix such as '(Tensor x) -> Tensor'."
+        )
     try:
         parsed = torch._C.parse_schema(f"_ttk::_probe{schema_str}")
     except Exception as exc:
@@ -262,7 +287,7 @@ def analyze_op_schema(
         raise ValueError("QDP operators must have at least one Tensor input.")
     if tensor_inputs_only and attr_arg_names:
         raise ValueError(
-            "triton_op currently supports Tensor-only Torch schemas; scalar Torch "
+            "AOT kernel frontends support Tensor-only Torch schemas; scalar Torch "
             f"attributes {list(attr_arg_names)} cannot be forwarded to its AOT "
             "grid or kernel arguments. Derive i32 kernel extras from TensorDesc "
             "shapes, or use the lower-level QDP JIT API for user attributes."
