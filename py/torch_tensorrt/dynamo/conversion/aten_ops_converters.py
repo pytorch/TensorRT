@@ -2256,8 +2256,7 @@ def _dynamic_placeholder_copy_supported(
     silently.
 
     An input dtype the engine cannot bind. float64 needs truncate_double, and without it
-    the binding expects float32 and rejects the caller's tensor at the first call. uint8
-    aborts the build outright.
+    the binding expects float32 and rejects the caller's tensor at the first call.
 
     A non-contiguous input with no memory_format. Default clone preserves the input strides,
     so a channels-last or transposed input keeps its layout in eager, but the copy the layer
@@ -2299,11 +2298,6 @@ def _dynamic_placeholder_copy_supported(
         )
         return False
 
-    if input_meta.dtype == torch.uint8:
-        _LOGGER.debug(
-            f"{node.target} with a uint8 input is not supported, falling back"
-        )
-        return False
     if input_meta.dtype == torch.float64 and not (
         settings is not None and settings.truncate_double
     ):
@@ -2655,8 +2649,8 @@ def log1p_validator(node: Node, settings: Optional[CompilationSettings] = None) 
         input_meta = input_node.meta.get("val")
     if input_meta is None:
         return True
-    # Casting inside the engine cannot repair an unsupported input binding.
-    if input_meta.dtype in (torch.int8, torch.uint8):
+    # TensorRT treats an int8 input as quantized, so math after the cast fails the build.
+    if input_meta.dtype == torch.int8:
         return False
     return input_meta.dtype != torch.float64 or (
         settings is not None and settings.truncate_double

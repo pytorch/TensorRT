@@ -143,13 +143,13 @@ class TestLog1pConverter(DispatchTestCase):
         [
             ("float64_fallback", torch.float64, False, 0),
             ("int8_fallback", torch.int8, False, 0),
-            ("uint8_fallback", torch.uint8, False, 0),
             ("float64_truncated", torch.float64, True, 1),
             ("float32", torch.float32, False, 1),
             ("float16", torch.float16, False, 1),
             ("bfloat16", torch.bfloat16, False, 1),
             ("int32", torch.int32, False, 1),
             ("int64", torch.int64, False, 1),
+            ("uint8", torch.uint8, False, 1),
             ("bool", torch.bool, False, 1),
         ]
     )

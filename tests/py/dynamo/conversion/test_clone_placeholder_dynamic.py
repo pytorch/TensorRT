@@ -107,27 +107,54 @@ class TestClonePlaceholderDynamicShape(TestCase):
         )
         torch.testing.assert_close(result, module(*inputs))
 
-    @parameterized.expand([("float64", torch.float64), ("uint8", torch.uint8)])
-    def test_unbindable_input_dtype_falls_back(self, _, dtype):
+    def test_unbindable_input_dtype_falls_back(self):
         """float64 needs truncate_double, and without it the binding expects float32 and
-        rejects the caller's tensor. uint8 aborts the build. Both run in PyTorch."""
+        rejects the caller's tensor. It runs in PyTorch."""
 
         class OnlyClone(torch.nn.Module):
             def forward(self, x):
                 return torch.ops.aten.clone.default(x)
 
         module = OnlyClone().eval().cuda()
-        if dtype == torch.uint8:
-            inputs = (torch.randint(0, 255, (3, 5), dtype=dtype, device="cuda"),)
-        else:
-            inputs = (torch.randn(3, 5, dtype=dtype, device="cuda"),)
+        inputs = (torch.randn(3, 5, dtype=torch.float64, device="cuda"),)
 
         compiled = self._compile(module, inputs)
         result = compiled(*inputs)
 
         self.assertEqual(self._engines(compiled), 0)
-        self.assertEqual(result.dtype, dtype)
+        self.assertEqual(result.dtype, torch.float64)
         torch.testing.assert_close(result, module(*inputs))
+
+    def test_uint8_converts(self):
+        """The engine can bind uint8, so it should not fall back."""
+
+        class OnlyClone(torch.nn.Module):
+            def forward(self, x):
+                return torch.ops.aten.clone.default(x)
+
+        module = OnlyClone().eval().cuda()
+        inputs = (torch.randint(0, 256, (3, 5), dtype=torch.uint8, device="cuda"),)
+        compiled = self._compile(module, inputs)
+
+        self.assertEqual(self._engines(compiled), 1)
+        torch.testing.assert_close(compiled(*inputs), module(*inputs))
+
+    def test_uint8_to_copy_converts(self):
+        class OnlyCopy(torch.nn.Module):
+            def forward(self, x):
+                return torch.ops.aten._to_copy.default(x, dtype=torch.float16)
+
+        module = OnlyCopy().eval().cuda()
+        values = torch.arange(256, dtype=torch.uint8, device="cuda")
+        inputs = (values.repeat(7, 1),)
+        compiled = self._compile(module, inputs, dim_max=32)
+
+        self.assertEqual(self._engines(compiled), 1)
+        for size in (1, 7, 32):
+            sized = (values.repeat(size, 1),)
+            result = compiled(*sized)
+            self.assertEqual(result.dtype, torch.float16)
+            torch.testing.assert_close(result, module(*sized), rtol=0, atol=0)
 
     def test_float64_converts_when_truncation_is_allowed(self):
         """With truncate_double the engine can bind it, so it should not fall back."""
