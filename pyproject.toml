@@ -130,12 +130,14 @@ docs = [
     "pillow",
 ]
 
-quantization = [
+quantization-base = [
     "nvidia-modelopt[hf]>=0.44.0; python_version > '3.9' and python_version < '3.13'",
     "torchao",
-    # The cu134 nightly index has no Windows MSLK wheels. Keep its optional
-    # TorchAO inference kernels on Linux so Windows test setup can resolve.
-    "mslk>=1.0.0; sys_platform == 'linux'",
+]
+
+quantization = [
+    {include-group = "quantization-base"},
+    "mslk>=1.0.0",
 ]
 
 # Optional runtime deps for the torch_tensorrt.kernels QDP-plugin layer,
@@ -214,6 +216,10 @@ conflicts = [
     [
       { group = "test_ext" },
       { group = "quantization" },
+    ],
+    [
+      { group = "test_ext" },
+      { group = "quantization-base" },
     ],
 ]
 constraint-dependencies = [
