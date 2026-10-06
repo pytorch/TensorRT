@@ -458,6 +458,61 @@ def test_bert_base_uncased_cpu_offload(ir):
     torch._dynamo.reset()
 
 
+class _FullyFallenBackNet(nn.Module):
+    """A net that runs only linear, with weights on the root and in a child module."""
+
+    def __init__(self):
+        super().__init__()
+        self.weight = nn.Parameter(torch.randn(4, 3))
+        self.bias = nn.Parameter(torch.randn(4))
+        self.fc = nn.Linear(4, 2)
+
+    def forward(self, x):
+        return self.fc(nn.functional.linear(x, self.weight, self.bias))
+
+
+@pytest.mark.unit
+def test_cpu_offload_full_fallback():
+    torch.manual_seed(0)
+    model = _FullyFallenBackNet().eval().to("cuda")
+    input = torch.rand((2, 3)).to("cuda")
+    expected_output = model(input)
+
+    # linear and addmm stay in PyTorch, and this net runs nothing else. So no operation
+    # converts, on any card.
+    compile_spec = {
+        "inputs": [input],
+        "ir": "dynamo",
+        "min_block_size": 1,
+        "pass_through_build_failures": True,
+        "optimization_level": 1,
+        "cache_built_engines": False,
+        "reuse_cached_engines": False,
+        "offload_module_to_cpu": True,
+        "torch_executed_ops": {
+            "torch.ops.aten.linear.default",
+            "torch.ops.aten.addmm.default",
+        },
+    }
+    trt_mod = torchtrt.compile(model, **compile_spec)
+
+    assertions.assertFalse(
+        any("_run_on_acc" in name for name, _ in trt_mod.named_children()),
+        msg="TensorRT took part of the graph, so this test does not cover a full fallback.",
+    )
+    # No operation converted, so every weight that the graph reads must be back on the device.
+    _assert_state_on(
+        list(trt_mod.named_parameters()), "cuda", "Compiled module parameter"
+    )
+    assertions.assertTrue(
+        torch.allclose(expected_output, trt_mod(input)),
+        msg="The output of the source model and the compiled module is not the same.",
+    )
+
+    # Clean up model env
+    torch._dynamo.reset()
+
+
 @pytest.mark.unit
 @unittest.skipIf(
     not importlib.util.find_spec("torchvision"),
