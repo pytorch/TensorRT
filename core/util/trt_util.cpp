@@ -312,6 +312,8 @@ const std::unordered_map<nvinfer1::DataType, at::ScalarType>& get_trt_at_type_ma
       {nvinfer1::DataType::kINT32, at::kInt},
       {nvinfer1::DataType::kINT64, at::kLong},
       {nvinfer1::DataType::kINT8, at::kChar},
+      {nvinfer1::DataType::kUINT8, at::kByte},
+      {nvinfer1::DataType::kFP8, at::kFloat8_e4m3fn},
       {nvinfer1::DataType::kBOOL, at::kBool},
       {nvinfer1::DataType::kBF16, at::kBFloat16}};
   return trt_at_type_map;
