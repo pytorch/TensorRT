@@ -400,11 +400,17 @@ def _cumsum_with_loop(
     # their own dtype; an explicit dtype wins over both
     input_dtype = _enums.dtype._from(input.dtype).to(torch.dtype)
     if dtype is not None:
-        acc_dtype = dtype
+        output_dtype = torch.float32 if dtype is torch.float64 else dtype
     elif not input_dtype.is_floating_point:
-        acc_dtype = torch.int64
+        output_dtype = torch.int64
     else:
-        acc_dtype = input_dtype
+        output_dtype = input_dtype
+
+    # eager sums float16 / bfloat16 in float32; rounding every partial total to the
+    # narrow type drifts badly over a long axis
+    acc_dtype = output_dtype
+    if output_dtype in (torch.float16, torch.bfloat16):
+        acc_dtype = torch.float32
 
     if input_dtype != acc_dtype:
         input = cast_trt_tensor(ctx, input, acc_dtype, f"{name}_input_cast")
@@ -466,7 +472,12 @@ def _cumsum_with_loop(
     loop_output = loop.add_loop_output(current_sum, trt.LoopOutput.CONCATENATE, dim)
     set_layer_name(loop_output, target, f"{name}_loop_output", source_ir)
     loop_output.set_input(1, trip_limit)
-    return loop_output.get_output(0)
+    result = loop_output.get_output(0)
+    if acc_dtype is not output_dtype:
+        result = cast_trt_tensor(
+            ctx, result, output_dtype, f"{name}_output_cast", target, source_ir
+        )
+    return result
 
 
 def cumsum(
