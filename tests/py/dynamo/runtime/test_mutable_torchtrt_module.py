@@ -914,3 +914,51 @@ def test_offload_module_to_cpu_keeps_torch_executed_weights_on_device():
 
     # Clean up model env
     torch._dynamo.reset()
+
+
+class _FullyFallenBackNet(nn.Module):
+    """A net that runs only linear, with weights on the root and in a child module."""
+
+    def __init__(self):
+        super().__init__()
+        self.weight = nn.Parameter(torch.randn(4, 3))
+        self.bias = nn.Parameter(torch.randn(4))
+        self.fc = nn.Linear(4, 2)
+
+    def forward(self, x):
+        return self.fc(F.linear(x, self.weight, self.bias))
+
+
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    "TorchScript Frontend is not available",
+)
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.refit,
+    "Refit feature is not supported in Python 3.13 or higher",
+)
+@pytest.mark.unit
+def test_offload_module_to_cpu_keeps_full_fallback_weights_on_device():
+    torch.manual_seed(0)
+    model = _FullyFallenBackNet().eval().to("cuda")
+    args = [torch.rand((2, 3)).to("cuda")]
+    expected_outputs = model(*args)
+
+    # The spec keeps linear in PyTorch, and this net runs nothing else. So no operation
+    # converts, and the root graph reads every weight itself.
+    compile_spec = dict(_PARTIAL_FALLBACK_SPEC, offload_module_to_cpu=True)
+    mutable_module = torch_trt.MutableTorchTensorRTModule(model, **compile_spec)
+    outputs = mutable_module(*args)
+
+    assertions.assertFalse(
+        any("_run_on_acc" in name for name, _ in mutable_module.gm.named_children()),
+        msg="TensorRT took part of the graph, so this test does not cover a full fallback.",
+    )
+    assertions.assertTrue(
+        check_output_equal(expected_outputs, outputs),
+        msg="The output of the source model and the compiled module is not the same.",
+    )
+    _assert_state_on(_all_state(mutable_module.gm), "cuda", "Compiled module state")
+
+    # Clean up model env
+    torch._dynamo.reset()

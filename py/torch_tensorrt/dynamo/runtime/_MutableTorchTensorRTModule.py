@@ -22,6 +22,7 @@ from torch_tensorrt.dynamo._compiler import compile as dynamo_compile
 from torch_tensorrt.dynamo._refit import refit_module_weights
 from torch_tensorrt.dynamo.utils import (
     deallocate_module,
+    pin_torch_executed_state,
     to_torch_device,
     to_torch_tensorrt_device,
 )
@@ -114,21 +115,6 @@ def _is_modelopt_quantized(model: torch.nn.Module) -> bool:
         return False
 
 
-def _pin_torch_executed_state(gm: torch.fx.GraphModule, device: torch.device) -> None:
-    """Place the state the compiled module still executes in PyTorch on ``device``.
-
-    Only the TensorRT submodules can spare their weights -- those live inside the engine.
-    Everything the partitioner left in PyTorch still reads its parameters from the graph
-    module, and ``compile_module`` puts those submodules on the target device the same way.
-    """
-    for name, submodule in gm.named_children():
-        if not isinstance(submodule, torch.fx.GraphModule):
-            continue
-        if "_run_on_acc" in name:
-            continue
-        submodule.to(device)
-
-
 def _offload_original_model(module: "MutableTorchTensorRTModule") -> None:
     """Offload the source PyTorch module without breaking the compiled one.
 
@@ -138,7 +124,7 @@ def _offload_original_model(module: "MutableTorchTensorRTModule") -> None:
     """
     deallocate_module(module.original_model)
     if module.gm is not None:
-        _pin_torch_executed_state(module.gm, to_torch_device(module.trt_device))
+        pin_torch_executed_state(module.gm, to_torch_device(module.trt_device))
 
 
 class RefitFlag(Enum):
