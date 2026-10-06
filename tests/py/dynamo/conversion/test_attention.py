@@ -135,7 +135,6 @@ class TestEfficientAttention(DispatchTestCase):
             inputs,
             rtol=1e-2,
             atol=1e-2,
-            precision=torch.float16,
             enable_passes=True,
             decompose_attention=True,
         )
