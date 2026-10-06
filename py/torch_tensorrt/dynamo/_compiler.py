@@ -66,6 +66,7 @@ from torch_tensorrt.dynamo.utils import (
     get_flat_args_with_check,
     get_output_metadata,
     parse_graph_io,
+    pin_torch_executed_state,
     prepare_inputs,
     to_torch_device,
     to_torch_tensorrt_device,
@@ -1380,6 +1381,10 @@ def compile_module(
         dryrun_tracker.to_run_in_torch.extend(parse_non_trt_nodes(gm))
         parse_graph_io(gm, dryrun_tracker)
         dryrun_stats_display(dryrun_tracker, settings.dryrun)
+        # compile() offloaded gm before this call. No operation converted, so all of gm
+        # runs in PyTorch, and its state must go back to the device.
+        if settings.offload_module_to_cpu:
+            pin_torch_executed_state(gm, to_torch_device(settings.device))
         return gm
     else:
         logger.debug(
