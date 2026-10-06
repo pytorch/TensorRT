@@ -243,6 +243,18 @@ def test_inline_trt_modules_tensorizes_scalar_inputs_and_restores_outputs():
     assert item_nodes[0].meta["val"] is scalar_val
 
 
+def _drop_guards_fn(gm: torch.fx.GraphModule) -> None:
+    """Remove the _guards_fn node that ExportedProgram.module() adds.
+
+    A compiled TensorRT GraphModule has no _guards_fn node, so this gives the
+    graph that create_trt_exp_program gets in the normal flow.
+    """
+    for node in list(gm.graph.nodes):
+        if node.op == "call_module" and node.target == "_guards_fn":
+            gm.graph.erase_node(node)
+            break
+
+
 @pytest.mark.unit
 def test_create_trt_exp_program_rebuilds_in_spec_without_inputs():
     """create_trt_exp_program must rebuild a correct in_spec on the plain-CodeGen
@@ -266,10 +278,7 @@ def test_create_trt_exp_program_rebuilds_in_spec_without_inputs():
     # lift_mutated_buffers strips both (replacing the codegen with a plain one) for
     # mutated-buffer models. Replicate that so the fallback branch is exercised.
     gm = torch.export.export(M().eval(), (torch.randn(3, 4),)).module()
-    for node in list(gm.graph.nodes):
-        if node.op == "call_module" and node.target == "_guards_fn":
-            gm.graph.erase_node(node)
-            break
+    _drop_guards_fn(gm)
     gm.graph.set_codegen(torch.fx.graph.CodeGen())
     gm.graph.lint()
     gm.recompile()
@@ -306,11 +315,8 @@ def test_create_trt_exp_program_reorders_kwargs_to_placeholder_order():
     gm = torch.export.export(
         Sub().eval(), (), {"a": torch.tensor(10.0), "b": torch.tensor(3.0)}
     ).module()
+    _drop_guards_fn(gm)
     # Force the plain-CodeGen fallback branch (see the no-input test above).
-    for node in list(gm.graph.nodes):
-        if node.op == "call_module" and node.target == "_guards_fn":
-            gm.graph.erase_node(node)
-            break
     gm.graph.set_codegen(torch.fx.graph.CodeGen())
     gm.graph.lint()
     gm.recompile()
@@ -354,12 +360,7 @@ def test_create_trt_exp_program_handles_get_attrs_before_placeholders():
     gm = torch.export.export(
         Linear().eval(), (torch.randn(4, 10),), dynamic_shapes={"x": {0: batch}}
     ).module()
-    # A compiled TRT GraphModule carries no _guards_fn; drop it so the graph
-    # matches what create_trt_exp_program is handed in the normal flow.
-    for node in list(gm.graph.nodes):
-        if node.op == "call_module" and node.target == "_guards_fn":
-            gm.graph.erase_node(node)
-            break
+    _drop_guards_fn(gm)
     gm.graph.lint()
     gm.recompile()
 
@@ -371,7 +372,6 @@ def test_create_trt_exp_program_handles_get_attrs_before_placeholders():
         gm, arg_inputs=(torch.randn(4, 10),), dynamic_shapes={"x": {0: batch}}
     )
 
-    # The user-specified Dim bound survived, so path 1 (make_constraints) ran.
     assert [str(vr) for vr in ep.range_constraints.values()] == ["VR[2, 8]"]
     assert [s.kind.name for s in ep.graph_signature.input_specs] == [
         "PARAMETER",
@@ -407,11 +407,8 @@ def test_create_trt_exp_program_handles_write_only_copyback_buffer():
         (torch.randn(4, 3),),
         dynamic_shapes={"x": {0: batch}},
     ).module()
+    _drop_guards_fn(gm)
     # Force the plain-CodeGen fallback branch (see the no-input test above).
-    for node in list(gm.graph.nodes):
-        if node.op == "call_module" and node.target == "_guards_fn":
-            gm.graph.erase_node(node)
-            break
     gm.graph.set_codegen(torch.fx.graph.CodeGen())
     gm.graph.lint()
     gm.recompile()
@@ -427,7 +424,6 @@ def test_create_trt_exp_program_handles_write_only_copyback_buffer():
         gm, arg_inputs=(torch.randn(4, 3),), dynamic_shapes={"x": {0: batch}}
     )
 
-    # The user-specified Dim bound survived, so path 1 (make_constraints) ran.
     assert [str(vr) for vr in ep.range_constraints.values()] == ["VR[2, 8]"]
     assert [(s.kind.name, s.target) for s in ep.graph_signature.input_specs] == [
         ("BUFFER", "state"),
