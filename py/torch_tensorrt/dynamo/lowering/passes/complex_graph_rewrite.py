@@ -1294,7 +1294,14 @@ class ComplexGraphRewriter:
 
         with SubgraphBuilder(self.gm.graph, node) as b:
             if to_complex and from_complex:
-                # remap dtype, [..., 2] layout unchanged
+                # remap dtype, [..., 2] layout unchanged. channels_last formats
+                # require the complex rank, which the trailing dim breaks; TRT
+                # ignores memory_format anyway.
+                if kwargs.get("memory_format") in (
+                    torch.channels_last,
+                    torch.channels_last_3d,
+                ):
+                    del kwargs["memory_format"]
                 out = b(torch.ops.aten._to_copy.default, inp)
                 out.kwargs = kwargs
                 out.meta["is_complex_layout"] = True

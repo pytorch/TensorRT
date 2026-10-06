@@ -628,6 +628,24 @@ def test_to_copy_complex_dtype():
 
 
 @pytest.mark.unit
+def test_to_copy_complex_channels_last():
+    """channels_last needs rank 4; the [..., 2] layout copy is rank 5."""
+
+    class M(nn.Module):
+        def forward(self, z):
+            return torch.ops.aten._to_copy.default(
+                z, dtype=torch.complex64, memory_format=torch.channels_last
+            )
+
+    z = torch.randn(2, 3, 4, 5, dtype=torch.complex64)
+    gm = _export_and_lower(M(), (z,))
+    targets = {n.target for n in gm.graph.nodes if n.op == "call_function"}
+    assert torch.ops.aten.view_as_complex.default not in targets
+    assert torch.ops.aten.view_as_real.default not in targets
+    _check_op(M(), (z,), "to_copy_complex_channels_last")
+
+
+@pytest.mark.unit
 def test_to_copy_complex_to_real():
     """z.to(float) discards the imaginary part and the trailing real/imag dim."""
 
@@ -1319,7 +1337,9 @@ def test_none_placeholder():
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("scale", [torch.tensor(2.0), 2, True], ids=["tensor", "int", "bool"])
+@pytest.mark.parametrize(
+    "scale", [torch.tensor(2.0), 2, True], ids=["tensor", "int", "bool"]
+)
 def test_non_tensor_scalar_placeholder(scale):
     class RotaryComplex(nn.Module):
         def forward(self, xq, freqs_cis, scale):
