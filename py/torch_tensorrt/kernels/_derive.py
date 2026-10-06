@@ -21,7 +21,8 @@ from typing import Any, Callable, Dict, List, Sequence, Tuple
 
 import torch
 
-from torch_tensorrt.kernels._cuda_python_spec import _default_cuda_include_paths
+from torch_tensorrt.kernels import _nvrtc
+from torch_tensorrt.kernels._common import pack_symint32_args
 from torch_tensorrt.kernels._dsl import (
     Custom,
     DimSize,
@@ -300,20 +301,17 @@ def _pack_extras_eager(
 def _pack_extras_aot(extras: List[ExtraArg], input_desc_by_name: Dict[str, Any]) -> Any:
     import tensorrt.plugin as trtp
 
-    if not extras:
-        return trtp.SymIntExprs(0)
-
-    sym_exprs = trtp.SymIntExprs(len(extras))
-    for i, e in enumerate(extras):
+    values = []
+    for e in extras:
         src = input_desc_by_name[e.input_name]
         if isinstance(e, Numel):
-            sym_exprs[i] = trtp.SymInt32(src.shape_expr.numel())
+            values.append(src.shape_expr.numel())
         elif isinstance(e, DimSize):
             axis = _resolve_axis(e.axis, len(src.shape_expr))
-            sym_exprs[i] = trtp.SymInt32(src.shape_expr[axis])
+            values.append(src.shape_expr[axis])
         else:
             raise TypeError(f"Unsupported ExtraArg: {e!r}")
-    return sym_exprs
+    return pack_symint32_args(values, trtp)
 
 
 # =============================================================================
@@ -404,45 +402,14 @@ def _make_positional_fn(
 
 def _compile_kernel(spec: KernelSpec) -> Tuple[bytes, Any, Any]:
     """Compile spec.kernel_source to PTX + get a loadable kernel object."""
-    try:
-        from cuda.core import (
-            Device,
-            Program,
-            ProgramOptions,
-        )
-    except ImportError:
-        from cuda.core.experimental import (
-            Device,
-            Program,
-            ProgramOptions,
-        )
-
-    device = Device()
-    device.set_current()
-    arch = spec.arch_override if spec.arch_override else f"sm_{device.arch}"
-    include_paths = (
-        list(spec.include_paths)
-        if spec.include_paths is not None
-        else _default_cuda_include_paths()
+    return _nvrtc.compile_to_ptx(
+        spec.kernel_source,
+        spec.kernel_name,
+        spec.include_paths,
+        spec.compile_std,
+        spec.arch_override,
+        load_kernel=True,
     )
-    options = ProgramOptions(
-        std=spec.compile_std, arch=arch, include_path=include_paths
-    )
-    # Two Program instances because cuda.core consumes name_expressions on the
-    # first compile() and raises NVRTC_ERROR_NO_NAME_EXPRESSIONS_AFTER_COMPILATION
-    # on the second call.
-    ptx_program = Program(spec.kernel_source, code_type="c++", options=options)
-    ptx: bytes = ptx_program.compile("ptx", name_expressions=(spec.kernel_name,)).code
-    # Use CUBIN — not PTX — to materialize the loadable kernel for the eager
-    # path.  Loading PTX goes through the driver's PTX JIT, which raises
-    # CUDA_ERROR_UNSUPPORTED_PTX_VERSION when the host driver predates the PTX
-    # ISA emitted by NVRTC (e.g. CI hosts on an older CUDA driver running
-    # cuda-python wheels built against a newer CUDA toolkit). CUBIN is loaded
-    # as-is — no driver-side PTX compatibility check.
-    cubin_program = Program(spec.kernel_source, code_type="c++", options=options)
-    cubin_module = cubin_program.compile("cubin", name_expressions=(spec.kernel_name,))
-    kernel = cubin_module.get_kernel(spec.kernel_name)
-    return ptx, device, kernel
 
 
 # =============================================================================
@@ -488,12 +455,7 @@ def _make_meta_fn(spec: KernelSpec) -> Callable[..., Any]:
 def _make_eager_fn(
     spec: KernelSpec, kernel_obj: Any, device: Any
 ) -> Callable[..., Any]:
-    try:
-        from cuda.core import LaunchConfig
-        from cuda.core import launch as cuda_launch
-    except ImportError:
-        from cuda.core.experimental import LaunchConfig
-        from cuda.core.experimental import launch as cuda_launch
+    _, _, _, cuda_launch, LaunchConfig = _nvrtc._cuda_core_imports()
 
     assert spec.inputs is not None and spec.outputs is not None
     input_specs = list(spec.inputs)

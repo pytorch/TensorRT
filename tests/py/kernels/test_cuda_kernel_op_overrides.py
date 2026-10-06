@@ -135,6 +135,39 @@ def test_override_missing_required_dsl_field(kwargs, match):
         ttk.cuda_kernel_op("ttk_test::missing", spec, **kwargs)
 
 
+@skip_no_qdp
+@pytest.mark.parametrize(
+    "override",
+    [
+        {"op_name": "unqualified"},
+        {"meta_fn": 1},
+        {"eager_fn": 1},
+        {"aot_fn": 1},
+        {"capability_validator": 1},
+    ],
+)
+def test_cuda_preflight_rejects_invalid_registration_before_compile(
+    monkeypatch, override
+):
+    from torch_tensorrt.kernels import _derive
+
+    monkeypatch.setattr(
+        _derive,
+        "_compile_kernel",
+        lambda *args: pytest.fail("invalid registration must not compile"),
+    )
+    options = dict(
+        op_name="ttk_test::cuda_invalid_preflight",
+        spec=ttk.KernelSpec(kernel_source="// s", kernel_name="k"),
+        meta_fn=lambda x: x,
+        eager_fn=lambda x: x,
+        aot_fn=lambda *args: None,
+    )
+    options.update(override)
+    with pytest.raises(ValueError):
+        ttk.cuda_kernel_op(**options)
+
+
 def test_precompiled_qdp_registrar_skips_nvrtc(monkeypatch):
     """The common precompiled path must never invoke NVRTC."""
     from torch_tensorrt.kernels import _nvrtc, _register
