@@ -542,11 +542,11 @@ of it only when `cudaStreamEndCapture` hands back
 `cudaErrorStreamCaptureInvalidated` and a null graph, long after the call that
 caused it.
 
-The check sits ahead of everything `execute()` does that a capture cannot take,
-not merely ahead of the pool's own calls: the wait on a previous enqueue and the
-`cudaMalloc` that grows a host-input staging buffer come before those and, outside
-`Relaxed`, would invalidate the capture first. Only the device query and the
-device switch run before the check, and a capture takes both.
+The capture check runs before the wait on a previous enqueue, the `cudaMalloc`
+that grows a host-input staging buffer, and the `cudaFree(nullptr)` that makes a
+context current for a default stream. These calls precede the pool's own calls
+and, outside `Relaxed`, can invalidate the capture. Only the device query and
+the device switch run before the check, and a capture takes both.
 
 Where the query fails for a reason that is not a capture, the call is not told it
 is capturing. `cudaStreamIsCapturing` also hands back a sticky fault left by
@@ -557,16 +557,15 @@ memory access it returns that fault with the capture status still
 failure that does still mean a capture, `cudaErrorStreamCaptureImplicit`, is
 refused with the rest.
 
-Only the selected stream is checked. A capture running on another stream under
-`Global`, or under `ThreadLocal` from the calling thread, is invalidated by the
-same calls and is not refused, because CUDA has no query for "is a capture live in
-this process". So that much is the caller's to keep: do not run a pooled engine
-while any capture is open anywhere in the process. Turning the option off removes
-the refusal, since the check lives inside the pooled path, but this delegate does
-not support capture with the option off either. No call shape here is built or
-tested for it, and the completion event `execute()` records so that the next call
-can wait for an enqueue that outlived the return would become a node of the graph
-rather than an event the host can wait on.
+Only handles that claim pooled scratch check their selected stream. A capture
+on another stream is not checked. Do not overlap `execute()` with a `Global`
+capture on any thread or a `ThreadLocal` capture on the calling thread. This
+applies to every stream, including streams created by the caller, with the option
+off or with an option-on engine that needs no scratch. Those engines skip the
+capture check, and their final `cudaStreamSynchronize` can fail and invalidate
+the capture. On a default stream, `cudaFree(nullptr)` can fail earlier, before
+enqueueing. A `ThreadLocal` capture on another thread is not affected by these
+calls. This does not make capturing the delegate itself supported.
 
 ### cudaDeviceReset() is not survivable
 

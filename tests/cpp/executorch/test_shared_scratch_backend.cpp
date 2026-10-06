@@ -69,6 +69,7 @@
 #include "torch_tensorrt/executorch/TensorRTBlobHeader.h"
 
 #include <NvInfer.h>
+#include <cudaTypedefs.h>
 #include <cuda_runtime.h>
 
 #include <executorch/extension/cuda/caller_stream.h>
@@ -1907,6 +1908,66 @@ TEST_F(SharedScratchBackendTest, APooledEngineRefusesACaptureBeforeAnythingCanIn
   ASSERT_EQ(cudaStreamDestroy(stream), cudaSuccess);
 }
 
+// The same refusal on the per-thread stream used when no caller stream is set. The call that makes a
+// context current for that stream is one a capture cannot take, so the refusal has to come first.
+TEST_F(SharedScratchBackendTest, APooledEngineWithNoCallerStreamRefusesACaptureBeforeAnythingCanInvalidateIt) {
+  ASSERT_EQ(set_shared_scratch(backend_, true), Error::Ok);
+  void* captured_target = nullptr;
+  ASSERT_EQ(cudaMalloc(&captured_target, 16), cudaSuccess);
+
+  LoadedEngine pooled;
+  ASSERT_EQ(pooled.load(blob(), 22), Error::Ok);
+  ASSERT_TRUE(pooled.handle()->shared_scratch);
+
+  ASSERT_EQ(cudaStreamBeginCapture(cudaStreamPerThread, cudaStreamCaptureModeGlobal), cudaSuccess);
+  ASSERT_EQ(cudaMemsetAsync(captured_target, 0, 16, cudaStreamPerThread), cudaSuccess);
+  const Error captured = pooled.run_on_the_synchronized_path();
+  cudaGraph_t graph = nullptr;
+  const cudaError_t end_err = cudaStreamEndCapture(cudaStreamPerThread, &graph);
+  const bool have_graph = graph != nullptr;
+  if (have_graph) {
+    cudaGraphDestroy(graph);
+  }
+
+  EXPECT_EQ(captured, Error::NotSupported) << "execute() did not refuse a pooled run capturing on its fallback stream";
+  EXPECT_EQ(end_err, cudaSuccess) << "the refused run had already made a call the capture could not take: "
+                                  << cudaGetErrorString(end_err);
+  EXPECT_TRUE(have_graph) << "the capture ended with no graph, so the run invalidated it before refusing";
+
+  EXPECT_EQ(cudaFree(captured_target), cudaSuccess);
+}
+
+// A Global capture cannot take cudaFree(nullptr), so bad input must be refused before that call.
+TEST_F(SharedScratchBackendTest, AnUnpooledEngineRefusesABadInputBeforeAnythingCanInvalidateACapture) {
+  LoadedEngine engine;
+  // A batch of two, where the engine's profile admits only one.
+  ASSERT_EQ(engine.load(blob(), 26, kRows, kCols, 2), Error::Ok);
+  ASSERT_FALSE(engine.handle()->shared_scratch);
+
+  cudaStream_t stream = nullptr;
+  ASSERT_EQ(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking), cudaSuccess);
+  void* captured_target = nullptr;
+  ASSERT_EQ(cudaMalloc(&captured_target, 16), cudaSuccess);
+
+  ASSERT_EQ(cudaStreamBeginCapture(stream, cudaStreamCaptureModeGlobal), cudaSuccess);
+  ASSERT_EQ(cudaMemsetAsync(captured_target, 0, 16, stream), cudaSuccess);
+  const Error refused = engine.run_on_the_synchronized_path();
+  cudaGraph_t graph = nullptr;
+  const cudaError_t end_err = cudaStreamEndCapture(stream, &graph);
+  const bool have_graph = graph != nullptr;
+  if (have_graph) {
+    cudaGraphDestroy(graph);
+  }
+
+  EXPECT_EQ(refused, Error::InvalidArgument) << "execute() did not refuse an input outside the engine's profile";
+  EXPECT_EQ(end_err, cudaSuccess) << "the refused run had already made a call the capture could not take: "
+                                  << cudaGetErrorString(end_err);
+  EXPECT_TRUE(have_graph) << "the capture ended with no graph, so the run invalidated it before refusing";
+
+  EXPECT_EQ(cudaFree(captured_target), cudaSuccess);
+  ASSERT_EQ(cudaStreamDestroy(stream), cudaSuccess);
+}
+
 // ---------------------------------------------------------------------------
 // The enqueue handoff, single-threaded, two caller streams
 // ---------------------------------------------------------------------------
@@ -2699,6 +2760,181 @@ TEST_F(SharedScratchBackendTest, AFailedUnpooledCallDrainsTheHostInputCopyItQueu
       << "a failing call left the host input copy it queued still running: that copy reads the caller's own memory, "
          "and the caller owns that memory again the moment execute() returns, so an error return between the copy and "
          "the synchronize on the success path has to drain it";
+}
+
+// ---------------------------------------------------------------------------
+// A thread that has not used CUDA yet
+// ---------------------------------------------------------------------------
+
+// The driver calls are looked up through the runtime, so this target links no driver library.
+template <typename Fn>
+bool find_driver_function(const char* symbol, unsigned int version, Fn& fn) {
+  cudaDriverEntryPointQueryResult query_result = cudaDriverEntryPointSymbolNotFound;
+  const cudaError_t err = cudaGetDriverEntryPointByVersion(
+      symbol, reinterpret_cast<void**>(&fn), version, cudaEnableDefault, &query_result);
+  return err == cudaSuccess && query_result == cudaDriverEntryPointSuccess;
+}
+
+// TensorRT 11.3 needs a current context for its default-stream driver lookup; 11.1 passes without the fix.
+// Each selection needs a fresh thread because a context stays current after a call.
+void check_default_streams_on_fresh_threads(LoadedEngine& engine) {
+  ASSERT_EQ(engine.run_on_the_synchronized_path(), Error::Ok);
+  const std::vector<float> expected = engine.read_output();
+  ASSERT_EQ(expected.size(), kElems);
+  ASSERT_NE(expected[0], kSentinel) << "the reference output is the sentinel, so a skipped enqueue would pass";
+  PFN_cuCtxGetCurrent_v4000 ctx_get_current = nullptr;
+  ASSERT_TRUE(find_driver_function("cuCtxGetCurrent", 4000, ctx_get_current));
+
+  struct Selection {
+    const char* name;
+    bool scoped;
+    cudaStream_t stream;
+  };
+  const Selection selections[] = {
+      {"no caller stream", false, nullptr},
+      // nullptr passes without the fix on 11.3 too; this row guards compatibility, not initialization.
+      {"nullptr", true, nullptr},
+      {"cudaStreamLegacy", true, cudaStreamLegacy},
+      {"cudaStreamPerThread", true, cudaStreamPerThread},
+  };
+  for (const Selection& selection : selections) {
+    ASSERT_TRUE(engine.fill_output(kSentinel));
+    Error result = Error::Internal;
+    CUresult query = CUDA_ERROR_UNKNOWN;
+    CUcontext starting_context = nullptr;
+    std::thread worker([&] {
+      query = ctx_get_current(&starting_context);
+      result = selection.scoped ? engine.run(selection.stream) : engine.run_on_the_synchronized_path();
+    });
+    worker.join();
+    ASSERT_EQ(query, CUDA_SUCCESS);
+    EXPECT_EQ(starting_context, nullptr) << "the worker already had a current context, so the run with "
+                                         << selection.name << " did not start on a thread that has not used CUDA";
+    EXPECT_EQ(result, Error::Ok) << "the first run on a new thread failed with " << selection.name;
+    const std::vector<float> actual = engine.read_output();
+    EXPECT_TRUE(actual.size() == expected.size() && std::memcmp(actual.data(), expected.data(), kBytes) == 0)
+        << "the first run on a new thread with " << selection.name << " did not produce the main thread's output";
+  }
+}
+
+TEST_F(SharedScratchBackendTest, AnUnpooledRunWorksOnEachDefaultStreamFromAThreadThatHasNotUsedCuda) {
+  LoadedEngine engine;
+  ASSERT_EQ(engine.load(blob(), 23), Error::Ok);
+  ASSERT_FALSE(engine.handle()->shared_scratch);
+  check_default_streams_on_fresh_threads(engine);
+}
+
+TEST_F(SharedScratchBackendTest, AScratchFreeRunWithThePoolEnabledWorksOnEachDefaultStreamFromAFreshThread) {
+  ASSERT_EQ(set_shared_scratch(backend_, true), Error::Ok);
+  LoadedEngine engine;
+  ASSERT_EQ(engine.load(scratch_free_blob(), 23), Error::Ok);
+  ASSERT_TRUE(engine.handle()->shared_scratch);
+  ASSERT_FALSE(engine.handle()->claims_pooled_scratch);
+  ASSERT_EQ(engine.handle()->engine->getDeviceMemorySizeV2(), 0);
+  check_default_streams_on_fresh_threads(engine);
+}
+
+TEST_F(SharedScratchBackendTest, APooledRunWorksOnEachDefaultStreamFromAFreshThread) {
+  ASSERT_EQ(set_shared_scratch(backend_, true), Error::Ok);
+  LoadedEngine engine;
+  ASSERT_EQ(engine.load(blob(), 23), Error::Ok);
+  ASSERT_TRUE(engine.handle()->claims_pooled_scratch);
+  check_default_streams_on_fresh_threads(engine);
+}
+
+// execute() calls cudaFree(nullptr) rather than cudaSetDevice, which would replace a context the caller made current
+// with the device's primary context. The engine loads inside the caller's context because its memory belongs to the
+// context current at load.
+TEST_F(SharedScratchBackendTest, ARunWithNoCallerStreamKeepsTheContextTheCallerMadeCurrent) {
+  PFN_cuDeviceGet_v2000 device_get = nullptr;
+  PFN_cuCtxCreate_v3020 ctx_create = nullptr;
+  PFN_cuCtxGetCurrent_v4000 ctx_get_current = nullptr;
+  PFN_cuCtxSetCurrent_v4000 ctx_set_current = nullptr;
+  PFN_cuCtxDestroy_v4000 ctx_destroy = nullptr;
+  ASSERT_TRUE(find_driver_function("cuDeviceGet", 2000, device_get));
+  ASSERT_TRUE(find_driver_function("cuCtxCreate", 3020, ctx_create));
+  ASSERT_TRUE(find_driver_function("cuCtxGetCurrent", 4000, ctx_get_current));
+  ASSERT_TRUE(find_driver_function("cuCtxSetCurrent", 4000, ctx_set_current));
+  ASSERT_TRUE(find_driver_function("cuCtxDestroy", 4000, ctx_destroy));
+
+  CUcontext created = nullptr;
+  CUcontext current_after_run = nullptr;
+  Error load_result = Error::Internal;
+  Error run_result = Error::Internal;
+  std::thread worker([&] {
+    CUdevice device = 0;
+    if (device_get(&device, 0) != CUDA_SUCCESS || ctx_create(&created, 0, device) != CUDA_SUCCESS) {
+      return;
+    }
+    {
+      LoadedEngine engine;
+      load_result = engine.load(blob(), 47);
+      if (load_result == Error::Ok) {
+        run_result = engine.run_on_the_synchronized_path();
+      }
+      ctx_get_current(&current_after_run);
+      // The engine is torn down in the context that owns it, even after a run that replaced that context.
+      ctx_set_current(created);
+    }
+    ctx_destroy(created);
+  });
+  worker.join();
+  ASSERT_NE(created, nullptr) << "could not create a CUDA context on device 0";
+  ASSERT_EQ(load_result, Error::Ok);
+  EXPECT_EQ(run_result, Error::Ok) << "a run with no caller stream failed inside a context the caller made current";
+  EXPECT_EQ(current_after_run, created) << "a run with no caller stream replaced the context the caller made current";
+}
+
+// A Global capture on any thread prohibits cudaFree(nullptr). Its failure must leave no pending CUDA error
+// and stop before enqueue: without this call, the engine writes the output before the final synchronize fails.
+TEST_F(SharedScratchBackendTest, AFailedContextCallReturnsInternalAndLeavesNoCudaErrorPending) {
+  LoadedEngine engine;
+  ASSERT_EQ(engine.load(blob(), 25), Error::Ok);
+  ASSERT_FALSE(engine.handle()->shared_scratch);
+  ASSERT_TRUE(engine.fill_output(kSentinel));
+
+  std::mutex mu;
+  std::condition_variable cv;
+  bool capturing = false;
+  bool run_done = false;
+  cudaError_t begin_err = cudaErrorUnknown;
+  cudaError_t end_err = cudaErrorUnknown;
+  bool have_graph = false;
+  std::thread capturer([&] {
+    begin_err = cudaStreamBeginCapture(cudaStreamPerThread, cudaStreamCaptureModeGlobal);
+    std::unique_lock<std::mutex> lock(mu);
+    capturing = true;
+    cv.notify_all();
+    cv.wait(lock, [&] { return run_done; });
+    cudaGraph_t graph = nullptr;
+    end_err = cudaStreamEndCapture(cudaStreamPerThread, &graph);
+    have_graph = graph != nullptr;
+    if (have_graph) {
+      cudaGraphDestroy(graph);
+    }
+  });
+  {
+    std::unique_lock<std::mutex> lock(mu);
+    cv.wait(lock, [&] { return capturing; });
+  }
+  const Error result = engine.run_on_the_synchronized_path();
+  const cudaError_t pending = cudaGetLastError();
+  {
+    std::lock_guard<std::mutex> lock(mu);
+    run_done = true;
+  }
+  cv.notify_all();
+  capturer.join();
+
+  ASSERT_EQ(begin_err, cudaSuccess) << "the other thread could not begin its capture";
+  EXPECT_EQ(end_err, cudaErrorStreamCaptureInvalidated);
+  EXPECT_FALSE(have_graph);
+  EXPECT_EQ(result, Error::Internal) << "a run whose context call failed did not return Internal";
+  EXPECT_EQ(pending, cudaSuccess) << "the failed context call left '" << cudaGetErrorString(pending)
+                                  << "' pending for the caller's next CUDA call to report";
+  const std::vector<float> output = engine.read_output();
+  ASSERT_EQ(output.size(), kElems);
+  EXPECT_EQ(output[0], kSentinel) << "the engine wrote its output, so the run did not stop at the failed context call";
 }
 
 // ---------------------------------------------------------------------------
