@@ -111,7 +111,13 @@ jobs:
         run: |
           set -euxo pipefail
           echo "::group::Cleanup debug output"
-          rm -rfv "${GITHUB_WORKSPACE}"
+          # Clear the workspace without removing the directory itself. On an OSDC
+          # runner GITHUB_WORKSPACE is a bind mount into the job container, and
+          # deleting it detaches the mount: later steps fail with "getcwd: cannot
+          # access parent directories" and local actions resolve against a host
+          # path that no longer matches what the container sees. EC2 runners reuse
+          # the workspace between jobs, so its contents still need clearing.
+          find "${GITHUB_WORKSPACE}" -mindepth 1 -delete 2>/dev/null || true
           mkdir -p "${GITHUB_WORKSPACE}"
           echo "::endgroup::"
       - uses: actions/checkout@v6
@@ -121,11 +127,11 @@ jobs:
           ref: ${{ inputs.test-infra-ref }}
           path: test-infra
       - name: Setup SSH
-        uses: ./test-infra/.github/actions/setup-ssh
+        uses: pytorch/test-infra/.github/actions/setup-ssh@main
         with:
           github-secret: ${{ github.token }}
-      - uses: ./test-infra/.github/actions/set-channel
-      - uses: ./test-infra/.github/actions/setup-binary-builds
+      - uses: pytorch/test-infra/.github/actions/set-channel@main
+      - uses: pytorch/test-infra/.github/actions/setup-binary-builds@main
         with:
           repository: ${{ inputs.repository }}
           ref: ${{ inputs.ref }}
@@ -144,7 +150,7 @@ jobs:
         run: echo "ARTIFACT_NAME=${ARTIFACT_NAME}_rtx" >> "${GITHUB_ENV}"
       - name: Run Pre-Script with Caching
         if: ${{ inputs.pre-script != '' }}
-        uses: ./test-infra/.github/actions/run-script-with-cache
+        uses: pytorch/test-infra/.github/actions/run-script-with-cache@main
         with:
           cache-path: ${{ inputs.cache-path }}
           cache-key: ${{ inputs.cache-key }}
@@ -164,7 +170,7 @@ jobs:
           path: /opt/torch-tensorrt-builds/
       # - name: Install torch and torch-tensorrt
       #   if: ${{ inputs.pre-script != '' }}
-      #   uses: ./test-infra/.github/actions/run-script-with-cache
+      #   uses: pytorch/test-infra/.github/actions/run-script-with-cache@main
       #   with:
       #     repository: ${{ inputs.repository  }}
       #     script: .github/scripts/install-torch-tensorrt.sh
@@ -174,6 +180,33 @@ jobs:
         with:
           name: ${{ inputs.additional-artifact }}-${{ env.ARTIFACT_NAME_SUFFIX }}
           path: /opt/torch-tensorrt-builds/
+      - name: Point the HuggingFace cache somewhere writable
+        # An OSDC runner mounts the shared model cache read-only at
+        # /mnt/hf_cache and exports HF_HOME pointing at it, so anything HF
+        # writes fails with "OSError: [Errno 30] Read-only file system".
+        #
+        # Pointing only HF_HOME at a writable dir is not enough: the hub's
+        # lock directory lives under HF_HUB_CACHE, so keeping that on the
+        # mount still fails in WeakFileLock on `.locks/models--<repo>/*.lock`
+        # -- even for a model that is already seeded there.
+        #
+        # So put the whole cache in RUNNER_TEMP. The trade is that models are
+        # downloaded per job instead of read from the shared mount; these
+        # suites pull a handful of small ones (bert-base-uncased,
+        # timm/efficientnet_b0), so that is cheap enough to prefer over
+        # splitting the paths.
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -d /mnt/hf_cache ]]; then
+            mkdir -p "${RUNNER_TEMP}/hf_home" "${RUNNER_TEMP}/hf_datasets"
+            {
+              echo "HF_HOME=${RUNNER_TEMP}/hf_home"
+              echo "HF_HUB_CACHE=${RUNNER_TEMP}/hf_home/hub"
+              echo "HF_DATASETS_CACHE=${RUNNER_TEMP}/hf_datasets"
+            } >> "${GITHUB_ENV}"
+          fi
+
       - name: Pack script
         continue-on-error: ${{ inputs.continue-on-error }}
         working-directory: ${{ inputs.repository }}
@@ -189,7 +222,7 @@ jobs:
           } > "user_script"
           cat .github/scripts/install-torch-tensorrt.sh user_script > exec_script
       - name: Run Script
-        uses: ./test-infra/.github/actions/run-script-with-cache
+        uses: pytorch/test-infra/.github/actions/run-script-with-cache@main
         with:
           repository: ${{ inputs.repository  }}
           script: exec_script
