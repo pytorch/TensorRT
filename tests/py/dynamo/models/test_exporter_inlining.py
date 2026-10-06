@@ -10,7 +10,6 @@ import operator
 import pytest
 import torch
 from torch._subclasses.fake_tensor import FakeTensorMode
-from torch.fx.experimental.symbolic_shapes import ShapeEnv
 from torch.export.graph_signature import (
     ExportGraphSignature,
     InputKind,
@@ -19,6 +18,7 @@ from torch.export.graph_signature import (
     OutputSpec,
     TensorArgument,
 )
+from torch.fx.experimental.symbolic_shapes import ShapeEnv
 from torch_tensorrt.dynamo._exporter import (
     create_trt_exp_program,
     inline_torch_modules,
@@ -77,7 +77,7 @@ def test_inline_torch_modules_wires_inputs_by_position():
 @pytest.mark.unit
 def test_inline_torch_modules_preserves_all_submodule_outputs():
     """A multi-output _run_on_gpu submodule must keep every output wired to its
-    consumer after inlining. Regression: a mis-wired input orphaned one submodule
+    consumer after inlining. Regression: a miswired input orphaned one submodule
     output, which dead-code elimination then pruned, leaving a downstream consumer
     (or, in the hybrid case, a TensorRT engine) short an output at runtime.
 
@@ -243,6 +243,18 @@ def test_inline_trt_modules_tensorizes_scalar_inputs_and_restores_outputs():
     assert item_nodes[0].meta["val"] is scalar_val
 
 
+def _drop_guards_fn(gm: torch.fx.GraphModule) -> None:
+    """Remove the _guards_fn node that ExportedProgram.module() adds.
+
+    A compiled TensorRT GraphModule has no _guards_fn node, so this gives the
+    graph that create_trt_exp_program gets in the normal flow.
+    """
+    for node in list(gm.graph.nodes):
+        if node.op == "call_module" and node.target == "_guards_fn":
+            gm.graph.erase_node(node)
+            break
+
+
 @pytest.mark.unit
 def test_create_trt_exp_program_rebuilds_in_spec_without_inputs():
     """create_trt_exp_program must rebuild a correct in_spec on the plain-CodeGen
@@ -266,10 +278,7 @@ def test_create_trt_exp_program_rebuilds_in_spec_without_inputs():
     # lift_mutated_buffers strips both (replacing the codegen with a plain one) for
     # mutated-buffer models. Replicate that so the fallback branch is exercised.
     gm = torch.export.export(M().eval(), (torch.randn(3, 4),)).module()
-    for node in list(gm.graph.nodes):
-        if node.op == "call_module" and node.target == "_guards_fn":
-            gm.graph.erase_node(node)
-            break
+    _drop_guards_fn(gm)
     gm.graph.set_codegen(torch.fx.graph.CodeGen())
     gm.graph.lint()
     gm.recompile()
@@ -306,11 +315,8 @@ def test_create_trt_exp_program_reorders_kwargs_to_placeholder_order():
     gm = torch.export.export(
         Sub().eval(), (), {"a": torch.tensor(10.0), "b": torch.tensor(3.0)}
     ).module()
+    _drop_guards_fn(gm)
     # Force the plain-CodeGen fallback branch (see the no-input test above).
-    for node in list(gm.graph.nodes):
-        if node.op == "call_module" and node.target == "_guards_fn":
-            gm.graph.erase_node(node)
-            break
     gm.graph.set_codegen(torch.fx.graph.CodeGen())
     gm.graph.lint()
     gm.recompile()
@@ -325,6 +331,116 @@ def test_create_trt_exp_program_reorders_kwargs_to_placeholder_order():
     out = ep.module()(a=torch.tensor(10.0), b=torch.tensor(3.0))
     out = out[0] if isinstance(out, (tuple, list)) else out
     assert torch.allclose(out, torch.tensor(7.0))
+
+
+@pytest.mark.unit
+def test_create_trt_exp_program_handles_get_attrs_before_placeholders():
+    """create_trt_exp_program must build range_constraints on a graph whose
+    get_attr nodes precede its user input.
+
+    Regression: when the partitioner sends ops back to PyTorch the parameters
+    come back as get_attr nodes AHEAD of the user inputs. torch's
+    make_constraints() indexes flat_dynamic_shapes by NODE position, not by
+    placeholder ordinal, so the lone input sitting at node index 2 made it read
+    flat_dynamic_shapes[2] on a one-element list and torch_tensorrt.save() died
+    with a bare "IndexError: list index out of range". Its own length check
+    passes, so nothing pointed at the real problem. An exported module reproduces
+    the node order exactly.
+    """
+
+    class Linear(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear = torch.nn.Linear(10, 5)
+
+        def forward(self, x):
+            return self.linear(x)
+
+    batch = torch.export.Dim("batch", min=2, max=8)
+    gm = torch.export.export(
+        Linear().eval(), (torch.randn(4, 10),), dynamic_shapes={"x": {0: batch}}
+    ).module()
+    _drop_guards_fn(gm)
+    gm.graph.lint()
+    gm.recompile()
+
+    nodes = list(gm.graph.nodes)
+    assert nodes[0].op == "get_attr"
+    assert [n.op for n in nodes].index("placeholder") > 0
+
+    ep = create_trt_exp_program(
+        gm, arg_inputs=(torch.randn(4, 10),), dynamic_shapes={"x": {0: batch}}
+    )
+
+    assert [str(vr) for vr in ep.range_constraints.values()] == ["VR[2, 8]"]
+    assert [s.kind.name for s in ep.graph_signature.input_specs] == [
+        "PARAMETER",
+        "PARAMETER",
+        "USER_INPUT",
+    ]
+
+    # And the program still runs at another batch size within the range.
+    out = ep.module()(torch.randn(3, 10))
+    out = out[0] if isinstance(out, (tuple, list)) else out
+    assert out.shape == (3, 5)
+
+
+@pytest.mark.unit
+def test_create_trt_exp_program_handles_write_only_copyback_buffer():
+    """create_trt_exp_program must build range_constraints after the copy-back
+    block adds a get_attr for a write-only buffer.
+
+    Regression: no node reads a write-only buffer, so transform() removes its
+    get_attr. The copy-back block then adds a get_attr before the first node of
+    the graph. When create_trt_exp_program ordered the placeholders before that
+    step, the get_attr stayed ahead of the user input, and make_constraints()
+    raised IndexError.
+    """
+
+    class WriteOnlyState(torch.nn.Module):
+        def forward(self, x):
+            return x + 1, x.sum(0)
+
+    batch = torch.export.Dim("batch", min=2, max=8)
+    gm = torch.export.export(
+        WriteOnlyState().eval(),
+        (torch.randn(4, 3),),
+        dynamic_shapes={"x": {0: batch}},
+    ).module()
+    _drop_guards_fn(gm)
+    # Force the plain-CodeGen fallback branch (see the no-input test above).
+    gm.graph.set_codegen(torch.fx.graph.CodeGen())
+    gm.graph.lint()
+    gm.recompile()
+    # The trailing output is the new value of "state". No node reads "state".
+    gm.register_buffer("state", torch.zeros(3))
+    gm.meta["_copyback_mutation_buffers"] = ["state"]
+
+    nodes = list(gm.graph.nodes)
+    assert nodes[0].op == "placeholder"
+    assert all(n.op != "get_attr" for n in nodes)
+
+    ep = create_trt_exp_program(
+        gm, arg_inputs=(torch.randn(4, 3),), dynamic_shapes={"x": {0: batch}}
+    )
+
+    assert [str(vr) for vr in ep.range_constraints.values()] == ["VR[2, 8]"]
+    assert [(s.kind.name, s.target) for s in ep.graph_signature.input_specs] == [
+        ("BUFFER", "state"),
+        ("USER_INPUT", "x"),
+    ]
+    assert [s.kind.name for s in ep.graph_signature.output_specs] == [
+        "BUFFER_MUTATION",
+        "USER_OUTPUT",
+    ]
+
+    # The program runs at another batch size, and it writes the buffer.
+    module = ep.module()
+    x = torch.randn(3, 3)
+    out = module(x)
+    out = out[0] if isinstance(out, (tuple, list)) else out
+    assert torch.allclose(out, x + 1)
+    assert torch.allclose(module.state, x.sum(0))
 
 
 @pytest.mark.unit
