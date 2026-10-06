@@ -43,9 +43,14 @@ runtime_test(
     name = "test_multi_device_safe_mode",
 )
 
+runtime_test(
+    name = "test_global_profiling",
+)
+
 test_suite(
     name = "runtime_tests",
     tests = [
+        ":test_global_profiling",
         ":test_multi_device_safe_mode",
     ],
 )
