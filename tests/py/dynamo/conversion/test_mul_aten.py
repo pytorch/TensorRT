@@ -5,7 +5,6 @@ import torch
 import torch.nn as nn
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt import Input
 
 from .harness import DispatchTestCase
 
@@ -23,6 +22,22 @@ class TestMulConverter(DispatchTestCase):
                 return torch.ops.aten.mul.Tensor(lhs_val, rhs_val)
 
         inputs = [torch.randn(shape), torch.randn(shape)]
+        self.run_test(
+            mul(),
+            inputs,
+        )
+
+    def test_mul_bool_tensor(self):
+        """Bool multiplication must compile and preserve its Boolean output dtype."""
+
+        class mul(nn.Module):
+            def forward(self, lhs_val, rhs_val):
+                return torch.ops.aten.mul.Tensor(lhs_val, rhs_val)
+
+        inputs = [
+            torch.randint(0, 2, (2, 3), dtype=torch.bool),
+            torch.randint(0, 2, (2, 3), dtype=torch.bool),
+        ]
         self.run_test(
             mul(),
             inputs,
