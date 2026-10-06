@@ -534,7 +534,8 @@ constexpr size_t kMinPooledScratchBytes = 1;
 // null graph. Refusing names the cause instead.
 //
 // execute() calls this ahead of every CUDA call it makes that a capture cannot
-// take, not just the pool's own: the cudaEventSynchronize on a previous enqueue,
+// take, not just the pool's own: the cudaFree(nullptr) that makes a context
+// current for a default stream, the cudaEventSynchronize on a previous enqueue,
 // the cudaMalloc that grows a host-input staging buffer, and the
 // cudaStreamSynchronize that ends a call this backend does not let return early.
 // Any of them leaves a refusal made after it nothing to save. Only the device
@@ -1205,12 +1206,8 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // not claim the device and does not serialize against the engines that do.
   const bool pooled_scratch = engine->claims_pooled_scratch;
 
-  // Refused here, ahead of every call this function makes that a capture cannot
-  // take. The pool's own are not the only ones: the cudaMalloc that grows a
-  // host-input staging buffer further down is prohibited under every mode but
-  // cudaStreamCaptureModeRelaxed, so outside that mode it would invalidate the
-  // capture before the pooled path was ever reached and a refusal any later would
-  // arrive after the thing it exists to protect was gone.
+  // Refuse before staging cudaMalloc or context setup with cudaFree(nullptr), since these can
+  // invalidate the capture before the pool is reached.
   if (pooled_scratch) {
     const Error capture_err = refuse_pooled_call_on_a_capturing_stream(stream, engine->device_id);
     if (capture_err != Error::Ok) {
@@ -1554,6 +1551,26 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     if (!ctx->setTensorAddress(name.c_str(), bind_ptr)) {
       ET_LOG(Error, "TensorRTBackend::execute: setTensorAddress failed for output '%s'", name.c_str());
       return Error::InvalidState;
+    }
+  }
+
+  // TensorRT's enqueue can look up a default stream's context through the driver, and that lookup fails while no
+  // context is current. A new thread has none, and the device guard sets one only when it switches devices.
+  // cudaFree(nullptr) sets the primary context only if none is current, so it keeps one the caller set. Outside
+  // cudaStreamCaptureModeRelaxed a capture cannot take it, so it runs after the pooled capture refusal and the
+  // argument checks. Any earlier, it would fail first under a capture, hiding their error and invalidating the capture.
+  if (stream == nullptr || stream == cudaStreamLegacy || stream == cudaStreamPerThread) {
+    cuda_err = cudaFree(nullptr);
+    if (cuda_err != cudaSuccess) {
+      ET_LOG(
+          Error,
+          "TensorRTBackend::execute: cudaFree(nullptr) on device %d failed: %s",
+          engine->device_id,
+          cudaGetErrorString(cuda_err));
+      // The error is this call's, so it is cleared rather than left for the caller's next CUDA call to
+      // report. A sticky fault survives the clear.
+      cudaGetLastError();
+      return Error::Internal;
     }
   }
 

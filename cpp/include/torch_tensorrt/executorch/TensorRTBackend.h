@@ -142,14 +142,17 @@ class TensorRTBackend final : public ::executorch::runtime::BackendInterface {
   //     only the caller will release once execute() returns, the call does not return. Do not hold
   //     a pooled call behind something it has to come back to release.
   //   - Capturing a CUDA graph around this delegate is not supported, with the option on or off.
-  //     With it on, a call whose selected stream is capturing is refused with
-  //     Error::NotSupported. A capture on any other stream is not caught and will be invalidated.
+  //     A handle that claims pooled scratch refuses a capturing selected stream with
+  //     Error::NotSupported. Other streams are not checked. Do not overlap execution with a
+  //     Global capture on any thread or a ThreadLocal capture on the calling thread, even with
+  //     the option off or with an engine that needs no scratch: the call can invalidate it.
   //   - cudaDeviceReset() invalidates the pool without emptying it, and the next call on that
   //     device uses what it destroyed. There is no guard: do not reset a device this backend has
   //     run a pooled engine on.
-  //   - Only Error::Internal is the pool's own, returned when a device's handoff event cannot be
-  //     created. Its other failures reuse codes execute() already returns, so the code alone does
-  //     not say the pool was involved; every one of them logs at Error first.
+  //   - Pool failures share error codes with other failures in execute(). Error::NotSupported
+  //     can also mean an output resize was refused. Error::Internal can mean handoff event
+  //     creation, cudaFree(nullptr), or the final stream synchronization failed. The CUDA call
+  //     can fail because of a capture or an earlier device fault. Check the error log for the cause.
   //
   // The mechanism behind all of that, the measurements, and which calls grow the pool are in the
   // backend README rather than here.
