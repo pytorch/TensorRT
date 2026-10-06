@@ -1603,7 +1603,6 @@ def compile_module(
 
         # set the submodule metadata back to the parent trt_module_node
         metadata_list = get_output_metadata(submodule)
-        assert len(metadata_list) > 0
         metadata_keys = ["val", "tensor_meta"]
         for key in metadata_keys:
             if key not in submodule_node_dict[name].meta:

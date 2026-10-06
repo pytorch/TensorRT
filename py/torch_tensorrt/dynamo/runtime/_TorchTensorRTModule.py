@@ -127,6 +127,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         requires_native_multidevice: bool = False,
         symbolic_shape_expressions: Optional[Dict[str, List[Dict[str, Any]]]] = None,
         aliased_io: Optional[Dict[str, Tuple[str, str]]] = None,
+        num_user_outputs: Optional[int] = None,
     ):
         """Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs
         a PyTorch ``torch.nn.Module`` around it. Uses the Torch-TensorRT runtime extension to run the engines
@@ -199,6 +200,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.requires_native_multidevice = requires_native_multidevice
         # Map of output binding name -> (input binding name, kind_str)
         self.aliased_io: Dict[str, Tuple[str, str]] = dict(aliased_io or {})
+        self.num_user_outputs = num_user_outputs
         self.target_platform = (
             Platform.current_platform()
             if not self.settings.enable_cross_compile_for_windows
@@ -244,6 +246,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         metadata = {
             "settings": self.settings,
             "inout_symexprs": self.symbolic_shape_expressions,
+            "num_user_outputs": self.num_user_outputs,
             "output_tensors_are_unowned": (
                 False
                 if self.engine is None
@@ -552,6 +555,10 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             metadata = TorchTensorRTModule.decode_metadata(serialized_metadata)
             self.settings = metadata["settings"]
             self.symbolic_shape_expressions = metadata["inout_symexprs"]
+            self.num_user_outputs = metadata.get("num_user_outputs")
+            self.aliased_io = deserialize_aliased_io(
+                str(serialized_engine_info[ALIASED_IO_IDX])
+            )
 
             # RuntimeSettings are NOT serialized; the reset leaves no runtime
             # cache, matching the freshly-built engine below. A caller who wants
@@ -747,12 +754,14 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         # satisfy the network-output requirement of aliased layers (e.g.
         # IKVCacheUpdateLayer). Truncate to the user-facing count; mutation
         # effects are visible on the corresponding input tensors. The
-        # boundary is derived from output_binding_names + aliased_io — no
-        # extra state needed.
-        if self.aliased_io:
-            n = user_output_count(self.output_binding_names, self.aliased_io)
-            if n < len(outputs):
-                outputs = outputs[:n]
+        # explicit count also preserves aliased tensors returned by the user.
+        if self.num_user_outputs is not None:
+            outputs = outputs[: self.num_user_outputs]
+        elif self.aliased_io:
+            # Legacy serialized modules did not carry an explicit count.
+            outputs = outputs[
+                : user_output_count(self.output_binding_names, self.aliased_io)
+            ]
 
         output_info = (self.symbolic_shape_expressions or {}).get("outputs", [])
         for index, info in enumerate(output_info):

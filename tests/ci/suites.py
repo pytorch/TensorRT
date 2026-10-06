@@ -147,6 +147,18 @@ _L0: list[Suite] = [
         overrides={"rtx": {"dist": None}},
     ),
     Suite(
+        "plugins-mutation-smoke",
+        tier="l0",
+        lanes=("fast", "full", "nightly"),
+        paths=(
+            "automatic_plugin/test_automatic_plugin_inplace_validation.py",
+            "automatic_plugin/test_automatic_plugin_mutation.py",
+        ),
+        jobs=_HEAVY,
+        variants=("standard",),
+        platforms=("linux-x86_64",),
+    ),
+    Suite(
         "dynamo-runtime-smoke",
         tier="l0",
         lanes=("fast", "full", "nightly"),
@@ -333,7 +345,8 @@ _L2: list[Suite] = [
         platforms=("linux-x86_64",),
     ),
     Suite(
-        # Standard: the automatic-plugin trio. RTX: the whole automatic_plugin
+        # Standard: automatic plugins and the in-place regression tests.
+        # RTX: the whole automatic_plugin
         # directory, except the Linux-only FlashInfer test below.
         # (The redundant conversion/ re-run from the old l2_plugin is dropped.)
         "plugins-automatic",
@@ -344,6 +357,10 @@ _L2: list[Suite] = [
             "automatic_plugin/test_automatic_plugin.py",
             "automatic_plugin/test_automatic_plugin_with_attrs.py",
             "automatic_plugin/test_plugin_attr_annotations.py",
+            "automatic_plugin/test_automatic_plugin_inplace.py",
+            "automatic_plugin/test_automatic_plugin_inplace_consumed.py",
+            "automatic_plugin/test_automatic_plugin_inplace_dynamic.py",
+            "automatic_plugin/test_automatic_plugin_inplace_multi.py",
         ),
         overrides={
             "rtx": {
