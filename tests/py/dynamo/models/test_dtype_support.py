@@ -12,8 +12,11 @@ import torch_tensorrt
 from torch import nn
 from torch.nn.parameter import Parameter, UninitializedParameter
 from torch.testing._internal.common_utils import TestCase, run_tests
+from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 
 from ..testing_utilities import DECIMALS_OF_AGREEMENT, lower_graph_testing
+
+import tensorrt as trt  # isort: skip  # imported after torch_tensorrt for RTX alias
 
 
 @pytest.mark.critical
@@ -184,6 +187,115 @@ class Test64BitSupport(TestCase):
             DECIMALS_OF_AGREEMENT,
             msg=f"Torch outputs and TRT outputs don't match close enough.",
         )
+
+
+def _build_engine(input_dtype, add_layer):
+    # Built by hand: the _to_copy converter does not accept a cast to uint8 or FP8, and
+    # TensorRT does not let a cast layer read an FP8 input.
+    builder = trt.Builder(trt.Logger(trt.Logger.ERROR))
+    network = builder.create_network(
+        1 << int(trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED)
+    )
+    x = network.add_input("x", input_dtype, (4, 4))
+    y = add_layer(network, x).get_output(0)
+    y.name = "y"
+    network.mark_output(y)
+    engine = builder.build_serialized_network(network, builder.create_builder_config())
+    assert engine is not None
+    return TorchTensorRTModule(bytes(engine), ["x"], ["y"])
+
+
+def _unit_scale(network):
+    return network.add_constant(
+        (), trt.Weights(torch.ones((), dtype=torch.float32).numpy())
+    ).get_output(0)
+
+
+@pytest.mark.critical
+@unittest.skipIf(
+    not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    "Torch-TensorRT Runtime is not available",
+)
+@unittest.skipIf(
+    torch.cuda.get_device_capability() < (8, 9),
+    "FP8 requires compute capability 8.9 or later",
+)
+class TestFP8Support(TestCase):
+    def test_fp8_output(self):
+        trt_mod = _build_engine(
+            trt.float32,
+            lambda network, x: network.add_quantize(
+                x, _unit_scale(network), trt.DataType.FP8
+            ),
+        )
+        in_tensor = torch.rand(4, 4, device="cuda") * 10
+        out = trt_mod(in_tensor)
+
+        self.assertEqual(out.dtype, torch.float8_e4m3fn)
+        self.assertTrue(
+            torch.equal(out.float(), in_tensor.to(torch.float8_e4m3fn).float())
+        )
+
+    def test_fp8_input(self):
+        trt_mod = _build_engine(
+            trt.fp8,
+            lambda network, x: network.add_dequantize(
+                x, _unit_scale(network), trt.float32
+            ),
+        )
+        in_tensor = (torch.rand(4, 4, device="cuda") * 10).to(torch.float8_e4m3fn)
+        out = trt_mod(in_tensor)
+
+        self.assertEqual(out.dtype, torch.float32)
+        self.assertTrue(torch.equal(out, in_tensor.float()))
+
+
+@pytest.mark.critical
+@unittest.skipIf(
+    not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    "Torch-TensorRT Runtime is not available",
+)
+class TestUInt8Support(TestCase):
+    def test_uint8_input(self):
+        class ImageModule(nn.Module):
+            def forward(self, image):
+                return (image.float() / 255).permute(2, 0, 1)
+
+        in_tensor = torch.randint(0, 256, (8, 8, 3), dtype=torch.uint8, device="cuda")
+        mod = ImageModule().to("cuda")
+
+        exp_mod = torch.export.export(mod, (in_tensor,))
+        trt_mod = torch_tensorrt.dynamo.compile(
+            exp_mod,
+            inputs=[in_tensor],
+            pass_through_build_failures=True,
+            min_block_size=1,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
+        )
+
+        torch_model_results = mod(in_tensor)
+        optimized_model_results = trt_mod(in_tensor)
+        assert torch_model_results.dtype == optimized_model_results.dtype
+        max_diff = float(
+            torch.max(torch.abs(optimized_model_results - torch_model_results))
+        )
+        self.assertAlmostEqual(
+            max_diff,
+            0,
+            DECIMALS_OF_AGREEMENT,
+            msg=f"Torch outputs and TRT outputs don't match close enough.",
+        )
+
+    def test_uint8_output(self):
+        trt_mod = _build_engine(
+            trt.float32, lambda network, x: network.add_cast(x, trt.uint8)
+        )
+        in_tensor = torch.randint(0, 256, (4, 4), device="cuda").float()
+        out = trt_mod(in_tensor)
+
+        self.assertEqual(out.dtype, torch.uint8)
+        self.assertTrue(torch.equal(out, in_tensor.to(torch.uint8)))
 
 
 @pytest.mark.critical
