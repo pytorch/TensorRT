@@ -10,6 +10,7 @@
 #include "torch/csrc/jit/runtime/custom_operator.h"
 #include "torch/torch.h"
 
+#include "core/runtime/CUDAGraphUtils.h"
 #include "core/runtime/TRTEngineProfiler.h"
 #include "core/runtime/runtime.h"
 #include "core/util/prelude.h"
@@ -541,11 +542,11 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
         if (need_cudagraphs_record) {
           // If cudagraphs needs to record a graph, capture the enqueueV3 call in a graph
           c10::cuda::CUDAStream recording_stream = compiled_engine->engine_stream;
-          compiled_engine->cudagraph.capture_begin();
-          bool enqueued = ctx->enqueueV3(recording_stream);
-          compiled_engine->cudagraph.capture_end();
-          TORCHTRT_CHECK(
-              enqueued, "TensorRT failed to run engine " << compiled_engine->name << ", see the TensorRT error above");
+          capture_cudagraph_safely(compiled_engine->cudagraph, [&]() {
+            TORCHTRT_CHECK(
+                ctx->enqueueV3(recording_stream),
+                "TensorRT failed to run engine " << compiled_engine->name << ", see the TensorRT error above");
+          });
           compiled_engine->cudagraph.instantiate();
           if (compiled_engine->profile_execution) {
             cudaError_t debug_dump_err = cudaGraphDebugDotPrint(
