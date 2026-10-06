@@ -20,6 +20,7 @@ from torch_tensorrt.dynamo.conversion.impl import (
     linalg,
     linear,
     matmul,
+    moe,
     nccl_ops,
     normalization,
     pad,
