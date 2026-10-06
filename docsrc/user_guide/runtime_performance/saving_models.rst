@@ -229,12 +229,12 @@ The ``executorch`` output format lowers the compiled module to an ExecuTorch
 ``.pte`` program, delegating the TensorRT engines to the Torch-TensorRT ExecuTorch
 backend. This CUDA integration links CUDA 13 libraries, so it supports Linux with
 any CUDA 13 PyTorch build and needs an ExecuTorch nightly wheel. Install from the
-channel matching your CUDA, for example a CUDA 13.0 environment:
+channel matching your CUDA, for example a CUDA 13.2 environment:
 
 .. code-block:: bash
 
     pip install --pre "torch_tensorrt[executorch]" \
-      --extra-index-url https://download.pytorch.org/whl/nightly/cu130
+      --extra-index-url https://download.pytorch.org/whl/nightly/cu132
 
 Substitute the channel for your CUDA, such as ``cu134`` for CUDA 13.4. ExecuTorch
 publishes a channel later than PyTorch does, so a very new CUDA minor may not have

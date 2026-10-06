@@ -46,7 +46,7 @@ Torch-TensorRT distributed nightlies targeting the PyTorch nightly. These can be
 
 .. code-block:: sh
 
-    python -m pip install --pre torch torch-tensorrt tensorrt --extra-index-url https://download.pytorch.org/whl/nightly/cu130
+    python -m pip install --pre torch torch-tensorrt tensorrt --extra-index-url https://download.pytorch.org/whl/nightly/cu132
 
 
 
@@ -153,7 +153,7 @@ Once the WORKSPACE has been configured properly, all that is required to build t
 
     .. code-block:: sh
 
-        python -m pip install --pre . --extra-index-url https://download.pytorch.org/whl/nightly/cu130
+        python -m pip install --pre . --extra-index-url https://download.pytorch.org/whl/nightly/cu132
 
 
 If you use the ``uv`` (`https://docs.astral.sh/uv/ <https://docs.astral.sh/uv/>`_) tool to manage python and your projects, the command is slightly simpler
@@ -168,7 +168,7 @@ To build the wheel file
 
     .. code-block:: sh
 
-        python -m pip wheel --no-deps --pre . --extra-index-url https://download.pytorch.org/whl/nightly/cu130 -w dist
+        python -m pip wheel --no-deps --pre . --extra-index-url https://download.pytorch.org/whl/nightly/cu132 -w dist
 
 Additional Build Options
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -186,7 +186,7 @@ which has implications for features like serialization.
 
 .. code-block:: sh
 
-    PYTHON_ONLY=1 python -m pip install --pre . --extra-index-url https://download.pytorch.org/whl/nightly/cu130
+    PYTHON_ONLY=1 python -m pip install --pre . --extra-index-url https://download.pytorch.org/whl/nightly/cu132
 
 
 No TorchScript Frontend
@@ -197,7 +197,7 @@ of C++ code that is no longer necessary for most users. Therefore you can exclud
 
 .. code-block:: sh
 
-    NO_TORCHSCRIPT=1 python -m pip install --pre . --extra-index-url https://download.pytorch.org/whl/nightly/cu130
+    NO_TORCHSCRIPT=1 python -m pip install --pre . --extra-index-url https://download.pytorch.org/whl/nightly/cu132
 
 
 Building the C++ Library Standalone (TorchScript Only)
@@ -277,7 +277,7 @@ Build steps
 
 * Open the app "x64 Native Tools Command Prompt for VS 2022" - note that Admin privileges may be necessary
 * Ensure Bazelisk (Bazel launcher) is installed on your machine and available from the command line. Package installers such as Chocolatey can be used to install Bazelisk
-* Install latest version of Torch (i.e. with ``pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu130``)
+* Install latest version of Torch (i.e. with ``pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu132``)
 * Clone the Torch-TensorRT repository and navigate to its root directory
 * Run ``pip install ninja wheel setuptools``
 * Run ``pip install --pre -r py/requirements.txt``

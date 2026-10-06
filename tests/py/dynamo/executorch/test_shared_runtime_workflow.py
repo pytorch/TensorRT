@@ -60,6 +60,30 @@ def test_manifest_suite_provisions_wheel(monkeypatch, cuda):
     _assert_test_wheel_dependency(command)
 
 
+@pytest.mark.parametrize("launcher", [["python"], ["uv", "run", "--no-sync", "python"]])
+def test_kernel_compatibility_follow_command(monkeypatch, tmp_path, launcher):
+    monkeypatch.syspath_prepend(str(ROOT))
+    from tests.ci import runner
+
+    monkeypatch.setenv("PYTHON", " ".join(launcher))
+    monkeypatch.setenv("RUNNER_TEST_RESULTS_DIR", str(tmp_path))
+    calls = []
+
+    def record(argv, *, cwd, **kwargs):
+        calls.append((argv, cwd))
+        return types.SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(runner.subprocess, "run", record)
+    assert runner.run_suite(runner.by_name("kernels"), "standard") == 0
+    command, cwd = calls[-1]
+    assert command[: len(launcher)] == launcher
+    script, version = command[len(launcher) :]
+    script_path = (cwd / script).resolve()
+    assert script_path == ROOT / "tests/ci/triton_compat.py"
+    assert script_path.is_file()
+    assert version == "3.5.0"
+
+
 @pytest.mark.parametrize(
     "environment,expected",
     [
@@ -609,9 +633,9 @@ def test_the_delegate_lane_narrows_the_matrix_to_cuda_13_rows() -> None:
 
     rows = [
         {"desired_cuda": cuda, "python_version": "3.10", "gpu_arch_type": "cuda"}
-        for cuda in ("cu126", "cu130", "cu134")
+        for cuda in ("cu126", "cu132", "cu134")
     ]
-    assert kept(rows, "--executorch-runtime") == {"cu130", "cu134"}
+    assert kept(rows, "--executorch-runtime") == {"cu132", "cu134"}
     # A row the other rules keep, so only the flag can drop it. Every row those rules keep on x86
     # and on Arm is already CUDA 13, so the assertion above held with the flag's branch deleted and
     # could not see it.

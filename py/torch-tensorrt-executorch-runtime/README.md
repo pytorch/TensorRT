@@ -109,12 +109,12 @@ and leave the backend unregistered.
 
 The wheel must use the same Python, PyTorch, ExecuTorch, CUDA, TensorRT, and
 C++ ABI as its matching Torch-TensorRT wheel. This delegate requires CUDA 13;
-the build matrix currently covers `cu130`, `cu132` and `cu134`, on both architectures. Ordinary Torch-TensorRT
+the build matrix currently covers `cu132` and `cu134`, on both architectures. Ordinary Torch-TensorRT
 release and JetPack builds retain their separate CUDA 12 support.
 
 ## Install
 One command. The `executorch` extra brings this wheel and a CUDA build of ExecuTorch, and
-Torch-TensorRT brings PyTorch. Swap `cu132` for the CUDA 13 channel you run, `cu130` or `cu134`:
+Torch-TensorRT brings PyTorch. Swap `cu132` for `cu134` if you run CUDA 13.4:
 ```bash
 python -m pip install --pre "torch-tensorrt[executorch]" \
   --index-url https://download.pytorch.org/whl/nightly/cu132 \
@@ -384,7 +384,7 @@ index applies to the whole dependency solve.
 
 ```bash
 python -m pip install dist/torch_tensorrt_executorch_runtime-*.whl \
-  --extra-index-url https://download.pytorch.org/whl/nightly/cu130
+  --extra-index-url https://download.pytorch.org/whl/nightly/cu132
 ```
 
 ```python

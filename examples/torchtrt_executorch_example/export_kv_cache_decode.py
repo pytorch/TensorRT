@@ -32,7 +32,7 @@ Prerequisites
 Install Torch-TensorRT with the ExecuTorch extra before running this example::
 
     pip install -e ".[executorch]" \
-        --extra-index-url https://download.pytorch.org/whl/nightly/cu130
+        --extra-index-url https://download.pytorch.org/whl/nightly/cu132
 """
 
 import argparse
