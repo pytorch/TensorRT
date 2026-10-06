@@ -165,10 +165,11 @@ def construct_dynamic_input(
                 unwrapped_min_max_opt["min"] = min_bound
 
             if "max" not in min_max_opt or min_max_opt["max"] is None:
+                fallback_max = max(unwrapped_min_max_opt["min"], 1) * (2**12)
                 logger.warning(
-                    f"Dynamic input {name} (shape: {input_shape}) has no max bound for dim {d}, attempting to use a sane default (max: min({unwrapped_min_max_opt['min']}) * 2^12). Please set an upper bound using torch._dynamo.mark_dynamic or torch.export.Dim"
+                    f"Dynamic input {name} (shape: {input_shape}) has no max bound for dim {d}, attempting to use a sane default (max: max(min({unwrapped_min_max_opt['min']}), 1) * 2^12 = {fallback_max}). Please set an upper bound using torch._dynamo.mark_dynamic or torch.export.Dim"
                 )
-                unwrapped_min_max_opt["max"] = unwrapped_min_max_opt["min"] * (2**12)
+                unwrapped_min_max_opt["max"] = fallback_max
             else:
                 unwrapped_min_max_opt["max"] = min_max_opt["max"]
 
@@ -194,6 +195,16 @@ def construct_dynamic_input(
             min_shape.append(dim)
             opt_shape.append(dim)
             max_shape.append(dim)
+
+    for d, (min_dim, opt_dim, max_dim) in enumerate(
+        zip(min_shape, opt_shape, max_shape)
+    ):
+        if not min_dim <= opt_dim <= max_dim:
+            raise ValueError(
+                f"Invalid optimization profile for input {name!r} at dimension {d}: "
+                "expected min <= opt <= max, but got "
+                f"min={min_dim}, opt={opt_dim}, max={max_dim}."
+            )
 
     # Multi-profile propagation: emit profiles for this intermediate input by
     # substituting source-symbol values into its SymInt dims.
