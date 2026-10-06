@@ -203,9 +203,15 @@ class TestFallbackIsReported(TestCase):
             self._impure_fallback_module(),
             inputs,
             torch_executed_ops={torch.ops.aten.relu.default},
+            torch_executed_modules={"torch.nn.modules.linear.Linear"},
             use_fast_partitioner=use_fast_partitioner,
         )
         self.assertEqual(len(messages), 1)
+        self.assertIn(
+            "torch.ops.aten.linear.default + Operator Count: 6 "
+            "(Reasons: excluded by torch_executed_modules)",
+            messages[0],
+        )
         self.assertIn(
             "torch.ops.aten.rand_like.default + Operator Count: 1 "
             "(Reasons: no validated TensorRT converter)",
@@ -216,6 +222,7 @@ class TestFallbackIsReported(TestCase):
             "(Reasons: excluded by torch_executed_ops)",
             messages[0],
         )
+        self.assertLess(messages[0].index("linear"), messages[0].index("rand_like"))
         self.assertLess(messages[0].index("rand_like"), messages[0].index("relu"))
 
     def test_warning_level_suppresses_summary(self):

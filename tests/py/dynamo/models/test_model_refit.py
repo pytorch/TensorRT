@@ -533,6 +533,80 @@ def test_refit_multiple_engine_with_weightmap():
     torch._dynamo.reset()
 
 
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.refit,
+    "Refit feature is not supported in Python 3.13 or higher",
+)
+@pytest.mark.unit
+@pytest.mark.parametrize("use_fast_partitioner", [True, False])
+def test_refit_preserves_torch_executed_modules_partitioning(use_fast_partitioner):
+    class net(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv1 = nn.Conv2d(3, 12, 3, padding=1)
+            self.bn = nn.BatchNorm2d(12)
+            self.conv2 = nn.Conv2d(12, 12, 3, padding=1)
+            self.fc1 = nn.Linear(12 * 56 * 56, 10)
+
+        def forward(self, x):
+            x = self.conv1(x)
+            x = F.relu(x)
+            x = self.bn(x)
+            x = F.max_pool2d(x, (2, 2))
+            x = self.conv2(x)
+            x = F.relu(x)
+            x = F.max_pool2d(x, (2, 2))
+            x = torch.flatten(x, 1)
+            return self.fc1(x)
+
+    model = net().eval().to("cuda")
+    model2 = net().eval().to("cuda")
+
+    inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
+    exp_program = torch.export.export(model, tuple(inputs))
+    exp_program2 = torch.export.export(model2, tuple(inputs))
+
+    trt_gm = torchtrt.dynamo.compile(
+        exp_program,
+        tuple(inputs),
+        min_block_size=1,
+        immutable_weights=False,
+        torch_executed_modules=["torch.nn.modules.conv.Conv2d"],
+        use_fast_partitioner=use_fast_partitioner,
+        reuse_cached_engines=False,
+    )
+
+    def partition_layout(gm):
+        # Get the partition layout, ignoring guard fns, which are stripped by refit_module_weights
+        return {
+            name: type(mod).__name__
+            for name, mod in gm.named_children()
+            if not isinstance(mod, torch.export._unlift.GuardsFn)
+        }
+
+    original_layout = partition_layout(trt_gm)
+
+    new_trt_gm = refit_module_weights(
+        compiled_module=trt_gm,
+        new_weight_module=exp_program2,
+        arg_inputs=inputs,
+    )
+
+    assertions.assertEqual(partition_layout(new_trt_gm), original_layout)
+
+    # Check the output
+    expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(
+        *inputs
+    )
+    for expected_output, refitted_output in zip(expected_outputs, refitted_outputs):
+        assertions.assertTrue(
+            torch.allclose(expected_output, refitted_output, 1e-2, 1e-2),
+            "Refit Result is not correct. Refit failed",
+        )
+
+    torch._dynamo.reset()
+
+
 @pytest.mark.unit
 def test_refit_multiple_engine_with_weightmap_cpu_offload():
     class net(nn.Module):

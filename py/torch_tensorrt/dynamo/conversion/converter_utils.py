@@ -46,7 +46,8 @@ def get_node_name(node: torch.fx.Node) -> str:
     # network architecture.
     stack_item = node.meta.get("nn_module_stack", None)
     # The current node is the last item in the stack
-    mod_stack = stack_item.popitem() if stack_item else ""
+    # Read without popping: mutating node.meta would drop the innermost module from the stack
+    mod_stack = next(reversed(stack_item.items())) if stack_item else ""
     node_name = str(node)
     if mod_stack:
         mod_name = mod_stack[1][0]
@@ -132,7 +133,7 @@ def get_node_io(
 
 
 def is_only_operator_on_placeholder(
-    node: torch.fx.Node, settings: CompilationSettings = None
+    node: torch.fx.Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
     """Detects whether a call_function node is the only operator on a placeholder"""
     # Returns true if the node operates on a placeholder and is a direct output
