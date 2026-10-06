@@ -184,7 +184,7 @@ def maybe_run_decompositions(
         use_fp32_acc,
     )
     if enable_autocast:
-        logger.info(
+        logger.warning(
             "Running run_decompositions after autocast: pre_export_lowering may have "
             "inserted ops that were not present during dynamo.trace"
         )
