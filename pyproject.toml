@@ -133,7 +133,9 @@ docs = [
 quantization = [
     "nvidia-modelopt[hf]>=0.44.0; python_version > '3.9' and python_version < '3.13'",
     "torchao",
-    "mslk>=1.0.0",
+    # The cu134 nightly index has no Windows MSLK wheels. Keep its optional
+    # TorchAO inference kernels on Linux so Windows test setup can resolve.
+    "mslk>=1.0.0; sys_platform == 'linux'",
 ]
 
 # Optional runtime deps for the torch_tensorrt.kernels QDP-plugin layer,
