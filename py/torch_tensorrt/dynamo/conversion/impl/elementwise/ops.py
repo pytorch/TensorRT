@@ -54,24 +54,6 @@ def trunc_div(
     Returns:
         A TensorRT tensor represent the result of trunc divide.
     """
-    prod_output = convert_binary_elementwise(
-        ctx,
-        target,
-        source_ir,
-        f"{name}_prod",
-        trt.ElementWiseOperation.PROD,
-        input,
-        other,
-    )
-
-    sign_output = sign(
-        ctx,
-        target,
-        source_ir,
-        name,
-        prod_output,
-    )
-
     # Convert constant input into ITensor for UnaryOperation
     if not isinstance(input, trt.tensorrt.ITensor):
         input = get_trt_tensor(ctx, input, f"{name}_input")
@@ -82,6 +64,19 @@ def trunc_div(
             f"{name}_other",
             dtype=_enums.dtype._from(input.dtype).to(torch.dtype),
         )
+
+    # sign(input * other) overflows for large integers, so take the signs separately
+    sign_input = sign(ctx, target, source_ir, f"{name}_sign_input", input)
+    sign_other = sign(ctx, target, source_ir, f"{name}_sign_other", other)
+    sign_output = convert_binary_elementwise(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_sign",
+        trt.ElementWiseOperation.PROD,
+        sign_input,
+        sign_other,
+    )
 
     abs_input_output = convert_unary(
         ctx,

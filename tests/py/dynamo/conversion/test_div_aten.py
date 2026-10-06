@@ -5,7 +5,6 @@ import torch
 import torch.nn as nn
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
-
 from torch_tensorrt import Input
 
 from .harness import DispatchTestCase
@@ -81,6 +80,29 @@ class TestDivConverter(DispatchTestCase):
                 )
 
         inputs = [torch.randn(shape)]
+        self.run_test(
+            div(),
+            inputs,
+        )
+
+    @parameterized.expand(
+        [
+            # input * divisor overflows the dtype, the sign of the quotient must still be right
+            ("int64", torch.int64, 5950571286963681280, 196613),
+            ("int32", torch.int32, 2**30, 7),
+        ]
+    )
+    def test_div_trunc_large_int(self, _, dtype, big, d):
+        class div(nn.Module):
+            def forward(self, lhs_val, rhs_val):
+                return torch.ops.aten.div.Tensor_mode(
+                    lhs_val, rhs_val, rounding_mode="trunc"
+                )
+
+        inputs = [
+            torch.tensor([big, -big, big, -big, 7, -7], dtype=dtype),
+            torch.tensor([d, d, -d, -d, -2, 2], dtype=dtype),
+        ]
         self.run_test(
             div(),
             inputs,
