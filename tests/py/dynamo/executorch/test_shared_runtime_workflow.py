@@ -60,6 +60,30 @@ def test_manifest_suite_provisions_wheel(monkeypatch, cuda):
     _assert_test_wheel_dependency(command)
 
 
+@pytest.mark.parametrize("launcher", [["python"], ["uv", "run", "--no-sync", "python"]])
+def test_kernel_compatibility_follow_command(monkeypatch, tmp_path, launcher):
+    monkeypatch.syspath_prepend(str(ROOT))
+    from tests.ci import runner
+
+    monkeypatch.setenv("PYTHON", " ".join(launcher))
+    monkeypatch.setenv("RUNNER_TEST_RESULTS_DIR", str(tmp_path))
+    calls = []
+
+    def record(argv, *, cwd, **kwargs):
+        calls.append((argv, cwd))
+        return types.SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(runner.subprocess, "run", record)
+    assert runner.run_suite(runner.by_name("kernels"), "standard") == 0
+    command, cwd = calls[-1]
+    assert command[: len(launcher)] == launcher
+    script, version = command[len(launcher) :]
+    script_path = (cwd / script).resolve()
+    assert script_path == ROOT / "tests/ci/triton_compat.py"
+    assert script_path.is_file()
+    assert version == "3.5.0"
+
+
 @pytest.mark.parametrize(
     "environment,expected",
     [
