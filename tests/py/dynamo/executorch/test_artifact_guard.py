@@ -1045,7 +1045,7 @@ def _assert_wrong_device_buffers_are_refused(source: str) -> None:
 
 def _assert_one_shared_runtime(source: str, header: str) -> None:
     code = _code_only(source)
-    accessor = "nvinfer1::IRuntime* shared_runtime()"
+    accessor = "nvinfer1::IRuntime* TensorRTBackend::shared_runtime()"
     assert accessor in code, "no shared runtime accessor"
     # Exactly one place builds it, and it is that accessor. The availability check used to build a
     # second one, which is what made TensorRT report an ignored logger on every load, and it ran

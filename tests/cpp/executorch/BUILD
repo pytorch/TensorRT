@@ -12,6 +12,7 @@ test_suite(
         ":test_executorch_binding_names",
         ":test_executorch_blob_header",
         ":test_executorch_weight_streaming_budget",
+        ":test_shared_engines",
         ":test_shared_scratch_backend",
         ":test_shared_scratch_pool",
     ],
@@ -70,6 +71,35 @@ cc_test(
         "//cpp:tensorrt_executorch_shared_scratch_pool_reset",
         "@googletest//:gtest_main",
     ],
+)
+
+cc_test(
+    name = "test_shared_engines",
+    srcs = ["test_shared_engines.cpp"],
+    target_compatible_with = select({
+        "//cpp:linux_x86_64": [],
+        "//cpp:sbsa": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "//cpp:tensorrt_executorch_backend",
+        "//cpp:tensorrt_executorch_shared_engine_key",
+        "//cpp:tensorrt_executorch_shared_engine_test_hooks",
+        "@executorch//:executorch_core",
+        "@executorch//:executorch_headers",
+        "@executorch//:extension_cuda",
+        "@googletest//:gtest_main",
+    ] + select({
+        "//cpp:linux_x86_64": [
+            "@cuda//:cudart",
+            "@tensorrt//:nvinfer",
+        ],
+        "//cpp:sbsa": [
+            "@cuda//:cudart",
+            "@tensorrt_sbsa//:nvinfer",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 # exclusive because the memory comparison reads device-wide free memory, which
