@@ -4,12 +4,14 @@
 # ExecuTorch TensorRT backend: serialize engines to a libtorch-free runtime blob.
 
 import copy
+import hashlib
 import json
 import operator
 from typing import Any, Container, Iterable, List, Optional, Set, final
 
 import torch
 import torch.fx
+from executorch.exir._serialize._named_data_store import NamedDataStore
 from executorch.exir.backend.backend_details import (
     BackendDetails,
     CompileSpec,
@@ -525,19 +527,25 @@ class TensorRTBackend(BackendDetails):  # type: ignore[misc]
         engine_info = list(engine_info)
         _validate_engine_info(engine_info)
         serialized_engine = engine_info[ENGINE_IDX]
-        if isinstance(serialized_engine, torch.Tensor):
-            # `bytes(storage)` looks equivalent but has two problems. It iterates
-            # the storage element by element in Python, costing about two seconds
-            # per megabyte, and it returns the whole backing allocation rather than
-            # the tensor's own extent, so a view of a larger buffer serializes too
-            # many bytes. A view and not a bytes copy, because serialize_engine
-            # already copies the engine into the blob once, and an engine can be
-            # several gigabytes. `.view(torch.uint8)` keeps `.numpy()` from
-            # rejecting a dtype it has no equivalent for.
-            engine_bytes = serialized_engine.cpu().contiguous().view(torch.uint8)
-            engine_info[ENGINE_IDX] = memoryview(engine_bytes.numpy())
-        elif not isinstance(serialized_engine, (bytes, bytearray)):
-            engine_info[ENGINE_IDX] = bytes(serialized_engine)
+        # ExecuTorch writes named data only from `bytes`, and an engine can be several
+        # gigabytes, so reuse the `bytes` the export staged the engine from
+        # (engine_bytes_tensor) and copy only a tensor that did not come from one.
+        engine_bytes = getattr(serialized_engine, "_trt_engine_bytes", None)
+        if not isinstance(engine_bytes, bytes):
+            if isinstance(serialized_engine, torch.Tensor):
+                # `bytes(storage)` looks equivalent but iterates element by element in
+                # Python, about two seconds per megabyte, and returns the whole backing
+                # allocation rather than the tensor's own extent. `.view(torch.uint8)`
+                # keeps `.numpy()` from rejecting a dtype it has no equivalent for.
+                engine_bytes = (
+                    serialized_engine.cpu()
+                    .contiguous()
+                    .view(torch.uint8)
+                    .numpy()
+                    .tobytes()
+                )
+            else:
+                engine_bytes = bytes(serialized_engine)
         input_names = _reorder_input_names_for_executorch(
             edge_program,
             engine_node,
@@ -587,6 +595,15 @@ class TensorRTBackend(BackendDetails):  # type: ignore[misc]
             device_id=_parse_device_id(engine_info[DEVICE_IDX]),
             serialized_metadata=_get_str(engine_info, SERIALIZED_METADATA_IDX),
             target_platform=_get_str(engine_info, TARGET_PLATFORM_IDX),
+            # Content-keyed, so identical engines in different methods share one
+            # entry and different engines can never collide on a key.
+            engine_key="tensorrt_engine_" + hashlib.sha256(engine_bytes).hexdigest(),
         )
-        blob = serialize_engine(engine_info[ENGINE_IDX], metadata)
-        return PreprocessResult(processed_bytes=blob)
+        # The engine goes to named data by reference and is streamed into the .pte,
+        # so the delegate blob holds only the header and metadata.
+        named_data = NamedDataStore()
+        named_data.add_named_data(metadata.engine_key, engine_bytes, alignment=16)
+        return PreprocessResult(
+            processed_bytes=serialize_engine(b"", metadata),
+            data_store_output=named_data.get_named_data_store_output(),
+        )

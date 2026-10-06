@@ -33,6 +33,8 @@ struct TensorRTBlobHeader {
   std::vector<AliasedBinding> aliased_io;
   bool hardware_compatible = false;
   int device_id = 0;
+  // Named-data key of an engine stored outside the blob; empty when it is inline.
+  std::string engine_key;
 
   static const void* engine_data(const void* blob, const TensorRTBlobHeader& h);
   static bool parse(const void* data, std::size_t size, TensorRTBlobHeader& out);

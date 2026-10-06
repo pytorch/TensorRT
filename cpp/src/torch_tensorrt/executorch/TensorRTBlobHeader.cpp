@@ -474,6 +474,15 @@ bool parse_metadata_json(const std::string& json, bool expects_aliased_io, Tenso
   if (expects_aliased_io && out.aliased_io.empty()) {
     return false;
   }
+  out.engine_key.clear();
+  const std::size_t engine_key_pos = find_top_level_key(json, "\"engine_key\"");
+  if (engine_key_pos != std::string::npos) {
+    const std::size_t colon = json.find(':', engine_key_pos);
+    if (colon == std::string::npos ||
+        parse_string(json, skip_ws(json, colon + 1), out.engine_key) == std::string::npos || out.engine_key.empty()) {
+      return false;
+    }
+  }
   const std::size_t hw_key = find_top_level_key(json, "\"hardware_compatible\"");
   const std::size_t device_key = find_top_level_key(json, "\"device_id\"");
   return parse_bool_after_key(json, hw_key, "\"hardware_compatible\"", out.hardware_compatible) &&
@@ -532,7 +541,8 @@ bool TensorRTBlobHeader::parse(const void* data, std::size_t size, TensorRTBlobH
   }
 
   std::string json(reinterpret_cast<const char*>(bytes + out.metadata_offset), out.metadata_size);
-  return parse_metadata_json(json, aliased_io_magic, out);
+  // An engine is either inline or named, never both, so neither copy can be silently ignored.
+  return parse_metadata_json(json, aliased_io_magic, out) && out.engine_key.empty() == (out.engine_size != 0);
 }
 
 } // namespace executorch_backend
