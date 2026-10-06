@@ -34,6 +34,12 @@ logger = logging.getLogger(__name__)
 # can be required for TRT legality (int64 indices never reach the converter).
 _MAX_CONSTANT_FOLD_BYTES = 1 << 20  # 1 MiB
 
+# Only skip installing aliased folds whose converters are verified to accept
+# constant inputs. Unknown operations retain the established install behavior.
+_SAFE_ALIASED_FOLD_SKIP_OPS: Set[torch._ops.OpOverload] = {
+    torch.ops.aten.permute.default,
+}
+
 
 def _tensor_reuses_module_storage(
     gm: torch.fx.GraphModule, constant: torch.Tensor
@@ -70,28 +76,34 @@ def constant_fold(
     # For TRT INetwork construction the constants are moved to CPU in get_attr call.
     skipped_alias = 0
     for node, constant in cf.node_replacements.items():
-        if isinstance(constant, torch.Tensor):
+        if (
+            isinstance(constant, torch.Tensor)
+            and node.target in _SAFE_ALIASED_FOLD_SKIP_OPS
+        ):
             nbytes = int(constant.numel() * constant.element_size())
             if nbytes > _MAX_CONSTANT_FOLD_BYTES and _tensor_reuses_module_storage(
                 gm, constant
             ):
                 skipped_alias += 1
                 logger.debug(
-                    "Skipping constant-fold install for aliased %s (%d bytes > %d)",
-                    node.name,
+                    "Skipping constant-fold install for supported aliased op %s "
+                    "(%d bytes > %d)",
+                    node.target,
                     nbytes,
                     _MAX_CONSTANT_FOLD_BYTES,
                 )
                 continue
-        # Register folded values as plain tensors (buffers), matching Inductor.
+
         if settings.offload_module_to_cpu:
             replace_node_with_constant(
                 gm,
                 node,
-                constant.cpu().contiguous(),
+                torch.nn.Parameter(constant.cpu().contiguous(), requires_grad=False),
             )
         else:
-            replace_node_with_constant(gm, node, constant)
+            replace_node_with_constant(
+                gm, node, torch.nn.Parameter(constant, requires_grad=False)
+            )
 
     if skipped_alias:
         logger.info(
@@ -126,7 +138,7 @@ def replace_node_with_constant(
     """Adapted from:
     https://github.com/pytorch/pytorch/blob/bcf35c6ae62bb6560befa3550e37a8283944e5f4/torch/_inductor/constant_folding.py#L17-L43
 
-    Registers frozen constants as buffers (same as Inductor), not Parameters.
+    Registers frozen constants as non-trainable parameters.
     """
     g = gm.graph
 
@@ -153,7 +165,7 @@ def replace_node_with_constant(
         g.erase_node(node)
 
     # Needed to suppress `does not reference an nn.Module, nn.Parameter, or buffer` warning
-    gm.register_buffer(qualname, constant)
+    gm.register_parameter(qualname, constant)
     setattr(gm, qualname, constant)
 
 
