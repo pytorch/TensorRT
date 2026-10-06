@@ -55,7 +55,7 @@ CUDA version):
 
 .. code-block:: sh
 
-    python -m pip install --pre torch torch_tensorrt_rtx --extra-index-url https://download.pytorch.org/whl/nightly/cu130
+    python -m pip install --pre torch torch_tensorrt_rtx --extra-index-url https://download.pytorch.org/whl/nightly/cu132
 
 
 Import Test

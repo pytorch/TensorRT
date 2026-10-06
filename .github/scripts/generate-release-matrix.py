@@ -7,7 +7,8 @@ import json
 import sys
 
 RELEASE_CUDA_VERSION = {
-    "wheel": ["cu130", "cu132", "cu134"],
+    # Wheels follow the CUDA rows in filter-matrix.py; libtorch still ships cu130 tarballs.
+    "wheel": ["cu132", "cu134"],
     "tarball": ["cu130", "cu132", "cu134"],
 }
 RELEASE_PYTHON_VERSION = {
