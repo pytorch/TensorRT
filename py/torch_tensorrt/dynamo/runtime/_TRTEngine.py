@@ -75,7 +75,7 @@ logger = logging.getLogger(__name__)
 
 def _current_serialized_platform() -> str:
     """Return the current platform using the engine-metadata representation."""
-    return Platform.current_platform()._to_serialized_platform()
+    return str(Platform.current_platform()._to_serialized_platform())
 
 
 class _InputBindingInfo(NamedTuple):
@@ -1133,13 +1133,12 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         return outputs
 
     def _tensor_address(self, tensor: torch.Tensor) -> int:
-        # TensorRT rejects a null address even for a tensor with no elements, and an empty
-        # tensor has one, so bind a one element placeholder instead.
+        """Return a non-null binding address, including for empty tensors."""
         if tensor.numel() != 0:
             return int(tensor.data_ptr())
         if self._empty_tensor_placeholder is None:
             self._empty_tensor_placeholder = torch.empty(
-                1, dtype=torch.uint8, device=torch.cuda.current_device()
+                1, dtype=torch.uint8, device=tensor.device
             )
         return int(self._empty_tensor_placeholder.data_ptr())
 
