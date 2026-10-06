@@ -4642,9 +4642,7 @@ def _arg_or_kwarg(
     return args_bounds_check(args, index, default)
 
 
-def histc_validator(
-    node: Node, settings: Optional[CompilationSettings] = None
-) -> bool:
+def histc_validator(node: Node, settings: Optional[CompilationSettings] = None) -> bool:
     bins = _arg_or_kwarg(node.args, node.kwargs, 1, "bins", 100)
     lo = _arg_or_kwarg(node.args, node.kwargs, 2, "min", 0)
     hi = _arg_or_kwarg(node.args, node.kwargs, 3, "max", 0)

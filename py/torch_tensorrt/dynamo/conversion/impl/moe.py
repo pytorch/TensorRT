@@ -96,7 +96,9 @@ def grouped_mm(
     offs_row = impl.shuffle.reshape(
         ctx, target, source_ir, f"{name}_offs_row", offs_i32, (1, -1)
     )
-    passed = impl.elementwise.le(ctx, target, source_ir, f"{name}_passed", offs_row, rows)
+    passed = impl.elementwise.le(
+        ctx, target, source_ir, f"{name}_passed", offs_row, rows
+    )
     group = impl.reduce.sum(
         ctx,
         target,
