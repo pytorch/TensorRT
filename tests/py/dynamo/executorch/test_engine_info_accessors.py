@@ -74,6 +74,13 @@ class RuntimeWithoutTensorAccessor:
         return (_record(base64.b64encode(ENGINE_BYTES).decode()),)
 
 
+class RuntimeWithTensorAccessor(RuntimeWithAccessor):
+    """Engine from a runtime that serializes into a buffer it owns, like the C++ one."""
+
+    def serialized_engine_tensor(self):
+        return torch.frombuffer(bytearray(ENGINE_BYTES), dtype=torch.uint8)
+
+
 class _Program:
     """Stand-in for ExportedProgram carrying what the two passes touch."""
 
@@ -185,3 +192,26 @@ def test_metadata_only_record_is_not_cross_served_as_engine_bytes():
         "metadata-only record cached by validation rather than re-resolving them"
     )
     assert engine.getstate_calls == 1, "the engine record still must be read once"
+
+
+@pytest.mark.unit
+def test_rewrite_stages_the_engine_once_as_bytes():
+    """The buffer the rewrite registers lives until the save ends, and ExecuTorch
+    writes named data only from ``bytes``. A buffer still viewing the runtime's
+    serialization makes preprocess copy it, holding every engine twice."""
+    import numpy as np
+
+    program, _ = _program_with_engine(RuntimeWithTensorAccessor())
+    _export_utils.replace_execute_engine(program, {})
+
+    no_op = torch.ops.tensorrt.no_op_placeholder_for_execute_engine.default
+    (no_op_node,) = [n for n in program.graph_module.graph.nodes if n.target is no_op]
+    engine_buffer = getattr(
+        program.graph_module, no_op_node.args[1 + ENGINE_IDX].target
+    )
+
+    engine_bytes = engine_buffer._trt_engine_bytes
+    assert engine_bytes == ENGINE_BYTES
+    assert np.shares_memory(
+        engine_buffer.numpy(), np.frombuffer(engine_bytes, dtype=np.uint8)
+    ), "the registered buffer must view the bytes preprocess hands to named data"

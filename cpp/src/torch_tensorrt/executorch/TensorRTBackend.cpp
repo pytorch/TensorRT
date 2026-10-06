@@ -24,6 +24,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -1061,14 +1062,30 @@ Result<DelegateHandle*> TensorRTBackend::init(
   }
 
   const void* engine_data = TensorRTBlobHeader::engine_data(processed->data(), header);
+  std::size_t engine_size = header.engine_size;
+  std::optional<FreeableBuffer> named_engine;
+  if (!header.engine_key.empty()) {
+    const auto* named_data = context.get_named_data_map();
+    TORCHTRT_ET_CHECK_NOT_NULL(
+        named_data, Error::InvalidProgram, "TensorRTBackend::init: engine is named data but the program has none");
+    auto engine_buffer = named_data->get_data(header.engine_key);
+    if (!engine_buffer.ok()) {
+      ET_LOG(Error, "TensorRTBackend::init: named engine '%s' not found", header.engine_key.c_str());
+      return engine_buffer.error();
+    }
+    named_engine.emplace(std::move(engine_buffer.get()));
+    engine_data = named_engine->data();
+    engine_size = named_engine->size();
+  }
   const bool share = !share_spec.ok() || share_spec.get();
   Error err;
   if (share) {
-    err =
-        acquire_shared_engine(*runtime, engine_data, header.engine_size, handle->device_id, ws_request, handle->engine);
+    err = acquire_shared_engine(*runtime, engine_data, engine_size, handle->device_id, ws_request, handle->engine);
   } else {
-    err = load_engine(*runtime, engine_data, header.engine_size, ws_request, handle->engine);
+    err = load_engine(*runtime, engine_data, engine_size, ws_request, handle->engine);
   }
+  // The engine now lives on the GPU, so release the host copy before building the context.
+  named_engine.reset();
   if (err != Error::Ok) {
     return err;
   }

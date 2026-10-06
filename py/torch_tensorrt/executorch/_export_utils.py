@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import copy
 import logging
+import warnings
 from typing import Any, Sequence
 
 import torch
@@ -188,7 +189,10 @@ def _resolve_engine_tensor(exported_program: Any, node: Any) -> "torch.Tensor":
         engine_obj = _resolve_engine_object(exported_program, node)
         raw = getattr(engine_obj, "serialized_engine_tensor", None)
         if raw is not None:
-            return raw()
+            # raw() views TensorRT's own buffer, and the returned tensor stays registered on
+            # the program until the save ends. ExecuTorch writes named data only from
+            # bytes, so copy now, while TensorRT's buffer is the only other copy.
+            return engine_bytes_tensor(raw().numpy().tobytes())
         _warn_missing_accessor("serialized_engine_tensor")
 
     engine_bytes = _resolve_engine_info(exported_program, node)[ENGINE_IDX]
@@ -196,9 +200,23 @@ def _resolve_engine_tensor(exported_program: Any, node: Any) -> "torch.Tensor":
         import base64
 
         engine_bytes = base64.b64decode(engine_bytes)
-    elif not isinstance(engine_bytes, (bytes, bytearray)):
+    elif not isinstance(engine_bytes, bytes):
         engine_bytes = bytes(engine_bytes)
-    return torch.frombuffer(bytearray(engine_bytes), dtype=torch.uint8)
+    return engine_bytes_tensor(engine_bytes)
+
+
+def engine_bytes_tensor(engine_bytes: bytes) -> "torch.Tensor":
+    """A uint8 view of ``engine_bytes`` that remembers the ``bytes`` object.
+
+    ExecuTorch stores named data only as ``bytes``, so ``TensorRTBackend.preprocess``
+    reads ``_trt_engine_bytes`` back to hand over this same object rather than a copy.
+    Nothing writes an engine buffer, so viewing read-only memory is safe.
+    """
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="The given buffer is not writable")
+        tensor = torch.frombuffer(engine_bytes, dtype=torch.uint8)
+    tensor._trt_engine_bytes = engine_bytes
+    return tensor
 
 
 def validate_engine_program(
