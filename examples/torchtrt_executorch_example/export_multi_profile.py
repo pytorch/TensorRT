@@ -51,7 +51,8 @@ Install Torch-TensorRT with the ExecuTorch extra before running this example.
 The Gemma-3 definition comes from ``transformers``, which that extra does not
 pull in::
 
-    pip install -e ".[executorch]" "transformers>=5.4.0"
+    pip install -e ".[executorch]" "transformers>=5.4.0" \
+        --extra-index-url https://download.pytorch.org/whl/nightly/cu132
 
 See https://pytorch.org/executorch/stable/getting-started-setup.html for details.
 """
