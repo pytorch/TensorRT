@@ -21,6 +21,8 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     set_layer_name,
     to_numpy,
 )
+from torch_tensorrt.dynamo.conversion.impl.shape import shape as get_shape
+from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 
 
 def embedding(
@@ -91,19 +93,20 @@ def embedding_bag_with_traversable_offsets(
         reduce_name = "max"
 
     offsets: np.ndarray = to_numpy(offsets_list)
+    # Notes: here offsets should always be 1d array
+    if len(offsets.shape) != 1:
+        raise TypeError(
+            f"The offsets should be in 1d array, here offset shape is {offsets.shape}."
+        )
+    # with dynamic indices, len_embed is -1 and the last bag ends at runtime
     len_embed = embed.shape[0]
+    dynamic_len_embed = len_embed == DYNAMIC_DIM
 
     if include_last_offset:
         # modify the last index of offsets to the end index
         # however, pytorch doc says if `include_last_offset` is True, the size of offsets
         # is equal to the number of bags + 1. The last element is the size of the input,
         # or the ending index position of the last bag (sequence).
-
-        # Notes: here offsets should always be 1d array
-        if len(offsets.shape) != 1:
-            raise TypeError(
-                f"The offsets should be in 1d array, here offset shape is {offsets.shape}."
-            )
         offsets[-1] = len_embed
     else:
         # add the end index to offsets
@@ -117,7 +120,48 @@ def embedding_bag_with_traversable_offsets(
     reduced_embed_bags = []
     len_offsets = offsets.shape[0]
     for i in range(len_offsets - 1):
-        if offsets[i] < offsets[i + 1]:
+        is_last_bag = i == len_offsets - 2
+        if dynamic_len_embed and is_last_bag:
+            sliced_embed = impl.slice.slice_op(
+                ctx,
+                target,
+                source_ir,
+                f"{name}_slice_embed_{i}",
+                embed,
+                0,
+                int(offsets[i]),
+                None,
+                1,
+            )
+            reduced_one_bag = reduce_op(
+                name=f"{name}_{reduce_name}_{i}",
+                input_val=sliced_embed,
+                dim=0,
+                keepdim=True,
+            )
+            # empty last bag: return zeros like PyTorch instead of NaN/-inf
+            runtime_len_embed = get_shape(
+                ctx, target, source_ir, f"{name}_len_embed", embed, 0
+            )
+            is_empty_bag = impl.elementwise.le(
+                ctx,
+                target,
+                source_ir,
+                f"{name}_is_empty_bag_{i}",
+                runtime_len_embed,
+                int(offsets[i]),
+            )
+            reduced_one_bag = impl.condition.where(
+                ctx,
+                target,
+                source_ir,
+                f"{name}_where_empty_bag_{i}",
+                zero_tensor,
+                reduced_one_bag,
+                is_empty_bag,
+            )
+            reduced_embed_bags.append(reduced_one_bag)
+        elif offsets[i] < offsets[i + 1]:
             sliced_embed = impl.slice.slice_op(
                 ctx,
                 target,
