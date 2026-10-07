@@ -28,16 +28,16 @@ This can exceed system limits when compiling large models.
 
 **Ways to lower CPU memory usage:**
 
-1. **Enable memory trimming**
+1. **Keep memory trimming enabled**
 
-   Set the following environment variable:
+   On Linux, Torch-TensorRT returns the memory the TensorRT builder frees to the
+   operating system after each engine build (glibc ``malloc_trim``). Without it the
+   process keeps on the order of gigabytes of freed builder memory for the rest of its
+   life. Trimming is on by default; to turn it off, set:
 
    .. code-block:: bash
 
-      export TORCHTRT_ENABLE_BUILDER_MALLOC_TRIM=1
-
-   This reduces approximately **2x** of redundant model copies, limiting 
-   total CPU memory usage to up to **3x** the model size.
+      export TORCHTRT_ENABLE_BUILDER_MALLOC_TRIM=0
 
 2. **Disable CPU offloading**
 

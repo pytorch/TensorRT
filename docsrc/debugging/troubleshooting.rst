@@ -112,7 +112,8 @@ Memory Errors During Compilation
 
     TRT compilation can use up to 5× the model size in CPU memory.
 
-    * Set ``TORCHTRT_ENABLE_BUILDER_MALLOC_TRIM=1`` to reduce to ~3× model size.
+    * Make sure ``TORCHTRT_ENABLE_BUILDER_MALLOC_TRIM`` is not set to ``0``; trimming
+      the builder's freed memory is on by default on Linux.
     * Disable ``offload_module_to_cpu`` (``False``) to drop another 1× copy.
 
 ----
