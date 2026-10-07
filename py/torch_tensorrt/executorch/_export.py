@@ -580,6 +580,7 @@ def export(
     from torch_tensorrt.executorch import TensorRTPartitioner, get_edge_compile_config
     from torch_tensorrt.executorch._export_utils import (
         replace_execute_engine,
+        replace_reshape_copy,
         stage_exported_program,
         validate_engine_program,
     )
@@ -715,6 +716,7 @@ def export(
                     name,
                     engine_call_counts[name],
                 )
+        replace_reshape_copy(program)
         # Drop this method's engine payloads as soon as they are in the graph.
         rewritten[name] = replace_execute_engine(program, resolved_engines.pop(name))
         trt_compile_specs = list(method_compile_specs[name])
