@@ -68,10 +68,10 @@ jobs:
             *)                  lane=fast ;;
           esac
           echo "lane=$lane" >> "$GITHUB_OUTPUT"
-          suite=""
-          if [ "$EVENT" = "pull_request" ] && [ "$HAS_TRT_API_LABEL" = "true" ]; then
-            suite=trt-api
-          fi
+          # TEMPORARY (#4802): pin every run on this branch to the one suite
+          # whose memory we are measuring, so each push is a cheap repeat
+          # sample rather than the whole lane.
+          suite=torch-compile-backend
           echo "suite=$suite" >> "$GITHUB_OUTPUT"
           # Backend: explicit labels win; otherwise a fast PR push stays
           # standard-only (cheap), while full/nightly default to BOTH engines.
@@ -86,5 +86,8 @@ jobs:
               else backend=both; fi ;;
             *)                  backend=both ;;   # push / approval / schedule
           esac
+          # TEMPORARY (#4802): a non-empty suite otherwise forces backend=both,
+          # which would add an RTX leg we are not measuring.
+          backend=standard
           echo "backend=$backend" >> "$GITHUB_OUTPUT"
           echo "Resolved lane='$lane' suite='$suite' backend='$backend' (event=$EVENT)."
