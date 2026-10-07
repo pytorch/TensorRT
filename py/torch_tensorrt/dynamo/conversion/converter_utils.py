@@ -1205,9 +1205,11 @@ def promote_trt_tensors_to_same_dtype(
     elif lhs.dtype == trt.bool and rhs.dtype == trt.bool:
         # Case 2: If both tensors are bool types, preserve bool
         promoted_dtype = trt.bool
+    elif trt.int64 in (lhs.dtype, rhs.dtype):
+        # Case 3: int pairs with an int64 side stay int64; narrowing to int32 wraps values
+        promoted_dtype = trt.int64
     else:
-        # Case 3: If both tensors are int types (e.g., int32, int64), promote to int32
-        # (Note: TensorRT does not support int64 for many ops like select/where)
+        # Case 4: Remaining int pairs (int8, int32) promote to int32
         promoted_dtype = trt.int32
 
     # Cast both tensors to the promoted dtype
