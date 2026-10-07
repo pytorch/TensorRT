@@ -273,6 +273,12 @@ _L1: list[Suite] = [
         tier="l1",
         lanes=("full", "nightly"),
         paths=("backend/",),
+        # g5.8xlarge rather than the default g5.4xlarge validation runner.
+        # Measured on the smaller pod: this suite holds a ~34 GiB plateau
+        # against a 41 GiB limit, so a passing run has 8 GiB of headroom and
+        # an unlucky one is OOM-killed with the hook reporting only "RPC
+        # server process died". The EC2 label this replaced had 64 GiB.
+        runner="mt-l-x86aavx2-29-113-a10g",
     ),
     Suite(
         "torch-compile-models-critical",
