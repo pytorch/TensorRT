@@ -2513,10 +2513,23 @@ def test_executorch_is_not_base_install_requirement():
 
 @pytest.mark.unit
 @pytest.mark.parametrize(
-    "installed",
-    ["10.16.1.11", "10.16.1.11+vendor.1", "10.17.0", "11.3.0"],
+    ("installed", "expected_tensorrt"),
+    [
+        # Actual TensorRT distribution versions; this is not a compatibility matrix.
+        ("10.16.1.11", "10.16.1.11"),
+        ("10.16.2.12", "10.16.2.12"),
+        ("11.3.0.99", "11.3.0.99"),
+        # Synthetic metadata only: check local-suffix stripping, not a real release.
+        pytest.param(
+            "10.16.1.11+test.1",
+            "10.16.1.11",
+            id="synthetic-local-version",
+        ),
+    ],
 )
-def test_driveos_packaging_pins_installed_tensorrt(monkeypatch, installed):
+def test_driveos_packaging_pins_installed_tensorrt(
+    monkeypatch, installed, expected_tensorrt
+):
     function = _function_def(_setup_tree(), "get_driveos_requirements")
     queries = []
 
@@ -2540,7 +2553,7 @@ def test_driveos_packaging_pins_installed_tensorrt(monkeypatch, installed):
         "base",
         "numpy",
         "torch>=2.15.0.dev,<2.16.0",
-        f"tensorrt=={installed.partition('+')[0]}",
+        f"tensorrt=={expected_tensorrt}",
     ]
     assert queries == ["tensorrt"]
 
