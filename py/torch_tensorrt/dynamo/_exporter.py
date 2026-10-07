@@ -577,8 +577,8 @@ def create_trt_exp_program(
     #      gm.meta["inline_constraints"] to be a dict; TRT graph modules don't
     #      set it so we default it to {} if absent.
     #   2. No dynamic_shapes (or no example inputs): harvest every SymInt free
-    #      symbol from placeholder meta["val"] shapes and look up its bound
-    #      directly in the shape_env.  This is the retrace=False path where the
+    #      symbol from tensor shapes and scalar placeholder values, then look up
+    #      its bound directly in the shape_env.  This is the retrace=False path where the
     #      caller didn't supply inputs.
     fake_mode = detect_fake_mode(
         tuple(
@@ -609,15 +609,21 @@ def create_trt_exp_program(
                 num_lifted_inputs=0,
             )
         else:
-            # Path 2: harvest bounds from shape_env for any SymInt dims present.
+            # Path 2: preserve tensor dimensions and scalar inputs such as KV
+            # cache start/end indices. Deserialization needs bounds for both.
             shape_env = fake_mode.shape_env
             for node in gm.graph.nodes:
                 if node.op != "placeholder" or "val" not in node.meta:
                     continue
                 val = node.meta["val"]
-                if not isinstance(val, torch.Tensor):
+                symbolic_values: Sequence[Any]
+                if isinstance(val, torch.Tensor):
+                    symbolic_values = val.shape
+                elif isinstance(val, torch.SymInt):
+                    symbolic_values = (val,)
+                else:
                     continue
-                for d in val.shape:
+                for d in symbolic_values:
                     if isinstance(d, torch.SymInt):
                         for sym in d.node.expr.free_symbols:
                             if (
