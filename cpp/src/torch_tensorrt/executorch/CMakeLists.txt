@@ -248,7 +248,7 @@ add_dependencies(executorch_backend_tensorrt_backend executorch_trt_backend)
 # does not come along with it. Carry it here: a runner that scopes
 # OptimizationProfileGuard needs the public header. (The caller-stream guard now
 # comes from ExecuTorch, not from this header.)
-target_include_directories(torchtrt_executorch_backend
+target_include_directories(executorch_backend_tensorrt_backend
     INTERFACE
         "${CMAKE_CURRENT_LIST_DIR}/../../../include"
 )
