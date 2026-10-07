@@ -2,7 +2,17 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Set, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Collection,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+)
 
 import sympy
 import torch
@@ -87,6 +97,33 @@ def _build_submodule_profiles(
     return profiles
 
 
+def node_in_torch_executed_module(
+    node: torch.fx.Node, torch_executed_modules: Collection[str]
+) -> bool:
+    """
+    Determine whether a node traces through a module that should run in Torch.
+    A node matches if any level of its nn_module_stack is one of the torch_executed_modules,
+    matched on fully-qualified class name (e.g. "torchvision.models.resnet.BasicBlock"), which
+    torch.export stores as the second element of each nn_module_stack value.
+    Args:
+        node: FX node to check
+        torch_executed_modules: Collection of fully-qualified module class names to run in Torch
+    Returns:
+        True if the node lies within a torch_executed_module, False otherwise
+    """
+    if not torch_executed_modules:
+        return False
+    stack = node.meta.get("nn_module_stack") or {}
+    for _, module_type in stack.values():
+        if module_type in torch_executed_modules:
+            logger.debug(
+                f"Excluding node {node.name} from TRT because its module type "
+                f"{module_type} is in torch_executed_modules."
+            )
+            return True
+    return False
+
+
 def construct_dynamic_input(
     input_shape: torch.Size,
     input_dtype: torch.dtype,
@@ -128,10 +165,11 @@ def construct_dynamic_input(
                 unwrapped_min_max_opt["min"] = min_bound
 
             if "max" not in min_max_opt or min_max_opt["max"] is None:
+                fallback_max = max(unwrapped_min_max_opt["min"], 1) * (2**12)
                 logger.warning(
-                    f"Dynamic input {name} (shape: {input_shape}) has no max bound for dim {d}, attempting to use a sane default (max: min({unwrapped_min_max_opt['min']}) * 2^12). Please set an upper bound using torch._dynamo.mark_dynamic or torch.export.Dim"
+                    f"Dynamic input {name} (shape: {input_shape}) has no max bound for dim {d}, attempting to use a sane default (max: max(min({unwrapped_min_max_opt['min']}), 1) * 2^12 = {fallback_max}). Please set an upper bound using torch._dynamo.mark_dynamic or torch.export.Dim"
                 )
-                unwrapped_min_max_opt["max"] = unwrapped_min_max_opt["min"] * (2**12)
+                unwrapped_min_max_opt["max"] = fallback_max
             else:
                 unwrapped_min_max_opt["max"] = min_max_opt["max"]
 
@@ -157,6 +195,16 @@ def construct_dynamic_input(
             min_shape.append(dim)
             opt_shape.append(dim)
             max_shape.append(dim)
+
+    for d, (min_dim, opt_dim, max_dim) in enumerate(
+        zip(min_shape, opt_shape, max_shape)
+    ):
+        if not min_dim <= opt_dim <= max_dim:
+            raise ValueError(
+                f"Invalid optimization profile for input {name!r} at dimension {d}: "
+                "expected min <= opt <= max, but got "
+                f"min={min_dim}, opt={opt_dim}, max={max_dim}."
+            )
 
     # Multi-profile propagation: emit profiles for this intermediate input by
     # substituting source-symbol values into its SymInt dims.
@@ -434,6 +482,7 @@ def run_shape_analysis(
 def get_graph_converter_support(
     graph_module: torch.fx.GraphModule,
     torch_executed_ops: Optional[Set[str]] = None,
+    torch_executed_modules: Optional[Collection[str]] = None,
 ) -> Tuple[int, int]:
     """Helper function to get converter support overview pre-partitioning
 
@@ -441,11 +490,14 @@ def get_graph_converter_support(
         graph_module: FX GraphModule to determine support for
         verbose: Bool representing whether to print operator support
         torch_executed_ops: Collection of operations to run in Torch, regardless of converter coverage
+        torch_executed_modules: Collection of module class names to run in Torch
     Returns:
         The number of supported call_function nodes in the graph
     """
     number_of_supported_nodes, total_functional_nodes, _ = (
-        get_graph_converter_support_overview(graph_module, torch_executed_ops)
+        get_graph_converter_support_overview(
+            graph_module, torch_executed_ops, torch_executed_modules
+        )
     )
     return number_of_supported_nodes, total_functional_nodes
 
@@ -453,6 +505,7 @@ def get_graph_converter_support(
 def get_graph_converter_support_overview(
     graph_module: torch.fx.GraphModule,
     torch_executed_ops: Optional[Set[str]] = None,
+    torch_executed_modules: Optional[Collection[str]] = None,
 ) -> Tuple[int, int, "TorchTensorRTOperatorSupport"]:
     """As get_graph_converter_support, but also returns the operator support object,
     which holds *which* operators are unsupported rather than just how many
@@ -460,7 +513,10 @@ def get_graph_converter_support_overview(
     from ._global_partitioner import TorchTensorRTOperatorSupport
 
     # Instantiate operator support object and module dictionary
-    op_support = TorchTensorRTOperatorSupport(torch_executed_ops=torch_executed_ops)
+    op_support = TorchTensorRTOperatorSupport(
+        torch_executed_ops=torch_executed_ops or set(),
+        torch_executed_modules=torch_executed_modules or set(),
+    )
     module_dict = dict(graph_module.named_modules())
 
     number_of_supported_nodes = 0

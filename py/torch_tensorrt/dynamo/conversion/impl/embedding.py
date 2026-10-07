@@ -386,8 +386,8 @@ def embedding_bag(
 
     # give weights to embedding
     if per_sample_weights is not None:
-        assert (
-            per_sample_weights.shape == indices.shape
+        assert tuple(per_sample_weights.shape) == tuple(
+            indices.shape
         ), f"`per_sample_weights` (shape: {per_sample_weights.shape}) must have exactly the same shape as indices/input (shape: {indices.shape})!"
         per_sample_weights = get_trt_tensor(
             ctx, per_sample_weights, f"{name}_per_sample_weights", np.float32

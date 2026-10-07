@@ -57,6 +57,9 @@ from torch_tensorrt.dynamo.lowering._buffer_lifting import (
     inline_lifted_buffers_into_gm,
     lift_mutated_buffers,
 )
+from torch_tensorrt.dynamo.lowering.passes.reset_folded_constructors import (
+    reset_folded_constructors,
+)
 from torch_tensorrt.dynamo.partitioning._resource_partitioner import (
     resource_partition,
 )
@@ -66,6 +69,7 @@ from torch_tensorrt.dynamo.utils import (
     get_flat_args_with_check,
     get_output_metadata,
     parse_graph_io,
+    pin_torch_executed_state,
     prepare_inputs,
     to_torch_device,
     to_torch_tensorrt_device,
@@ -97,7 +101,7 @@ def cross_compile_for_windows(
     require_full_compilation: bool = _defaults.REQUIRE_FULL_COMPILATION,
     min_block_size: int = _defaults.MIN_BLOCK_SIZE,
     torch_executed_ops: Optional[Collection[Target]] = None,
-    torch_executed_modules: Optional[List[str]] = None,
+    torch_executed_modules: Optional[Collection[str]] = None,
     pass_through_build_failures: bool = _defaults.PASS_THROUGH_BUILD_FAILURES,
     max_aux_streams: Optional[int] = _defaults.MAX_AUX_STREAMS,
     version_compatible: bool = _defaults.VERSION_COMPATIBLE,
@@ -180,7 +184,7 @@ def cross_compile_for_windows(
         require_full_compilation (bool): Require modules to be compiled end to end or return an error as opposed to returning a hybrid graph where operations that cannot be run in TensorRT are run in PyTorch
         min_block_size (int): The minimum number of contiguous TensorRT convertible operations in order to run a set of operations in TensorRT
         torch_executed_ops (Collection[Target]): Set of aten operators that must be run in PyTorch. An error will be thrown if this set is not empty but ``require_full_compilation`` is True
-        torch_executed_modules (List[str]): List of modules that must be run in PyTorch. An error will be thrown if this list is not empty but ``require_full_compilation`` is True
+        torch_executed_modules (Collection[str]): Collection of modules that must be run in PyTorch. An error will be thrown if this collection is not empty but ``require_full_compilation`` is True
         pass_through_build_failures (bool): Error out if there are issues during compilation (only applicable to torch.compile workflows)
         max_aux_stream (Optional[int]): Maximum streams in the engine
         version_compatible (bool): Build the TensorRT engines compatible with future versions of TensorRT (Restrict to lean runtime operators to provide version forward compatibility for the engines)
@@ -297,12 +301,6 @@ def cross_compile_for_windows(
 
     engine_capability = EngineCapability._from(engine_capability)
 
-    if torch_executed_modules is not None and torch_executed_modules:
-        logger.warning(
-            f"Detected torch_executed_modules was non-empty: {torch_executed_modules}"
-            "\nThis feature is unimplemented in Torch-TRT Dynamo currently."
-        )
-
     if use_fp32_acc:
         logger.debug(
             "FP32 accumulation for FP16 matmul layers is enabled. If "
@@ -332,8 +330,12 @@ def cross_compile_for_windows(
         arg_inputs = [arg_inputs]  # type: ignore
 
     # Prepare torch_trt inputs
-    trt_arg_inputs: Sequence[Input] = prepare_inputs(arg_inputs)
-    trt_kwarg_inputs: Optional[dict[Any, Any]] = prepare_inputs(kwarg_inputs)
+    trt_arg_inputs: Sequence[Input] = prepare_inputs(
+        arg_inputs, disable_memory_format_check=True
+    )
+    trt_kwarg_inputs: Optional[dict[Any, Any]] = prepare_inputs(
+        kwarg_inputs, disable_memory_format_check=True
+    )
     device = to_torch_tensorrt_device(device)
 
     compilation_options = {
@@ -343,6 +345,9 @@ def cross_compile_for_windows(
         "min_block_size": min_block_size,
         "torch_executed_ops": (
             torch_executed_ops if torch_executed_ops is not None else set()
+        ),
+        "torch_executed_modules": (
+            torch_executed_modules if torch_executed_modules is not None else set()
         ),
         "pass_through_build_failures": pass_through_build_failures,
         "max_aux_streams": max_aux_streams,
@@ -465,7 +470,7 @@ def compile(
     require_full_compilation: bool = _defaults.REQUIRE_FULL_COMPILATION,
     min_block_size: int = _defaults.MIN_BLOCK_SIZE,
     torch_executed_ops: Optional[Collection[Target]] = None,
-    torch_executed_modules: Optional[List[str]] = None,
+    torch_executed_modules: Optional[Collection[str]] = None,
     pass_through_build_failures: bool = _defaults.PASS_THROUGH_BUILD_FAILURES,
     max_aux_streams: Optional[int] = _defaults.MAX_AUX_STREAMS,
     version_compatible: bool = _defaults.VERSION_COMPATIBLE,
@@ -578,7 +583,7 @@ def compile(
         require_full_compilation (bool): Require modules to be compiled end to end or return an error as opposed to returning a hybrid graph where operations that cannot be run in TensorRT are run in PyTorch
         min_block_size (int): The minimum number of contiguous TensorRT convertible operations in order to run a set of operations in TensorRT
         torch_executed_ops (Optional[Collection[Target]]): Set of aten operators that must be run in PyTorch. An error will be thrown if this set is not empty but ``require_full_compilation`` is True
-        torch_executed_modules (Optional[List[str]]): List of modules that must be run in PyTorch. An error will be thrown if this list is not empty but ``require_full_compilation`` is True
+        torch_executed_modules (Optional[Collection[str]]): Collection of modules that must be run in PyTorch. An error will be thrown if this collection is not empty but ``require_full_compilation`` is True
         pass_through_build_failures (bool): Error out if there are issues during compilation (only applicable to torch.compile workflows)
         max_aux_streams (Optional[int]): Maximum streams in the engine
         version_compatible (bool): Build the TensorRT engines compatible with future versions of TensorRT (Restrict to lean runtime operators to provide version forward compatibility for the engines)
@@ -719,12 +724,6 @@ def compile(
 
     engine_capability = EngineCapability._from(engine_capability)
 
-    if torch_executed_modules is not None and torch_executed_modules:
-        logger.warning(
-            f"Detected torch_executed_modules was non-empty: {torch_executed_modules}"
-            "\nThis feature is unimplemented in Torch-TRT Dynamo currently."
-        )
-
     if autocast_low_precision_type is not None:
         if not isinstance(autocast_low_precision_type, (torch.dtype, dtype)):
             raise ValueError(
@@ -767,8 +766,12 @@ def compile(
         arg_inputs = [arg_inputs]  # type: ignore
 
     # Prepare torch_trt inputs
-    trt_arg_inputs: Sequence[Input] = prepare_inputs(arg_inputs)
-    trt_kwarg_inputs: Optional[dict[Any, Any]] = prepare_inputs(kwarg_inputs)
+    trt_arg_inputs: Sequence[Input] = prepare_inputs(
+        arg_inputs, disable_memory_format_check=True
+    )
+    trt_kwarg_inputs: Optional[dict[Any, Any]] = prepare_inputs(
+        kwarg_inputs, disable_memory_format_check=True
+    )
     device = to_torch_tensorrt_device(device)
 
     engine_cache = None
@@ -786,6 +789,9 @@ def compile(
         "min_block_size": min_block_size,
         "torch_executed_ops": (
             torch_executed_ops if torch_executed_ops is not None else set()
+        ),
+        "torch_executed_modules": (
+            torch_executed_modules if torch_executed_modules is not None else set()
         ),
         "pass_through_build_failures": pass_through_build_failures,
         "max_aux_streams": max_aux_streams,
@@ -1333,7 +1339,7 @@ def compile_module(
     # Check the number of supported operations in the graph
     num_supported_ops, total_ops, op_support = (
         partitioning.get_graph_converter_support_overview(
-            gm, settings.torch_executed_ops
+            gm, settings.torch_executed_ops, settings.torch_executed_modules
         )
     )
 
@@ -1380,6 +1386,10 @@ def compile_module(
         dryrun_tracker.to_run_in_torch.extend(parse_non_trt_nodes(gm))
         parse_graph_io(gm, dryrun_tracker)
         dryrun_stats_display(dryrun_tracker, settings.dryrun)
+        # compile() offloaded gm before this call. No operation converted, so all of gm
+        # runs in PyTorch, and its state must go back to the device.
+        if settings.offload_module_to_cpu:
+            pin_torch_executed_state(gm, to_torch_device(settings.device))
         return gm
     else:
         logger.debug(
@@ -1467,6 +1477,7 @@ def compile_module(
                 gm,
                 min_block_size=settings.min_block_size,
                 torch_executed_ops=settings.torch_executed_ops,
+                torch_executed_modules=settings.torch_executed_modules,
                 require_full_compilation=enforce_full_compilation,
                 skip_fusion=(num_supported_ops == total_ops),
                 assume_full_support=(
@@ -1490,6 +1501,7 @@ def compile_module(
             gm,
             min_block_size=settings.min_block_size,
             torch_executed_ops=settings.torch_executed_ops,
+            torch_executed_modules=settings.torch_executed_modules,
             require_full_compilation=enforce_full_compilation,
         )
 
@@ -1579,9 +1591,14 @@ def compile_module(
                 f"node_name: {name} does not exist in the submodule node dictionary"
             )
 
+        # Partitioning can expose an internal folded constructor as a new TRT
+        # subgraph output. Give that compiler-owned value fresh storage on each
+        # invocation before downstream eager code can mutate it.
+        submodule = reset_folded_constructors(submodule, settings)
+        setattr(partitioned_module, name, submodule)
+
         # set the submodule metadata back to the parent trt_module_node
         metadata_list = get_output_metadata(submodule)
-        assert len(metadata_list) > 0
         metadata_keys = ["val", "tensor_meta"]
         for key in metadata_keys:
             if key not in submodule_node_dict[name].meta:
@@ -1920,7 +1937,7 @@ def convert_exported_program_to_serialized_trt_engine(
     require_full_compilation: bool = _defaults.REQUIRE_FULL_COMPILATION,
     min_block_size: int = _defaults.MIN_BLOCK_SIZE,
     torch_executed_ops: Optional[Collection[Target]] = None,
-    torch_executed_modules: Optional[List[str]] = None,
+    torch_executed_modules: Optional[Collection[str]] = None,
     pass_through_build_failures: bool = _defaults.PASS_THROUGH_BUILD_FAILURES,
     max_aux_streams: Optional[int] = _defaults.MAX_AUX_STREAMS,
     version_compatible: bool = _defaults.VERSION_COMPATIBLE,
@@ -2025,7 +2042,7 @@ def convert_exported_program_to_serialized_trt_engine(
         require_full_compilation (bool): Require modules to be compiled end to end or return an error as opposed to returning a hybrid graph where operations that cannot be run in TensorRT are run in PyTorch
         min_block_size (int): The minimum number of contiguous TensorRT convertible operations in order to run a set of operations in TensorRT
         torch_executed_ops (Optional[Collection[Target]]): Set of aten operators that must be run in PyTorch. An error will be thrown if this set is not empty but ``require_full_compilation`` is True
-        torch_executed_modules (Optional[List[str]]): List of modules that must be run in PyTorch. An error will be thrown if this list is not empty but ``require_full_compilation`` is True
+        torch_executed_modules (Optional[Collection[str]]): Collection of modules that must be run in PyTorch. An error will be thrown if this collection is not empty but ``require_full_compilation`` is True
         pass_through_build_failures (bool): Error out if there are issues during compilation (only applicable to torch.compile workflows)
         max_aux_streams (Optional[int]): Maximum streams in the engine
         version_compatible (bool): Build the TensorRT engines compatible with future versions of TensorRT (Restrict to lean runtime operators to provide version forward compatibility for the engines)
@@ -2148,12 +2165,6 @@ def convert_exported_program_to_serialized_trt_engine(
 
     engine_capability = EngineCapability._from(engine_capability)
 
-    if torch_executed_modules is not None and torch_executed_modules:
-        logger.warning(
-            f"Detected torch_executed_modules was non-empty: {torch_executed_modules}"
-            "\nThis feature is unimplemented in Torch-TRT Dynamo currently."
-        )
-
     if use_fp32_acc:
         logger.debug(
             "FP32 accumulation for FP16 matmul layers is enabled. If "
@@ -2183,8 +2194,12 @@ def convert_exported_program_to_serialized_trt_engine(
         arg_inputs = [arg_inputs]  # type: ignore
 
     # Prepare torch_trt inputs
-    trt_arg_inputs: Sequence[Input] = prepare_inputs(arg_inputs)
-    trt_kwarg_inputs: Optional[dict[str, Any]] = prepare_inputs(kwarg_inputs)
+    trt_arg_inputs: Sequence[Input] = prepare_inputs(
+        arg_inputs, disable_memory_format_check=True
+    )
+    trt_kwarg_inputs: Optional[dict[str, Any]] = prepare_inputs(
+        kwarg_inputs, disable_memory_format_check=True
+    )
     device = to_torch_tensorrt_device(device)
 
     engine_cache = None
@@ -2202,6 +2217,9 @@ def convert_exported_program_to_serialized_trt_engine(
         "min_block_size": min_block_size,
         "torch_executed_ops": (
             torch_executed_ops if torch_executed_ops is not None else set()
+        ),
+        "torch_executed_modules": (
+            torch_executed_modules if torch_executed_modules is not None else set()
         ),
         "pass_through_build_failures": pass_through_build_failures,
         "max_aux_streams": max_aux_streams,

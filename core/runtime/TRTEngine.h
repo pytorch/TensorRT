@@ -377,7 +377,7 @@ struct TRTEngine : torch::CustomClassHolder {
   // manual pins are applied eagerly via set_active_profile.
   int64_t auto_select_profile(const std::vector<at::Tensor>& inputs);
 
-  // Single placeholder buffer for empty tensor inputs (allocated once, reused)
+  // Single placeholder buffer for empty tensor bindings (allocated once, reused)
   void* empty_tensor_placeholder = nullptr;
 
   // Output Allocator-Related Functionality

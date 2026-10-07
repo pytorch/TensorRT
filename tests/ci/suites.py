@@ -82,7 +82,7 @@ class Suite:
     verbose: bool = False  # -v
     variants: tuple[Variant, ...] = ALL_VARIANTS
     platforms: tuple[Platform, ...] = ALL_PLATFORMS  # channels this suite runs on
-    setup: tuple[str, ...] = ()  # named pre-steps: hub|executorch|cuda-core|mpi
+    setup: tuple[str, ...] = ()  # named pre-steps; validated by ``ci doctor``
     follow: tuple[tuple[str, ...], ...] = ()  # extra argv to run AFTER pytest
     env: dict[str, str] = field(default_factory=dict)
     runner: str | None = None  # GHA runner label; None = matrix.validation_runner
@@ -145,6 +145,18 @@ _L0: list[Suite] = [
         jobs="8",
         # RTX does not shard converters with loadscope.
         overrides={"rtx": {"dist": None}},
+    ),
+    Suite(
+        "plugins-mutation-smoke",
+        tier="l0",
+        lanes=("fast", "full", "nightly"),
+        paths=(
+            "automatic_plugin/test_automatic_plugin_inplace_validation.py",
+            "automatic_plugin/test_automatic_plugin_mutation.py",
+        ),
+        jobs=_HEAVY,
+        variants=("standard",),
+        platforms=("linux-x86_64",),
     ),
     Suite(
         "dynamo-runtime-smoke",
@@ -211,6 +223,11 @@ _L0: list[Suite] = [
         paths=("api/",),
         setup=("hub",),
         variants=("standard",),
+        # g5.8xlarge rather than the default g5.4xlarge validation runner:
+        # this suite was dying on the smaller pod without surfacing a test
+        # failure -- in one run the container hook reported the RPC server
+        # process dying mid-step. Same single A10G, more CPU and RAM.
+        runner="mt-l-x86aavx2-29-113-a10g",
     ),
 ]
 
@@ -245,6 +262,11 @@ _L1: list[Suite] = [
         lanes=("full", "nightly"),
         paths=("models/",),
         markers="critical",
+        # g5.8xlarge rather than the default g5.4xlarge validation runner:
+        # this suite was dying on the smaller pod without surfacing a test
+        # failure -- in one run the container hook reported the RPC server
+        # process dying mid-step. Same single A10G, more CPU and RAM.
+        runner="mt-l-x86aavx2-29-113-a10g",
     ),
     Suite(
         "torch-compile-backend",
@@ -333,7 +355,8 @@ _L2: list[Suite] = [
         platforms=("linux-x86_64",),
     ),
     Suite(
-        # Standard: the automatic-plugin trio. RTX: the whole automatic_plugin
+        # Standard: automatic plugins and the in-place regression tests.
+        # RTX: the whole automatic_plugin
         # directory, except the Linux-only FlashInfer test below.
         # (The redundant conversion/ re-run from the old l2_plugin is dropped.)
         "plugins-automatic",
@@ -344,6 +367,10 @@ _L2: list[Suite] = [
             "automatic_plugin/test_automatic_plugin.py",
             "automatic_plugin/test_automatic_plugin_with_attrs.py",
             "automatic_plugin/test_plugin_attr_annotations.py",
+            "automatic_plugin/test_automatic_plugin_inplace.py",
+            "automatic_plugin/test_automatic_plugin_inplace_consumed.py",
+            "automatic_plugin/test_automatic_plugin_inplace_dynamic.py",
+            "automatic_plugin/test_automatic_plugin_inplace_multi.py",
         ),
         overrides={
             "rtx": {
@@ -372,12 +399,30 @@ _L2: list[Suite] = [
         platforms=("linux-x86_64",),
     ),
     Suite(
+        "kernels-cutile",
+        tier="l0",
+        lanes=("fast", "full"),
+        cwd="tests/py/kernels",
+        paths=(
+            "test_cutile_op.py",
+            "test_common.py",
+            "test_kernel_dtype_safety.py",
+            "test_cutile_example.py",
+            "test_cutile_elf.py",
+            "test_kernel_schema_safety.py",
+        ),
+        setup=("cuda-core", "cuda-tile"),
+        jobs="2",
+        variants=("standard",),
+        platforms=("linux-x86_64",),
+    ),
+    Suite(
         "kernels",
         tier="l2",
         lanes=("nightly",),
         cwd="tests/py/kernels",
         paths=(".",),
-        setup=("cuda-core",),
+        setup=("cuda-core", "cuda-tile"),
         follow=(("../../ci/triton_compat.py", "3.5.0"),),
         jobs="auto",
         variants=("standard",),

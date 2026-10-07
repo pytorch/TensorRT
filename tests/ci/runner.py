@@ -175,6 +175,35 @@ def _setup_commands(step: str) -> list[tuple[list[str], Path]]:
         return [
             (launcher + ["-m", "pip", "install", "cuda-python", "cuda-core"], REPO_ROOT)
         ]
+    if step == "cuda-tile":
+        commands = [
+            (
+                launcher + ["-m", "pip", "install", "cuda-tile>=1.3.0,<2"],
+                REPO_ROOT,
+            )
+        ]
+        # cuTile's compiler first ships in the system CUDA Toolkit at 13.1;
+        # compatibility still depends on the cuda-tile release. PR jobs use
+        # cu132 and must prove that the image really contains it;
+        # older nightly rows still run the non-cuTile kernel tests and let the
+        # compiler-aware pytest marker skip only the cuTile integrations.
+        cuda_version = os.environ.get("CU_VERSION")
+        match = re.fullmatch(r"cu(\d+)", cuda_version or "")
+        compiler_expected = match is None or int(match.group(1)) >= 131
+        if compiler_expected:
+            commands.append(
+                (
+                    launcher
+                    + [
+                        "-c",
+                        "from cuda.tile.compilation import export_kernel; "
+                        "from cuda.tile._compile import _find_compiler_bin; "
+                        "_find_compiler_bin()",
+                    ],
+                    REPO_ROOT,
+                )
+            )
+        return commands
     if step == "mpi":
         return [
             (
@@ -235,14 +264,14 @@ def run_suite(
             print(f"==> setup[{step}]: {shlex.join(argv)}", flush=True)
             rc = subprocess.run(argv, cwd=scwd, env=env).returncode
             if rc != 0:
-                # The executorch suite gates on pytest.importorskip, so a failed install skips
+                # These suites gate on optional dependencies, so a failed setup skips
                 # those files, leaves the rest passing, and reports success with a populated
                 # junit xml: the run looks green precisely when the thing it exists to test is
-                # absent. The pin names a nightly build, which the channel prunes eventually, so
-                # that has to be loud. Other steps keep warning and continuing, because their
+                # absent. A missing ExecuTorch build or required cuTile compiler must fail
+                # explicitly. Other steps keep warning and continuing, because their
                 # suites fail visibly on a missing dependency and a flaky checkpoint download
                 # should not fail a suite that would otherwise report honestly.
-                if step == "executorch":
+                if step in {"executorch", "cuda-tile"}:
                     print(
                         f"::error::setup step {step!r} exited {rc}, so the suite cannot test "
                         "what it was asked to test",

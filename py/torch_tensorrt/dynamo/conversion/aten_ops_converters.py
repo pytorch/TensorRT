@@ -2256,8 +2256,7 @@ def _dynamic_placeholder_copy_supported(
     silently.
 
     An input dtype the engine cannot bind. float64 needs truncate_double, and without it
-    the binding expects float32 and rejects the caller's tensor at the first call. uint8
-    aborts the build outright.
+    the binding expects float32 and rejects the caller's tensor at the first call.
 
     A non-contiguous input with no memory_format. Default clone preserves the input strides,
     so a channels-last or transposed input keeps its layout in eager, but the copy the layer
@@ -2299,11 +2298,6 @@ def _dynamic_placeholder_copy_supported(
         )
         return False
 
-    if input_meta.dtype == torch.uint8:
-        _LOGGER.debug(
-            f"{node.target} with a uint8 input is not supported, falling back"
-        )
-        return False
     if input_meta.dtype == torch.float64 and not (
         settings is not None and settings.truncate_double
     ):
@@ -2655,8 +2649,8 @@ def log1p_validator(node: Node, settings: Optional[CompilationSettings] = None) 
         input_meta = input_node.meta.get("val")
     if input_meta is None:
         return True
-    # Casting inside the engine cannot repair an unsupported input binding.
-    if input_meta.dtype in (torch.int8, torch.uint8):
+    # TensorRT treats an int8 input as quantized, so math after the cast fails the build.
+    if input_meta.dtype == torch.int8:
         return False
     return input_meta.dtype != torch.float64 or (
         settings is not None and settings.truncate_double
@@ -4626,6 +4620,99 @@ def aten_ops_sort(
         args[0],
         dim=args_bounds_check(args, 1, -1),
         descending=args_bounds_check(args, 2, False),
+    )
+
+
+def _arg_or_kwarg(
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    index: int,
+    key: str,
+    default: Any = None,
+) -> Any:
+    """Read an operand that export may have left positional or keyword."""
+    if key in kwargs and kwargs[key] is not None:
+        return kwargs[key]
+    return args_bounds_check(args, index, default)
+
+
+def histc_validator(node: Node, settings: Optional[CompilationSettings] = None) -> bool:
+    bins = _arg_or_kwarg(node.args, node.kwargs, 1, "bins", 100)
+    lo = _arg_or_kwarg(node.args, node.kwargs, 2, "min", 0)
+    hi = _arg_or_kwarg(node.args, node.kwargs, 3, "max", 0)
+    if not all(
+        isinstance(v, (int, float)) and not isinstance(v, bool) for v in (bins, lo, hi)
+    ):
+        return False
+    # min == max == 0 asks aten to take the bin edges from the data itself.
+    return int(bins) > 0 and float(lo) < float(hi)
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.histc.default, capability_validator=histc_validator
+)
+@enforce_tensor_types({0: (TRTTensor,)})
+def aten_ops_histc(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.moe.histc(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        int(_arg_or_kwarg(args, kwargs, 1, "bins", 100)),
+        float(_arg_or_kwarg(args, kwargs, 2, "min", 0)),
+        float(_arg_or_kwarg(args, kwargs, 3, "max", 0)),
+    )
+
+
+def grouped_mm_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    # Per-group bias would need a gather this lowering does not implement.
+    if _arg_or_kwarg(node.args, node.kwargs, 3, "bias") is not None:
+        return False
+    # Without offsets this is a plain bmm, which already has a converter.
+    if _arg_or_kwarg(node.args, node.kwargs, 2, "offs") is None:
+        return False
+    shapes = []
+    for arg in node.args[:2]:
+        val = arg.meta.get("val")
+        if val is None:
+            return False
+        try:
+            shapes.append(tuple(int(d) for d in val.shape))
+        except (TypeError, ValueError):  # SymInt
+            return False
+    # Only the (rows, K) x (experts, K, N) form.
+    return len(shapes[0]) == 2 and len(shapes[1]) == 3
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten._grouped_mm.default, capability_validator=grouped_mm_validator
+)
+@enforce_tensor_types({0: (TRTTensor,), 1: (TRTTensor,)})
+def aten_ops_grouped_mm(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.moe.grouped_mm(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+        _arg_or_kwarg(args, kwargs, 2, "offs"),
+        _arg_or_kwarg(args, kwargs, 4, "out_dtype"),
     )
 
 

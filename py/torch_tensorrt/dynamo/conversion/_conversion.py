@@ -7,7 +7,6 @@ import io
 import logging
 from typing import Any, Dict, List, NamedTuple, Optional, Sequence, Tuple
 
-import tensorrt as trt
 import torch
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
@@ -29,6 +28,8 @@ from torch_tensorrt.dynamo.utils import (
 )
 from torch_tensorrt.logging import TRT_LOGGER
 
+import tensorrt as trt
+
 logger = logging.getLogger(__name__)
 
 
@@ -45,6 +46,7 @@ class SerializedInterpreterResult(NamedTuple):
     # from "user" (Torch-TensorRT-declared; runtime must enforce shape match
     # and bind the same device pointer).
     aliased_io: Dict[str, Tuple[str, str]] = {}
+    num_user_outputs: Optional[int] = None
 
 
 def infer_module_output_dtypes(
@@ -200,6 +202,18 @@ def pull_cached_engine(
             requires_native_multidevice=requires_native_multidevice,
             symbolic_shape_expressions=symbolic_shape_expressions,
             aliased_io=aliased_io,
+            # The cached graph is identical; recover its user-output boundary
+            # without changing the cache's on-disk tuple format.
+            num_user_outputs=len(
+                {
+                    id(value)
+                    for value in torch.utils._pytree.tree_leaves(
+                        next(
+                            node for node in module.graph.nodes if node.op == "output"
+                        ).args[0]
+                    )
+                }
+            ),
         )
     return None
 
@@ -235,7 +249,7 @@ def interpret_module_to_result(
         validate_tuning_options(settings)
 
     if should_run_tuning(settings):
-        return tune_subgraph(
+        tuned_result: SerializedInterpreterResult = tune_subgraph(
             module,
             inputs,
             settings,
@@ -243,6 +257,7 @@ def interpret_module_to_result(
             input_binding_names=input_binding_names,
             output_binding_names=output_binding_names,
         )
+        return tuned_result
 
     return _interpret_module_to_result_impl(
         module,
@@ -380,6 +395,7 @@ def _interpret_module_to_result_impl(
         requires_native_multidevice=interpreter_result.requires_native_multidevice,
         symbolic_shape_expressions=symbolic_shape_expressions,
         aliased_io=interpreter_result.aliased_io,
+        num_user_outputs=interpreter_result.num_user_outputs,
     )
 
     return serialized_interpreter_result
@@ -437,4 +453,5 @@ def convert_module(
         requires_native_multidevice=serialized_interpreter_result.requires_native_multidevice,
         symbolic_shape_expressions=serialized_interpreter_result.symbolic_shape_expressions,
         aliased_io=serialized_interpreter_result.aliased_io,
+        num_user_outputs=serialized_interpreter_result.num_user_outputs,
     )

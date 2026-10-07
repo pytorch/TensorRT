@@ -393,10 +393,28 @@ def _cumsum_with_loop(
     name: str,
     input: TRTTensor,
     dim: int,
+    dtype: Optional[torch.dtype] = None,
 ) -> TRTTensor:
-    # Kept for TensorRT without the cumulative layer. It seeds its accumulator with a
-    # float32 zero, so an integer total loses exactness above 2**24; the layer path does
-    # not have that problem.
+    # Kept for TensorRT without the cumulative layer.
+    # aten.cumsum accumulates bool and integer inputs in int64 and floats in
+    # their own dtype; an explicit dtype wins over both
+    input_dtype = _enums.dtype._from(input.dtype).to(torch.dtype)
+    if dtype is not None:
+        output_dtype = torch.float32 if dtype is torch.float64 else dtype
+    elif not input_dtype.is_floating_point:
+        output_dtype = torch.int64
+    else:
+        output_dtype = input_dtype
+
+    # eager sums float16 / bfloat16 in float32; rounding every partial total to the
+    # narrow type drifts badly over a long axis
+    acc_dtype = output_dtype
+    if output_dtype in (torch.float16, torch.bfloat16):
+        acc_dtype = torch.float32
+
+    if input_dtype != acc_dtype:
+        input = cast_trt_tensor(ctx, input, acc_dtype, f"{name}_input_cast")
+
     input_shape = input.shape
     dim = get_positive_dim(dim, len(input_shape))
     if input_shape[dim] < 0:
@@ -429,13 +447,13 @@ def _cumsum_with_loop(
                     )
                 else:
                     data_shape.append(input_shape[i])
-        zero_trttensor = impl.full.full(
-            ctx, target, source_ir, name + "_full", data_shape, 0.0
-        )
     else:
-        new_dims = tuple(data.shape)
-        zeros = np.zeros(new_dims, dtype=np.float32)
-        zero_trttensor = get_trt_tensor(ctx, zeros, f"{name}_initial_value")
+        data_shape = list(data.shape)
+
+    # full rather than np.zeros: numpy has no bf16
+    zero_trttensor = impl.full.full(
+        ctx, target, source_ir, f"{name}_initial_value", data_shape, 0, dtype=acc_dtype
+    )
 
     running_sum = loop.add_recurrence(zero_trttensor)
     set_layer_name(running_sum, target, f"{name}_running_sum", source_ir)
@@ -454,7 +472,12 @@ def _cumsum_with_loop(
     loop_output = loop.add_loop_output(current_sum, trt.LoopOutput.CONCATENATE, dim)
     set_layer_name(loop_output, target, f"{name}_loop_output", source_ir)
     loop_output.set_input(1, trip_limit)
-    return loop_output.get_output(0)
+    result = loop_output.get_output(0)
+    if acc_dtype is not output_dtype:
+        result = cast_trt_tensor(
+            ctx, result, output_dtype, f"{name}_output_cast", target, source_ir
+        )
+    return result
 
 
 def cumsum(
@@ -468,7 +491,7 @@ def cumsum(
 ) -> TRTTensor:
     if not is_tensorrt_version_supported("10.8.0"):
         # No cumulative layer before this version, so build it out of a loop.
-        return _cumsum_with_loop(ctx, target, source_ir, name, input, dim)
+        return _cumsum_with_loop(ctx, target, source_ir, name, input, dim, dtype)
 
     # torch.cumsum accumulates a bool or integer input in int64 and returns int64, so
     # accumulating in the input type would turn every non-zero running total for a bool
@@ -523,10 +546,14 @@ def tile(
     source_ir: Optional[SourceIR],
     name: str,
     input: TRTTensor,
-    dims: Sequence[int],
+    dims: Sequence[Union[int, TRTTensor]],
 ) -> TRTTensor:
     diff = len(dims) - len(input.shape)
-    has_dynamic_shape_input = has_dynamic_shape(input.shape)
+    # A symbolic repeat count (ITensor) needs the dynamic path as well, even
+    # when the input shape itself is static.
+    is_dynamic = has_dynamic_shape(input.shape) or any(
+        isinstance(dim, TRTTensor) for dim in dims
+    )
     if diff > 0:
         # prepend 1 to input.shape
         new_shape = (1,) * diff + tuple(input.shape)
@@ -540,7 +567,7 @@ def tile(
     starts = tuple([0] * len(dims))
     strides = tuple([1] * len(dims))
     # layer = ctx.net.add_slice(input, tuple(starts), tuple(shapes), tuple(strides))
-    if not (has_dynamic_shape_input):
+    if not is_dynamic:
         shapes = [i * j for i, j in zip(input.shape, dims)]
         layer = ctx.net.add_slice(input, tuple(starts), tuple(shapes), tuple(strides))
     else:
@@ -555,7 +582,7 @@ def tile(
                 ctx,
                 target,
                 source_ir,
-                name + "_prod",
+                name + f"_prod_{index}",
                 trt.ElementWiseOperation.PROD,
                 i,
                 j,

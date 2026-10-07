@@ -315,6 +315,73 @@ requirements, which previously lived on the removed `CudaStreamGuard`:
   context is only exercised where the device has the SMs for one.
 
 
+## Shared engines
+
+Loading the same program twice in one process, for example once per robot arm, used to
+deserialize its TensorRT engine twice, so its weights sat in device memory twice. Now handles
+loaded from the same engine bytes, for the same device and the same weight streaming request,
+share one engine. Each handle still creates its own execution context, I/O buffers and lock. From
+C++, two handles of one engine can run at the same time on two threads, unless both handles
+were loaded with shared activation scratch enabled and the engine needs scratch. Those two
+handles then take turns, like all pooled calls on one device. From Python
+they take turns anyway, because ExecuTorch's Python `execute` holds the interpreter lock for the
+whole call.
+
+A second load still allocates its own context and buffers. In measurements on an 8 GB Jetson
+Orin Nano, loading one robot policy twice increased CUDA-reported memory usage by 806 MiB for
+the second load without sharing, compared with 122 MiB with sharing. Loading two methods that
+carry the same engine in one program gave 742 MiB versus 120 MiB. These are whole-load changes in the board's shared
+memory, not separate engine and context allocations. Serialized plan size is a different measure.
+Inference speed was unchanged in those runs. To find a match, every load with sharing on hashes
+the engine bytes, even a load that ends up sharing nothing. That takes about 0.15 s per GB of
+engine on a Jetson AGX Thor and about 0.25 s per GB on the Orin Nano.
+
+- The weight streaming budget belongs to the engine, and TensorRT refuses to change it once a
+  context exists. Sharing uses the requested budget, not the value after TensorRT clamps or
+  ignores it. A different request gets its own engine. With no budget requested, the automatic
+  budget from the load that publishes first is kept. Racing loads can size that budget while
+  another copy occupies device memory. Pass an explicit budget for a predictable value.
+- A match is found by hashing the engine bytes, because the bytes are freed after loading and
+  keeping a copy to compare would cost the memory being saved. The hash is not collision
+  resistant, so this relies on every program in the process being trusted input, as the
+  section on corrupted engines above already asks.
+- The engine is freed when the last handle that uses it is destroyed.
+
+Set the `use_shared_engines` load option (a boolean, true by default) to false to keep one
+module's engines private. Pass it through `Module::load`, like `weight_streaming_budget`.
+It changes nothing for other modules loading at the same time. Private loads neither look up
+nor publish an engine, and do not hash the bytes. A value of the wrong type is rejected with
+`Error::InvalidArgument`. Passing this load-only key to `executorch::runtime::set_option`
+also returns `Error::InvalidArgument`; pass it to `Module::load` instead.
+
+The ExecuTorch Python bindings do not expose load options, so every Python load hashes the
+engine bytes and uses sharing. The C++ example below sets options before any method is loaded:
+
+```cpp
+#include <executorch/extension/module/module.h>
+
+using namespace executorch::extension;
+using namespace executorch::runtime;
+
+Error load_with_private_engines(Module& module) {
+  BackendOptions<1> options;
+  const Error stored = options.set_option("use_shared_engines", false);
+  if (stored != Error::Ok) {
+    return stored;
+  }
+  LoadBackendOptionsMap by_backend;
+  const Error mapped = by_backend.set_options("TensorRTBackend", options.view());
+  if (mapped != Error::Ok) {
+    return mapped;
+  }
+  return module.load(by_backend);
+}
+```
+
+Turn it off when two loads of one program must not share an engine, for example to compare
+their memory, or when the loads run under different CUDA driver contexts on one device, which
+sharing does not tell apart.
+
 ## Shared activation scratch
 
 A TensorRT execution context allocates its own activation scratch and holds it
@@ -350,10 +417,10 @@ binary that has not linked the backend archive gets. Nothing forces the check: t
 free `executorch::runtime::set_option` is not `ET_NODISCARD`, so dropping its
 return compiles.
 
-N per-engine copies collapse to one, so the reclaimed memory is the sum of the N
+N per-context copies collapse to one, so the reclaimed memory is the sum of the N
 requirements less the largest of them. Set the option before loading the methods
-whose engines should use the pool, and read the `use_shared_activation_scratch`
-bullet of the caller-stream contract above: engines sharing a buffer do not run
+whose contexts should use the pool, and read the `use_shared_activation_scratch`
+bullet of the caller-stream contract above: contexts sharing a buffer do not run
 concurrently on the device. The pool never shrinks, so the largest scratch it was
 ever asked for stays allocated until the process exits.
 
@@ -542,11 +609,11 @@ of it only when `cudaStreamEndCapture` hands back
 `cudaErrorStreamCaptureInvalidated` and a null graph, long after the call that
 caused it.
 
-The check sits ahead of everything `execute()` does that a capture cannot take,
-not merely ahead of the pool's own calls: the wait on a previous enqueue and the
-`cudaMalloc` that grows a host-input staging buffer come before those and, outside
-`Relaxed`, would invalidate the capture first. Only the device query and the
-device switch run before the check, and a capture takes both.
+The capture check runs before the wait on a previous enqueue, the `cudaMalloc`
+that grows a host-input staging buffer, and the `cudaFree(nullptr)` that makes a
+context current for a default stream. These calls precede the pool's own calls
+and, outside `Relaxed`, can invalidate the capture. Only the device query and
+the device switch run before the check, and a capture takes both.
 
 Where the query fails for a reason that is not a capture, the call is not told it
 is capturing. `cudaStreamIsCapturing` also hands back a sticky fault left by
@@ -557,16 +624,15 @@ memory access it returns that fault with the capture status still
 failure that does still mean a capture, `cudaErrorStreamCaptureImplicit`, is
 refused with the rest.
 
-Only the selected stream is checked. A capture running on another stream under
-`Global`, or under `ThreadLocal` from the calling thread, is invalidated by the
-same calls and is not refused, because CUDA has no query for "is a capture live in
-this process". So that much is the caller's to keep: do not run a pooled engine
-while any capture is open anywhere in the process. Turning the option off removes
-the refusal, since the check lives inside the pooled path, but this delegate does
-not support capture with the option off either. No call shape here is built or
-tested for it, and the completion event `execute()` records so that the next call
-can wait for an enqueue that outlived the return would become a node of the graph
-rather than an event the host can wait on.
+Only handles that claim pooled scratch check their selected stream. A capture
+on another stream is not checked. Do not overlap `execute()` with a `Global`
+capture on any thread or a `ThreadLocal` capture on the calling thread. This
+applies to every stream, including streams created by the caller, with the option
+off or with an option-on engine that needs no scratch. Those engines skip the
+capture check, and their final `cudaStreamSynchronize` can fail and invalidate
+the capture. On a default stream, `cudaFree(nullptr)` can fail earlier, before
+enqueueing. A `ThreadLocal` capture on another thread is not affected by these
+calls. This does not make capturing the delegate itself supported.
 
 ### cudaDeviceReset() is not survivable
 

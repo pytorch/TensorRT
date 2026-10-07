@@ -144,6 +144,38 @@ class TestRepeatConverterDynamicShape(DispatchTestCase):
             input_specs,
         )
 
+    @parameterized.expand(
+        [
+            # Regression tests for https://github.com/pytorch/TensorRT/issues/3974
+            # and #3972: the repeated tensor has a static shape, only the
+            # repeat count is symbolic. "n" stands for the dynamic dim of x.
+            ("same_rank", (1, 1, 4), (1, "n", 1)),
+            ("more_repeats_than_rank", (1, 4), (1, "n", 1)),
+            ("non_unit_axes", (2, 3, 4), ("n", "n", 2)),
+            ("symbolic_and_zero_count", (1, 1, 4), (0, "n", 1)),
+            ("5d", (1, 1, 1, 8, 8), (1, 1, "n", 1, 1)),
+        ]
+    )
+    def test_repeat_static_input_dynamic_repeats(self, _, weight_shape, repeats):
+        class Repeat(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.weight = nn.Parameter(torch.randn(weight_shape))
+
+            def forward(self, x):
+                n = x.shape[1]
+                return self.weight.repeat([n if r == "n" else r for r in repeats])
+
+        input_specs = [
+            Input(
+                min_shape=(1, 1, 4),
+                opt_shape=(1, 3, 4),
+                max_shape=(1, 8, 4),
+                dtype=torch.float32,
+            ),
+        ]
+        self.run_test_with_dynamic_shape(Repeat(), input_specs, use_dynamo_tracer=True)
+
 
 @unittest.skipIf(not torch.cuda.is_available(), "Skip because CUDA is not available")
 class TestRepeatValidator(TestCase):

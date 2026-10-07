@@ -4,7 +4,8 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, List, Optional, Tuple
+import os
+from typing import Any, List, Optional, Sequence, Tuple
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -34,20 +35,28 @@ def _cuda_core_imports() -> Tuple[Any, Any, Any, Any, Any]:
         )
 
 
+def _default_cuda_include_paths() -> List[str]:
+    """Resolve CUDA include dir from CUDA_HOME / CUDA_PATH, else default."""
+    for env_var in ("CUDA_HOME", "CUDA_PATH"):
+        root = os.environ.get(env_var)
+        if root:
+            return [os.path.join(root, "include")]
+    return ["/usr/local/cuda/include"]
+
+
 def compile_to_ptx(
     kernel_source: str,
     kernel_name: str,
-    include_paths: List[str],
+    include_paths: Optional[Sequence[str]],
     compile_std: str = "c++17",
     arch_override: Optional[str] = None,
+    *,
+    load_kernel: bool = False,
 ) -> Tuple[bytes, Any, Any]:
-    """Compile CUDA C++ source to PTX using NVRTC via cuda-python.
+    """Compile CUDA C++ to PTX and optionally load a CUBIN for eager use.
 
-    Returns:
-        (ptx_bytes, device, None) — the third slot is reserved for a loadable
-        kernel handle but is intentionally not materialized here; see
-        ``_derive._compile_kernel`` if you need one (it compiles to CUBIN to
-        avoid driver-side PTX JIT).
+    Returns ``(ptx_bytes, device, kernel)``. ``kernel`` is None unless
+    ``load_kernel=True``; its separate CUBIN compilation avoids driver PTX JIT.
     """
     Device, Program, ProgramOptions, _launch, _LaunchConfig = _cuda_core_imports()
 
@@ -58,7 +67,11 @@ def compile_to_ptx(
     options = ProgramOptions(
         std=compile_std,
         arch=arch,
-        include_path=include_paths,
+        include_path=(
+            list(include_paths)
+            if include_paths is not None
+            else _default_cuda_include_paths()
+        ),
     )
     program = Program(kernel_source, code_type="c++", options=options)
     module = program.compile("ptx", name_expressions=(kernel_name,))
@@ -66,7 +79,12 @@ def compile_to_ptx(
     _LOGGER.debug(
         "Compiled kernel '%s' to PTX for %s (%d bytes)", kernel_name, arch, len(ptx)
     )
-    # Materializing a Kernel from the PTX module triggers the driver's PTX JIT,
-    # which fails with CUDA_ERROR_UNSUPPORTED_PTX_VERSION when the host driver
-    # is older than the PTX ISA NVRTC emits. Callers only consume ``ptx``.
-    return ptx, device, None
+    kernel = None
+    if load_kernel:
+        # Loading PTX invokes the driver's JIT, which may reject NVRTC's newer
+        # PTX ISA. Load CUBIN instead, using a fresh Program because NVRTC does
+        # not accept name_expressions after a Program has already compiled.
+        cubin_program = Program(kernel_source, code_type="c++", options=options)
+        cubin = cubin_program.compile("cubin", name_expressions=(kernel_name,))
+        kernel = cubin.get_kernel(kernel_name)
+    return ptx, device, kernel

@@ -21,14 +21,14 @@ from typing import (
     cast,
 )
 
+import tensorrt as trt
 import torch
 from torch import SymBool, SymFloat, SymInt
 from torch._ops import OpOverloadPacket
 from torch.fx.node import Argument, Node, Target, _get_qualified_name
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
-
-import tensorrt as trt
+from torch_tensorrt.dynamo.partitioning.common import node_in_torch_executed_module
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +84,7 @@ class ConverterSupport:
             this function must not modify the node or its graph
         supports_dynamic_shapes: Boolean flag indicating if the converter has support for dynamic inputs.
         requires_output_allocator: Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators).
+        requires_aliased_plugin_io: Boolean flag indicating if the converter creates plugins with aliased I/O (in-place mutation), requiring the ALIASED_PLUGIN_IO preview feature at build time.
     """
 
     converter_implementation: ConverterImplSignature
@@ -93,6 +94,7 @@ class ConverterSupport:
     supports_dynamic_shapes: bool = False
     requires_output_allocator: bool = False
     requires_native_multidevice: bool = False
+    requires_aliased_plugin_io: bool = False
 
 
 # Dictionary representing Dynamo aten-only converters
@@ -133,7 +135,7 @@ def has_static_shapes_in_args(
 
 def _has_dynamic_shapes(
     node: torch.fx.Node,
-    compilation_settings: CompilationSettings = None,
+    compilation_settings: Optional[CompilationSettings] = None,
     arg_positions_to_check: Optional[List[int]] = None,
 ) -> bool:
     # Validate that none of the inputs to the node have Dynamic shapes
@@ -206,6 +208,7 @@ def dynamo_tensorrt_converter(
     supports_dynamic_shapes: bool = False,
     requires_output_allocator: bool = False,
     requires_native_multidevice: bool = False,
+    requires_aliased_plugin_io: bool = False,
 ) -> Callable[[ConverterImplSignature], ConverterImplSignature]:
     """Decorator for Dynamo TensorRT Converter
 
@@ -224,6 +227,7 @@ def dynamo_tensorrt_converter(
         supports_dynamic_shapes: Boolean flag indicating if the converter has support for dynamic shapes.
         requires_output_allocator: Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators).
         requires_native_multidevice: Boolean flag indicating if the converter creates operators which require native TensorRT multi device collectives.
+        requires_aliased_plugin_io: Boolean flag indicating if the converter creates plugins with aliased I/O (in-place mutation), requiring the ALIASED_PLUGIN_IO preview feature at build time.
     Returns:
         The converter being decorated
     """
@@ -239,6 +243,7 @@ def dynamo_tensorrt_converter(
                 supports_dynamic_shapes=supports_dynamic_shapes,
                 requires_output_allocator=requires_output_allocator,
                 requires_native_multidevice=requires_native_multidevice,
+                requires_aliased_plugin_io=requires_aliased_plugin_io,
             )
         else:
             assert callable(
@@ -250,6 +255,7 @@ def dynamo_tensorrt_converter(
                 supports_dynamic_shapes=supports_dynamic_shapes,
                 requires_output_allocator=requires_output_allocator,
                 requires_native_multidevice=requires_native_multidevice,
+                requires_aliased_plugin_io=requires_aliased_plugin_io,
             )
 
         # OpOverloadPackets are only valid if they have a single overload, or
@@ -339,7 +345,7 @@ class ConverterRegistry:
                 CallingConvention.CTX for _ in range(len(self.registries))
             ]
 
-        self.compilation_settings: CompilationSettings = None
+        self.compilation_settings: Optional[CompilationSettings] = None
         self.disallowed_targets: Collection[Target] = set()
         self.validate_invariants()
 
@@ -449,6 +455,13 @@ class ConverterRegistry:
             raise KeyError(
                 f"A converter exists for {key}, but it was " "explicitly disallowed"
             )
+        if self.compilation_settings and node_in_torch_executed_module(
+            node, self.compilation_settings.torch_executed_modules
+        ):
+            raise KeyError(
+                f"Node {node.name} is in a module listed in torch_executed_modules, "
+                "so its converter is disallowed"
+            )
 
         # Iterate over all registries, validating the converter on the input node
         # If no capability_validator function is found, assume full coverage
@@ -482,6 +495,7 @@ class ConverterRegistry:
                                     "supports_dynamic_shapes": candidate.supports_dynamic_shapes,
                                     "requires_output_allocator": candidate.requires_output_allocator,
                                     "requires_native_multidevice": candidate.requires_native_multidevice,
+                                    "requires_aliased_plugin_io": candidate.requires_aliased_plugin_io,
                                 },
                             )
                         else:
@@ -499,6 +513,7 @@ class ConverterRegistry:
                                 "supports_dynamic_shapes": False,
                                 "requires_output_allocator": False,
                                 "requires_native_multidevice": False,
+                                "requires_aliased_plugin_io": False,
                             },
                         )
 

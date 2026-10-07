@@ -127,6 +127,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         requires_native_multidevice: bool = False,
         symbolic_shape_expressions: Optional[Dict[str, List[Dict[str, Any]]]] = None,
         aliased_io: Optional[Dict[str, Tuple[str, str]]] = None,
+        num_user_outputs: Optional[int] = None,
     ):
         """Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs
         a PyTorch ``torch.nn.Module`` around it. Uses the Torch-TensorRT runtime extension to run the engines
@@ -199,6 +200,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.requires_native_multidevice = requires_native_multidevice
         # Map of output binding name -> (input binding name, kind_str)
         self.aliased_io: Dict[str, Tuple[str, str]] = dict(aliased_io or {})
+        self.num_user_outputs = num_user_outputs
         self.target_platform = (
             Platform.current_platform()
             if not self.settings.enable_cross_compile_for_windows
@@ -244,6 +246,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         metadata = {
             "settings": self.settings,
             "inout_symexprs": self.symbolic_shape_expressions,
+            "num_user_outputs": self.num_user_outputs,
             "output_tensors_are_unowned": (
                 False
                 if self.engine is None
@@ -351,7 +354,9 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         rs_resolved = self._resolve_runtime_cache(rs)
         # 2. Push to the engine if it exists; if not we stash for later.
         if self.engine is not None:
-            self._send_to_engine(rs_resolved)
+            from torch_tensorrt.runtime._runtime_config import _send_settings_to_engine
+
+            _send_settings_to_engine(self.engine, rs_resolved)
         # 3. Store the resolved form so reads agree with what the engine sees.
         self._runtime_settings = rs_resolved
 
@@ -426,28 +431,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         engine has no way to hold the same underlying ``IRuntimeCache``).
         """
         return not ENABLED_FEATURES.torch_tensorrt_runtime or w.is_cpp_runtime()
-
-    def _send_to_engine(self, rs: RuntimeSettings) -> None:
-        """Push ``rs`` to whichever engine flavor is attached."""
-        from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
-        from torch_tensorrt.runtime._runtime_cache import _to_torchbind_handle
-        from torch_tensorrt.runtime._runtime_config import (
-            _CUDA_GRAPH_STRATEGY_MAP,
-            _DYNAMIC_SHAPES_KERNEL_STRATEGY_MAP,
-        )
-
-        if isinstance(self.engine, TRTEngine):
-            self.engine.update_runtime_settings(rs)
-        else:
-            # Strategies cross the boundary as ints (TorchBind ``int64_t``,
-            # mirroring the nvinfer1 enum integers on the cpp side).
-            self.get_engine().update_runtime_settings(
-                _DYNAMIC_SHAPES_KERNEL_STRATEGY_MAP[
-                    rs.dynamic_shapes_kernel_specialization_strategy
-                ],
-                _CUDA_GRAPH_STRATEGY_MAP[rs.cuda_graph_strategy],
-                _to_torchbind_handle(rs.runtime_cache),
-            )
 
     def setup_engine(self) -> None:
         """
@@ -572,6 +555,10 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             metadata = TorchTensorRTModule.decode_metadata(serialized_metadata)
             self.settings = metadata["settings"]
             self.symbolic_shape_expressions = metadata["inout_symexprs"]
+            self.num_user_outputs = metadata.get("num_user_outputs")
+            self.aliased_io = deserialize_aliased_io(
+                str(serialized_engine_info[ALIASED_IO_IDX])
+            )
 
             # RuntimeSettings are NOT serialized; the reset leaves no runtime
             # cache, matching the freshly-built engine below. A caller who wants
@@ -767,12 +754,14 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         # satisfy the network-output requirement of aliased layers (e.g.
         # IKVCacheUpdateLayer). Truncate to the user-facing count; mutation
         # effects are visible on the corresponding input tensors. The
-        # boundary is derived from output_binding_names + aliased_io — no
-        # extra state needed.
-        if self.aliased_io:
-            n = user_output_count(self.output_binding_names, self.aliased_io)
-            if n < len(outputs):
-                outputs = outputs[:n]
+        # explicit count also preserves aliased tensors returned by the user.
+        if self.num_user_outputs is not None:
+            outputs = outputs[: self.num_user_outputs]
+        elif self.aliased_io:
+            # Legacy serialized modules did not carry an explicit count.
+            outputs = outputs[
+                : user_output_count(self.output_binding_names, self.aliased_io)
+            ]
 
         output_info = (self.symbolic_shape_expressions or {}).get("outputs", [])
         for index, info in enumerate(output_info):

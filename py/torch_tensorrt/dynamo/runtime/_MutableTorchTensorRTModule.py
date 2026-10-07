@@ -22,6 +22,7 @@ from torch_tensorrt.dynamo._compiler import compile as dynamo_compile
 from torch_tensorrt.dynamo._refit import refit_module_weights
 from torch_tensorrt.dynamo.utils import (
     deallocate_module,
+    pin_torch_executed_state,
     to_torch_device,
     to_torch_tensorrt_device,
 )
@@ -112,6 +113,18 @@ def _is_modelopt_quantized(model: torch.nn.Module) -> bool:
         return any(isinstance(m, TensorQuantizer) for m in model.modules())
     except ImportError:
         return False
+
+
+def _offload_original_model(module: "MutableTorchTensorRTModule") -> None:
+    """Offload the source PyTorch module without breaking the compiled one.
+
+    The compiled graph module holds the very same ``torch.nn.Parameter`` objects as the
+    module it was compiled from, and ``deallocate_module`` moves them in place, so any
+    weight a PyTorch-executed node still needs has to be put back afterwards.
+    """
+    deallocate_module(module.original_model)
+    if module.gm is not None:
+        pin_torch_executed_state(module.gm, to_torch_device(module.trt_device))
 
 
 class RefitFlag(Enum):
@@ -396,7 +409,8 @@ class MutableTorchTensorRTModule(object):
             in_place=True,
         )
 
-        deallocate_module(self.original_model)
+        if self.additional_settings.get("offload_module_to_cpu", False):
+            _offload_original_model(self)
 
     def get_exported_program(self) -> torch.export.ExportedProgram:
 
@@ -452,7 +466,7 @@ class MutableTorchTensorRTModule(object):
             **self.additional_settings,
         )
         if self.additional_settings.get("offload_module_to_cpu", False):
-            deallocate_module(self.original_model)
+            _offload_original_model(self)
         if self.enable_weight_streaming:
             self.set_weight_streaming_ctx(self.weight_streaming_budget)
 
@@ -812,7 +826,8 @@ class MutableTorchTensorRTModule(object):
         module.exp_program = torch.export.export(
             module.original_model, module.arg_inputs, kwargs=module.kwarg_inputs
         )
-        deallocate_module(module.original_model)
+        if module.additional_settings.get("offload_module_to_cpu", False):
+            _offload_original_model(module)
         cls = module.__class__
         module.__class__ = type(
             module.original_model.__class__.__name__,

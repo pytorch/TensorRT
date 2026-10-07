@@ -27,7 +27,6 @@ from typing import (
 import numpy as np
 import psutil
 import sympy
-import tensorrt as trt
 import torch
 from torch._subclasses.fake_tensor import FakeScriptObject, FakeTensor
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
@@ -42,6 +41,7 @@ from torch_tensorrt.dynamo._defaults import default_device
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
+import tensorrt as trt
 from packaging import version
 
 from .types import TRTDataType
@@ -149,6 +149,38 @@ def deallocate_module(module: torch.fx.GraphModule) -> None:
     module.to(CPU_DEVICE)
     torch.cuda.empty_cache()
     gc.collect()
+
+
+def pin_torch_executed_state(module: torch.nn.Module, device: torch.device) -> None:
+    """Move the state that a compiled module executes in PyTorch to ``device``.
+
+    The TensorRT submodules hold their weights inside the engine, so they need no state here.
+    The rest of the graph reads its state in two ways: through a submodule that the
+    partitioner kept in PyTorch, or through a ``get_attr`` node in the root graph. When no
+    operation converts, ``compile_module`` returns the input graph, and the root graph reads
+    all the state.
+    """
+    # A lone TensorRT module executes nothing in PyTorch.
+    if not isinstance(module, torch.fx.GraphModule):
+        return
+    for node in module.graph.nodes:
+        if node.op == "get_attr":
+            _move_attr(module, str(node.target), device)
+        elif node.op == "call_module" and "_run_on_acc" not in str(node.target):
+            module.get_submodule(str(node.target)).to(device)
+
+
+def _move_attr(module: torch.nn.Module, target: str, device: torch.device) -> None:
+    prefix, _, name = target.rpartition(".")
+    owner = module.get_submodule(prefix)
+    # A target can be missing: compile_module deletes the root _frozen_param attributes.
+    value = getattr(owner, name, None)
+    if isinstance(value, torch.nn.Parameter):
+        # nn.Module.to() sets .data in the same way. The source model holds this same
+        # Parameter, so the source model sees the move too.
+        value.data = value.data.to(device)
+    elif isinstance(value, torch.Tensor):
+        setattr(owner, name, value.to(device))
 
 
 def cosine_similarity(gt_tensor: torch.Tensor, pred_tensor: torch.Tensor) -> float:
@@ -956,7 +988,6 @@ def get_output_metadata(
     assert len(outputs) > 0
     outputs = outputs[0].args
     nodes = flatten_nodes(outputs)
-    assert len(nodes) > 0
     return [node.meta for node in nodes]
 
 

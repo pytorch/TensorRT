@@ -12,6 +12,7 @@
 
 #include "torch_tensorrt/executorch/TensorRTBackend.h"
 #include "torch_tensorrt/executorch/PooledScratchInstall.h"
+#include "torch_tensorrt/executorch/SharedEngineKey.h"
 #include "torch_tensorrt/executorch/SharedScratchPool.h"
 #include "torch_tensorrt/executorch/TensorRTBindingNames.h"
 #include "torch_tensorrt/executorch/TensorRTBlobHeader.h"
@@ -20,6 +21,7 @@
 #include <atomic>
 #include <cstdint>
 #include <cstring>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -106,8 +108,6 @@ EngineHandle::~EngineHandle() {
   // The runtime is shared and outlives this handle, so there is nothing to release for it.
 }
 
-namespace {
-
 // The process-wide TensorRT runtime and its logger, built once on first use and then never
 // destroyed. TensorRT requires the runtime to outlive every engine deserialized from it, and never
 // destroying it is the only way to promise that here. Destroying it at exit would not: statics are
@@ -115,7 +115,7 @@ namespace {
 // program in a global finishes that global's constructor during static initialization, before
 // anything has called this. The runtime would then be destroyed first and the engine second, which
 // is the wrong way round. The cost is one runtime and one logger still allocated at exit.
-nvinfer1::IRuntime* shared_runtime() {
+nvinfer1::IRuntime* TensorRTBackend::shared_runtime() {
   static std::mutex mutex;
   static TRTLogger* logger = nullptr;
   static nvinfer1::IRuntime* runtime = nullptr;
@@ -129,6 +129,8 @@ nvinfer1::IRuntime* shared_runtime() {
   }
   return runtime;
 }
+
+namespace {
 
 // Drains on an early exit, so a retry cannot land in a staging buffer still being written.
 class StreamDrainOnEarlyReturn {
@@ -197,10 +199,153 @@ bool infer_binding_names(
 // pool rather than allocating its own.
 //
 // execute() must read EngineHandle::claims_pooled_scratch, never this. This can
-// have moved since the engine was loaded, and what the engine can do about it
+// have moved since the handle was loaded, and what the handle can do about it
 // cannot: its context's allocation strategy was fixed when the context was
 // created. initialize_engine_io below is the one place this is read.
 std::atomic<bool> scratch_enabled{false};
+
+// TensorRT forbids moving the budget while any execution context exists, so this must run before
+// the engine's first context.
+Error apply_weight_streaming_budget(nvinfer1::ICudaEngine& engine, const WsBudget& request) {
+  const int64_t streamable = engine.getStreamableWeightsSize();
+  if (streamable > 0) {
+    // getStreamableWeightsSize is > 0 only when the engine was built with
+    // BuilderFlag::kWEIGHT_STREAMING.
+    int64_t budget;
+    if (request.valid) {
+      // An explicit budget is a non-negative byte count, clamped to the
+      // streamable size (TensorRT also caps it, but clamp for a clear log).
+      budget = request.bytes > streamable ? streamable : request.bytes;
+    } else {
+      budget = engine.getWeightStreamingAutomaticBudget();
+    }
+    if (!engine.setWeightStreamingBudgetV2(budget)) {
+      if (!request.valid && engine.setWeightStreamingBudgetV2(0)) {
+        // The automatic budget could not be applied; fall back to budget 0, which
+        // streams all weights (minimum resident memory) and always fits.
+        ET_LOG(
+            Info,
+            "TensorRTBackend::init: automatic weight streaming budget failed; falling back to budget 0 (stream all weights)");
+      } else {
+        ET_LOG(
+            Error,
+            "TensorRTBackend::init: setWeightStreamingBudgetV2 failed (requested=%lld%s)",
+            (long long)budget,
+            request.valid ? "" : ", and fallback to 0 also failed");
+        return Error::InvalidProgram;
+      }
+    }
+    ET_LOG(
+        Info,
+        "TensorRTBackend::init: weight streaming budget=%lld streamable=%lld scratch=%lld",
+        (long long)engine.getWeightStreamingBudgetV2(),
+        (long long)streamable,
+        (long long)engine.getWeightStreamingScratchMemorySize());
+  } else if (request.valid) {
+    // A budget was requested but the engine has no streamable weights (it was not
+    // built with enable_weight_streaming=True, or nothing is streamable). The
+    // engine is still valid and runs fully resident, so log and continue rather
+    // than fail; failing here would break mixed multi-engine programs where only
+    // some engines were built for streaming. Logged at Error because the caller
+    // asked for a memory setting that will not take effect, and ExecuTorch has no
+    // Warning level.
+    ET_LOG(
+        Error,
+        "TensorRTBackend::init: weight_streaming_budget ignored; engine has no streamable weights (it was not built with enable_weight_streaming=True, or none of its weights are streamable). The engine runs with all weights resident.");
+  }
+  return Error::Ok;
+}
+
+Error load_engine(
+    nvinfer1::IRuntime& runtime,
+    const void* data,
+    uint64_t size,
+    const WsBudget& request,
+    std::shared_ptr<nvinfer1::ICudaEngine>& out) {
+  std::shared_ptr<nvinfer1::ICudaEngine> engine(runtime.deserializeCudaEngine(data, size), TRTDeleter{});
+  TORCHTRT_ET_CHECK_NOT_NULL(
+      engine, Error::InvalidProgram, "TensorRTBackend::init: failed to deserialize TensorRT engine");
+  const Error err = apply_weight_streaming_budget(*engine, request);
+  if (err != Error::Ok) {
+    return err;
+  }
+  out = std::move(engine);
+  return Error::Ok;
+}
+
+// Weak entries let the last handle free its engine without taking the map lock. Expired entries
+// stay until the next publish sweeps them. Never destroyed, like the runtime above. Nothing may
+// call an ICudaEngine setter on a published engine.
+struct SharedEngines {
+  std::mutex mutex;
+  std::map<SharedEngineKey, std::weak_ptr<nvinfer1::ICudaEngine>> by_key;
+};
+
+SharedEngines& shared_engines() {
+  static SharedEngines* const engines = new SharedEngines();
+  return *engines;
+}
+
+// Sets `out` to the engine a live handle already holds for these bytes, device and budget request,
+// or to a newly loaded one. The lock covers lookup, sweep and insert, never a TensorRT call or a log line:
+// TensorRT logs while it deserializes, and under the Python bindings a log line waits for the
+// interpreter lock, which a thread blocked on this lock may be holding. So two loads racing on the
+// same bytes can both deserialize; the second to insert drops its copy and shares the first.
+Error acquire_shared_engine(
+    nvinfer1::IRuntime& runtime,
+    const void* data,
+    uint64_t size,
+    int device_id,
+    const WsBudget& request,
+    std::shared_ptr<nvinfer1::ICudaEngine>& out) {
+  const SharedEngineKey key = shared_engine_key(data, size, device_id, request.valid ? request.bytes : -1);
+  SharedEngines& engines = shared_engines();
+  const auto find_live = [&]() -> std::shared_ptr<nvinfer1::ICudaEngine> {
+    const std::lock_guard<std::mutex> lock(engines.mutex);
+    const auto found = engines.by_key.find(key);
+    return found != engines.by_key.end() ? found->second.lock() : nullptr;
+  };
+  out = find_live();
+  // Declared out here so a copy that lost the race is freed after the lock is released.
+  std::shared_ptr<nvinfer1::ICudaEngine> loaded;
+  if (out == nullptr) {
+    const Error err = load_engine(runtime, data, size, request, loaded);
+    if (err != Error::Ok) {
+      // A racing load of the same bytes may have published its engine meanwhile, and this load may
+      // have failed only because the device had no room for a second copy.
+      out = find_live();
+      if (out == nullptr) {
+        return err;
+      }
+      ET_LOG(
+          Info,
+          "TensorRTBackend::init: recovered from the error above: a racing load published the same engine, so this load shares it");
+    }
+  }
+  if (loaded != nullptr) {
+    const std::lock_guard<std::mutex> lock(engines.mutex);
+    for (auto it = engines.by_key.begin(); it != engines.by_key.end();) {
+      if (it->second.expired()) {
+        it = engines.by_key.erase(it);
+      } else {
+        ++it;
+      }
+    }
+    std::weak_ptr<nvinfer1::ICudaEngine>& entry = engines.by_key[key];
+    out = entry.lock();
+    if (out == nullptr) {
+      entry = loaded;
+      out = loaded;
+      return Error::Ok;
+    }
+  }
+  ET_LOG(
+      Info,
+      "TensorRTBackend::init: sharing the TensorRT engine already loaded from these bytes on device %d, now held by %ld handles",
+      device_id,
+      static_cast<long>(out.use_count()));
+  return Error::Ok;
+}
 
 Error initialize_engine_io(EngineHandle& handle) {
   if (handle.input_binding_names.empty() && handle.output_binding_names.empty() &&
@@ -239,11 +384,11 @@ Error initialize_engine_io(EngineHandle& handle) {
       handle.exec_ctx, Error::InvalidProgram, "TensorRTBackend::init: failed to create TensorRT execution context");
 
   if (handle.shared_scratch) {
-    // Gated so an engine loaded with the option off pays no TensorRT call for a
+    // Gated so a handle loaded with the option off pays no TensorRT call for a
     // pool it will never claim from. Read after the weight streaming budget is
-    // applied, which the caller does before this runs because TensorRT forbids
-    // moving the budget once a context exists -- and the budget is the one thing
-    // that moves this figure.
+    // applied, which happens before the engine's first context because TensorRT
+    // forbids moving the budget once a context exists, and the budget is the one
+    // thing that moves this figure.
     handle.claims_pooled_scratch = handle.engine->getDeviceMemorySizeV2() > 0;
   }
 
@@ -534,7 +679,8 @@ constexpr size_t kMinPooledScratchBytes = 1;
 // null graph. Refusing names the cause instead.
 //
 // execute() calls this ahead of every CUDA call it makes that a capture cannot
-// take, not just the pool's own: the cudaEventSynchronize on a previous enqueue,
+// take, not just the pool's own: the cudaFree(nullptr) that makes a context
+// current for a default stream, the cudaEventSynchronize on a previous enqueue,
 // the cudaMalloc that grows a host-input staging buffer, and the
 // cudaStreamSynchronize that ends a call this backend does not let return early.
 // Any of them leaves a refusal made after it nothing to save. Only the device
@@ -748,9 +894,11 @@ bool TensorRTBackend::is_available() const {
 // ---------------------------------------------------------------------------
 // init
 //
-// Deserializes the processed blob into a TensorRT engine handle. The handle is
-// placement-new'd into memory provided by the ExecuTorch MemoryAllocator so
-// that ExecuTorch owns the arena lifetime; destroy() calls the destructor.
+// Loads the processed blob into a TensorRT engine handle. The engine is
+// deserialized, or shared with a live handle loaded from the same engine bytes,
+// device and weight streaming request. The handle is placement-new'd into memory
+// provided by the ExecuTorch MemoryAllocator so that ExecuTorch owns the arena
+// lifetime; destroy() calls the destructor.
 // ---------------------------------------------------------------------------
 Result<DelegateHandle*> TensorRTBackend::init(
     BackendInitContext& context,
@@ -818,15 +966,8 @@ Result<DelegateHandle*> TensorRTBackend::init(
   TORCHTRT_ET_CHECK_NOT_NULL(
       runtime, Error::InvalidProgram, "TensorRTBackend::init: failed to create TensorRT runtime");
 
-  const void* engine_data = TensorRTBlobHeader::engine_data(processed->data(), header);
-  handle->engine.reset(runtime->deserializeCudaEngine(engine_data, header.engine_size));
-  TORCHTRT_ET_CHECK_NOT_NULL(
-      handle->engine, Error::InvalidProgram, "TensorRTBackend::init: failed to deserialize TensorRT engine");
-
-  // Apply the weight streaming budget before the execution context is created
-  // below: TensorRT forbids changing the budget while a context is active. The
-  // budget is a non-negative decimal byte count and may come from two places, in
-  // order of precedence:
+  // The weight streaming budget is parsed first, because it is part of the sharing key. It is a
+  // non-negative decimal byte count and may come from two places, in order of precedence:
   //   1. A load-time backend option ("weight_streaming_budget" runtime spec) that
   //      the caller passes to Module::load(LoadBackendOptionsMap). This lets a
   //      deployment size the budget for its own GPU without re-exporting.
@@ -837,7 +978,6 @@ Result<DelegateHandle*> TensorRTBackend::init(
   // TensorRT's automatic budget, mirroring what the PyTorch runtimes do on
   // deserialize. Negative or malformed values are rejected as InvalidProgram.
   WsBudget ws_request;
-  bool is_explicit = false;
 
   // (1) A load-time runtime spec takes precedence over the baked compile spec.
   // The value is a decimal byte string; a non-negative int is also accepted for
@@ -864,7 +1004,6 @@ Result<DelegateHandle*> TensorRTBackend::init(
         ET_LOG(Error, "TensorRTBackend::init: malformed weight_streaming_budget runtime option");
         return Error::InvalidProgram;
       }
-      is_explicit = true;
     } else {
       // The option was supplied but carries no characters, so nothing was set. Say so
       // rather than falling through silently, since a caller who passed the option
@@ -881,7 +1020,6 @@ Result<DelegateHandle*> TensorRTBackend::init(
     if (ws_runtime_int.ok() && ws_runtime_int.get() >= 0) {
       ws_request.valid = true;
       ws_request.bytes = ws_runtime_int.get();
-      is_explicit = true;
     } else {
       ET_LOG(
           Error,
@@ -892,7 +1030,7 @@ Result<DelegateHandle*> TensorRTBackend::init(
   }
 
   // (2) Otherwise fall back to the compile spec baked into the .pte at export.
-  if (!is_explicit) {
+  if (!ws_request.valid) {
     const CompileSpec* ws_spec = nullptr;
     for (const auto& spec : compile_specs) {
       if (spec.key != nullptr && std::strcmp(spec.key, kWeightStreamingBudgetKey) == 0) {
@@ -911,58 +1049,31 @@ Result<DelegateHandle*> TensorRTBackend::init(
         ET_LOG(Error, "TensorRTBackend::init: malformed weight_streaming_budget compile spec");
         return Error::InvalidProgram;
       }
-      is_explicit = true;
     }
   }
 
-  const int64_t streamable = handle->engine->getStreamableWeightsSize();
-  if (streamable > 0) {
-    // getStreamableWeightsSize is > 0 only when the engine was built with
-    // BuilderFlag::kWEIGHT_STREAMING.
-    int64_t budget;
-    if (is_explicit) {
-      // An explicit budget is a non-negative byte count, clamped to the
-      // streamable size (TensorRT also caps it, but clamp for a clear log).
-      budget = ws_request.bytes > streamable ? streamable : ws_request.bytes;
-    } else {
-      budget = handle->engine->getWeightStreamingAutomaticBudget();
-    }
-    if (!handle->engine->setWeightStreamingBudgetV2(budget)) {
-      if (!is_explicit && handle->engine->setWeightStreamingBudgetV2(0)) {
-        // The automatic budget could not be applied; fall back to budget 0, which
-        // streams all weights (minimum resident memory) and always fits.
-        ET_LOG(
-            Info,
-            "TensorRTBackend::init: automatic weight streaming budget failed; falling back to budget 0 (stream all weights)");
-      } else {
-        ET_LOG(
-            Error,
-            "TensorRTBackend::init: setWeightStreamingBudgetV2 failed (requested=%lld%s)",
-            (long long)budget,
-            is_explicit ? "" : ", and fallback to 0 also failed");
-        return Error::InvalidProgram;
-      }
-    }
-    ET_LOG(
-        Info,
-        "TensorRTBackend::init: weight streaming budget=%lld streamable=%lld scratch=%lld",
-        (long long)handle->engine->getWeightStreamingBudgetV2(),
-        (long long)streamable,
-        (long long)handle->engine->getWeightStreamingScratchMemorySize());
-  } else if (is_explicit) {
-    // A budget was requested but the engine has no streamable weights (it was not
-    // built with enable_weight_streaming=True, or nothing is streamable). The
-    // engine is still valid and runs fully resident, so log and continue rather
-    // than fail; failing here would break mixed multi-engine programs where only
-    // some engines were built for streaming. Logged at Error because the caller
-    // asked for a memory setting that will not take effect, and ExecuTorch has no
-    // Warning level.
-    ET_LOG(
-        Error,
-        "TensorRTBackend::init: weight_streaming_budget ignored; engine has no streamable weights (it was not built with enable_weight_streaming=True, or none of its weights are streamable). The engine runs with all weights resident.");
+  // Read per load, not through set_option, so a load that must not share changes nothing for loads
+  // on other threads.
+  const auto share_spec = context.get_runtime_spec<bool>(kSharedEnginesKey);
+  if (!share_spec.ok() && share_spec.error() != Error::NotFound) {
+    ET_LOG(Error, "TensorRTBackend::init: %s runtime option must be a boolean", kSharedEnginesKey);
+    return Error::InvalidArgument;
   }
 
-  Error err = initialize_engine_io(*handle);
+  const void* engine_data = TensorRTBlobHeader::engine_data(processed->data(), header);
+  const bool share = !share_spec.ok() || share_spec.get();
+  Error err;
+  if (share) {
+    err =
+        acquire_shared_engine(*runtime, engine_data, header.engine_size, handle->device_id, ws_request, handle->engine);
+  } else {
+    err = load_engine(*runtime, engine_data, header.engine_size, ws_request, handle->engine);
+  }
+  if (err != Error::Ok) {
+    return err;
+  }
+
+  err = initialize_engine_io(*handle);
   if (err != Error::Ok) {
     return err;
   }
@@ -1199,18 +1310,14 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   cudaStream_t stream = caller_stream.value_or(cudaStreamPerThread);
   StreamDrainOnEarlyReturn drain_on_early_return(stream);
 
-  // Settled at init: the option was on at this engine's load and the engine needs
+  // Settled at init: the option was on at this handle's load and the engine needs
   // scratch under some shape. An engine that needs none is left out of the pool
   // entirely -- enqueueV3 accepts it with no device memory installed, so it need
   // not claim the device and does not serialize against the engines that do.
   const bool pooled_scratch = engine->claims_pooled_scratch;
 
-  // Refused here, ahead of every call this function makes that a capture cannot
-  // take. The pool's own are not the only ones: the cudaMalloc that grows a
-  // host-input staging buffer further down is prohibited under every mode but
-  // cudaStreamCaptureModeRelaxed, so outside that mode it would invalidate the
-  // capture before the pooled path was ever reached and a refusal any later would
-  // arrive after the thing it exists to protect was gone.
+  // Refuse before staging cudaMalloc or context setup with cudaFree(nullptr), since these can
+  // invalidate the capture before the pool is reached.
   if (pooled_scratch) {
     const Error capture_err = refuse_pooled_call_on_a_capturing_stream(stream, engine->device_id);
     if (capture_err != Error::Ok) {
@@ -1557,6 +1664,26 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     }
   }
 
+  // TensorRT's enqueue can look up a default stream's context through the driver, and that lookup fails while no
+  // context is current. A new thread has none, and the device guard sets one only when it switches devices.
+  // cudaFree(nullptr) sets the primary context only if none is current, so it keeps one the caller set. Outside
+  // cudaStreamCaptureModeRelaxed a capture cannot take it, so it runs after the pooled capture refusal and the
+  // argument checks. Any earlier, it would fail first under a capture, hiding their error and invalidating the capture.
+  if (stream == nullptr || stream == cudaStreamLegacy || stream == cudaStreamPerThread) {
+    cuda_err = cudaFree(nullptr);
+    if (cuda_err != cudaSuccess) {
+      ET_LOG(
+          Error,
+          "TensorRTBackend::execute: cudaFree(nullptr) on device %d failed: %s",
+          engine->device_id,
+          cudaGetErrorString(cuda_err));
+      // The error is this call's, so it is cleared rather than left for the caller's next CUDA call to
+      // report. A sticky fault survives the clear.
+      cudaGetLastError();
+      return Error::Internal;
+    }
+  }
+
   // ------------------------------------------------------------------
   // 4. Back activation scratch with the shared per-device pool
   // ------------------------------------------------------------------
@@ -1725,12 +1852,19 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
 Error TensorRTBackend::set_option(ET_UNUSED BackendOptionContext& context, const Span<BackendOption>& backend_options) {
   // The whole span is read before anything is stored. A span is one request, so a
   // caller told it was refused must not find part of it applied -- and the part
-  // that would be applied here is process-wide and governs every engine loaded
+  // that would be applied here is process-wide and governs every method loaded
   // after it. Where a span names this key more than once the last one wins, which
   // is what applying each in turn did.
   bool requested = false;
   bool have_request = false;
   for (const auto& option : backend_options) {
+    if (std::strcmp(option.key, kSharedEnginesKey) == 0) {
+      ET_LOG(
+          Error,
+          "TensorRTBackend::set_option: option '%s' is load-only; pass it to Module::load in LoadBackendOptionsMap",
+          kSharedEnginesKey);
+      return Error::InvalidArgument;
+    }
     // A caller may address one option span to several backends, so a key this
     // backend does not read is skipped rather than refused.
     if (std::strcmp(option.key, kSharedActivationScratchKey) == 0) {

@@ -18,7 +18,6 @@ from typing import (
 )
 
 import numpy as np
-import tensorrt as trt
 import torch
 import torch.fx
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
@@ -56,6 +55,8 @@ from torch_tensorrt.dynamo.utils import (
 )
 from torch_tensorrt.logging import TRT_LOGGER
 
+import tensorrt as trt
+
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 TRT_INTERPRETER_CALL_PRE_OBSERVER: Observer[Callable[[torch.fx.GraphModule], None]] = (
@@ -79,13 +80,11 @@ class TRTInterpreterResult(NamedTuple):
     # Torch-TensorRT-declared aliasing. The runtime uses this to bind aliased
     # outputs to their input device pointers and skip fresh allocation.
     #
-    # By convention the interpreter appends side-effect aliased outputs
-    # (added to satisfy layers like IKVCacheUpdateLayer that require their
-    # output to be a network output) to the END of ``output_names``. The
-    # runtime derives the user-output count by walking that list backwards
-    # — see ``user_output_count`` in the runtime module — and hides the
-    # side-effect outputs from the caller's return tuple.
+    # The interpreter appends hidden mutation outputs after user outputs.
+    # num_user_outputs preserves this boundary even for aliased user returns.
     aliased_io: dict[str, tuple[str, str]] = {}
+    # Explicit count: a user return may itself be an aliased output.
+    num_user_outputs: Optional[int] = None
 
 
 def _named_compute_capability(major: int, minor: int) -> "trt.ComputeCapability":
@@ -434,6 +433,19 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         if self.compilation_settings.enable_weight_streaming:
             builder_config.set_flag(trt.BuilderFlag.WEIGHT_STREAMING)
 
+        if self.ctx.requires_aliased_plugin_io:
+            aliased_io_feature = getattr(
+                trt.PreviewFeature, "ALIASED_PLUGIN_IO_10_03", None
+            )
+            if aliased_io_feature is None:
+                raise RuntimeError(
+                    "An in-place QDP plugin declared aliased I/O, but this TensorRT"
+                    " version does not expose PreviewFeature.ALIASED_PLUGIN_IO_10_03."
+                    " TensorRT 10.3+ is required for aliased plugin I/O."
+                )
+            builder_config.set_preview_feature(aliased_io_feature, True)
+            _LOGGER.info("Enabling preview feature ALIASED_PLUGIN_IO_10_03")
+
         if is_tensorrt_version_supported("10.8"):
             TilingOptimizationLevel = {
                 "none": trt.TilingOptimizationLevel.NONE,
@@ -623,6 +635,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             self.ctx.requires_output_allocator,
             self.ctx.requires_native_multidevice,
             engine_aliased_io,
+            self._num_user_outputs,
         )
 
     def run_node(self, n: torch.fx.Node) -> torch.fx.Node:
@@ -801,6 +814,10 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             self.ctx.requires_native_multidevice = True
             _LOGGER.debug(f"{target} requires native multi-device support")
 
+        if converter_info.get("requires_aliased_plugin_io", False):
+            self.ctx.requires_aliased_plugin_io = True
+            _LOGGER.debug(f"{target} requires aliased plugin I/O")
+
         self.ctx.current_node = self._cur_node
         if calling_convention is CallingConvention.LEGACY:
             return converter(self.ctx.net, target, args, kwargs, self._cur_node_name)
@@ -896,16 +913,19 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         else:
             outputs = (args[0],)
 
+        num_declared_outputs = len(outputs)
+        self._num_user_outputs = 0
+
         # Aliased outputs (e.g. IKVCacheUpdateLayer) must be marked as network
         # outputs even if the user's source did not return them. We APPEND
-        # them after the user outputs — the runtime derives the user/
-        # side-effect boundary by walking output_names backward and treating
-        # the contiguous in-aliased_io suffix as side-effects.
+        # them after the user outputs and carry the explicit number of user
+        # bindings to the runtime. A user return can itself be aliased.
         user_output_ids = {id(o) for o in outputs if isinstance(o, trt.ITensor)}
         for entry in self.ctx.aliased_outputs:
             aliased_tensor = entry.output_tensor
             if id(aliased_tensor) not in user_output_ids:
                 outputs = outputs + (aliased_tensor,)
+                user_output_ids.add(id(aliased_tensor))
                 # Extend output_dtypes so the dtype-mismatch check passes and
                 # no cast is inserted (a cast would break engine-level aliasing).
                 if self.output_dtypes is not None:
@@ -944,12 +964,16 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             if id(output) in marked_outputs_ids:
                 continue
             marked_outputs_ids.append(id(output))
+            if i < num_declared_outputs:
+                self._num_user_outputs += 1
 
             # Default policy is "output{i}"; engine-converter API may override
             # via output_binding_names, already validated by the caller to
             # have one entry per output node in FX flattening order.
-            if self._user_output_binding_names is not None:
+            if self._user_output_binding_names is not None and i < num_declared_outputs:
                 name = self._user_output_binding_names[i]
+            elif i >= num_declared_outputs:
+                name = f"__torch_tensorrt_mutation_{i}"
             else:
                 name = f"output{i}"
 
@@ -1024,4 +1048,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 f"Marking output {name} [shape={output.shape}, dtype={output.dtype}]"
             )
 
-        return list(outputs)
+        # FX's output pytree describes user returns only. Hidden bindings are
+        # network outputs, but must not be fed into graph.process_outputs.
+        return list(outputs[:num_declared_outputs])

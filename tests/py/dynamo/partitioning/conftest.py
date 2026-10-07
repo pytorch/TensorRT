@@ -38,16 +38,19 @@ def reset_torch_tensorrt_state():
             {k: list(v) for k, v in original_registry.items()}
         )
 
-        # Restore disallowed targets and compilation settings
-        try:
-            DYNAMO_CONVERTERS.set_disallowed_targets(original_disallowed)
-        except Exception:
-            pass
+        # Restore compilation settings, then disallowed targets
         if original_settings is not None:
             try:
                 DYNAMO_CONVERTERS.set_compilation_settings(original_settings)
             except Exception:
                 pass
+        else:
+            DYNAMO_CONVERTERS.compilation_settings = None
+
+        try:
+            DYNAMO_CONVERTERS.set_disallowed_targets(original_disallowed)
+        except Exception:
+            pass
 
         # Clear caches again to avoid stale state carrying forward
         try:

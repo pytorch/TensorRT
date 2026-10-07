@@ -23,10 +23,12 @@ from .complex_decomposition_adapter import (
 from .complex_graph_rewrite import complex_graph_detection
 from .constant_folding import constant_fold
 from .decompose_dynamic_slice_scatter import decompose_dynamic_slice_scatter
+from .decompose_unsupported_attention import decompose_unsupported_attention
 from .eliminate_sym_min_int64_max import eliminate_sym_min_int64_max
 from .force_causal_efficient_attention import force_causal_efficient_attention
 from .fuse_pad_into_convolution import fuse_pad_into_convolution
 from .fuse_prims_broadcast import fuse_prims_broadcast
+from .lower_associative_scan import lower_associative_scan
 from .normalize_negative_slice_stop import normalize_negative_slice_stop
 from .pass_manager import DynamoPassManager
 from .remove_assert_nodes import remove_assert_nodes
@@ -36,6 +38,7 @@ from .remove_num_users_is_0_nodes import remove_num_users_is_0_nodes
 from .repair_input_as_output import repair_input_as_output
 from .replace_fused_rms_norm import replace_fused_rms_norm
 from .replace_max_pool_with_indices import replace_max_pool_with_indices
+from .reset_folded_constructors import reset_folded_constructors
 from .rule_based_autocast import rule_based_autocast
 
 pre_lowering_pass_list = [
@@ -61,9 +64,11 @@ def complex_lowering_pass(
 post_lowering_pass_list = [
     replace_fused_rms_norm,
     remove_input_alias_fixing_clones,
+    lower_associative_scan,
     mark_constant_fold_exclusions,
     constant_fold,
     repair_input_as_output,
+    reset_folded_constructors,
     fuse_prims_broadcast,
     replace_max_pool_with_indices,
     fuse_pad_into_convolution,
@@ -71,6 +76,7 @@ post_lowering_pass_list = [
     remove_num_users_is_0_nodes,
     complex_lowering_pass,
     force_causal_efficient_attention,
+    decompose_unsupported_attention,
     eliminate_sym_min_int64_max,
     normalize_negative_slice_stop,
     annotate_fp8_sdpa,
