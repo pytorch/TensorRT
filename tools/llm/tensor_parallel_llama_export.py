@@ -382,6 +382,13 @@ def export_and_save(input_ids, args):
             f"Max logit diff: {(ref.float() - trt.float()).abs().max().item():.6f}"
         )
 
+    if args.cache:
+        # Cache lowering adds positional KV/index inputs and flat tensor outputs.
+        # Its original HF pytree metadata still describes position_ids as a kwarg
+        # and only logits as an output; saving that metadata breaks the loaded API.
+        trt_model.graph.set_codegen(torch.fx.graph.CodeGen())
+        trt_model.recompile()
+
     # Save outside autocast — serialization doesn't need it and retrace=True
     # would fail (execute_engine has no AutocastCUDA kernel for torch.export).
     save_path = _rank_path(args.save_dir, rank, world_size)
