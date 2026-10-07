@@ -1088,6 +1088,31 @@ class TestLowering(TestCase):
             f"Select_scatter TRT outputs don't match with the original model.",
         )
 
+    @parameterized.expand(
+        [
+            ("last_index", 1, -1),
+            ("negative_dim_last_index", -1, -1),
+            ("negative_dim", -2, 1),
+            ("second_to_last_index", 0, -2),
+        ]
+    )
+    def test_lowering_select_scatter_negative_dim_or_index(self, _, dim, index):
+        # x[:, -1] = src is a select_scatter with index -1, which must write the last
+        # element and not the empty slice [-1:0].
+        class SelectScatter(torch.nn.Module):
+            def forward(self, x, src):
+                return torch.ops.aten.select_scatter.default(x, src, dim, index)
+
+        model = SelectScatter().eval().cuda()
+        x = torch.zeros(3, 4, 5).cuda()
+        src = torch.randn(torch.select(x, dim, index).shape).cuda()
+        trt_model = torch_tensorrt.dynamo.compile(
+            torch.export.export(model, (x, src)),
+            arg_inputs=[x, src],
+            min_block_size=1,
+        )
+        torch.testing.assert_close(trt_model(x, src), model(x, src))
+
     def test_lowering_select_scatter_multidimension_module(self):
         class selectScatter(torch.nn.Module):
             def __init__(self, *args, **kwargs) -> None:
