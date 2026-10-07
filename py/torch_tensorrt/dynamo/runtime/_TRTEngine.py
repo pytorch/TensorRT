@@ -55,6 +55,7 @@ from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
     SERIALIZED_METADATA_IDX,
     TARGET_PLATFORM_IDX,
     SerializedTensorRTEngineFmt,
+    create_cpp_engine,
     deserialize_binding_names,
     parse_device_info,
 )
@@ -208,7 +209,7 @@ def _reconstruct_trt_engine(serialized_info: List[Any]) -> Any:
         serialized_info[ENGINE_IDX] = base64.b64decode(engine_field)
 
     if torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime:
-        return torch.classes.tensorrt.Engine(tuple(serialized_info))
+        return create_cpp_engine(serialized_info)
 
     return TRTEngine(serialized_info)
 
@@ -225,7 +226,9 @@ class EngineSerializer(OpaqueBase):  # type: ignore[misc]
         or a Python ``TRTEngine``, so a single saved artifact works on both.
         """
         state = list(self.serialized_info)
-        state[ENGINE_IDX] = base64.b64encode(state[ENGINE_IDX]).decode("utf-8")
+        state[ENGINE_IDX] = base64.b64encode(cast(bytes, state[ENGINE_IDX])).decode(
+            "utf-8"
+        )
         return (_reconstruct_trt_engine, (state,))
 
 
@@ -381,7 +384,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         """
         serialized_info = list(self.serialized_info)
         serialized_info[ENGINE_IDX] = base64.b64encode(
-            serialized_info[ENGINE_IDX]
+            cast(bytes, serialized_info[ENGINE_IDX])
         ).decode("utf-8")
         return (serialized_info, "TRTEngine")
 

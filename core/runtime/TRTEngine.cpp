@@ -141,9 +141,12 @@ TRTEngine::TRTEngine(
           aliased_io) {}
 
 TRTEngine::TRTEngine(std::vector<std::string> serialized_info)
+    : TRTEngine(serialized_info, serialized_info[ENGINE_IDX]) {}
+
+TRTEngine::TRTEngine(const std::vector<std::string>& serialized_info, std::string_view serialized_engine)
     : TRTEngine(
           serialized_info[NAME_IDX],
-          serialized_info[ENGINE_IDX],
+          serialized_engine,
           RTDevice(serialized_info[DEVICE_IDX]),
           split_serialized_binding_names(serialized_info[INPUT_BINDING_NAMES_IDX]),
           split_serialized_binding_names(serialized_info[OUTPUT_BINDING_NAMES_IDX]),
@@ -169,7 +172,7 @@ TRTEngine::TRTEngine(std::vector<std::string> serialized_info)
 
 TRTEngine::TRTEngine(
     const std::string& mod_name,
-    const std::string& serialized_engine,
+    std::string_view serialized_engine,
     const RTDevice& cuda_device,
     const std::vector<std::string>& _in_binding_names,
     const std::vector<std::string>& _out_binding_names,
@@ -208,7 +211,7 @@ TRTEngine::TRTEngine(
 
   name = slugify(mod_name);
 
-  cuda_engine = make_trt(rt->deserializeCudaEngine(serialized_engine.c_str(), serialized_engine.size()));
+  cuda_engine = make_trt(rt->deserializeCudaEngine(serialized_engine.data(), serialized_engine.size()));
   TORCHTRT_CHECK((cuda_engine.get() != nullptr), "Unable to deserialize the TensorRT engine");
 
   if (get_streamable_device_memory_budget() > 0) {

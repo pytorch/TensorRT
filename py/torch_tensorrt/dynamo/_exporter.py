@@ -26,6 +26,7 @@ from torch.export.exported_program import (
 )
 from torch.fx.graph import _PyTreeCodeGen
 from torch_tensorrt._features import ENABLED_FEATURES
+from torch_tensorrt.dynamo.runtime._serialized_engine_layout import create_cpp_engine
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import ENGINE_IDX, NAME_IDX
 
 logger = logging.getLogger(__name__)
@@ -1228,7 +1229,7 @@ def replace_execute_engine_no_op_node(
                 engine_bytes.encode("utf-8")
             )
             if ENABLED_FEATURES.torch_tensorrt_runtime:
-                trt_engine = torch.classes.tensorrt.Engine(tuple(packed_engine_info))
+                trt_engine = create_cpp_engine(packed_engine_info)
             else:
                 from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
 
