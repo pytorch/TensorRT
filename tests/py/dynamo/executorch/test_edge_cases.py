@@ -28,6 +28,42 @@ def test_validate_executorch_engine_info_rejects_output_allocator():
 
 
 @pytest.mark.unit
+def test_save_runs_a_view_left_outside_the_engines(tmp_path):
+    """A view TensorRT cannot take stays in PyTorch as aten._reshape_copy, which
+    ExecuTorch has no kernel for; the save must still produce a program that runs."""
+    pytest.importorskip("executorch.exir")
+    import torch
+
+    if not torch.cuda.is_available():
+        pytest.skip("requires CUDA + TensorRT for a real engine")
+    pytest.importorskip("torch_tensorrt_executorch_runtime")
+    from executorch.runtime import Runtime
+
+    class Patchify(torch.nn.Module):
+        # Nine dimensions, one more than TensorRT allows, as in Qwen-VL's patch packing.
+        def forward(self, x):
+            patches = (x * 2.0).view(1, 2, 3, 2, 1, 2, 2, 1, 4)
+            patches = patches.permute(0, 1, 3, 2, 4, 5, 6, 7, 8)
+            return (patches.reshape(12, 16) + 1.0).relu()
+
+    model = Patchify().eval().cuda()
+    x = torch.randn(6, 32, device="cuda")
+    with torch.no_grad():
+        expected = model(x)
+        exported = torch.export.export(model, (x,))
+    trt_module = torch_tensorrt.dynamo.compile(
+        exported, arg_inputs=[x], min_block_size=1
+    )
+    pte = tmp_path / "model.pte"
+    torch_tensorrt.save(
+        trt_module, str(pte), output_format="executorch", arg_inputs=[x], retrace=False
+    )
+
+    method = Runtime.get().load_program(pte).load_method("forward")
+    torch.testing.assert_close(method.execute([x.cpu()])[0].cpu(), expected.cpu())
+
+
+@pytest.mark.unit
 @pytest.mark.skipif(
     not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,
     reason="Torch-TensorRT runtime operators are not available",
