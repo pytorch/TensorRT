@@ -245,6 +245,29 @@ class TestPlanRetention(unittest.TestCase):
         self.assertIs(clone.engine, module.engine)
         self._check(clone)
 
+    def _host_memory_plan(self) -> Any:
+        """The same plan as TensorRT hands it out (``IHostMemory``), not as bytes."""
+        engine = trt.Runtime(TRT_LOGGER).deserialize_cuda_engine(self.plan)
+        return engine.serialize()
+
+    def test_accepts_tensorrt_host_memory(self):
+        self._check(self._module(self._host_memory_plan()))
+
+    def test_lazy_init_stores_host_memory_as_bytes(self):
+        module = TorchTensorRTModule(
+            serialized_engine=self._host_memory_plan(),
+            input_binding_names=["x"],
+            output_binding_names=["y"],
+            name="retention_probe",
+            settings=CompilationSettings(lazy_engine_init=True),
+        )
+        # Until setup the module may be pickled or deep copied, which IHostMemory
+        # does not support.
+        self.assertIsInstance(module._serialized_engine, bytes)
+        copy.deepcopy(module)
+        module.setup_engine()
+        self._check(module)
+
 
 if __name__ == "__main__":
     unittest.main()
