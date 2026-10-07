@@ -579,6 +579,7 @@ def export(
     from torch_tensorrt.dynamo._exporter import _declare_aliased_kv_mutations_on_ep
     from torch_tensorrt.executorch import TensorRTPartitioner, get_edge_compile_config
     from torch_tensorrt.executorch._export_utils import (
+        move_constants_to_host,
         replace_execute_engine,
         stage_exported_program,
         validate_engine_program,
@@ -776,4 +777,7 @@ def export(
     # whether some other method asked for zero-copy.
     for name in edge_manager.methods:
         order_copyback_mutations_first(edge_manager.exported_program(name))
+        # After lowering, so the trace in to_edge still sees the program as exported;
+        # only the emitter in to_executorch reads the tensors' data.
+        move_constants_to_host(edge_manager.exported_program(name))
     return edge_manager

@@ -128,3 +128,55 @@ def test_write_external_tensor_data_fails_loud_without_attr(tmp_path):
     prog = SimpleNamespace(write_tensor_data_to_file=MagicMock())
     with pytest.raises(AttributeError):
         _write_external_tensor_data(prog, str(tmp_path / "model.pte"))
+
+
+@pytest.mark.unit
+def test_save_handles_folded_constants_read_outside_the_engine(tmp_path):
+    """Constant folding can leave a CUDA constant that only an op left to PyTorch reads.
+
+    Here that is a flow-matching style time grid read with .item(). ExecuTorch's
+    emitter reads constants through a host pointer, so the save crashed with SIGSEGV.
+    """
+    pytest.importorskip("executorch.exir")
+    import torch
+
+    if not torch.cuda.is_available():
+        pytest.skip("requires CUDA + TensorRT for a real engine")
+    pytest.importorskip("torch_tensorrt_executorch_runtime")
+    from executorch.runtime import Runtime
+
+    class TimeGrid(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.linear = torch.nn.Linear(8, 8)
+
+        def forward(self, x):
+            grid = torch.linspace(0, 1, 4, device=x.device)
+            for i in range(3):
+                t = grid[i].item()
+                dt = (grid[i + 1] - grid[i]).item()
+                t_column = torch.full(
+                    (x.shape[0], 1), t, dtype=x.dtype, device=x.device
+                )
+                x = x + dt * self.linear(x + t_column)
+            return x
+
+    model = TimeGrid().eval().cuda()
+    x = torch.randn(2, 8, device="cuda")
+    with torch.no_grad():
+        expected = model(x)
+        exported = torch.export.export(model, (x,))
+    trt_module = torch_tensorrt.dynamo.compile(
+        exported, arg_inputs=[x], min_block_size=1
+    )
+    pte = tmp_path / "model.pte"
+    torch_tensorrt.save(
+        trt_module, str(pte), output_format="executorch", arg_inputs=[x], retrace=False
+    )
+
+    method = Runtime.get().load_program(pte).load_method("forward")
+    torch.testing.assert_close(
+        method.execute([x.cpu()])[0].cpu(), expected.cpu(), rtol=1e-4, atol=1e-4
+    )
+    # Saving gives the program host copies; the compiled module still runs on its own.
+    torch.testing.assert_close(trt_module(x), expected, rtol=1e-4, atol=1e-4)

@@ -10,7 +10,7 @@ from typing import Any, Sequence
 import torch
 from torch._library.fake_class_registry import FakeScriptObject
 from torch._subclasses.fake_tensor import is_fake
-from torch.export.graph_signature import InputKind
+from torch.export.graph_signature import InputKind, OutputKind
 
 logger = logging.getLogger(__name__)
 
@@ -359,6 +359,36 @@ def stage_exported_program(exported_program: Any) -> Any:
         state_dict=dict(exported_program.state_dict),
         constants=dict(exported_program.constants),
     )
+
+
+def move_constants_to_host(exported_program: Any) -> None:
+    """Give a lowered program host copies of the CUDA tensors it serializes.
+
+    ExecuTorch's emitter reads every constant the program keeps outside a delegate
+    through a host pointer, so a CUDA tensor there crashes the save (SIGSEGV). Torch-
+    TensorRT leaves one behind when constant folding produces a value that only an
+    operator it leaves to PyTorch reads, such as a time grid read with .item(); that
+    operator runs on ExecuTorch's host kernels anyway. Mutated buffers are left alone,
+    since ExecuTorch plans them instead of serializing them. Only this program's
+    tables change: the source program keeps its tensors.
+    """
+    mutated = {
+        spec.target
+        for spec in exported_program.graph_signature.output_specs
+        if spec.kind == OutputKind.BUFFER_MUTATION
+    }
+    for table in (exported_program.state_dict, exported_program.constants):
+        for name, value in list(table.items()):
+            if name in mutated or not isinstance(value, torch.Tensor):
+                continue
+            if not value.is_cuda:
+                continue
+            host = value.detach().cpu()
+            table[name] = (
+                torch.nn.Parameter(host, requires_grad=value.requires_grad)
+                if isinstance(value, torch.nn.Parameter)
+                else host
+            )
 
 
 def _unique_engine_buffer_name(
