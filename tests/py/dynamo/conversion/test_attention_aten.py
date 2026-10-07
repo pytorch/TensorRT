@@ -408,6 +408,58 @@ class TestScaledDotProductAttention(DispatchTestCase):
             )
         self.run_test_with_dynamic_shape(SDPA(), input_specs, output_dtypes=[dtype])
 
+    # A buffer operand reaches the converter as a frozen torch.Tensor, as for a
+    # cross-attention over a fixed text context or for learned latent queries.
+    def test_sdpa_constant_key_value(self):
+        class SDPA(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer(
+                    "key", torch.rand(2, 4, 24, 32, dtype=torch.float16)
+                )
+                self.register_buffer(
+                    "value", torch.rand(2, 4, 24, 32, dtype=torch.float16)
+                )
+
+            def forward(self, query):
+                return torch.ops.aten.scaled_dot_product_attention.default(
+                    query, self.key, self.value
+                )
+
+        self.run_test(
+            SDPA(),
+            [torch.randn(2, 4, 16, 32, dtype=torch.float16)],
+            rtol=1e-2,
+            atol=1e-2,
+            precision=torch.float16,
+            enable_passes=True,
+        )
+
+    def test_sdpa_constant_query(self):
+        class SDPA(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer(
+                    "query", torch.randn(2, 4, 16, 32, dtype=torch.float16)
+                )
+
+            def forward(self, key, value):
+                return torch.ops.aten.scaled_dot_product_attention.default(
+                    self.query, key, value
+                )
+
+        self.run_test(
+            SDPA(),
+            [
+                torch.rand(2, 4, 24, 32, dtype=torch.float16),
+                torch.rand(2, 4, 24, 32, dtype=torch.float16),
+            ],
+            rtol=1e-2,
+            atol=1e-2,
+            precision=torch.float16,
+            enable_passes=True,
+        )
+
 
 class TestScaledDotProductEfficientAttention(DispatchTestCase):
     @parameterized.expand(
@@ -652,6 +704,56 @@ class TestScaledDotProductEfficientAttention(DispatchTestCase):
             rtol=1e-2,
             atol=1e-2,
             precision=dtype,
+            enable_passes=True,
+        )
+
+    def test_efficient_sdpa_constant_key_value(self):
+        class EfficientSDPA(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer(
+                    "key", torch.rand(2, 4, 24, 32, dtype=torch.float16)
+                )
+                self.register_buffer(
+                    "value", torch.rand(2, 4, 24, 32, dtype=torch.float16)
+                )
+
+            def forward(self, query):
+                return torch.ops.aten._scaled_dot_product_efficient_attention.default(
+                    query, self.key, self.value, None, False
+                )[0]
+
+        self.run_test(
+            EfficientSDPA(),
+            [torch.randn(2, 4, 16, 32, dtype=torch.float16)],
+            rtol=1e-2,
+            atol=1e-2,
+            precision=torch.float16,
+            enable_passes=True,
+        )
+
+    def test_efficient_sdpa_constant_query(self):
+        class EfficientSDPA(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer(
+                    "query", torch.randn(2, 4, 16, 32, dtype=torch.float16)
+                )
+
+            def forward(self, key, value):
+                return torch.ops.aten._scaled_dot_product_efficient_attention.default(
+                    self.query, key, value, None, False
+                )[0]
+
+        self.run_test(
+            EfficientSDPA(),
+            [
+                torch.rand(2, 4, 24, 32, dtype=torch.float16),
+                torch.rand(2, 4, 24, 32, dtype=torch.float16),
+            ],
+            rtol=1e-2,
+            atol=1e-2,
+            precision=torch.float16,
             enable_passes=True,
         )
 
