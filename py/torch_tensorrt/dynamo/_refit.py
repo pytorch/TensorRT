@@ -36,6 +36,7 @@ from torch_tensorrt.dynamo.lowering import (
 from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
     ENGINE_IDX,
     SERIALIZED_METADATA_IDX,
+    create_cpp_engine,
 )
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
 from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
@@ -437,14 +438,14 @@ def refit_module_weights(
                 compiled_submodule.setup_engine()
         elif inline_module:
             new_engine_info = list(engine_info)
-            new_engine_info[ENGINE_IDX] = bytes(serialized_engine)
-            refitted_engine = torch.classes.tensorrt.Engine(tuple(new_engine_info))
+            new_engine_info[ENGINE_IDX] = serialized_engine
+            refitted_engine = create_cpp_engine(new_engine_info)
             setattr(compiled_module, f"{name}_engine", refitted_engine)
         elif isinstance(compiled_submodule, torch.nn.Module):
             # Torch retrace module
             new_engine_info = list(engine_info)
-            new_engine_info[ENGINE_IDX] = bytes(serialized_engine)
-            refitted_engine = torch.classes.tensorrt.Engine(tuple(new_engine_info))
+            new_engine_info[ENGINE_IDX] = serialized_engine
+            refitted_engine = create_cpp_engine(new_engine_info)
             compiled_submodule.engine = refitted_engine
         del engine
         gc.collect()

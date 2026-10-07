@@ -70,6 +70,22 @@ static auto TORCHTRT_UNUSED RuntimeCacheHandleRegistration =
 static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
     torch::class_<TRTEngine>("tensorrt", "Engine")
         .def(torch::init<std::vector<std::string>>())
+        // Builds the engine from a uint8 CPU tensor holding the TensorRT plan and ignores
+        // serialized_info[ENGINE_IDX]. Converting a Python list holding the plan as bytes
+        // into the std::vector<std::string> that __init__ takes copies the plan twice,
+        // and plans run to gigabytes. A tensor viewing the caller's buffer is read in place.
+        .def_static(
+            "from_engine_tensor",
+            [](std::vector<std::string> serialized_info,
+               at::Tensor serialized_engine) -> c10::intrusive_ptr<TRTEngine> {
+              TORCHTRT_CHECK(
+                  serialized_engine.device().is_cpu() && serialized_engine.is_contiguous(),
+                  "The serialized TensorRT engine must be a contiguous CPU tensor");
+              return c10::make_intrusive<TRTEngine>(
+                  serialized_info,
+                  std::string_view(
+                      static_cast<const char*>(serialized_engine.const_data_ptr()), serialized_engine.nbytes()));
+            })
         // TODO: .def("__call__", &TRTEngine::Run)
         // TODO: .def("run", &TRTEngine::Run)
         .def("__str__", &TRTEngine::to_str)
