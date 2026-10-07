@@ -443,7 +443,8 @@ def cutile_op(
             architecture is a cross-compile, so its PTX cannot be driver-checked
             locally and must be verified on the target device.
         max_ptx_version: explicit ISA ceiling for the embedded PTX, as a
-            ``90``-style int (``.version 9.0``). The compiler's header is left
+            ``92``-style int (``.version 9.2``), minimum 92. It does not bypass
+            the CUDA 13.2+ driver/toolkit requirements. The compiler's header is left
             unchanged by default. A capped candidate is verified by the driver.
         capability_validator: optional extra predicate gating conversion. It is
             combined with the dtype check derived from ``signature`` — both must
