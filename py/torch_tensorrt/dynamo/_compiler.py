@@ -2410,7 +2410,7 @@ def convert_exported_program_to_serialized_trt_engine(
         settings,
     )
 
-    serialized_engine: bytes = interpreter_result.serialized_engine
+    serialized_engine: bytes = bytes(interpreter_result.serialized_engine)
     return serialized_engine
 
 

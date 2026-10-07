@@ -390,7 +390,9 @@ def _execute_route_trial(payload: Dict[str, Any]) -> Dict[str, Any]:
         "error_message": error_message,
         "accuracy_loss": accuracy_loss,
         "gpu_time": gpu_time,
-        "serialized_engine": result.serialized_engine,
+        # The trial result crosses a process boundary by pickle; TensorRT's buffer
+        # type does not pickle.
+        "serialized_engine": bytes(result.serialized_engine),
         "input_names": list(result.input_names),
         "output_names": list(result.output_names),
         "requires_output_allocator": result.requires_output_allocator,
