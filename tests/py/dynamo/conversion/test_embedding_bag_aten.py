@@ -498,7 +498,6 @@ class TestEmbeddingBagConverter(DispatchTestCase):
         trt_mod = torch_tensorrt.dynamo.compile(
             fx_mod,
             inputs=inputs,
-            enable_precisions=torch.float32,
             min_block_size=1,
             cache_built_engines=False,
             reuse_cached_engines=False,
@@ -699,7 +698,6 @@ class TestEmbeddingBagConverter(DispatchTestCase):
         trt_mod = torch_tensorrt.dynamo.compile(
             fx_mod,
             inputs=inputs,
-            enable_precisions=torch.float32,
             min_block_size=1,
             cache_built_engines=False,
             reuse_cached_engines=False,
