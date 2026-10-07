@@ -337,8 +337,32 @@ cc_library(
 )
 
 cc_library(
+    name = "tensorrt_executorch_execution_graph_headers",
+    hdrs = ["src/torch_tensorrt/executorch/ExecutionGraph.h"],
+    strip_include_prefix = "src",
+    visibility = ["//visibility:private"],
+    target_compatible_with = select({
+        ":linux_x86_64": [],
+        ":sbsa": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = ["@cuda//:cuda_headers"] + select({
+        ":linux_x86_64": [
+            "@executorch//:executorch_headers",
+            "@tensorrt//:nvinfer",
+        ],
+        ":sbsa": [
+            "@executorch//:executorch_headers",
+            "@tensorrt_sbsa//:nvinfer",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+cc_library(
     name = "tensorrt_executorch_backend",
     srcs = [
+        "src/torch_tensorrt/executorch/ExecutionGraph.cpp",
         "src/torch_tensorrt/executorch/TensorRTBackend.cpp",
     ],
     hdrs = [
@@ -356,6 +380,7 @@ cc_library(
     deps = [
         ":tensorrt_executorch_binding_names",
         ":tensorrt_executorch_blob_header",
+        ":tensorrt_executorch_execution_graph_headers",
         ":tensorrt_executorch_pooled_scratch_install",
         ":tensorrt_executorch_shared_engine_key",
         ":tensorrt_executorch_shared_scratch_pool",
@@ -382,6 +407,8 @@ filegroup(
     name = "executorch_backend_source_files",
     srcs = [
         "src/torch_tensorrt/executorch/CMakeLists.txt",
+        "src/torch_tensorrt/executorch/ExecutionGraph.cpp",
+        "src/torch_tensorrt/executorch/ExecutionGraph.h",
         "src/torch_tensorrt/executorch/PooledScratchInstall.cpp",
         "src/torch_tensorrt/executorch/PooledScratchInstall.h",
         "src/torch_tensorrt/executorch/README.md",

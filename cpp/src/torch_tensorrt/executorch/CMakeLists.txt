@@ -24,6 +24,7 @@ find_package(CUDAToolkit REQUIRED)
 find_package(Threads REQUIRED)
 
 set(_executorch_backend_tensorrt_sources
+    "${CMAKE_CURRENT_LIST_DIR}/ExecutionGraph.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/PooledScratchInstall.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/TensorRTBackend.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/TensorRTBlobHeader.cpp"

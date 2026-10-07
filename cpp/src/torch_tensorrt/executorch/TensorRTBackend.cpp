@@ -11,6 +11,7 @@
  */
 
 #include "torch_tensorrt/executorch/TensorRTBackend.h"
+#include "torch_tensorrt/executorch/ExecutionGraph.h"
 #include "torch_tensorrt/executorch/PooledScratchInstall.h"
 #include "torch_tensorrt/executorch/SharedEngineKey.h"
 #include "torch_tensorrt/executorch/SharedScratchPool.h"
@@ -86,12 +87,15 @@ void TRTLogger::log(Severity severity, const char* msg) noexcept {
   }
 }
 
+EngineHandle::EngineHandle() = default;
+
 EngineHandle::~EngineHandle() {
   // Freeing runs on the engine's device. Borrowed rather than selected outright,
   // because this can run from arena teardown on a thread that was working
   // elsewhere, and a destructor has no way to report a failure.
   const auto guard = ::executorch::extension::cuda::CUDAGuard::create(device_id);
   (void)guard;
+  execution_graph.reset();
   // No wait here: execute already waited, and a device-wide one blocks unrelated work.
   for (void* p : cached_input_ptrs) {
     if (p != nullptr) {
@@ -203,6 +207,7 @@ bool infer_binding_names(
 // cannot: its context's allocation strategy was fixed when the context was
 // created. initialize_engine_io below is the one place this is read.
 std::atomic<bool> scratch_enabled{false};
+std::atomic<bool> cuda_graphs_enabled{false};
 
 // TensorRT forbids moving the budget while any execution context exists, so this must run before
 // the engine's first context.
@@ -393,6 +398,29 @@ Error initialize_engine_io(EngineHandle& handle) {
   }
 
   return Error::Ok;
+}
+
+// Called once the aliased outputs are known. Each reason replay stays off is logged, because a caller
+// who turned it on expects it.
+void enable_cuda_graphs(EngineHandle& handle) {
+  if (handle.claims_pooled_scratch) {
+    ET_LOG(Info, "TensorRTBackend::init: CUDA graph replay is off for an engine on pooled activation scratch");
+    return;
+  }
+  if (handle.num_aliased_outputs > 0) {
+    ET_LOG(Info, "TensorRTBackend::init: CUDA graph replay is off for an engine with aliased outputs");
+    return;
+  }
+  int memory_pools_supported = 0;
+  if (cudaDeviceGetAttribute(&memory_pools_supported, cudaDevAttrMemoryPoolsSupported, handle.device_id) !=
+      cudaSuccess) {
+    cudaGetLastError();
+  }
+  if (memory_pools_supported == 0) {
+    ET_LOG(Info, "TensorRTBackend::init: CUDA graph replay needs stream-ordered memory; using enqueueV3");
+    return;
+  }
+  handle.execution_graph = std::make_unique<ExecutionGraph>();
 }
 
 Error initialize_input_profiles(EngineHandle& handle) {
@@ -1052,6 +1080,35 @@ Result<DelegateHandle*> TensorRTBackend::init(
     }
   }
 
+  // A load-time option wins, so a host that knows recording is unsafe in its process can refuse it for any
+  // program. Then the program's compile spec, then the process-wide option set from C++.
+  bool cuda_graphs = cuda_graphs_enabled.load(std::memory_order_relaxed);
+  const CompileSpec* graphs_spec = nullptr;
+  for (const auto& spec : compile_specs) {
+    if (spec.key != nullptr && std::strcmp(spec.key, kCudaGraphsKey) == 0) {
+      if (graphs_spec != nullptr) {
+        ET_LOG(Error, "TensorRTBackend::init: duplicate %s compile spec", kCudaGraphsKey);
+        return Error::InvalidProgram;
+      }
+      graphs_spec = &spec;
+    }
+  }
+  if (graphs_spec != nullptr) {
+    const auto* value = static_cast<const char*>(graphs_spec->value.buffer);
+    if (value == nullptr || graphs_spec->value.nbytes != 1 || (value[0] != '0' && value[0] != '1')) {
+      ET_LOG(Error, "TensorRTBackend::init: %s compile spec must be b\"0\" or b\"1\"", kCudaGraphsKey);
+      return Error::InvalidProgram;
+    }
+    cuda_graphs = value[0] == '1';
+  }
+  const auto graphs_option = context.get_runtime_spec<bool>(kCudaGraphsKey);
+  if (graphs_option.ok()) {
+    cuda_graphs = graphs_option.get();
+  } else if (graphs_option.error() != Error::NotFound) {
+    ET_LOG(Error, "TensorRTBackend::init: %s runtime option must be a boolean", kCudaGraphsKey);
+    return Error::InvalidArgument;
+  }
+
   // Read per load, not through set_option, so a load that must not share changes nothing for loads
   // on other threads.
   const auto share_spec = context.get_runtime_spec<bool>(kSharedEnginesKey);
@@ -1171,6 +1228,9 @@ Result<DelegateHandle*> TensorRTBackend::init(
         "TensorRTBackend::init: %zu aliased output(s) bound in-place to caller-owned inputs",
         handle->num_aliased_outputs);
   }
+  if (cuda_graphs) {
+    enable_cuda_graphs(*handle);
+  }
 
   err = initialize_input_profiles(*handle);
   if (err != Error::Ok) {
@@ -1192,10 +1252,8 @@ Result<DelegateHandle*> TensorRTBackend::init(
 // ---------------------------------------------------------------------------
 // execute
 //
-// Binds the ExecuTorch input/output tensor data pointers directly to the
-// TRT IExecutionContext and calls enqueueV3().  ExecuTorch pre-allocates
-// all output tensors before calling execute(), so we only need to register
-// their addresses; no separate output allocation is required.
+// Binds the ExecuTorch tensors to TensorRT. Graph replay stages these bindings
+// through persistent device buffers, then copies results to the caller's outputs.
 //
 // Args layout (mirroring the Python exporter):
 //   args[0 .. num_inputs-1]                               -- input EValues
@@ -1342,6 +1400,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // Device pointer each input binding was bound to; aliased outputs reuse the
   // pointer of the input they alias so their update lands in-place.
   std::vector<void*> input_bind_ptrs(num_inputs, nullptr);
+  std::vector<size_t> binding_bytes(num_inputs + num_outputs);
   size_t arg_idx = 0; // running index into delegate args
   for (size_t i = 0; i < num_inputs; ++i) {
     const std::string& name = engine->input_binding_names[i];
@@ -1355,6 +1414,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     }
 
     exec_aten::Tensor et_in = arg->toTensor();
+    binding_bytes[i] = et_in.nbytes();
     // Caught here rather than at submission. Device memory on the wrong GPU binds without complaint
     // and then fails inside TensorRT as an invalid program, which sends the reader to re-export a
     // model that was never the problem.
@@ -1628,6 +1688,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       }
     }
 
+    binding_bytes[num_inputs + o] = et_out.nbytes();
     void* bind_ptr = nullptr;
     if (et_out.nbytes() == 0) {
       if (engine->cached_output_sizes[o] == 0) {
@@ -1664,12 +1725,13 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     }
   }
 
-  // TensorRT's enqueue can look up a default stream's context through the driver, and that lookup fails while no
-  // context is current. A new thread has none, and the device guard sets one only when it switches devices.
+  // TensorRT's enqueue can look up a default stream's context through the driver, and graph replay compares the
+  // stream's context with the current one, and both fail while no context is current. A new thread has none, and
+  // the device guard sets one only when it switches devices.
   // cudaFree(nullptr) sets the primary context only if none is current, so it keeps one the caller set. Outside
   // cudaStreamCaptureModeRelaxed a capture cannot take it, so it runs after the pooled capture refusal and the
   // argument checks. Any earlier, it would fail first under a capture, hiding their error and invalidating the capture.
-  if (stream == nullptr || stream == cudaStreamLegacy || stream == cudaStreamPerThread) {
+  if (engine->execution_graph || stream == nullptr || stream == cudaStreamLegacy || stream == cudaStreamPerThread) {
     cuda_err = cudaFree(nullptr);
     if (cuda_err != cudaSuccess) {
       ET_LOG(
@@ -1741,13 +1803,10 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // ------------------------------------------------------------------
   // Armed before the launch, so a partial launch still drains what it submitted.
   drain_on_early_return.arm();
-  if (!ctx->enqueueV3(stream)) {
-    ET_LOG(
-        Error,
-        "TensorRTBackend::execute: enqueueV3 failed. Likely an output with no address: supply each "
-        "with set_output_data_ptr. Else the guard's stream is on another device, or is the "
-        "per-thread stream inside a green context, which is invalid there.");
-    return Error::InvalidState;
+  const Error enqueue_err = engine->execution_graph ? engine->execution_graph->enqueue(*engine, stream, binding_bytes)
+                                                    : enqueue_plain(*ctx, stream);
+  if (enqueue_err != Error::Ok) {
+    return enqueue_err;
   }
 
   // Pairs with claim_shared_scratch: the next claimant waits on this event.
@@ -1857,6 +1916,8 @@ Error TensorRTBackend::set_option(ET_UNUSED BackendOptionContext& context, const
   // is what applying each in turn did.
   bool requested = false;
   bool have_request = false;
+  bool graphs_requested = false;
+  bool have_graphs_request = false;
   for (const auto& option : backend_options) {
     if (std::strcmp(option.key, kSharedEnginesKey) == 0) {
       ET_LOG(
@@ -1875,9 +1936,20 @@ Error TensorRTBackend::set_option(ET_UNUSED BackendOptionContext& context, const
       }
       requested = *val;
       have_request = true;
+    } else if (std::strcmp(option.key, kCudaGraphsKey) == 0) {
+      const bool* const val = std::get_if<bool>(&option.value);
+      if (val == nullptr) {
+        ET_LOG(Error, "TensorRTBackend::set_option: option '%s' must be a boolean", kCudaGraphsKey);
+        return Error::InvalidArgument;
+      }
+      graphs_requested = *val;
+      have_graphs_request = true;
     }
   }
 
+  if (have_graphs_request) {
+    cuda_graphs_enabled.store(graphs_requested, std::memory_order_relaxed);
+  }
   if (have_request) {
     scratch_enabled.store(requested, std::memory_order_relaxed);
   }

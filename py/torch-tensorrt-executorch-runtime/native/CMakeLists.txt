@@ -52,6 +52,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 # process; linking the shipped shared library is what guarantees that, since a static copy
 # would give this library a second, invisibly separate stream.
 add_library(executorch_backend_tensorrt SHARED
+  "${TORCH_TENSORRT_SOURCE_DIR}/cpp/src/torch_tensorrt/executorch/ExecutionGraph.cpp"
   "${TORCH_TENSORRT_SOURCE_DIR}/cpp/src/torch_tensorrt/executorch/PooledScratchInstall.cpp"
   "${TORCH_TENSORRT_SOURCE_DIR}/cpp/src/torch_tensorrt/executorch/TensorRTBackend.cpp"
   "${TORCH_TENSORRT_SOURCE_DIR}/cpp/src/torch_tensorrt/executorch/TensorRTBlobHeader.cpp"

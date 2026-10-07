@@ -49,7 +49,11 @@ struct InputProfileBounds {
   nvinfer1::Dims max{};
 };
 
+class ExecutionGraph;
+
 struct EngineHandle {
+  EngineHandle();
+  std::unique_ptr<ExecutionGraph> execution_graph;
   // Shared with every other handle loaded with kSharedEnginesKey on from the same engine bytes, for
   // the same device and weight streaming request, so the weights are on the device once. The context
   // and everything below it stay this handle's own.
@@ -128,6 +132,15 @@ inline constexpr char kSharedActivationScratchKey[] = "use_shared_activation_scr
 // with kSharedActivationScratchKey on and the engine needs activation scratch.
 inline constexpr char kSharedEnginesKey[] = "use_shared_engines";
 
+// Records each eligible engine as a CUDA graph and replays it. Read when an engine loads, from the
+// first of these present: the load option of this name, a boolean passed to Module::load; the
+// program's compile spec of this name, b"1" or b"0"; the process-wide runtime option of this name,
+// false unless set. Any other compile spec value, or the key twice, fails the load. Engines with pooled
+// scratch or aliased outputs, GPUs without stream-ordered memory, and drivers older than CUDA 12.5 keep
+// ordinary enqueueV3. Any caller stream can replay, and so can a call with no caller stream; a call on
+// a green context or other-context stream runs plain enqueueV3 and keeps the graph.
+inline constexpr char kCudaGraphsKey[] = "use_cuda_graphs";
+
 class TensorRTBackend final : public ::executorch::runtime::BackendInterface {
  public:
   bool is_available() const override;
@@ -175,8 +188,9 @@ class TensorRTBackend final : public ::executorch::runtime::BackendInterface {
       ::executorch::runtime::Span<::executorch::runtime::EValue*> args) const override;
 
   // Applies the runtime backend options a caller passes to
-  // executorch::runtime::set_option("TensorRTBackend", ...). The only key read is
-  // kSharedActivationScratchKey, a boolean. kSharedEnginesKey is load-only and is rejected here.
+  // executorch::runtime::set_option("TensorRTBackend", ...). The keys read are
+  // kSharedActivationScratchKey and kCudaGraphsKey, both booleans. A kCudaGraphsKey load option or
+  // compile spec wins over this one. kSharedEnginesKey is load-only and is rejected here.
   ::executorch::runtime::Error set_option(
       ET_UNUSED ::executorch::runtime::BackendOptionContext& context,
       const ::executorch::runtime::Span<::executorch::runtime::BackendOption>& backend_options) override;

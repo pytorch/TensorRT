@@ -712,9 +712,8 @@ def load(
 
 
 # The keyword arguments save() consumes only for output_format="executorch",
-# each with the default it is popped with. One table, because the unexpected-keyword
-# error spells the supported set out for the caller: an option added to the pops
-# alone would leave that message telling someone their flag is unsupported.
+# including explicit keyword-only parameters, with their defaults. Keep the
+# unexpected-keyword error's supported set in sync with the accepted options.
 _EXECUTORCH_SAVE_OPTIONS: Dict[str, Any] = {
     "partitioners": None,
     "compile_specs": None,
@@ -724,6 +723,7 @@ _EXECUTORCH_SAVE_OPTIONS: Dict[str, Any] = {
     "compile_config": None,
     "generate_etrecord": False,
     "weight_streaming_budget_per_engine": None,
+    "use_cuda_graphs": None,
     "zero_copy_kv": False,
 }
 
@@ -743,6 +743,7 @@ def save(
     use_legacy_exporter: Optional[bool] = None,
     pickle_protocol: int = 2,
     dynamic_shapes: Optional[Dict[str, Any]] = None,
+    use_cuda_graphs: bool | None = None,
     **kwargs: Any,
 ) -> None:
     """
@@ -822,6 +823,12 @@ def save(
 
                 - If both dynamic_shapes and Input objects are provided, the explicit dynamic_shapes
                   parameter takes precedence.
+        use_cuda_graphs (Optional[bool]): Bake CUDA graph replay on (True) or off
+                (False) into every TensorRT delegate for ``output_format="executorch"``.
+                None leaves the choice unset so the runtime default applies. A load-time
+                option overrides this value. Non-booleans are rejected for ExecuTorch;
+                other formats ignore non-None values with a warning. Use this keyword,
+                not a raw ``CompileSpec("use_cuda_graphs", ...)``.
         kwargs: Additional format-specific kwargs. ``partitioners=``,
                 ``compile_specs=``, ``backend_config=``, ``constant_methods=``,
                 ``transform_passes=``, ``compile_config=``, ``generate_etrecord=``,
@@ -929,15 +936,16 @@ def save(
                 f"output_format='executorch': {sorted(kwargs)}. Supported executorch "
                 f"options are {supported}."
             )
-        # Validate the budget before the input and model-shape checks below, so a wrong
-        # type is not reported as an unrelated failure.
+        # Validate options before input and model-shape checks can obscure type errors.
         from torch_tensorrt.executorch.partitioner import (
+            normalize_use_cuda_graphs,
             normalize_weight_streaming_budget_per_engine,
         )
 
         normalize_weight_streaming_budget_per_engine(
             executorch_weight_streaming_budget_per_engine
         )
+        normalize_use_cuda_graphs(use_cuda_graphs)
         # For the same reason, the one refusal zero-copy makes on the config
         # alone. _save_as_executorch reaches it only through
         # zero_copy_backend_config, which it calls after export() has partitioned
@@ -1096,6 +1104,11 @@ def save(
             "output_format='executorch' and will be ignored for "
             f"output_format='{output_format}'."
         )
+    if use_cuda_graphs is not None and output_format != "executorch":
+        logger.warning(
+            "use_cuda_graphs= is only used with output_format='executorch' and will "
+            f"be ignored for output_format='{output_format}'."
+        )
     if executorch_zero_copy_kv and output_format != "executorch":
         logger.warning(
             "zero_copy_kv= is only used with output_format='executorch' and will "
@@ -1194,6 +1207,7 @@ def save(
                     compile_config=executorch_compile_config,
                     generate_etrecord=executorch_generate_etrecord,
                     weight_streaming_budget_per_engine=executorch_weight_streaming_budget_per_engine,
+                    use_cuda_graphs=use_cuda_graphs,
                     zero_copy_kv=executorch_zero_copy_kv,
                 )
             else:
@@ -1312,6 +1326,7 @@ def save(
                         compile_config=executorch_compile_config,
                         generate_etrecord=executorch_generate_etrecord,
                         weight_streaming_budget_per_engine=executorch_weight_streaming_budget_per_engine,
+                        use_cuda_graphs=use_cuda_graphs,
                         zero_copy_kv=executorch_zero_copy_kv,
                     )
                 else:
@@ -1439,6 +1454,7 @@ def save(
                         compile_config=executorch_compile_config,
                         generate_etrecord=executorch_generate_etrecord,
                         weight_streaming_budget_per_engine=executorch_weight_streaming_budget_per_engine,
+                        use_cuda_graphs=use_cuda_graphs,
                         zero_copy_kv=executorch_zero_copy_kv,
                     )
                 else:
@@ -1511,6 +1527,7 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
         weight_streaming_budget_per_engine=kwargs.get(
             "weight_streaming_budget_per_engine"
         ),
+        use_cuda_graphs=kwargs.get("use_cuda_graphs"),
         zero_copy_kv=zero_copy_kv,
     )
     # Unlike the direct export()+to_executorch() path -- where the two steps
