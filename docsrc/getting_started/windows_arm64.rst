@@ -83,7 +83,7 @@ Native build on Windows ARM64
       python -m pip install numpy packaging pyyaml setuptools==72.1.0 wheel fmt build
 
       # Install the Windows ARM64 PyTorch 2.15 nightly.
-      python -m pip install --pre "torch>=2.15.0.dev,<2.16.0" --index-url https://pypi.nvidia.com/nvtorch_oot_nightly/torch/
+      python -m pip install --pre "torch>=2.16.0.dev,<2.17.0" --index-url https://pypi.nvidia.com/nvtorch_oot_nightly/torch/
 
       # build the native windows on arm TensorRT-RTX wheel
       python setup.py bdist_wheel --use-rtx

@@ -89,6 +89,9 @@ def filter_matrix_item(
             return True
         return False
     else:
+        # PyTorch 2.16 nightlies require Python 3.11 or newer.
+        if item["python_version"] == "3.10":
+            return False
         cuda_versions = (
             arm_cuda_versions
             if item["gpu_arch_type"] in {"cuda-aarch64", "cuda-arm64"}
