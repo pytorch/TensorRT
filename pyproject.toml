@@ -130,9 +130,13 @@ docs = [
     "pillow",
 ]
 
-quantization = [
+quantization-base = [
     "nvidia-modelopt[hf]>=0.44.0; python_version > '3.9' and python_version < '3.13'",
     "torchao",
+]
+
+quantization = [
+    {include-group = "quantization-base"},
     "mslk>=1.0.0",
 ]
 
@@ -212,6 +216,10 @@ conflicts = [
     [
       { group = "test_ext" },
       { group = "quantization" },
+    ],
+    [
+      { group = "test_ext" },
+      { group = "quantization-base" },
     ],
 ]
 constraint-dependencies = [
