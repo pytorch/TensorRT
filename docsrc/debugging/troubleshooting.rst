@@ -110,7 +110,8 @@ Memory Errors During Compilation
 
 **Process killed (OOM) on CPU**
 
-    TRT compilation can use up to 5× the model size in CPU memory.
+    Compilation peaks at about 1× the model size in CPU memory, plus about 2 GB for
+    TensorRT's builder, or about 2× with ``offload_module_to_cpu=True``.
 
     * Make sure ``TORCHTRT_ENABLE_BUILDER_MALLOC_TRIM`` is not set to ``0``; trimming
       the builder's freed memory is on by default on Linux.
