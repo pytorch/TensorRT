@@ -2995,8 +2995,9 @@ TEST_F(SharedScratchBackendTest, TwoThreadsRunningPooledEnginesOnOneDeviceKeepTh
   ASSERT_EQ(cudaStreamCreateWithFlags(&first_stream, cudaStreamNonBlocking), cudaSuccess);
   ASSERT_EQ(cudaStreamCreateWithFlags(&second_stream, cudaStreamNonBlocking), cudaSuccess);
 
-  // The host copies that bracket each run synchronize the whole device, so two
-  // threads left to themselves take turns rather than overlap. Against a build
+  // The host copies that bracket each run order nothing against the two
+  // non-blocking streams, but they do block each thread for a while, so two
+  // threads left to themselves tend to take turns rather than overlap. Against a build
   // that leaves the window open, taking turns caught it in 2 of the 120 runs
   // below; releasing both threads together caught nearly all of them.
   //
@@ -3035,7 +3036,8 @@ TEST_F(SharedScratchBackendTest, TwoThreadsRunningPooledEnginesOnOneDeviceKeepTh
     for (int i = 0; i < kConcurrentRunsPerThread; ++i) {
       // Rewritten every iteration, so a run whose enqueue never reached the engine
       // leaves the sentinel behind rather than the previous iteration's output.
-      if (!engine.fill_output(kSentinel)) {
+      // Finish the default-stream fill before inference on a non-blocking stream.
+      if (!engine.fill_output(kSentinel) || cudaStreamSynchronize(nullptr) != cudaSuccess) {
         failures.fetch_add(1);
       }
       submit_together(i);
