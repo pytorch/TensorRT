@@ -123,6 +123,17 @@ cc_library(
 )
 
 cc_library(
+    name = "edge_llm_executorch_blob_header",
+    srcs = [
+        "src/torch_tensorrt/executorch/EdgeLLMBlobHeader.cpp",
+    ],
+    hdrs = [
+        "include/torch_tensorrt/executorch/EdgeLLMBlobHeader.h",
+    ],
+    strip_include_prefix = "include",
+)
+
+cc_library(
     name = "tensorrt_executorch_weight_streaming_budget",
     srcs = [
         "src/torch_tensorrt/executorch/WeightStreamingBudget.cpp",
@@ -384,6 +395,8 @@ filegroup(
         "src/torch_tensorrt/executorch/CMakeLists.txt",
         "src/torch_tensorrt/executorch/PooledScratchInstall.cpp",
         "src/torch_tensorrt/executorch/PooledScratchInstall.h",
+        "src/torch_tensorrt/executorch/EdgeLLMBackend.cpp",
+        "src/torch_tensorrt/executorch/EdgeLLMBlobHeader.cpp",
         "src/torch_tensorrt/executorch/README.md",
         "src/torch_tensorrt/executorch/SharedEngineKey.h",
         "src/torch_tensorrt/executorch/SharedScratchPool.h",
@@ -406,6 +419,8 @@ filegroup(
 filegroup(
     name = "executorch_api_headers",
     srcs = [
+        "include/torch_tensorrt/executorch/EdgeLLMBackend.h",
+        "include/torch_tensorrt/executorch/EdgeLLMBlobHeader.h",
         "include/torch_tensorrt/executorch/TensorRTBackend.h",
         "include/torch_tensorrt/executorch/TensorRTBindingNames.h",
         "include/torch_tensorrt/executorch/TensorRTBlobHeader.h",
