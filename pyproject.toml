@@ -38,7 +38,7 @@ readme = { file = "README.md", content-type = "text/markdown" }
 # Capped because the resolver has to find a solution for every version this admits, and the
 # pinned ExecuTorch ships no wheel above 3.14, so an open upper bound fails the lock on a
 # version nothing supports. The required-environments below already stop at 3.13.
-requires-python = ">=3.10,<3.15"
+requires-python = ">=3.11,<3.15"
 keywords = [
     "pytorch",
     "torch",
@@ -201,9 +201,9 @@ environments = [
     "sys_platform == 'win32' and platform_machine == 'AMD64'",
 ]
 required-environments = [
-    "sys_platform == 'linux' and python_version >= '3.10' and python_version <= '3.13' and platform_machine == 'x86_64'",
-    "sys_platform == 'linux' and python_version >= '3.10' and python_version <= '3.13' and platform_machine == 'aarch64'",
-    "sys_platform == 'win32' and python_version >= '3.10' and python_version <= '3.13' and platform_machine == 'AMD64'"
+    "sys_platform == 'linux' and python_version >= '3.11' and python_version <= '3.13' and platform_machine == 'x86_64'",
+    "sys_platform == 'linux' and python_version >= '3.11' and python_version <= '3.13' and platform_machine == 'aarch64'",
+    "sys_platform == 'win32' and python_version >= '3.11' and python_version <= '3.13' and platform_machine == 'AMD64'"
 ]
 # The lock records this mode, so every writer has to agree on it or the next one
 # re-resolves and rewrites the file. CI passes --prerelease=allow, and the pinned
@@ -438,7 +438,7 @@ skip = ["py/torch_tensorrt/fx"]
 
 [tool.black]
 #line-length = 120
-target-version = ["py38", "py39", "py310", "py311", "py312"]
+target-version = ["py311", "py312"]
 force-exclude = """
 elu_converter/setup.py
 | docs/

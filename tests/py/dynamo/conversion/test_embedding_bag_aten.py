@@ -149,7 +149,6 @@ class TestEmbeddingBagConverter(DispatchTestCase):
         self.run_test(
             TestEmbeddingBag(),
             inputs=[weight, indices],
-            precision=weight.dtype,
             enable_passes=True,
             propagate_shapes=True,
             immutable_weights=True,
@@ -348,7 +347,6 @@ class TestEmbeddingBagConverter(DispatchTestCase):
         self.run_test(
             TestEmbeddingBag(),
             inputs=[weight, indices, offsets],
-            precision=weight.dtype,
             enable_passes=True,
             propagate_shapes=True,
             immutable_weights=True,
@@ -413,7 +411,6 @@ class TestEmbeddingBagConverter(DispatchTestCase):
         self.run_test(
             TestEmbeddingBag(),
             inputs=[weight, indices, offsets],
-            precision=weight.dtype,
             enable_passes=True,
             propagate_shapes=True,
             immutable_weights=True,
@@ -498,7 +495,6 @@ class TestEmbeddingBagConverter(DispatchTestCase):
         trt_mod = torch_tensorrt.dynamo.compile(
             fx_mod,
             inputs=inputs,
-            enable_precisions=torch.float32,
             min_block_size=1,
             cache_built_engines=False,
             reuse_cached_engines=False,
@@ -638,6 +634,87 @@ class TestEmbeddingBagConverter(DispatchTestCase):
             propagate_shapes=True,
             immutable_weights=True,
         )
+
+    @parameterized.expand(
+        [
+            param(
+                test_name="sum_int32",
+                indices_dtype=torch.int32,
+                mode=0,
+            ),
+            param(
+                test_name="mean_int32",
+                indices_dtype=torch.int32,
+                mode=1,
+            ),
+            param(
+                test_name="max_int32",
+                indices_dtype=torch.int32,
+                mode=2,
+            ),
+            param(
+                test_name="sum_int64",
+                indices_dtype=torch.int64,
+                mode=0,
+            ),
+        ]
+    )
+    def test_embedding_bag_with_dynamic_indices_traversable_offsets(
+        self, test_name, indices_dtype, mode
+    ):
+        # constant offsets with dynamic indices, the last bag ends at runtime
+        offsets = torch.tensor([0, 2, 5], dtype=indices_dtype)
+
+        class EmbeddingBag(torch.nn.Module):
+            def forward(self, weight, indices):
+                return torch.ops.aten._embedding_bag.default(
+                    weight,
+                    indices,
+                    offsets,
+                    False,
+                    mode,
+                    False,
+                    None,
+                    False,
+                    -1,
+                )[0]
+
+        weight = torch.randn((20, 3), dtype=torch.float32)
+        indices = torch.tensor([1, 2, 4, 5, 4, 3, 2], dtype=indices_dtype)
+        inputs = (weight, indices)
+        mod = EmbeddingBag()
+
+        fx_mod = torch.export.export(
+            mod,
+            inputs,
+            dynamic_shapes={
+                "weight": {},
+                "indices": {0: torch.export.Dim("num_indices", min=5, max=16)},
+            },
+        )
+        trt_mod = torch_tensorrt.dynamo.compile(
+            fx_mod,
+            inputs=inputs,
+            min_block_size=1,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
+            immutable_weights=True,
+        )
+
+        # 5 leaves the last bag empty, the others give it 1, 2 and 7 entries
+        for num_indices in (5, 6, 7, 12):
+            run_indices = torch.randint(0, 20, (num_indices,), dtype=indices_dtype)
+            with torch.no_grad():
+                ref = mod(weight, run_indices).cuda()
+                out = trt_mod(weight.cuda(), run_indices.cuda())
+            torch.testing.assert_close(
+                out,
+                ref,
+                rtol=RTOL,
+                atol=ATOL,
+                equal_nan=True,
+                check_dtype=True,
+            )
 
 
 if __name__ == "__main__":

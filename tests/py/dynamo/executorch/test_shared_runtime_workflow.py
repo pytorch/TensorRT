@@ -632,7 +632,7 @@ def test_the_delegate_lane_narrows_the_matrix_to_cuda_13_rows() -> None:
         return {row["desired_cuda"] for row in json.loads(result.stdout)["include"]}
 
     rows = [
-        {"desired_cuda": cuda, "python_version": "3.10", "gpu_arch_type": "cuda"}
+        {"desired_cuda": cuda, "python_version": "3.11", "gpu_arch_type": "cuda"}
         for cuda in ("cu126", "cu132", "cu134")
     ]
     assert kept(rows, "--executorch-runtime") == {"cu132", "cu134"}

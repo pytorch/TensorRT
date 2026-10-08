@@ -11,7 +11,7 @@ Torch-TensorRT 2.x is centered primarily around Python. As such, precompiled rel
 Dependencies
 ~~~~~~~~~~~~~~
 
-You need to have CUDA, PyTorch, and TensorRT (python package is sufficient) installed to use Torch-TensorRT
+Torch-TensorRT requires Python 3.11–3.14, CUDA, PyTorch, and TensorRT (the Python package is sufficient).
 
     * https://developer.nvidia.com/cuda
     * https://pytorch.org
@@ -351,14 +351,14 @@ To build natively on aarch64-linux-gnu platform, configure the ``WORKSPACE`` wit
 2. Configure the correct paths to directory roots containing local dependencies in the ``new_local_repository`` rules:
 
     NOTE: If you installed PyTorch using a pip package, the correct path is the path to the root of the python torch package.
-    In the case that you installed with ``sudo pip install`` this will be ``/usr/local/lib/python3.8/dist-packages/torch``.
-    In the case you installed with ``pip install --user`` this will be ``$HOME/.local/lib/python3.8/site-packages/torch``.
+    In the case that you installed with ``sudo pip install`` this will be ``/usr/local/lib/python3.11/dist-packages/torch``.
+    In the case you installed with ``pip install --user`` this will be ``$HOME/.local/lib/python3.11/site-packages/torch``.
 
 .. code-block:: shell
 
     new_local_repository(
         name = "libtorch",
-        path = "/usr/local/lib/python3.8/dist-packages/torch",
+        path = "/usr/local/lib/python3.11/dist-packages/torch",
         build_file = "third_party/libtorch/BUILD"
     )
 
