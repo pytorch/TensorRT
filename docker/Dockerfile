@@ -3,10 +3,10 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 # Base image starts with CUDA
-#TODO: cuda version
-ARG BASE_IMG=nvidia/cuda:13.2.0-devel-ubuntu24.04
+ARG BASE_IMG=nvidia/cuda:13.4.0-devel-ubuntu24.04
 FROM ${BASE_IMG} as base
-ENV BASE_IMG=nvidia/cuda:13.2.0-devel-ubuntu24.04
+ARG BASE_IMG
+ENV BASE_IMG=${BASE_IMG}
 
 ARG TENSORRT_VERSION
 ENV TENSORRT_VERSION=${TENSORRT_VERSION}

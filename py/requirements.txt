@@ -1,7 +1,7 @@
 numpy
 packaging
 pybind11==2.6.2
---extra-index-url https://download.pytorch.org/whl/nightly/cu130
+--extra-index-url https://download.pytorch.org/whl/nightly/cu134
 torch>=2.16.0.dev,<2.17.0
 --extra-index-url https://pypi.ngc.nvidia.com
 pyyaml
