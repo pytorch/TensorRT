@@ -3,6 +3,7 @@
 This package is included in `libtorchtrt.tar.gz` as
 `torch_tensorrt/src/torch_tensorrt/executorch/`. It builds the TensorRT
 backend delegate for ExecuTorch from source.
+Building this backend requires CUDA Toolkit 12.5 or newer.
 
 ```text
 user_runner_project/
@@ -392,19 +393,20 @@ kernels, where launch work on the CPU is a large share of each call.
 ### Turning it on, and off
 
 Three settings choose it, all read when an engine loads, so a later change does
-not affect engines already loaded. The first one present wins:
+not affect engines already loaded. They apply in this order:
 
-1. The `use_cuda_graphs` load option (a boolean), passed to `Module::load`. A host
-   that cannot allow replay sets it to false, and that wins over any program.
-2. The `use_cuda_graphs` compile spec baked into the program at export, `b"1"`
-   (on) or `b"0"` (off). Any other value, or the key twice, fails the load with
-   `Error::InvalidProgram`, and so does a load option that is not a boolean, with
+1. The `use_cuda_graphs` load option passed to `Module::load` wins over every
+   other setting. It must be a boolean; any other type fails the load with
    `Error::InvalidArgument`.
-3. The process-wide `use_cuda_graphs` option a C++ host sets with
-   `executorch::runtime::set_option`, false unless set.
-
-This is the same order `weight_streaming_budget` uses: the load option wins over
-the compile spec.
+2. With no load option, an explicit false set through
+   `executorch::runtime::set_option` turns replay off for the process, even if
+   the program saved true.
+3. Otherwise, the `use_cuda_graphs` compile spec saved at export chooses replay:
+   `b"1"` turns it on and `b"0"` turns it off. It wins over a process option set
+   to true and over the default when the process option was never set. Any other
+   value, or the key twice, fails the load with `Error::InvalidProgram`.
+4. If the program has no saved choice, the process option applies. Replay stays
+   off when that option was never set.
 
 In Python, at export:
 
@@ -459,20 +461,28 @@ set_option("TensorRTBackend", options.view());
 
 ### When recording is unsafe
 
-While an engine records its graph, some work on another thread in the same
-process breaks the recording, and can crash the process inside the CUDA driver.
-In tests these did:
+Recording can recur throughout an engine's lifetime. Every input shape change
+starts another warmup and recording cycle. A failed recording is retried on the
+next call, up to three failures for that set of shapes. A shape change resets
+that budget, so loading everything before the first replay does not end the risk.
 
-- a whole-device sync, `cudaDeviceSynchronize`, from another thread;
-- creating or destroying a TensorRT engine or execution context on another
-  thread, which includes this backend loading or destroying a program;
-- loading a program that uses ExecuTorch's CUDA delegate on another thread,
-  because its load calls `cudaDeviceSynchronize`.
+A lock shared across this backend prevents recording from overlapping its own
+engine and execution context creation and destruction. Loading or destroying a
+program through this backend is protected from this recording race. A handle
+must still not be destroyed while it is executing.
 
-So a host that loads or destroys programs while others run should leave replay
-off with the load option above, or load everything before the first replayed
-call. Replay also does not support wrapping `execute()` in a caller's own CUDA
-capture.
+The lock does not cover work outside this backend. Creating or destroying a
+TensorRT engine or execution context elsewhere in the process remains unsafe
+while recording runs. A whole device sync on any thread, such as
+`cudaDeviceSynchronize` or `torch.cuda.synchronize()`, is also unsafe. The sync
+itself can fail with `cudaErrorStreamCaptureUnsupported`, and the overlap can
+crash the process inside the CUDA driver. Loading a program with ExecuTorch's
+CUDA delegate can make such a sync too.
+
+Leave replay off when other threads may perform any of that work. Use an
+explicit false process option to refuse a program's saved request, or a false
+load option for one load. Replay also does not support wrapping `execute()` in
+a caller's own CUDA capture.
 
 ### What it costs
 
@@ -487,19 +497,24 @@ and still pay the copies.
 The first call with a set of input shapes runs on the stable buffers with an
 ordinary launch, the second records the graph on a private stream and launches
 it on the caller's stream, and later calls replay. A shape change starts this
-again. Changing the caller stream does not: any stream works, including the
-legacy and per-thread default streams, and a call with no caller stream replays
-on `cudaStreamPerThread`. `execute()` waits for the stream before it returns, as
-it always does.
+again. Changing the caller stream does not restart recording when the stream is
+in the same current CUDA context and is not a green context stream. This includes
+the legacy default stream and the default stream for each thread. A call with no
+caller stream replays on `cudaStreamPerThread`. `execute()` waits for the stream
+before it returns, as it always does.
 
-These keep the ordinary path: engines with aliased outputs or pooled activation
-scratch, GPUs without stream-ordered memory, and drivers older than CUDA 12.5,
-each logged once at load or first call. A call on a green context stream or a
-stream of another context also takes the ordinary path, and keeps the recorded
-graph for the next call. If buffer allocation fails, the engine uses the ordinary
-path until an input shape changes. A failed recording is retried on the next
-call, and after three failures for one set of shapes the engine logs an error and
-uses the ordinary path until a shape changes. Outputs are correct either way.
+Engines with aliased outputs or pooled activation scratch, GPUs without support
+for stream ordered memory, and drivers older than CUDA 12.5 keep the ordinary
+path. Each reason is logged once at load or first call. A call on a green context
+stream or a stream from another context also takes the ordinary path and keeps
+the recorded graph for the next compatible call. Taking the ordinary path does
+not guarantee that a stream from another context works with the engine; the call
+can still fail.
+
+If buffer allocation fails, the engine uses the ordinary path until an input
+shape changes. A failed recording is retried on the next call, and after three
+failures for one set of shapes the engine logs an error and uses the ordinary
+path until a shape changes.
 
 ## Shared activation scratch
 
