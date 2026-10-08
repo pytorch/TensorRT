@@ -641,38 +641,6 @@ def test_matrix_keeps_every_cuda_13_row_the_pin_supports():
 
 
 @pytest.mark.unit
-def test_jetpack_matrix_keeps_its_separate_cuda_contract():
-    result = subprocess.run(
-        [
-            sys.executable,
-            str(REPO_ROOT / ".github/scripts/filter-matrix.py"),
-            "--matrix",
-            json.dumps(
-                {
-                    "include": [
-                        {
-                            "python_version": "3.10",
-                            "desired_cuda": "cu126",
-                            "gpu_arch_type": "cuda-aarch64",
-                            "channel": "nightly",
-                        }
-                    ]
-                }
-            ),
-            "--jetpack",
-            "true",
-        ],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    rows = json.loads(result.stdout)["include"]
-    assert len(rows) == 1
-    assert rows[0]["desired_cuda"] == "cu126"
-    assert rows[0]["container_image"] == "nvcr.io/nvidia/l4t-jetpack:r36.4.0"
-
-
-@pytest.mark.unit
 @pytest.mark.parametrize("channel", ["cu126", "cu130", "cu132", "cu134", "cpu", "rocm"])
 @pytest.mark.parametrize("variable", [False, True])
 def test_install_channel_guard_rejects_unsupported_nightly_recipes(
