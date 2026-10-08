@@ -4,7 +4,7 @@
 
 #include <cuda_runtime.h>
 #include <executorch/extension/cuda/caller_stream.h>
-#include <executorch/languagePrefillExecutorchAdapter.h>
+#include <executorch/languageExecutorchAdapter.h>
 #include <executorch/runtime/backend/interface.h>
 #include <executorch/runtime/platform/log.h>
 #include <executorch/vitExecutorchAdapter.h>
@@ -185,8 +185,9 @@ Result<DelegateHandle*> EdgeLLMBackend::init(
     }
     handle->runner = trt_edgellm::executorch::VitExecutorchAdapter::create(engine_view, stream);
   } else if (edge_header.component == "language") {
-    handle->runner = trt_edgellm::executorch::LanguagePrefillExecutorchAdapter::create(
-        engine_view, trt_header.input_binding_names, trt_header.output_binding_names, stream);
+    const int32_t profile_index = edge_header.runner == "llm_decode" ? 1 : 0;
+    handle->runner = trt_edgellm::executorch::LanguageExecutorchAdapter::create(
+        engine_view, trt_header.input_binding_names, trt_header.output_binding_names, stream, profile_index);
   }
   if (!handle->runner) {
     ET_LOG(Error, "EdgeLLMBackend::init: failed to create %s adapter", edge_header.component.c_str());

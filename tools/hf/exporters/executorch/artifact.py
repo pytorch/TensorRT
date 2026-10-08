@@ -105,7 +105,12 @@ def build_language_artifact(
     engine_dir: str | Path,
     *,
     device_id: int = 0,
+    runner: str = "llm_prefill",
+    output_specs: tuple[EdgeOutputSpec, ...] | None = None,
 ) -> EdgeExecuTorchArtifact:
+    if runner not in {"llm_prefill", "llm_decode"}:
+        raise ValueError(f"Unsupported language runner {runner!r}")
+
     component_dir = Path(engine_dir)
     config_path = component_dir / "config.json"
 
@@ -133,15 +138,18 @@ def build_language_artifact(
     engine_path = component_dir / engine_file
     engine_bytes = engine_path.read_bytes()
 
-    output_specs = tuple(
-        EdgeOutputSpec.from_dict(
-            {
-                "shape": output["shape"],
-                "dtype": _dtype_name(output["dtype"]),
-            }
+    if output_specs is None:
+        output_specs = tuple(
+            EdgeOutputSpec.from_dict(
+                {
+                    "shape": output["shape"],
+                    "dtype": _dtype_name(output["dtype"]),
+                }
+            )
+            for output in outputs
         )
-        for output in outputs
-    )
+    elif len(output_names) != len(output_specs):
+        raise ValueError("Language output names and output specifications must match")
 
     bindings = [TensorRTIOBinding(name=name, is_input=True) for name in input_names]
     bindings.extend(
@@ -160,10 +168,11 @@ def build_language_artifact(
     )
     edge_metadata = EdgeComponentMetadata(
         component="language",
-        runner="llm_prefill",
+        runner=runner,
         outputs=output_specs,
         runner_config={
             "model_type": "language",
+            "profile_index": 0 if runner == "llm_prefill" else 1,
             "context_attention_mask_type": config.get("context_attention_mask_type"),
             "prefix_pad_mask_len": config.get("prefix_pad_mask_len"),
         },
