@@ -36,24 +36,24 @@ Usage
 -----
 # Export mode — single node, 2 GPUs (ungated Qwen, no token needed):
   torchtrtrun --nproc_per_node=2 \\
-      tools/llm/tensor_parallel_llama_export.py \\
+      tools/llm/tensor_parallel_llm_export.py \\
       --mode export --save_dir /tmp/llm_tp_engines --model Qwen/Qwen3-1.7B
 
 # Load mode — load saved engines + inference (no model download needed):
   torchtrtrun --nproc_per_node=2 \\
-      tools/llm/tensor_parallel_llama_export.py \\
+      tools/llm/tensor_parallel_llm_export.py \\
       --mode load --save_dir /tmp/llm_tp_engines --model Qwen/Qwen3-1.7B
 
 # FP32 export with static KV cache (use --mode load to reload these engines):
   torchtrtrun --nproc_per_node=2 \\
-      tools/llm/tensor_parallel_llama_export.py \\
+      tools/llm/tensor_parallel_llm_export.py \\
       --mode export --model Qwen/Qwen2.5-0.5B-Instruct \\
       --precision fp32 --cache static_v2 --save_dir /tmp/qwen_tp_fp32
 
 # Multi-node export (one GPU per node):
   torchtrtrun --nproc_per_node=1 --nnodes=2 --node_rank=0 \\
       --rdzv_endpoint=<node0-ip>:29500 \\
-      tools/llm/tensor_parallel_llama_export.py --mode export --save_dir /tmp/llm_tp_engines
+      tools/llm/tensor_parallel_llm_export.py --mode export --save_dir /tmp/llm_tp_engines
 """
 
 import argparse
