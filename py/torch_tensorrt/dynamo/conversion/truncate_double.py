@@ -83,8 +83,14 @@ def _repair_64bit_input(
     gm: torch.fx.GraphModule,
     position: int,
     submodule_name: str,
+    input_metadata: Dict[str, Any],
 ) -> None:
-    """Downcast a single double input at a TRT boundary to float32."""
+    """Downcast a single double input at a TRT boundary to float32.
+
+    input_metadata is the partition's own metadata for this input. It stands in for
+    the producer's when the producer has none, as the call to a partition left to
+    PyTorch does; a cast without a value fails ExportedProgram verification on save.
+    """
     logger.info(
         f"Downcasting a 64-bit input at position {position} of submodule {submodule_name}"
     )
@@ -93,13 +99,14 @@ def _repair_64bit_input(
     module_node = _find_module_node(gm, submodule_name)
 
     node_64bit = module_node.all_input_nodes[position]
+    metadata = node_64bit.meta if "val" in node_64bit.meta else input_metadata
     with gm.graph.inserting_before(module_node):
         node_32bit = gm.graph.call_function(
             torch.ops.aten._to_copy.default,
             args=(node_64bit,),
             kwargs={"dtype": dtype_32bit},
         )
-        node_32bit.meta = _metadata_to_dtype(node_64bit.meta, dtype_32bit)
+        node_32bit.meta = _metadata_to_dtype(metadata, dtype_32bit)
 
     module_node.replace_input_with(node_64bit, node_32bit)
 
@@ -220,13 +227,18 @@ def repair_double_inputs(
     output_node = next(node for node in submodule.graph.nodes if node.op == "output")
     is_collection_output = isinstance(output_node.args[0], (tuple, list))
     submodule_output_metadata = get_output_metadata(submodule)
+    submodule_input_metadata = [
+        node.meta for node in submodule.graph.nodes if node.op == "placeholder"
+    ]
 
     # For each input to the TRT subgraph, check if its type is double.
     for position in range(num_submodule_inputs):
         param = submodule_torch_inputs[position]
 
         if isinstance(param, torch.Tensor) and param.dtype == torch.float64:
-            _repair_64bit_input(parent_graph, position, name)
+            _repair_64bit_input(
+                parent_graph, position, name, submodule_input_metadata[position]
+            )
 
             # Repair submodule inputs in accordance with inserted casts
             dtype_32bit = torch.float32
