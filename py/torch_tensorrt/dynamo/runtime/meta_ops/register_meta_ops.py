@@ -3,7 +3,7 @@
 
 import base64
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import sympy
 import torch
@@ -14,7 +14,9 @@ logger = logging.getLogger(__name__)
 
 
 def _apply_symbolic_shape_expressions(
-    inputs: List[Any], shape_info: Dict[str, List[Dict[str, Any]]]
+    inputs: List[Any],
+    shape_info: Dict[str, List[Dict[str, Any]]],
+    output_device: Optional[torch.device] = None,
 ) -> List[torch.Tensor]:
     """
     Apply symbolic shape expressions to create output fake tensors.
@@ -26,6 +28,7 @@ def _apply_symbolic_shape_expressions(
     Args:
         inputs: Input fake tensors with current symbolic shapes
         shape_info: Dict with 'inputs' and 'outputs' keys containing shape_exprs and dtype info
+        output_device: Engine device to use when there are no tensor inputs
 
     Returns:
         List of output fake tensors with symbolic shapes
@@ -40,11 +43,12 @@ def _apply_symbolic_shape_expressions(
     output_info = shape_info.get("outputs", [])
 
     tensor_inputs = [value for value in inputs if isinstance(value, torch.Tensor)]
-    if not tensor_inputs:
+    if tensor_inputs:
+        output_device = tensor_inputs[0].device
+    elif output_device is None:
         raise RuntimeError(
             "[torch.ops.tensorrt.execute_engine]: At least one tensor input is required to infer the engine output device"
         )
-    output_device = tensor_inputs[0].device
 
     fake_mode = detect_fake_mode(inputs)
     if fake_mode is None:
@@ -337,7 +341,21 @@ def fake_tensorrt_execute_engine(
     if shape_info:
         # Apply the symbolic shape expressions to create output fake tensors
         # shape_info now contains both 'inputs' and 'outputs' keys
-        return _apply_symbolic_shape_expressions(inputs, shape_info)
+        output_device = None
+        if not inputs:
+            from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
+                DEVICE_IDX,
+                parse_device_info,
+            )
+
+            # Constant-only partitions have no input from which to infer a device.
+            # Read the engine's target without serializing its engine weights.
+            if hasattr(fake_trt_engine, "real_obj"):
+                device_info = trt_engine.serialize_metadata_only()[DEVICE_IDX]
+            else:
+                device_info = fake_trt_engine.device_info
+            output_device = torch.device("cuda", parse_device_info(device_info)["id"])
+        return _apply_symbolic_shape_expressions(inputs, shape_info, output_device)
     else:
         raise RuntimeError(
             "No symbolic shape expressions found in TensorRT engine metadata. "
@@ -485,6 +503,7 @@ def fake_no_op_placeholder_for_execute_engine(
     """
     from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
         deserialize_binding_names,
+        parse_device_info,
     )
     from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
         TorchTensorRTModule,
@@ -494,7 +513,12 @@ def fake_no_op_placeholder_for_execute_engine(
     metadata = TorchTensorRTModule.decode_metadata(serialized_metadata)
     shape_info = metadata.get("inout_symexprs") if metadata else None
     if shape_info:
-        outputs = _apply_symbolic_shape_expressions(inputs, shape_info)
+        output_device = (
+            torch.device("cuda", parse_device_info(serialized_device_info)["id"])
+            if not inputs
+            else None
+        )
+        outputs = _apply_symbolic_shape_expressions(inputs, shape_info, output_device)
         # Append the engine's aliased (KV-cache) outputs so the getitem indices
         # produced when to_edge re-traces this op stay in range: the aliased
         # outputs are network bindings appended after the fx output boundary, so
