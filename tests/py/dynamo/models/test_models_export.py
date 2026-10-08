@@ -317,8 +317,6 @@ def test_base_fp4_static_shapes(ir):
     input_tensor = torch.randn(128, 64, dtype=dtype).cuda()
 
     model = SimpleNetwork().eval().cuda()
-    expected_output = model(input_tensor)
-
     quant_cfg = mtq.NVFP4_DEFAULT_CFG
     mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
     # model has qdq nodes at this point
@@ -334,6 +332,7 @@ def test_base_fp4_static_shapes(ir):
                 cache_built_engines=False,
                 reuse_cached_engines=False,
             )
+            expected_output = model(input_tensor)
             outputs_trt = trt_model(input_tensor)
             abs_diff = torch.abs(expected_output - outputs_trt)
             print(f"max/mean abs_diff: {abs_diff.max().item()=} {abs_diff.mean()=}")
