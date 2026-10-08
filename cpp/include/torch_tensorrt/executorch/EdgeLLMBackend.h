@@ -3,7 +3,7 @@
 #include <cuda_runtime.h>
 #include <executorch/runtime/backend/interface.h>
 
-#include <executorch/executorchAdapterTypes.h>
+#include <edge_llm/executorchAdapterTypes.h>
 
 #include <cstddef>
 #include <memory>

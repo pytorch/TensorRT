@@ -3,12 +3,12 @@
 #include "torch_tensorrt/executorch/TensorRTBlobHeader.h"
 
 #include <cuda_runtime.h>
-#include <executorch/actionExecutorchAdapter.h>
+#include <edge_llm/actionExecutorchAdapter.h>
+#include <edge_llm/languageExecutorchAdapter.h>
+#include <edge_llm/vitExecutorchAdapter.h>
 #include <executorch/extension/cuda/caller_stream.h>
-#include <executorch/languageExecutorchAdapter.h>
 #include <executorch/runtime/backend/interface.h>
 #include <executorch/runtime/platform/log.h>
-#include <executorch/vitExecutorchAdapter.h>
 
 #include <cstdint>
 #include <memory>
