@@ -23,10 +23,9 @@ Precision defaults to FP16 autocast. --precision fp32 converts floating weights
 and buffers to FP32 and disables autocast; TensorRT compilation disables TF32.
 Use a separate --save_dir for each precision and re-export when changing it:
 load mode executes the saved engine and does not convert its precision.
-Export/load do not require a tolerance profile. For optional numerical validation,
-use check_tensor_parallel_llama_export.py with the same --precision. See the
-"Tensor-parallel export: FP16 and FP32" section in tools/llm/README.md for the
-measured logit differences and token-choice findings.
+See the "Accuracy check" section in tools/llm/README.md for a runnable comparison
+against a full eager reference, and "Precision findings" for measured logit
+differences and token choices. Export/load do not take tolerance arguments.
 
 Tested ungated models (no HF token needed):
   Qwen/Qwen2.5-0.5B-Instruct  - smallest/fastest smoke test; kv_heads=2 => TP=2 ONLY
@@ -398,10 +397,10 @@ def export_and_save(input_ids, args):
     # Verify
     if args.cache:
         # With KV cache, the engine takes (input_ids, position_ids, *kv_cache,
-        # start_idx, end_idx) and the reference model doesn't. Use
-        # check_tensor_parallel_llama_export.py to compare saved cached engines
-        # against an unsharded reference with identical token histories.
-        logger.info("Skipping logit-diff verify (KV cache enabled).")
+        # start_idx, end_idx) and the reference model doesn't. The README's
+        # "Accuracy check" snippet compares saved cached engines against an
+        # unsharded reference with identical token histories.
+        logger.info("For cached-model logit validation, run the README accuracy check.")
     else:
         logger.info("Verifying compiled model ...")
         with torch.no_grad(), _precision_context(args):

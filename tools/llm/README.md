@@ -92,73 +92,141 @@ precision, and keep the load flag consistent with the saved engine. The saved
 sequence/cache capacity must cover the inference prompt and requested tokens.
 FP32 uses more memory; its performance was not measured in this investigation.
 
-#### Optional accuracy check
+#### Accuracy check
 
-Export and load do not require a tolerance profile. Without a cache, export logs
-the maximum logit difference against the sharded eager model; with a cache, use
-[`check_tensor_parallel_llama_export.py`](check_tensor_parallel_llama_export.py)
-to compare the saved model against a full, unsharded eager reference. Each GPU
-must also have enough memory for that reference.
+Compare the saved cached engines with a full, unsharded eager reference using the
+same token history at every step. Each GPU must also fit the reference model.
+Save this snippet as `/tmp/check_tp_accuracy.py`; its settings match the FP32
+export command above. `start` and `end` select the cache positions to update.
 
-```bash
-torchtrtrun --nproc_per_node=2 tools/llm/check_tensor_parallel_llama_export.py \
-    --model Qwen/Qwen2.5-0.5B-Instruct --save-dir /tmp/qwen_tp_fp32 \
-    --precision fp32 --cache static_v2 --steps 128 \
-    --prompt "What is tensor parallelism?"
+```python
+import gc
+
+import torch
+import torch.distributed as dist
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+import tensor_parallel_llama_export as example  # Initializes NCCL and the device.
+import torch_tensorrt
+from torch_tensorrt.distributed._nccl_utils import initialize_nccl_comm
+from utils import get_zeroed_static_cache_inputs
+
+model_id = "Qwen/Qwen2.5-0.5B-Instruct"
+engine_dir = "/tmp/qwen_tp_fp32"
+precision = "fp32"
+prompt = "What is tensor parallelism?"
+steps = 128
+atol, rtol = 0.001, 0.0001
+
+assert precision in ("fp16", "fp32") and steps > 0
+rank, world = dist.get_rank(), dist.get_world_size()
+device = example.DEVICE
+initialize_nccl_comm()
+program = torch_tensorrt.load(example._rank_path(engine_dir, rank, world))
+loaded = program.module()
+reference = (
+    AutoModelForCausalLM.from_pretrained(
+        model_id, use_cache=False, attn_implementation="sdpa"
+    )
+    .to(device)
+    .eval()
+)
+if precision == "fp32":
+    reference = reference.float()
+    torch.set_float32_matmul_precision("highest")
+
+tokenizer = AutoTokenizer.from_pretrained(model_id)
+sequence = tokenizer(prompt, return_tensors="pt")["input_ids"].to(device)
+dist.broadcast(sequence, src=0)
+current = sequence
+kv = get_zeroed_static_cache_inputs(loaded, device=device)
+if precision == "fp32":
+    assert all(t.dtype == torch.float32 for t in kv), "Re-export in FP32"
+for node in program.graph.nodes:
+    value = node.meta.get("val")
+    if node.op == "placeholder" and isinstance(value, torch.SymInt):
+        capacity = program.range_constraints[value.node.expr].upper
+        assert sequence.shape[1] + steps - 1 <= capacity, "Re-export with more capacity"
+
+max_difference, token_matches = 0.0, 0
+with torch.inference_mode(), torch.autocast(
+    "cuda", dtype=torch.float16, enabled=precision == "fp16"
+):
+    for step in range(steps):
+        end = sequence.shape[1]
+        start = 0 if step == 0 else end - 1
+        positions = torch.arange(end, device=device).unsqueeze(0)
+        outputs = loaded(current, positions[:, start:], *kv, start, end)
+        actual, kv = outputs[0][:, -1, :], outputs[1:]
+        expected = reference(sequence, position_ids=positions).logits[:, -1, :]
+        difference = (actual.float() - expected.float()).abs().max().item()
+        max_difference = max(max_difference, difference)
+        token_matches += int(torch.equal(actual.argmax(-1), expected.argmax(-1)))
+        torch.testing.assert_close(
+            actual.float(), expected.float(), atol=atol, rtol=rtol
+        )
+        # Feed the reference's token to both paths for the next comparison.
+        current = expected.argmax(-1, keepdim=True)
+        dist.broadcast(current, src=0)
+        sequence = torch.cat([sequence, current], dim=1)
+
+print(
+    f"rank={rank}: max logit difference={max_difference:.7f}; "
+    f"matching tokens={token_matches}/{steps}",
+    flush=True,
+)
+# Release the engine before destroying its communicator.
+del loaded, program, reference, outputs, actual, expected, kv
+gc.collect()
+dist.barrier()
+dist.destroy_process_group()
 ```
 
-No `--tolerance-profile` argument is needed for FP32. The checker uses
-`atol=0.001, rtol=0.0001` and reports next-token agreement separately. FP32 still
-has small numerical differences, so exact equality is not required. The initial
-`atol=rtol=0.0001` check passed all 896 natural-prompt contexts below but failed
-the eight synthetic-token contexts; those needed `atol` up to `0.000465` with
-`rtol=0.0001`.
+Run it from the repository root:
 
-For FP16 the checker defaults to `atol=rtol=0.02`. Checking the measured
-Qwen2.5-0.5B-Instruct configuration can explicitly select
-`--tolerance-profile qwen2.5-0.5b-fp16`, which uses `atol=0.08, rtol=0.02`.
-That profile requires `static_v2`, TP=2 and the matching model configuration;
-the checker uses batch size 1 and rejects this profile with FP32.
+```bash
+PYTHONPATH=tools/llm torchtrtrun --nproc_per_node=2 /tmp/check_tp_accuracy.py
+```
 
-#### Precision findings (2026-10-08)
+For FP16 engines, set `precision = "fp16"` and the matching `engine_dir`.
+Use `atol=rtol=0.02` as the default FP16 check; the measured
+Qwen2.5-0.5B-Instruct / `static_v2` / TP=2 / batch=1 configuration needs
+`atol=0.08, rtol=0.02`. The FP32 snippet uses `atol=0.001, rtol=0.0001`:
+FP32 reduces rounding differences but does not guarantee identical logits.
+The numerical tolerance does not require identical next-token choices, which
+are reported separately. Export and load do not take tolerance arguments.
 
-The pretrained Qwen2.5-0.5B-Instruct experiment used B300 GPUs, TensorRT 11.3.0.99,
-PyTorch 2.15.0.dev20261005+cu130, Transformers 5.14.1, TP=2, batch size 1 and
-`static_v2`. Six prompts were checked for 64 decoding steps and four for 128
-steps (896 contexts), plus eight steps from the original synthetic token input
-`[4, 5, 6, 7]`. FP32 replay used the same token histories as the FP16 experiment,
-so the input context at every comparison was identical. Each precision was
-compared with a full eager reference at that precision; results agreed across
-both TP ranks, which are counted once in this table.
+#### Precision findings
 
-| TRT versus full eager reference | Largest absolute logit difference | Matching next-token choices |
+Settings: pretrained Qwen2.5-0.5B-Instruct, B300 GPUs, TensorRT 11.3.0.99,
+PyTorch 2.15.0.dev20261005+cu130, Transformers 5.14.1, TP=2, batch size 1,
+`static_v2`. We compared 904 contexts: six prompts x 64 steps, four x 128 steps,
+and eight steps from synthetic tokens `[4, 5, 6, 7]`. FP32 replay used the same
+input histories as FP16; matching results across the two ranks are counted once.
+
+**TRT versus full eager reference**
+
+Each TRT engine was compared with eager PyTorch at the same precision.
+
+| Precision | Largest absolute logit difference | Matching next-token choices |
 |---|---:|---:|
 | FP16 autocast | 0.0805664 | 902 / 904 |
 | FP32 | 0.0006111 | 904 / 904 |
 
-Matching next-token choices means the same token had the highest score; it does
-not mean the logit tensors were identical. For example, in the code prompt the
-FP32 eager score for `dictionary` was 18.762611, while FP32 TRT scored it
-18.762600. Both selected `dictionary`, despite the small numerical difference.
+The FP32 token choices all matched, while the logits still differed slightly.
 
-The two FP16 mismatches occurred when the full FP16 reference's highest scores
-were tied. Replaying those contexts in FP32 gave the following choices:
+**Prompt and generated text**
+
+The FP16 eager reference's top scores tied at the two differing positions:
 
 | Prompt and generated text before the differing token | FP16 eager | FP16 TRT | FP32 eager and TRT |
 |---|---|---|---|
 | Implement an LRU cache: "This implementation uses a ..." | `list` | `dictionary` | `dictionary` |
 | Plan a library schedule: "a reading event for children from 3 PM to ..." | `5` | `6` | `6` |
 
-Thus FP16 TRT matched the FP32 reference at both disputed positions. This does
-not establish factual answer correctness: for example, the library prompt gave
-the event's start time but did not specify its ending time. Logit closeness and
-next-token agreement measure numerical behavior, not free-running answer quality.
-
-Fresh FP32 export, separate-process reload and accuracy checks passed for the
-pretrained Qwen model. Small randomly initialized Llama and Qwen3 fixtures also
-passed FP32 export/load/accuracy checks; these do not establish accuracy for
-pretrained Llama or larger Qwen checkpoints. The default FP16 path passed the
-same checks on the small Qwen3 fixture.
+FP16 TRT matched both FP32 implementations at those positions. These comparisons
+measure numerical agreement; the library prompt did not specify the event's
+ending time, so matching `6` does not establish factual correctness.
 
 ### Quantization
 
