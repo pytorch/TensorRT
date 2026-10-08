@@ -75,7 +75,6 @@ class TestCrossConverter(DispatchTestCase):
         self.run_test(
             Cross(),
             inputs,
-            precision=torch.half,
             use_dynamo_tracer=True,
         )
 

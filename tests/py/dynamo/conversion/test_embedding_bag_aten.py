@@ -149,7 +149,6 @@ class TestEmbeddingBagConverter(DispatchTestCase):
         self.run_test(
             TestEmbeddingBag(),
             inputs=[weight, indices],
-            precision=weight.dtype,
             enable_passes=True,
             propagate_shapes=True,
             immutable_weights=True,
@@ -348,7 +347,6 @@ class TestEmbeddingBagConverter(DispatchTestCase):
         self.run_test(
             TestEmbeddingBag(),
             inputs=[weight, indices, offsets],
-            precision=weight.dtype,
             enable_passes=True,
             propagate_shapes=True,
             immutable_weights=True,
@@ -413,7 +411,6 @@ class TestEmbeddingBagConverter(DispatchTestCase):
         self.run_test(
             TestEmbeddingBag(),
             inputs=[weight, indices, offsets],
-            precision=weight.dtype,
             enable_passes=True,
             propagate_shapes=True,
             immutable_weights=True,
