@@ -142,14 +142,35 @@ def unified_dtype_converter(
         raise TypeError("%s is not a supported dtype" % dtype)
 
 
-def deallocate_module(module: torch.fx.GraphModule) -> None:
+def deallocate_module(
+    module: torch.nn.Module, release_every_bytes: int = 1 << 30
+) -> None:
+    """Move ``module``'s parameters and buffers to the CPU and release their GPU memory.
+
+    ``module.to("cpu")`` leaves every freed block in PyTorch's CUDA cache until it
+    returns, so for the length of the move the process holds both the GPU and the CPU
+    copy of the weights. On unified memory systems those come out of the same DRAM.
+    Instead the cache is emptied each time ``release_every_bytes`` have moved, so the
+    GPU copy shrinks as the CPU copy grows.
     """
-    This is a helper function to delete the instance of module. We first move it to CPU and then
-    delete the object. This function ensures the GPU memory occupied by the module is released effectively after this call
-    """
-    module.to(CPU_DEVICE)
-    torch.cuda.empty_cache()
+    moved_since_release = 0
+
+    def to_cpu(t: torch.Tensor) -> torch.Tensor:
+        nonlocal moved_since_release
+        if t.device.type == "cuda":
+            # The tensor moved before this one has already been rebound to its CPU
+            # copy, so its GPU block is free by now.
+            if moved_since_release >= release_every_bytes:
+                torch.cuda.empty_cache()
+                moved_since_release = 0
+            # Only paces the releases; sparse and other layouts don't define nbytes.
+            moved_since_release += t.nbytes if t.layout == torch.strided else 0
+        return t.to(CPU_DEVICE)
+
+    # Same conversion as ``module.to(CPU_DEVICE)``, which is ``_apply`` with a ``.to``.
+    module._apply(to_cpu)
     gc.collect()
+    torch.cuda.empty_cache()
 
 
 def pin_torch_executed_state(module: torch.nn.Module, device: torch.device) -> None:
