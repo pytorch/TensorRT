@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import torch
-import torch.nn as nn
 from lerobot.policies.pi05.modeling_pi05 import make_att_2d_masks
 
 
@@ -223,15 +222,6 @@ def make_pi05_suffix_position_and_mask(core, prefix_pad_masks, x_t, device):
     prefix_offsets = torch.sum(prefix_pad_masks, dim=-1)[:, None]
     position_ids = prefix_offsets + torch.cumsum(suffix_pad_masks, dim=1) - 1
     return position_ids, attention_mask
-
-
-def _core(model: nn.Module) -> nn.Module:
-    if hasattr(model, "paligemma_with_expert"):
-        return model
-    inner = getattr(model, "model", None)
-    if isinstance(inner, nn.Module) and hasattr(inner, "paligemma_with_expert"):
-        return inner
-    raise RuntimeError("PI05 spec expected a policy or paligemma_with_expert module")
 
 
 def _nchw_to_hwc(pixel_values):
