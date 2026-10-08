@@ -6,14 +6,17 @@ from typing import Any
 
 import torch
 import torch_tensorrt
-from torch_tensorrt.hf.exporters.ops import _as_tuple, record_engine
-from torch_tensorrt.hf.exporters.spec import ComponentBundle
+
+from .measure import cuda_ms, parity
+from .ops import _as_tuple, record_engine
+from .spec import ComponentBundle
 
 DEFAULT_TRT_SETTINGS: dict[str, Any] = {
     "min_block_size": 1,
     "require_full_compilation": True,
     "immutable_weights": True,
     "disable_tf32": True,
+    "truncate_double": True,
 }
 
 _TRT_COMPILE_KEYS = frozenset(DEFAULT_TRT_SETTINGS) | {
@@ -33,6 +36,7 @@ def compile_component(
     engine_dir: Path,
     dryrun: bool = False,
     trt_settings: dict[str, Any] | None = None,
+    bench: dict[str, tuple[float, float]] | None = None,
 ) -> tuple[str, tuple[torch.Tensor, ...]]:
     """Export one component, compile it, write ``engine_dir/<name>/``.
 
@@ -42,7 +46,7 @@ def compile_component(
     Family setattr is owned by ``EdgeSpec.apply_patches``, not this helper.
     ``dryrun`` records the patched eager module for ``execute_engine``.
     """
-    from torch_tensorrt.hf.exporters.plugin.attn_patches import (
+    from .plugin.attn_patches import (
         set_language_mask_type,
     )
 
@@ -89,6 +93,22 @@ def compile_component(
             arg_inputs=trace_args,
             **settings,
         )
+
+        with torch.no_grad():
+            trt_out = _as_tuple(compiled(*execute_args))
+        for i, (eager_t, trt_t) in enumerate(zip(outputs, trt_out)):
+            if not isinstance(eager_t, torch.Tensor) or not isinstance(
+                trt_t, torch.Tensor
+            ):
+                continue
+            label = name if i == 0 else f"{name}[{i}]"
+            parity(f"{label} A vs C (TRT)", eager_t, trt_t)
+
+        eager_ms = cuda_ms(lambda: module(*execute_args))
+        trt_ms = cuda_ms(lambda: compiled(*execute_args))
+        if bench is not None:
+            bench[name] = (eager_ms, trt_ms)
+
         record_engine(
             engine_path,
             component=name,
@@ -111,7 +131,7 @@ def compile_component(
         return engine_path, outputs
     finally:
         if not dryrun and patched is not None:
-            from torch_tensorrt.hf.exporters.plugin.plugin_utils import (
+            from .plugin.plugin_utils import (
                 restore_attention,
             )
 
