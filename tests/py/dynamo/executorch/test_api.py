@@ -368,6 +368,10 @@ _RUNTIME_INIT_PY = (
     _REPO_ROOT
     / "py/torch-tensorrt-executorch-runtime/torch_tensorrt_executorch_runtime/__init__.py"
 )
+_TENSORRT_CMAKE_FINDER = _REPO_ROOT / "cmake/Modules/FindTensorRT.cmake"
+_DRIVE_CUDA_REPOSITORY_RULE = _REPO_ROOT / "toolchains/drive_cuda_repository.bzl"
+_MODULE_BAZEL = _REPO_ROOT / "MODULE.bazel"
+_BAZELRC = _REPO_ROOT / ".bazelrc"
 
 # The RUNPATH the build declares, TORCH_TENSORRT_DELEGATE_RUNPATH in native/CMakeLists.txt joined
 # with ':'. Production hands this to the guard as its fourth argument, which selects the
@@ -1976,6 +1980,10 @@ def _setup_tree():
     return ast.parse(_SETUP_PY.read_text(encoding="utf-8"))
 
 
+def _runtime_setup_tree():
+    return ast.parse(_RUNTIME_SETUP_PY.read_text(encoding="utf-8"))
+
+
 def _assignment_value(tree, name):
     for node in tree.body:
         if isinstance(node, ast.Assign) and any(
@@ -1991,6 +1999,15 @@ def _function_def(tree, name):
         if isinstance(node, ast.FunctionDef) and node.name == name:
             return node
     raise AssertionError(f"Could not find function {name}")
+
+
+def _class_method_def(tree, class_name, method_name):
+    for node in tree.body:
+        if isinstance(node, ast.ClassDef) and node.name == class_name:
+            for member in node.body:
+                if isinstance(member, ast.FunctionDef) and member.name == method_name:
+                    return member
+    raise AssertionError(f"Could not find {class_name}.{method_name}")
 
 
 @pytest.mark.unit
@@ -2481,6 +2498,7 @@ def test_packaging_declares_executorch_extra():
 def test_executorch_is_not_base_install_requirement():
     tree = _setup_tree()
     for function_name in (
+        "get_driveos_requirements",
         "get_jetpack_requirements",
         "get_sbsa_requirements",
         "get_x86_64_requirements",
@@ -2491,6 +2509,182 @@ def test_executorch_is_not_base_install_requirement():
             isinstance(node, ast.Name) and node.id == "EXECUTORCH_REQUIREMENT"
             for node in ast.walk(function)
         )
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("installed", "expected_tensorrt"),
+    [
+        # Actual TensorRT distribution versions; this is not a compatibility matrix.
+        ("10.16.1.11", "10.16.1.11"),
+        ("10.16.2.12", "10.16.2.12"),
+        ("11.3.0.99", "11.3.0.99"),
+        # Synthetic metadata only: check local-suffix stripping, not a real release.
+        pytest.param(
+            "10.16.1.11+test.1",
+            "10.16.1.11",
+            id="synthetic-local-version",
+        ),
+    ],
+)
+def test_driveos_packaging_pins_installed_tensorrt(
+    monkeypatch, installed, expected_tensorrt
+):
+    function = _function_def(_setup_tree(), "get_driveos_requirements")
+    queries = []
+
+    def installed_version(name):
+        queries.append(name)
+        assert name == "tensorrt"
+        return installed
+
+    monkeypatch.setattr(importlib.metadata, "version", installed_version)
+    namespace = {
+        "importlib": importlib,
+        "IS_DLFW_CI": False,
+    }
+    exec(
+        compile(ast.Module(body=[function], type_ignores=[]), "<setup.py>", "exec"),
+        namespace,
+    )
+
+    requirements = namespace["get_driveos_requirements"](["base"])
+    assert requirements == [
+        "base",
+        "numpy",
+        "torch>=2.15.0.dev,<2.16.0",
+        f"tensorrt=={expected_tensorrt}",
+    ]
+    assert queries == ["tensorrt"]
+
+
+@pytest.mark.unit
+def test_driveos_packaging_requires_installed_tensorrt(monkeypatch):
+    function = _function_def(_setup_tree(), "get_driveos_requirements")
+
+    def missing_version(name):
+        raise importlib.metadata.PackageNotFoundError(name)
+
+    monkeypatch.setattr(importlib.metadata, "version", missing_version)
+    namespace = {"importlib": importlib, "IS_DLFW_CI": False}
+    exec(
+        compile(ast.Module(body=[function], type_ignores=[]), "<setup.py>", "exec"),
+        namespace,
+    )
+
+    with pytest.raises(RuntimeError, match="--no-build-isolation"):
+        namespace["get_driveos_requirements"](["base"])
+
+    # DLFW CI keeps managing these dependencies separately, as before.
+    namespace["IS_DLFW_CI"] = True
+    assert namespace["get_driveos_requirements"](["base"]) == ["base", "numpy"]
+
+
+@pytest.mark.unit
+def test_runtime_wheel_uses_platform_tensorrt_on_driveos():
+    function = _function_def(_runtime_setup_tree(), "tensorrt_distribution")
+    namespace = {
+        "TARGET_PLATFORM": "driveos",
+    }
+    exec(
+        compile(ast.Module(body=[function], type_ignores=[]), "<setup.py>", "exec"),
+        namespace,
+    )
+
+    assert namespace["tensorrt_distribution"]() == "tensorrt"
+    namespace["TARGET_PLATFORM"] = ""
+    assert namespace["tensorrt_distribution"]() == "tensorrt-cu13"
+
+
+@pytest.mark.unit
+def test_driveos_packaging_selects_driveos_bazel_config():
+    source = ast.unparse(_function_def(_setup_tree(), "build_libtorchtrt_cxx11_abi"))
+    assert "cmd.append('--config=driveos')" in source
+
+
+@pytest.mark.unit
+def test_driveos_sdk_discovery_has_no_absolute_path_dependency():
+    cuda_rule = _DRIVE_CUDA_REPOSITORY_RULE.read_text()
+    assert 'ctx.os.environ.get("TORCHTRT_DRIVE_CUDA_ROOT"' in cuda_rule
+    assert 'ctx.os.environ.get("TORCHTRT_DRIVE_CUDA_LIB_DIR"' in cuda_rule
+    assert "/usr/local/cuda" not in cuda_rule
+    assert '"libcudart.so.13"' in cuda_rule
+
+    module = _MODULE_BAZEL.read_text()
+    assert 'name = "cuda"' in module
+    assert 'name = "cuda_driveos"' in module
+    assert '"//toolchains:drive_cuda_repository.bzl"' in module
+
+    bazelrc = _BAZELRC.read_text()
+    assert "build:driveos --//toolchains/dep_collection:compute_libs=driveos" in bazelrc
+
+    tensorrt_finder = _TENSORRT_CMAKE_FINDER.read_text()
+    assert "ENV{TORCHTRT_TENSORRT_ROOT}" in tensorrt_finder
+    assert "${CMAKE_LIBRARY_ARCHITECTURE}" in tensorrt_finder
+    assert 'PATHS "/usr"' not in tensorrt_finder
+
+
+@pytest.mark.unit
+def test_runtime_wheel_selects_driveos_bazel_config():
+    source = ast.unparse(
+        _class_method_def(_runtime_setup_tree(), "BazelBuild", "_build")
+    )
+    assert "build_config = 'driveos' if TARGET_PLATFORM == 'driveos' else 'linux'" in source
+
+
+@pytest.mark.unit
+def test_tensorrt_cmake_finder_parses_enterprise_version_macros(tmp_path):
+    cmake = shutil.which("cmake")
+    if cmake is None:
+        pytest.skip("CMake is required to exercise FindTensorRT.cmake")
+
+    tensorrt_root = tmp_path / "tensorrt"
+    include_dir = tensorrt_root / "include"
+    library_dir = tensorrt_root / "lib"
+    include_dir.mkdir(parents=True)
+    library_dir.mkdir()
+    (include_dir / "NvInfer.h").write_text(
+        '#include "NvInferVersion.h"\n', encoding="utf-8"
+    )
+    (include_dir / "NvInferVersion.h").write_text(
+        "\n".join(
+            (
+                "#define TRT_MAJOR_ENTERPRISE 10",
+                "#define TRT_MINOR_ENTERPRISE 16",
+                "#define TRT_PATCH_ENTERPRISE 1",
+                "#define NV_TENSORRT_MAJOR TRT_MAJOR_ENTERPRISE",
+                "#define NV_TENSORRT_MINOR TRT_MINOR_ENTERPRISE",
+                "#define NV_TENSORRT_PATCH TRT_PATCH_ENTERPRISE",
+            )
+        ),
+        encoding="utf-8",
+    )
+    (library_dir / "libnvinfer.so").touch()
+
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    (project_dir / "CMakeLists.txt").write_text(
+        "\n".join(
+            (
+                "cmake_minimum_required(VERSION 3.18)",
+                "project(test_find_tensorrt LANGUAGES NONE)",
+                f'list(PREPEND CMAKE_MODULE_PATH "{_REPO_ROOT / "cmake/Modules"}")',
+                f'set(TensorRT_ROOT "{tensorrt_root}")',
+                "find_package(TensorRT 10.16.1 EXACT REQUIRED)",
+                'file(WRITE "${CMAKE_BINARY_DIR}/version.txt" "${TensorRT_VERSION_STRING}")',
+            )
+        ),
+        encoding="utf-8",
+    )
+
+    build_dir = tmp_path / "build"
+    subprocess.run(
+        [cmake, "-S", str(project_dir), "-B", str(build_dir)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert (build_dir / "version.txt").read_text(encoding="utf-8") == "10.16.1"
 
 
 @pytest.mark.unit

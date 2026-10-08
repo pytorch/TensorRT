@@ -85,6 +85,19 @@ new_local_repository(
     path = "/usr/local/cuda-13.4/",
 )
 
+# DRIVE exposes common and Thor-specific headers under one injected CUDA root,
+# but does not necessarily ship an unversioned libcudart development symlink.
+# Keep that non-conventional layout isolated from the default @cuda repository.
+drive_cuda_repository = use_repo_rule(
+    "//toolchains:drive_cuda_repository.bzl",
+    "drive_cuda_repository",
+)
+
+drive_cuda_repository(
+    name = "cuda_driveos",
+    build_file = "@//third_party/cuda/driveos:BUILD",
+)
+
 # for Jetson
 # These versions can be selected using the flag `--//toolchains/dep_collection:compute_libs="jetpack"`
 new_local_repository(
@@ -236,6 +249,17 @@ http_archive(
     urls = [
         "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/11.3.0/tars/TensorRT-Enterprise-11.3.0.99-Linux-aarch64-cuda-13.4-Release-external.tar.zst",
     ],
+)
+
+# DRIVE builds must use the target SDK, never the normal SBSA archive.
+drive_tensorrt_repository = use_repo_rule(
+    "//toolchains:drive_tensorrt_repository.bzl",
+    "drive_tensorrt_repository",
+)
+
+drive_tensorrt_repository(
+    name = "tensorrt_driveos",
+    build_file = "@//third_party/tensorrt/local:BUILD",
 )
 
 http_archive(
