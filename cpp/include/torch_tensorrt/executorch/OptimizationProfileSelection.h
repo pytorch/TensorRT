@@ -17,6 +17,8 @@
 #include <NvInfer.h>
 
 #include <cstdint>
+#include <limits>
+#include <type_traits>
 #include <vector>
 
 namespace torch_tensorrt {
@@ -87,6 +89,27 @@ enum class ProfileSelection {
   /// @brief Auto-selection ran out of profiles.
   kNoProfileMatchesInputs,
 };
+
+/**
+ * @brief Narrows any integer spelling of a profile index to int32_t.
+ *
+ * An index outside the int32_t range becomes -1, which no engine has, so it is
+ * rejected like any other missing index instead of wrapping onto a real profile
+ * (int64_t{1} << 32 would otherwise pin profile 0).
+ *
+ * @param index The index as the caller computed it.
+ * @return The same index, or -1 when it does not fit.
+ */
+template <typename T>
+constexpr int32_t to_profile_index(T index) {
+  static_assert(std::is_integral_v<T> && !std::is_same_v<std::remove_cv_t<T>, bool>);
+  constexpr auto kMax = std::numeric_limits<int32_t>::max();
+  if constexpr (std::is_signed_v<T>) {
+    return index >= std::numeric_limits<int32_t>::min() && index <= kMax ? static_cast<int32_t>(index) : -1;
+  } else {
+    return index <= static_cast<std::make_unsigned_t<int32_t>>(kMax) ? static_cast<int32_t>(index) : -1;
+  }
+}
 
 /**
  * @brief Whether one input shape falls inside one profile's envelope.
