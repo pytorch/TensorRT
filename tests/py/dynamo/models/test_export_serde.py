@@ -627,6 +627,13 @@ def test_arange_export(ir, tmpdir):
             msg=f"test_arange_export deserialized TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
         )
 
+    # Returned constructor values must have fresh storage on each invocation,
+    # including after serialization of a constant-only TRT partition.
+    for module in (trt_module, deser_trt_module):
+        first = module(input)
+        first.zero_()
+        torch.testing.assert_close(module(input), outputs_pyt, rtol=0, atol=0)
+
 
 @pytest.mark.unit
 def test_save_load_ts(ir, tmp_path):

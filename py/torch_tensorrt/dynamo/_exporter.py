@@ -953,11 +953,10 @@ def inline_trt_modules(
         # Get the TRT submodule
         trt_module = getattr(gm, name)
 
-        # Ensure the trt module node in the main graph (gm) has inputs
+        # Constant-only TRT partitions can have zero runtime inputs.
         trt_module_node = [node for node in gm.graph.nodes if node.name == name]
         assert trt_module_node
         trt_module_node = trt_module_node[0]
-        assert trt_module_node.args
 
         if "val" not in trt_module_node.meta:
             raise ValueError(
