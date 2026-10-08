@@ -51,6 +51,9 @@ class TensorRTBlobMetadata:
     device_id: int = 0
     serialized_metadata: str = ""
     target_platform: str = ""
+    # Named-data key of the engine when it is stored outside the blob, which then
+    # carries an empty engine. Empty means the engine follows the metadata inline.
+    engine_key: str = ""
 
     def to_json(self) -> bytes:
         # Keep field order stable because the C++ parser is intentionally small.
@@ -80,6 +83,8 @@ class TensorRTBlobMetadata:
             "serialized_metadata": self.serialized_metadata,
             "target_platform": self.target_platform,
         }
+        if self.engine_key:
+            data["engine_key"] = self.engine_key
         return json.dumps(data, separators=(",", ":")).encode("utf-8")
 
     @classmethod
@@ -103,6 +108,7 @@ class TensorRTBlobMetadata:
             device_id=parsed.get("device_id", 0),
             serialized_metadata=parsed.get("serialized_metadata", ""),
             target_platform=parsed.get("target_platform", ""),
+            engine_key=parsed.get("engine_key", ""),
         )
 
 

@@ -759,6 +759,23 @@ TEST(ExecuTorchTensorRTBlobHeader, RejectsUnknownFutureMagic) {
   EXPECT_FALSE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
 }
 
+TEST(ExecuTorchTensorRTBlobHeader, ReadsTheEngineKeyOfAnEngineStoredAsNamedData) {
+  const std::string bindings = R"({"io_bindings":[{"name":"x","is_input":true}],)";
+  const auto blob = make_blob(bindings + R"("engine_key":"tensorrt_engine_ab"})", 0);
+  TensorRTBlobHeader header;
+  ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
+  EXPECT_EQ(header.engine_key, "tensorrt_engine_ab");
+  EXPECT_EQ(header.engine_size, 0u);
+
+  // Inline and named at once leaves one of the two engines unread, and neither leaves none to load.
+  const auto both = make_blob(bindings + R"("engine_key":"tensorrt_engine_ab"})", 4);
+  EXPECT_FALSE(TensorRTBlobHeader::parse(both.data(), both.size(), header));
+  const auto neither = make_blob(VALID_METADATA, 0);
+  EXPECT_FALSE(TensorRTBlobHeader::parse(neither.data(), neither.size(), header));
+  const auto empty_key = make_blob(bindings + R"("engine_key":""})", 0);
+  EXPECT_FALSE(TensorRTBlobHeader::parse(empty_key.data(), empty_key.size(), header));
+}
+
 } // namespace
 } // namespace executorch_backend
 } // namespace torch_tensorrt
