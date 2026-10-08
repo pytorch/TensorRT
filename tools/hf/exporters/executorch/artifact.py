@@ -182,3 +182,63 @@ def build_language_artifact(
         trt_blob=serialize_engine(engine_bytes, trt_metadata),
         edge_metadata_json=edge_metadata.to_json(),
     )
+
+
+def build_action_artifact(
+    engine_dir: str | Path,
+    *,
+    device_id: int = 0,
+) -> EdgeExecuTorchArtifact:
+    component_dir = Path(engine_dir)
+    config_path = component_dir / "config.json"
+    try:
+        config = json.loads(config_path.read_text())
+        if config["component"] != "action" or config["model_type"] != "action":
+            raise ValueError(
+                "Action artifact requires component='action' and model_type='action'"
+            )
+        input_names = list(config["input_names"])
+        output_names = list(config["output_names"])
+        outputs = list(config["outputs"])
+        engine_file = str(config["engine_file"])
+    except (FileNotFoundError, json.JSONDecodeError, KeyError, TypeError) as exc:
+        raise ValueError(f"Invalid Edge action config at {config_path}") from exc
+
+    if len(input_names) != 6 or len(output_names) != 1 or len(outputs) != 1:
+        raise ValueError(
+            "PI0.5 action-step artifact requires six inputs and one output"
+        )
+
+    output_spec = EdgeOutputSpec.from_dict(
+        {
+            "shape": outputs[0]["shape"],
+            "dtype": _dtype_name(outputs[0]["dtype"]),
+        }
+    )
+    bindings = [TensorRTIOBinding(name=name, is_input=True) for name in input_names]
+    bindings.append(
+        TensorRTIOBinding(
+            name=output_names[0],
+            dtype=output_spec.dtype,
+            shape=list(output_spec.shape),
+            is_input=False,
+        )
+    )
+    edge_metadata = EdgeComponentMetadata(
+        component="action",
+        runner="flow_step",
+        outputs=(output_spec,),
+        runner_config={
+            "model_type": "action",
+            "chunk_size": config.get("chunk_size"),
+            "max_action_dim": config.get("max_action_dim"),
+        },
+    )
+    engine_bytes = (component_dir / engine_file).read_bytes()
+    return EdgeExecuTorchArtifact(
+        trt_blob=serialize_engine(
+            engine_bytes,
+            TensorRTBlobMetadata(io_bindings=bindings, device_id=device_id),
+        ),
+        edge_metadata_json=edge_metadata.to_json(),
+    )

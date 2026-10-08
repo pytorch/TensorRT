@@ -103,4 +103,18 @@ if(TORCHTRT_BUILD_EDGE_LLM_EXECUTORCH_BACKEND)
       executorch::backend_tensorrt
       torchtrt::edge_llm_executorch_backend
       CUDA::cudart)
+
+  add_executable(
+    edge_llm_action_loop_check
+    edge_llm_action_loop_check.cpp)
+  target_link_libraries(
+    edge_llm_action_loop_check
+    PRIVATE
+      executorch
+      executorch::backends
+      executorch::extensions
+      executorch::kernels
+      executorch::backend_tensorrt
+      torchtrt::edge_llm_executorch_backend
+      CUDA::cudart)
 endif()
