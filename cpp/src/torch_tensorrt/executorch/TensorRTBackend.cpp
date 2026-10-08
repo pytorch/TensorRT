@@ -90,6 +90,7 @@ void TRTLogger::log(Severity severity, const char* msg) noexcept {
 EngineHandle::EngineHandle() = default;
 
 EngineHandle::~EngineHandle() {
+  const std::shared_lock<std::shared_mutex> capture_lock(cuda_graph_capture_mutex());
   // Freeing runs on the engine's device. Borrowed rather than selected outright,
   // because this can run from arena teardown on a thread that was working
   // elsewhere, and a destructor has no way to report a failure.
@@ -126,6 +127,7 @@ nvinfer1::IRuntime* TensorRTBackend::shared_runtime() {
   const std::lock_guard<std::mutex> lock(mutex);
   // Retried while null, so one transient failure does not disable the backend for the process.
   if (runtime == nullptr) {
+    const std::shared_lock<std::shared_mutex> capture_lock(cuda_graph_capture_mutex());
     if (logger == nullptr) {
       logger = new TRTLogger();
     }
@@ -1121,19 +1123,22 @@ Result<DelegateHandle*> TensorRTBackend::init(
   const void* engine_data = TensorRTBlobHeader::engine_data(processed->data(), header);
   const bool share = !share_spec.ok() || share_spec.get();
   Error err;
-  if (share) {
-    err =
-        acquire_shared_engine(*runtime, engine_data, header.engine_size, handle->device_id, ws_request, handle->engine);
-  } else {
-    err = load_engine(*runtime, engine_data, header.engine_size, ws_request, handle->engine);
-  }
-  if (err != Error::Ok) {
-    return err;
-  }
+  {
+    const std::shared_lock<std::shared_mutex> capture_lock(cuda_graph_capture_mutex());
+    if (share) {
+      err = acquire_shared_engine(
+          *runtime, engine_data, header.engine_size, handle->device_id, ws_request, handle->engine);
+    } else {
+      err = load_engine(*runtime, engine_data, header.engine_size, ws_request, handle->engine);
+    }
+    if (err != Error::Ok) {
+      return err;
+    }
 
-  err = initialize_engine_io(*handle);
-  if (err != Error::Ok) {
-    return err;
+    err = initialize_engine_io(*handle);
+    if (err != Error::Ok) {
+      return err;
+    }
   }
 
   // Map each aliased output binding to the index of the input it aliases so

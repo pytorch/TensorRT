@@ -9,12 +9,16 @@
 #include <cuda_runtime.h>
 #include <executorch/runtime/core/error.h>
 
+#include <shared_mutex>
 #include <vector>
 
 namespace torch_tensorrt {
 namespace executorch_backend {
 
 struct EngineHandle;
+
+// Loads and destruction share this lock; only the capture window takes it exclusively.
+std::shared_mutex& cuda_graph_capture_mutex();
 
 // enqueueV3, logging the error the delegate reports when TensorRT refuses the enqueue.
 ::executorch::runtime::Error enqueue_plain(nvinfer1::IExecutionContext& context, cudaStream_t stream);

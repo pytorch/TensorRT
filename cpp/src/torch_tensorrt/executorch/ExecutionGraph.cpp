@@ -17,9 +17,13 @@ namespace executorch_backend {
 
 using namespace ::executorch::runtime;
 
+std::shared_mutex& cuda_graph_capture_mutex() {
+  // Handles can outlive other static objects during process teardown.
+  static auto* mutex = new std::shared_mutex();
+  return *mutex;
+}
+
 namespace {
-// A recording also fails when another thread loads or frees an engine at the same moment, so one
-// failure does not turn replay off.
 constexpr int kMaxCaptureAttempts = 3;
 
 bool can_replay_on(cudaStream_t stream) {
@@ -204,15 +208,18 @@ Error ExecutionGraph::enqueue(EngineHandle& handle, cudaStream_t stream, const s
     bool enqueued = true;
     // Only this handle can submit to this stream, so capture cannot absorb another caller's work.
     if (error == cudaSuccess) {
-      error = cudaStreamBeginCapture(capture_stream_, cudaStreamCaptureModeThreadLocal);
-      if (error == cudaSuccess) {
-        enqueued = context.enqueueV3(capture_stream_);
-        error = cudaStreamEndCapture(capture_stream_, &graph);
-        if (error == cudaSuccess && enqueued) {
-          error = cudaGraphInstantiate(&graph_exec_, graph, nullptr, nullptr, 0);
-          if (error != cudaSuccess) {
-            graph_exec_ = nullptr;
-          }
+      {
+        const std::unique_lock<std::shared_mutex> capture_lock(cuda_graph_capture_mutex());
+        error = cudaStreamBeginCapture(capture_stream_, cudaStreamCaptureModeThreadLocal);
+        if (error == cudaSuccess) {
+          enqueued = context.enqueueV3(capture_stream_);
+          error = cudaStreamEndCapture(capture_stream_, &graph);
+        }
+      }
+      if (error == cudaSuccess && enqueued) {
+        error = cudaGraphInstantiate(&graph_exec_, graph, nullptr, nullptr, 0);
+        if (error != cudaSuccess) {
+          graph_exec_ = nullptr;
         }
       }
     }

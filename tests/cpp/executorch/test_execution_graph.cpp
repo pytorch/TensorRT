@@ -1188,27 +1188,111 @@ TEST_F(ExecutionGraphReplayTest, TwoGraphEnginesCaptureIndependentlyOnOneCallerS
   ASSERT_EQ(cudaMemcpyAsync(inputs_[1], input.data(), 64, cudaMemcpyHostToDevice, streams_[0]), cudaSuccess);
   ASSERT_EQ(second.run(inputs_[1], outputs_[1], 2, 8, streams_[0]), Error::Ok);
   CudaCalls calls;
-  size_t overlaps = 0;
+  std::promise<void> started, finished;
+  auto start = started.get_future();
+  auto finish = finished.get_future();
+  std::thread worker;
   calls.during_capture = [&](cudaStream_t first_capture) {
-    std::thread worker([&] {
-      ASSERT_EQ(cudaSetDevice(0), cudaSuccess);
+    worker = std::thread([&, first_capture] {
+      EXPECT_EQ(cudaSetDevice(0), cudaSuccess);
+      started.set_value();
       CudaCalls second_calls;
-      ASSERT_EQ(second.run(inputs_[1], outputs_[1], 2, 8, streams_[0]), Error::Ok);
-      ASSERT_EQ(second_calls.captures.size(), 1u);
-      EXPECT_NE(second_calls.captures.front(), first_capture);
-      EXPECT_NE(second_calls.captures.front(), streams_[0]);
+      EXPECT_EQ(second.run(inputs_[1], outputs_[1], 2, 8, streams_[0]), Error::Ok);
+      EXPECT_EQ(second_calls.captures.size(), 1u);
+      if (!second_calls.captures.empty()) {
+        EXPECT_NE(second_calls.captures.front(), first_capture);
+        EXPECT_NE(second_calls.captures.front(), streams_[0]);
+      }
       EXPECT_EQ(second_calls.launches, std::vector<cudaStream_t>(1, streams_[0]));
       std::vector<float> output(16);
-      ASSERT_EQ(cudaMemcpy(output.data(), outputs_[1], 64, cudaMemcpyDeviceToHost), cudaSuccess);
+      EXPECT_EQ(cudaMemcpy(output.data(), outputs_[1], 64, cudaMemcpyDeviceToHost), cudaSuccess);
       EXPECT_EQ(output, std::vector<float>(16, 101.0f));
-      ++overlaps;
+      finished.set_value();
     });
-    worker.join();
+    EXPECT_EQ(start.wait_for(std::chrono::seconds(30)), std::future_status::ready);
+    EXPECT_EQ(finish.wait_for(std::chrono::milliseconds(50)), std::future_status::timeout);
   };
-  ASSERT_NO_FATAL_FAILURE(compare(plain, first, 0, 2, 8, 2, streams_[0]));
-  EXPECT_EQ(overlaps, 1u);
+  compare(plain, first, 0, 2, 8, 2, streams_[0]);
+  if (worker.joinable()) {
+    worker.join();
+  }
+  EXPECT_EQ(finish.wait_for(std::chrono::seconds(0)), std::future_status::ready);
   EXPECT_EQ(calls.captures.size(), 1u);
   EXPECT_EQ(calls.launches, std::vector<cudaStream_t>(1, streams_[0]));
+}
+
+TEST_F(ExecutionGraphReplayTest, CaptureSerializesWithBackendLoadsAndDestruction) {
+  for (bool share : {false, true}) {
+    SCOPED_TRACE(share);
+    BackendOption options[] = {option(kSharedEnginesKey, share), option(kGraphOption, false)};
+    for (bool destroy : {false, true}) {
+      SCOPED_TRACE(destroy);
+      LoadedGraphEngine graph;
+      ASSERT_NO_FATAL_FAILURE(load_graph(graph));
+      ASSERT_NO_FATAL_FAILURE(compare_default(graph, 0, 2, 8, 1));
+      auto retiring = std::make_unique<LoadedGraphEngine>();
+      ASSERT_EQ(retiring->load(blob_, {}, {options, 2}), Error::Ok);
+      std::promise<void> started, finished;
+      auto start = started.get_future();
+      auto finish = finished.get_future();
+      std::thread worker;
+      CudaCalls calls;
+      calls.during_capture = [&](cudaStream_t) {
+        worker = std::thread([&] {
+          EXPECT_EQ(cudaSetDevice(0), cudaSuccess);
+          started.set_value();
+          if (destroy) {
+            retiring.reset();
+          } else {
+            LoadedGraphEngine loaded;
+            EXPECT_EQ(loaded.load(blob_, {}, {options, 2}), Error::Ok);
+          }
+          finished.set_value();
+        });
+        EXPECT_EQ(start.wait_for(std::chrono::seconds(30)), std::future_status::ready);
+        EXPECT_EQ(finish.wait_for(std::chrono::milliseconds(100)), std::future_status::timeout)
+            << "backend load or destruction overlapped capture";
+      };
+      compare_default(graph, 0, 2, 8, 2);
+      if (worker.joinable()) {
+        worker.join();
+      }
+      ASSERT_EQ(finish.wait_for(std::chrono::seconds(0)), std::future_status::ready);
+      EXPECT_TRUE(graph.is_captured());
+      EXPECT_EQ(calls.captures.size(), 1u);
+    }
+
+    LoadedGraphEngine graph;
+    ASSERT_NO_FATAL_FAILURE(load_graph(graph));
+    const std::vector<float> input(16, 3.0f);
+    ASSERT_EQ(cudaMemcpy(inputs_[0], input.data(), 64, cudaMemcpyHostToDevice), cudaSuccess);
+    std::atomic<bool> started{false};
+    std::atomic<int> loads{0};
+    std::thread churn([&] {
+      EXPECT_EQ(cudaSetDevice(0), cudaSuccess);
+      started.store(true);
+      for (int i = 0; i < 200; ++i) {
+        LoadedGraphEngine loaded;
+        EXPECT_EQ(loaded.load(blob_, {}, {options, 2}), Error::Ok);
+        ++loads;
+      }
+    });
+    while (!started.load()) {
+      std::this_thread::yield();
+    }
+    CudaCalls calls;
+    for (int i = 0; i < 2000; ++i) {
+      const bool square = (i / 2) % 2 != 0;
+      EXPECT_EQ(graph.run(inputs_[0], outputs_[0], square ? 4 : 2, square ? 4 : 8, streams_[0]), Error::Ok);
+      EXPECT_EQ(graph.is_captured(), i % 2 != 0);
+    }
+    churn.join();
+    EXPECT_EQ(loads.load(), 200);
+    EXPECT_EQ(calls.captures.size(), 1000u);
+    std::vector<float> output(16);
+    ASSERT_EQ(cudaMemcpy(output.data(), outputs_[0], 64, cudaMemcpyDeviceToHost), cudaSuccess);
+    EXPECT_EQ(output, std::vector<float>(16, 7.0f));
+  }
 }
 
 TEST_F(ExecutionGraphReplayTest, AllocationFailureUsesCallerBindingsAndSuppressesRetries) {
