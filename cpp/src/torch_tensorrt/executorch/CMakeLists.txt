@@ -299,6 +299,7 @@ if(TORCHTRT_BUILD_EDGE_LLM_EXECUTORCH_BACKEND)
 
     add_library(torchtrt_edge_llm_executorch_backend INTERFACE)
     add_library(torchtrt::edge_llm_executorch_backend ALIAS torchtrt_edge_llm_executorch_backend)
+    add_dependencies(torchtrt_edge_llm_executorch_backend executorch_edge_llm_backend)
     if(MSVC)
         target_link_libraries(torchtrt_edge_llm_executorch_backend
             INTERFACE executorch_edge_llm_backend edgellm_executorch)

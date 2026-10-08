@@ -133,11 +133,14 @@ bool parse_compound(const std::string& json, const char* key, char open, char cl
 
 bool parse_metadata(const std::string& json, EdgeLLMBlobHeader& out) {
   std::string outputs_json;
-  return parse_int(json, "abi_version", out.abi_version) && out.abi_version == SUPPORTED_ABI_VERSION &&
-      parse_string(json, "component", out.component) && out.component == "vision" &&
-      parse_string(json, "runner", out.runner) && out.runner == "vit" &&
-      parse_compound(json, "outputs", '[', ']', outputs_json) && outputs_json != "[]" &&
-      parse_compound(json, "runner_config", '{', '}', out.runner_config_json);
+  if (!parse_int(json, "abi_version", out.abi_version) || out.abi_version != SUPPORTED_ABI_VERSION ||
+      !parse_string(json, "component", out.component) || !parse_string(json, "runner", out.runner) ||
+      !parse_compound(json, "outputs", '[', ']', outputs_json) || outputs_json == "[]" ||
+      !parse_compound(json, "runner_config", '{', '}', out.runner_config_json)) {
+    return false;
+  }
+  return (out.component == "vision" && out.runner == "vit") ||
+      (out.component == "language" && out.runner == "llm_prefill");
 }
 
 } // namespace
