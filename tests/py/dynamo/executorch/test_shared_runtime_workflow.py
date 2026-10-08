@@ -632,17 +632,16 @@ def test_the_delegate_lane_narrows_the_matrix_to_cuda_13_rows() -> None:
         return {row["desired_cuda"] for row in json.loads(result.stdout)["include"]}
 
     rows = [
-        {"desired_cuda": cuda, "python_version": "3.10", "gpu_arch_type": "cuda"}
+        {"desired_cuda": cuda, "python_version": "3.11", "gpu_arch_type": "cuda"}
         for cuda in ("cu126", "cu132", "cu134")
     ]
     assert kept(rows, "--executorch-runtime") == {"cu132", "cu134"}
-    # A row the other rules keep, so only the flag can drop it. Every row those rules keep on x86
-    # and on Arm is already CUDA 13, so the assertion above held with the flag's branch deleted and
-    # could not see it.
+    # JetPack 6.2's Python 3.10 rows are below the supported Python minimum,
+    # even without the CUDA 13 restriction for the ExecuTorch delegate.
     jetpack = [
         {"desired_cuda": "cu126", "python_version": "3.10", "gpu_arch_type": "cuda"}
     ]
-    assert kept(jetpack, "--jetpack", "true") == {"cu126"}
+    assert kept(jetpack, "--jetpack", "true") == set()
     assert kept(jetpack, "--jetpack", "true", "--executorch-runtime") == set()
 
 

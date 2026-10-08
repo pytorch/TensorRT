@@ -9,12 +9,22 @@ import re
 import sys
 from typing import Any, Dict, List
 
-# TensorRT does not yet support free-threaded Python 3.13+ or Python 3.15.
-disabled_python_versions: List[str] = ["3.13t", "3.14t", "3.15", "3.15t"]
+# Python versions below 3.11 are unsupported. TensorRT also excludes free-threaded
+# Python 3.13+ and Python 3.15.
+disabled_python_versions: List[str] = [
+    "3.8",
+    "3.9",
+    "3.10",
+    "3.13t",
+    "3.14t",
+    "3.15",
+    "3.15t",
+]
 disabled_cuda_versions: List[str] = []
 
-# jetpack 6.2 only officially supports python 3.10 and cu126
-jetpack_python_versions: List[str] = ["3.10"]
+# JetPack 6.2's Python 3.10 build is below our minimum supported version.
+# Keep this lane disabled until it has a supported Python interpreter.
+jetpack_python_versions: List[str] = []
 jetpack_cuda_versions: List[str] = ["cu126"]
 # CUDA 13 wheels are supported on x86_64 and Arm, including Windows Arm/AArch64.
 x86_cuda_versions: List[str] = ["cu132", "cu134"]
@@ -79,8 +89,6 @@ def filter_matrix_item(
         # Skipping disabled CUDA version
         return False
     if is_jetpack:
-        # pr build,matrix passed from test-infra is cu126,cu128 and cu130, python 3.10, filter to cu126, python 3.10
-        # nightly/main build, matrix passed from test-infra is cu126, cu128 and cu130, all python versions, filter to cu126, python 3.10
         if (
             item["python_version"] in jetpack_python_versions
             and item["desired_cuda"] in jetpack_cuda_versions

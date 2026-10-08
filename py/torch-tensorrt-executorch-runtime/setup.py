@@ -429,7 +429,7 @@ setup(
     cmdclass={"build_py": BazelBuild, "bdist_wheel": WheelTag},
     # Capped for the same reason the main manifest is: the pinned ExecuTorch ships no wheel
     # above 3.14, so declaring support past it promises something that cannot resolve.
-    python_requires=">=3.10,<3.15",
+    python_requires=">=3.11,<3.15",
     # Exactly what the delegate library links, and nothing else. Each of these three is an ABI
     # question: the shared object names libexecutorch, libnvinfer and libcudart in its own headers,
     # so a different build of any of them is a different binary contract, and the local label is the

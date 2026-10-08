@@ -21,7 +21,7 @@ torchrun --nproc_per_node=2 tensor_parallel_llama2.py
 
  apt install libopenmpi-dev
 
- #For python3.10
+ #For python3.11
 
  pip install tensorrt-llm
 
@@ -39,7 +39,7 @@ torchrun --nproc_per_node=2 tensor_parallel_llama2.py
 
  apt install libopenmpi-dev
 
-#For python3.10
+#For python3.11
 
  pip install tensorrt-llm
 
