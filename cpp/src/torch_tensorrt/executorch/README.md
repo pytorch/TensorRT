@@ -3,6 +3,7 @@
 This package is included in `libtorchtrt.tar.gz` as
 `torch_tensorrt/src/torch_tensorrt/executorch/`. It builds the TensorRT
 backend delegate for ExecuTorch from source.
+Building this backend requires CUDA Toolkit 12.5 or newer.
 
 ```text
 user_runner_project/
@@ -382,6 +383,141 @@ Turn it off when two loads of one program must not share an engine, for example 
 their memory, or when the loads run under different CUDA driver contexts on one device, which
 sharing does not tell apart.
 
+## CUDA graph replay
+
+CUDA graph replay is off by default. When it is on, the delegate records an
+engine's kernel launches once as a CUDA graph and then replays the whole engine
+with one launch. This helps engines with fixed shapes that launch many short
+kernels, where launch work on the CPU is a large share of each call.
+
+### Turning it on, and off
+
+Three settings choose it, all read when an engine loads, so a later change does
+not affect engines already loaded. They apply in this order:
+
+1. The `use_cuda_graphs` load option passed to `Module::load` wins over every
+   other setting. It must be a boolean; any other type fails the load with
+   `Error::InvalidArgument`.
+2. With no load option, an explicit false set through
+   `executorch::runtime::set_option` turns replay off for the process, even if
+   the program saved true.
+3. Otherwise, the `use_cuda_graphs` compile spec saved at export chooses replay:
+   `b"1"` turns it on and `b"0"` turns it off. It wins over a process option set
+   to true and over the default when the process option was never set. Any other
+   value, or the key twice, fails the load with `Error::InvalidProgram`.
+4. If the program has no saved choice, the process option applies. Replay stays
+   off when that option was never set.
+
+In Python, at export:
+
+```python
+import torch_tensorrt
+
+torch_tensorrt.save(
+    trt_module,
+    "model.pte",
+    output_format="executorch",
+    arg_inputs=inputs,
+    use_cuda_graphs=True,
+)
+```
+
+Both `save()` and `torch_tensorrt.executorch.export()` accept `use_cuda_graphs=True`
+(on), `False` (off), or `None` (default, no baked choice). The choice applies to every
+method's TensorRT delegates. Export rejects non-booleans and raw
+`CompileSpec("use_cuda_graphs", ...)` entries; pass the keyword instead.
+
+In C++, a host that must not replay refuses it for one load:
+
+```cpp
+#include <executorch/extension/module/module.h>
+
+using namespace executorch::extension;
+using namespace executorch::runtime;
+
+Error load_without_cuda_graphs(Module& module) {
+  BackendOptions<1> options;
+  const Error stored = options.set_option("use_cuda_graphs", false);
+  if (stored != Error::Ok) {
+    return stored;
+  }
+  LoadBackendOptionsMap by_backend;
+  const Error mapped = by_backend.set_options("TensorRTBackend", options.view());
+  if (mapped != Error::Ok) {
+    return mapped;
+  }
+  return module.load(by_backend);
+}
+```
+
+A C++ host can also turn it on for every program that does not choose, before it
+loads them:
+
+```cpp
+BackendOptions<1> options;
+options.set_option("use_cuda_graphs", true);
+set_option("TensorRTBackend", options.view());
+```
+
+### When recording is unsafe
+
+Recording can recur throughout an engine's lifetime. Every input shape change
+starts another warmup and recording cycle. A failed recording is retried on the
+next call, up to three failures for that set of shapes. A shape change resets
+that budget, so loading everything before the first replay does not end the risk.
+
+A lock shared across this backend prevents recording from overlapping its own
+engine and execution context creation and destruction. Loading or destroying a
+program through this backend is protected from this recording race. A handle
+must still not be destroyed while it is executing.
+
+The lock does not cover work outside this backend. Creating or destroying a
+TensorRT engine or execution context elsewhere in the process remains unsafe
+while recording runs. A whole device sync on any thread, such as
+`cudaDeviceSynchronize` or `torch.cuda.synchronize()`, is also unsafe. The sync
+itself can fail with `cudaErrorStreamCaptureUnsupported`, and the overlap can
+crash the process inside the CUDA driver. Loading a program with ExecuTorch's
+CUDA delegate can make such a sync too.
+
+Leave replay off when other threads may perform any of that work. Use an
+explicit false process option to refuse a program's saved request, or a false
+load option for one load. Replay also does not support wrapping `execute()` in
+a caller's own CUDA capture.
+
+### What it costs
+
+Each engine keeps one stable device buffer per input and output, and every call
+that runs through the graph copies each input in and each output out. For an
+engine with few kernels, or with large inputs or outputs, these copies can cost
+more than the launches they save. Shapes that change on every call never replay
+and still pay the copies.
+
+### How it works
+
+The first call with a set of input shapes runs on the stable buffers with an
+ordinary launch, the second records the graph on a private stream and launches
+it on the caller's stream, and later calls replay. A shape change starts this
+again. Changing the caller stream does not restart recording when the stream is
+in the same current CUDA context and is not a green context stream. This includes
+the legacy default stream and the default stream for each thread. A call with no
+caller stream replays on `cudaStreamPerThread`. `execute()` waits for the stream
+before it returns, as it always does.
+
+Engines with aliased outputs or pooled activation scratch, GPUs without support
+for stream ordered memory, and drivers older than CUDA 12.5 keep the ordinary
+path. Each reason is logged once at load or first call. A call on a green context
+stream or a stream from another context also takes the ordinary path and keeps
+the recorded graph for the next compatible call. Taking the ordinary path does
+not guarantee that a stream from another context works with the engine; the call
+can still fail.
+
+If allocating a graph buffer fails, the engine uses the ordinary path until an
+input shape changes. Host staging allocations can still fail with
+`Error::MemoryAllocationFailed`; retained graph buffers are not reclaimed to
+retry them. A failed recording is retried on the next call, and after three
+failures for one set of shapes the engine logs an error and uses the ordinary
+path until a shape changes.
+
 ## Shared activation scratch
 
 A TensorRT execution context allocates its own activation scratch and holds it
@@ -595,7 +731,7 @@ call whose shapes need more than every call before them, so with one of those in
 the program no run order bounds the number of allocations. One engine over a
 `[1..4, 512, 512]` profile is either, depending on how it was built.
 
-### CUDA graph capture is not supported
+### Capturing execute from the caller is not supported
 
 A pooled call whose selected stream is capturing is refused with
 `Error::NotSupported`. The handoff between one enqueue and the next waits on an

@@ -9,6 +9,7 @@ test_suite(
     name = "executorch_backend_tests",
     tests = [
         ":test_caller_stream",
+        ":test_execution_graph",
         ":test_executorch_binding_names",
         ":test_executorch_blob_header",
         ":test_executorch_weight_streaming_budget",
@@ -52,6 +53,51 @@ cc_test(
         "//cpp:tensorrt_executorch_weight_streaming_budget",
         "@googletest//:gtest_main",
     ],
+)
+
+cc_test(
+    name = "test_execution_graph",
+    timeout = "long",
+    srcs = [
+        "execution_graph_cuda_wrappers.cpp",
+        "execution_graph_cuda_wrappers.h",
+        "test_execution_graph.cpp",
+    ],
+    # Route CUDA calls through test wrappers to count calls and inject failures.
+    linkopts = [
+        "-Wl,--wrap=cudaMalloc",
+        "-Wl,--wrap=cudaFree",
+        "-Wl,--wrap=cudaFreeAsync",
+        "-Wl,--wrap=cudaMemcpyAsync",
+        "-Wl,--wrap=cudaStreamBeginCapture",
+        "-Wl,--wrap=cudaGraphLaunch",
+        "-Wl,--wrap=cudaDeviceGetAttribute",
+        "-Wl,--wrap=cudaStreamSynchronize",
+        "-Wl,--wrap=cudaGetDriverEntryPointByVersion",
+    ],
+    linkstatic = True,
+    target_compatible_with = select({
+        "//cpp:linux_x86_64": [],
+        "//cpp:sbsa": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "//cpp:tensorrt_executorch_backend",
+        "@executorch//:executorch_core",
+        "@executorch//:executorch_headers",
+        "@executorch//:extension_cuda",
+        "@googletest//:gtest_main",
+    ] + select({
+        "//cpp:linux_x86_64": [
+            "@cuda//:cudart",
+            "@tensorrt//:nvinfer",
+        ],
+        "//cpp:sbsa": [
+            "@cuda//:cudart",
+            "@tensorrt_sbsa//:nvinfer",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 # The long timeout is what makes the fork case's per-child deadline mean anything:

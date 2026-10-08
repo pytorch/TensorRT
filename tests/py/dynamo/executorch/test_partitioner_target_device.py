@@ -16,6 +16,7 @@ from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (  # noqa: E402
 )
 from torch_tensorrt.executorch.partitioner import (  # noqa: E402
     _TARGET_DEVICE_COMPILE_SPEC_KEY,
+    CUDA_GRAPHS_COMPILE_SPEC_KEY,
     TensorRTPartitioner,
 )
 
@@ -157,3 +158,46 @@ def test_explicit_target_device_used_verbatim():
     )
     result = partitioner.partition(_edge_program(_engine_node("0")))
     assert _target_device(result) == b"cuda:3"
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("value", [None, b"0", b"1"])
+def test_cuda_graphs_spec_reaches_every_partition(value):
+    compile_specs = (
+        [] if value is None else [CompileSpec(CUDA_GRAPHS_COMPILE_SPEC_KEY, value)]
+    )
+    result = TensorRTPartitioner(compile_specs).partition(
+        _edge_program(_engine_node("0"), _engine_node("1"))
+    )
+    assert set(result.partition_tags) == {"tensorrt_0", "tensorrt_1"}
+    for delegate in result.partition_tags.values():
+        values = [
+            spec.value
+            for spec in delegate.compile_specs
+            if spec.key == CUDA_GRAPHS_COMPILE_SPEC_KEY
+        ]
+        assert values == ([] if value is None else [value])
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("value", [b"0", b"1"])
+def test_cuda_graphs_spec_accepts_zero_and_one(value):
+    TensorRTPartitioner([CompileSpec(CUDA_GRAPHS_COMPILE_SPEC_KEY, value)])
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("value", [b"", b"2", b"true", b"True", b"1\0", b" 1"])
+def test_cuda_graphs_spec_rejects_other_values(value):
+    with pytest.raises(ValueError, match=CUDA_GRAPHS_COMPILE_SPEC_KEY):
+        TensorRTPartitioner([CompileSpec(CUDA_GRAPHS_COMPILE_SPEC_KEY, value)])
+
+
+@pytest.mark.unit
+def test_cuda_graphs_spec_rejects_a_duplicate():
+    with pytest.raises(ValueError, match="at most once"):
+        TensorRTPartitioner(
+            [
+                CompileSpec(CUDA_GRAPHS_COMPILE_SPEC_KEY, b"1"),
+                CompileSpec(CUDA_GRAPHS_COMPILE_SPEC_KEY, b"1"),
+            ]
+        )

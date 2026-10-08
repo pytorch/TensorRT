@@ -299,6 +299,33 @@ def _apply_weight_streaming_budget(
         specs.append(CompileSpec(WEIGHT_STREAMING_BUDGET_COMPILE_SPEC_KEY, spec_value))
 
 
+def _apply_use_cuda_graphs(
+    method_compile_specs: dict[str, list[Any]],
+    use_cuda_graphs: bool | None,
+) -> None:
+    """Apply the typed replay choice to each method, rejecting raw specs."""
+    from executorch.exir.backend.compile_spec_schema import CompileSpec
+    from torch_tensorrt.executorch.partitioner import (
+        CUDA_GRAPHS_COMPILE_SPEC_KEY,
+        normalize_use_cuda_graphs,
+    )
+
+    for name, specs in method_compile_specs.items():
+        if any(
+            getattr(spec, "key", None) == CUDA_GRAPHS_COMPILE_SPEC_KEY for spec in specs
+        ):
+            raise ValueError(
+                f"compile_specs for {name!r} carries a "
+                f"CompileSpec({CUDA_GRAPHS_COMPILE_SPEC_KEY!r}, ...). Pass "
+                "use_cuda_graphs= instead."
+            )
+    spec_value = normalize_use_cuda_graphs(use_cuda_graphs)
+    if spec_value is None:
+        return
+    for specs in method_compile_specs.values():
+        specs.append(CompileSpec(CUDA_GRAPHS_COMPILE_SPEC_KEY, spec_value))
+
+
 def _apply_zero_copy_kv(
     program_map: dict[str, ExportedProgram],
 ) -> dict[str, list[str]]:
@@ -428,6 +455,7 @@ def export(
     zero_copy_kv: bool = False,
     generate_etrecord: bool = False,
     weight_streaming_budget_per_engine: int | None = None,
+    use_cuda_graphs: bool | None = None,
 ) -> "EdgeProgramManager":
     """Prepare TensorRT-compiled programs for composable ExecuTorch lowering.
 
@@ -551,6 +579,11 @@ def export(
             actually loads on. This is a different unit from
             ``torch_tensorrt.runtime.weight_streaming(...).device_budget``, which is a
             program total split proportionally across engines.
+        use_cuda_graphs (Optional[bool]): Bake CUDA graph replay on (True) or off
+            (False) into every method's TensorRT compile specs. None leaves the choice
+            unset so the runtime default applies. A load-time option overrides this
+            value. Non-booleans and raw ``CompileSpec("use_cuda_graphs", ...)`` entries
+            are rejected; use this keyword instead.
 
     Returns:
         executorch.exir.EdgeProgramManager: The Edge program, ready for inspection,
@@ -630,6 +663,7 @@ def export(
     _apply_weight_streaming_budget(
         method_compile_specs, weight_streaming_budget_per_engine
     )
+    _apply_use_cuda_graphs(method_compile_specs, use_cuda_graphs)
 
     if constant_methods is not None:
         invalid = [
