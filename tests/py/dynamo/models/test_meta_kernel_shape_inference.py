@@ -31,6 +31,7 @@ from torch._subclasses.fake_tensor import FakeTensorMode
 from torch.export import Dim
 from torch.fx.experimental.symbolic_shapes import DimDynamic, ShapeEnv
 from torch_tensorrt.dynamo.runtime.meta_ops.register_meta_ops import (
+    FakeTRTEngine,
     _apply_symbolic_shape_expressions,
     fake_tensorrt_execute_engine,
 )
@@ -328,23 +329,23 @@ class TestApplySymbolicShapeExpressions:
             ],
         }
 
-    @pytest.mark.parametrize("wrapped_engine", [False, True])
-    def test_constant_only_engine_uses_serialized_device(self, wrapped_engine):
+    @pytest.mark.parametrize("engine_kind", ["wrapped", "fake", "cpp"])
+    def test_constant_only_engine_uses_serialized_device(self, engine_kind):
         shape_info = self._shape_info(128, 128)
         shape_info["inputs"] = []
         serialized_device = "1%8%9%0%test GPU"
-        if wrapped_engine:
-            engine = SimpleNamespace(
-                real_obj=SimpleNamespace(
-                    get_serialized_metadata=lambda: "metadata",
-                    serialize_metadata_only=lambda: ["10", "arange", serialized_device],
-                )
-            )
+        if engine_kind == "fake":
+            engine = FakeTRTEngine.__new__(FakeTRTEngine)
+            engine.serialized_metadata = "metadata"
+            engine.device_info = serialized_device
         else:
+            # The C++ engine exposes a serialization method, not device_info.
             engine = SimpleNamespace(
                 get_serialized_metadata=lambda: "metadata",
-                device_info=serialized_device,
+                serialize_metadata_only=lambda: ["10", "arange", serialized_device],
             )
+            if engine_kind == "wrapped":
+                engine = SimpleNamespace(real_obj=engine)
 
         with (
             patch(

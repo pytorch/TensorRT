@@ -352,8 +352,11 @@ def fake_tensorrt_execute_engine(
             # Read the engine's target without serializing its engine weights.
             if hasattr(fake_trt_engine, "real_obj"):
                 device_info = trt_engine.serialize_metadata_only()[DEVICE_IDX]
-            else:
+            elif isinstance(fake_trt_engine, FakeTRTEngine):
                 device_info = fake_trt_engine.device_info
+            else:
+                # Non-strict export can pass the C++ engine directly.
+                device_info = fake_trt_engine.serialize_metadata_only()[DEVICE_IDX]
             output_device = torch.device("cuda", parse_device_info(device_info)["id"])
         return _apply_symbolic_shape_expressions(inputs, shape_info, output_device)
     else:
