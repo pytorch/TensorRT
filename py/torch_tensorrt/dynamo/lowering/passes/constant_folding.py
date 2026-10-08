@@ -1,8 +1,10 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
+import inspect
 import logging
-from typing import Any, Set
+from operator import attrgetter
+from typing import Any, Callable, Optional, Set
 
 import torch
 from torch_tensorrt._utils import sanitized_torch_version
@@ -41,6 +43,55 @@ _SAFE_ALIASED_FOLD_SKIP_OPS: Set[torch._ops.OpOverload] = {
 }
 
 
+def _named_attr(gm: torch.fx.GraphModule, target: Any) -> Any:
+    if not isinstance(target, str):
+        return None
+    try:
+        return attrgetter(target)(gm)
+    except (AttributeError, ValueError):
+        return None
+
+
+def _is_module_attr_view(gm: torch.fx.GraphModule, node: torch.fx.Node) -> bool:
+    """Whether an allowlisted view chain is rooted in a module tensor."""
+    seen: Set[torch.fx.Node] = set()
+    cur: Optional[torch.fx.Node] = node
+    while cur is not None and cur not in seen:
+        seen.add(cur)
+        if cur.op == "get_attr":
+            return isinstance(_named_attr(gm, cur.target), torch.Tensor)
+        if cur.op != "call_function" or cur.target not in _SAFE_ALIASED_FOLD_SKIP_OPS:
+            return False
+        tensor_args = [arg for arg in cur.args if isinstance(arg, torch.fx.Node)]
+        if len(tensor_args) != 1:
+            return False
+        cur = tensor_args[0]
+    return False
+
+
+def _node_output_nbytes(node: torch.fx.Node) -> int:
+    """Output bytes from export metadata, or zero when unavailable."""
+    value = node.meta.get("val")
+    if not isinstance(value, torch.Tensor):
+        return 0
+    try:
+        return int(value.numel() * value.element_size())
+    except Exception:
+        return 0
+
+
+def skip_large_aliased_view_fold(gm: torch.fx.GraphModule, node: torch.fx.Node) -> bool:
+    """Inductor ``skip_folding_node_fn``: True → do not execute this fold.
+
+    Matches the install skip: only large, converter-safe views of module tensors
+    remain in the graph. Unknown and unsupported operations still fold normally.
+    """
+    if node.op != "call_function" or node.target not in _SAFE_ALIASED_FOLD_SKIP_OPS:
+        return False
+    output_is_large = _node_output_nbytes(node) > _MAX_CONSTANT_FOLD_BYTES
+    return output_is_large and _is_module_attr_view(gm, node)
+
+
 def _tensor_reuses_module_storage(
     gm: torch.fx.GraphModule, constant: torch.Tensor
 ) -> bool:
@@ -69,7 +120,11 @@ def constant_fold(
 
     Modifies the graph in-place and replaces node with constants
     """
-    cf = _TorchTensorRTConstantFolder(gm, skip_constructors=False)
+    cf = _TorchTensorRTConstantFolder(
+        gm,
+        skip_constructors=False,
+        skip_folding_node_fn=lambda node: skip_large_aliased_view_fold(gm, node),
+    )
     cf.run()
 
     # The constants are created on CPU to save GPU memory for TensorRT compilation.
@@ -173,7 +228,14 @@ def replace_node_with_constant(
 # https://github.com/pytorch/pytorch/blob/4b881b0da390c1290bb12850ef9daad6f6eb2cb6/torch/_inductor/constant_folding.py#L53-L63
 class _TorchTensorRTConstantFolder(ConstantFolder):  # type: ignore[misc]
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
+        skip_fn = kwargs.get("skip_folding_node_fn")
+        init_params = inspect.signature(ConstantFolder.__init__).parameters
+        if "skip_folding_node_fn" not in init_params:
+            kwargs.pop("skip_folding_node_fn", None)
+            super().__init__(*args, **kwargs)
+            self.skip_folding_node_fn = skip_fn
+        else:
+            super().__init__(*args, **kwargs)
         # Quantization ops excluded from constant folding so TRT sees QDQ
         # (ModelOpt tensorrt.quantize_op, TorchAO dequantize_affine, TorchAO
         # NVFP4 dequantize_nvfp4, and TorchAO MXFP4 dequantize_mxfp4 when
@@ -230,6 +292,20 @@ class _TorchTensorRTConstantFolder(ConstantFolder):  # type: ignore[misc]
             self.quantization_ops.add(torch.ops.torchao_trt.dequantize_mxfp4.default)
         except Exception:
             pass
+
+    def run_node(self, node: torch.fx.node.Node) -> Any:
+        # Inductor only consults skip_folding_node_fn when lifted_constant_names
+        # is set. Our cf.run() path has none, so honor the callback here and
+        # return unknown without executing the op.
+        skip_fn: Optional[Callable[[torch.fx.Node], bool]] = getattr(
+            self, "skip_folding_node_fn", None
+        )
+        if skip_fn is not None and node.op == "call_function" and skip_fn(node):
+            logger.debug(
+                "Skipping constant-fold execute for aliased view %s", node.name
+            )
+            return self.unknown_value
+        return super().run_node(node)
 
     # TODO: Update this function when quantization is added
     def is_impure(self, node: torch.fx.node.Node) -> bool:
