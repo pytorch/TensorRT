@@ -20,9 +20,9 @@ class IterTiming(TypedDict):
         ttft_s: Time-to-first-token (prefill latency) in seconds.
         decode_s: Total decode-phase latency (all decode steps) in seconds.
         total_s: ttft_s + decode_s; convenience for downstream aggregation.
-        prefill_tokens: Number of input tokens fed to the prefill forward pass.
-        decode_tokens: Number of tokens produced by the decode loop (does not
-            include the first token produced by the prefill step).
+        prefill_tokens: Number of input tokens per sequence in the prefill pass.
+        decode_tokens: Number of tokens per sequence produced by the decode loop
+            (does not include the first token produced by the prefill step).
     """
 
     ttft_s: float
@@ -338,15 +338,15 @@ def _timed_generate_static_cache(
     prefill_start = timeit.default_timer()
     input_signature = (input_seq, position_ids, *kv_cache, start_idx, end_idx)
     logits_keys_values = model(*input_signature)
-    torch.cuda.synchronize()
-    ttft_s = timeit.default_timer() - prefill_start
-
     logits = logits_keys_values[0]
     kv_cache = logits_keys_values[1:]
     next_tokens = torch.argmax(logits[:, -1, :], dim=-1, keepdim=True)
     input_seq = next_tokens
     start_idx = end_idx
     end_idx = start_idx + 1
+    # Include selection of the first token in time-to-first-token.
+    torch.cuda.synchronize()
+    ttft_s = timeit.default_timer() - prefill_start
 
     decode_tokens = 0
     decode_start = timeit.default_timer()
@@ -397,12 +397,11 @@ def _timed_generate_no_cache(
     torch.cuda.synchronize()
     prefill_start = timeit.default_timer()
     outputs = model(input_seq, position_ids=position_ids)
-    torch.cuda.synchronize()
-    ttft_s = timeit.default_timer() - prefill_start
-
     logits = outputs.logits if hasattr(outputs, "logits") else outputs[0]
     next_tokens = torch.argmax(logits[:, -1, :], dim=-1)
     input_seq = torch.cat([input_seq, next_tokens[:, None]], dim=-1)
+    torch.cuda.synchronize()
+    ttft_s = timeit.default_timer() - prefill_start
 
     decode_tokens = 0
     decode_start = timeit.default_timer()
@@ -435,11 +434,12 @@ def time_generate_split(
     eos_token_id: int,
     use_cache: bool = False,
     iterations: int = 5,
+    warmup: int = 3,
 ) -> list[IterTiming]:
     """Measure per-iteration prefill / decode timings over ``iterations`` runs.
 
-    A single warmup pass (using the un-timed helper) is run before the
-    timed iterations. The warmup-fn / timed-fn pair is built up-front so
+    Untimed warmup passes are run before the timed iterations. The
+    warmup-fn / timed-fn pair is built up-front so
     the warmup loop is no longer duplicated inside each ``use_cache``
     branch.
 
@@ -453,6 +453,7 @@ def time_generate_split(
         use_cache: If True, use static-cache prefill/decode; else recompute
             the full sequence each step.
         iterations: Number of timed iterations.
+        warmup: Number of untimed warmup iterations.
 
     Returns:
         List of per-iteration ``IterTiming`` dicts.
@@ -472,7 +473,8 @@ def time_generate_split(
             model, inputs.clone(), output_seq_length, eos_token_id
         )
 
-    _ = warmup_fn()
+    for _ in range(warmup):
+        warmup_fn()
     torch.cuda.synchronize()
 
     timings: list[IterTiming] = []
@@ -503,7 +505,8 @@ def record_stats_split(
         compile_time_s: Optional compile time in seconds; passthrough.
 
     Returns:
-        Dict of summary stats (latencies in ms, throughputs in tok/s).
+        Dict of summary stats (latencies in ms, aggregate batch throughput in tok/s).
+        Token counts are per sequence; throughput includes all batch elements.
     """
     ttfts = np.array([t["ttft_s"] for t in timings])
     decodes = np.array([t["decode_s"] for t in timings])
@@ -514,10 +517,14 @@ def record_stats_split(
     output_tokens = decode_tokens + 1
 
     decode_tps_mean = (
-        float((decode_tokens / decodes).mean()) if decode_tokens > 0 else 0.0
+        float((batch_size * decode_tokens / decodes).mean())
+        if decode_tokens > 0
+        else 0.0
     )
     output_tps_mean = (
-        float((output_tokens / totals).mean()) if output_tokens > 0 else 0.0
+        float((batch_size * output_tokens / totals).mean())
+        if output_tokens > 0
+        else 0.0
     )
 
     return {

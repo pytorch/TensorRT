@@ -317,6 +317,7 @@ def export_and_save(input_ids, args):
     position_ids = torch.arange(input_ids.shape[1]).unsqueeze(0).to(DEVICE)
     max_seq = args.max_seq_len
     isl = input_ids.shape[1]
+    batch_size = input_ids.shape[0]
 
     logger.info("Exporting manually-sharded model with torch.export ...")
     with torch.no_grad(), _precision_context(args):
@@ -359,9 +360,9 @@ def export_and_save(input_ids, args):
             ep,
             inputs=[
                 torch_tensorrt.Input(
-                    min_shape=(1, 1),
-                    opt_shape=(1, isl),
-                    max_shape=(1, max_seq),
+                    min_shape=(batch_size, 1),
+                    opt_shape=(batch_size, isl),
+                    max_shape=(batch_size, max_seq),
                     dtype=torch.int64,
                     name="input_ids",
                 ),
@@ -523,16 +524,37 @@ if __name__ == "__main__":
     parser.add_argument(
         "--isl", type=int, default=2048, help="Input sequence length for benchmarking"
     )
+    parser.add_argument(
+        "--warmup", type=int, default=3, help="Untimed benchmark iterations"
+    )
+    parser.add_argument("--seed", type=int, default=0, help="Benchmark input seed")
     args = parser.parse_args()
+    if args.benchmark and (
+        args.iterations < 1
+        or args.warmup < 0
+        or args.isl < 1
+        or args.num_tokens < 1
+        or args.batch_size < 1
+    ):
+        parser.error(
+            "Benchmark sizes and iterations must be positive; warmup must be nonnegative"
+        )
 
     tokenizer = AutoTokenizer.from_pretrained(args.model)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
     if args.benchmark:
-        input_ids = torch.randint(
-            1, 10000, (args.batch_size, args.isl), dtype=torch.int64
-        ).to(DEVICE)
+        # Every shard must receive the same input; seed rank 0 for repeatable runs.
+        shape = (args.batch_size, args.isl)
+        if rank == 0:
+            generator = torch.Generator().manual_seed(args.seed)
+            input_ids = torch.randint(
+                tokenizer.vocab_size, shape, generator=generator, dtype=torch.int64
+            ).to(DEVICE)
+        else:
+            input_ids = torch.empty(shape, dtype=torch.int64, device=DEVICE)
+        dist.broadcast(input_ids, src=0)
     else:
         input_ids = tokenizer(args.prompt, return_tensors="pt")["input_ids"].to(DEVICE)
     max_len = input_ids.shape[1] + args.num_tokens
@@ -561,12 +583,13 @@ if __name__ == "__main__":
                 # All ranks must participate in the benchmark loop.
                 use_cache = args.cache in ("static_v1", "static_v2")
                 trt_results = time_generate_split(
-                    trt_model,
-                    input_ids.clone(),
-                    max_len,
-                    tokenizer.eos_token_id,
+                    model=trt_model,
+                    inputs=input_ids.clone(),
+                    output_seq_length=max_len,
+                    eos_token_id=tokenizer.eos_token_id,
                     iterations=args.iterations,
                     use_cache=use_cache,
+                    warmup=args.warmup,
                 )
                 if rank == 0:
                     stats = record_stats_split(
@@ -586,12 +609,13 @@ if __name__ == "__main__":
                 # all-reduce ops that require every rank to call in lockstep.
                 use_cache = args.cache in ("static_v1", "static_v2")
                 trt_results = time_generate_split(
-                    trt_model,
-                    input_ids.clone(),
-                    max_len,
-                    tokenizer.eos_token_id,
+                    model=trt_model,
+                    inputs=input_ids.clone(),
+                    output_seq_length=max_len,
+                    eos_token_id=tokenizer.eos_token_id,
                     iterations=args.iterations,
                     use_cache=use_cache,
+                    warmup=args.warmup,
                 )
                 if rank == 0:
                     stats = record_stats_split(
