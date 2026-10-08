@@ -20,17 +20,19 @@ class TestTrimHostHeap(unittest.TestCase):
             for k, v in os.environ.items()
             if k != "TORCHTRT_ENABLE_BUILDER_MALLOC_TRIM"
         }
-        with mock.patch.object(
-            utils, "_glibc_malloc_trim", return_value=malloc_trim
-        ), mock.patch.dict(os.environ, env, clear=True):
+        with (
+            mock.patch.object(utils, "_glibc_malloc_trim", return_value=malloc_trim),
+            mock.patch.dict(os.environ, env, clear=True),
+        ):
             utils.trim_host_heap()
         malloc_trim.assert_called_once_with(0)
 
     def test_env_var_disables_trimming(self):
         malloc_trim = mock.Mock(return_value=1)
-        with mock.patch.object(
-            utils, "_glibc_malloc_trim", return_value=malloc_trim
-        ), mock.patch.dict(os.environ, {"TORCHTRT_ENABLE_BUILDER_MALLOC_TRIM": "0"}):
+        with (
+            mock.patch.object(utils, "_glibc_malloc_trim", return_value=malloc_trim),
+            mock.patch.dict(os.environ, {"TORCHTRT_ENABLE_BUILDER_MALLOC_TRIM": "0"}),
+        ):
             utils.trim_host_heap()
         malloc_trim.assert_not_called()
 
