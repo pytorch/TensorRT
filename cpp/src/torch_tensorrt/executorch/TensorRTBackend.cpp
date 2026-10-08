@@ -207,7 +207,8 @@ bool infer_binding_names(
 // cannot: its context's allocation strategy was fixed when the context was
 // created. initialize_engine_io below is the one place this is read.
 std::atomic<bool> scratch_enabled{false};
-std::atomic<bool> cuda_graphs_enabled{false};
+enum class CudaGraphsOption { Unset, Disabled, Enabled };
+std::atomic<CudaGraphsOption> cuda_graphs_option{CudaGraphsOption::Unset};
 
 // TensorRT forbids moving the budget while any execution context exists, so this must run before
 // the engine's first context.
@@ -1080,9 +1081,9 @@ Result<DelegateHandle*> TensorRTBackend::init(
     }
   }
 
-  // A load-time option wins, so a host that knows recording is unsafe in its process can refuse it for any
-  // program. Then the program's compile spec, then the process-wide option set from C++.
-  bool cuda_graphs = cuda_graphs_enabled.load(std::memory_order_relaxed);
+  // A saved setting must not override a host that explicitly refused recording.
+  const auto process_graphs = cuda_graphs_option.load(std::memory_order_relaxed);
+  bool cuda_graphs = process_graphs == CudaGraphsOption::Enabled;
   const CompileSpec* graphs_spec = nullptr;
   for (const auto& spec : compile_specs) {
     if (spec.key != nullptr && std::strcmp(spec.key, kCudaGraphsKey) == 0) {
@@ -1099,7 +1100,7 @@ Result<DelegateHandle*> TensorRTBackend::init(
       ET_LOG(Error, "TensorRTBackend::init: %s compile spec must be b\"0\" or b\"1\"", kCudaGraphsKey);
       return Error::InvalidProgram;
     }
-    cuda_graphs = value[0] == '1';
+    cuda_graphs = process_graphs != CudaGraphsOption::Disabled && value[0] == '1';
   }
   const auto graphs_option = context.get_runtime_spec<bool>(kCudaGraphsKey);
   if (graphs_option.ok()) {
@@ -1948,7 +1949,8 @@ Error TensorRTBackend::set_option(ET_UNUSED BackendOptionContext& context, const
   }
 
   if (have_graphs_request) {
-    cuda_graphs_enabled.store(graphs_requested, std::memory_order_relaxed);
+    cuda_graphs_option.store(
+        graphs_requested ? CudaGraphsOption::Enabled : CudaGraphsOption::Disabled, std::memory_order_relaxed);
   }
   if (have_request) {
     scratch_enabled.store(requested, std::memory_order_relaxed);

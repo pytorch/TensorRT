@@ -380,6 +380,11 @@ class ExecutionGraphTest : public ::testing::Test {
     LoadedGraphEngine engine;
     ASSERT_EQ(engine.load(blob_), Error::Ok);
     default_has_graph_ = engine.handle()->execution_graph != nullptr;
+    char on[] = "1";
+    CompileSpec spec{kGraphOption, {on, 1}};
+    LoadedGraphEngine saved;
+    ASSERT_EQ(saved.load(blob_, {&spec, 1}), Error::Ok);
+    saved_default_has_graph_ = saved.handle()->execution_graph != nullptr;
   }
 
   void SetUp() override {
@@ -497,6 +502,7 @@ class ExecutionGraphTest : public ::testing::Test {
   static std::vector<uint8_t> alias_blob_;
   static std::vector<uint8_t> kv_blob_;
   static bool default_has_graph_;
+  static bool saved_default_has_graph_;
   static bool memory_pools_;
   int original_device_ = -1;
   void* inputs_[2]{};
@@ -509,6 +515,7 @@ std::vector<uint8_t> ExecutionGraphTest::blob_;
 std::vector<uint8_t> ExecutionGraphTest::alias_blob_;
 std::vector<uint8_t> ExecutionGraphTest::kv_blob_;
 bool ExecutionGraphTest::default_has_graph_ = false;
+bool ExecutionGraphTest::saved_default_has_graph_ = false;
 bool ExecutionGraphTest::memory_pools_ = false;
 
 // Replay needs stream-ordered memory. Without it the backend keeps enqueueV3, which the
@@ -525,9 +532,10 @@ class ExecutionGraphReplayTest : public ExecutionGraphTest {
 
 TEST_F(ExecutionGraphTest, DisabledByDefault) {
   EXPECT_FALSE(default_has_graph_);
+  EXPECT_EQ(saved_default_has_graph_, memory_pools_);
 }
 
-TEST_F(ExecutionGraphReplayTest, LoadOptionWinsOverCompileSpecWhichWinsOverTheProcessOption) {
+TEST_F(ExecutionGraphReplayTest, LoadOptionWinsOverProcessRefusalAndSavedChoice) {
   char on[] = "1";
   char off[] = "0";
   for (bool process_option : {false, true}) {
@@ -547,7 +555,13 @@ TEST_F(ExecutionGraphReplayTest, LoadOptionWinsOverCompileSpecWhichWinsOverThePr
                                  : ::executorch::runtime::ArrayRef<CompileSpec>(&spec, 1),
                 load_option < 0 ? Span<const BackendOption>{} : Span<const BackendOption>(&option_value, 1)),
             Error::Ok);
-        const bool expected = load_option >= 0 ? load_option == 1 : value != nullptr ? value[0] == '1' : process_option;
+        bool expected = process_option;
+        if (value != nullptr) {
+          expected = process_option && value[0] == '1';
+        }
+        if (load_option >= 0) {
+          expected = load_option == 1;
+        }
         EXPECT_EQ(engine.handle()->execution_graph != nullptr, expected);
       }
     }
@@ -558,7 +572,7 @@ TEST_F(ExecutionGraphReplayTest, LoadOptionWinsOverCompileSpecWhichWinsOverThePr
   EXPECT_EQ(engine.load(blob_, {}, {&wrong_type, 1}), Error::InvalidArgument);
 }
 
-TEST_F(ExecutionGraphReplayTest, CompileSpecOverridesTheProcessOption) {
+TEST_F(ExecutionGraphReplayTest, CompileSpecRespectsProcessRefusalAndRejectsInvalidValues) {
   for (bool process_option : {false, true}) {
     for (const char* value : {"0", "1"}) {
       SCOPED_TRACE(process_option);
@@ -567,7 +581,7 @@ TEST_F(ExecutionGraphReplayTest, CompileSpecOverridesTheProcessOption) {
       CompileSpec spec{kGraphOption, {const_cast<char*>(value), 1}};
       LoadedGraphEngine engine;
       ASSERT_EQ(engine.load(blob_, {&spec, 1}), Error::Ok);
-      EXPECT_EQ(engine.handle()->execution_graph != nullptr, value[0] == '1');
+      EXPECT_EQ(engine.handle()->execution_graph != nullptr, process_option && value[0] == '1');
     }
   }
   for (const char* value : {"", "2", "10", "true"}) {
@@ -580,6 +594,23 @@ TEST_F(ExecutionGraphReplayTest, CompileSpecOverridesTheProcessOption) {
   CompileSpec twice[] = {{kGraphOption, {on, 1}}, {kGraphOption, {on, 1}}};
   LoadedGraphEngine engine;
   EXPECT_EQ(engine.load(blob_, {twice, 2}), Error::InvalidProgram);
+}
+
+TEST_F(ExecutionGraphReplayTest, ExplicitProcessRefusalPreventsSavedReplay) {
+  ASSERT_EQ(set_graphs(false), Error::Ok);
+  char on[] = "1";
+  CompileSpec spec{kGraphOption, {on, 1}};
+  LoadedGraphEngine engine;
+  ASSERT_EQ(engine.load(blob_, {&spec, 1}), Error::Ok);
+  EXPECT_EQ(engine.handle()->execution_graph, nullptr);
+  std::vector<float> input(16, 3.0f), output(16, -1.0f);
+  CudaCalls calls;
+  for (int i = 0; i < 4; ++i) {
+    ASSERT_EQ(engine.run(input.data(), output.data(), 2, 8), Error::Ok);
+    EXPECT_EQ(output, std::vector<float>(16, 7.0f));
+  }
+  EXPECT_TRUE(calls.captures.empty());
+  EXPECT_TRUE(calls.launches.empty());
 }
 
 TEST_F(ExecutionGraphReplayTest, CapturesSecondCallAndReplaysChangedAddressesAndValues) {
