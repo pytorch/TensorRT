@@ -514,7 +514,11 @@ _PYTHON_ONLY: list[Suite] = [
         "python-only-executorch-export",
         tier="l1",
         lanes=("python-only",),
-        paths=("executorch/test_export.py",),
+        paths=(
+            "executorch/test_export.py",
+            "executorch/test_cuda_graphs.py",
+            "executorch/test_partitioner_target_device.py",
+        ),
         setup=("executorch",),
         variants=("standard",),
         platforms=("linux-x86_64",),
