@@ -603,7 +603,6 @@ class TestEmbeddingBagConverter(DispatchTestCase):
         self.run_test(
             mod,
             inputs=inputs,
-            precision=weight.dtype,
             enable_passes=True,
             propagate_shapes=True,
             immutable_weights=True,
