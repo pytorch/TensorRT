@@ -23,7 +23,8 @@ Given an original `torch.fx.GraphModule` and a capability-partitioned
 2) Estimate memory cost of each possible subgraphs
    - Compute a per-subgraph "size" by traversing the graph to find weights
      (get_attr) reachable from its nodes and summing tensor bytes.
-   - Use a set to record the visited nodes and avoid double counting shared parameters across subgraphs.
+   - A parameter shared by several subgraphs counts toward each of them: every engine embeds
+     its own copy, so a subgraph that only reuses weights still builds with all of them.
 
 
 4) Split large accelerated subgraphs
@@ -431,16 +432,17 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
         """Estimate parameter footprint (bytes) for each subgraph.
 
         Traverses each subgraph's nodes and their producer chains to find
-        parameters referenced via `get_attr`, summing tensor bytes. Shared
-        parameters are counted only once globally.
+        parameters referenced via `get_attr`, summing tensor bytes. A parameter
+        shared by several subgraphs counts toward each of them, because every
+        engine that uses it embeds its own copy.
 
         Returns:
             List[int]: Size per subgraph in bytes.
         """
         state_dict = self.module.state_dict(keep_vars=True)
         sizes = []
-        weight_visited_nodes = set()
         for subgraph in subgraphs:
+            weight_visited_nodes = set()
             nodes_in_subgraph = set(subgraph.nodes)
             stack = subgraph.nodes.copy()
             size = 0

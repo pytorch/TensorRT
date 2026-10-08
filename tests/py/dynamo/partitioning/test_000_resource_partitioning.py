@@ -116,6 +116,27 @@ class TestResourcePartitioning(TestCase):
 
             break
 
+    def test_shared_weight_counts_toward_every_subgraph_that_uses_it(self):
+        class net(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.w = nn.Parameter(torch.randn(64, 64))
+
+            def forward(self, x):
+                return torch.mm(torch.mm(x, self.w), self.w)
+
+        gm = torch.fx.symbolic_trace(net())
+        mm_0, mm_1 = [n for n in gm.graph.nodes if n.op == "call_function"]
+        with mock.patch("psutil.Process"):
+            partitioner = ResourcePartitioner(
+                gm, cpu_memory_budget=None, submodule_name="m"
+            )
+        sizes = partitioner.size_of_subgraphs(
+            [Subgraph(is_acc=True, nodes=[mm_0]), Subgraph(is_acc=True, nodes=[mm_1])]
+        )
+        # Each engine embeds its own copy of w, so the second subgraph is not free.
+        assert sizes == [64 * 64 * 4] * 2, sizes
+
 
 if __name__ == "__main__":
     run_tests()
