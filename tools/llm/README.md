@@ -94,7 +94,8 @@ Use `--precision fp16` and a different save directory for FP16. Changing the fla
 in load mode does not convert an existing engine: re-export when changing
 precision, and keep the load flag consistent with the saved engine. The saved
 sequence/cache capacity must cover the inference prompt and requested tokens.
-FP32 uses more memory; its performance was not measured in this investigation.
+FP32 uses more memory. Performance measurements for both precisions are reported
+in [Benchmark experiment results](#benchmark-experiment-results).
 
 #### Accuracy check
 
@@ -242,6 +243,287 @@ reference's top scores tied:
 FP16 TRT matched both FP32 implementations at those positions. These comparisons
 measure numerical agreement; the library prompt did not specify the event's
 ending time, so matching `6` does not establish factual correctness.
+
+#### Benchmark experiment results
+
+Settings: Qwen/Qwen2.5-0.5B-Instruct (revision
+`7ae557604adf67be50417f59c2c2f167def9a775`), 2 x NVIDIA B300 SXM6, TP=2,
+batch size 1, TensorRT 11.3.0.99, PyTorch 2.15.0.dev20261005+cu130, and
+Transformers 5.14.1. These measurements used the Python source changes with
+existing Torch-TensorRT `2.15.0.dev0+bc747c4ad6` runtime binaries.
+
+All four saved engines used the same sequence profile: min=1, opt=128, max=384.
+The profile accepts sequence lengths from 1 to 384; `opt=128` is the target length
+for TensorRT kernel tuning. Both tested input lengths, **128 and 256 tokens**,
+are within that range. The 384-token KV cache accommodates a 256-token prompt
+plus 128 generated tokens. Inputs were seeded synthetic token IDs (seed 0),
+broadcast to both ranks. Each run generated exactly 128 tokens without
+stopping at EOS. Cases ran sequentially on the same GPU pair. Each case had two
+runs, each with three warmup generations and ten measured generations per input
+length. `static_v2` FP16 had a third run to investigate timing variation; all
+30 samples are retained for that case.
+
+Wall-clock timings synchronize CUDA at the phase boundaries and include token
+selection. The first token comes from prefill; decode throughput counts the
+remaining 127 tokens. Each sample uses the slower TP rank, and the table reports
+medians across the measured samples. Timings exclude engine/model loading,
+compilation, tokenization, and explicit cache creation. Eager cache growth during
+forward execution is included.
+
+The performance baseline is **cached, tensor-parallel eager PyTorch** using
+Hugging Face `DynamicCache`. For the FP16 baseline, the checkpoint's BF16 model
+weights are converted to FP16 once, before timing starts. Buffers that were already
+FP32, such as the frequencies used for rotary position embeddings, keep that dtype.
+These buffers are non-weight tensors. Autocast is disabled because the weights
+have already been prepared in FP16; the model's explicit dtype conversions still apply.
+The FP32 baseline uses FP32 parameters and highest float32 matmul precision.
+The full, unsharded eager model remains the reference for the accuracy checks above.
+
+First-token latency and decode throughput in this table use the 128-token input.
+Both total-time columns include prefill and generation of 128 output tokens.
+
+| Backend | Precision | First token (ms) | Decode (tokens/s) | Total: 128-token input (ms) | Total: 256-token input (ms) |
+|---|---|---:|---:|---:|---:|
+| Cached eager PyTorch | FP16 | 17.60 | 60.2 | 2,126 | 2,139 |
+| TRT `static_v1` | FP16 | 4.55 | 239.2 | 535 | 536 |
+| TRT `static_v2` | FP16 | 4.51 | 246.4 | 520 | 523 |
+| Cached eager PyTorch | FP32 | 17.34 | 71.0 | 1,806 | 1,804 |
+| TRT `static_v1` | FP32 | 8.20 | 156.0 | 822 | 845 |
+| TRT `static_v2` | FP32 | 8.18 | 155.1 | 827 | 851 |
+
+For the 128-token input, TRT reduced total generation time by approximately
+4x in FP16 and 2.2x in FP32 relative to cached eager at the same precision.
+These results describe this model, hardware, and workload.
+
+All four new engines also passed logit checks against full eager at 16 positions
+each (eight steps at each input length), with matching next-token choices. Those
+short checks do not replace the extended [precision findings](#precision-findings).
+
+**Benchmark changes**
+
+- The export/load benchmark calls pass named arguments to `time_generate_split`.
+- `--seed` makes benchmark inputs repeatable, and rank 0 broadcasts them to every shard.
+- `--warmup` controls untimed generations; benchmark sizes and iteration counts are validated.
+- Time to first token includes the first `argmax`; throughput counts all batch elements.
+- The exported input profile uses the requested batch size.
+
+**Commands**
+
+Run these Bash commands from the repository root. Select the same two GPUs for
+all timed cases. Pin the model snapshot and use separate engine directories for
+each cache/precision combination:
+
+```bash
+export CUDA_VISIBLE_DEVICES=1,2
+export PYTHONPATH="${PWD}/tools/llm${PYTHONPATH:+:${PYTHONPATH}}"
+TP_BENCH_MODEL=$(python -c 'from huggingface_hub import snapshot_download; print(snapshot_download("Qwen/Qwen2.5-0.5B-Instruct", revision="7ae557604adf67be50417f59c2c2f167def9a775"))')
+TP_BENCH_ENGINES=/tmp/qwen_tp_benchmark_engines
+TP_BENCH_RESULTS=/tmp/qwen_tp_benchmark_results
+
+for precision in fp16 fp32; do
+    for cache in static_v1 static_v2; do
+        torchtrtrun --nproc_per_node=2 tools/llm/tensor_parallel_llm_export.py \
+            --mode export --model "$TP_BENCH_MODEL" \
+            --precision "$precision" --cache "$cache" \
+            --save_dir "$TP_BENCH_ENGINES/$cache-$precision" \
+            --benchmark --batch_size 1 --isl 128 --num_tokens 256 \
+            --seed 0 --warmup 0 --iterations 1
+    done
+done
+```
+
+Export uses `--isl 128 --num_tokens 256` to create the opt=128, max=384 profile.
+Ignore the timing printed during export: the measured workloads below generate
+128 tokens, and load the saved engines in separate processes.
+
+Save the following snippet as `/tmp/benchmark_tp.py`. It measures both input
+lengths, supports the cached eager baseline and either saved TRT cache variant,
+and writes one JSON file per case/run. It prints pooled medians as runs finish.
+Use a fresh results directory when changing the model, hardware, or settings.
+
+```python
+import argparse
+import json
+import os
+import statistics
+import time
+from pathlib import Path
+
+import torch
+import torch.distributed as dist
+from transformers import AutoTokenizer, DynamicCache
+
+import tensor_parallel_llm_export as example  # Initializes NCCL and the device.
+from torch_tensorrt.distributed._nccl_utils import initialize_nccl_comm
+from utils import _timed_generate_static_cache
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--model", required=True)
+parser.add_argument(
+    "--backend", choices=["eager", "static_v1", "static_v2"], required=True
+)
+parser.add_argument("--precision", choices=["fp16", "fp32"], required=True)
+parser.add_argument("--engine-root", required=True)
+parser.add_argument("--results", required=True)
+parser.add_argument("--round", type=int, required=True)
+parser.add_argument("--warmup", type=int, default=3)
+parser.add_argument("--iterations", type=int, default=10)
+args = parser.parse_args()
+assert args.warmup >= 0 and args.iterations > 0
+rank, world, device = example.rank, example.world_size, example.DEVICE
+assert world == 2
+initialize_nccl_comm()
+tokenizer = AutoTokenizer.from_pretrained(args.model)
+torch.set_float32_matmul_precision("highest")
+
+if args.backend == "eager":
+    model = example.get_exportable_model(args, rank, world)
+    if args.precision == "fp16":
+        # Convert weights once; retain FP32 buffers such as rotary frequencies.
+        for parameter in model.parameters():
+            parameter.data = parameter.data.to(torch.float16)
+else:
+    directory = Path(args.engine_root) / f"{args.backend}-{args.precision}"
+    model = torch.export.load(example._rank_path(directory, rank, world)).module()
+
+
+def timed_eager(inputs):
+    cache = DynamicCache(config=model.config)
+    length = inputs.shape[1]
+    positions = torch.arange(length, device=device).unsqueeze(0)
+    torch.cuda.synchronize()
+    start = time.perf_counter()
+    output = model(
+        inputs, position_ids=positions, past_key_values=cache, use_cache=True
+    )
+    token = output.logits[:, -1, :].argmax(-1, keepdim=True)
+    torch.cuda.synchronize()
+    ttft = time.perf_counter() - start
+    start = time.perf_counter()
+    for index in range(length, length + 127):
+        positions = torch.tensor([[index]], device=device, dtype=torch.int64)
+        output = model(
+            token, position_ids=positions, past_key_values=cache, use_cache=True
+        )
+        token = output.logits[:, -1, :].argmax(-1, keepdim=True)
+    torch.cuda.synchronize()
+    decode = time.perf_counter() - start
+    assert cache.get_seq_length() == length + 127
+    return {"ttft_s": ttft, "decode_s": decode, "total_s": ttft + decode}
+
+
+rows = []
+with torch.no_grad(), torch.autocast(
+    "cuda",
+    dtype=torch.float16,
+    enabled=args.backend != "eager" and args.precision == "fp16",
+):
+    for length in (128, 256):
+        inputs = torch.randint(
+            tokenizer.vocab_size,
+            (1, length),
+            generator=torch.Generator().manual_seed(0),
+        ).to(device)
+        dist.broadcast(inputs, src=0)
+        for iteration in range(-args.warmup, args.iterations):
+            dist.barrier()  # Outside the timed region; every rank must participate.
+            if args.backend == "eager":
+                timing = timed_eager(inputs)
+            else:
+                timing = _timed_generate_static_cache(
+                    model, inputs, length + 128, tokenizer.eos_token_id
+                )
+                assert timing["decode_tokens"] == 127
+            if iteration >= 0:
+                rows.append({"isl": length, **timing})
+        dist.barrier()
+
+# Aggregate after timing. Each sample uses the slower TP rank for each metric.
+per_rank = [None] * world
+dist.all_gather_object(per_rank, rows)
+if rank == 0:
+    merged = [
+        {
+            "isl": row["isl"],
+            **{
+                key: max(rank_rows[index][key] for rank_rows in per_rank)
+                for key in ("ttft_s", "decode_s", "total_s")
+            },
+        }
+        for index, row in enumerate(rows)
+    ]
+    result_dir = Path(args.results)
+    result_dir.mkdir(parents=True, exist_ok=True)
+    case = f"{args.backend}-{args.precision}"
+    (result_dir / f"{case}-round{args.round}.json").write_text(
+        json.dumps(merged, indent=2)
+    )
+    pooled = [
+        row
+        for path in sorted(result_dir.glob(f"{case}-round*.json"))
+        for row in json.loads(path.read_text())
+    ]
+    for length in (128, 256):
+        samples = [row for row in pooled if row["isl"] == length]
+        print(
+            {
+                "case": case,
+                "input_tokens": length,
+                "output_tokens": 128,
+                "samples": len(samples),
+                "median_ttft_ms": 1000
+                * statistics.median(row["ttft_s"] for row in samples),
+                "median_decode_tokens_s": statistics.median(
+                    127 / row["decode_s"] for row in samples
+                ),
+                "median_total_ms": 1000
+                * statistics.median(row["total_s"] for row in samples),
+            },
+            flush=True,
+        )
+
+del model
+dist.barrier()
+dist.destroy_process_group()
+os._exit(0)  # Same shutdown convention as the export example.
+```
+
+Run two rounds in opposite case order, with each process completing before the
+next starts:
+
+```bash
+for round in 0 1; do
+    cases=(eager:fp16 static_v1:fp16 static_v2:fp16 eager:fp32 static_v1:fp32 static_v2:fp32)
+    if [ "$round" -eq 1 ]; then
+        cases=(static_v2:fp32 static_v1:fp32 eager:fp32 static_v2:fp16 static_v1:fp16 eager:fp16)
+    fi
+    for case in "${cases[@]}"; do
+        torchtrtrun --nproc_per_node=2 /tmp/benchmark_tp.py \
+            --model "$TP_BENCH_MODEL" --backend "${case%:*}" --precision "${case#*:}" \
+            --engine-root "$TP_BENCH_ENGINES" --results "$TP_BENCH_RESULTS" \
+            --round "$round" --warmup 3 --iterations 10
+    done
+done
+
+# The experiment included one additional static_v2 FP16 run.
+torchtrtrun --nproc_per_node=2 /tmp/benchmark_tp.py \
+    --model "$TP_BENCH_MODEL" --backend static_v2 --precision fp16 \
+    --engine-root "$TP_BENCH_ENGINES" --results "$TP_BENCH_RESULTS" \
+    --round 2 --warmup 3 --iterations 10
+```
+
+For a quick TRT-only check, the export script's load mode also exposes the timing
+helpers directly. This prints rank 0's summary, including **mean** throughput;
+the comparison snippet above instead pools the slower rank's samples and reports
+**median** throughput:
+
+```bash
+torchtrtrun --nproc_per_node=2 tools/llm/tensor_parallel_llm_export.py \
+    --mode load --model "$TP_BENCH_MODEL" --precision fp16 --cache static_v2 \
+    --save_dir "$TP_BENCH_ENGINES/static_v2-fp16" \
+    --benchmark --batch_size 1 --isl 128 --num_tokens 128 \
+    --seed 0 --warmup 3 --iterations 10
+```
 
 ### Quantization
 
