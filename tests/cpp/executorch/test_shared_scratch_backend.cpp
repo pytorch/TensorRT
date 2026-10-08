@@ -3073,6 +3073,48 @@ TEST_F(SharedScratchBackendTest, TwoThreadsRunningPooledEnginesOnOneDeviceKeepTh
                                         "its own scratch";
 }
 
+// ---------------------------------------------------------------------------
+// Where an engine's memory comes from
+// ---------------------------------------------------------------------------
+
+// TensorRT's default allocator draws from whichever stream-ordered pool is
+// current when it allocates, so a fresh pool made current for one load sees
+// anything that load would take from it.
+TEST_F(SharedScratchBackendTest, LoadingAnEngineReservesNothingFromTheStreamOrderedPool) {
+  // The device every fixture blob names.
+  constexpr int kDeviceId = 0;
+  int memory_pools = 0;
+  ASSERT_EQ(cudaDeviceGetAttribute(&memory_pools, cudaDevAttrMemoryPoolsSupported, kDeviceId), cudaSuccess);
+  if (memory_pools == 0) {
+    GTEST_SKIP() << "device " << kDeviceId
+                 << " reports no stream-ordered allocator (cudaDevAttrMemoryPoolsSupported = 0), so there is no pool "
+                    "an engine could be loaded into";
+  }
+
+  cudaMemPoolProps props{};
+  props.allocType = cudaMemAllocationTypePinned;
+  props.location.type = cudaMemLocationTypeDevice;
+  props.location.id = kDeviceId;
+  cudaMemPool_t watched = nullptr;
+  ASSERT_EQ(cudaMemPoolCreate(&watched, &props), cudaSuccess);
+  cudaMemPool_t previous = nullptr;
+  ASSERT_EQ(cudaDeviceGetMemPool(&previous, kDeviceId), cudaSuccess);
+
+  LoadedEngine engine;
+  ASSERT_EQ(cudaDeviceSetMemPool(kDeviceId, watched), cudaSuccess);
+  const Error loaded = engine.load(blob(), 28);
+  ASSERT_EQ(cudaDeviceSetMemPool(kDeviceId, previous), cudaSuccess);
+  std::uint64_t reserved = 0;
+  ASSERT_EQ(cudaMemPoolGetAttribute(watched, cudaMemPoolAttrReservedMemHigh, &reserved), cudaSuccess);
+  // Returns at once even if the load took from it; the pool goes when that is freed.
+  ASSERT_EQ(cudaMemPoolDestroy(watched), cudaSuccess);
+
+  ASSERT_EQ(loaded, Error::Ok);
+  EXPECT_EQ(reserved, 0u) << "loading an engine reserved " << reserved
+                          << " bytes from the device's stream-ordered pool, which on a Jetson cannot place a block "
+                             "that cudaMalloc still can";
+}
+
 } // namespace
 } // namespace executorch_backend
 } // namespace torch_tensorrt

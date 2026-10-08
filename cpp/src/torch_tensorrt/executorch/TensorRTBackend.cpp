@@ -34,6 +34,7 @@
 #include <cuda_runtime.h>
 
 #include <executorch/extension/cuda/caller_stream.h>
+#include <executorch/extension/cuda/cuda_allocator.h>
 #include <executorch/extension/cuda/device_guard.h>
 #include <executorch/runtime/backend/interface.h>
 #include <executorch/runtime/core/exec_aten/util/tensor_util.h>
@@ -43,6 +44,7 @@ namespace torch_tensorrt {
 namespace executorch_backend {
 
 using ::executorch::aten::SizesType;
+using ::executorch::backends::cuda::CudaAllocator;
 using ::executorch::runtime::ArrayRef;
 using ::executorch::runtime::BackendExecutionContext;
 using ::executorch::runtime::BackendInitContext;
@@ -50,6 +52,7 @@ using ::executorch::runtime::BackendOption;
 using ::executorch::runtime::BackendOptionContext;
 using ::executorch::runtime::CompileSpec;
 using ::executorch::runtime::DelegateHandle;
+using ::executorch::runtime::DeviceAllocator;
 using ::executorch::runtime::Error;
 using ::executorch::runtime::EValue;
 using ::executorch::runtime::FreeableBuffer;
@@ -108,6 +111,43 @@ EngineHandle::~EngineHandle() {
   // The runtime is shared and outlives this handle, so there is nothing to release for it.
 }
 
+namespace {
+
+// TensorRT's default allocator takes engine memory from CUDA's stream-ordered pool, which on a
+// Jetson, whose GPU shares the board's memory, can fail to place a large block that cudaMalloc
+// still can. ExecuTorch's CUDA allocator uses cudaMalloc, and every CUDA delegate shares it.
+class ExecuTorchCudaAllocator final : public nvinfer1::IGpuAsyncAllocator {
+ public:
+  void* allocateAsync(
+      uint64_t size,
+      uint64_t alignment,
+      nvinfer1::AllocatorFlags /*flags*/,
+      cudaStream_t /*stream*/) noexcept override {
+    if (size == 0) {
+      return nullptr;
+    }
+    // TensorRT passes 0 when any alignment will do.
+    auto memory = CudaAllocator::instance().allocate(
+        size, kCurrentDevice, alignment == 0 ? DeviceAllocator::kDefaultAlignment : alignment);
+    return memory.ok() ? memory.get() : nullptr;
+  }
+
+  // TensorRT requires the memory to stay valid until `stream` reaches this point.
+  bool deallocateAsync(void* memory, cudaStream_t stream) noexcept override {
+    if (cudaStreamSynchronize(stream) != cudaSuccess) {
+      cudaGetLastError();
+      return false;
+    }
+    CudaAllocator::instance().deallocate(memory, kCurrentDevice);
+    return true;
+  }
+
+ private:
+  static constexpr ::executorch::runtime::etensor::DeviceIndex kCurrentDevice = -1;
+};
+
+} // namespace
+
 // The process-wide TensorRT runtime and its logger, built once on first use and then never
 // destroyed. TensorRT requires the runtime to outlive every engine deserialized from it, and never
 // destroying it is the only way to promise that here. Destroying it at exit would not: statics are
@@ -126,6 +166,10 @@ nvinfer1::IRuntime* TensorRTBackend::shared_runtime() {
       logger = new TRTLogger();
     }
     runtime = nvinfer1::createInferRuntime(*logger);
+    if (runtime != nullptr) {
+      // Never destroyed, for the same reason as the runtime: every engine frees through it.
+      runtime->setGpuAllocator(new ExecuTorchCudaAllocator());
+    }
   }
   return runtime;
 }
