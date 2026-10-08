@@ -1,7 +1,6 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
-import copy
 import timeit
 from typing import Any, Callable, Optional, TypedDict
 
@@ -53,7 +52,7 @@ def export_llm(model, inputs, min_seq_len=1, max_seq_len=16):
                 dynamic_shapes=({1: seq_len}, {1: seq_len}),
                 strict=False,
             )
-        except:
+        except Exception:
             print(
                 "Trying torch.export._trace._export to trace the graph since torch.export.export() failed"
             )
@@ -212,9 +211,9 @@ def generate_with_static_cache(model, input_seq, max_output_seq_length, eos_toke
     """
     start_idx = 0
     end_idx = input_seq.shape[1]
-    position_ids = torch.arange(
-        input_seq.shape[1], device=input_seq.device
-    ).unsqueeze(0)
+    position_ids = torch.arange(input_seq.shape[1], device=input_seq.device).unsqueeze(
+        0
+    )
     output_seq = input_seq.clone()
     # TODO: Confirm this: When end_idx = max_output_seq_length-1, number of tokens generated = OSL
     num_tokens_generated = 0
@@ -330,9 +329,9 @@ def _timed_generate_static_cache(
     start_idx = 0
     end_idx = input_seq.shape[1]
     prefill_tokens = end_idx
-    position_ids = torch.arange(
-        input_seq.shape[1], device=input_seq.device
-    ).unsqueeze(0)
+    position_ids = torch.arange(input_seq.shape[1], device=input_seq.device).unsqueeze(
+        0
+    )
     kv_cache = get_zeroed_static_cache_inputs(model, device=input_seq.device)
 
     torch.cuda.synchronize()
