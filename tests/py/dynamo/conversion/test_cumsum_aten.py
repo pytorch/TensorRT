@@ -284,7 +284,7 @@ class TestCumsumConverter(DispatchTestCase):
             Cumsum(),
             inputs,
             use_dynamo_tracer=True,
-            immutable_weights=False,
+            immutable_weights=True,
         )
 
     @parameterized.expand(
@@ -310,7 +310,7 @@ class TestCumsumConverter(DispatchTestCase):
             rtol=0,
             atol=0,
             use_dynamo_tracer=True,
-            immutable_weights=False,
+            immutable_weights=True,
         )
 
     @parameterized.expand([(torch.float16,), (torch.bfloat16,)])
@@ -331,7 +331,8 @@ class TestCumsumConverter(DispatchTestCase):
         self.run_test_with_dynamic_shape(
             Cumsum(),
             inputs,
-            immutable_weights=False,
+            use_dynamo_tracer=True,
+            immutable_weights=True,
         )
 
 
