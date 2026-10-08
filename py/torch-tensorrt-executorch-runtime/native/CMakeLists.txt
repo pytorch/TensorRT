@@ -16,7 +16,7 @@ endif()
 
 list(APPEND CMAKE_MODULE_PATH "${TORCH_TENSORRT_SOURCE_DIR}/cmake/Modules")
 find_package(TensorRT REQUIRED)
-find_package(CUDAToolkit REQUIRED)
+find_package(CUDAToolkit 12.5 REQUIRED)
 find_package(Threads REQUIRED)
 
 # The prebuilt ExecuTorch runtime, from the installed wheel. Everything this wheel used to

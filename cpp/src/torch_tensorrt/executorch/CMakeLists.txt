@@ -20,7 +20,7 @@ foreach(_torchtrt_cmake_module_dir IN ITEMS
 endforeach()
 
 find_package(TensorRT REQUIRED)
-find_package(CUDAToolkit REQUIRED)
+find_package(CUDAToolkit 12.5 REQUIRED)
 find_package(Threads REQUIRED)
 
 set(_executorch_backend_tensorrt_sources
