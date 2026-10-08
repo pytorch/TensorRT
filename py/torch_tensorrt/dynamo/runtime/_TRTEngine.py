@@ -47,6 +47,7 @@ from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
     HW_COMPATIBLE_IDX,
     INPUT_BINDING_NAMES_IDX,
     NAME_IDX,
+    NATIVE_COLLECTIVE_PARENT_IDX,
     OUTPUT_BINDING_NAMES_IDX,
     REQUIRES_NATIVE_MULTIDEVICE_IDX,
     REQUIRES_OUTPUT_ALLOCATOR_IDX,
@@ -349,6 +350,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         every settings-mutation path so reads of ``self.context`` always
         observe up-to-date settings."""
         self._context = None
+        self._nccl_comm = None
 
     def has_context(self) -> bool:
         """True iff the execution context has been materialized. Probes
@@ -482,6 +484,10 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         # Internal alias used by the NCCL setup paths (matches the original
         # _PythonTorchTensorRTModule attribute name).
         self._has_nccl_ops: bool = self.requires_native_multidevice
+        self.native_collective_parent = str(
+            self.serialized_info[NATIVE_COLLECTIVE_PARENT_IDX]
+        )
+        self.group_name = ""
 
         # aliased_io maps an output binding name to (input_binding_name, kind).
         # Aliased outputs share storage with their source input so the engine
@@ -589,30 +595,9 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             )
 
             check_nccl_engine_requirements()
-
-            # For engines with native NCCL collective layers, all ranks must
-            # have a live IExecutionContext before any rank executes a
-            # collective. Materialize the context up front (mirrors the C++
-            # ctor's eager bind_nccl_comm path) and barrier so a fast-compiling
-            # rank does not race ahead
-            # and issue an NCCL op while another rank is still inside
-            # deserialize_cuda_engine / create_execution_context.
-            #
-            # Trade-off: NCCL engines forfeit the "one createExecutionContext
-            # per setup" invariant the non-NCCL path enjoys. Any subsequent
-            # ``mod.runtime_settings = ...`` invalidates this eagerly-created
-            # context and triggers a second create on next execute.
-            _ = self.context  # property triggers create_execution_context
-
-            if (
-                dist.is_available()
-                and dist.is_initialized()
-                and dist.get_world_size() > 1
-            ):
-                logger.debug(
-                    "Barrier after execution context creation (distributed NCCL engine)"
-                )
-                dist.barrier()
+            # Communicator setup is deferred until execution. In particular,
+            # loading a subgroup engine must not synchronize unrelated WORLD ranks.
+            # setup_nccl_comm materializes each context before its parent warm-up.
 
         if not self.in_binding_names and not self.out_binding_names:
             input_names: List[str] = []
@@ -926,24 +911,48 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             dist.is_available() and dist.is_initialized() and dist.get_world_size() > 1
         )
 
+    @property
+    def nccl_initialized(self) -> bool:
+        return self._nccl_comm is not None
+
+    def release_nccl_comm(self) -> None:
+        self.reset_captured_graph()
+        self.invalidate_context()
+
+    def set_group_name(self, group_name: str) -> None:
+        from torch.distributed.distributed_c10d import _resolve_process_group
+        from torch_tensorrt.distributed._distributed import _require_native_parent
+
+        if self.requires_native_multidevice:
+            _require_native_parent(
+                _resolve_process_group(group_name), self.native_collective_parent
+            )
+        if self.group_name != group_name:
+            if self._nccl_comm is not None:
+                self.release_nccl_comm()
+            self.group_name = group_name
+
     def setup_nccl_comm(self) -> None:
         """Set up NCCL communicator from the active ProcessGroup.
 
-        Native engines use global rank IDs and require the WORLD communicator.
-        An active subgroup is rejected before any NCCL warm-up or TRT binding.
+        Native engines require their saved compile-time parent mapping.
+        Incompatible parents are rejected before any NCCL warm-up or TRT binding.
         Called lazily on first forward pass for distributed engines.
         """
         from torch_tensorrt.distributed._distributed import (
-            _require_world_group,
+            _require_native_parent,
             get_active_group,
         )
 
+        pg = get_active_group()
+        if self.group_name:
+            from torch.distributed.distributed_c10d import _resolve_process_group
+
+            pg = _resolve_process_group(self.group_name)
+        if self.requires_native_multidevice:
+            _require_native_parent(pg, self.native_collective_parent)
         if not self.is_distributed:
             return
-
-        pg = get_active_group()
-        if self.requires_native_multidevice:
-            _require_world_group(pg)
         if pg is None or dist.get_backend(pg) != "nccl":
             raise RuntimeError(
                 "Active ProcessGroup must use NCCL backend. "
@@ -951,6 +960,10 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             )
 
         backend = pg._get_backend(torch.device("cuda"))
+
+        # Create the context before warm-up so every parent's context is ready
+        # when that collective completes, including after save/load or invalidation.
+        context = self.context
 
         # Force NCCL communicator initialization with a dummy collective.
         # Must use group=pg so the correct group's comm is initialized;
@@ -965,9 +978,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         self._nccl_comm = comm_ptr
 
         # Bind communicator to TRT execution context (PyCapsule required by TRT
-        # Python API). ``self.context`` is the lazy-create property; reading it
-        # here materializes the context if it hasn't been created yet (mirrors
-        # the cpp ``bind_nccl_comm`` path which also ensures the context first).
+        # Python API). The context was materialized before the parent warm-up.
         import ctypes
 
         ctypes.pythonapi.PyCapsule_New.restype = ctypes.py_object
@@ -977,7 +988,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             ctypes.c_void_p,
         ]
         comm_capsule = ctypes.pythonapi.PyCapsule_New(comm_ptr, None, None)
-        ok = self.context.set_communicator(comm_capsule)
+        ok = context.set_communicator(comm_capsule)
         if not ok:
             raise RuntimeError(
                 f"TRT context.set_communicator() returned False for rank={dist.get_rank()}. "

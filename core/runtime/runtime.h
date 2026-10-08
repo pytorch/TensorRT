@@ -23,7 +23,7 @@ namespace core {
 namespace runtime {
 
 using EngineID = int64_t;
-const std::string ABI_VERSION = "10";
+const std::string ABI_VERSION = "11";
 extern bool MULTI_DEVICE_SAFE_MODE;
 // AliasKind, AliasedIOSpec, and the alias_kind_(to|from)_string helpers are
 // declared in core/runtime/TRTEngine.h since runtime.h includes that header.
@@ -50,6 +50,7 @@ typedef enum {
   RESOURCE_ALLOCATION_STRATEGY_IDX,
   REQUIRES_NATIVE_MULTIDEVICE_IDX,
   ALIASED_IO_IDX,
+  NATIVE_COLLECTIVE_PARENT_IDX,
   SERIALIZATION_LEN, // NEVER USED FOR DATA, USED TO DETERMINE LENGTH OF SERIALIZED INFO
 } SerializedInfoIndex;
 
@@ -66,6 +67,8 @@ inline constexpr std::array<const char*, SERIALIZATION_LEN> kSerializedInfoIndex
     "REQUIRES_OUTPUT_ALLOCATOR_IDX",
     "RESOURCE_ALLOCATION_STRATEGY_IDX",
     "REQUIRES_NATIVE_MULTIDEVICE_IDX",
+    "ALIASED_IO_IDX",
+    "NATIVE_COLLECTIVE_PARENT_IDX",
 }};
 // For adding new serialized info indices, update above and update /dynamo/runtime/_serialized_engine_layout.py
 

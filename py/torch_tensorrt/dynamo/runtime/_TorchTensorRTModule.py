@@ -23,6 +23,7 @@ from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
     HW_COMPATIBLE_IDX,
     INPUT_BINDING_NAMES_IDX,
     NAME_IDX,
+    NATIVE_COLLECTIVE_PARENT_IDX,
     OUTPUT_BINDING_NAMES_IDX,
     REQUIRES_NATIVE_MULTIDEVICE_IDX,
     REQUIRES_OUTPUT_ALLOCATOR_IDX,
@@ -125,6 +126,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         settings: CompilationSettings = CompilationSettings(),
         requires_output_allocator: bool = False,
         requires_native_multidevice: bool = False,
+        native_collective_parent: str = "",
         symbolic_shape_expressions: Optional[Dict[str, List[Dict[str, Any]]]] = None,
         aliased_io: Optional[Dict[str, Tuple[str, str]]] = None,
     ):
@@ -146,6 +148,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             settings (torch_tensorrt.dynamo.CompilationSettings): Settings used to compile engine, assumes engine was built with default compilation settings if object not passed
             requires_output_allocator (bool): Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators)
             requires_native_multidevice (bool): Boolean flag indicating if the converter creates operators which require multiple devices to run (e.g. multi-device collective operations)
+            native_collective_parent (str): Ordered global ranks of the compile-time parent, comma-separated; empty for WORLD. Must match the rank space baked into the serialized engine.
             symbolic_shape_expressions (List[Any]): List of symbolic shape expressions for each input binding
 
         Example:
@@ -197,6 +200,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self._implicit_cache_handle: Any = None
         self.symbolic_shape_expressions = symbolic_shape_expressions
         self.requires_native_multidevice = requires_native_multidevice
+        self.native_collective_parent = native_collective_parent
         # Map of output binding name -> (input binding name, kind_str)
         self.aliased_io: Dict[str, Tuple[str, str]] = dict(aliased_io or {})
         self.target_platform = (
@@ -290,6 +294,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             int(self.requires_native_multidevice)
         )
         engine_info[ALIASED_IO_IDX] = serialize_aliased_io(self.aliased_io)
+        engine_info[NATIVE_COLLECTIVE_PARENT_IDX] = self.native_collective_parent
         # rank/world_size are runtime facts; queried from ProcessGroup at execution time.
         # RuntimeSettings are intentionally NOT serialized: they're per-engine, in-memory
         # init values, not part of the engine's identity (see pytorch/TensorRT#4310).
@@ -478,7 +483,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         # requires_native_multidevice is set by the C++ constructor from the serialized REQUIRES_NATIVE_MULTIDEVICE_IDX field.
         if self.engine.requires_native_multidevice:
             from torch_tensorrt.distributed._distributed import (
-                _require_world_group,
+                _require_native_parent,
                 get_active_group,
             )
             from torch_tensorrt.distributed._nccl_utils import (
@@ -487,7 +492,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
 
             active_group = get_active_group()
             if active_group is not None:
-                _require_world_group(active_group)
+                _require_native_parent(active_group, self.native_collective_parent)
             check_nccl_engine_requirements()
 
         # Store the active process group name on the C++ engine so that the
@@ -569,11 +574,14 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             self.requires_output_allocator = bool(
                 int(serialized_engine_info[REQUIRES_OUTPUT_ALLOCATOR_IDX])
             )
-            # Preserve the native/WORLD contract if this restored module is saved again.
+            # Preserve the native parent contract if this restored module is saved again.
             self.requires_native_multidevice = bool(
                 int(serialized_engine_info[REQUIRES_NATIVE_MULTIDEVICE_IDX])
             )
             self.serialized_engine = serialized_engine_info[ENGINE_IDX]
+            self.native_collective_parent = str(
+                serialized_engine_info[NATIVE_COLLECTIVE_PARENT_IDX]
+            )
 
             serialized_metadata = serialized_engine_info[SERIALIZED_METADATA_IDX]
             # ``_pack_engine_info`` packs the metadata as a ``str``

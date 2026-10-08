@@ -453,6 +453,7 @@ def no_op_placeholder_for_execute_engine(
     serialized_resource_allocation_strategy: str,
     serialized_requires_native_multidevice: str,
     serialized_aliased_io: str,
+    serialized_native_collective_parent: str = "",
 ) -> List[torch.Tensor]:
     raise RuntimeError(
         "The saved model is cross compiled for windows in Linux, should only be loadded in Windows via torch_tensorrt.load_cross_compiled_exported_program() api."
@@ -475,6 +476,7 @@ def fake_no_op_placeholder_for_execute_engine(
     serialized_resource_allocation_strategy: str,
     serialized_requires_native_multidevice: str,
     serialized_aliased_io: str,
+    serialized_native_collective_parent: str = "",
 ) -> List[torch.Tensor]:
     """Fake kernel for no_op_placeholder_for_execute_engine.
 

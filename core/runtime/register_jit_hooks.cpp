@@ -75,6 +75,7 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
         .def("__str__", &TRTEngine::to_str)
         .def("__repr__", &TRTEngine::to_str)
         .def("__obj_flatten__", &TRTEngine::__obj_flatten__)
+        .def_readonly("native_collective_parent", &TRTEngine::native_collective_parent)
         // Reporting "real" below puts the engine itself into torch's fake tensor
         // dispatch cache key, and that cache compares keys with ==. Without this the
         // second lookup raises "'__eq__' is not implemented", which breaks any
@@ -238,6 +239,7 @@ TORCH_LIBRARY(tensorrt, m) {
   m.def("RESOURCE_ALLOCATION_STRATEGY_IDX", []() -> int64_t { return RESOURCE_ALLOCATION_STRATEGY_IDX; });
   m.def("REQUIRES_NATIVE_MULTIDEVICE_IDX", []() -> int64_t { return REQUIRES_NATIVE_MULTIDEVICE_IDX; });
   m.def("ALIASED_IO_IDX", []() -> int64_t { return ALIASED_IO_IDX; });
+  m.def("NATIVE_COLLECTIVE_PARENT_IDX", []() -> int64_t { return NATIVE_COLLECTIVE_PARENT_IDX; });
   m.def("NATIVE_TRT_COLLECTIVES_AVAIL", []() -> bool {
 #ifdef ENABLE_TRT_NCCL_COLLECTIVES
     return true;

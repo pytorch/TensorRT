@@ -106,7 +106,8 @@ using FlattenedState = std::tuple<
     std::tuple<std::string, std::string>, // Platform
     std::tuple<std::string, std::string>, // Resource Allocation Strategy
     std::tuple<std::string, std::string>, // requires_native_multidevice
-    std::tuple<std::string, std::string> // aliased_io
+    std::tuple<std::string, std::string>, // aliased_io
+    std::tuple<std::string, std::string> // native_collective_parent
     >;
 
 struct TorchTRTRuntimeStates {
@@ -386,9 +387,10 @@ struct TRTEngine : torch::CustomClassHolder {
   std::shared_ptr<DynamicOutputAllocator> output_allocator;
 
   // Member variables for distributed inference
-  // Serialized marker for native collectives, whose converters emit WORLD-global rank IDs.
-  // These engines must bind the current WORLD communicator, including after deserialization.
   bool requires_native_multidevice = false;
+  // Empty means WORLD; otherwise ordered global ranks of the compile-time parent.
+  // Collective layers contain rank IDs relative to this parent communicator.
+  std::string native_collective_parent;
   int64_t rank = -1; // populated at runtime by setup_nccl_comm()
   int64_t world_size = -1; // populated at runtime by setup_nccl_comm()
   std::string group_name = ""; // c10d registry name set after Python validation; empty = not configured
