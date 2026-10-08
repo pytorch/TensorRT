@@ -19,6 +19,15 @@ The manual slicing assumes the standard decoder layout
 ``mlp.{gate,up,down}_proj``), which both Llama and Qwen2/Qwen3 follow, so the
 same script works for either.
 
+Precision defaults to FP16 autocast. --precision fp32 converts floating weights
+and buffers to FP32 and disables autocast; TensorRT compilation disables TF32.
+Use a separate --save_dir for each precision and re-export when changing it:
+load mode executes the saved engine and does not convert its precision.
+Export/load do not require a tolerance profile. For optional numerical validation,
+use check_tensor_parallel_llama_export.py with the same --precision. See the
+"Tensor-parallel export: FP16 and FP32" section in tools/llm/README.md for the
+measured logit differences and token-choice findings.
+
 Tested ungated models (no HF token needed):
   Qwen/Qwen2.5-0.5B-Instruct  - smallest/fastest smoke test; kv_heads=2 => TP=2 ONLY
   Qwen/Qwen3-1.7B             - default; kv_heads=8 => TP 2/4/8
@@ -35,6 +44,12 @@ Usage
   torchtrtrun --nproc_per_node=2 \\
       tools/llm/tensor_parallel_llama_export.py \\
       --mode load --save_dir /tmp/llm_tp_engines --model Qwen/Qwen3-1.7B
+
+# FP32 export with static KV cache (use --mode load to reload these engines):
+  torchtrtrun --nproc_per_node=2 \\
+      tools/llm/tensor_parallel_llama_export.py \\
+      --mode export --model Qwen/Qwen2.5-0.5B-Instruct \\
+      --precision fp32 --cache static_v2 --save_dir /tmp/qwen_tp_fp32
 
 # Multi-node export (one GPU per node):
   torchtrtrun --nproc_per_node=1 --nnodes=2 --node_rank=0 \\
@@ -100,6 +115,15 @@ logger.info(f"dist init OK  rank={rank}/{world_size}  device={DEVICE}")
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _precision_context(args):
+    """Apply the same autocast policy to export, compilation and inference."""
+    precision = getattr(args, "precision", "fp16")
+    if precision == "fp32":
+        # Match disable_tf32=True below for the eager FP32 reference as well.
+        torch.set_float32_matmul_precision("highest")
+    return torch.autocast("cuda", dtype=torch.float16, enabled=precision == "fp16")
 
 
 def _rank_path(save_dir, rank, world_size):
@@ -192,6 +216,10 @@ def get_exportable_model(args, rank, world_size):
             .eval()
             .to(DEVICE)
         )
+        if getattr(args, "precision", "fp16") == "fp32":
+            # Disabling autocast alone leaves a BF16 checkpoint in BF16. Convert
+            # parameters and buffers before tracing to build an FP32 engine.
+            model = model.float()
         # Keep SDPA as a single op so the TRT custom converter (and optional
         # static KV cache lowering pass) can pattern-match it.
         register_sdpa.enable_sdpa_converter(args.model, model.config)
@@ -292,7 +320,7 @@ def export_and_save(input_ids, args):
     isl = input_ids.shape[1]
 
     logger.info("Exporting manually-sharded model with torch.export ...")
-    with torch.no_grad(), torch.autocast("cuda", dtype=torch.float16):
+    with torch.no_grad(), _precision_context(args):
         seq_len = torch.export.Dim("seq_len", min=1, max=max_seq)
         try:
             ep = torch.export.export(
@@ -322,10 +350,10 @@ def export_and_save(input_ids, args):
         import static_cache_v2  # noqa: F401
 
     logger.info("Compiling exported program with TRT (AOT) ...")
-    # Always run compile under FP16 autocast (matches the verify path below);
+    # Compile with the same precision used during export and verification;
     # additionally enable verbose Torch-TRT logging when --debug is set.
     with ExitStack() as _compile_stack:
-        _compile_stack.enter_context(torch.autocast("cuda", dtype=torch.float16))
+        _compile_stack.enter_context(_precision_context(args))
         if args.debug:
             _compile_stack.enter_context(torch_tensorrt.logging.debug())
         trt_model = torch_tensorrt.dynamo.compile(
@@ -370,12 +398,13 @@ def export_and_save(input_ids, args):
     # Verify
     if args.cache:
         # With KV cache, the engine takes (input_ids, position_ids, *kv_cache,
-        # start_idx, end_idx) and the reference model doesn't — logit
-        # comparison requires a separate KV-aware driver. Skip.
+        # start_idx, end_idx) and the reference model doesn't. Use
+        # check_tensor_parallel_llama_export.py to compare saved cached engines
+        # against an unsharded reference with identical token histories.
         logger.info("Skipping logit-diff verify (KV cache enabled).")
     else:
         logger.info("Verifying compiled model ...")
-        with torch.no_grad(), torch.autocast("cuda", dtype=torch.float16):
+        with torch.no_grad(), _precision_context(args):
             ref = _extract_logits(model(input_ids, position_ids=position_ids))
             trt = _extract_logits(trt_model(input_ids, position_ids=position_ids))
         logger.info(
@@ -461,6 +490,12 @@ if __name__ == "__main__":
         "  Qwen/Qwen3-1.7B             - default; kv_heads=8 => TP 2/4/8\n"
         "  meta-llama/Llama-3.2-1B-Instruct - original example (GATED, needs HF token)",
     )
+    parser.add_argument(
+        "--precision",
+        choices=["fp16", "fp32"],
+        default="fp16",
+        help="FP16 autocast or FP32 weights/operations. Re-export into a separate save directory when changing precision.",
+    )
     parser.add_argument("--prompt", default="What is tensor parallelism?")
     parser.add_argument("--num_tokens", type=int, default=128)
     parser.add_argument(
@@ -505,7 +540,7 @@ if __name__ == "__main__":
     args.max_seq_len = max_len
 
     trt_model = None
-    with torch.inference_mode(), torch.autocast("cuda", dtype=torch.float16):
+    with torch.inference_mode(), _precision_context(args):
         gen_fn = _pick_generate_fn(args)
 
         if args.mode == "export":
@@ -538,7 +573,7 @@ if __name__ == "__main__":
                     stats = record_stats_split(
                         "TensorRT-TP (export)",
                         trt_results,
-                        "FP16",
+                        args.precision.upper(),
                         batch_size=args.batch_size,
                     )
                     print("\n=========TensorRT-TP (export) PERFORMANCE============")
@@ -563,7 +598,7 @@ if __name__ == "__main__":
                     stats = record_stats_split(
                         "TensorRT-TP (load)",
                         trt_results,
-                        "FP16",
+                        args.precision.upper(),
                         batch_size=args.batch_size,
                     )
                     print("\n=========TensorRT-TP (load) PERFORMANCE============")
