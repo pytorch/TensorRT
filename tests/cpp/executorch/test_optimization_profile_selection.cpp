@@ -26,6 +26,7 @@
 
 #include <cstdint>
 #include <initializer_list>
+#include <limits>
 #include <vector>
 
 namespace torch_tensorrt {
@@ -320,6 +321,24 @@ TEST(ExecuTorchOptimizationProfileSelection, ProfileWhoseBoundsCarryAnExtraExten
   // reject a rank-2 input on its own and the rank check could go missing unseen.
   EXPECT_FALSE(profile_fits(table, 0, prefill_input()));
   EXPECT_FALSE(profile_fits(table, 1, prefill_input()));
+}
+
+TEST(ExecuTorchOptimizationProfileSelection, AnIndexOutsideInt32IsRejectedRatherThanWrapped) {
+  EXPECT_EQ(to_profile_index(int64_t{1}), 1);
+  EXPECT_EQ(to_profile_index(size_t{2}), 2);
+  EXPECT_EQ(to_profile_index(int64_t{-1}), -1);
+  EXPECT_EQ(to_profile_index(int64_t{1} << 32), -1);
+  EXPECT_EQ(to_profile_index(int64_t{4294967297}), -1);
+  EXPECT_EQ(to_profile_index(int64_t{std::numeric_limits<int32_t>::min()} - 1), -1);
+  EXPECT_EQ(to_profile_index(uint64_t{std::numeric_limits<uint32_t>::max()}), -1);
+  EXPECT_EQ(to_profile_index(std::numeric_limits<int32_t>::max()), std::numeric_limits<int32_t>::max());
+
+  ProfileTable table;
+  table.bounds = {{bounds({1}, {1})}, {bounds({1}, {8})}};
+  int32_t selected = -7;
+  EXPECT_EQ(
+      select_profile(table, ProfileRequest::kPinned, to_profile_index(int64_t{1} << 32), {dims({1})}, selected),
+      ProfileSelection::kRequestedProfileUnavailable);
 }
 
 } // namespace

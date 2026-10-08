@@ -298,6 +298,9 @@ class TestMultiProfileRuntime(TestCase):
             else:
                 e.set_active_profile(1)
             self.assertEqual(e._active_profile_index, 0)
+            # Only a positive pin is tolerated; a negative one is still an error.
+            with self.assertRaises((ValueError, RuntimeError)):
+                e.set_active_profile(-1)
 
         # Tolerating the pin must leave the engine runnable, on profile 0.
         ref = self.model(static_in)

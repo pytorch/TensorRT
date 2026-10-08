@@ -269,14 +269,14 @@ class [[nodiscard]] OptimizationProfileGuard {
   [[nodiscard]] explicit OptimizationProfileGuard(int32_t profile_index);
 
   /**
-   * @brief Pin using any other integer spelling of an index, converted to
-   * int32_t.
+   * @brief Pin using any other integer spelling of an index.
    *
-   * An index arrives as int64_t from TRTEngine::set_active_profile, as size_t
-   * from a container, and as int from a literal. Without this overload the
-   * deleted bool constructor would make every one of those spellings ambiguous
-   * rather than converting, since narrowing to int32_t and converting to bool
-   * rank equally.
+   * An index arrives as int64_t from TRTEngine::set_active_profile and as size_t
+   * from a container. Without this overload the deleted bool constructor would
+   * make those spellings ambiguous rather than converting, since narrowing to
+   * int32_t and converting to bool rank equally. An index outside the int32_t
+   * range is pinned as -1, so execute() rejects it like any other index the
+   * engine lacks instead of it wrapping onto a real profile.
    *
    * @param profile_index Position in the export-time profile list.
    */
@@ -284,7 +284,7 @@ class [[nodiscard]] OptimizationProfileGuard {
       typename T,
       typename = std::enable_if_t<std::is_integral_v<T> && !std::is_same_v<std::remove_cv_t<T>, bool>>>
   [[nodiscard]] explicit OptimizationProfileGuard(T profile_index)
-      : OptimizationProfileGuard(static_cast<int32_t>(profile_index)) {}
+      : OptimizationProfileGuard(to_profile_index(profile_index)) {}
 
   /// @brief Rejected so that OptimizationProfileGuard(true) cannot become index 1.
   OptimizationProfileGuard(bool) = delete;

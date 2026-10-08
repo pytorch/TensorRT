@@ -632,30 +632,41 @@ void log_no_profile_matches(const EngineHandle& handle, const std::vector<nvinfe
 // pinned and unset paths, where select_profile() never tests fit.
 Error validate_input_dims(const EngineHandle& handle, int32_t profile, const std::vector<nvinfer1::Dims>& input_dims) {
   const auto& bounds = handle.profiles.bounds[static_cast<size_t>(profile)];
+  // With no guard in scope this is the error a caller who forgot one gets, so say
+  // that other profiles exist and how to reach them.
+  const auto hint = [&handle]() -> std::string {
+    if (handle.profiles.size() <= 1) {
+      return "";
+    }
+    return "; this engine has " + std::to_string(handle.profiles.size()) +
+        " profiles, so pin another with OptimizationProfileGuard or use OptimizationProfileGuard::automatic()";
+  };
   for (size_t i = 0; i < input_dims.size(); ++i) {
     const char* name = handle.input_binding_names[i].c_str();
     const nvinfer1::Dims& dims = input_dims[i];
     if (dims.nbDims != bounds[i].min.nbDims) {
       ET_LOG(
           Error,
-          "TensorRTBackend::execute: input '%s' rank %d does not match profile %d rank %d",
+          "TensorRTBackend::execute: input '%s' rank %d does not match profile %d rank %d%s",
           name,
           dims.nbDims,
           profile,
-          bounds[i].min.nbDims);
+          bounds[i].min.nbDims,
+          hint().c_str());
       return Error::InvalidArgument;
     }
     for (int d = 0; d < dims.nbDims; ++d) {
       if (dims.d[d] < bounds[i].min.d[d] || dims.d[d] > bounds[i].max.d[d]) {
         ET_LOG(
             Error,
-            "TensorRTBackend::execute: input '%s' dim %d is %ld, outside profile %d bounds [%ld, %ld]",
+            "TensorRTBackend::execute: input '%s' dim %d is %ld, outside profile %d bounds [%ld, %ld]%s",
             name,
             d,
             static_cast<long>(dims.d[d]),
             profile,
             static_cast<long>(bounds[i].min.d[d]),
-            static_cast<long>(bounds[i].max.d[d]));
+            static_cast<long>(bounds[i].max.d[d]),
+            hint().c_str());
         return Error::InvalidArgument;
       }
     }
