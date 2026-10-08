@@ -6,6 +6,7 @@ from typing import Any, Callable, Iterator
 import torch
 
 from ...plugin.attn_patches import _patch_language_attention, patch_attribute
+from ...plugin.plugin_utils import attention_plugin_uses_paged_kv, dense_kv_from_pool
 
 
 def _num_loops(config: Any) -> int:
@@ -73,8 +74,14 @@ def _patch_nanbeige_language_model(original: Callable) -> Callable:
             indices,
         ]
         logits = lm_head(last_hidden).float()
-        prefix_k = torch.stack([kv[:, 0, :, :seq_len, :] for kv in new_kvs], dim=0)
-        prefix_v = torch.stack([kv[:, 1, :, :seq_len, :] for kv in new_kvs], dim=0)
+        if attention_plugin_uses_paged_kv(default=False):
+            bsz = inputs_embeds.shape[0]
+            dense = [dense_kv_from_pool(kv, bsz, seq_len) for kv in new_kvs]
+            prefix_k = torch.stack([k for k, _ in dense], dim=0)
+            prefix_v = torch.stack([v for _, v in dense], dim=0)
+        else:
+            prefix_k = torch.stack([kv[:, 0, :, :seq_len, :] for kv in new_kvs], dim=0)
+            prefix_v = torch.stack([kv[:, 1, :, :seq_len, :] for kv in new_kvs], dim=0)
         return logits, hidden, prefix_k, prefix_v
 
     return forward

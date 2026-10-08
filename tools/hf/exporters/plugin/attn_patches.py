@@ -22,6 +22,11 @@ import torch
 import torch.nn as nn
 
 from .attention import ContextAttentionMaskType
+from .plugin_utils import (
+    attention_plugin_uses_paged_kv,
+    identity_kv_page_table,
+    ragged_prefill_metadata,
+)
 
 _PATCHES: dict[str, list[tuple[str, Callable]]] = {}
 _LANGUAGE_MASK_TYPE = int(ContextAttentionMaskType.PADDING)
@@ -137,6 +142,63 @@ def _language_dims(module: nn.Module) -> tuple[int, int, int]:
         or (cfg.hidden_size // cfg.num_attention_heads)
     )
     return num_heads, num_kv, head_dim
+
+
+def _paged_attention(
+    q: torch.Tensor,
+    k: torch.Tensor,
+    v: torch.Tensor,
+    kv_pool: torch.Tensor,
+    ctx_len: torch.Tensor,
+    rope_rotary_cos_sin: torch.Tensor,
+    kvcache_start_index: torch.Tensor,
+    num_heads: int,
+    num_kv: int,
+    head_dim: int,
+    mask_type: int | None = None,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Fresh-prefill call into the Edge-LLM >=0.10 AttentionPlugin.
+
+    Packs Q/K/V token-major, gathers the token-aligned rope rows for positions
+    ``0..S-1`` and builds the ragged metadata the plugin expects for a context
+    prefill (phase marker extent 1, one context sequence per batch row).
+    ``mask_type`` defaults to :func:`language_mask_type`.
+    """
+    if mask_type is None:
+        mask_type = language_mask_type()
+    batch_size, seq_len, _ = q.shape
+    tokens = batch_size * seq_len
+    device = q.device
+    qkv = torch.cat([q, k, v], dim=-1).to(torch.float16).reshape(tokens, -1)
+    rope_rows = (
+        rope_rotary_cos_sin[:, :seq_len].expand(batch_size, -1, -1).reshape(tokens, -1)
+    )
+    query_lengths = ctx_len.to(torch.int32)
+    selector = (
+        None
+        if int(mask_type) == int(ContextAttentionMaskType.CAUSAL)
+        else torch.zeros(batch_size, dtype=torch.int32, device=device)
+    )
+    query_start_offsets, phase_marker, ctx_carrier = ragged_prefill_metadata(
+        batch_size, seq_len, device
+    )
+    attn_out, updated_kv = torch.ops.trt.attention_plugin_paged.default(
+        qkv,
+        kv_pool,
+        query_lengths,
+        rope_rows,
+        kvcache_start_index,
+        identity_kv_page_table(kv_pool, batch_size),
+        selector,
+        query_start_offsets,
+        query_lengths,
+        phase_marker,
+        ctx_carrier,
+        num_heads,
+        num_kv,
+        head_dim,
+    )
+    return attn_out, updated_kv
 
 
 @register_patch(
@@ -276,22 +338,36 @@ def _patch_language_attention(original: Callable) -> Callable:
             )
 
         dtype = q.dtype
-        attn_out, updated_kv = torch.ops.trt.attention_plugin.default(
-            q.to(torch.float16),
-            k.to(torch.float16),
-            v.to(torch.float16),
-            past_key_value,
-            ctx_len,
-            rope_rotary_cos_sin,
-            kvcache_start_index,
-            num_heads,
-            num_kv,
-            False,
-            head_dim,
-            False,
-            -1,
-            language_mask_type(),
-        )
+        if attention_plugin_uses_paged_kv(default=False):
+            attn_out, updated_kv = _paged_attention(
+                q,
+                k,
+                v,
+                past_key_value,
+                ctx_len,
+                rope_rotary_cos_sin,
+                kvcache_start_index,
+                num_heads,
+                num_kv,
+                head_dim,
+            )
+        else:
+            attn_out, updated_kv = torch.ops.trt.attention_plugin.default(
+                q.to(torch.float16),
+                k.to(torch.float16),
+                v.to(torch.float16),
+                past_key_value,
+                ctx_len,
+                rope_rotary_cos_sin,
+                kvcache_start_index,
+                num_heads,
+                num_kv,
+                False,
+                head_dim,
+                False,
+                -1,
+                language_mask_type(),
+            )
         attn_hidden = num_heads * head_dim
         attn_out = attn_out.reshape(batch_size, seq_len, attn_hidden).to(dtype)
         o_proj = getattr(self, "o_proj", None) or getattr(self, "out_proj", None)

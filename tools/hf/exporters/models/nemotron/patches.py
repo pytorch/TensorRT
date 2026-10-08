@@ -2,18 +2,16 @@
 
 from __future__ import annotations
 
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from typing import Any, Callable, Iterator
 
 import torch
 
-from ...plugin.attn_patches import (
-    apply_patches,
-    register_patch,
-)
+from ...plugin.attn_patches import apply_patches, patch_attribute, register_patch
 from .helpers import _decoder, _kind
 
 NEMOTRON = "nemotron"
+_NATIVE_MODULE = "transformers.models.nemotron_h.modeling_nemotron_h"
 
 
 @register_patch(
@@ -98,7 +96,14 @@ def apply_nemotron_patches(model: Any | None = None) -> Iterator[None]:
                 prepare = getattr(block.mixer, "prepare_for_export", None)
                 if callable(prepare):
                     prepare()
-        with apply_patches(NEMOTRON):
+        with ExitStack() as stack:
+            stack.enter_context(apply_patches(NEMOTRON))
+            # ``trust_remote_code`` checkpoints load the Hub copy of the modeling
+            # file, a different class from the registered native path.
+            if model is not None and type(model).__module__ != _NATIVE_MODULE:
+                stack.enter_context(
+                    patch_attribute(type(model), "forward", _patch_nemotron_causal_lm)
+                )
             yield
     finally:
         if restore:

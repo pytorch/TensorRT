@@ -5,6 +5,8 @@ from typing import Any
 import torch
 import torch.nn as nn
 
+from ...plugin.plugin_utils import attention_plugin_uses_paged_kv, paged_kv_pool_shape
+
 
 def _decoder(model: nn.Module) -> nn.Module:
     return getattr(model, "backbone", None) or model.model
@@ -38,20 +40,15 @@ def allocate_plugin_states(
         config.n_groups
     ) * int(config.ssm_state_size)
     conv_kernel = int(getattr(config, "conv_kernel", 4))
+    num_kv = int(config.num_key_value_heads)
+    if attention_plugin_uses_paged_kv(default=False):
+        kv_shape = paged_kv_pool_shape(max_seq_len, num_kv, head_dim, batch)
+    else:
+        kv_shape = (batch, 2, num_kv, max_seq_len, head_dim)
     kvs, convs, ssms = [], [], []
     for kind in kinds:
         if kind == "attention":
-            kvs.append(
-                torch.zeros(
-                    batch,
-                    2,
-                    int(config.num_key_value_heads),
-                    max_seq_len,
-                    head_dim,
-                    device=device,
-                    dtype=dtype,
-                )
-            )
+            kvs.append(torch.zeros(kv_shape, device=device, dtype=dtype))
         elif kind == "mamba":
             convs.append(
                 torch.zeros(batch, conv_dim, conv_kernel, device=device, dtype=dtype)

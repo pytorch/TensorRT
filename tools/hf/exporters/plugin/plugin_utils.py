@@ -253,6 +253,180 @@ def _register_attention_plugin_op() -> None:
         return attn_output, torch.empty_like(past_key_value)
 
 
+# Edge-LLM >=0.10 paged KV pool: [2, num_pages, PAGED_KV_TOKENS_PER_PAGE, Hkv, D],
+# plane 0 holds K pages and plane 1 holds V pages.
+PAGED_KV_TOKENS_PER_PAGE = 128
+
+
+def paged_kv_pool_shape(
+    max_seq_len: int, num_kv_heads: int, head_dim: int, batch_size: int = 1
+) -> tuple[int, int, int, int, int]:
+    pages_per_seq = -(-int(max_seq_len) // PAGED_KV_TOKENS_PER_PAGE)
+    return (
+        2,
+        int(batch_size) * pages_per_seq,
+        PAGED_KV_TOKENS_PER_PAGE,
+        int(num_kv_heads),
+        int(head_dim),
+    )
+
+
+def identity_kv_page_table(kv_pool: torch.Tensor, batch_size: int) -> torch.Tensor:
+    """``[B, 2, pages_per_seq]`` table giving each sequence a contiguous page range.
+
+    Row 0 holds K page ids; row 1 holds the derived V page ids (K id + num_pages).
+    """
+    num_pages = kv_pool.shape[1]
+    pages_per_seq = num_pages // batch_size
+    k_ids = torch.arange(num_pages, device=kv_pool.device, dtype=torch.int32).view(
+        batch_size, 1, pages_per_seq
+    )
+    return torch.cat([k_ids, k_ids + num_pages], dim=1)
+
+
+def dense_kv_from_pool(
+    kv_pool: torch.Tensor, batch_size: int, seq_len: int
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """``[B, Hkv, S, D]`` K and V from a pool laid out by ``identity_kv_page_table``."""
+    _, num_pages, page, num_kv, head_dim = kv_pool.shape
+    tokens = (num_pages // batch_size) * page
+    planes = kv_pool.reshape(2, batch_size, tokens, num_kv, head_dim)[:, :, :seq_len]
+    return planes[0].permute(0, 2, 1, 3), planes[1].permute(0, 2, 1, 3)
+
+
+def _attention_plugin_paged_eager(
+    qkv: torch.Tensor,
+    kv_pool: torch.Tensor,
+    query_lengths: torch.Tensor,
+    rope_rows: torch.Tensor,
+    kvcache_start_index: torch.Tensor,
+    kv_page_table: torch.Tensor,
+    context_mask_selector: Optional[torch.Tensor],
+    num_q_heads: int,
+    num_kv_heads: int,
+    head_size: int,
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    """Eager SDPA stand-in for the >=0.10 ``AttentionPlugin`` (fresh prefill only)."""
+    if kvcache_start_index.numel() and bool(kvcache_start_index.ne(0).any()):
+        raise NotImplementedError(
+            "paged attention eager reference only supports prefill"
+        )
+    batch = query_lengths.shape[0]
+    tokens = qkv.shape[0]
+    seq_len = tokens // batch
+    orig_dtype = qkv.dtype
+    qkv = qkv.view(batch, seq_len, num_q_heads + 2 * num_kv_heads, head_size)
+    q, k, v = qkv.split([num_q_heads, num_kv_heads, num_kv_heads], dim=2)
+    rope = rope_rows.float().view(batch, seq_len, -1)
+    q, k = _apply_plugin_rope(q, k, rope, head_size)
+    q = q.to(orig_dtype)
+    k = k.to(orig_dtype)
+
+    present = kv_pool.clone()
+    flat = present.view(-1, num_kv_heads, head_size)
+    table = kv_page_table.to(dtype=torch.long)
+    for b, length in enumerate(query_lengths.to(dtype=torch.long).tolist()):
+        t = torch.arange(length, device=qkv.device)
+        page, slot = t // PAGED_KV_TOKENS_PER_PAGE, t % PAGED_KV_TOKENS_PER_PAGE
+        flat[table[b, 0, page] * PAGED_KV_TOKENS_PER_PAGE + slot] = k[b, :length].to(
+            present.dtype
+        )
+        flat[table[b, 1, page] * PAGED_KV_TOKENS_PER_PAGE + slot] = v[b, :length].to(
+            present.dtype
+        )
+
+    q = q.permute(0, 2, 1, 3)
+    k = k.permute(0, 2, 1, 3)
+    v = v.permute(0, 2, 1, 3)
+    if num_q_heads != num_kv_heads:
+        repeats = num_q_heads // num_kv_heads
+        k = k.repeat_interleave(repeats, dim=1)
+        v = v.repeat_interleave(repeats, dim=1)
+    token = torch.arange(seq_len, device=qkv.device)
+    valid = token.unsqueeze(0) < query_lengths.to(dtype=torch.long).unsqueeze(1)
+    # Keys past each sequence's length are padding; a non-empty selector requests the
+    # non-causal (padding) context mask, otherwise the context mask is causal.
+    mask = valid[:, None, None, :]
+    if context_mask_selector is None or context_mask_selector.numel() == 0:
+        mask = (
+            mask
+            & torch.ones(seq_len, seq_len, dtype=torch.bool, device=qkv.device).tril()
+        )
+    attn = F.scaled_dot_product_attention(q, k, v, attn_mask=mask)
+    attn = attn.permute(0, 2, 1, 3).masked_fill(~valid[:, :, None, None], 0)
+    return attn.reshape(tokens, num_q_heads, head_size).to(orig_dtype), present
+
+
+def _register_attention_plugin_paged_op() -> None:
+    """Register the >=0.10 Edge-LLM ``AttentionPlugin`` op (packed QKV, paged KV pool).
+
+    Inputs follow the plugin's order: qkv, kv pool, query lengths, token-aligned rope
+    rows, kv start, page table, optional context-mask selector, then the four ragged
+    metadata tensors. The selector and the phase/context-count carriers are read for
+    their shape only.
+    """
+    if _has_torch_op("trt", "attention_plugin_paged"):
+        return
+
+    @torch.library.custom_op("trt::attention_plugin_paged", mutates_args=())
+    def attention_plugin_paged(
+        qkv: torch.Tensor,
+        kv_pool: torch.Tensor,
+        query_lengths: torch.Tensor,
+        rope_rows: torch.Tensor,
+        kvcache_start_index: torch.Tensor,
+        kv_page_table: torch.Tensor,
+        context_mask_selector: Optional[torch.Tensor],
+        query_start_offsets: torch.Tensor,
+        attention_sequence_lengths: torch.Tensor,
+        execution_phase_marker: torch.Tensor,
+        context_sequence_count_carrier: torch.Tensor,
+        num_q_heads: int,
+        num_kv_heads: int,
+        head_size: int,
+        sliding_window_size: int = -1,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        del query_start_offsets, attention_sequence_lengths
+        del execution_phase_marker, context_sequence_count_carrier
+        if sliding_window_size > 0:
+            raise NotImplementedError(
+                "paged attention eager reference has no sliding window"
+            )
+        return _attention_plugin_paged_eager(
+            qkv,
+            kv_pool,
+            query_lengths,
+            rope_rows,
+            kvcache_start_index,
+            kv_page_table,
+            context_mask_selector,
+            int(num_q_heads),
+            int(num_kv_heads),
+            int(head_size),
+        )
+
+    @attention_plugin_paged.register_fake
+    def _attention_plugin_paged_fake(
+        qkv,
+        kv_pool,
+        query_lengths,
+        rope_rows,
+        kvcache_start_index,
+        kv_page_table,
+        context_mask_selector,
+        query_start_offsets,
+        attention_sequence_lengths,
+        execution_phase_marker,
+        context_sequence_count_carrier,
+        num_q_heads,
+        num_kv_heads,
+        head_size,
+        sliding_window_size=-1,
+    ):
+        attn_output = qkv.new_empty(qkv.shape[0], num_q_heads, head_size)
+        return attn_output, torch.empty_like(kv_pool)
+
+
 def _register_vit_attention_plugin_op() -> None:
     """Register the same ViT attention op and fake used by Edge-LLM ONNX export."""
     if _has_torch_op("trt", "vit_attention_plugin"):
@@ -323,6 +497,56 @@ def get_trt_plugin_creator(
     return None
 
 
+def attention_plugin_uses_paged_kv(default: Optional[bool] = None) -> bool:
+    """Whether the loaded Edge-LLM ``AttentionPlugin`` uses the >0.9.1 API.
+
+    Edge-LLM <=0.9.1 takes separate Q/K/V plus a contiguous KV cache and always
+    runs causal context attention. Edge-LLM 0.10.0 switched to packed token-major
+    QKV, a paged KV pool and a context-mask selector input. The library exports no
+    version symbol, so detect the API by the creator's field names. ``default`` is
+    returned when no plugin is registered (raises if ``default`` is None).
+    """
+    creator = get_trt_plugin_creator("AttentionPlugin", "1", "")
+    if creator is None:
+        if default is not None:
+            return default
+        raise RuntimeError("AttentionPlugin not found in TensorRT plugin registry")
+    return any(f.name == "enable_context_mask_selector" for f in creator.field_names)
+
+
+def mamba_plugin_uses_ragged(default: Optional[bool] = None) -> bool:
+    """Whether the loaded Edge-LLM Mamba plugins take token-major ragged inputs.
+
+    Edge-LLM 0.11.0 moved ``causal_conv1d`` / ``update_ssm_state`` from
+    ``[B, S, ...]`` inputs to ``[T, ...]`` rows plus query offsets, state indices
+    and phase/context-count carriers (a release after the AttentionPlugin split).
+    The ``use_ddtree`` field on the ``update_ssm_state`` creator arrived with it.
+    """
+    creator = get_trt_plugin_creator("update_ssm_state", "1", "")
+    if creator is None:
+        if default is not None:
+            return default
+        raise RuntimeError("update_ssm_state not found in TensorRT plugin registry")
+    return any(f.name == "use_ddtree" for f in creator.field_names)
+
+
+def ragged_prefill_metadata(
+    batch_size: int, seq_len: int, device: torch.device
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Edge-LLM >=0.10 ragged metadata for a fresh, uniform-length context prefill.
+
+    Returns ``query_start_offsets`` ``[B + 1]``, the execution-phase marker (extent 1
+    = context prefill) and the context-sequence-count carrier (extent ``B``). The
+    last two are read for their shape only.
+    """
+    query_start_offsets = (
+        torch.arange(batch_size + 1, dtype=torch.int32, device=device) * seq_len
+    )
+    phase_marker = torch.zeros(1, dtype=torch.int32, device=device)
+    ctx_carrier = torch.zeros(batch_size, dtype=torch.int32, device=device)
+    return query_start_offsets, phase_marker, ctx_carrier
+
+
 def load_plugin():
     plugin_so = (
         os.environ.get("EDGE_LLM_PLUGIN_SO")
@@ -345,6 +569,7 @@ def load_plugins_for_trt():
     from .moe import register_moe_plugin_ops
 
     _register_attention_plugin_op()
+    _register_attention_plugin_paged_op()
     _register_vit_attention_plugin_op()
     register_mamba_plugin_ops()
     register_moe_plugin_ops()

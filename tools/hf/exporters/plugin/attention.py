@@ -24,8 +24,9 @@ class PluginAttention(nn.Module):
     Model-agnostic Plugin Attention module that replaces standard attention.
 
     This module wraps the projection layers from the original attention module
-    and uses ``trt.attention_plugin`` with separate Q/K/V tensors for the
-    attention computation.
+    and uses ``trt.attention_plugin`` with separate Q/K/V tensors (Edge-LLM
+    <=0.9.1) or ``trt.attention_plugin_paged`` (>=0.10) for the attention
+    computation.
 
     Supports:
     - Qwen2.5, Llama: Standard attention
@@ -98,7 +99,8 @@ class PluginAttention(nn.Module):
                 at runtime filled by LLMEngineRunner (not computed here).
             attention_mask: Unused (plugin handles masking internally).
             position_ids: Unused; RoPE lookup uses rope_rotary_cos_sin and ctx_len.
-            past_key_value: KV cache tensor of shape [batch, 2, num_kv_heads, capacity, head_dim].
+            past_key_value: KV cache tensor of shape [batch, 2, num_kv_heads, capacity, head_dim]
+                (Edge-LLM <=0.9.1), or a paged pool ``paged_kv_pool_shape`` (>=0.10).
             ctx_len: Context length tensor for each batch item.
             kvcache_start_index: External KV cache start indices. Empty tensor
                 ``[0]`` for fresh prefill; ``[batch]`` for decode/chunked prefill.
@@ -142,26 +144,41 @@ class PluginAttention(nn.Module):
             raise ValueError("kvcache_start_index must be provided")
 
         dtype = q.dtype
-        q = q.to(torch.float16)
-        k = k.to(torch.float16)
-        v = v.to(torch.float16)
+        from .plugin_utils import attention_plugin_uses_paged_kv
 
-        attn_out, updated_kv = torch.ops.trt.attention_plugin.default(
-            q,
-            k,
-            v,
-            past_key_value,
-            ctx_len,
-            rope_rotary_cos_sin,
-            kvcache_start_index,
-            self.num_heads,
-            self.num_key_value_heads,
-            False,
-            self.head_dim,
-            False,
-            -1,
-            self.context_attention_mask_type,
-        )
+        if attention_plugin_uses_paged_kv(default=False):
+            from .attn_patches import _paged_attention
+
+            attn_out, updated_kv = _paged_attention(
+                q,
+                k,
+                v,
+                past_key_value,
+                ctx_len,
+                rope_rotary_cos_sin,
+                kvcache_start_index,
+                self.num_heads,
+                self.num_key_value_heads,
+                self.head_dim,
+                mask_type=self.context_attention_mask_type,
+            )
+        else:
+            attn_out, updated_kv = torch.ops.trt.attention_plugin.default(
+                q.to(torch.float16),
+                k.to(torch.float16),
+                v.to(torch.float16),
+                past_key_value,
+                ctx_len,
+                rope_rotary_cos_sin,
+                kvcache_start_index,
+                self.num_heads,
+                self.num_key_value_heads,
+                False,
+                self.head_dim,
+                False,
+                -1,
+                self.context_attention_mask_type,
+            )
 
         # Use attn_hidden_size for reshape (may differ from hidden_size in Qwen3)
         attn_out = attn_out.reshape(batch_size, seq_len, self.attn_hidden_size).to(

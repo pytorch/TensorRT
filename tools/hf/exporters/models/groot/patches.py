@@ -1,63 +1,33 @@
-"""GR00T setattr replacements. Installed for the whole export via ``GrootSpec.apply_patches``."""
+"""GR00T N1.7 setattr replacements. Installed for the whole export via ``GrootSpec.apply_patches``."""
 
 from __future__ import annotations
 
-from contextlib import contextmanager
-from typing import Any, Callable, Iterator
+from typing import Any, Callable
 
 import torch
+import torch.nn as nn
 
-from ...plugin.attn_patches import (
-    _patch_language_attention,
-    _patch_vision_attention,
-    register_patch,
-)
+from ...plugin.attn_patches import _patch_language_attention, register_patch
 from ..common.patches import causal_lm_plugin_forward
 
 GROOT = "groot"
 
 register_patch(
     GROOT,
-    "transformers.models.internvl.modeling_internvl.InternVLVisionAttention.forward",
-    "transformers.models.siglip.modeling_siglip.SiglipAttention.forward",
-    "transformers.models.siglip.modeling_siglip.SiglipSdpaAttention.forward",
-    "transformers.models.siglip.modeling_siglip.SiglipFlashAttention2.forward",
-)(_patch_vision_attention)
-
-register_patch(
-    GROOT,
-    "transformers.models.llama.modeling_llama.LlamaAttention.forward",
-    "transformers.models.qwen2.modeling_qwen2.Qwen2Attention.forward",
-    "transformers.models.qwen3.modeling_qwen3.Qwen3Attention.forward",
+    "transformers.models.qwen3_vl.modeling_qwen3_vl.Qwen3VLTextAttention.forward",
 )(_patch_language_attention)
 
 
 @register_patch(
     GROOT,
-    "lerobot.policies.groot.eagle2_hg_model.modeling_eagle2_5_vl.Eagle25VLForConditionalGeneration.forward",
-)
-def _patch_eagle_image_features(original: Callable) -> Callable:
-    """Vision-only compile calls ``eagle(pixel_values)``; otherwise the full VLM forward."""
-
-    def forward(self, pixel_values, input_ids=None, **kwargs: Any):
-        if input_ids is None:
-            return self.extract_feature(pixel_values)
-        return original(self, pixel_values, input_ids, **kwargs)
-
-    return forward
-
-
-@register_patch(
-    GROOT,
-    "transformers.models.llama.modeling_llama.LlamaForCausalLM.forward",
-    "transformers.models.qwen2.modeling_qwen2.Qwen2ForCausalLM.forward",
-    "transformers.models.qwen3.modeling_qwen3.Qwen3ForCausalLM.forward",
-    "transformers.models.llama.modeling_llama.LlamaModel.forward",
-    "transformers.models.qwen2.modeling_qwen2.Qwen2Model.forward",
-    "transformers.models.qwen3.modeling_qwen3.Qwen3Model.forward",
+    "transformers.models.qwen3_vl.modeling_qwen3_vl.Qwen3VLTextModel.forward",
 )
 def _patch_groot_language_model(original: Callable) -> Callable:
-    """Edge prefill when rope is present; otherwise HF causal-LM forward."""
+    """Edge prefill when rope is present; otherwise the HF text-model forward.
+
+    ``lm_hidden_states`` is the last kept decoder layer *before* the final norm,
+    which is what GR00T N1.7 feeds the action head (``select_layer`` truncation).
+    """
 
     def forward(
         self,
@@ -83,35 +53,54 @@ def _patch_groot_language_model(original: Callable) -> Callable:
             ds_stack,
             *past_key_values,
             lm_head=getattr(self, "lm_head", None),
+            select_layer=len(decoder.layers),
         )
 
     return forward
 
 
+def action_velocity(
+    head: nn.Module,
+    actions: torch.Tensor,
+    timestep: torch.Tensor,
+    context_embs: torch.Tensor,
+    state: torch.Tensor,
+    embodiment_id: torch.Tensor,
+    image_mask: torch.Tensor,
+    backbone_attention_mask: torch.Tensor,
+) -> torch.Tensor:
+    """One denoising step of ``GR00TN17ActionHead.get_action_with_features``."""
+    state_features = head.state_encoder(
+        state.reshape(state.shape[0], 1, -1), embodiment_id
+    )
+    action_features = head.action_encoder(actions, timestep, embodiment_id)
+    if head.config.add_pos_embed:
+        pos_ids = torch.arange(
+            action_features.shape[1], dtype=torch.long, device=action_features.device
+        )
+        action_features = action_features + head.position_embedding(pos_ids).unsqueeze(0)
+    sa_embs = torch.cat((state_features, action_features), dim=1)
+    if head.config.use_alternate_vl_dit:
+        model_output = head.model(
+            hidden_states=sa_embs,
+            encoder_hidden_states=context_embs,
+            timestep=timestep,
+            image_mask=image_mask,
+            backbone_attention_mask=backbone_attention_mask,
+        )
+    else:
+        model_output = head.model(
+            hidden_states=sa_embs,
+            encoder_hidden_states=context_embs,
+            timestep=timestep,
+        )
+    pred = head.action_decoder(model_output, embodiment_id)
+    return pred[:, -int(head.action_horizon) :]
+
+
 @register_patch(
     GROOT,
-    "lerobot.policies.groot.groot_n1.GR00TN15.forward",
-)
-def _patch_groot_context_projection(original: Callable) -> Callable:
-    """One linear + VLLN + VL attention when a single hidden tensor is present."""
-
-    def forward(self, hidden_states, *args, **kwargs: Any):
-        if args:
-            return original(self, hidden_states, *args, **kwargs)
-        context_embs = self.backbone.eagle_linear(hidden_states)
-        vlln = self.action_head.vlln
-        weight = getattr(vlln, "weight", None)
-        if weight is not None:
-            context_embs = context_embs.to(dtype=weight.dtype)
-        context_embs = vlln(context_embs)
-        return self.action_head.vl_self_attention(context_embs)
-
-    return forward
-
-
-@register_patch(
-    GROOT,
-    "lerobot.policies.groot.action_head.flow_matching_action_head.FlowmatchingActionHead.forward",
+    "lerobot.policies.groot.groot_n1_7.GR00TN17ActionHead.forward",
 )
 def _patch_groot_action_step_forward(original: Callable) -> Callable:
     """One DiT velocity step when Edge action I/O is present; otherwise training."""
@@ -123,49 +112,30 @@ def _patch_groot_action_step_forward(original: Callable) -> Callable:
         context_embs=None,
         state=None,
         embodiment_id=None,
+        image_mask=None,
+        backbone_attention_mask=None,
         *args,
         **kwargs: Any,
     ):
         if context_embs is None:
             return original(self, actions, timestep, *args, **kwargs)
-        state_features = self.state_encoder(state, embodiment_id)
-        action_features = self.action_encoder(actions, timestep, embodiment_id)
-        if self.config.add_pos_embed:
-            pos_ids = torch.arange(
-                action_features.shape[1],
-                dtype=torch.long,
-                device=action_features.device,
-            )
-            action_features = action_features + self.position_embedding(
-                pos_ids
-            ).unsqueeze(0)
-        future_tokens = self.future_tokens.weight.unsqueeze(0).expand(
-            context_embs.shape[0],
-            -1,
-            -1,
+        return action_velocity(
+            self,
+            actions,
+            timestep,
+            context_embs,
+            state,
+            embodiment_id,
+            image_mask,
+            backbone_attention_mask,
         )
-        sa_embs = torch.cat((state_features, future_tokens, action_features), dim=1)
-        expert_out = self.model(
-            hidden_states=sa_embs,
-            encoder_hidden_states=context_embs,
-            timestep=timestep,
-        )
-        hidden = (
-            expert_out.last_hidden_state
-            if hasattr(expert_out, "last_hidden_state")
-            else expert_out
-        )
-        if isinstance(hidden, (tuple, list)):
-            hidden = hidden[0]
-        action_hidden = hidden[:, -int(self.config.action_horizon) :]
-        return self.action_decoder(action_hidden, embodiment_id)
 
     return forward
 
 
 @register_patch(
     GROOT,
-    "lerobot.policies.groot.action_head.flow_matching_action_head.CategorySpecificLinear.forward",
+    "lerobot.policies.groot.groot_n1_7.CategorySpecificLinear.forward",
 )
 def _patch_category_specific_linear(_original: Callable) -> Callable:
     """``index_select`` + ``bmm`` is the TensorRT-friendly form of ``W[cat_ids]``."""

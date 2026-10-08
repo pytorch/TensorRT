@@ -1,13 +1,25 @@
 from __future__ import annotations
 
 from contextlib import ExitStack, contextmanager
-from typing import Any, Callable, Iterator
+from typing import Any, Callable, Generator
 
 import torch
 import torch.nn.functional as F
 
 from ...plugin.attn_patches import patch_attribute
+from ...plugin.plugin_utils import (
+    get_trt_plugin_creator,
+    mamba_plugin_uses_ragged,
+    ragged_prefill_metadata,
+)
 from .helpers import decoder_model, language_model
+
+# Present states of the KDA layers, filled while the language forward traces.
+# Recurrent states are real outputs; conv states are updated in place by the
+# Edge-LLM >=0.11 plugin (aliased), and Torch-TensorRT only treats a trailing
+# run of aliased outputs as side effects, so they are returned last.
+_present_recurrent: list[torch.Tensor] = []
+_present_conv: list[torch.Tensor] = []
 
 
 def _conv_bias(conv, projected: torch.Tensor) -> torch.Tensor:
@@ -28,18 +40,93 @@ def _plugin_convolution(
     context_lengths: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     kernel_size = int(conv.weight.shape[-1])
-    output, next_state = torch.ops.trt.causal_conv1d.default(
-        projected,
-        conv.weight,
-        _conv_bias(conv, projected),
-        state,
-        context_lengths,
-        1,
-        kernel_size - 1,
-        1,
-        int(projected.shape[-1]),
-    )
+    bias = _conv_bias(conv, projected)
+    if mamba_plugin_uses_ragged(default=False):
+        # Edge-LLM >=0.11: token-major rows, one resident state row per sequence.
+        batch_size, seq_len, channels = projected.shape
+        query_offsets, phase_marker, ctx_carrier = ragged_prefill_metadata(
+            batch_size, seq_len, projected.device
+        )
+        state_indices = torch.arange(
+            batch_size, dtype=torch.int32, device=projected.device
+        )
+        output, next_state = torch.ops.trt.causal_conv1d_ragged.default(
+            projected.reshape(batch_size * seq_len, channels),
+            conv.weight,
+            bias,
+            state,
+            context_lengths,
+            query_offsets,
+            state_indices,
+            phase_marker,
+            ctx_carrier,
+            1,
+            kernel_size - 1,
+            1,
+            channels,
+        )
+        output = output.reshape(batch_size, seq_len, channels)
+    else:
+        output, next_state = torch.ops.trt.causal_conv1d.default(
+            projected,
+            conv.weight,
+            bias,
+            state,
+            context_lengths,
+            1,
+            kernel_size - 1,
+            1,
+            int(projected.shape[-1]),
+        )
     return F.silu(output), next_state
+
+
+def _kda_recurrence(
+    q: torch.Tensor,
+    k: torch.Tensor,
+    v: torch.Tensor,
+    gate: torch.Tensor,
+    beta: torch.Tensor,
+    a_log: torch.Tensor,
+    dt_bias: torch.Tensor,
+    state: torch.Tensor,
+    lower_bound: float | None,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Gated delta rule with per-channel decay, unrolled over the sequence.
+
+    Mirrors ``fla.ops.kda.naive_recurrent_kda`` with the in-kernel gate, beta
+    sigmoid and q/k L2 norm used by the HF module. ``state`` is ``[B, H, V, K]``
+    (transposed layout). The Edge-LLM ``kimi_kda`` plugin does not exist, so this
+    lowers to plain TensorRT layers; export length is static, so the loop unrolls.
+    Returns the outputs ``[B, T, H, V]`` and the final state ``[B, H, V, K]``.
+    """
+    batch_size, seq_len, num_heads, head_dim = q.shape
+    dtype = v.dtype
+    q, k, v, gate, beta = (x.float() for x in (q, k, v, gate, beta))
+    q = q * torch.rsqrt(q.square().sum(-1, keepdim=True) + 1e-6)
+    k = k * torch.rsqrt(k.square().sum(-1, keepdim=True) + 1e-6)
+    q = q * head_dim**-0.5
+    beta = beta.sigmoid()
+
+    gate = gate + dt_bias.float().reshape(num_heads, head_dim)
+    a = a_log.float().reshape(num_heads, 1)
+    if lower_bound is not None:
+        decay = float(lower_bound) * torch.sigmoid(a.exp() * gate)
+    else:
+        decay = -a.exp() * F.softplus(gate)
+    decay = decay.exp()
+
+    memory = state.float().transpose(-1, -2)  # [B, H, K, V]
+    outputs = []
+    for t in range(seq_len):
+        k_t = k[:, t]
+        memory = memory * decay[:, t].unsqueeze(-1)
+        error = v[:, t] - (k_t.unsqueeze(-1) * memory).sum(-2)
+        memory = memory + (beta[:, t].unsqueeze(-1) * k_t).unsqueeze(
+            -1
+        ) * error.unsqueeze(-2)
+        outputs.append((q[:, t].unsqueeze(-1) * memory).sum(-2))
+    return torch.stack(outputs, dim=1).to(dtype), memory.transpose(-1, -2)
 
 
 def _patch_kda_attention(original: Callable) -> Callable:
@@ -71,19 +158,19 @@ def _patch_kda_attention(original: Callable) -> Callable:
         if conv_state_q is None or conv_state_k is None or conv_state_v is None:
             raise ValueError("Kimi KDA export requires Q/K/V convolution states")
 
-        q, _ = _plugin_convolution(
+        q, conv_state_q_out = _plugin_convolution(
             self.q_conv1d,
             self.q_proj(hidden_states),
             conv_state_q,
             context_lengths,
         )
-        k, _ = _plugin_convolution(
+        k, conv_state_k_out = _plugin_convolution(
             self.k_conv1d,
             self.k_proj(hidden_states),
             conv_state_k,
             context_lengths,
         )
-        v, _ = _plugin_convolution(
+        v, conv_state_v_out = _plugin_convolution(
             self.v_conv1d,
             self.v_proj(hidden_states),
             conv_state_v,
@@ -102,19 +189,36 @@ def _patch_kda_attention(original: Callable) -> Callable:
         beta = self.b_proj(hidden_states).to(dtype=hidden_states.dtype)
         lower_bound = getattr(self, "gate_lower_bound", None)
 
-        output, _ = torch.ops.trt.kimi_kda_plugin.default(
-            q,
-            k,
-            v,
-            gate,
-            beta,
-            self.A_log.float(),
-            self.dt_bias.reshape(num_heads, head_dim).to(hidden_states.dtype),
-            recurrent_state,
-            context_lengths,
-            float(lower_bound if lower_bound is not None else -5.0),
-            lower_bound is not None,
-        )
+        if get_trt_plugin_creator("kimi_kda", "1", "") is not None:
+            output, recurrent_state_out = torch.ops.trt.kimi_kda_plugin.default(
+                q,
+                k,
+                v,
+                gate,
+                beta,
+                self.A_log.float(),
+                self.dt_bias.reshape(num_heads, head_dim).to(hidden_states.dtype),
+                recurrent_state,
+                context_lengths,
+                float(lower_bound if lower_bound is not None else -5.0),
+                lower_bound is not None,
+            )
+        else:
+            # No Edge-LLM build ships kimi_kda; lower the recurrence to plain TRT layers.
+            output, recurrent_state_out = _kda_recurrence(
+                q,
+                k,
+                v,
+                gate,
+                beta,
+                self.A_log,
+                self.dt_bias,
+                recurrent_state,
+                lower_bound,
+            )
+
+        _present_recurrent.append(recurrent_state_out)
+        _present_conv.extend((conv_state_q_out, conv_state_k_out, conv_state_v_out))
 
         output_gate = (
             self.g_proj(hidden_states)
@@ -271,6 +375,8 @@ def _patch_language_forward(original: Callable) -> Callable:
             raise ValueError("Kimi export requires embeddings and last-token indices")
 
         decoder = self.model
+        _present_recurrent.clear()
+        _present_conv.clear()
         hidden = inputs_embeds.to(dtype=next(decoder.parameters()).dtype)
         batch_size, seq_len, hidden_size = hidden.shape
         causal_mask = _causal_mask(context_lengths, seq_len, hidden.dtype)
@@ -309,13 +415,13 @@ def _patch_language_forward(original: Callable) -> Callable:
             torch.arange(batch_size, device=hidden.device, dtype=torch.long),
             indices,
         ]
-        return self.lm_head(selected).float()
+        return (self.lm_head(selected).float(), *_present_recurrent, *_present_conv)
 
     return forward
 
 
 @contextmanager
-def apply_kimik3_patches(model: Any | None = None) -> Iterator[None]:
+def apply_kimik3_patches(model: Any | None = None) -> Generator[None]:
     if model is None:
         yield
         return

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import torch
 from lerobot.policies.pi05.modeling_pi05 import make_att_2d_masks
+from lerobot.policies.common.vla_utils import prepare_attention_masks_4d
 
 
 def build_pi05_prefix_embs(
@@ -218,15 +219,7 @@ def make_pi05_suffix_position_and_mask(core, prefix_pad_masks, x_t, device):
     suffix_att_2d_masks = make_att_2d_masks(suffix_pad_masks, suffix_att_masks)
     full_att_2d_masks = torch.cat([prefix_pad_2d_masks, suffix_att_2d_masks], dim=2)
 
-    attention_mask = core._prepare_attention_masks_4d(full_att_2d_masks)
+    attention_mask = prepare_attention_masks_4d(full_att_2d_masks)
     prefix_offsets = torch.sum(prefix_pad_masks, dim=-1)[:, None]
     position_ids = prefix_offsets + torch.cumsum(suffix_pad_masks, dim=1) - 1
     return position_ids, attention_mask
-
-
-def _nchw_to_hwc(pixel_values):
-    if pixel_values.ndim != 4:
-        return pixel_values
-    if pixel_values.shape[1] in (1, 3, 4) and pixel_values.shape[-1] not in (1, 3, 4):
-        return pixel_values.permute(0, 2, 3, 1).contiguous()
-    return pixel_values

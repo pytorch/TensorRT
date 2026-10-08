@@ -6,6 +6,7 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from ...config import EdgeConfig
+from ...fla_compat import reraise_with_fla_fix
 
 DEFAULT_CHECKPOINT = "inference-optimization/Kimi-K3-0.40B"
 
@@ -16,6 +17,11 @@ def prepare_export(
     dtype: torch.dtype,
 ):
     checkpoint = args.checkpoint or DEFAULT_CHECKPOINT
+    try:
+        import fla.ops  # noqa: F401  (the checkpoint's remote code requires it)
+    except Exception as exc:
+        reraise_with_fla_fix(exc)
+        raise
     model = (
         AutoModelForCausalLM.from_pretrained(
             checkpoint,

@@ -14,11 +14,16 @@ from torch_tensorrt.dynamo.conversion import (
     ConversionContext,
     dynamo_tensorrt_converter,
 )
+from torch_tensorrt.dynamo.conversion._ConversionContext import AliasedOutput, AliasKind
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import ConverterPriority
 from torch_tensorrt.dynamo.conversion.converter_utils import get_trt_tensor
 
 from .attention import ContextAttentionMaskType
-from .plugin_utils import get_trt_plugin_creator
+from .plugin_utils import (
+    attention_plugin_uses_paged_kv,
+    get_trt_plugin_creator,
+    mamba_plugin_uses_ragged,
+)
 
 
 def _creator_is_v3(creator) -> bool:
@@ -73,6 +78,21 @@ def convert_llm_attention_plugin(ctx: ConversionContext, target, args, kwargs, n
     creator = get_trt_plugin_creator("AttentionPlugin", "1", "")
     if creator is None:
         raise RuntimeError("AttentionPlugin not found in TensorRT plugin registry")
+    if attention_plugin_uses_paged_kv():
+        raise NotImplementedError(
+            "The loaded Edge-LLM AttentionPlugin uses the >=0.10 paged-KV API, which this "
+            "converter does not support yet; use an Edge-LLM <=0.9.1 plugin build."
+        )
+    if context_attention_mask_type not in (
+        int(ContextAttentionMaskType.CAUSAL),
+        int(ContextAttentionMaskType.SLIDING_OR_CHUNKED_CAUSAL),
+    ):
+        raise NotImplementedError(
+            f"{name}: context_attention_mask_type="
+            f"{ContextAttentionMaskType(context_attention_mask_type).name} needs Edge-LLM "
+            ">=0.10 (context mask selector); the <=0.9.1 AttentionPlugin always applies "
+            "a causal context mask."
+        )
 
     field_list = [
         trt.PluginField(
@@ -87,7 +107,6 @@ def convert_llm_attention_plugin(ctx: ConversionContext, target, args, kwargs, n
             ("enable_tree_attention", int(enable_tree_attention)),
             ("enable_fp8_kv_cache", int(enable_fp8_kv_cache)),
             ("sliding_window_size", int(sliding_window_size)),
-            ("context_attention_mask_type", context_attention_mask_type),
         ]
     ]
     if bool(enable_fp8_kv_cache) and qkv_scales is not None:
@@ -125,6 +144,62 @@ def convert_llm_attention_plugin(ctx: ConversionContext, target, args, kwargs, n
         shuffle_layer.reshape_dims = (inputs[kv_cache_start_idx_input_idx].shape[0],)
         inputs[kv_cache_start_idx_input_idx] = shuffle_layer.get_output(0)
 
+    layer = _add_plugin_layer(ctx, inputs, plugin, name)
+    return layer.get_output(0), layer.get_output(1)
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.trt.attention_plugin_paged.default,
+    supports_dynamic_shapes=True,
+    priority=ConverterPriority.HIGH,
+)
+def convert_llm_attention_plugin_paged(
+    ctx: ConversionContext, target, args, kwargs, name
+):
+    """Edge-LLM >=0.10 AttentionPlugin: packed QKV, paged KV pool, ragged metadata."""
+    del target
+    args = list(args) + [kwargs[k] for k in ("sliding_window_size",) if k in kwargs]
+    qkv, kv_pool, query_lengths, rope_rows, kv_start, page_table, selector = args[:7]
+    offsets, seq_lengths, phase_marker, ctx_carrier = args[7:11]
+    num_q_heads, num_kv_heads, head_size = (int(a) for a in args[11:14])
+    sliding_window_size = int(args[14]) if len(args) > 14 else -1
+
+    creator = get_trt_plugin_creator("AttentionPlugin", "1", "")
+    if creator is None:
+        raise RuntimeError("AttentionPlugin not found in TensorRT plugin registry")
+    if not attention_plugin_uses_paged_kv():
+        raise NotImplementedError(
+            "trt::attention_plugin_paged needs an Edge-LLM >=0.10 AttentionPlugin build"
+        )
+
+    fields = [
+        ("num_q_heads", num_q_heads),
+        ("num_kv_heads", num_kv_heads),
+        ("head_size", head_size),
+        ("enable_context_mask_selector", int(selector is not None)),
+    ]
+    if sliding_window_size > 0:
+        fields.append(("sliding_window_size", sliding_window_size))
+    field_list = [
+        trt.PluginField(n, np.array([v], dtype=np.int32), trt.PluginFieldType.INT32)
+        for n, v in fields
+    ]
+    plugin = _create_trt_plugin(creator, name, field_list)
+    if plugin is None:
+        raise RuntimeError("Failed to create AttentionPlugin")
+
+    plugin_inputs = [qkv, kv_pool, query_lengths, rope_rows, kv_start, page_table]
+    if selector is not None:
+        plugin_inputs.append(selector)
+    plugin_inputs += [offsets, seq_lengths, phase_marker, ctx_carrier]
+    inputs = [
+        (
+            tensor
+            if isinstance(tensor, trt.ITensor)
+            else get_trt_tensor(ctx, tensor, f"{name}_i{idx}")
+        )
+        for idx, tensor in enumerate(plugin_inputs)
+    ]
     layer = _add_plugin_layer(ctx, inputs, plugin, name)
     return layer.get_output(0), layer.get_output(1)
 
@@ -293,6 +368,101 @@ def convert_update_ssm_state(ctx: ConversionContext, target, args, kwargs, name)
         name,
     )
     layer = _add_plugin_layer(ctx, inputs, plugin, name)
+    return layer.get_output(0), layer.get_output(1)
+
+
+def _alias_resident_state(
+    ctx: ConversionContext, output: trt.ITensor, state: trt.ITensor, name: str
+) -> None:
+    """Bind a >=0.11 Mamba plugin's state output to its state input's storage.
+
+    These plugins update resident state in place and fail ``enqueue`` unless the
+    output pointer equals the input pointer. They do not declare the alias to TRT
+    (the Edge-LLM runtime binds both to one pool), so declare it to Torch-TensorRT.
+    """
+    if not state.is_network_input:
+        raise RuntimeError(
+            f"{name}: resident state must be an engine input to alias it in place"
+        )
+    ctx.aliased_outputs.append(AliasedOutput(output, state.name, AliasKind.USER))
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.trt.causal_conv1d_ragged.default,
+    supports_dynamic_shapes=True,
+    priority=ConverterPriority.HIGH,
+)
+def convert_causal_conv1d_ragged(ctx: ConversionContext, target, args, kwargs, name):
+    """Edge-LLM >=0.11 ``causal_conv1d``: token-major rows plus ragged metadata."""
+    del target, kwargs
+    args = list(args)
+    tensors = args[:9]
+    stride, padding, dilation, groups = args[9:13]
+
+    creator = get_trt_plugin_creator("causal_conv1d", "1", "")
+    if creator is None:
+        raise RuntimeError("causal_conv1d plugin not found in TensorRT plugin registry")
+    if not mamba_plugin_uses_ragged():
+        raise NotImplementedError(
+            "trt::causal_conv1d_ragged needs an Edge-LLM >=0.11 causal_conv1d build"
+        )
+    plugin = _create_trt_plugin(
+        creator,
+        name,
+        [
+            _int_field("stride", stride),
+            _int_field("padding", padding),
+            _int_field("dilation", dilation),
+            _int_field("groups", groups),
+            _int_field("use_mtp", 0),
+            _int_field("use_ddtree", 0),
+        ],
+    )
+    if plugin is None:
+        raise RuntimeError("Failed to create causal_conv1d plugin")
+    inputs = _as_plugin_inputs(ctx, tensors, name)
+    layer = _add_plugin_layer(ctx, inputs, plugin, name)
+    _alias_resident_state(ctx, layer.get_output(1), inputs[3], name)
+    return layer.get_output(0), layer.get_output(1)
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.trt.update_ssm_state_ragged.default,
+    supports_dynamic_shapes=True,
+    priority=ConverterPriority.HIGH,
+)
+def convert_update_ssm_state_ragged(ctx: ConversionContext, target, args, kwargs, name):
+    """Edge-LLM >=0.11 ``update_ssm_state``: token-major rows plus ragged metadata."""
+    del target, kwargs
+    args = list(args)
+    tensors = args[:13]
+    dt_softplus, ngroups, nheads, head_dim, dstate = args[13:18]
+
+    creator = get_trt_plugin_creator("update_ssm_state", "1", "")
+    if creator is None:
+        raise RuntimeError(
+            "update_ssm_state plugin not found in TensorRT plugin registry"
+        )
+    if not mamba_plugin_uses_ragged():
+        raise NotImplementedError(
+            "trt::update_ssm_state_ragged needs an Edge-LLM >=0.11 update_ssm_state build"
+        )
+    plugin = _create_trt_plugin(
+        creator,
+        name,
+        [
+            _int_field("dim", head_dim),
+            _int_field("dstate", dstate),
+            _int_field("nheads", nheads),
+            _int_field("ngroups", ngroups),
+            _int_field("dt_softplus", dt_softplus),
+        ],
+    )
+    if plugin is None:
+        raise RuntimeError("Failed to create update_ssm_state plugin")
+    inputs = _as_plugin_inputs(ctx, tensors, name)
+    layer = _add_plugin_layer(ctx, inputs, plugin, name)
+    _alias_resident_state(ctx, layer.get_output(1), inputs[7], name)
     return layer.get_output(0), layer.get_output(1)
 
 

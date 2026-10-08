@@ -321,13 +321,11 @@ def test_groot_backend_registers_components():
     from exporters.plugin.attn_patches import _PATCHES
 
     paths = [p for p, _ in _PATCHES[GROOT]]
-    assert any("SiglipAttention.forward" in p for p in paths)
-    assert any("Qwen3Attention.forward" in p for p in paths)
-    assert any("Eagle25VLForConditionalGeneration.forward" in p for p in paths)
-    assert any("Qwen3ForCausalLM.forward" in p for p in paths)
-    assert any("GR00TN15.forward" in p for p in paths)
-    assert any("FlowmatchingActionHead.forward" in p for p in paths)
-    assert any("CategorySpecificLinear.forward" in p for p in paths)
+    assert any("Qwen3VLTextAttention.forward" in p for p in paths)
+    assert any("Qwen3VLTextModel.forward" in p for p in paths)
+    assert any("GR00TN17ActionHead.forward" in p for p in paths)
+    assert any("groot_n1_7.CategorySpecificLinear.forward" in p for p in paths)
+    assert not any("eagle" in p.lower() for p in paths)
 
 
 @pytest.mark.unit
@@ -337,72 +335,6 @@ def test_nemotron_backend_registers_causal_lm():
 
     paths = [p for p, _ in _PATCHES[NEMOTRON]]
     assert any("NemotronHForCausalLM.forward" in p for p in paths)
-
-
-@pytest.mark.unit
-def test_eagle_vision_patch_extracts_features():
-    from exporters.models.groot.patches import (
-        _patch_eagle_image_features,
-    )
-
-    class Dummy(nn.Module):
-        def extract_feature(self, pixel_values):
-            return pixel_values + 1
-
-        def forward(self, *args, **kwargs):
-            raise AssertionError("full VLM forward should not run")
-
-    Dummy.forward = _patch_eagle_image_features(Dummy.forward)
-    pixel_values = torch.zeros(1, 3, 4, 4)
-    torch.testing.assert_close(Dummy()(pixel_values), pixel_values + 1)
-
-
-@pytest.mark.unit
-def test_groot_patches_live_eagle_class():
-    from exporters.models.groot.patches import apply_groot_patches
-
-    class Eagle(nn.Module):
-        def extract_feature(self, pixel_values):
-            return pixel_values + 1
-
-        def forward(self, pixel_values, input_ids=None, **kwargs):
-            raise AssertionError("unpatched Eagle.forward should not run")
-
-    class Groot:
-        def __init__(self):
-            self.backbone = type("Backbone", (), {})()
-            self.backbone.eagle_model = Eagle()
-
-    class Policy:
-        def __init__(self):
-            self._groot_model = Groot()
-
-    policy = Policy()
-    eagle = policy._groot_model.backbone.eagle_model
-    pixel_values = torch.zeros(1, 3, 4, 4)
-    with apply_groot_patches(policy):
-        torch.testing.assert_close(eagle(pixel_values), pixel_values + 1)
-
-
-@pytest.mark.unit
-def test_eagle_vision_keeps_vlm_forward_with_input_ids():
-    from exporters.models.groot.patches import (
-        _patch_eagle_image_features,
-    )
-
-    class Dummy(nn.Module):
-        def extract_feature(self, pixel_values):
-            raise AssertionError("extract_feature should not run")
-
-        def forward(self, pixel_values, input_ids=None, **kwargs):
-            del kwargs
-            return (pixel_values, input_ids)
-
-    Dummy.forward = _patch_eagle_image_features(Dummy.forward)
-    pixel_values = torch.zeros(1, 3, 4, 4)
-    input_ids = torch.ones(1, 2, dtype=torch.long)
-    out = Dummy()(pixel_values, input_ids)
-    assert out[1] is input_ids
 
 
 @pytest.mark.unit
@@ -420,17 +352,70 @@ def test_groot_action_keeps_training_forward_without_context():
 
 
 @pytest.mark.unit
-def test_groot_context_keeps_training_forward_without_hidden():
-    from exporters.models.groot.patches import (
-        _patch_groot_context_projection,
+def test_groot_vision_rope_matches_hf():
+    pytest.importorskip("transformers.models.qwen3_vl")
+    from exporters.models.groot.vision import vision_rope
+    from transformers.models.qwen3_vl.configuration_qwen3_vl import (
+        Qwen3VLVisionConfig,
+    )
+    from transformers.models.qwen3_vl.modeling_qwen3_vl import (
+        Qwen3VLVisionRotaryEmbedding,
     )
 
-    class Dummy(nn.Module):
-        def forward(self, backbone_inputs, action_inputs):
-            return backbone_inputs
+    rotary = Qwen3VLVisionRotaryEmbedding(
+        Qwen3VLVisionConfig(hidden_size=64, num_heads=2)
+    )
+    position_ids = torch.stack(
+        torch.meshgrid(torch.arange(4), torch.arange(6), indexing="ij"), dim=-1
+    ).reshape(-1, 2)
+    ref_cos, ref_sin = rotary(torch.zeros(1), position_ids)
+    cos, sin = vision_rope(rotary, position_ids)
+    torch.testing.assert_close(cos, ref_cos)
+    torch.testing.assert_close(sin, ref_sin)
 
-    Dummy.forward = _patch_groot_context_projection(Dummy.forward)
-    assert Dummy()("backbone", "action") == "backbone"
+
+@pytest.mark.unit
+def test_groot_mrope_cache_matches_text_rope_and_extends():
+    pytest.importorskip("transformers.models.qwen3_vl")
+    from exporters.models.groot.helpers import mrope_rotary_cos_sin
+    from exporters.rope import make_normal_rope_rotary_cos_sin
+    from transformers.models.qwen3_vl.configuration_qwen3_vl import (
+        Qwen3VLTextConfig,
+    )
+    from transformers.models.qwen3_vl.modeling_qwen3_vl import (
+        Qwen3VLTextRotaryEmbedding,
+    )
+
+    cfg = Qwen3VLTextConfig(
+        hidden_size=64,
+        num_attention_heads=2,
+        num_key_value_heads=1,
+        head_dim=32,
+        rope_parameters={
+            "rope_type": "default",
+            "rope_theta": 10000.0,
+            "mrope_section": [6, 5, 5],
+            "mrope_interleaved": True,
+        },
+    )
+    language = nn.Module()
+    language.config = cfg
+    language.rotary_emb = Qwen3VLTextRotaryEmbedding(cfg)
+
+    # Text-only prompt: all three M-RoPE rows equal -> plain RoPE, incl. the tail.
+    prompt = torch.arange(5).view(1, 1, -1).expand(3, 1, -1)
+    cache = mrope_rotary_cos_sin(language, prompt, max_seq_len=9)
+    ref = make_normal_rope_rotary_cos_sin(
+        9, 32, rope_theta=10000.0, device=torch.device("cpu")
+    )
+    assert cache.shape == (1, 9, 32)
+    torch.testing.assert_close(cache, ref)
+
+    # Image grid rows differ; decode rows continue from max(position) + 1.
+    grid = torch.tensor([[[0, 1, 1, 1, 3]], [[0, 1, 1, 2, 3]], [[0, 1, 2, 1, 3]]])
+    cache = mrope_rotary_cos_sin(language, grid, max_seq_len=7)
+    torch.testing.assert_close(cache[:, 5:], ref[:, 4:6])
+    assert not torch.allclose(cache[:, 2], cache[:, 3])
 
 
 @pytest.mark.unit
@@ -502,3 +487,81 @@ def test_measure_parity_and_bench(capsys):
     assert "total speedup: 2.000x" in log
     print_bench({})
     assert capsys.readouterr().out == ""
+
+
+@pytest.mark.unit
+def test_mamba_ragged_ops_match_batch_major():
+    from exporters.plugin.mamba import register_mamba_plugin_ops
+    from exporters.plugin.plugin_utils import ragged_prefill_metadata
+
+    register_mamba_plugin_ops()
+    torch.manual_seed(0)
+    batch, seq, conv_dim, kernel = 2, 5, 6, 4
+    heads, head_dim, groups, dstate = 4, 3, 2, 5
+    lengths = torch.full((batch,), seq, dtype=torch.int32)
+    offsets, phase, ctx = ragged_prefill_metadata(batch, seq, torch.device("cpu"))
+    rows = torch.arange(batch, dtype=torch.int32)
+    meta = (lengths, offsets, rows, phase, ctx)
+
+    x = torch.randn(batch, seq, conv_dim)
+    weight = torch.randn(conv_dim, 1, kernel)
+    bias = torch.randn(conv_dim)
+    conv_state = torch.randn(batch, conv_dim, kernel)
+    ref = torch.ops.trt.causal_conv1d(
+        x, weight, bias, conv_state, lengths, 1, kernel - 1, 1, conv_dim
+    )
+    out = torch.ops.trt.causal_conv1d_ragged(
+        x.reshape(-1, conv_dim), weight, bias, conv_state, *meta, 1, kernel - 1, 1, conv_dim
+    )
+    torch.testing.assert_close(out[0], ref[0].reshape(-1, conv_dim))
+    torch.testing.assert_close(out[1], ref[1])
+
+    u = torch.randn(batch, seq, heads, head_dim)
+    a = -torch.rand(heads)
+    b = torch.randn(batch, seq, groups, dstate)
+    c = torch.randn(batch, seq, groups, dstate)
+    d = torch.randn(heads)
+    dt = torch.randn(batch, seq, heads)
+    dt_bias = torch.randn(heads)
+    state = torch.randn(batch, heads, head_dim, dstate)
+    fields = (1, groups, heads, head_dim, dstate)
+    ref = torch.ops.trt.update_ssm_state(
+        u, a, b, c, d, dt, dt_bias, state, lengths, *fields
+    )
+    out = torch.ops.trt.update_ssm_state_ragged(
+        u.reshape(-1, heads, head_dim),
+        a,
+        b.reshape(-1, groups, dstate),
+        c.reshape(-1, groups, dstate),
+        d,
+        dt.reshape(-1, heads),
+        dt_bias,
+        state,
+        *meta,
+        *fields,
+    )
+    torch.testing.assert_close(out[0], ref[0].reshape(-1, heads, head_dim))
+    torch.testing.assert_close(out[1], ref[1])
+
+
+@pytest.mark.unit
+def test_nemotron_patches_remote_code_class():
+    from exporters.models.nemotron.patches import apply_nemotron_patches
+
+    class RemoteNemotronHForCausalLM(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.config = None
+            self.backbone = nn.Module()
+            self.backbone.layers = nn.ModuleList()
+
+        def forward(self, input_ids=None, inputs_embeds=None, **kwargs):
+            return inputs_embeds
+
+    model = RemoteNemotronHForCausalLM()
+    original = RemoteNemotronHForCausalLM.forward
+    with apply_nemotron_patches(model):
+        assert RemoteNemotronHForCausalLM.forward is not original
+        hidden = torch.ones(1, 2, 4)
+        torch.testing.assert_close(model(inputs_embeds=hidden), hidden)
+    assert RemoteNemotronHForCausalLM.forward is original

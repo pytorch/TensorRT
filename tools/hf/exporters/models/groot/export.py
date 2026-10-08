@@ -9,9 +9,11 @@ from lerobot.policies.groot.configuration_groot import GrootConfig
 from lerobot.utils.constants import ACTION, OBS_STATE
 
 from ...config import EdgeConfig
-from ...utils import force_hf_attention
+from ..common.lerobot import apply_lerobot_compat, skip_weight_init
 
-DEFAULT_CHECKPOINT = "nvidia/GR00T-N1.5-3B"
+DEFAULT_CHECKPOINT = "nvidia/GR00T-N1.7-3B"
+
+apply_lerobot_compat()
 
 
 def prepare_export(
@@ -19,32 +21,26 @@ def prepare_export(
     device: torch.device,
     dtype: torch.dtype,
 ):
+    # chunk_size / max_*_dim / image_size keep the GrootConfig N1.7 defaults.
     policy_config = GrootConfig(
         base_model_path=args.checkpoint or DEFAULT_CHECKPOINT,
         device=str(device),
         embodiment_tag="new_embodiment",
-        chunk_size=50,
-        n_action_steps=50,
-        max_state_dim=64,
-        max_action_dim=32,
-        image_size=(224, 224),
-        tokenizer_assets_repo="lerobot/eagle2hg-processor-groot-n1p5",
         input_features={
             "observation.images.image": PolicyFeature(
-                type=FeatureType.VISUAL, shape=(3, 224, 224)
+                type=FeatureType.VISUAL, shape=(3, 256, 256)
             ),
             "observation.images.image2": PolicyFeature(
-                type=FeatureType.VISUAL, shape=(3, 224, 224)
+                type=FeatureType.VISUAL, shape=(3, 256, 256)
             ),
-            OBS_STATE: PolicyFeature(type=FeatureType.STATE, shape=(7,)),
+            OBS_STATE: PolicyFeature(type=FeatureType.STATE, shape=(8,)),
         },
-        output_features={ACTION: PolicyFeature(type=FeatureType.ACTION, shape=(32,))},
+        output_features={ACTION: PolicyFeature(type=FeatureType.ACTION, shape=(7,))},
     )
-    policy = GrootPolicy(policy_config).to(device).eval()
-    model = policy._groot_model.to(device=device, dtype=dtype).eval()
-    eagle = model.backbone.eagle_model
-    force_hf_attention(eagle.vision_model, "eager")
-    force_hf_attention(eagle.language_model, "eager")
+    with skip_weight_init():
+        policy = GrootPolicy(policy_config)
+    policy = policy.to(device).eval()
+    policy._groot_model.to(device=device, dtype=dtype).eval()
 
     export_config = EdgeConfig(
         model_type="groot",

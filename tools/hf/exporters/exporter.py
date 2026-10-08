@@ -8,11 +8,17 @@ from typing import Any
 import torch
 import torch.nn as nn
 from torch.export import ExportedProgram
-from transformers.exporters.exporter_dynamo import (
-    DynamoExporter,
-    get_auto_dynamic_shapes,
-    patch_forward_signature,
-)
+from .fla_compat import reraise_with_fla_fix
+
+try:
+    from transformers.exporters.exporter_dynamo import (
+        DynamoExporter,
+        get_auto_dynamic_shapes,
+        patch_forward_signature,
+    )
+except Exception as exc:  # executorch imports fla when installed
+    reraise_with_fla_fix(exc)
+    raise
 
 from . import ops as _ops  # noqa: F401
 from .compile import compile_component

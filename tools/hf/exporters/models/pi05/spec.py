@@ -8,16 +8,9 @@ import torch.nn as nn
 import torch_tensorrt
 
 from ...ops import call_engine, fuse_prefix
-from ...spec import (
-    ComponentBundle,
-    EdgeSpec,
-    register_edge_spec,
-)
-from ..common.helpers import (
-    causal_lm_flat,
-    kv_kwargs,
-    split_flat_to_kwargs,
-)
+from ...plugin.plugin_utils import attention_plugin_uses_paged_kv
+from ...spec import ComponentBundle, EdgeSpec, register_edge_spec
+from ..common.helpers import causal_lm_flat, kv_kwargs, split_flat_to_kwargs
 from ..common.patches import language_decoder
 from .helpers import (
     build_pi05_prefix_embs,
@@ -57,7 +50,9 @@ class Pi05Spec(EdgeSpec):  # type: ignore[misc]
         hidden = int(embs.shape[-1])
         opt_prefill = max(int(max_seq_len) // 2, 1)
         num_ds = int(ds.shape[0])
-        num_kv = int(kv.shape[2])
+        # >=0.10 plugins take fixed-size paged KV pools, which use the static spec.
+        paged_kv = attention_plugin_uses_paged_kv(default=False)
+        num_kv = int(kv.shape[3] if paged_kv else kv.shape[2])
         head_dim = int(kv.shape[-1])
         prefill_profile = {
             "min_shape": (1, 1, hidden),
@@ -106,7 +101,7 @@ class Pi05Spec(EdgeSpec):  # type: ignore[misc]
                         name=name,
                     )
                 )
-            elif name.startswith("past_key_values_"):
+            elif name.startswith("past_key_values_") and not paged_kv:
                 input_specs.append(
                     torch_tensorrt.Input(
                         profiles=[kv_profile, kv_profile],

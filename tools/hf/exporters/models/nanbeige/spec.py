@@ -12,6 +12,7 @@ from ...spec import (
     EdgeSpec,
     register_edge_spec,
 )
+from ...plugin.plugin_utils import attention_plugin_uses_paged_kv, paged_kv_pool_shape
 from ..common.helpers import kv_kwargs, split_flat_to_kwargs
 from .helpers import ensure_valid_rope_inv_freq
 from .patches import apply_nanbeige_patches
@@ -171,16 +172,14 @@ class NanbeigeSpec(EdgeSpec):  # type: ignore[misc]
             )
 
         kvcache_start_index = torch.empty(0, device=device, dtype=torch.int32)
-        past_key_values = [
-            torch.zeros(
-                batch_size,
-                2,
-                num_kv_heads,
-                max_seq_len,
-                head_dim,
-                device=device,
-                dtype=dtype,
+        if attention_plugin_uses_paged_kv(default=False):
+            kv_shape = paged_kv_pool_shape(
+                max_seq_len, num_kv_heads, head_dim, batch_size
             )
+        else:
+            kv_shape = (batch_size, 2, num_kv_heads, max_seq_len, head_dim)
+        past_key_values = [
+            torch.zeros(kv_shape, device=device, dtype=dtype)
             for _ in range(logical_layers)
         ]
         flat = (

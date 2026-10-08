@@ -7,23 +7,10 @@ import torch
 import torch.nn as nn
 
 from ...ops import call_engine
-from ...spec import (
-    ComponentBundle,
-    EdgeSpec,
-    register_edge_spec,
-)
-from ..common.helpers import (
-    kv_kwargs,
-    split_flat_to_kwargs,
-)
-from .helpers import (
-    _decoder,
-    _kind,
-    allocate_plugin_states,
-)
-from .patches import (
-    apply_nemotron_patches,
-)
+from ...spec import ComponentBundle, EdgeSpec, register_edge_spec
+from ..common.helpers import kv_kwargs, split_flat_to_kwargs
+from .helpers import _decoder, _kind, allocate_plugin_states
+from .patches import apply_nemotron_patches
 
 
 @register_edge_spec("nemotron_h", "nemotron")
@@ -78,6 +65,8 @@ class NemotronSpec(EdgeSpec):  # type: ignore[misc]
         with torch.no_grad():
             out = model(**kwargs)
         logits = out.logits if hasattr(out, "logits") else out[0]
+        # The engine returns logits for ``last_token_ids`` (the final position) only.
+        logits = logits[:, -1]
         if bench is not None:
             bench["language"] = cuda_ms(lambda: model(**kwargs))
         return {"language": logits}
@@ -126,6 +115,9 @@ class NemotronSpec(EdgeSpec):  # type: ignore[misc]
                 module=model.eval(),
                 trace_args=flat,
                 save_args=flat,
+                # >=0.11 Mamba plugins update conv/SSM state in place; keep the
+                # sample's zero states for the runtime graph.
+                execute_args=tuple(t.clone() for t in flat),
                 input_names=names,
                 output_names=["logits"]
                 + [f"present_kv_{i}" for i in range(na)]

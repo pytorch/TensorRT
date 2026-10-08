@@ -133,8 +133,20 @@ def compile_component(
     )
     (out_dir / engine_file).write_bytes(serialized)
 
-    _write_sidecar(out_dir, bundle, name, trt_out, engine_file=engine_file)
+    # Aliased (in-place state) outputs are engine outputs that the Torch-TensorRT
+    # module does not return; describe those engines from the exported graph.
+    described = trt_out
+    if len(trt_out) < len(bundle.output_names):
+        described = _exported_outputs(exported)
+    _write_sidecar(out_dir, bundle, name, described, engine_file=engine_file)
     return engine_path, trt_out, trt_ms
+
+
+def _exported_outputs(exported) -> tuple[torch.Tensor, ...]:
+    output_node = next(n for n in exported.graph.nodes if n.op == "output")
+    return tuple(
+        node.meta["val"] for node in torch.utils._pytree.tree_leaves(output_node.args)
+    )
 
 
 def _write_sidecar(

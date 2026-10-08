@@ -4,6 +4,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ...plugin.plugin_utils import attention_plugin_uses_paged_kv, dense_kv_from_pool
+
 
 def _as_tensor(x):
     """Unwrap tuple/list outputs from patched attention modules."""
@@ -88,6 +90,13 @@ def causal_lm_plugin_forward(
     else:
         embed = getattr(lm, "embed_tokens", None)
         logits = F.linear(last_hidden, embed.weight).float()
-    prefix_k = torch.stack([kv[:, 0, :, :seq_len, :] for kv in new_kvs], dim=0)
-    prefix_v = torch.stack([kv[:, 1, :, :seq_len, :] for kv in new_kvs], dim=0)
+
+    if attention_plugin_uses_paged_kv(default=False):
+        bsz = inputs_embeds.shape[0]
+        dense = [dense_kv_from_pool(kv, bsz, seq_len) for kv in new_kvs]
+        prefix_k = torch.stack([k for k, _ in dense], dim=0)
+        prefix_v = torch.stack([v for _, v in dense], dim=0)
+    else:
+        prefix_k = torch.stack([kv[:, 0, :, :seq_len, :] for kv in new_kvs], dim=0)
+        prefix_v = torch.stack([kv[:, 1, :, :seq_len, :] for kv in new_kvs], dim=0)
     return logits, context_hidden, prefix_k, prefix_v

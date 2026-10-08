@@ -109,8 +109,21 @@ class KimiK3Spec(EdgeSpec):  # type: ignore[misc]
                 module=language_model(model).eval(),
                 trace_args=args,
                 save_args=args,
+                # >=0.11 conv plugins update state in place; keep the sample's
+                # zero states for the runtime graph.
+                execute_args=tuple(t.clone() for t in args),
                 input_names=input_names,
-                output_names=["logits"],
+                output_names=["logits"]
+                + [
+                    name.replace("kda_", "present_kda_", 1)
+                    for name in state_names
+                    if name.startswith("kda_recurrent_")
+                ]
+                + [
+                    name.replace("kda_", "present_kda_", 1)
+                    for name in state_names
+                    if name.startswith("kda_conv_")
+                ],
                 parity_output="logits",
                 model_type="kimi_k3",
                 engine_file="language.engine",

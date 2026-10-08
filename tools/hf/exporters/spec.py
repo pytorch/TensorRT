@@ -143,7 +143,8 @@ def infer_model_type(model: nn.Module, explicit: str | None = None) -> str:
     ):
         return "pi05"
     if hasattr(model, "_groot_model") or (
-        getattr(getattr(model, "backbone", None), "eagle_model", None) is not None
+        getattr(getattr(model, "backbone", None), "visual", None) is not None
+        and hasattr(model, "action_head")
     ):
         return "groot"
     name = type(model).__name__.lower()
