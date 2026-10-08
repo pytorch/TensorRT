@@ -122,6 +122,9 @@ cc_test(
 cc_test(
     name = "test_shared_engines",
     srcs = ["test_shared_engines.cpp"],
+    linkopts = ["-Wl,--wrap=cudaMemGetInfo"],
+    # The wrapper needs the backend's CUDA reference at this executable's link.
+    linkstatic = True,
     target_compatible_with = select({
         "//cpp:linux_x86_64": [],
         "//cpp:sbsa": [],

@@ -316,6 +316,19 @@ requirements, which previously lived on the removed `CudaStreamGuard`:
   context is only exercised where the device has the SMs for one.
 
 
+## Engine load errors
+
+Loading returns `Error::MemoryAllocationFailed` when TensorRT's last error contains
+`OutOfMemory` or `out of memory`, ignoring case. This covers deserialization,
+weight streaming budget application and execution context creation. Other TensorRT
+load failures return `Error::InvalidProgram`.
+
+The log names the failed operation and preserves up to 1023 characters of the
+TensorRT reason across short lines. Allocation failures include free and total
+device memory in bytes, or the memory query error if those figures are unavailable.
+These figures are not the failed allocation size. Loading does not clear a caller's
+pending CUDA error to classify TensorRT failures.
+
 ## Shared engines
 
 Loading the same program twice in one process, for example once per robot arm, used to

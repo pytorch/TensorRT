@@ -28,6 +28,15 @@
 #include <future>
 #include <thread>
 
+namespace {
+thread_local bool fail_memory_query = false;
+}
+
+extern "C" cudaError_t __real_cudaMemGetInfo(std::size_t*, std::size_t*);
+extern "C" cudaError_t __wrap_cudaMemGetInfo(std::size_t* free_bytes, std::size_t* total_bytes) {
+  return fail_memory_query ? cudaErrorUnknown : __real_cudaMemGetInfo(free_bytes, total_bytes);
+}
+
 namespace torch_tensorrt {
 namespace executorch_backend {
 namespace {
@@ -180,6 +189,10 @@ std::atomic<int> budget_lines{0};
 std::mutex stall_gate;
 std::atomic<bool> stall_armed{false};
 std::atomic<bool> logger_stalled{false};
+thread_local std::string last_trt_error;
+thread_local std::string load_error;
+thread_local std::string reported_trt_error;
+thread_local const char* next_trt_error = nullptr;
 
 void tap_log(
     et_timestamp_t,
@@ -191,6 +204,23 @@ void tap_log(
     std::size_t length) {
   std::fprintf(stderr, "%c %.*s\n", static_cast<char>(level), static_cast<int>(length), message);
   const std::string_view line(message, length);
+  if (line.rfind("TensorRT: ", 0) == 0) {
+    last_trt_error = line.substr(std::strlen("TensorRT: "));
+    if (next_trt_error != nullptr) {
+      const char* replacement = next_trt_error;
+      next_trt_error = nullptr;
+      TRTLogger logger;
+      logger.log(nvinfer1::ILogger::Severity::kERROR, replacement);
+    }
+  }
+  if (line.rfind("TensorRTBackend::init: failed to ", 0) == 0) {
+    load_error = line;
+    reported_trt_error.clear();
+  }
+  constexpr std::string_view reason_prefix = "TensorRTBackend::init: TensorRT error: ";
+  if (line.rfind(reason_prefix, 0) == 0) {
+    reported_trt_error += line.substr(reason_prefix.size());
+  }
   if (line.find(kBudgetLine) != std::string_view::npos) {
     budget_lines.fetch_add(1);
   }
@@ -385,6 +415,9 @@ class SharedEnginesTest : public ::testing::Test {
       }
       GTEST_SKIP() << "no CUDA device: engine sharing is not covered by this run";
     }
+    last_trt_error.clear();
+    load_error.clear();
+    reported_trt_error.clear();
     ASSERT_FALSE(blob_.empty() || other_weights_blob_.empty() || dynamic_blob_.empty() || streaming_blob_.empty())
         << "TensorRT could not build the fixture engines";
   }
@@ -860,6 +893,219 @@ TEST_F(SharedEnginesTest, LoadTimeBudgetsSeparateEnginesAndOverrideCompileSpecs)
   ASSERT_FALSE(reference.empty());
   EXPECT_EQ(d.run(1, 9), reference);
   EXPECT_EQ(e.run(1, 9), reference);
+}
+
+class FailingAllocator : public nvinfer1::IGpuAllocator {
+ public:
+  void* allocate(std::uint64_t size, std::uint64_t, nvinfer1::AllocatorFlags) noexcept override {
+    if (fail) {
+      ++failures;
+      return nullptr;
+    }
+    void* memory = nullptr;
+    return cudaMalloc(&memory, size) == cudaSuccess ? memory : nullptr;
+  }
+  bool deallocate(void* memory) noexcept override {
+    return cudaFree(memory) == cudaSuccess;
+  }
+  bool fail = false;
+  std::atomic<int> failures{0};
+};
+
+class ScopedGpuAllocator {
+ public:
+  explicit ScopedGpuAllocator(nvinfer1::IGpuAllocator& allocator) {
+    shared_runtime_for_testing()->setGpuAllocator(&allocator);
+  }
+  ~ScopedGpuAllocator() {
+    shared_runtime_for_testing()->setGpuAllocator(nullptr);
+  }
+};
+
+void expect_load_failure_diagnostics(const char* operation) {
+  EXPECT_NE(load_error.find(operation), std::string::npos) << load_error;
+  ASSERT_FALSE(last_trt_error.empty());
+  // The original TensorRT log line may be truncated by the runtime's log buffer.
+  EXPECT_EQ(reported_trt_error.find(last_trt_error), 0) << reported_trt_error;
+  const auto value_pos = load_error.find("free=");
+  ASSERT_NE(value_pos, std::string::npos) << load_error;
+  std::size_t free_bytes = 0;
+  std::size_t total = 0;
+  ASSERT_EQ(std::sscanf(load_error.c_str() + value_pos, "free=%zu, total=%zu", &free_bytes, &total), 2);
+  EXPECT_GT(total, 0);
+  EXPECT_LE(free_bytes, total);
+  EXPECT_EQ(load_error.find("engine_size="), std::string::npos) << load_error;
+}
+
+TEST_F(SharedEnginesTest, EngineAllocationFailureReportsMemoryAndTensorRTReason) {
+  ASSERT_NE(shared_runtime_for_testing(), nullptr);
+  FailingAllocator allocator;
+  ScopedGpuAllocator installed(allocator);
+  Handle handle;
+  allocator.fail = true;
+  last_trt_error.clear();
+  load_error.clear();
+  EXPECT_EQ(handle.load(blob_), Error::MemoryAllocationFailed);
+  ASSERT_GT(allocator.failures.load(), 0);
+  expect_load_failure_diagnostics("deserialize TensorRT engine");
+}
+
+TEST_F(SharedEnginesTest, ContextAllocationFailureReportsMemoryAndTensorRTReason) {
+  ASSERT_NE(shared_runtime_for_testing(), nullptr);
+  FailingAllocator allocator;
+  ScopedGpuAllocator installed(allocator);
+  Handle first;
+  ASSERT_EQ(first.load(blob_), Error::Ok);
+  Handle second;
+  allocator.fail = true;
+  last_trt_error.clear();
+  load_error.clear();
+  EXPECT_EQ(second.load(blob_), Error::MemoryAllocationFailed);
+  ASSERT_GT(allocator.failures, 0);
+  expect_load_failure_diagnostics("create TensorRT execution context");
+}
+
+TEST_F(SharedEnginesTest, TruncatedEngineReportsInvalidProgramAndTensorRTReason) {
+  const auto damaged = wrap_engine_plan(blob_.data() + plan_offset(blob_), 32, blob_metadata(0));
+  Handle handle;
+  last_trt_error.clear();
+  load_error.clear();
+  EXPECT_EQ(handle.load(damaged), Error::InvalidProgram);
+  ASSERT_FALSE(last_trt_error.empty());
+  EXPECT_NE(load_error.find("deserialize TensorRT engine"), std::string::npos) << load_error;
+  EXPECT_EQ(reported_trt_error.find(last_trt_error), 0) << reported_trt_error;
+}
+
+TEST_F(SharedEnginesTest, AnotherThreadsErrorDoesNotChangeTheLoadFailure) {
+  const auto damaged = wrap_engine_plan(blob_.data() + plan_offset(blob_), 32, blob_metadata(0));
+  Error result = Error::Ok;
+  std::string reason;
+  std::string reported;
+  std::unique_lock<std::mutex> gate(stall_gate);
+  logger_stalled.store(false);
+  stall_armed.store(true);
+  std::thread loader([&] {
+    cudaSetDevice(0);
+    Handle handle;
+    result = handle.load(damaged);
+    reason = last_trt_error;
+    reported = reported_trt_error;
+  });
+  const bool reached_log = wait_for_flag(logger_stalled);
+  TRTLogger logger;
+  logger.log(nvinfer1::ILogger::Severity::kERROR, "out of memory on another thread");
+  stall_armed.store(false);
+  gate.unlock();
+  loader.join();
+  ASSERT_TRUE(reached_log);
+  EXPECT_EQ(result, Error::InvalidProgram);
+  ASSERT_FALSE(reason.empty());
+  EXPECT_EQ(reported.find(reason), 0) << reported;
+  EXPECT_EQ(reported.find("another thread"), std::string::npos) << reported;
+}
+
+TEST_F(SharedEnginesTest, FreshLoadPreservesTheCallersPendingCudaError) {
+  Handle handle;
+  void* memory = nullptr;
+  ASSERT_EQ(cudaMalloc(&memory, std::size_t{1} << 62), cudaErrorMemoryAllocation);
+  ASSERT_EQ(cudaPeekAtLastError(), cudaErrorMemoryAllocation);
+  EXPECT_EQ(handle.load(blob_), Error::Ok);
+  EXPECT_EQ(cudaGetLastError(), cudaErrorMemoryAllocation);
+}
+
+TEST_F(SharedEnginesTest, SharedLoadPreservesTheCallersPendingCudaError) {
+  Handle first;
+  ASSERT_EQ(first.load(blob_), Error::Ok);
+  Handle second;
+  void* memory = nullptr;
+  ASSERT_EQ(cudaMalloc(&memory, std::size_t{1} << 62), cudaErrorMemoryAllocation);
+  ASSERT_EQ(cudaPeekAtLastError(), cudaErrorMemoryAllocation);
+  EXPECT_EQ(second.load(blob_), Error::Ok);
+  EXPECT_EQ(cudaGetLastError(), cudaErrorMemoryAllocation);
+}
+
+TEST_F(SharedEnginesTest, FailedLoadPreservesTheCallersPendingCudaError) {
+  const auto damaged = wrap_engine_plan(blob_.data() + plan_offset(blob_), 32, blob_metadata(0));
+  Handle handle;
+  void* memory = nullptr;
+  ASSERT_EQ(cudaMalloc(&memory, std::size_t{1} << 62), cudaErrorMemoryAllocation);
+  ASSERT_EQ(cudaPeekAtLastError(), cudaErrorMemoryAllocation);
+  EXPECT_EQ(handle.load(damaged), Error::InvalidProgram);
+  EXPECT_EQ(cudaGetLastError(), cudaErrorMemoryAllocation);
+}
+
+TEST_F(SharedEnginesTest, WeightStreamingAllocationFailureReportsMemoryAndTensorRTReason) {
+  Handle probe;
+  ASSERT_EQ(probe.load(streaming_blob_, "0"), Error::Ok);
+  const auto streamable = probe.engine()->getStreamableWeightsSize();
+  ASSERT_GT(streamable, 0);
+  const std::string budget = std::to_string(streamable);
+  FailingAllocator allocator;
+  ScopedGpuAllocator installed(allocator);
+  Handle handle;
+  allocator.fail = true;
+  EXPECT_EQ(handle.load(streaming_blob_, budget.c_str()), Error::MemoryAllocationFailed);
+  ASSERT_GT(allocator.failures.load(), 0);
+  expect_load_failure_diagnostics("set TensorRT weight streaming budget");
+}
+
+TEST_F(SharedEnginesTest, AllocationFailureReportsAnUnavailableMemoryQuery) {
+  FailingAllocator allocator;
+  ScopedGpuAllocator installed(allocator);
+  Handle handle;
+  allocator.fail = true;
+  void* memory = nullptr;
+  ASSERT_EQ(cudaMalloc(&memory, std::size_t{1} << 62), cudaErrorMemoryAllocation);
+  fail_memory_query = true;
+  const auto result = handle.load(blob_);
+  fail_memory_query = false;
+  EXPECT_EQ(cudaGetLastError(), cudaErrorMemoryAllocation);
+  EXPECT_EQ(result, Error::MemoryAllocationFailed);
+  ASSERT_GT(allocator.failures.load(), 0);
+  EXPECT_NE(load_error.find("device memory unavailable: unknown error"), std::string::npos) << load_error;
+  EXPECT_EQ(load_error.find("free="), std::string::npos) << load_error;
+  ASSERT_FALSE(last_trt_error.empty());
+  EXPECT_EQ(reported_trt_error.find(last_trt_error), 0) << reported_trt_error;
+}
+
+TEST_F(SharedEnginesTest, TheLastReasonAndItsErrorCodeStayConsistent) {
+  FailingAllocator allocator;
+  ScopedGpuAllocator installed(allocator);
+  Handle handle;
+  allocator.fail = true;
+  constexpr char reason[] = "a later general TensorRT failure";
+  next_trt_error = reason;
+  const auto result = handle.load(blob_);
+  next_trt_error = nullptr;
+  EXPECT_EQ(result, Error::InvalidProgram);
+  ASSERT_GT(allocator.failures.load(), 0);
+  EXPECT_EQ(reported_trt_error, reason);
+  EXPECT_EQ(load_error.find("out of memory"), std::string::npos) << load_error;
+}
+
+TEST_F(SharedEnginesTest, LongTensorRTReasonIsPreservedAcrossLogLines) {
+  std::vector<std::uint8_t> damaged = blob_;
+  const auto offset = plan_offset(damaged);
+  std::memset(damaged.data() + offset, 0, damaged.size() - offset);
+  class RecordingLogger : public nvinfer1::ILogger {
+   public:
+    void log(Severity severity, const char* message) noexcept override {
+      if (severity <= Severity::kERROR) {
+        reason = message;
+      }
+    }
+    std::string reason;
+  } logger;
+  TRTUniquePtr<nvinfer1::IRuntime> runtime(nvinfer1::createInferRuntime(logger));
+  ASSERT_NE(runtime, nullptr);
+  TRTUniquePtr<nvinfer1::ICudaEngine> engine(
+      runtime->deserializeCudaEngine(damaged.data() + offset, damaged.size() - offset));
+  ASSERT_EQ(engine, nullptr);
+  ASSERT_GT(logger.reason.size(), 200);
+  ASSERT_LT(logger.reason.size(), 1024);
+  Handle handle;
+  EXPECT_EQ(handle.load(damaged), Error::InvalidProgram);
+  EXPECT_EQ(reported_trt_error, logger.reason);
 }
 
 thread_local bool fail_this_load = false;

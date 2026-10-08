@@ -19,7 +19,9 @@
 #include "torch_tensorrt/executorch/TensorRTBlobHeader.h"
 #include "torch_tensorrt/executorch/WeightStreamingBudget.h"
 
+#include <algorithm>
 #include <atomic>
+#include <cctype>
 #include <cstdint>
 #include <cstring>
 #include <map>
@@ -73,6 +75,59 @@ namespace {
 
 extern const Error kRegistrationResult;
 
+// Fixed storage keeps the noexcept logger usable when memory is exhausted.
+struct TensorRTLoadError {
+  char message[1024] = {};
+  bool out_of_memory = false;
+};
+thread_local TensorRTLoadError last_load_error;
+
+bool is_allocation_error(const char* message) {
+  const std::string_view text(message);
+  // TensorRT 11.1 reports allocation failures as kINTERNAL_ERROR to an error recorder,
+  // which also suppresses logger calls. Match its OutOfMemory text and 11.3's CUDA wording.
+  for (const std::string_view reason : {"out of memory", "outofmemory"}) {
+    if (std::search(text.begin(), text.end(), reason.begin(), reason.end(), [](unsigned char a, unsigned char b) {
+          return std::tolower(a) == b;
+        }) != text.end()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+Error report_load_error(const char* operation) {
+  const bool out_of_memory = last_load_error.out_of_memory;
+  if (out_of_memory) {
+    size_t free_bytes = 0;
+    size_t total = 0;
+    const cudaError_t memory_error = cudaMemGetInfo(&free_bytes, &total);
+    if (memory_error == cudaSuccess) {
+      ET_LOG(
+          Error,
+          "TensorRTBackend::init: failed to %s: out of memory (free=%zu, total=%zu bytes)",
+          operation,
+          free_bytes,
+          total);
+    } else {
+      ET_LOG(
+          Error,
+          "TensorRTBackend::init: failed to %s: out of memory (device memory unavailable: %s)",
+          operation,
+          cudaGetErrorString(memory_error));
+    }
+  } else {
+    ET_LOG(Error, "TensorRTBackend::init: failed to %s", operation);
+  }
+  const char* const reason = last_load_error.message[0] != '\0' ? last_load_error.message : "no TensorRT error logged";
+  // Leave room for the prefix in ExecuTorch's 256 byte log buffer.
+  const size_t length = std::strlen(reason);
+  for (size_t offset = 0; offset < length; offset += 200) {
+    ET_LOG(Error, "TensorRTBackend::init: TensorRT error: %.200s", reason + offset);
+  }
+  return out_of_memory ? Error::MemoryAllocationFailed : Error::InvalidProgram;
+}
+
 Error check_registration() {
   if (kRegistrationResult != Error::Ok) {
     ET_LOG(Error, "TensorRTBackend registration failed: %s", ::executorch::runtime::to_string(kRegistrationResult));
@@ -84,6 +139,9 @@ Error check_registration() {
 
 void TRTLogger::log(Severity severity, const char* msg) noexcept {
   if (severity <= Severity::kERROR) {
+    std::strncpy(last_load_error.message, msg, sizeof(last_load_error.message) - 1);
+    last_load_error.message[sizeof(last_load_error.message) - 1] = '\0';
+    last_load_error.out_of_memory = is_allocation_error(msg);
     ET_LOG(Error, "TensorRT: %s", msg);
   } else if (severity == Severity::kWARNING) {
     ET_LOG(Info, "TensorRT warning: %s", msg);
@@ -314,12 +372,14 @@ Error load_engine(
     uint64_t size,
     const WsBudget& request,
     std::shared_ptr<nvinfer1::ICudaEngine>& out) {
+  last_load_error = {};
   std::shared_ptr<nvinfer1::ICudaEngine> engine(runtime.deserializeCudaEngine(data, size), TRTDeleter{});
-  TORCHTRT_ET_CHECK_NOT_NULL(
-      engine, Error::InvalidProgram, "TensorRTBackend::init: failed to deserialize TensorRT engine");
+  if (engine == nullptr) {
+    return report_load_error("deserialize TensorRT engine");
+  }
   const Error err = apply_weight_streaming_budget(*engine, request);
   if (err != Error::Ok) {
-    return err;
+    return report_load_error("set TensorRT weight streaming budget");
   }
   out = std::move(engine);
   return Error::Ok;
@@ -431,9 +491,11 @@ Error initialize_engine_io(EngineHandle& handle) {
   handle.shared_scratch = scratch_enabled.load(std::memory_order_relaxed);
   const auto strategy = handle.shared_scratch ? nvinfer1::ExecutionContextAllocationStrategy::kUSER_MANAGED
                                               : nvinfer1::ExecutionContextAllocationStrategy::kSTATIC;
+  last_load_error = {};
   handle.exec_ctx.reset(handle.engine->createExecutionContext(strategy));
-  TORCHTRT_ET_CHECK_NOT_NULL(
-      handle.exec_ctx, Error::InvalidProgram, "TensorRTBackend::init: failed to create TensorRT execution context");
+  if (handle.exec_ctx == nullptr) {
+    return report_load_error("create TensorRT execution context");
+  }
 
   if (handle.shared_scratch) {
     // Gated so a handle loaded with the option off pays no TensorRT call for a
