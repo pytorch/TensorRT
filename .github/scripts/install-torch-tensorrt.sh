@@ -15,9 +15,10 @@ fi
 
 # Install all the dependencies required for Torch-TensorRT
 QUANTIZATION_GROUP=quantization
-# cu132 publishes Windows MSLK wheels, but cu134 currently does not.
-# Keep TorchAO and ModelOpt on that row without requesting unavailable MSLK.
-if [[ ${PLATFORM} == win32 && ${CU_VERSION} == cu134 ]]; then
+# Windows MSLK wheels import Triton kernels through TorchAO even for
+# unquantized Transformers models. Keep TorchAO and ModelOpt without MSLK
+# because Triton is unavailable in these Windows test environments.
+if [[ ${PLATFORM} == win32 ]]; then
     QUANTIZATION_GROUP=quantization-base
 fi
 python -m pip install --upgrade "pip>=25.1"
