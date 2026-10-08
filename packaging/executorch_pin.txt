@@ -5,4 +5,4 @@
 # credential without workflow permission, which is why the daily pin update could never publish
 # a bump. The workflows pass this with -r and keep their own pip flags, so the index they install
 # from stays visible where they call pip.
-executorch==1.6.0.dev20261005
+executorch==1.6.0.dev20261007

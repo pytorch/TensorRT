@@ -44,7 +44,7 @@ torch_tensorrt/bin/example_executorch_runner
 ```bash
 # Get the ExecuTorch source snapshot this package is built against. Keep this in sync
 # with the executorch commit pinned in MODULE.bazel.
-EXECUTORCH_REF="${EXECUTORCH_REF:-7f775e7e205f1ae36ce0289d9441902f41b6cd58}"
+EXECUTORCH_REF="${EXECUTORCH_REF:-3a3d12632682b29dbeeee367868d204846371c8d}"
 git clone --filter=blob:none --no-checkout \
   https://github.com/pytorch/executorch.git executorch
 pushd executorch
