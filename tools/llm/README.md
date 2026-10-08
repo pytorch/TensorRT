@@ -65,7 +65,7 @@ python run_vlm.py --model nvidia/Eagle2-2B --precision FP16 --num_tokens 128 --c
 
 ### Tensor-parallel export: FP16 and FP32
 
-[`tensor_parallel_llama_export.py`](tensor_parallel_llama_export.py) exports
+[`tensor_parallel_llm_export.py`](tensor_parallel_llm_export.py) exports
 Llama/Qwen models into per-rank TensorRT engines. `--precision fp16` is the default
 and uses FP16 autocast. `--precision fp32` converts floating model weights and
 buffers to FP32 before tracing and disables autocast. TensorRT compilation disables
@@ -75,16 +75,20 @@ Run these commands from the repository root with two GPUs. Export a cached FP32
 Qwen model, then reload it in a separate process:
 
 ```bash
-torchtrtrun --nproc_per_node=2 tools/llm/tensor_parallel_llama_export.py \
+torchtrtrun --nproc_per_node=2 tools/llm/tensor_parallel_llm_export.py \
     --mode export --model Qwen/Qwen2.5-0.5B-Instruct \
     --precision fp32 --cache static_v2 --save_dir /tmp/qwen_tp_fp32 \
     --prompt "What is tensor parallelism?" --num_tokens 128
 
-torchtrtrun --nproc_per_node=2 tools/llm/tensor_parallel_llama_export.py \
+torchtrtrun --nproc_per_node=2 tools/llm/tensor_parallel_llm_export.py \
     --mode load --model Qwen/Qwen2.5-0.5B-Instruct \
     --precision fp32 --cache static_v2 --save_dir /tmp/qwen_tp_fp32 \
     --prompt "What is tensor parallelism?" --num_tokens 128
 ```
+
+Both `static_v1` and `static_v2` are supported. To run v1, replace
+`--cache static_v2` with `--cache static_v1` in both commands and use a separate
+save directory such as `/tmp/qwen_tp_fp32_v1`.
 
 Use `--precision fp16` and a different save directory for FP16. Changing the flag
 in load mode does not convert an existing engine: re-export when changing
@@ -97,7 +101,9 @@ FP32 uses more memory; its performance was not measured in this investigation.
 Compare the saved cached engines with a full, unsharded eager reference using the
 same token history at every step. Each GPU must also fit the reference model.
 Save this snippet as `/tmp/check_tp_accuracy.py`; its settings match the FP32
-export command above. `start` and `end` select the cache positions to update.
+export command above. The same snippet works with `static_v1` engines by setting
+`engine_dir` to their save directory. `start` and `end` select the cache positions
+to update.
 
 ```python
 import gc
@@ -106,7 +112,7 @@ import torch
 import torch.distributed as dist
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-import tensor_parallel_llama_export as example  # Initializes NCCL and the device.
+import tensor_parallel_llm_export as example  # Initializes NCCL and the device.
 import torch_tensorrt
 from torch_tensorrt.distributed._nccl_utils import initialize_nccl_comm
 from utils import get_zeroed_static_cache_inputs
@@ -191,8 +197,8 @@ PYTHONPATH=tools/llm torchtrtrun --nproc_per_node=2 /tmp/check_tp_accuracy.py
 For FP16 engines, set `precision = "fp16"` and the matching `engine_dir`.
 Use `atol=rtol=0.02` as the default FP16 check; the measured
 Qwen2.5-0.5B-Instruct / `static_v2` / TP=2 / batch=1 configuration needs
-`atol=0.08, rtol=0.02`. The FP32 snippet uses `atol=0.001, rtol=0.0001`:
-FP32 reduces rounding differences but does not guarantee identical logits.
+`atol=0.08, rtol=0.02`. The FP32 snippet uses `atol=0.001, rtol=0.0001` to allow
+small floating-point differences between TensorRT and PyTorch eager.
 The numerical tolerance does not require identical next-token choices, which
 are reported separately. Export and load do not take tolerance arguments.
 
@@ -200,24 +206,33 @@ are reported separately. Export and load do not take tolerance arguments.
 
 Settings: pretrained Qwen2.5-0.5B-Instruct, B300 GPUs, TensorRT 11.3.0.99,
 PyTorch 2.15.0.dev20261005+cu130, Transformers 5.14.1, TP=2, batch size 1,
-`static_v2`. We compared 904 contexts: six prompts x 64 steps, four x 128 steps,
-and eight steps from synthetic tokens `[4, 5, 6, 7]`. FP32 replay used the same
-input histories as FP16; matching results across the two ranks are counted once.
+with both `static_v1` and `static_v2`. Each cache/precision combination was checked
+on the same 904 contexts: six prompts x 64 steps, four x 128 steps, and eight
+steps from synthetic tokens `[4, 5, 6, 7]`. All runs followed the original FP16
+reference's token histories; matching results across the two ranks are counted once.
 
 **TRT versus full eager reference**
 
-Each TRT engine was compared with eager PyTorch at the same precision.
+Each TRT engine was compared with eager PyTorch at the same precision. The logit
+checks below use `atol=0.08, rtol=0.02` for FP16 and `atol=0.001, rtol=0.0001`
+for FP32.
 
-| Precision | Largest absolute logit difference | Matching next-token choices |
-|---|---:|---:|
-| FP16 autocast | 0.0805664 | 902 / 904 |
-| FP32 | 0.0006111 | 904 / 904 |
+| Cache | Precision | Largest absolute logit difference | Matching next-token choices | Passing logit checks |
+|---|---|---:|---:|---:|
+| `static_v1` | FP16 autocast | 0.0957031 | 902 / 904 | 903 / 904 |
+| `static_v1` | FP32 | 0.0006673 | 904 / 904 | 904 / 904 |
+| `static_v2` | FP16 autocast | 0.0805664 | 902 / 904 | 904 / 904 |
+| `static_v2` | FP32 | 0.0006111 | 904 / 904 | 904 / 904 |
 
-The FP32 token choices all matched, while the logits still differed slightly.
+For `static_v1` FP16, one logit at the eighth synthetic-input step exceeded the
+numerical tolerance (required `atol` approximately 0.08412 at `rtol=0.02`), while
+the next-token choice still matched. The tolerance remains unchanged. FP32
+matched all token choices for both cache variants, with small logit differences.
 
 **Prompt and generated text**
 
-The FP16 eager reference's top scores tied at the two differing positions:
+Both cache variants had the same two FP16 token mismatches, where the full eager
+reference's top scores tied:
 
 | Prompt and generated text before the differing token | FP16 eager | FP16 TRT | FP32 eager and TRT |
 |---|---|---|---|
