@@ -288,7 +288,7 @@ in the loaded module and get the configured model back as the context value:
   the NCCL communicator on first execution.
 
 For a complete example, see
-`tensor_parallel_llama_export.py <https://github.com/pytorch/TensorRT/blob/main/tools/llm/tensor_parallel_llama_export.py>`_.
+`tensor_parallel_llm_export.py <https://github.com/pytorch/TensorRT/blob/main/tools/llm/tensor_parallel_llm_export.py>`_.
 
 ----
 
@@ -701,7 +701,7 @@ The following complete examples are available in the Torch-TensorRT repository:
      - Export → save → load round-trip test for distributed engines
    * - ``tools/llm/tensor_parallel_llama_multinode.py``
      - Llama TP with torch.compile (multinode, C++ runtime)
-   * - ``tools/llm/tensor_parallel_llama_export.py``
-     - Llama TP: export + save + load workflow (multinode)
+   * - ``tools/llm/tensor_parallel_llm_export.py``
+     - Llama/Qwen TP: export + save + load workflow (multinode)
    * - ``tools/llm/tensor_parallel_qwen_multinode.py``
      - Qwen TP with torch.compile (multinode)
