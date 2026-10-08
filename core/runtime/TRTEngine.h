@@ -430,7 +430,7 @@ struct TRTEngine : torch::CustomClassHolder {
   std::string enqueue_profile_path;
   std::string trt_engine_profile_path;
   std::string cuda_graph_debug_path;
-  uint64_t global_profiling_generation = 0;
+  uint64_t applied_global_profiling_generation = 0;
   std::mutex mu;
   std::unique_ptr<TRTEngineProfiler> trt_engine_profiler;
   ResourceAllocationStrategy resource_allocation_strategy = kStatic;
