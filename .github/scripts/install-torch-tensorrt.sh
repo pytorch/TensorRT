@@ -14,13 +14,6 @@ if [[ $(uname -m) == "aarch64" ]]; then
 fi
 
 # Install all the dependencies required for Torch-TensorRT
-QUANTIZATION_GROUP=quantization
-# Windows MSLK wheels import Triton kernels through TorchAO even for
-# unquantized Transformers models. Keep TorchAO and ModelOpt without MSLK
-# because Triton is unavailable in these Windows test environments.
-if [[ ${PLATFORM} == win32 ]]; then
-    QUANTIZATION_GROUP=quantization-base
-fi
 python -m pip install --upgrade "pip>=25.1"
 python -m pip install \
     --pre \
@@ -28,7 +21,7 @@ python -m pip install \
     --extra-index-url https://download.pytorch.org/whl/${CHANNEL}/${CU_VERSION} \
     --group test \
     --group test-ext \
-    --group "${QUANTIZATION_GROUP}"
+    --group quantization
 TORCHVISION=$(python - <<'PY'
 import tomllib
 
