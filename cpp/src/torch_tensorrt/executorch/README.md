@@ -511,8 +511,10 @@ the recorded graph for the next compatible call. Taking the ordinary path does
 not guarantee that a stream from another context works with the engine; the call
 can still fail.
 
-If buffer allocation fails, the engine uses the ordinary path until an input
-shape changes. A failed recording is retried on the next call, and after three
+If allocating a graph buffer fails, the engine uses the ordinary path until an
+input shape changes. Host staging allocations can still fail with
+`Error::MemoryAllocationFailed`; retained graph buffers are not reclaimed to
+retry them. A failed recording is retried on the next call, and after three
 failures for one set of shapes the engine logs an error and uses the ordinary
 path until a shape changes.
 
