@@ -287,6 +287,9 @@ _L1: list[Suite] = [
         paths=("models/test_models.py", "models/test_dyn_models.py"),
         markers="critical",
         ir="torch_compile",
+        # The RPC server died on the 41 GiB runner during this suite. Use
+        # the same larger RAM runner as torch-compile-backend, with one A10G.
+        runner="mt-l-x86aavx2-29-113-a10g",
     ),
     Suite(
         "ts-models",
@@ -514,7 +517,11 @@ _PYTHON_ONLY: list[Suite] = [
         "python-only-executorch-export",
         tier="l1",
         lanes=("python-only",),
-        paths=("executorch/test_export.py",),
+        paths=(
+            "executorch/test_export.py",
+            "executorch/test_cuda_graphs.py",
+            "executorch/test_partitioner_target_device.py",
+        ),
         setup=("executorch",),
         variants=("standard",),
         platforms=("linux-x86_64",),

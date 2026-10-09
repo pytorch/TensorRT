@@ -15,6 +15,8 @@ from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
 )
 from torch_tensorrt.dynamo.lowering.passes.reset_folded_constructors import (
     FOLDED_CONSTRUCTOR_META,
+    _aliases_input,
+    _storage_escapes,
 )
 
 from packaging import version
@@ -176,6 +178,12 @@ class _TorchTensorRTConstantFolder(ConstantFolder):  # type: ignore[misc]
 
     # TODO: Update this function when quantization is added
     def is_impure(self, node: torch.fx.node.Node) -> bool:
+
+        # Folding an observable view loses its relation to the original storage.
+        # Keep the view so the reset pass can clone a fresh allocation once and
+        # rebuild its views, while views of module state keep their aliases.
+        if _aliases_input(node) and _storage_escapes(node):
+            return True
 
         if node.target in self.quantization_ops:
             return True

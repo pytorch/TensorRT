@@ -1594,9 +1594,10 @@ if not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime:
             # unavailable (e.g. engine context not yet initialised in meta mode).
             output_shapes = [list(s) for s in engine.output_shapes]
 
+        output_device = (
+            input_tensors[0].device if input_tensors else engine._target_device
+        )
         return [
-            torch.empty(
-                shape, dtype=engine.output_dtypes[i], device=input_tensors[0].device
-            )
+            torch.empty(shape, dtype=engine.output_dtypes[i], device=output_device)
             for i, shape in enumerate(output_shapes)
         ]

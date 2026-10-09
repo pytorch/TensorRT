@@ -3,7 +3,7 @@
 
 module(
     name = "torch_tensorrt",
-    version = "2.15.0a0",
+    version = "2.16.0a0",
     repo_name = "org_pytorch_tensorrt",
 )
 
@@ -53,8 +53,8 @@ local_torch = use_repo_rule("//toolchains:local_torch.bzl", "local_torch")
 new_git_repository(
     name = "executorch",
     build_file = "@//third_party/executorch:BUILD",
-    # executorch==1.6.0.dev20261005
-    commit = "7f775e7e205f1ae36ce0289d9441902f41b6cd58",
+    # executorch==1.6.0.dev20261008
+    commit = "e132612f3bf9d5c5b7c9012a398851aa9c3fee27",
     patch_cmds = [
         "find . -mindepth 2 \\( -name BUILD -o -name BUILD.bazel \\) -delete",
         "mkdir executorch && find . -mindepth 1 -maxdepth 1 ! -name executorch ! -name BUILD ! -name BUILD.bazel ! -name REPO.bazel -exec cp -a {} executorch/ \\;",
@@ -180,10 +180,10 @@ http_archive(
 http_archive(
     name = "libtorch_win_arm64",
     build_file = "@//third_party/libtorch:BUILD",
-    sha256 = "e72f2b05d062651d0ba1d44e189979f70c2faf7e879e925849f3c5716ab4319e",
+    sha256 = "241feccbb04a144383a04836458555b848ef9625ec98be5f049338d1e615a057",
     strip_prefix = "torch",
     type = "zip",
-    urls = ["https://pypi.nvidia.com/nvtorch_oot_nightly/torch/torch-2.15.0.dev20260902%2Bcu134-cp313-cp313-win_arm64.whl"],
+    urls = ["https://pypi.nvidia.com/nvtorch_oot_nightly/torch/torch-2.16.0.dev20261006%2Bcu134-cp313-cp313-win_arm64.whl"],
 )
 
 http_archive(

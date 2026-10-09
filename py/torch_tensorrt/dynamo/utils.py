@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import ctypes
+import functools
 import gc
 import importlib.util
 import logging
@@ -141,14 +142,35 @@ def unified_dtype_converter(
         raise TypeError("%s is not a supported dtype" % dtype)
 
 
-def deallocate_module(module: torch.fx.GraphModule) -> None:
+def deallocate_module(
+    module: torch.nn.Module, release_every_bytes: int = 1 << 30
+) -> None:
+    """Move ``module``'s parameters and buffers to the CPU and release their GPU memory.
+
+    ``module.to("cpu")`` leaves every freed block in PyTorch's CUDA cache until it
+    returns, so for the length of the move the process holds both the GPU and the CPU
+    copy of the weights. On unified memory systems those come out of the same DRAM.
+    Instead the cache is emptied each time ``release_every_bytes`` have moved, so the
+    GPU copy shrinks as the CPU copy grows.
     """
-    This is a helper function to delete the instance of module. We first move it to CPU and then
-    delete the object. This function ensures the GPU memory occupied by the module is released effectively after this call
-    """
-    module.to(CPU_DEVICE)
-    torch.cuda.empty_cache()
+    moved_since_release = 0
+
+    def to_cpu(t: torch.Tensor) -> torch.Tensor:
+        nonlocal moved_since_release
+        if t.device.type == "cuda":
+            # The tensor moved before this one has already been rebound to its CPU
+            # copy, so its GPU block is free by now.
+            if moved_since_release >= release_every_bytes:
+                torch.cuda.empty_cache()
+                moved_since_release = 0
+            # Only paces the releases; sparse and other layouts don't define nbytes.
+            moved_since_release += t.nbytes if t.layout == torch.strided else 0
+        return t.to(CPU_DEVICE)
+
+    # Same conversion as ``module.to(CPU_DEVICE)``, which is ``_apply`` with a ``.to``.
+    module._apply(to_cpu)
     gc.collect()
+    torch.cuda.empty_cache()
 
 
 def pin_torch_executed_state(module: torch.nn.Module, device: torch.device) -> None:
@@ -1038,16 +1060,38 @@ def release_host_and_device_memory() -> None:
         torch.cuda.ipc_collect()
         torch.cuda.synchronize()
 
-    if (
-        platform.system() == "Linux"
-        and os.environ.get("TORCHTRT_ENABLE_BUILDER_MALLOC_TRIM", "0") == "1"
-    ):
-        try:
-            libc = ctypes.CDLL("libc.so.6")
-            if libc.malloc_trim(0) != 1:
-                logger.warning("Failed to release CPU memory.")
-        except Exception:
-            logger.warning("Failed to release CPU memory.")
+    trim_host_heap()
+
+
+@functools.lru_cache(maxsize=1)
+def _glibc_malloc_trim() -> Optional[Callable[[int], int]]:
+    """glibc's ``malloc_trim``, or ``None`` where the C library doesn't provide it."""
+    if platform.system() != "Linux":
+        return None
+    try:
+        malloc_trim = ctypes.CDLL("libc.so.6").malloc_trim
+    except (OSError, AttributeError):
+        return None
+    malloc_trim.argtypes = [ctypes.c_size_t]
+    malloc_trim.restype = ctypes.c_int
+    return malloc_trim
+
+
+def trim_host_heap() -> None:
+    """Return freed heap memory to the operating system.
+
+    Building a TensorRT engine frees on the order of gigabytes of host allocations that
+    glibc keeps in its arenas instead of returning to the OS, so the process holds them
+    for the rest of its life. On unified memory systems that memory is also unavailable
+    to the GPU. ``malloc_trim`` hands it back. Set
+    ``TORCHTRT_ENABLE_BUILDER_MALLOC_TRIM=0`` to skip this.
+    """
+    if os.environ.get("TORCHTRT_ENABLE_BUILDER_MALLOC_TRIM", "1") == "0":
+        return
+    malloc_trim = _glibc_malloc_trim()
+    if malloc_trim is not None:
+        # The return value only says whether there was anything to release.
+        malloc_trim(0)
 
 
 def is_quantized_by_modelopt(model: torch.nn.Module) -> bool:

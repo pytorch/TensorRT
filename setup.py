@@ -1033,7 +1033,7 @@ def get_sbsa_requirements(base_requirements):
         return requirements
     else:
         requirements = requirements + [
-            "torch>=2.15.0.dev,<2.16.0",
+            "torch>=2.16.0.dev,<2.17.0",
         ]
         if USE_TRT_RTX:
             # TensorRT-RTX ships an aarch64 (SBSA) wheel; mirror get_x86_64_requirements.
@@ -1045,7 +1045,7 @@ def get_sbsa_requirements(base_requirements):
         return (
             requirements
             + [
-                "torch>=2.15.0.dev,<2.16.0",
+                "torch>=2.16.0.dev,<2.17.0",
             ]
             + get_tensorrt_requirements()
         )
@@ -1058,7 +1058,7 @@ def get_x86_64_requirements(base_requirements):
         return requirements
     else:
         requirements = requirements + [
-            "torch>=2.15.0.dev,<2.16.0",
+            "torch>=2.16.0.dev,<2.17.0",
         ]
         if USE_TRT_RTX:
             return requirements + [

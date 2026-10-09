@@ -9,7 +9,7 @@ requires = [
     "ninja>=1.11.0",
     "pyyaml>=6.0",
     "cffi>=1.15.1",
-    "torch>=2.15.0.dev,<2.16.0",
+    "torch>=2.16.0.dev,<2.17.0",
     "pybind11==2.6.2",
 ]
 build-backend = "setuptools.build_meta"
@@ -130,14 +130,10 @@ docs = [
     "pillow",
 ]
 
-quantization-base = [
+quantization = [
     "nvidia-modelopt[hf]>=0.44.0; python_version > '3.9' and python_version < '3.13'",
     "torchao",
-]
-
-quantization = [
-    {include-group = "quantization-base"},
-    "mslk>=1.0.0",
+    "mslk>=1.0.0; sys_platform == 'linux'",
 ]
 
 # Optional runtime deps for the torch_tensorrt.kernels QDP-plugin layer,
@@ -216,10 +212,6 @@ conflicts = [
     [
       { group = "test_ext" },
       { group = "quantization" },
-    ],
-    [
-      { group = "test_ext" },
-      { group = "quantization-base" },
     ],
 ]
 constraint-dependencies = [

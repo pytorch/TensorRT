@@ -3,7 +3,7 @@
 
 module(
     name = "torch_tensorrt",
-    version = "2.15.0a0",
+    version = "2.16.0a0",
     repo_name = "org_pytorch_tensorrt",
 )
 
@@ -78,8 +78,8 @@ new_local_repository(
 new_git_repository(
     name = "executorch",
     build_file = "@//third_party/executorch:BUILD",
-    # executorch==1.6.0.dev20261005
-    commit = "7f775e7e205f1ae36ce0289d9441902f41b6cd58",
+    # executorch==1.6.0.dev20261008
+    commit = "e132612f3bf9d5c5b7c9012a398851aa9c3fee27",
     recursive_init_submodules = True,
     patch_cmds = [
         "find . -mindepth 2 \\( -name BUILD -o -name BUILD.bazel \\) -delete",

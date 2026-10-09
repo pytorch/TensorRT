@@ -102,7 +102,7 @@ install-test-ext:
     # compiled from the commit this version pairs with.
     uv pip install pyyaml patchelf \
       --extra-index-url https://download.pytorch.org/whl/nightly/cu132 \
-      "executorch==1.6.0.dev20261005"
+      "executorch==1.6.0.dev20261008"
 
 # ── Linting ───────────────────────────────────────────────────────────────────
 

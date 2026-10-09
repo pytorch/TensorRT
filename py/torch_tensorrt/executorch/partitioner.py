@@ -56,6 +56,12 @@ except ImportError:
 # spec), which takes precedence over this baked value when provided at load.
 WEIGHT_STREAMING_BUDGET_COMPILE_SPEC_KEY = "weight_streaming_budget"
 
+# Compile spec key that turns CUDA graph replay on (b"1") or off (b"0") for every
+# TensorRT engine in the program. Must match kCudaGraphsKey on the C++ side
+# (cpp/include/torch_tensorrt/executorch/TensorRTBackend.h). A load-time backend
+# option of the same name wins over it.
+CUDA_GRAPHS_COMPILE_SPEC_KEY = "use_cuda_graphs"
+
 # The C++ side parses the value into an int64_t, so anything at or above 2**63 has no
 # representation there.
 WEIGHT_STREAMING_BUDGET_MAX_BYTES = 2**63
@@ -89,6 +95,18 @@ def normalize_weight_streaming_budget_per_engine(
             f"{weight_streaming_budget_per_engine}."
         )
     return str(weight_streaming_budget_per_engine).encode("ascii")
+
+
+def normalize_use_cuda_graphs(use_cuda_graphs: bool | None) -> bytes | None:
+    """Validate the replay choice; None leaves the runtime default unchanged."""
+    if use_cuda_graphs is None:
+        return None
+    if not isinstance(use_cuda_graphs, bool):
+        raise TypeError(
+            "use_cuda_graphs must be a bool or None, got "
+            f"{type(use_cuda_graphs).__name__}."
+        )
+    return b"1" if use_cuda_graphs else b"0"
 
 
 def _keep_mutated_buffers_above_delegate(exported_program: ExportedProgram) -> None:
@@ -175,6 +193,18 @@ class TensorRTPartitioner(Partitioner):  # type: ignore[misc]
                     'so the value has to be "cuda" or "cuda:N".'
                 )
         self._has_explicit_target_device = bool(explicit)
+        # The delegate refuses any other value at load, which is too late: on the device, after the
+        # program has shipped.
+        cuda_graphs = [
+            s for s in self.compile_specs if s.key == CUDA_GRAPHS_COMPILE_SPEC_KEY
+        ]
+        if len(cuda_graphs) > 1 or any(
+            s.value not in (b"0", b"1") for s in cuda_graphs
+        ):
+            raise ValueError(
+                f"{CUDA_GRAPHS_COMPILE_SPEC_KEY} must appear at most once, with the value "
+                f'b"0" or b"1", got {[s.value for s in cuda_graphs]!r}.'
+            )
         self.delegation_spec = DelegationSpec(
             backend_id=TensorRTBackend.__name__,
             compile_specs=self.compile_specs,
