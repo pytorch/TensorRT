@@ -38,6 +38,30 @@ _REPOSITORY_PIN = {
 }
 
 
+def check_windows_dependencies(native: Path) -> None:
+    direct = subprocess.check_output(
+        ["dumpbin", "/DEPENDENTS", str(native)], text=True
+    ).lower()
+    required = (
+        "executorch.dll",
+        "executorch_extension_cuda.dll",
+        "nvinfer_11.dll",
+    )
+    for dependency in required:
+        if dependency not in direct:
+            reject(f"the delegate does not import {dependency}\n{direct}")
+
+    # CUDA 13's Windows hybrid runtime loads nvcudart_hybrid64.dll at runtime,
+    # so cudart need not appear in the PE import table. CMake still links
+    # CUDA::cudart and the metadata checks below require the CUDA-labelled
+    # ExecuTorch build. If a traditional cudart DLL is imported, require CUDA 13.
+    cuda_imports = set(re.findall(r"\bcudart64_\d+\.dll\b", direct))
+    if cuda_imports - {"cudart64_13.dll"}:
+        reject(
+            f"the delegate imports a CUDA runtime other than CUDA 13: {cuda_imports}"
+        )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("wheel", type=Path)
@@ -95,17 +119,7 @@ def main() -> None:
             with tempfile.TemporaryDirectory() as directory:
                 native = Path(directory) / library
                 native.write_bytes(payload)
-                dependencies = subprocess.check_output(
-                    ["dumpbin", "/DEPENDENTS", str(native)], text=True
-                ).lower()
-                for dependency in (
-                    "executorch.dll",
-                    "executorch_extension_cuda.dll",
-                    "nvinfer_11.dll",
-                    "cudart64_13.dll",
-                ):
-                    if dependency not in dependencies:
-                        reject(f"the delegate does not import {dependency}")
+                check_windows_dependencies(native)
                 exports = subprocess.check_output(
                     ["dumpbin", "/EXPORTS", str(native)], text=True
                 )
