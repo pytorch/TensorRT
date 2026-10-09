@@ -68,8 +68,8 @@ The workflow is the standard ``ir="dynamo"`` path, with two extra arguments to
 ``torch_tensorrt.save``:
 
 * ``output_format="executorch"`` selects the ``.pte`` writer.
-* ``retrace=False`` is required. Re-exporting the compiled graph drops the engine constant,
-  and the failure only surfaces much later at load time.
+* ``retrace=False`` is recommended. It keeps the compiled graph as it is instead of
+  re-exporting it, so each TensorRT engine is still there when ExecuTorch's partitioner runs.
 
 .. code-block:: python
 
@@ -222,13 +222,14 @@ without building anything from source:
 
 .. code-block:: cmake
 
-    find_package(executorch REQUIRED COMPONENTS backend_cuda kernels_optimized)
+    find_package(executorch REQUIRED COMPONENTS backend_cuda extension_cuda kernels_optimized)
     find_package(executorch_backend_tensorrt REQUIRED)
 
     target_link_libraries(my_app PRIVATE
       executorch::runtime
       executorch::backend_cuda
       executorch::backend_tensorrt
+      executorch::extension_cuda
       executorch::kernels_optimized
     )
 
@@ -236,7 +237,8 @@ without building anything from source:
 boundary. ``backend_cuda`` registers the device allocator those copies use, so it is needed
 even by a program that carries only the TensorRT delegate. Without it the program loads, the
 engine initializes, and the first instruction fails with
-``_h2d_copy: no device allocator registered``.
+``_h2d_copy: no device allocator registered``. ``extension_cuda`` provides
+``CallerStreamGuard``, used below to choose the CUDA stream.
 
 The two packages live in two distributions, so point CMake at both. ExecuTorch is a namespace
 package, so its path has to come from its distribution metadata rather than from
@@ -300,10 +302,18 @@ Building the delegate from source
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The delegate source ships inside ``libtorchtrt.tar.gz`` as
-``torch_tensorrt/src/torch_tensorrt/executorch/``. Add it beside ExecuTorch and link the
-target it provides:
+``torch_tensorrt/src/torch_tensorrt/executorch/``. Turn on ExecuTorch's CUDA backend and the
+extensions a ``Module`` app uses, add the delegate next to ExecuTorch, and link the target it
+provides:
 
 .. code-block:: cmake
+
+    set(EXECUTORCH_BUILD_CUDA ON CACHE BOOL "" FORCE)
+    set(EXECUTORCH_BUILD_EXTENSION_TENSOR ON CACHE BOOL "" FORCE)
+    set(EXECUTORCH_BUILD_EXTENSION_DATA_LOADER ON CACHE BOOL "" FORCE)
+    set(EXECUTORCH_BUILD_EXTENSION_FLAT_TENSOR ON CACHE BOOL "" FORCE)
+    set(EXECUTORCH_BUILD_EXTENSION_MODULE ON CACHE BOOL "" FORCE)
+    set(EXECUTORCH_BUILD_EXTENSION_NAMED_DATA_MAP ON CACHE BOOL "" FORCE)
 
     add_subdirectory("executorch")
     add_subdirectory("torch_tensorrt/src/torch_tensorrt/executorch")
@@ -329,17 +339,15 @@ state. A static copy would give each delegate its own.
 Runtime Performance
 --------------------
 
-One CUDA stream for every delegate
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Choosing the CUDA stream
+^^^^^^^^^^^^^^^^^^^^^^^^^
 
-A coalesced ``.pte`` runs on more than one delegate, and by default each backend enqueues its
-work on its own CUDA stream. Separate streams are not ordered against one another, so at a
-delegate boundary the consuming delegate can start before the producing one has finished
-writing. That is a race. It is intermittent, and it shows up either as wrong results or as an
-illegal memory access.
+With no stream chosen, both delegates run on ``cudaStreamPerThread``, the default stream of the
+calling thread. A coalesced program run from one thread is therefore ordered correctly as it
+is, with nothing to add.
 
-The runtime does not impose a shared stream, so this is the application's job. Create one
-stream and scope a guard over the whole execution:
+To run every delegate on a stream of your own, for example a green-context stream, scope a
+guard over the whole execution:
 
 .. code-block:: cpp
 
@@ -351,11 +359,16 @@ stream and scope a guard over the whole execution:
     module.forward(input);
 
 One guard reaches every CUDA-capable delegate, because they all resolve the same shared
-``libextension_cuda``. The stream must be on the engine's device. With no guard active the
-backend falls back to ``cudaStreamPerThread``.
+``libextension_cuda``, the ``extension_cuda`` component linked above. The stream must be on
+the engine's device. The CUDA backend refuses a caller stream for a method that uses its own
+CUDA graphs.
 
-``execute()`` always returns with the work finished, whatever stream it ran on, so there is
-no event to wait for afterwards.
+Only the TensorRT delegate always waits for its work before it returns. ExecuTorch's CUDA
+backend can return once its work is queued, so ``execute()`` on a coalesced program can return
+before the work finishes. When the guard sets a stream of your own, synchronize that stream
+before reading GPU outputs on the host or from another stream.
+:ref:`Running a coalesced .pte <executorch_single_stream>` describes the same rule for a
+decode loop.
 
 Green contexts
 ^^^^^^^^^^^^^^^
@@ -404,6 +417,12 @@ It is not free. Each engine keeps one stable device buffer per input and output,
 replayed call copies each input in and each output out. For an engine with few kernels, or
 with large inputs and outputs, those copies can cost more than the launches they save. Shapes
 that change on every call never replay and still pay the copies.
+
+Some engines never replay, even with replay on. An engine on the shared activation scratch
+described below always runs without a graph, so turning on both options gives no replay.
+Engines with aliased outputs, GPUs without stream-ordered memory, and drivers older than
+CUDA 12.5 also run without one, as does a call on a green-context stream. The delegate logs
+the reason once.
 
 .. warning::
 
