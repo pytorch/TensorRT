@@ -47,28 +47,6 @@ def _patch_eagle_image_features(original: Callable) -> Callable:
     return forward
 
 
-@contextmanager
-def apply_groot_patches(model: Any | None = None) -> Iterator[None]:
-    """Family setattr, plus the live Eagle class.
-
-    LeRobot builds Eagle with ``AutoModel.from_config(..., trust_remote_code=True)``,
-    so the running class is HuggingFace ``transformers_modules`` code, not
-    ``lerobot.policies.groot.eagle2_hg_model``. The dotted path still covers the
-    in-tree copy; this patches ``type(eagle_model)`` so vision
-    ``eagle(pixel_values)`` hits ``extract_feature``.
-    """
-    from ...plugin.attn_patches import apply_patches, patch_attribute
-    from .helpers import _groot
-
-    with apply_patches(GROOT):
-        if model is None:
-            yield
-            return
-        eagle_cls = type(_groot(model).backbone.eagle_model)
-        with patch_attribute(eagle_cls, "forward", _patch_eagle_image_features):
-            yield
-
-
 @register_patch(
     GROOT,
     "transformers.models.llama.modeling_llama.LlamaForCausalLM.forward",
