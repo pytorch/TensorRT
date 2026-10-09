@@ -2,19 +2,12 @@ import logging
 from typing import Any, Optional, Sequence, Tuple
 
 import torch
-from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
-from torch.utils._python_dispatch import _disable_current_modes
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
-from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
-    DYNAMO_CONVERTERS as CONVERTERS,
-)
-from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
-    CallingConvention,
-)
 from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
+    TRTInterpreter,
     UnsupportedOperatorException,
 )
-from torch_tensorrt.dynamo.conversion.converter_utils import get_node_name, to_torch
+from torch_tensorrt.dynamo.conversion.converter_utils import get_node_name
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -55,47 +48,9 @@ class TRTSubgraphInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         finally:
             self.ctx.current_node = prev
 
-    def get_attr(self, target: str, args: Any, kwargs: Any) -> Any:
-        del args, kwargs
-        with _disable_current_modes(), unset_fake_temporarily():
-            attr = self.fetch_attr(target)
-            if isinstance(attr, torch.nn.Module):
-                return attr
-            if isinstance(attr, torch.nn.Parameter):
-                attr = attr.data
-            return to_torch(attr)
-
-    def call_function(self, target: Any, args: Any, kwargs: Any) -> Any:
-        converter_packet = CONVERTERS.get(self._cur_node)
-        if converter_packet is None:
-            raise UnsupportedOperatorException(
-                f"Conversion of function {torch.typename(target)} not currently supported "
-                f"inside torch.cond subgraph '{self.name_prefix}'"
-            )
-
-        converter, calling_convention, converter_info = converter_packet
-        if converter_info.get("requires_output_allocator", False):
-            self.ctx.requires_output_allocator = True
-            _LOGGER.debug("%s requires output allocator", target)
-        if converter_info.get("requires_native_multidevice", False):
-            self.ctx.requires_native_multidevice = True
-            _LOGGER.debug("%s requires native multi-device support", target)
-
-        if calling_convention is CallingConvention.LEGACY:
-            return converter(self.ctx.net, target, args, kwargs, self._cur_node_name)
-        return converter(self.ctx, target, args, kwargs, self._cur_node_name)
-
-    def call_method(self, target: str, args: Any, kwargs: Any) -> Any:
-        converter_packet = CONVERTERS.get(self._cur_node)
-        if converter_packet is None:
-            raise UnsupportedOperatorException(
-                f"Conversion of method {target} not currently supported "
-                f"inside torch.cond subgraph '{self.name_prefix}'"
-            )
-        converter, calling_convention, _ = converter_packet
-        if calling_convention is CallingConvention.LEGACY:
-            return converter(self.ctx.net, target, args, kwargs, self._cur_node_name)
-        return converter(self.ctx, target, args, kwargs, self._cur_node_name)
+    get_attr = TRTInterpreter.get_attr
+    call_function = TRTInterpreter.call_function
+    call_method = TRTInterpreter.call_method
 
     def call_module(self, target: str, args: Any, kwargs: Any) -> Any:
         del args, kwargs
