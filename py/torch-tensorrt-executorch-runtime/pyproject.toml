@@ -9,7 +9,7 @@ requires = [
     # Native ABI dependencies supplied by the active Torch-TensorRT build
     # environment.
     # Builds must use --no-build-isolation; see README.md.
-    "torch",
+    "torch>=2.16.0.dev,<2.17.0",
     "executorch==1.6.0.dev20261009",
 ]
 build-backend = "setuptools.build_meta"

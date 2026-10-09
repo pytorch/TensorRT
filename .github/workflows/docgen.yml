@@ -47,7 +47,7 @@ jobs:
             - name: Build Python Package
               run: |
                   # Use the source-paired wheel, not a newer member of the authoring range.
-                  python3 -m pip install ".[executorch]" \
+                  python3 -m pip install --pre ".[executorch]" \
                     "executorch==$(python3 -c 'import yaml;print(yaml.safe_load(open("dev_dep_versions.yml"))["__executorch_version__"])')" \
                     --extra-index-url https://download.pytorch.org/whl/nightly/cu132
             - name: Install uv
