@@ -5,6 +5,7 @@ import torch
 from torch.fx.experimental.proxy_tensor import make_fx
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion.aten_ops_converters import (
+    attention_capability_validator,
     scaled_dot_product_attention_validator,
 )
 from torch_tensorrt.dynamo.lowering._decompositions import (
@@ -109,6 +110,11 @@ def decompose_unsupported_attention(
     changed = False
     for node in list(gm.graph.nodes):
         if node.op != "call_function" or node.target not in _ATTENTION_FALLBACKS:
+            continue
+
+        # Hardware restrictions require the whole attention op to fall back
+        # to PyTorch. Decomposing it would leave partial TensorRT partitions.
+        if not attention_capability_validator(node, settings):
             continue
 
         validator, decomp = _ATTENTION_FALLBACKS[node.target]

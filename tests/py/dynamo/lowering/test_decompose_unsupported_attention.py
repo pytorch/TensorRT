@@ -1,3 +1,5 @@
+from unittest import mock
+
 import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase, run_tests
@@ -13,6 +15,48 @@ from ..testing_utilities import lower_graph_testing
 
 
 class TestDecomposeUnsupportedAttention(TestCase):
+    def test_turing_fp32_attention_kept_for_pytorch_fallback(self):
+        class MHA(nn.Module):
+            def forward(self, q, k, v):
+                return torch.ops.aten.scaled_dot_product_attention.default(q, k, v)
+
+        with mock.patch(
+            "torch_tensorrt._features.ENABLED_FEATURES", mock.Mock(tensorrt_rtx=True)
+        ):
+            settings = CompilationSettings(
+                min_block_size=1,
+                decompose_attention=False,
+                target_compute_capabilities=[(7, 5)],
+            )
+        # Cover both native-compatible shapes and shapes otherwise decomposed.
+        for value_dim in (8, 4):
+            with self.subTest(value_dim=value_dim):
+                inputs = (
+                    torch.randn(1, 2, 4, 8),
+                    torch.randn(1, 2, 4, 8),
+                    torch.randn(1, 2, 4, value_dim),
+                )
+                gm = torch.export.export(MHA(), inputs).module()
+                with mock.patch(
+                    "torch_tensorrt.dynamo.conversion.aten_ops_converters.trt_rtx_targets_turing",
+                    return_value=True,
+                ):
+                    sdpa = next(
+                        n
+                        for n in gm.graph.nodes
+                        if n.target
+                        == torch.ops.aten.scaled_dot_product_attention.default
+                    )
+                    self.assertFalse(
+                        scaled_dot_product_attention_validator(sdpa, settings)
+                    )
+                    gm = decompose_unsupported_attention(gm, settings)
+
+                targets = {n.target for n in gm.graph.nodes if n.op == "call_function"}
+                self.assertIn(
+                    torch.ops.aten.scaled_dot_product_attention.default, targets
+                )
+
     def test_mla_kv_head_dim_mismatch_is_decomposed(self):
         # MLA: K head dim = nope + rope, V head dim = v only.
         b, h, s, d_k, d_v = 1, 2, 4, 6, 4
