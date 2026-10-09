@@ -8,17 +8,6 @@ from typing import Any
 
 import torch
 
-_THOR_CUDA_LIB = Path("/usr/local/cuda-13.0/thor/targets/aarch64-linux/lib")
-
-
-def configure_thor_pytorch() -> None:
-    """Use PyTorch fallbacks for ops whose pip CUDA wheels mismatch DriveOS Thor."""
-    on_thor = os.environ.get("TRT_VLA_THOR", "auto")
-    if on_thor == "auto":
-        on_thor = "1" if _THOR_CUDA_LIB.is_dir() else "0"
-    if on_thor == "1":
-        torch.backends.cudnn.enabled = False
-
 
 def force_hf_attention(module: Any, attn: str, use_cache: bool | None = False) -> None:
     """Force HuggingFace attention implementation on a module tree."""
