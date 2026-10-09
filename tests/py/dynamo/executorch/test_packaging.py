@@ -7,6 +7,7 @@ import ast
 import importlib.metadata
 import json
 import os
+import re
 import runpy
 import shlex
 import shutil
@@ -17,8 +18,6 @@ import tempfile
 import types
 import zipfile
 from pathlib import Path
-
-import re
 
 import pytest
 import setuptools
@@ -42,7 +41,7 @@ FLAG_VALUES = [
     (" true ", False),
     ("1", True),
     ("true", True),
-    ("TrUe", True),
+    ("tRUE", True),
     ("yes", True),
     ("YES", True),
     ("on", True),
@@ -227,7 +226,7 @@ def test_setup_flags_reject_string_presence_control(packaging_build, monkeypatch
             for child in ast.walk(node.left)
         )
     ]
-    assert len(checks) == 1
+    assert len(checks) == (1 if flag == "unpinned" else 2)
     check = checks[0]
     check.left = ast.parse(f"os.getenv({name!r})", mode="eval").body
     check.ops = [ast.Is() if flag == "unpinned" else ast.IsNot()]
@@ -706,7 +705,8 @@ def test_the_three_pinned_runtimes_keep_their_build_labels() -> None:
     ), f"torch is pinned again: {requires}"
     # And the two that legitimately have no label keep the public form.
     assert "public_version(tensorrt_version)" in requires, requires
-    assert "public_version(cuda_runtime_version)" in requires, requires
+    assert "*cuda_requirements" in requires, requires
+    assert "public_version(cuda_runtime_version)" in source, source
 
 
 @pytest.mark.unit
@@ -784,10 +784,10 @@ def test_a_second_build_in_the_same_tree_succeeds(tmp_path):
     build = next(
         node
         for node in ast.walk(ast.parse(source))
-        if isinstance(node, ast.FunctionDef) and node.name == "_build"
+        if isinstance(node, ast.FunctionDef) and node.name == "_install_delegate"
     )
     wanted = (
-        'for stale in output.parent.glob("*.so*")',
+        'for pattern in ("*.so*", "*.dll", "*.lib")',
         "shutil.copy2(built, output)",
         "output.chmod(",
     )

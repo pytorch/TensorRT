@@ -472,7 +472,10 @@ def _native_project(tmp_path, tools, *, mutation=None, static_cuda=False):
     guard_command = '    COMMAND sh\n      "${CMAKE_CURRENT_LIST_DIR}/check_imports_executorch_runtime.sh"'
     if mutation == "remove":
         start = cmake.index(
-            "  add_custom_command", cmake.index("if(TORCH_TENSORRT_READELF)")
+            "  add_custom_command",
+            cmake.index(
+                'if(TORCH_TENSORRT_READELF AND CMAKE_SYSTEM_NAME STREQUAL "Linux")'
+            ),
         )
         end = cmake.index("    VERBATIM)", start) + len("    VERBATIM)")
         cmake = cmake[:start] + cmake[end:]
