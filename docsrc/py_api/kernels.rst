@@ -397,15 +397,26 @@ are checked before TensorRT accepts the launch.
    only. Runtime scalar parameters cannot be forwarded by this AOT ABI; make
    them ``ct.Constant`` parameters and supply them through ``constants``.
 
-   ``tileiras`` emits the PTX ISA of the toolkit it was built against, which
-   can be newer than the installed driver loads.  Nothing catches that on its
-   own: TensorRT builds the engine, and at inference the plugin logs
-   ``onShapeChange status -1`` while ``enqueue`` still returns, so the model
-   silently produces wrong numbers.  :func:`cutile_op` therefore offers the
-   exact compiled PTX to the driver at registration and raises if it is
-   refused. Align the driver with the cuda-tile toolchain; only pass
-   ``max_ptx_version=`` to explicitly cap the header when you have independently
-   verified that the compiled instructions are compatible.
+   This frontend requires CUDA Toolkit **13.2 or newer** and a loaded CUDA
+   driver supporting **PTX ISA 9.2 or newer** (CUDA driver API 13.2+). This
+   requirement applies even when cross-compiling with ``arch_override``.
+   The selected ``tileiras`` toolkit version must not exceed the CUDA version
+   supported by the loaded driver. For example, a CUDA 13.2 driver requires
+   a 13.2 compiler; a CUDA 13.4 driver permits compilers from 13.2 through 13.4.
+   Keep ``tileiras``, ``ptxas``, and ``libnvvm`` on matching toolkit major/minor
+   versions. The frontend logs the selected versions and toolkit guidance,
+   and rejects incompatible combinations before compilation.
+
+   This path extracts PTX from cuTile's CUBIN and gives that PTX to TensorRT
+   QDP. Installing a newer toolkit does not upgrade the driver's PTX JIT.
+   Native cuTile's R580 support therefore does not establish support for this
+   frontend. Upgrade the driver or configure supported CUDA forward-compatibility
+   libraries when the loaded driver API is older than 13.2.
+
+   The exact compiled PTX is also loaded through the driver at registration
+   and rejected if incompatible. ``max_ptx_version=`` must be at least ``92``;
+   it does not bypass the driver/toolkit checks or make newer instructions
+   compatible with an older driver.
 
    ``arch_override=`` may be used to cross-compile for another GPU. PTX for the
    current device is checked by loading it through the CUDA driver; a different

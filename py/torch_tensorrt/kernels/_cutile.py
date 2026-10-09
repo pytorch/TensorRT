@@ -32,6 +32,7 @@ import io
 import logging
 import re
 import struct
+import subprocess
 from math import prod
 from typing import (
     TYPE_CHECKING,
@@ -43,6 +44,7 @@ from typing import (
     Optional,
     Sequence,
     Tuple,
+    cast,
 )
 
 import torch
@@ -336,12 +338,15 @@ def make_dtype_capability_validator(
     user_validator: Optional[Callable[..., bool]] = None,
 ) -> Callable[..., bool]:
     """Require tensor metadata matching every compiled cuTile array."""
-    return _common.make_dtype_capability_validator(
-        op_name,
-        "cuTile",
-        [param.dtype for param in layout.inputs],
-        [param.dtype for param in layout.outputs],
-        user_validator,
+    return cast(
+        Callable[..., bool],
+        _common.make_dtype_capability_validator(
+            op_name,
+            "cuTile",
+            [param.dtype for param in layout.inputs],
+            [param.dtype for param in layout.outputs],
+            user_validator,
+        ),
     )
 
 
@@ -622,6 +627,87 @@ def set_ptx_version(ptx: str, version: int) -> str:
     return ptx[: match.start()] + replacement + ptx[match.end() :]
 
 
+def _cutile_driver_version() -> Tuple[int, int]:
+    """Query the loaded driver, including any configured compatibility libraries."""
+    try:
+        from cuda.bindings import driver as cuda
+    except ImportError:
+        from cuda import cuda
+
+    status, version = cuda.cuDriverGetVersion()
+    if int(status) != 0 or version <= 0:
+        raise RuntimeError("could not query the loaded CUDA driver API version")
+    return version // 1000, (version % 1000) // 10
+
+
+def _cutile_compiler_version() -> Tuple[int, int]:
+    """Inspect the compiler selected by cuTile, not nvcc or torch.version.cuda."""
+    from cuda.tile._compile import _find_compiler_bin
+
+    compiler = _find_compiler_bin()
+    path = getattr(compiler, "path", compiler)
+    result = subprocess.run(
+        [str(path), "--version"], check=True, capture_output=True, text=True, timeout=10
+    )
+    match = re.search(r"release\s+(\d+)\.(\d+)", result.stdout + result.stderr)
+    if match is None:
+        raise RuntimeError(f"could not determine CUDA Toolkit version of {path}")
+    return int(match[1]), int(match[2])
+
+
+def validate_cutile_toolchain(op_name: str) -> Tuple[int, int]:
+    """Require CUDA 13.2+ and a driver that supports the compiler's PTX ISA."""
+    try:
+        driver = _cutile_driver_version()
+    except (ImportError, OSError, RuntimeError) as exc:
+        raise RuntimeError(
+            f"cutile_op '{op_name}': cannot determine driver PTX support: {exc}"
+        ) from exc
+    driver_label = f"{driver[0]}.{driver[1]}"
+    if driver < (13, 2):
+        raise RuntimeError(
+            f"cutile_op '{op_name}' requires CUDA Toolkit 13.2+ and a loaded "
+            f"driver supporting PTX ISA 9.2+ (CUDA driver API 13.2+); detected "
+            f"driver CUDA {driver_label}. Upgrade the driver or configure supported "
+            "CUDA forward-compatibility libraries. Installing a newer toolkit "
+            "alone does not upgrade the driver's PTX JIT compiler."
+        )
+    guidance = (
+        f"Use CUDA Toolkit 13.2 through {driver_label} with matching tileiras, "
+        "ptxas, and libnvvm components to generate PTX supported by this driver. "
+        "Select the matching compiler through cuTile's compiler discovery "
+        "(PATH/CUDA_HOME or matching Python compiler packages)."
+    )
+    try:
+        compiler = _cutile_compiler_version()
+    except (
+        ImportError,
+        AttributeError,
+        OSError,
+        ValueError,
+        RuntimeError,
+        subprocess.SubprocessError,
+    ) as exc:
+        raise RuntimeError(
+            f"cutile_op '{op_name}': cannot inspect the selected tileiras compiler: "
+            f"{exc}. {guidance}"
+        ) from exc
+    if compiler < (13, 2) or compiler > driver:
+        raise RuntimeError(
+            f"cutile_op '{op_name}': selected tileiras CUDA {compiler[0]}.{compiler[1]} "
+            f"is incompatible with this frontend and driver CUDA {driver_label}. "
+            + guidance
+        )
+    _LOGGER.info(
+        "cutile_op '%s': driver CUDA %s, tileiras CUDA %s.%s. %s",
+        op_name,
+        driver_label,
+        *compiler,
+        guidance,
+    )
+    return driver
+
+
 def _load_ptx(ptx: str, kernel_name: str) -> Any:
     """Ask the driver to JIT the module and resolve its expected entry."""
     try:
@@ -751,7 +837,7 @@ def compile_cutile_to_ptx(
             baked into the compiled symbol.
         arch_override: target architecture (e.g. ``"sm_90"``). Defaults to the
             current device's compute capability.
-        max_ptx_version: Explicit ISA ceiling as a ``90``-style int, pinning the
+        max_ptx_version: Explicit ISA ceiling as a ``92``-style int (minimum 92), pinning the
             ``.version`` header. By default the emitted version header is unchanged.
 
     Returns:
@@ -763,14 +849,15 @@ def compile_cutile_to_ptx(
     if max_ptx_version is not None and (
         isinstance(max_ptx_version, bool)
         or not isinstance(max_ptx_version, int)
-        or max_ptx_version < 10
+        or max_ptx_version < 92
         or max_ptx_version > 999
     ):
         raise ValueError(
             f"cutile_op '{op_name}' max_ptx_version must be an integer encoded "
-            f"like 90 for PTX 9.0; got {max_ptx_version!r}."
+            f"at least 92 for PTX 9.2; got {max_ptx_version!r}."
         )
 
+    validate_cutile_toolchain(op_name)
     ct = _cutile_import()
     try:
         from cuda.tile.compilation import (
@@ -834,6 +921,12 @@ def compile_cutile_to_ptx(
             "parameters into TensorRT's launch order."
         )
 
+    emitted_version = parse_ptx_version(ptx)
+    if emitted_version is None or emitted_version < 92:
+        raise RuntimeError(
+            f"cutile_op '{op_name}': expected PTX ISA 9.2+ from CUDA Toolkit "
+            "13.2+. Select matching CUDA 13.2+ compiler components."
+        )
     parsed = parse_entry(ptx)
     _, kernel_name, params = parsed
     if not kernel_name:
@@ -1101,7 +1194,7 @@ def _static_launch_dim(op_name: str, field: str, value: Any) -> int:
             f"cutile_op '{op_name}' custom aot_fn must set {field} to a "
             "build-time integer."
         )
-    return constant
+    return cast(int, constant)
 
 
 def make_checked_aot_fn(
