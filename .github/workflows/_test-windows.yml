@@ -158,7 +158,11 @@ jobs:
       script: |
         set -euo pipefail
         if [[ "${{ matrix.suite }}" == "executorch-windows" ]]; then
-          python -m pip install pyyaml --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" -r packaging/executorch_pin.txt
+          # Windows uses torchao's Python-only nightly wheel from the CPU index.
+          python -m pip install --pre pyyaml \
+            --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" \
+            --extra-index-url "https://download.pytorch.org/whl/nightly/cpu" \
+            -r packaging/executorch_pin.txt
           runtime_wheels=("${RUNNER_TEMP}"/artifacts/torch_tensorrt_executorch_runtime-*.whl)
           [[ ${#runtime_wheels[@]} -eq 1 && -f "${runtime_wheels[0]}" ]]
           python -m pip install --no-deps "${runtime_wheels[0]}"

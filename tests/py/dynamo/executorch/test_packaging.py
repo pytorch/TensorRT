@@ -41,7 +41,7 @@ FLAG_VALUES = [
     (" true ", False),
     ("1", True),
     ("true", True),
-    ("tRUE", True),
+    ("TrUe", True),
     ("yes", True),
     ("YES", True),
     ("on", True),

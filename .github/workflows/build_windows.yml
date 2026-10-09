@@ -488,8 +488,10 @@ jobs:
           source "${BUILD_ENV_FILE}"
           case "${CU_VERSION}" in cu132|cu134) ;; *) echo "Unsupported ExecuTorch CUDA row: ${CU_VERSION}" >&2; exit 1 ;; esac
           ${CONDA_RUN} python -m pip install --no-deps dist/torch_tensorrt-*.whl
-          ${CONDA_RUN} python -m pip install "cmake>=3.28" ninja pyyaml "wheel>=0.40" \
+          # Windows uses torchao's Python-only nightly wheel from the CPU index.
+          ${CONDA_RUN} python -m pip install --pre "cmake>=3.28" ninja pyyaml "wheel>=0.40" \
             --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" \
+            --extra-index-url "https://download.pytorch.org/whl/nightly/cpu" \
             -r packaging/executorch_pin.txt
           # The core build has fetched the TensorRT SDK containing headers and import libraries.
           bazel_output="$(${CONDA_RUN} bazel info output_base --config=windows)"
