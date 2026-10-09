@@ -24,6 +24,7 @@ from torch_tensorrt.dynamo._defaults import (
     AUTOCAST_MAX_OUTPUT_THRESHOLD,
     BUILD_ROUTE,
     CACHE_BUILT_ENGINES,
+    CACHE_LOWERED_GRAPHS,
     CPU_MEMORY_BUDGET,
     DECOMPOSE_ATTENTION,
     DISABLE_TF32,
@@ -53,6 +54,7 @@ from torch_tensorrt.dynamo._defaults import (
     REFIT_IDENTICAL_ENGINE_WEIGHTS,
     REQUIRE_FULL_COMPILATION,
     REUSE_CACHED_ENGINES,
+    REUSE_CACHED_LOWERED_GRAPHS,
     SPARSE_WEIGHTS,
     STRIP_ENGINE_WEIGHTS,
     TARGET_COMPUTE_CAPABILITIES,
@@ -207,6 +209,8 @@ class CompilationSettings:
     lazy_engine_init: bool = LAZY_ENGINE_INIT
     cache_built_engines: bool = CACHE_BUILT_ENGINES
     reuse_cached_engines: bool = REUSE_CACHED_ENGINES
+    cache_lowered_graphs: bool = CACHE_LOWERED_GRAPHS
+    reuse_cached_lowered_graphs: bool = REUSE_CACHED_LOWERED_GRAPHS
     use_fp32_acc: bool = USE_FP32_ACC
     refit_identical_engine_weights: bool = REFIT_IDENTICAL_ENGINE_WEIGHTS
     strip_engine_weights: bool = STRIP_ENGINE_WEIGHTS
@@ -302,6 +306,8 @@ class CompilationSettings:
         state.setdefault("accuracy_algorithm", ACCURACY_ALGORITHM)
         state.setdefault("accuracy_atol", ACCURACY_ATOL)
         state.setdefault("accuracy_rtol", ACCURACY_RTOL)
+        state.setdefault("cache_lowered_graphs", CACHE_LOWERED_GRAPHS)
+        state.setdefault("reuse_cached_lowered_graphs", REUSE_CACHED_LOWERED_GRAPHS)
         self.__dict__.update(state)
 
 
