@@ -238,7 +238,7 @@ render it for your machine before building. The template takes seven values:
 export CUDA_HOME=/usr/local/cuda-13.2
 export CU_VERSION=cu132
 export CHANNEL=nightly
-export BUILD_VERSION=0.3.0.dev0
+export BUILD_VERSION=0.2.0.dev0
 export TORCH_INSTALL_PATH="$(python -c 'import torch; print(torch.__path__[0])')"
 export TENSORRT_CUDA_VERSION_UPPER_BOUND=14.0
 export TENSORRT_RTX_CUDA_VERSION_UPPER_BOUND=14.0
@@ -255,7 +255,7 @@ python -m pip install pyyaml patchelf tensorrt-cu13 \
   --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" \
   --extra-index-url https://pypi.nvidia.com/ \
   "executorch==1.6.0.dev20261009"
-export TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION="0.3.0.dev0+${CU_VERSION}"
+export TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION="0.2.0.dev0+${CU_VERSION}"
 python -m pip wheel --no-build-isolation --no-deps \
   --wheel-dir dist py/torch-tensorrt-executorch-runtime
 ```
