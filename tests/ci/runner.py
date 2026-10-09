@@ -176,34 +176,12 @@ def _setup_commands(step: str) -> list[tuple[list[str], Path]]:
             (launcher + ["-m", "pip", "install", "cuda-python", "cuda-core"], REPO_ROOT)
         ]
     if step == "cuda-tile":
-        commands = [
+        return [
             (
                 launcher + ["-m", "pip", "install", "cuda-tile>=1.3.0,<2"],
                 REPO_ROOT,
             )
         ]
-        # cuTile's compiler first ships in the system CUDA Toolkit at 13.1;
-        # compatibility still depends on the cuda-tile release. PR jobs use
-        # cu132 and must prove that the image really contains it;
-        # older nightly rows still run the non-cuTile kernel tests and let the
-        # compiler-aware pytest marker skip only the cuTile integrations.
-        cuda_version = os.environ.get("CU_VERSION")
-        match = re.fullmatch(r"cu(\d+)", cuda_version or "")
-        compiler_expected = match is None or int(match.group(1)) >= 131
-        if compiler_expected:
-            commands.append(
-                (
-                    launcher
-                    + [
-                        "-c",
-                        "from cuda.tile.compilation import export_kernel; "
-                        "from cuda.tile._compile import _find_compiler_bin; "
-                        "_find_compiler_bin()",
-                    ],
-                    REPO_ROOT,
-                )
-            )
-        return commands
     if step == "mpi":
         return [
             (
