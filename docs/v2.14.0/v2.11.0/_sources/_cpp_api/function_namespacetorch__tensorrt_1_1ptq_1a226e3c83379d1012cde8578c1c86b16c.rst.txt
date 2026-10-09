@@ -1,0 +1,14 @@
+.. _exhale_function_namespacetorch__tensorrt_1_1ptq_1a226e3c83379d1012cde8578c1c86b16c:
+
+Template Function torch_tensorrt::ptq::make_int8_cache_calibrator
+=================================================================
+
+.. did not find file this was defined in
+
+
+Function Documentation
+----------------------
+
+
+.. doxygenfunction:: torch_tensorrt::ptq::make_int8_cache_calibrator(const std::string&)
+   :project: Torch-TensorRT

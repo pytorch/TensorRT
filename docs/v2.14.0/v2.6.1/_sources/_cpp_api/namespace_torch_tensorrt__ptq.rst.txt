@@ -1,0 +1,31 @@
+
+.. _namespace_torch_tensorrt__ptq:
+
+Namespace torch_tensorrt::ptq
+=============================
+
+
+.. contents:: Contents
+   :local:
+   :backlinks: none
+
+
+
+
+
+Classes
+-------
+
+
+- :ref:`exhale_class_classtorch__tensorrt_1_1ptq_1_1Int8CacheCalibrator`
+
+- :ref:`exhale_class_classtorch__tensorrt_1_1ptq_1_1Int8Calibrator`
+
+
+Functions
+---------
+
+
+- :ref:`exhale_function_ptq_8h_1a226e3c83379d1012cde8578c1c86b16c`
+
+- :ref:`exhale_function_ptq_8h_1a6186e305f47c1d94b6130ef6c7f7e178`

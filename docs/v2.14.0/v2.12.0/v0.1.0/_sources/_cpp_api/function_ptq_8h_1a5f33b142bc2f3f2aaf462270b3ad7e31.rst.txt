@@ -1,0 +1,13 @@
+.. _exhale_function_ptq_8h_1a5f33b142bc2f3f2aaf462270b3ad7e31:
+
+Template Function trtorch::ptq::make_int8_cache_calibrator
+==========================================================
+
+- Defined in :ref:`file_cpp_api_include_trtorch_ptq.h`
+
+
+Function Documentation
+----------------------
+
+
+.. doxygenfunction:: trtorch::ptq::make_int8_cache_calibrator(const std::string&)

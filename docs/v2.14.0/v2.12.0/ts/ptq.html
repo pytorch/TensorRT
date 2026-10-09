@@ -1,0 +1,795 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Post Training Quantization (PTQ) &#8212; Torch-TensorRT</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=72e443bf" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=61a4c737" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=e5fbc548" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <link rel="stylesheet" type="text/css" href="../_static/collapsible-lists/css/tree_view.css?v=a885cde7" />
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/katex@0.10.0-beta/dist/katex.min.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css?v=0cb2b9ef" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../_static/documentation_options.js?v=c3d35e0c"></script>
+    <script src="../_static/doctools.js?v=888ff710"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
+    <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js?v=660e4f45"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'ts/ptq';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://raw.githubusercontent.com/pytorch/TensorRT/refs/heads/main/docs/versions.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = 'main';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner = false;
+        </script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Torch-TensorRT (FX Frontend) User Guide" href="../fx/getting_started_with_fx_path.html" />
+    <link rel="prev" title="Using Torch-TensorRT TorchScript Frontend Directly From PyTorch" href="torchscript_frontend_from_pytorch.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Torch-TensorRT</p>
+  
+</a></div>
+    
+      <div class="navbar-item">
+<script>
+document.write(`
+  <div class="version-switcher__container dropdown">
+    <button id="pst-version-switcher-button-2"
+      type="button"
+      class="version-switcher__button btn btn-sm dropdown-toggle"
+      data-bs-toggle="dropdown"
+      aria-haspopup="listbox"
+      aria-controls="pst-version-switcher-list-2"
+      aria-label="Version switcher list"
+    >
+      Choose version  <!-- this text may get changed later by javascript -->
+      <span class="caret"></span>
+    </button>
+    <div id="pst-version-switcher-list-2"
+      class="version-switcher__menu dropdown-menu list-group-flush py-0"
+      role="listbox" aria-labelledby="pst-version-switcher-button-2">
+      <!-- dropdown will be populated by javascript on page load -->
+    </div>
+  </div>
+`);
+</script></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" current active">
+  <a class="nav-link dropdown-item nav-internal" href="../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="creating_torchscript_module_in_python.html">Creating a TorchScript Module</a></li>
+
+
+<li class="toctree-l1"><a class="reference internal" href="getting_started_with_python_api.html">Using Torch-TensorRT in Python</a></li>
+<li class="toctree-l1"><a class="reference internal" href="getting_started_with_cpp_api.html">Using Torch-TensorRT in  C++</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torchscript_frontend_from_pytorch.html">Using Torch-TensorRT TorchScript Frontend Directly From PyTorch</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Post Training Quantization (PTQ)</a></li>
+</ul>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../fx/getting_started_with_fx_path.html">Torch-TensorRT (FX Frontend) User Guide</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../legacy.html" class="nav-link">Legacy Frontends</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page">Post...</li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="post-training-quantization-ptq">
+<span id="ptq"></span><h1>Post Training Quantization (PTQ)<a class="headerlink" href="#post-training-quantization-ptq" title="Link to this heading">#</a></h1>
+<p>Post Training Quantization (PTQ) is a technique to reduce the required computational resources for inference
+while still preserving the accuracy of your model by mapping the traditional FP32 activation space to a reduced
+INT8 space. TensorRT uses a calibration step which executes your model with sample data from the target domain
+and track the activations in FP32 to calibrate a mapping to INT8 that minimizes the information loss between
+FP32 inference and INT8 inference.</p>
+<p>Users writing TensorRT applications are required to setup a calibrator class which will provide sample data to
+the TensorRT calibrator. With Torch-TensorRT we look to leverage existing infrastructure in PyTorch to make implementing
+calibrators easier.</p>
+<p>LibTorch provides a <code class="docutils literal notranslate"><span class="pre">DataLoader</span></code> and <code class="docutils literal notranslate"><span class="pre">Dataset</span></code> API which streamlines preprocessing and batching input data.
+These APIs are exposed via both C++ and Python interface which makes it easier for the end user.
+For C++ interface, we use <code class="docutils literal notranslate"><span class="pre">torch::Dataset</span></code> and <code class="docutils literal notranslate"><span class="pre">torch::data::make_data_loader</span></code> objects to construct and perform pre-processing on datasets.
+The equivalent functionality in python interface uses <code class="docutils literal notranslate"><span class="pre">torch.utils.data.Dataset</span></code> and <code class="docutils literal notranslate"><span class="pre">torch.utils.data.DataLoader</span></code>.
+This section of the PyTorch documentation has more information <a class="reference external" href="https://pytorch.org/tutorials/advanced/cpp_frontend.html#loading-data">https://pytorch.org/tutorials/advanced/cpp_frontend.html#loading-data</a> and <a class="reference external" href="https://pytorch.org/tutorials/recipes/recipes/loading_data_recipe.html">https://pytorch.org/tutorials/recipes/recipes/loading_data_recipe.html</a>.
+Torch-TensorRT uses Dataloaders as the base of a generic calibrator implementation. So you will be able to reuse or quickly
+implement a <code class="docutils literal notranslate"><span class="pre">torch::Dataset</span></code> for your target domain, place it in a DataLoader and create an INT8 Calibrator
+which you can provide to Torch-TensorRT to run INT8 Calibration during compilation of your module.</p>
+<section id="how-to-create-your-own-ptq-application-in-c">
+<span id="writing-ptq-cpp"></span><h2>How to create your own PTQ application in C++<a class="headerlink" href="#how-to-create-your-own-ptq-application-in-c" title="Link to this heading">#</a></h2>
+<p>Here is an example interface of a <code class="docutils literal notranslate"><span class="pre">torch::Dataset</span></code> class for CIFAR10:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="linenos"> 1</span><span class="c1">//cpp/ptq/datasets/cifar10.h</span>
+<span class="linenos"> 2</span><span class="cp">#pragma once</span>
+<span class="linenos"> 3</span>
+<span class="linenos"> 4</span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch/data/datasets/base.h&quot;</span>
+<span class="linenos"> 5</span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch/data/example.h&quot;</span>
+<span class="linenos"> 6</span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch/types.h&quot;</span>
+<span class="linenos"> 7</span>
+<span class="linenos"> 8</span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;cstddef&gt;</span>
+<span class="linenos"> 9</span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;string&gt;</span>
+<span class="linenos">10</span>
+<span class="linenos">11</span><span class="k">namespace</span><span class="w"> </span><span class="nn">datasets</span><span class="w"> </span><span class="p">{</span>
+<span class="linenos">12</span><span class="c1">// The CIFAR10 Dataset</span>
+<span class="linenos">13</span><span class="k">class</span><span class="w"> </span><span class="nc">CIFAR10</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">data</span><span class="o">::</span><span class="n">datasets</span><span class="o">::</span><span class="n">Dataset</span><span class="o">&lt;</span><span class="n">CIFAR10</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="linenos">14</span><span class="k">public</span><span class="o">:</span>
+<span class="linenos">15</span><span class="w">    </span><span class="c1">// The mode in which the dataset is loaded</span>
+<span class="linenos">16</span><span class="w">    </span><span class="k">enum</span><span class="w"> </span><span class="k">class</span><span class="w"> </span><span class="nc">Mode</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">kTrain</span><span class="p">,</span><span class="w"> </span><span class="n">kTest</span><span class="w"> </span><span class="p">};</span>
+<span class="linenos">17</span>
+<span class="linenos">18</span><span class="w">    </span><span class="c1">// Loads CIFAR10 from un-tarred file</span>
+<span class="linenos">19</span><span class="w">    </span><span class="c1">// Dataset can be found https://www.cs.toronto.edu/~kriz/cifar-10-binary.tar.gz</span>
+<span class="linenos">20</span><span class="w">    </span><span class="c1">// Root path should be the directory that contains the content of tarball</span>
+<span class="linenos">21</span><span class="w">    </span><span class="k">explicit</span><span class="w"> </span><span class="n">CIFAR10</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&amp;</span><span class="w"> </span><span class="n">root</span><span class="p">,</span><span class="w"> </span><span class="n">Mode</span><span class="w"> </span><span class="n">mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Mode</span><span class="o">::</span><span class="n">kTrain</span><span class="p">);</span>
+<span class="linenos">22</span>
+<span class="linenos">23</span><span class="w">    </span><span class="c1">// Returns the pair at index in the dataset</span>
+<span class="linenos">24</span><span class="w">    </span><span class="n">torch</span><span class="o">::</span><span class="n">data</span><span class="o">::</span><span class="n">Example</span><span class="o">&lt;&gt;</span><span class="w"> </span><span class="n">get</span><span class="p">(</span><span class="kt">size_t</span><span class="w"> </span><span class="n">index</span><span class="p">)</span><span class="w"> </span><span class="k">override</span><span class="p">;</span>
+<span class="linenos">25</span>
+<span class="linenos">26</span><span class="w">    </span><span class="c1">// The size of the dataset</span>
+<span class="linenos">27</span><span class="w">    </span><span class="n">c10</span><span class="o">::</span><span class="n">optional</span><span class="o">&lt;</span><span class="kt">size_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">size</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="k">override</span><span class="p">;</span>
+<span class="linenos">28</span>
+<span class="linenos">29</span><span class="w">    </span><span class="c1">// The mode the dataset is in</span>
+<span class="linenos">30</span><span class="w">    </span><span class="kt">bool</span><span class="w"> </span><span class="nf">is_train</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="k">noexcept</span><span class="p">;</span>
+<span class="linenos">31</span>
+<span class="linenos">32</span><span class="w">    </span><span class="c1">// Returns all images stacked into a single tensor</span>
+<span class="linenos">33</span><span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">Tensor</span><span class="o">&amp;</span><span class="w"> </span><span class="nf">images</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="p">;</span>
+<span class="linenos">34</span>
+<span class="linenos">35</span><span class="w">    </span><span class="c1">// Returns all targets stacked into a single tensor</span>
+<span class="linenos">36</span><span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">Tensor</span><span class="o">&amp;</span><span class="w"> </span><span class="nf">targets</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="p">;</span>
+<span class="linenos">37</span>
+<span class="linenos">38</span><span class="w">    </span><span class="c1">// Trims the dataset to the first n pairs</span>
+<span class="linenos">39</span><span class="w">    </span><span class="n">CIFAR10</span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nf">use_subset</span><span class="p">(</span><span class="kt">int64_t</span><span class="w"> </span><span class="n">new_size</span><span class="p">);</span>
+<span class="linenos">40</span>
+<span class="linenos">41</span>
+<span class="linenos">42</span><span class="k">private</span><span class="o">:</span>
+<span class="linenos">43</span><span class="w">    </span><span class="n">Mode</span><span class="w"> </span><span class="n">mode_</span><span class="p">;</span>
+<span class="linenos">44</span><span class="w">    </span><span class="n">torch</span><span class="o">::</span><span class="n">Tensor</span><span class="w"> </span><span class="n">images_</span><span class="p">,</span><span class="w"> </span><span class="n">targets_</span><span class="p">;</span>
+<span class="linenos">45</span><span class="p">};</span>
+<span class="linenos">46</span><span class="p">}</span><span class="w"> </span><span class="c1">// namespace datasets</span>
+</pre></div>
+</div>
+<p>This class’s implementation reads from the binary distribution of the CIFAR10 dataset and builds two tensors which hold the images and labels.</p>
+<p>We use a subset of the dataset to use for calibration, since we don’t need the the full dataset for effective calibration and calibration does
+some take time, then define the preprocessing to apply to the images in the dataset and create a DataLoader from the dataset which will batch the data:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span><span class="w"> </span><span class="n">calibration_dataset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">datasets</span><span class="o">::</span><span class="n">CIFAR10</span><span class="p">(</span><span class="n">data_dir</span><span class="p">,</span><span class="w"> </span><span class="n">datasets</span><span class="o">::</span><span class="n">CIFAR10</span><span class="o">::</span><span class="n">Mode</span><span class="o">::</span><span class="n">kTest</span><span class="p">)</span>
+<span class="w">                                    </span><span class="p">.</span><span class="n">use_subset</span><span class="p">(</span><span class="mi">320</span><span class="p">)</span>
+<span class="w">                                    </span><span class="p">.</span><span class="n">map</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">data</span><span class="o">::</span><span class="n">transforms</span><span class="o">::</span><span class="n">Normalize</span><span class="o">&lt;&gt;</span><span class="p">({</span><span class="mf">0.4914</span><span class="p">,</span><span class="w"> </span><span class="mf">0.4822</span><span class="p">,</span><span class="w"> </span><span class="mf">0.4465</span><span class="p">},</span>
+<span class="w">                                                                            </span><span class="p">{</span><span class="mf">0.2023</span><span class="p">,</span><span class="w"> </span><span class="mf">0.1994</span><span class="p">,</span><span class="w"> </span><span class="mf">0.2010</span><span class="p">}))</span>
+<span class="w">                                    </span><span class="p">.</span><span class="n">map</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">data</span><span class="o">::</span><span class="n">transforms</span><span class="o">::</span><span class="n">Stack</span><span class="o">&lt;&gt;</span><span class="p">());</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">calibration_dataloader</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">data</span><span class="o">::</span><span class="n">make_data_loader</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">calibration_dataset</span><span class="p">),</span>
+<span class="w">                                                            </span><span class="n">torch</span><span class="o">::</span><span class="n">data</span><span class="o">::</span><span class="n">DataLoaderOptions</span><span class="p">().</span><span class="n">batch_size</span><span class="p">(</span><span class="mi">32</span><span class="p">)</span>
+<span class="w">                                                                                            </span><span class="p">.</span><span class="n">workers</span><span class="p">(</span><span class="mi">2</span><span class="p">));</span>
+</pre></div>
+</div>
+<p>Next we create a calibrator from the <code class="docutils literal notranslate"><span class="pre">calibration_dataloader</span></code> using the calibrator factory (found in <code class="docutils literal notranslate"><span class="pre">torch_tensorrt/ptq.h</span></code>):</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch_tensorrt/ptq.h&quot;</span>
+<span class="p">...</span>
+
+<span class="k">auto</span><span class="w"> </span><span class="n">calibrator</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch_tensorrt</span><span class="o">::</span><span class="n">ptq</span><span class="o">::</span><span class="n">make_int8_calibrator</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">calibration_dataloader</span><span class="p">),</span><span class="w"> </span><span class="n">calibration_cache_file</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>Here we also define a location to write a calibration cache file to which we can use to reuse the calibration data without needing the dataset and whether or not
+we should use the cache file if it exists. There also exists a <code class="docutils literal notranslate"><span class="pre">torch_tensorrt::ptq::make_int8_cache_calibrator</span></code> factory which creates a calibrator that uses the cache
+only for cases where you may do engine building on a machine that has limited storage (i.e. no space for a full dataset) or to have a simpler deployment application.</p>
+<p>The calibrator factories create a calibrator that inherits from a <code class="docutils literal notranslate"><span class="pre">nvinfer1::IInt8Calibrator</span></code> virtual class (<code class="docutils literal notranslate"><span class="pre">nvinfer1::IInt8EntropyCalibrator2</span></code> by default) which
+defines the calibration algorithm used when calibrating. You can explicitly make the selection of calibration algorithm like this:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="c1">// MinMax Calibrator is geared more towards NLP tasks</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">calibrator</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch_tensorrt</span><span class="o">::</span><span class="n">ptq</span><span class="o">::</span><span class="n">make_int8_calibrator</span><span class="o">&lt;</span><span class="n">nvinfer1</span><span class="o">::</span><span class="n">IInt8MinMaxCalibrator</span><span class="o">&gt;</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">calibration_dataloader</span><span class="p">),</span><span class="w"> </span><span class="n">calibration_cache_file</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>Then all that’s required to setup the module for INT8 calibration is to set the following compile settings in the <cite>torch_tensorrt::CompileSpec</cite> struct and compiling the module:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">input_shape</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{{</span><span class="mi">32</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">}};</span>
+<span class="c1">/// Configure settings for compilation</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">compile_spec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch_tensorrt</span><span class="o">::</span><span class="n">CompileSpec</span><span class="p">({</span><span class="n">input_shape</span><span class="p">});</span>
+<span class="c1">/// Set operating precision to INT8</span>
+<span class="n">compile_spec</span><span class="p">.</span><span class="n">enabled_precisions</span><span class="p">.</span><span class="n">insert</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">kF16</span><span class="p">);</span>
+<span class="n">compile_spec</span><span class="p">.</span><span class="n">enabled_precisions</span><span class="p">.</span><span class="n">insert</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">kI8</span><span class="p">);</span>
+<span class="c1">/// Use the TensorRT Entropy Calibrator</span>
+<span class="n">compile_spec</span><span class="p">.</span><span class="n">ptq_calibrator</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">calibrator</span><span class="p">;</span>
+
+<span class="k">auto</span><span class="w"> </span><span class="n">trt_mod</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch_tensorrt</span><span class="o">::</span><span class="n">CompileGraph</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span><span class="w"> </span><span class="n">compile_spec</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>If you have an existing Calibrator implementation for TensorRT you may directly set the <code class="docutils literal notranslate"><span class="pre">ptq_calibrator</span></code> field with a pointer to your calibrator and it will work as well.
+From here not much changes in terms of how to execution works. You are still able to fully use LibTorch as the sole interface for inference. Data should remain
+in FP32 precision when it’s passed into <cite>trt_mod.forward</cite>. There exists an example application in the Torch-TensorRT demo that takes you from training a VGG16 network on
+CIFAR10 to deploying in INT8 with Torch-TensorRT here: <a class="github reference external" href="https://github.com/pytorch/TensorRT/tree/master/cpp/ptq">pytorch/TensorRT</a></p>
+</section>
+<section id="how-to-create-your-own-ptq-application-in-python">
+<span id="writing-ptq-python"></span><h2>How to create your own PTQ application in Python<a class="headerlink" href="#how-to-create-your-own-ptq-application-in-python" title="Link to this heading">#</a></h2>
+<p>Torch-TensorRT Python API provides an easy and convenient way to use pytorch dataloaders with TensorRT calibrators. <code class="docutils literal notranslate"><span class="pre">DataLoaderCalibrator</span></code> class can be used to create
+a TensorRT calibrator by providing desired configuration. The following code demonstrates an example on how to use it</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">testing_dataset</span> <span class="o">=</span> <span class="n">torchvision</span><span class="o">.</span><span class="n">datasets</span><span class="o">.</span><span class="n">CIFAR10</span><span class="p">(</span>
+    <span class="n">root</span><span class="o">=</span><span class="s2">&quot;./data&quot;</span><span class="p">,</span>
+    <span class="n">train</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">download</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">transform</span><span class="o">=</span><span class="n">transforms</span><span class="o">.</span><span class="n">Compose</span><span class="p">(</span>
+        <span class="p">[</span>
+            <span class="n">transforms</span><span class="o">.</span><span class="n">ToTensor</span><span class="p">(),</span>
+            <span class="n">transforms</span><span class="o">.</span><span class="n">Normalize</span><span class="p">((</span><span class="mf">0.4914</span><span class="p">,</span> <span class="mf">0.4822</span><span class="p">,</span> <span class="mf">0.4465</span><span class="p">),</span> <span class="p">(</span><span class="mf">0.2023</span><span class="p">,</span> <span class="mf">0.1994</span><span class="p">,</span> <span class="mf">0.2010</span><span class="p">)),</span>
+        <span class="p">]</span>
+    <span class="p">),</span>
+<span class="p">)</span>
+
+<span class="n">testing_dataloader</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">DataLoader</span><span class="p">(</span>
+    <span class="n">testing_dataset</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">shuffle</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="mi">1</span>
+<span class="p">)</span>
+<span class="n">calibrator</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">ptq</span><span class="o">.</span><span class="n">DataLoaderCalibrator</span><span class="p">(</span>
+    <span class="n">testing_dataloader</span><span class="p">,</span>
+    <span class="n">cache_file</span><span class="o">=</span><span class="s2">&quot;./calibration.cache&quot;</span><span class="p">,</span>
+    <span class="n">use_cache</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">algo_type</span><span class="o">=</span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">ptq</span><span class="o">.</span><span class="n">CalibrationAlgo</span><span class="o">.</span><span class="n">ENTROPY_CALIBRATION_2</span><span class="p">,</span>
+    <span class="n">device</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">&quot;cuda:0&quot;</span><span class="p">),</span>
+<span class="p">)</span>
+
+<span class="n">trt_mod</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">inputs</span><span class="o">=</span><span class="p">[</span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">Input</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">))],</span>
+                                    <span class="n">enabled_precisions</span><span class="o">=</span><span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">int8</span><span class="p">},</span>
+                                    <span class="n">calibrator</span><span class="o">=</span><span class="n">calibrator</span><span class="p">,</span>
+                                    <span class="n">device</span><span class="o">=</span><span class="p">{</span>
+                                         <span class="s2">&quot;device_type&quot;</span><span class="p">:</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">DeviceType</span><span class="o">.</span><span class="n">GPU</span><span class="p">,</span>
+                                         <span class="s2">&quot;gpu_id&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                                         <span class="s2">&quot;dla_core&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                                         <span class="s2">&quot;allow_gpu_fallback&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+                                         <span class="s2">&quot;disable_tf32&quot;</span><span class="p">:</span> <span class="kc">False</span>
+                                     <span class="p">})</span>
+</pre></div>
+</div>
+<p>In the cases where there is a pre-existing calibration cache file that users want to use, <code class="docutils literal notranslate"><span class="pre">CacheCalibrator</span></code> can be used without any dataloaders. The following example demonstrates how
+to use <code class="docutils literal notranslate"><span class="pre">CacheCalibrator</span></code> to use in INT8 mode.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">calibrator</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">ptq</span><span class="o">.</span><span class="n">CacheCalibrator</span><span class="p">(</span><span class="s2">&quot;./calibration.cache&quot;</span><span class="p">)</span>
+
+<span class="n">trt_mod</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">inputs</span><span class="o">=</span><span class="p">[</span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">Input</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">])],</span>
+                                      <span class="n">enabled_precisions</span><span class="o">=</span><span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">int8</span><span class="p">},</span>
+                                      <span class="n">calibrator</span><span class="o">=</span><span class="n">calibrator</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>If you already have an existing calibrator class (implemented directly using TensorRT API), you can directly set the calibrator field to your class which can be very convenient.
+For a demo on how PTQ can be performed on a VGG network using Torch-TensorRT API, you can refer to <a class="github reference external" href="https://github.com/pytorch/TensorRT/blob/master/tests/py/test_ptq_dataloader_calibrator.py">pytorch/TensorRT</a>
+and <a class="github reference external" href="https://github.com/pytorch/TensorRT/blob/master/tests/py/test_ptq_trt_calibrator.py">pytorch/TensorRT</a></p>
+<section id="citations">
+<h3>Citations<a class="headerlink" href="#citations" title="Link to this heading">#</a></h3>
+<p>Krizhevsky, A., &amp; Hinton, G. (2009). Learning multiple layers of features from tiny images.</p>
+<p>Simonyan, K., &amp; Zisserman, A. (2014). Very deep convolutional networks for large-scale image recognition. arXiv preprint arXiv:1409.1556.</p>
+</section>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="torchscript_frontend_from_pytorch.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Using Torch-TensorRT TorchScript Frontend Directly From PyTorch</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="../fx/getting_started_with_fx_path.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Torch-TensorRT (FX Frontend) User Guide</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#how-to-create-your-own-ptq-application-in-c">How to create your own PTQ application in C++</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#how-to-create-your-own-ptq-application-in-python">How to create your own PTQ application in Python</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#citations">Citations</a></li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+
+  
+  <div class="tocsection editthispage">
+    <a href="https://github.com/pytorch/TensorRT/edit/main/docsrc/ts/ptq.rst">
+      <i class="fa-solid fa-pencil"></i>
+      
+      
+        
+          Edit on GitHub
+        
+      
+    </a>
+  </div>
+</div>
+
+  <div class="sidebar-secondary-item">
+
+  <div class="tocsection sourcelink">
+    <a href="../_sources/ts/ptq.rst.txt">
+      <i class="fa-solid fa-file-lines"></i> Show Source
+    </a>
+  </div>
+</div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2024, NVIDIA Corporation.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>

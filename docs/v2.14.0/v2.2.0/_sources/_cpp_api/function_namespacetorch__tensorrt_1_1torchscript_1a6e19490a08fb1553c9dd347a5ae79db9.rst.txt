@@ -1,0 +1,14 @@
+.. _exhale_function_namespacetorch__tensorrt_1_1torchscript_1a6e19490a08fb1553c9dd347a5ae79db9:
+
+Function torch_tensorrt::torchscript::compile
+=============================================
+
+.. did not find file this was defined in
+
+
+Function Documentation
+----------------------
+
+
+.. doxygenfunction:: torch_tensorrt::torchscript::compile(const torch::jit::Module&, CompileSpec)
+   :project: Torch-TensorRT

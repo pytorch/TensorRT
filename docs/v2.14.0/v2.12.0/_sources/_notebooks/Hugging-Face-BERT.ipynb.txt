@@ -1,0 +1,714 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "id": "9369b63c",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Copyright 2022 NVIDIA Corporation. All Rights Reserved.\n",
+    "#\n",
+    "# Licensed under the Apache License, Version 2.0 (the \"License\");\n",
+    "# you may not use this file except in compliance with the License.\n",
+    "# You may obtain a copy of the License at\n",
+    "#\n",
+    "#     http://www.apache.org/licenses/LICENSE-2.0\n",
+    "#\n",
+    "# Unless required by applicable law or agreed to in writing, software\n",
+    "# distributed under the License is distributed on an \"AS IS\" BASIS,\n",
+    "# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n",
+    "# See the License for the specific language governing permissions and\n",
+    "# limitations under the License.\n",
+    "# =============================================================================="
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "d0a97ac5",
+   "metadata": {},
+   "source": [
+    "<img src=\"https://developer.download.nvidia.com/tesla/notebook_assets/nv_logo_torch_trt_resnet_notebook.png\" style=\"width: 90px; float: right;\">\n",
+    "\n",
+    "# Masked Language Modeling (MLM) with Hugging Face BERT Transformer"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "83f47edb",
+   "metadata": {},
+   "source": [
+    "## Learning objectives\n",
+    "\n",
+    "This notebook demonstrates the steps for compiling a TorchScript module with Torch-TensorRT on a pretrained BERT transformer from Hugging Face, and running it to test the speedup obtained.\n",
+    "\n",
+    "## Contents\n",
+    "1. [Requirements](#1)\n",
+    "2. [BERT Overview](#2)\n",
+    "3. [Creating TorchScript modules](#3)\n",
+    "4. [Compiling with Torch-TensorRT](#4)\n",
+    "5. [Benchmarking](#5)\n",
+    "6. [Conclusion](#6)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "596fa151",
+   "metadata": {},
+   "source": [
+    "<a id=\"1\"></a>\n",
+    "## 1. Requirements\n",
+    "\n",
+    "NVIDIA's NGC provides a PyTorch Docker Container which contains PyTorch and Torch-TensorRT. Starting with version `22.05-py3`, we can make use of [latest pytorch](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch) container to run this notebook.\n",
+    "\n",
+    "Otherwise, you can follow the steps in `notebooks/README` to prepare a Docker container yourself, within which you can run this demo notebook."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "id": "58e687d1",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Looking in indexes: https://pypi.org/simple, https://pypi.ngc.nvidia.com\n",
+      "Requirement already satisfied: transformers in /opt/conda/lib/python3.8/site-packages (4.18.0)\n",
+      "Requirement already satisfied: tqdm>=4.27 in /opt/conda/lib/python3.8/site-packages (from transformers) (4.63.0)\n",
+      "Requirement already satisfied: regex!=2019.12.17 in /opt/conda/lib/python3.8/site-packages (from transformers) (2022.3.15)\n",
+      "Requirement already satisfied: huggingface-hub<1.0,>=0.1.0 in /opt/conda/lib/python3.8/site-packages (from transformers) (0.5.1)\n",
+      "Requirement already satisfied: tokenizers!=0.11.3,<0.13,>=0.11.1 in /opt/conda/lib/python3.8/site-packages (from transformers) (0.12.1)\n",
+      "Requirement already satisfied: numpy>=1.17 in /opt/conda/lib/python3.8/site-packages (from transformers) (1.22.3)\n",
+      "Requirement already satisfied: sacremoses in /opt/conda/lib/python3.8/site-packages (from transformers) (0.0.49)\n",
+      "Requirement already satisfied: requests in /opt/conda/lib/python3.8/site-packages (from transformers) (2.27.1)\n",
+      "Requirement already satisfied: pyyaml>=5.1 in /opt/conda/lib/python3.8/site-packages (from transformers) (6.0)\n",
+      "Requirement already satisfied: filelock in /opt/conda/lib/python3.8/site-packages (from transformers) (3.6.0)\n",
+      "Requirement already satisfied: packaging>=20.0 in /opt/conda/lib/python3.8/site-packages (from transformers) (21.3)\n",
+      "Requirement already satisfied: typing-extensions>=3.7.4.3 in /opt/conda/lib/python3.8/site-packages (from huggingface-hub<1.0,>=0.1.0->transformers) (4.1.1)\n",
+      "Requirement already satisfied: pyparsing!=3.0.5,>=2.0.2 in /opt/conda/lib/python3.8/site-packages (from packaging>=20.0->transformers) (3.0.7)\n",
+      "Requirement already satisfied: urllib3<1.27,>=1.21.1 in /opt/conda/lib/python3.8/site-packages (from requests->transformers) (1.26.8)\n",
+      "Requirement already satisfied: charset-normalizer~=2.0.0 in /opt/conda/lib/python3.8/site-packages (from requests->transformers) (2.0.12)\n",
+      "Requirement already satisfied: certifi>=2017.4.17 in /opt/conda/lib/python3.8/site-packages (from requests->transformers) (2021.10.8)\n",
+      "Requirement already satisfied: idna<4,>=2.5 in /opt/conda/lib/python3.8/site-packages (from requests->transformers) (3.3)\n",
+      "Requirement already satisfied: six in /opt/conda/lib/python3.8/site-packages (from sacremoses->transformers) (1.16.0)\n",
+      "Requirement already satisfied: click in /opt/conda/lib/python3.8/site-packages (from sacremoses->transformers) (8.0.4)\n",
+      "Requirement already satisfied: joblib in /opt/conda/lib/python3.8/site-packages (from sacremoses->transformers) (1.1.0)\n",
+      "\u001b[33mWARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv\u001b[0m\n"
+     ]
+    }
+   ],
+   "source": [
+    "!pip install transformers"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "id": "1104c4f1",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from transformers import BertTokenizer, BertForMaskedLM\n",
+    "import torch\n",
+    "import timeit\n",
+    "import numpy as np\n",
+    "import torch_tensorrt\n",
+    "import torch.backends.cudnn as cudnn"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "acf67a5e",
+   "metadata": {},
+   "source": [
+    "<a id=\"2\"></a>\n",
+    "## 2. BERT Overview\n",
+    "\n",
+    "Transformers comprise a class of deep learning algorithms employing self-attention; broadly speaking, the models learn large matrices of numbers, each element of which denotes how important one component of input data is to another. Since their introduction in 2017, transformers have enjoyed widespread adoption, particularly in natural language processing, but also in computer vision problems. This is largely because they are easier to parallelize than the sequence models which attention mechanisms were originally designed to augment. \n",
+    "\n",
+    "Hugging Face is a company that maintains a huge respository of pre-trained transformer models. The company also provides tools for integrating those models into PyTorch code and running inference with them. \n",
+    "\n",
+    "One of the most popular transformer models is BERT (Bidirectional Encoder Representations from Transformers). First developed at Google and released in 2018, it has become the backbone of Google's search engine and a standard benchmark for NLP experiments. BERT was originally trained for next sentence prediction and masked language modeling (MLM), which aims to predict hidden words in sentences. In this notebook, we will use Hugging Face's `bert-base-uncased` model (BERT's smallest and simplest form, which does not employ text capitalization) for MLM."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "19e711c0",
+   "metadata": {},
+   "source": [
+    "<a id=\"3\"></a>\n",
+    "## 3. Creating TorchScript modules  "
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "81d4c6f6",
+   "metadata": {},
+   "source": [
+    "First, create a pretrained BERT tokenizer from the `bert-base-uncased` model"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "id": "c7c8721e",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "enc = BertTokenizer.from_pretrained('bert-base-uncased')"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "b7c1c679",
+   "metadata": {},
+   "source": [
+    "Create dummy inputs to generate a traced TorchScript model later"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "id": "c3827087",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "batch_size = 4\n",
+    "\n",
+    "batched_indexed_tokens = [[101, 64]*64]*batch_size\n",
+    "batched_segment_ids = [[0, 1]*64]*batch_size\n",
+    "batched_attention_masks = [[1, 1]*64]*batch_size\n",
+    "\n",
+    "tokens_tensor = torch.tensor(batched_indexed_tokens)\n",
+    "segments_tensor = torch.tensor(batched_segment_ids)\n",
+    "attention_masks_tensor = torch.tensor(batched_attention_masks)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "7e31b27f",
+   "metadata": {},
+   "source": [
+    "Obtain a BERT masked language model from Hugging Face in the (scripted) TorchScript, then use the dummy inputs to trace it"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "id": "a3cd5a35",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "Some weights of the model checkpoint at bert-base-uncased were not used when initializing BertForMaskedLM: ['cls.seq_relationship.bias', 'cls.seq_relationship.weight']\n",
+      "- This IS expected if you are initializing BertForMaskedLM from the checkpoint of a model trained on another task or with another architecture (e.g. initializing a BertForSequenceClassification model from a BertForPreTraining model).\n",
+      "- This IS NOT expected if you are initializing BertForMaskedLM from the checkpoint of a model that you expect to be exactly identical (initializing a BertForSequenceClassification model from a BertForSequenceClassification model).\n"
+     ]
+    }
+   ],
+   "source": [
+    "mlm_model_ts = BertForMaskedLM.from_pretrained('bert-base-uncased', torchscript=True)\n",
+    "traced_mlm_model = torch.jit.trace(mlm_model_ts, [tokens_tensor, segments_tensor, attention_masks_tensor])"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "d8d2217a",
+   "metadata": {},
+   "source": [
+    "Define 4 masked sentences, with 1 word in each sentence hidden from the model. Fluent English speakers will probably be able to guess the masked words, but just in case, they are `'capital'`, `'language'`, `'innings'`, and `'mathematics'`.\n",
+    "\n",
+    "Also create a list containing the position of the masked word within each sentence. Given Python's 0-based indexing convention, the numbers are each higher by 1 than might be expected. This is because the token at index 0 in each sentence is a beginning-of-sentence token, denoted `[CLS]` when entered explicitly. "
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "id": "4d1af982",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "masked_sentences = ['Paris is the [MASK] of France.', \n",
+    "                    'The primary [MASK] of the United States is English.', \n",
+    "                    'A baseball game consists of at least nine [MASK].', \n",
+    "                    'Topology is a branch of [MASK] concerned with the properties of geometric objects that remain unchanged under continuous transformations.']\n",
+    "pos_masks = [4, 3, 9, 6]"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "4d89b4c8",
+   "metadata": {},
+   "source": [
+    "Pass the masked sentences into the (scripted) TorchScript MLM model and verify that the unmasked sentences yield the expected results.  \n",
+    "\n",
+    "Because the sentences are of different lengths, we must specify the `padding` argument in calling our encoder/tokenizer. There are several possible padding strategies, but we'll use `'max_length'` padding with `max_length=128`. Later, when we compile an optimized version of the model with Torch-TensorRT, the optimized model will expect inputs of length 128, hence our choice of padding strategy and length here. "
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 8,
+   "id": "d2d7546b",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Paris is the capital of France.\n",
+      "The primary language of the United States is English.\n",
+      "A baseball game consists of at least nine innings.\n",
+      "Topology is a branch of mathematics concerned with the properties of geometric objects that remain unchanged under continuous transformations.\n"
+     ]
+    }
+   ],
+   "source": [
+    "encoded_inputs = enc(masked_sentences, return_tensors='pt', padding='max_length', max_length=128)\n",
+    "outputs = mlm_model_ts(**encoded_inputs)\n",
+    "most_likely_token_ids = [torch.argmax(outputs[0][i, pos, :]) for i, pos in enumerate(pos_masks)]\n",
+    "unmasked_tokens = enc.decode(most_likely_token_ids).split(' ')\n",
+    "unmasked_sentences = [masked_sentences[i].replace('[MASK]', token) for i, token in enumerate(unmasked_tokens)]\n",
+    "for sentence in unmasked_sentences:\n",
+    "    print(sentence)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "b0b423ff",
+   "metadata": {},
+   "source": [
+    "Pass the masked sentences into the traced MLM model and verify that the unmasked sentences yield the expected results. \n",
+    "\n",
+    "Note the difference in how the `encoded_inputs` are passed into the model in the following cell compared to the previous one. If you examine `encoded_inputs`, you'll find that it's a dictionary with 3 keys, `'input_ids'`, `'token_type_ids'`, and `'attention_mask'`, each with a PyTorch tensor as an associated value. The traced model will accept `**encoded_inputs` as an input, but the Torch-TensorRT-optimized model (to be defined later) will not. "
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 9,
+   "id": "683a4a73",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Paris is the capital of France.\n",
+      "The primary language of the United States is English.\n",
+      "A baseball game consists of at least nine innings.\n",
+      "Topology is a branch of mathematics concerned with the properties of geometric objects that remain unchanged under continuous transformations.\n"
+     ]
+    }
+   ],
+   "source": [
+    "encoded_inputs = enc(masked_sentences, return_tensors='pt', padding='max_length', max_length=128)\n",
+    "outputs = traced_mlm_model(encoded_inputs['input_ids'], encoded_inputs['token_type_ids'], encoded_inputs['attention_mask'])\n",
+    "most_likely_token_ids = [torch.argmax(outputs[0][i, pos, :]) for i, pos in enumerate(pos_masks)]\n",
+    "unmasked_tokens = enc.decode(most_likely_token_ids).split(' ')\n",
+    "unmasked_sentences = [masked_sentences[i].replace('[MASK]', token) for i, token in enumerate(unmasked_tokens)]\n",
+    "for sentence in unmasked_sentences:\n",
+    "    print(sentence)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "7a31b545",
+   "metadata": {},
+   "source": [
+    "<a id=\"4\"></a>\n",
+    "## 4. Compiling with Torch-TensorRT"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "413d8b4f",
+   "metadata": {},
+   "source": [
+    "Change the logging level to avoid long printouts"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 10,
+   "id": "42862893",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "new_level = torch_tensorrt.logging.Level.Error\n",
+    "torch_tensorrt.logging.set_reportable_log_level(new_level)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "121d6d59",
+   "metadata": {},
+   "source": [
+    "Compile the model"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 11,
+   "id": "eab90150",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "trt_model = torch_tensorrt.compile(traced_mlm_model, \n",
+    "    inputs= [torch_tensorrt.Input(shape=[batch_size, 128], dtype=torch.int32),  # input_ids\n",
+    "             torch_tensorrt.Input(shape=[batch_size, 128], dtype=torch.int32),  # token_type_ids\n",
+    "             torch_tensorrt.Input(shape=[batch_size, 128], dtype=torch.int32)], # attention_mask\n",
+    "    enabled_precisions= {torch.float32}, # Run with 32-bit precision\n",
+    "    workspace_size=2000000000,\n",
+    "    truncate_long_and_double=True\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "a96751ce",
+   "metadata": {},
+   "source": [
+    "Pass the masked sentences into the compiled model and verify that the unmasked sentences yield the expected results."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 12,
+   "id": "097ea381",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Paris is the capital of France.\n",
+      "The primary language of the United States is English.\n",
+      "A baseball game consists of at least nine innings.\n",
+      "Topology is a branch of mathematics concerned with the properties of geometric objects that remain unchanged under continuous transformations.\n"
+     ]
+    }
+   ],
+   "source": [
+    "enc_inputs = enc(masked_sentences, return_tensors='pt', padding='max_length', max_length=128)\n",
+    "enc_inputs = {k: v.type(torch.int32).cuda() for k, v in enc_inputs.items()}\n",
+    "output_trt = trt_model(enc_inputs['input_ids'], enc_inputs['token_type_ids'], enc_inputs['attention_mask'])\n",
+    "most_likely_token_ids_trt = [torch.argmax(output_trt[i, pos, :]) for i, pos in enumerate(pos_masks)] \n",
+    "unmasked_tokens_trt = enc.decode(most_likely_token_ids_trt).split(' ')\n",
+    "unmasked_sentences_trt = [masked_sentences[i].replace('[MASK]', token) for i, token in enumerate(unmasked_tokens_trt)]\n",
+    "for sentence in unmasked_sentences_trt:\n",
+    "    print(sentence)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "a398271d",
+   "metadata": {},
+   "source": [
+    "Compile the model again, this time with 16-bit precision"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 13,
+   "id": "a063dee2",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "trt_model_fp16 = torch_tensorrt.compile(traced_mlm_model, \n",
+    "    inputs= [torch_tensorrt.Input(shape=[batch_size, 128], dtype=torch.int32),  # input_ids\n",
+    "             torch_tensorrt.Input(shape=[batch_size, 128], dtype=torch.int32),  # token_type_ids\n",
+    "             torch_tensorrt.Input(shape=[batch_size, 128], dtype=torch.int32)], # attention_mask\n",
+    "    enabled_precisions= {torch.half}, # Run with 16-bit precision\n",
+    "    workspace_size=2000000000,\n",
+    "    truncate_long_and_double=True\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "a926334a",
+   "metadata": {},
+   "source": [
+    "<a id=\"5\"></a>\n",
+    "## 5. Benchmarking\n",
+    "\n",
+    "In developing this notebook, we conducted our benchmarking on a single NVIDIA A100 GPU. Your results may differ from those shown, particularly on a different GPU."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "976c6fb9",
+   "metadata": {},
+   "source": [
+    "This function passes the inputs into the model and runs inference `num_loops` times, then returns a list of length containing the amount of time in seconds that each instance of inference took."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 14,
+   "id": "b72a091e",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def timeGraph(model, input_tensor1, input_tensor2, input_tensor3, num_loops=50):\n",
+    "    print(\"Warm up ...\")\n",
+    "    with torch.no_grad():\n",
+    "        for _ in range(20):\n",
+    "            features = model(input_tensor1, input_tensor2, input_tensor3)\n",
+    "\n",
+    "    torch.cuda.synchronize()\n",
+    "\n",
+    "    print(\"Start timing ...\")\n",
+    "    timings = []\n",
+    "    with torch.no_grad():\n",
+    "        for i in range(num_loops):\n",
+    "            start_time = timeit.default_timer()\n",
+    "            features = model(input_tensor1, input_tensor2, input_tensor3)\n",
+    "            torch.cuda.synchronize()\n",
+    "            end_time = timeit.default_timer()\n",
+    "            timings.append(end_time - start_time)\n",
+    "            # print(\"Iteration {}: {:.6f} s\".format(i, end_time - start_time))\n",
+    "\n",
+    "    return timings"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "0b44dcf8",
+   "metadata": {},
+   "source": [
+    "This function prints the number of input batches the model is able to process each second and summary statistics of the model's latency."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 15,
+   "id": "2ef71ab7",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def printStats(graphName, timings, batch_size):\n",
+    "    times = np.array(timings)\n",
+    "    steps = len(times)\n",
+    "    speeds = batch_size / times\n",
+    "    time_mean = np.mean(times)\n",
+    "    time_med = np.median(times)\n",
+    "    time_99th = np.percentile(times, 99)\n",
+    "    time_std = np.std(times, ddof=0)\n",
+    "    speed_mean = np.mean(speeds)\n",
+    "    speed_med = np.median(speeds)\n",
+    "\n",
+    "    msg = (\"\\n%s =================================\\n\"\n",
+    "            \"batch size=%d, num iterations=%d\\n\"\n",
+    "            \"  Median text batches/second: %.1f, mean: %.1f\\n\"\n",
+    "            \"  Median latency: %.6f, mean: %.6f, 99th_p: %.6f, std_dev: %.6f\\n\"\n",
+    "            ) % (graphName,\n",
+    "                batch_size, steps,\n",
+    "                speed_med, speed_mean,\n",
+    "                time_med, time_mean, time_99th, time_std)\n",
+    "    print(msg)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 16,
+   "id": "afe97b9b",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "cudnn.benchmark = True"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "eba98b24",
+   "metadata": {},
+   "source": [
+    "Benchmark the (scripted) TorchScript model on GPU"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 17,
+   "id": "bab5fa8f",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Warm up ...\n",
+      "Start timing ...\n",
+      "\n",
+      "BERT =================================\n",
+      "batch size=4, num iterations=50\n",
+      "  Median text batches/second: 599.1, mean: 597.6\n",
+      "  Median latency: 0.006677, mean: 0.006693, 99th_p: 0.006943, std_dev: 0.000059\n",
+      "\n"
+     ]
+    }
+   ],
+   "source": [
+    "timings = timeGraph(mlm_model_ts.cuda(), enc_inputs['input_ids'], enc_inputs['token_type_ids'], enc_inputs['attention_mask'])\n",
+    "\n",
+    "printStats(\"BERT\", timings, batch_size)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "bc79c452",
+   "metadata": {},
+   "source": [
+    "Benchmark the traced model on GPU"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 18,
+   "id": "5c0bd8e9",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Warm up ...\n",
+      "Start timing ...\n",
+      "\n",
+      "BERT =================================\n",
+      "batch size=4, num iterations=50\n",
+      "  Median text batches/second: 951.2, mean: 951.0\n",
+      "  Median latency: 0.004205, mean: 0.004206, 99th_p: 0.004256, std_dev: 0.000015\n",
+      "\n"
+     ]
+    }
+   ],
+   "source": [
+    "timings = timeGraph(traced_mlm_model.cuda(), enc_inputs['input_ids'], enc_inputs['token_type_ids'], enc_inputs['attention_mask'])\n",
+    "\n",
+    "printStats(\"BERT\", timings, batch_size)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "41db22a1",
+   "metadata": {},
+   "source": [
+    "Benchmark the compiled FP32 model on GPU"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 19,
+   "id": "ade7b508",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Warm up ...\n",
+      "Start timing ...\n",
+      "\n",
+      "BERT =================================\n",
+      "batch size=4, num iterations=50\n",
+      "  Median text batches/second: 1216.9, mean: 1216.4\n",
+      "  Median latency: 0.003287, mean: 0.003289, 99th_p: 0.003317, std_dev: 0.000007\n",
+      "\n"
+     ]
+    }
+   ],
+   "source": [
+    "timings = timeGraph(trt_model, enc_inputs['input_ids'], enc_inputs['token_type_ids'], enc_inputs['attention_mask'])\n",
+    "\n",
+    "printStats(\"BERT\", timings, batch_size)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "57b696de",
+   "metadata": {},
+   "source": [
+    "Benchmark the compiled FP16 model on GPU"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 20,
+   "id": "f61b83fd",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Warm up ...\n",
+      "Start timing ...\n",
+      "\n",
+      "BERT =================================\n",
+      "batch size=4, num iterations=50\n",
+      "  Median text batches/second: 1776.7, mean: 1771.1\n",
+      "  Median latency: 0.002251, mean: 0.002259, 99th_p: 0.002305, std_dev: 0.000015\n",
+      "\n"
+     ]
+    }
+   ],
+   "source": [
+    "timings = timeGraph(trt_model_fp16, enc_inputs['input_ids'], enc_inputs['token_type_ids'], enc_inputs['attention_mask'])\n",
+    "\n",
+    "printStats(\"BERT\", timings, batch_size)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "43f67ba3",
+   "metadata": {},
+   "source": [
+    "<a id=\"6\"></a>\n",
+    "## 6. Conclusion\n",
+    "\n",
+    "In this notebook, we have walked through the complete process of compiling TorchScript models with Torch-TensorRT for Masked Language Modeling with Hugging Face's `bert-base-uncased` transformer and testing the performance impact of the optimization. With Torch-TensorRT on an NVIDIA A100 GPU, we observe the speedups indicated below. These acceleration numbers will vary from GPU to GPU (as well as implementation to implementation based on the ops used) and we encorage you to try out latest generation of Data center compute cards for maximum acceleration.\n",
+    "\n",
+    "Scripted (GPU): 1.0x\n",
+    "Traced (GPU): 1.62x\n",
+    "Torch-TensorRT (FP32): 2.14x\n",
+    "Torch-TensorRT (FP16): 3.15x\n",
+    "\n",
+    "### What's next\n",
+    "Now it's time to try Torch-TensorRT on your own model. If you run into any issues, you can fill them at https://github.com/NVIDIA/Torch-TensorRT. Your involvement will help future development of Torch-TensorRT."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "4ebd152d",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3 (ipykernel)",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.8.12"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}

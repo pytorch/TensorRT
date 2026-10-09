@@ -1,0 +1,28 @@
+.. _exhale_struct_structtrtorch_1_1CompileSpec:
+
+Struct CompileSpec
+================
+
+- Defined in :ref:`file_cpp_api_include_trtorch_trtorch.h`
+
+
+Nested Relationships
+--------------------
+
+
+Nested Types
+************
+
+- :ref:`exhale_class_classtrtorch_1_1CompileSpec_1_1DataType`
+- :ref:`exhale_class_classtrtorch_1_1CompileSpec_1_1DeviceType`
+- :ref:`exhale_struct_structtrtorch_1_1CompileSpec_1_1InputRange`
+
+
+Struct Documentation
+--------------------
+
+
+.. doxygenstruct:: trtorch::CompileSpec
+   :members:
+   :protected-members:
+   :undoc-members:

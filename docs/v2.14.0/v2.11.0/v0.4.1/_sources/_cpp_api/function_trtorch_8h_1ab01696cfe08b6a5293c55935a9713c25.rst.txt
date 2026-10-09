@@ -1,0 +1,13 @@
+.. _exhale_function_trtorch_8h_1ab01696cfe08b6a5293c55935a9713c25:
+
+Function trtorch::CheckMethodOperatorSupport
+============================================
+
+- Defined in :ref:`file_cpp_include_trtorch_trtorch.h`
+
+
+Function Documentation
+----------------------
+
+
+.. doxygenfunction:: trtorch::CheckMethodOperatorSupport(const torch::jit::Module&, std::string)

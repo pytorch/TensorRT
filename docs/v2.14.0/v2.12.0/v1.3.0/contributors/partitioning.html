@@ -1,0 +1,930 @@
+
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Partitioning Phase &mdash; Torch-TensorRT v1.3.0 documentation</title>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <!-- <link rel="stylesheet" href="../_static/pygments.css" type="text/css" /> -->
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/collapsible-lists/css/tree_view.css" type="text/css" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Conversion Phase" href="conversion.html" />
+    <link rel="prev" title="Lowering Phase" href="lowering.html" />
+  <!-- Google Analytics -->
+
+  <!-- End Google Analytics -->
+
+
+
+  <script src="../_static/js/modernizr.min.js"></script>
+
+  <!-- Preload the theme fonts -->
+
+<link rel="preload" href="../_static/fonts/FreightSans/freight-sans-book.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../_static/fonts/FreightSans/freight-sans-medium.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../_static/fonts/IBMPlexMono/IBMPlexMono-Medium.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../_static/fonts/FreightSans/freight-sans-bold.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../_static/fonts/FreightSans/freight-sans-medium-italic.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../_static/fonts/IBMPlexMono/IBMPlexMono-SemiBold.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+
+<!-- Preload the katex fonts -->
+
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Math-Italic.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Main-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Main-Bold.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size1-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size4-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size2-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size3-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Caligraphic-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.2/css/all.css" integrity="sha384-vSIIfh2YWi9wW0r9iZe7RJPrKwp6bG+s9QZMoITbCckVJqGCCRhc+ccxNcdpHuYu" crossorigin="anonymous">
+</head>
+
+<div class="container-fluid header-holder tutorials-header" id="header-holder">
+  <div class="container">
+    <div class="header-container">
+      <a class="header-logo" href="https://pytorch.org/" aria-label="PyTorch"></a>
+
+      <div class="main-menu">
+        <ul>
+          <li>
+            <a href="https://pytorch.org/get-started">Get Started</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/ecosystem">Ecosystem</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/mobile">Mobile</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/blog/">Blog</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/tutorials">Tutorials</a>
+          </li>
+
+          <li>
+            <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="resource-option with-down-orange-arrow">
+                Docs
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/docs/stable/index.html">
+                  <span class="dropdown-title">PyTorch</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/audio/stable/index.html">
+                  <span class="dropdown-title">torchaudio</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/text/stable/index.html">
+                  <span class="dropdown-title">torchtext</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/vision/stable/index.html">
+                  <span class="dropdown-title">torchvision</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/torcharrow">
+                  <span class="dropdown-title">torcharrow</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/data">
+                  <span class="dropdown-title">TorchData</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/torchrec">
+                  <span class="dropdown-title">TorchRec</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/serve/">
+                  <span class="dropdown-title">TorchServe</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/torchx/">
+                  <span class="dropdown-title">TorchX</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/xla">
+                  <span class="dropdown-title">PyTorch on XLA Devices</span>
+                  <p></p>
+                </a>
+            </div>
+          </li>
+
+          <li>
+            <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="resource-option with-down-arrow">
+                Resources
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="nav-dropdown-item" href="https://pytorch.org/features">
+                  <span class="dropdown-title">About</span>
+                  <p>Learn about PyTorch’s features and capabilities</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/foundation">
+                  <span class="dropdown-title">PyTorch Foundation</span>
+                  <p>Learn about the PyTorch foundation</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/#community-module">
+                  <span class="dropdown-title">Community</span>
+                  <p>Join the PyTorch developer community to contribute, learn, and get your questions answered.</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/community-stories">
+                  <span class="dropdown-title">Community Stories</span>
+                  <p>Learn how our community solves real, everyday machine learning problems with PyTorch.</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/resources">
+                  <span class="dropdown-title">Developer Resources</span>
+                  <p>Find resources and get questions answered</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/events">
+                  <span class="dropdown-title">Events</span>
+                  <p>Find events, webinars, and podcasts</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://discuss.pytorch.org/" target="_blank">
+                  <span class="dropdown-title">Forums</span>
+                  <p>A place to discuss PyTorch code, issues, install, research</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/hub">
+                  <span class="dropdown-title">Models (Beta)</span>
+                  <p>Discover, publish, and reuse pre-trained models</p>
+                </a>
+              </div>
+            </div>
+          </li>
+
+          <li>
+            <a href="https://github.com/pytorch/pytorch">GitHub</a>
+          </li>
+        </ul>
+      </div>
+
+      <a class="main-menu-open-button" href="#" data-behavior="open-mobile-menu"></a>
+    </div>
+  </div>
+</div>
+
+<body class="pytorch-body">
+
+
+
+
+
+    <div class="table-of-contents-link-wrapper">
+      <span>Table of Contents</span>
+      <a href="#" class="toggle-table-of-contents" data-behavior="toggle-table-of-contents"></a>
+    </div>
+
+    <nav data-toggle="wy-nav-shift" class="pytorch-left-menu" id="pytorch-left-menu">
+      <div class="pytorch-side-scroll">
+        <div class="pytorch-menu pytorch-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          <div class="pytorch-left-menu-search">
+
+
+
+
+
+                <div class="version">
+                  v1.3.0
+                </div>
+
+
+
+
+
+
+
+
+
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search Docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+
+          </div>
+
+
+
+
+
+
+
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/getting_started_with_python_api.html">Using Torch-TensorRT in Python</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/getting_started_with_cpp_api.html">Using Torch-TensorRT in  C++</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/creating_torchscript_module_in_python.html">Creating a TorchScript Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/creating_torchscript_module_in_python.html#working-with-torchscript-in-python">Working with TorchScript in Python</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">Saving TorchScript Module to Disk</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/getting_started_with_fx_path.html">Torch-TensorRT (FX Frontend) User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/ptq.html">Post Training Quantization (PTQ)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/runtime.html">Deploying Torch-TensorRT Programs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/serving_torch_tensorrt_with_triton.html">Serving a Torch-TensorRT model with Triton</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/use_from_pytorch.html">Using Torch-TensorRT Directly From PyTorch</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/using_dla.html">DLA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/notebooks.html">Example notebooks</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Python API Documenation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/torch_tensorrt.html">torch_tensorrt</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/logging.html">torch_tensorrt.logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/ptq.html">torch_tensorrt.ptq</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/ts.html">torch_tensorrt.ts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/fx.html">torch_tensorrt.fx</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">C++ API Documenation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/torch_tensort_cpp.html">Torch-TensorRT C++ API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt.html">Namespace torch_tensorrt</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt__logging.html">Namespace torch_tensorrt::logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt__ptq.html">Namespace torch_tensorrt::ptq</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CLI Documenation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../cli/torchtrtc.html">torchtrtc</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributor Documentation</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="system_overview.html">System Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="writing_converters.html">Writing Converters</a></li>
+<li class="toctree-l1"><a class="reference internal" href="useful_links.html">Useful Links for Torch-TensorRT Development</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Indices</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../indices/supported_ops.html">Operators Supported</a></li>
+</ul>
+
+
+
+        </div>
+      </div>
+    </nav>
+
+    <div class="pytorch-container">
+      <div class="pytorch-page-level-bar" id="pytorch-page-level-bar">
+        <div class="pytorch-breadcrumbs-wrapper">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="pytorch-breadcrumbs">
+
+      <li>
+        <a href="../index.html">
+
+            Docs
+
+        </a> &gt;
+      </li>
+
+
+          <li><a href="system_overview.html">System Overview</a> &gt;</li>
+
+      <li>Partitioning Phase</li>
+
+
+      <li class="pytorch-breadcrumbs-aside">
+
+
+            <a href="../_sources/contributors/partitioning.rst.txt" rel="nofollow"><img src="../_static/images/view-page-source-icon.svg"></a>
+
+
+      </li>
+
+  </ul>
+
+
+</div>
+        </div>
+
+        <div class="pytorch-shortcuts-wrapper" id="pytorch-shortcuts-wrapper">
+          Shortcuts
+        </div>
+      </div>
+
+      <section data-toggle="wy-nav-shift" id="pytorch-content-wrap" class="pytorch-content-wrap">
+        <div class="pytorch-content-left">
+
+
+
+          <div class="rst-content">
+
+            <div role="main" class="main-content" itemscope="itemscope" itemtype="http://schema.org/Article">
+             <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
+
+  <section id="partitioning-phase">
+<span id="partitioning"></span><h1>Partitioning Phase<a class="headerlink" href="#partitioning-phase" title="Permalink to this headline">¶</a></h1>
+<p>The phase is optional and enabled by the user. It instructs the compiler to separate nodes into ones that should run in PyTorch and ones that should run in TensorRT.
+Criteria for separation include: Lack of a converter, operator is explicitly set to run in PyTorch by the user or the node has a flag which tells partitioning to
+run in PyTorch by the module fallback passes.</p>
+<p>On a high level, Torch-TensorRT partitioning phase does the following:</p>
+<ul class="simple">
+<li><p>Segmentation. Go through the set of operators in order and verify if there is converter for each operator. Then, roughly separate the graph into parts that Torch-TensorRT can support and parts Torch-TensorRT cannot.</p></li>
+<li><p>Dependency Analysis. For every to be compiled operator there is a “complete dependency graph”, which means that every input can to traced back to an input as Tensor or TensorList. Go through all segments after segmentation then do dependency analysis to ensure that there are only Tensor/TensorList inputs and outputs for TensorRT segments.</p></li>
+<li><p>Shape Analysis. For each segments, figure out the input and outputs shapes starting from the provided input shape from the user. Shapes can be calculated by running the graphs with JIT.</p></li>
+<li><p>Conversion. Every TensorRT segments will be converted to TensorRT engine. This part is done in compiler.cpp, but it’s still a phase in our partitioning process.</p></li>
+<li><p>Stitching. Stitch all TensorRT engines with PyTorch nodes altogether.</p></li>
+</ul>
+<p>Here are the brief description of these functions of each file:</p>
+<section id="partitoninfo-h-cpp">
+<h2>PartitonInfo.h/.cpp<a class="headerlink" href="#partitoninfo-h-cpp" title="Permalink to this headline">¶</a></h2>
+<blockquote>
+<div><p><a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/core/partitioning/PartitionInfo.h">core/partitioning/PartitionInfo.h</a></p>
+</div></blockquote>
+<p>The automatic fallback APIs that is used for partitioning.</p>
+</section>
+<section id="segmentedblock-h-cpp">
+<h2>SegmentedBlock.h/.cpp<a class="headerlink" href="#segmentedblock-h-cpp" title="Permalink to this headline">¶</a></h2>
+<blockquote>
+<div><p><a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/core/partitioning/SegmentedBlock.h">core/partitioning/SegmentedBlock.h</a></p>
+</div></blockquote>
+<p>The main data structures that is used to maintain information for each segments after segmentation.</p>
+</section>
+<section id="shape-analysis-h-cpp">
+<h2>shape_analysis.h/.cpp<a class="headerlink" href="#shape-analysis-h-cpp" title="Permalink to this headline">¶</a></h2>
+<blockquote>
+<div><p><a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/core/partitioning/shape_analysis.h">core/partitioning/shape_analysis.h</a></p>
+</div></blockquote>
+<p>Code implementation to get the shapes for each segments by running them in JIT.</p>
+</section>
+<section id="partitioning-h-cpp">
+<h2>partitioning.h/.cpp<a class="headerlink" href="#partitioning-h-cpp" title="Permalink to this headline">¶</a></h2>
+<blockquote>
+<div><p><a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/core/partitioning/partitioning.h">core/partitioning/partitioning.h</a></p>
+</div></blockquote>
+<p>APIs and main code implementation for partitioning phase.</p>
+</section>
+</section>
+<section id="automatic-fallback">
+<h1>Automatic Fallback<a class="headerlink" href="#automatic-fallback" title="Permalink to this headline">¶</a></h1>
+<p>To enable automatic fallback feature, you can set following attributes in Python:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>import torch
+import torch_tensorrt as torchtrt
+
+...
+model = MyModel()
+ts_model = torch.jit.script(model)
+trt_model = torchtrt.ts.compile(model, **{
+  ...
+  &quot;min_block_size&quot; : 3,
+  &quot;torch_executed_ops&quot;: [&quot;aten::add&quot;],
+  &quot;torch_executed_modules&quot;: [],
+})
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>enabled: By default automatic fallback will be off. It is enabled by setting it to True.</p></li>
+<li><p>min_block_size: The minimum number of consecutive operations that must satisfy to be converted to TensorRT. For example, if it’s set to 3, then there must be 3 consecutive supported operators then this segments will be converted.</p></li>
+<li><p>forced_fallback_ops: A list of strings that will be the names of operations that the user explicitly want to be in PyTorch nodes.</p></li>
+</ul>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>#include &quot;torch/script.h&quot;
+#include &quot;torch_tensorrt/torch_tensorrt.h&quot;
+
+...
+auto in = torch::randn({1, 3, 224, 224}, {torch::kCUDA});
+
+auto mod = torch::jit::load(&quot;trt_ts_module.ts&quot;);
+auto input_sizes =  std::vector&lt;torchtrt::InputRange&gt;{{in.sizes()}};
+torchtrt::ts::CompileSpec cfg(input_sizes);
+cfg.min_block_size = 2;
+cfg.torch_executed_ops.push_back(&quot;aten::relu&quot;);
+auto trt_mod = torchtrt::ts::compile(mod, cfg);
+auto out = trt_mod.forward({in});
+</pre></div>
+</div>
+</section>
+<section id="dependency-aware-partitioning">
+<h1>Dependency Aware Partitioning<a class="headerlink" href="#dependency-aware-partitioning" title="Permalink to this headline">¶</a></h1>
+<p>During segmentation, Torch-TensorRT uses a dependency graph of the input TorchScript nodes to reduce the number of segments created. Consider this example from test Partitioning.SegmentModelWithDependencyAwareness in <a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/tests/core/partitioning/test_segmentation.cpp">tests/core/partitioning/test_segmentation.cpp</a></p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>graph(%x : Tensor, %y : Tensor):
+    %3 : int = prim::Constant[value=0]()
+    %20 : int = prim::Constant[value=1]()
+    %add : Tensor = aten::add(%x, %y, %20)
+    %x_lgamma : Tensor = aten::lgamma(%x)
+    %mul : Tensor = aten::mul(%x, %y)
+    %y_lgamma : Tensor = aten::lgamma(%y)
+    %div : Tensor = aten::div(%x, %y)
+    %div_lgamma : Tensor = aten::lgamma(%div)
+    %27 : Tensor[] = prim::ListConstruct(%x_lgamma, %y_lgamma, %div_lgamma, %add, %mul)
+    %12 : Tensor = aten::cat(%27, %3)
+    return (%12)
+</pre></div>
+</div>
+<p>In this graph <cite>aten::lgamma</cite> is not supported by conversion and must be partitioned in a Torch fallback segment. If Torch-TensorRT uses a greedy segmentation strategy that traverses nodes in the input graph in order and gathers ops with the same target (TensorRT or Torch) into a segment until it encounters an op with a different target, the resulting partition includes 7 segments, many with just a single op.</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>Segment Block @0:
+    Target: TensorRT
+
+    Graph: graph(%x : Tensor,
+        %y : Tensor):
+    %3 : int = prim::Constant[value=1]()
+    %0 : Tensor = aten::add(%x, %y, %3)
+    return ()
+
+Segment Block @1:
+    Target: Torch
+
+    Graph: graph(%x : Tensor):
+    %0 : Tensor = aten::lgamma(%x)
+    return ()
+
+Segment Block @2:
+    Target: TensorRT
+
+    Graph: graph(%x : Tensor,
+        %y : Tensor):
+    %0 : Tensor = aten::mul(%x, %y)
+    return ()
+
+Segment Block @3:
+    Target: Torch
+
+    Graph: graph(%y : Tensor):
+    %0 : Tensor = aten::lgamma(%y)
+    return ()
+
+Segment Block @4:
+    Target: TensorRT
+
+    Graph: graph(%x : Tensor,
+        %y : Tensor):
+    %0 : Tensor = aten::div(%x, %y)
+    return ()
+
+Segment Block @5:
+    Target: Torch
+
+    Graph: graph(%1 : Tensor):
+    %0 : Tensor = aten::lgamma(%1)
+    return ()
+
+Segment Block @6:
+    Target: TensorRT
+
+    Graph: graph(%1 : Tensor,
+        %2 : Tensor,
+        %3 : Tensor,
+        %4 : Tensor,
+        %5 : Tensor):
+    %7 : int = prim::Constant[value=0]()
+    %0 : Tensor[] = prim::ListConstruct(%1, %2, %3, %4, %5)
+    %6 : Tensor = aten::cat(%0, %7)
+    return ()
+</pre></div>
+</div>
+<p>This partition is valid, but the segmentation is suboptimal. These arithmetic ops and <cite>aten::lgamma</cite> ops are each split into their own segment as we alternate between Torch and TensorRT targets in the linear traversal of the graph.</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>%add : Tensor = aten::add(%x, %y, %20)
+%x_lgamma : Tensor = aten::lgamma(%x)
+%mul : Tensor = aten::mul(%x, %y)
+%y_lgamma : Tensor = aten::lgamma(%y)
+%div : Tensor = aten::div(%x, %y)
+%div_lgamma : Tensor = aten::lgamma(%div)
+</pre></div>
+</div>
+<p>Each of the arithmetic ops in this segment is only dependent on constants and the inputs <cite>%x</cite> and <cite>%y</cite>. The <cite>aten::lgamma</cite> ops are dependent on the inputs <cite>%x</cite>, <cite>%y</cite> and the output of the <cite>aten::div</cite>. This means that we could rewrite this portion of the input graph as below without changing the behavior of the graph. This reordered series of ops could be cleanly partitioned into just 2 segments using the greedy segmentation approach described above.</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>%add : Tensor = aten::add(%x, %y, %20)
+%mul : Tensor = aten::mul(%x, %y)
+%div : Tensor = aten::div(%x, %y)
+%x_lgamma : Tensor = aten::lgamma(%x)
+%y_lgamma : Tensor = aten::lgamma(%y)
+%div_lgamma : Tensor = aten::lgamma(%div)
+</pre></div>
+</div>
+<p>By adding awareness of the dependencies between ops to the basic greedy segmentation approach we can achieve the same partition without rewriting the graph. Now we will maintain both Torch and TensorRT targeted segments at the same time as we traverse the graph. We will only finalize a segment once we hit an op that is both dependent on an op in the segment and has a different target. This will allow the partition to create larger segments by reordering nodes across the segment boundary while guaranteeing that we will not modify the behavior of the graph by reordering nodes relative to their dependencies.
+In this example we will collect the arithmetic ops in a TensorRT segment and the <cite>aten::lgamma</cite> ops in a Torch segment. When we encounter the <cite>%div_lgamma : Tensor = aten::lgamma(%div)</cite> op we can see it is dependent on <cite>%div : Tensor = aten::div(%x, %y)</cite> in the current TensorRT segment. This triggers finalization of the TensorRT segment containing the <cite>aten::div</cite> op to guarantee it will appear before its dependency in the final partition. The Torch segment containing the <cite>aten::lgamma</cite> op is finalized when we encounter the <cite>prim::ListConstruct</cite> op which targets TensorRT and is dependent on the results of the <cite>aten::lgamma</cite> ops.</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>Segment Block @0:
+    Target: TensorRT
+
+    Graph: graph(%x : Tensor,
+        %y : Tensor):
+    %3 : int = prim::Constant[value=1]()
+    %0 : Tensor = aten::add(%x, %y, %3)
+    %4 : Tensor = aten::mul(%x, %y)
+    %5 : Tensor = aten::div(%x, %y)
+    return ()
+
+Segment Block @1:
+    Target: Torch
+
+    Graph: graph(%x : Tensor,
+        %y : Tensor,
+        %5 : Tensor):
+    %0 : Tensor = aten::lgamma(%x)
+    %2 : Tensor = aten::lgamma(%y)
+    %4 : Tensor = aten::lgamma(%5)
+    return ()
+
+Segment Block @2:
+    Target: TensorRT
+
+    Graph: graph(%1 : Tensor,
+        %2 : Tensor,
+        %3 : Tensor,
+        %4 : Tensor,
+        %5 : Tensor):
+    %7 : int = prim::Constant[value=0]()
+    %0 : Tensor[] = prim::ListConstruct(%1, %2, %3, %4, %5)
+    %6 : Tensor = aten::cat(%0, %7)
+    return ()
+</pre></div>
+</div>
+<p>In some cases this approach may create adjacent segments in the partition which have the same target. As a clean-up step we can consolidate these adjacent segments to further reduce the number of segments in the final partition.
+The merge segments step identifies a list of segments that are adjacent in the graph, have the same target, and are not marked as <cite>do_not_merge</cite>. The nodes from these segments will be combined into a single new segment that will replace the merged segments in the partition.
+The <cite>do_not_merge</cite> marking is used to prevent merging of segments created for conditional nodes and loops that are handled as special cases in graph stitching and should not be merged with adjacent segments of the same type.</p>
+</section>
+
+
+             </article>
+
+            </div>
+            <footer>
+
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+
+        <a href="conversion.html" class="btn btn-neutral float-right" title="Conversion Phase" accesskey="n" rel="next">Next <img src="../_static/images/chevron-right-orange.svg" class="next-page"></a>
+
+
+        <a href="lowering.html" class="btn btn-neutral" title="Lowering Phase" accesskey="p" rel="prev"><img src="../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
+
+    </div>
+
+
+
+
+    <hr>
+
+
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2022, NVIDIA Corporation.
+
+    </p>
+  </div>
+
+      <div>
+        Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+      </div>
+
+
+</footer>
+
+          </div>
+        </div>
+
+        <div class="pytorch-content-right" id="pytorch-content-right">
+          <div class="pytorch-right-menu" id="pytorch-right-menu">
+            <div class="pytorch-side-scroll" id="pytorch-side-scroll-right">
+              <ul>
+<li><a class="reference internal" href="#">Partitioning Phase</a><ul>
+<li><a class="reference internal" href="#partitoninfo-h-cpp">PartitonInfo.h/.cpp</a></li>
+<li><a class="reference internal" href="#segmentedblock-h-cpp">SegmentedBlock.h/.cpp</a></li>
+<li><a class="reference internal" href="#shape-analysis-h-cpp">shape_analysis.h/.cpp</a></li>
+<li><a class="reference internal" href="#partitioning-h-cpp">partitioning.h/.cpp</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#automatic-fallback">Automatic Fallback</a></li>
+<li><a class="reference internal" href="#dependency-aware-partitioning">Dependency Aware Partitioning</a></li>
+</ul>
+
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+
+
+
+
+
+
+       <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+         <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+         <script src="../_static/jquery.js"></script>
+         <script src="../_static/underscore.js"></script>
+         <script src="../_static/doctools.js"></script>
+         <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js"></script>
+         <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js"></script>
+         <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+
+
+
+
+  <script type="text/javascript" src="../_static/js/vendor/popper.min.js"></script>
+  <script type="text/javascript" src="../_static/js/vendor/bootstrap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/list.js/1.5.0/list.min.js"></script>
+  <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  <!-- Begin Footer -->
+
+  <div class="container-fluid docs-tutorials-resources" id="docs-tutorials-resources">
+    <div class="container">
+      <div class="row">
+        <div class="col-md-4 text-center">
+          <h2>Docs</h2>
+          <p>Access comprehensive developer documentation for PyTorch</p>
+          <a class="with-right-arrow" href="https://pytorch.org/docs/stable/index.html">View Docs</a>
+        </div>
+
+        <div class="col-md-4 text-center">
+          <h2>Tutorials</h2>
+          <p>Get in-depth tutorials for beginners and advanced developers</p>
+          <a class="with-right-arrow" href="https://pytorch.org/tutorials">View Tutorials</a>
+        </div>
+
+        <div class="col-md-4 text-center">
+          <h2>Resources</h2>
+          <p>Find development resources and get your questions answered</p>
+          <a class="with-right-arrow" href="https://pytorch.org/resources">View Resources</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="container footer-container">
+      <div class="footer-logo-wrapper">
+        <a href="https://pytorch.org/" class="footer-logo"></a>
+      </div>
+
+      <div class="footer-links-wrapper">
+        <div class="footer-links-col">
+          <ul>
+            <li class="list-title"><a href="https://pytorch.org/">PyTorch</a></li>
+            <li><a href="https://pytorch.org/get-started">Get Started</a></li>
+            <li><a href="https://pytorch.org/features">Features</a></li>
+            <li><a href="https://pytorch.org/ecosystem">Ecosystem</a></li>
+            <li><a href="https://pytorch.org/blog/">Blog</a></li>
+            <li><a href="https://github.com/pytorch/pytorch/blob/master/CONTRIBUTING.md">Contributing</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-links-col">
+          <ul>
+            <li class="list-title"><a href="https://pytorch.org/resources">Resources</a></li>
+            <li><a href="https://pytorch.org/tutorials">Tutorials</a></li>
+            <li><a href="https://pytorch.org/docs/stable/index.html">Docs</a></li>
+            <li><a href="https://discuss.pytorch.org" target="_blank">Discuss</a></li>
+            <li><a href="https://github.com/pytorch/pytorch/issues" target="_blank">Github Issues</a></li>
+            <li><a href="https://pytorch.org/assets/brand-guidelines/PyTorch-Brand-Guidelines.pdf" target="_blank">Brand Guidelines</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-links-col">
+          <ul>
+            <li class="list-title">Stay up to date</li>
+            <li><a href="https://www.facebook.com/pytorch" target="_blank">Facebook</a></li>
+            <li><a href="https://twitter.com/pytorch" target="_blank">Twitter</a></li>
+            <li><a href="https://www.youtube.com/pytorch" target="_blank">YouTube</a></li>
+            <li><a href="https://www.linkedin.com/company/pytorch" target="_blank">LinkedIn</a></li>
+          </ul>
+          </div>
+
+        <div class="footer-links-col">
+          <ul>
+            <li class="list-title">PyTorch Podcasts</li>
+            <li><a href="https://open.spotify.com/show/6UzHKeiy368jKfQMKKvJY5" target="_blank">Spotify</a></li>
+            <li><a href="https://podcasts.apple.com/us/podcast/pytorch-developer-podcast/id1566080008" target="_blank">Apple</a></li>
+            <li><a href="https://www.google.com/podcasts?feed=aHR0cHM6Ly9mZWVkcy5zaW1wbGVjYXN0LmNvbS9PQjVGa0lsOA%3D%3D" target="_blank">Google</a></li>
+            <li><a href="https://music.amazon.com/podcasts/7a4e6f0e-26c2-49e9-a478-41bd244197d0/PyTorch-Developer-Podcast?" target="_blank">Amazon</a></li>
+          </ul>
+         </div>
+        </div>
+
+        <div class="privacy-policy">
+          <ul>
+            <li class="privacy-policy-links"><a href="https://www.linuxfoundation.org/terms/" target="_blank">Terms</a></li>
+            <li class="privacy-policy-links">|</li>
+            <li class="privacy-policy-links"><a href="https://www.linuxfoundation.org/privacy-policy/" target="_blank">Privacy</a></li>
+          </ul>
+        </div>
+        <div class="copyright">
+        <p>© Copyright The Linux Foundation. The PyTorch Foundation is a project of The Linux Foundation.
+          For web site terms of use, trademark policy and other policies applicable to The PyTorch Foundation please see
+          <a href="www.linuxfoundation.org/policies/">www.linuxfoundation.org/policies/</a>. The PyTorch Foundation supports the PyTorch open source
+          project, which has been established as PyTorch Project a Series of LF Projects, LLC. For policies applicable to the PyTorch Project a Series of LF Projects, LLC,
+          please see <a href="www.lfprojects.org/policies/">www.lfprojects.org/policies/</a>.</p>
+      </div>
+     </div>
+
+  </footer>
+
+  <div class="cookie-banner-wrapper">
+  <div class="container">
+    <p class="gdpr-notice">To analyze traffic and optimize your experience, we serve cookies on this site. By clicking or navigating, you agree to allow our usage of cookies. As the current maintainers of this site, Facebook’s Cookies Policy applies. Learn more, including about available controls: <a href="https://www.facebook.com/policies/cookies/">Cookies Policy</a>.</p>
+    <img class="close-button" src="../_static/images/pytorch-x.svg">
+  </div>
+</div>
+
+  <!-- End Footer -->
+
+  <!-- Begin Mobile Menu -->
+
+  <div class="mobile-main-menu">
+    <div class="container-fluid">
+      <div class="container">
+        <div class="mobile-main-menu-header-container">
+          <a class="header-logo" href="https://pytorch.org/" aria-label="PyTorch"></a>
+          <a class="main-menu-close-button" href="#" data-behavior="close-mobile-menu"></a>
+        </div>
+      </div>
+    </div>
+
+    <div class="mobile-main-menu-links-container">
+      <div class="main-menu">
+        <ul>
+          <li>
+            <a href="https://pytorch.org/get-started">Get Started</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/ecosystem">Ecosystem</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/mobile">Mobile</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/blog/">Blog</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/tutorials">Tutorials</a>
+          </li>
+
+          <li class="resources-mobile-menu-title">
+            Docs
+          </li>
+
+          <ul class="resources-mobile-menu-items">
+            <li>
+              <a href="https://pytorch.org/docs/stable/index.html">PyTorch</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/audio/stable/index.html">torchaudio</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/text/stable/index.html">torchtext</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/vision/stable/index.html">torchvision</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/torcharrow">torcharrow</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/data">TorchData</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/torchrec">TorchRec</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/serve/">TorchServe</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/torchx/">TorchX</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/xla">PyTorch on XLA Devices</a>
+            </li>
+          </ul>
+
+          <li class="resources-mobile-menu-title">
+            Resources
+          </li>
+
+           <ul class="resources-mobile-menu-items">
+
+            <li>
+              <a href="https://pytorch.org/features">About</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/foundation">PyTorch Foundation</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/#community-module">Community</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/community-stories">Community Stories</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/resources">Developer Resources</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/events">Events</a>
+            </li>
+
+            <li>
+              <a href="https://discuss.pytorch.org/">Forums</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/hub">Models (Beta)</a>
+            </li>
+          </ul>
+
+          <li>
+            <a href="https://github.com/pytorch/pytorch">Github</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- End Mobile Menu -->
+
+  <script type="text/javascript" src="../_static/js/vendor/anchor.min.js"></script>
+
+  <script type="text/javascript">
+    $(document).ready(function() {
+      mobileMenu.bind();
+      mobileTOC.bind();
+      pytorchAnchors.bind();
+      sideMenus.bind();
+      scrollToAnchor.bind();
+      highlightNavigation.bind();
+      mainMenuDropdown.bind();
+      filterTags.bind();
+
+      // Add class to links that have code blocks, since we cannot create links in code blocks
+      $("article.pytorch-article a span.pre").each(function(e) {
+        $(this).closest("a").addClass("has-code");
+      });
+    })
+  </script>
+</body>
+</html>

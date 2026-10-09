@@ -1,0 +1,13 @@
+.. _exhale_enum_logging_8h_1a5f612ff2f783ff4fbe89d168f0d817d4:
+
+Enum Level
+==========
+
+- Defined in :ref:`file_cpp_include_trtorch_logging.h`
+
+
+Enum Documentation
+------------------
+
+
+.. doxygenenum:: trtorch::logging::Level

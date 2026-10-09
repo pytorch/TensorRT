@@ -1,0 +1,14 @@
+.. _exhale_function_logging_8h_1a0c012cb374addd90eb1f42eaec570650:
+
+Function torch_tensorrt::logging::get_reportable_log_level
+==========================================================
+
+- Defined in :ref:`file_cpp_include_torch_tensorrt_logging.h`
+
+
+Function Documentation
+----------------------
+
+
+.. doxygenfunction:: torch_tensorrt::logging::get_reportable_log_level()
+   :project: Torch-TensorRT

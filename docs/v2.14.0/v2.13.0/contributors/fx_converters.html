@@ -1,0 +1,942 @@
+
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Dynamo Converters &mdash; Torch-TensorRT v2.2.0.dev0+f617898 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <!-- <link rel="stylesheet" href="../_static/pygments.css" type="text/css" /> -->
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sg_gallery.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sg_gallery-binder.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sg_gallery-dataframe.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sg_gallery-rendered-html.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/collapsible-lists/css/tree_view.css" type="text/css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.10.0-beta/dist/katex.min.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/custom.css" type="text/css" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+  <!-- Google Tag Manager -->
+    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer','');</script>
+    <!-- End Google Tag Manager -->
+  
+
+  
+  <script src="../_static/js/modernizr.min.js"></script>
+
+  <!-- Preload the theme fonts -->
+
+<link rel="preload" href="../_static/fonts/FreightSans/freight-sans-book.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../_static/fonts/FreightSans/freight-sans-medium.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../_static/fonts/IBMPlexMono/IBMPlexMono-Medium.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../_static/fonts/FreightSans/freight-sans-bold.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../_static/fonts/FreightSans/freight-sans-medium-italic.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../_static/fonts/IBMPlexMono/IBMPlexMono-SemiBold.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+
+<!-- Preload the katex fonts -->
+
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Math-Italic.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Main-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Main-Bold.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size1-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size4-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size2-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size3-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Caligraphic-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.2/css/all.css" integrity="sha384-vSIIfh2YWi9wW0r9iZe7RJPrKwp6bG+s9QZMoITbCckVJqGCCRhc+ccxNcdpHuYu" crossorigin="anonymous">
+</head>
+
+<div class="container-fluid header-holder tutorials-header" id="header-holder">
+  <div class="container">
+    <div class="header-container">
+      <a class="header-logo" href="https://pytorch.org/" aria-label="PyTorch"></a>
+
+      <div class="main-menu">
+        <ul>
+          <li>
+            <a href="https://pytorch.org/get-started">Get Started</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/ecosystem">Ecosystem</a>
+          </li>
+
+          <li>
+          <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="resource-option with-down-arrow">
+                PyTorch Edge
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="nav-dropdown-item" href="https://pytorch.org/edge">
+                  <span class="dropdown-title">About PyTorch Edge</span>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/executorch">
+                  <span class="dropdown-title">ExecuTorch</span>
+                </a>
+              </div>
+            </div>  
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/blog/">Blog</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/tutorials">Tutorials</a>
+          </li>
+
+          <li>
+            <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="resource-option with-down-orange-arrow">
+                Docs
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/docs/stable/index.html">
+                  <span class="dropdown-title">PyTorch</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/audio/stable/index.html">
+                  <span class="dropdown-title">torchaudio</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/text/stable/index.html">
+                  <span class="dropdown-title">torchtext</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/vision/stable/index.html">
+                  <span class="dropdown-title">torchvision</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/torcharrow">
+                  <span class="dropdown-title">torcharrow</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/data">
+                  <span class="dropdown-title">TorchData</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/torchrec">
+                  <span class="dropdown-title">TorchRec</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/serve/">
+                  <span class="dropdown-title">TorchServe</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/torchx/">
+                  <span class="dropdown-title">TorchX</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/xla">
+                  <span class="dropdown-title">PyTorch on XLA Devices</span>
+                  <p></p>
+                </a>
+            </div>
+          </li>
+
+          <li>
+            <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="resource-option with-down-arrow">
+                Resources
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="nav-dropdown-item" href="https://pytorch.org/features">
+                  <span class="dropdown-title">About</span>
+                  <p>Learn about PyTorch’s features and capabilities</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/foundation">
+                  <span class="dropdown-title">PyTorch Foundation</span>
+                  <p>Learn about the PyTorch foundation</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/#community-module">
+                  <span class="dropdown-title">Community</span>
+                  <p>Join the PyTorch developer community to contribute, learn, and get your questions answered.</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/community-stories">
+                  <span class="dropdown-title">Community Stories</span>
+                  <p>Learn how our community solves real, everyday machine learning problems with PyTorch.</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/resources">
+                  <span class="dropdown-title">Developer Resources</span>
+                  <p>Find resources and get questions answered</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/events">
+                  <span class="dropdown-title">Events</span>
+                  <p>Find events, webinars, and podcasts</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://discuss.pytorch.org/" target="_blank">
+                  <span class="dropdown-title">Forums</span>
+                  <p>A place to discuss PyTorch code, issues, install, research</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/hub">
+                  <span class="dropdown-title">Models (Beta)</span>
+                  <p>Discover, publish, and reuse pre-trained models</p>
+                </a>
+              </div>
+            </div>
+          </li>
+
+          <li>
+            <a href="https://github.com/pytorch/pytorch">GitHub</a>
+          </li>
+        </ul>
+      </div>
+
+      <a class="main-menu-open-button" href="#" data-behavior="open-mobile-menu"></a>
+    </div>
+  </div>
+</div>
+
+<body class="pytorch-body">
+
+   
+
+    
+
+    <div class="table-of-contents-link-wrapper">
+      <span>Table of Contents</span>
+      <a href="#" class="toggle-table-of-contents" data-behavior="toggle-table-of-contents"></a>
+    </div>
+
+    <nav data-toggle="wy-nav-shift" class="pytorch-left-menu" id="pytorch-left-menu">
+      <div class="pytorch-side-scroll">
+        <div class="pytorch-menu pytorch-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          <div class="pytorch-left-menu-search">
+            
+
+            
+              
+              
+                <div class="version">
+                  v2.2.0.dev0+f617898
+                </div>
+              
+            
+
+            
+
+
+  
+
+
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search Docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+            
+          </div>
+
+          
+            
+            
+              
+            
+            
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/getting_started_with_python_api.html">Using Torch-TensorRT in Python</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/getting_started_with_cpp_api.html">Using Torch-TensorRT in  C++</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/getting_started_with_windows.html">Building Torch-TensorRT on Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/getting_started_with_windows.html#building-with-visual-studio-code">Building With Visual Studio Code</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/creating_torchscript_module_in_python.html">Creating a TorchScript Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/creating_torchscript_module_in_python.html#working-with-torchscript-in-python">Working with TorchScript in Python</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">Saving TorchScript Module to Disk</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/getting_started_with_fx_path.html">Torch-TensorRT (FX Frontend) User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/torch_compile.html">Torch-TensorRT <cite>torch.compile</cite> Backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/dynamo_export.html">Torch-TensorRT Dynamo Backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/ptq.html">Post Training Quantization (PTQ)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/runtime.html">Deploying Torch-TensorRT Programs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/dynamic_shapes.html">Dynamic shapes with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/use_from_pytorch.html">Using Torch-TensorRT Directly From PyTorch</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/using_dla.html">DLA</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/serving_torch_tensorrt_with_triton.html">Serving a Torch-TensorRT model with Triton</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/notebooks.html">Example notebooks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_resnet_example.html">Compiling ResNet using the Torch-TensorRT <cite>torch.compile</cite> Backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_transformers_example.html">Compiling a Transformer using torch.compile and TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Python API Documenation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/torch_tensorrt.html">torch_tensorrt</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/logging.html">torch_tensorrt.logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/ptq.html">torch_tensorrt.ptq</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/ts.html">torch_tensorrt.ts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/fx.html">torch_tensorrt.fx</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">C++ API Documenation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/torch_tensort_cpp.html">Torch-TensorRT C++ API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt.html">Namespace torch_tensorrt</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt__logging.html">Namespace torch_tensorrt::logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt__ptq.html">Namespace torch_tensorrt::ptq</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CLI Documenation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../cli/torchtrtc.html">torchtrtc</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributor Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="system_overview.html">System Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="writing_converters.html">Writing Converters</a></li>
+<li class="toctree-l1"><a class="reference internal" href="writing_dynamo_aten_lowering_passes.html">Writing Dynamo ATen Lowering Passes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="useful_links.html">Useful Links for Torch-TensorRT Development</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Indices</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../indices/supported_ops.html">Operators Supported</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <div class="pytorch-container">
+      <div class="pytorch-page-level-bar" id="pytorch-page-level-bar">
+        <div class="pytorch-breadcrumbs-wrapper">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="pytorch-breadcrumbs">
+    
+      <li>
+        <a href="../index.html">
+          
+            Docs
+          
+        </a> &gt;
+      </li>
+
+        
+      <li>Dynamo Converters</li>
+    
+    
+      <li class="pytorch-breadcrumbs-aside">
+        
+            
+            <a href="../_sources/contributors/fx_converters.rst.txt" rel="nofollow"><img src="../_static/images/view-page-source-icon.svg"></a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+</div>
+        </div>
+
+        <div class="pytorch-shortcuts-wrapper" id="pytorch-shortcuts-wrapper">
+          Shortcuts
+        </div>
+      </div>
+
+      <section data-toggle="wy-nav-shift" id="pytorch-content-wrap" class="pytorch-content-wrap">
+        <div class="pytorch-content-left">
+
+        
+          <!-- Google Tag Manager (noscript) -->
+          <noscript><iframe src="https://www.googletagmanager.com/ns.html?id="
+          height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+          <!-- End Google Tag Manager (noscript) -->
+          
+          <div class="rst-content">
+          
+            <div role="main" class="main-content" itemscope="itemscope" itemtype="http://schema.org/Article">
+             <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
+              
+  <section id="dynamo-converters">
+<span id="dynamo-conversion"></span><h1>Dynamo Converters<a class="headerlink" href="#dynamo-converters" title="Permalink to this headline">¶</a></h1>
+<p>The dynamo converter library in Torch-TensorRT is located in <code class="docutils literal notranslate"><span class="pre">TensorRT/py/torch_tensorrt/dynamo/conversion</span></code>.</p>
+</section>
+<section id="steps">
+<h1>Steps<a class="headerlink" href="#steps" title="Permalink to this headline">¶</a></h1>
+<section id="operation-set">
+<h2>Operation Set<a class="headerlink" href="#operation-set" title="Permalink to this headline">¶</a></h2>
+<p>The converters in dynamo are produced by <code class="docutils literal notranslate"><span class="pre">aten_trace</span></code> and falls under <code class="docutils literal notranslate"><span class="pre">aten_ops_converters</span></code> ( FX earlier had <code class="docutils literal notranslate"><span class="pre">acc_ops_converters</span></code>, <code class="docutils literal notranslate"><span class="pre">aten_ops_converters</span></code> or <code class="docutils literal notranslate"><span class="pre">nn_ops_converters</span></code> depending on the trace through which it was produced).  The converters are registered using  <code class="docutils literal notranslate"><span class="pre">dynamo_tensorrt_converter</span></code> for dynamo. The function decorated
+has the arguments - <code class="docutils literal notranslate"><span class="pre">network,</span> <span class="pre">target,</span> <span class="pre">args,</span> <span class="pre">kwargs,</span> <span class="pre">name</span></code>,  which is common across all the operators schema.
+These functions are mapped in the <code class="docutils literal notranslate"><span class="pre">aten</span></code> converter registry dictionary (at present a compilation of FX and dynamo converters, FX will be deprecated soon), with key as the function target name.</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>aten_trace is produced by <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.trace(..)</span></code> for the export path and <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.compile(ir=dynamo)</span></code> for the compile path.</p></li>
+</ul>
+<p>The export path makes use of <code class="docutils literal notranslate"><span class="pre">aten_tracer</span></code> whereas the alternate trace in compile is produced by the AOT Autograd library.
+Both these simplify the torch operators to reduced set of Aten operations.</p>
+</div></blockquote>
+<p>As mentioned above, if you would like to add a new converter, its implementation will be included in <code class="docutils literal notranslate"><span class="pre">TensorRT/py/torch_tensorrt/dynamo/conversion/impl</span></code>
+Although there is a corresponding implementation of the converters  included in the common implementation library present in <code class="docutils literal notranslate"><span class="pre">TensorRT/py/torch_tensorrt/fx/impl</span></code> for FX converters, this documentation focuses on the implementation of the <code class="docutils literal notranslate"><span class="pre">aten_ops</span></code> converters in dynamo.</p>
+</section>
+<section id="converter-implementation">
+<h2>Converter implementation<a class="headerlink" href="#converter-implementation" title="Permalink to this headline">¶</a></h2>
+<p>In this section, we illustrate the steps to be implemented for writing a converter. We divide them according to activation, operator, lowering pass implementation or evaluator.
+Each of them is detailed with the help of an example</p>
+<blockquote>
+<div><ul>
+<li><p>Registration</p>
+<blockquote>
+<div><p>The converter needs to be registered with the appropriate op code in the <code class="docutils literal notranslate"><span class="pre">dynamo_tensorrt_converter</span></code>.</p>
+<ul>
+<li><p>Activation type</p>
+<blockquote>
+<div><p>Example: <code class="docutils literal notranslate"><span class="pre">leaky_relu</span></code></p>
+<ul>
+<li><p>aten_ops_converters: Dynamo_converters</p>
+<blockquote>
+<div><p>Define in <code class="docutils literal notranslate"><span class="pre">py/torch_tensorrt/dynamo/conversion/aten_ops_converters</span></code>. One needs to register the opcode generated in the trace with <code class="docutils literal notranslate"><span class="pre">dynamo_tensorrt_converter</span></code> decorator. Op code to be used for the registration or the converter registry key in this case is <code class="docutils literal notranslate"><span class="pre">torch.ops.aten.leaky_relu.default</span></code></p>
+<blockquote>
+<div><div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@dynamo_tensorrt_converter</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">aten</span><span class="o">.</span><span class="n">leaky_relu</span><span class="o">.</span><span class="n">default</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">aten_ops_leaky_relu</span><span class="p">(</span>
+        <span class="n">network</span><span class="p">:</span> <span class="n">TRTNetwork</span><span class="p">,</span>
+        <span class="n">target</span><span class="p">:</span> <span class="n">Target</span><span class="p">,</span>
+        <span class="n">args</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Argument</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+        <span class="n">kwargs</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Argument</span><span class="p">],</span>
+        <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">TRTTensor</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">TRTTensor</span><span class="p">]]:</span>
+            <span class="k">return</span> <span class="n">activation</span><span class="o">.</span><span class="n">leaky_relu</span><span class="p">(</span><span class="n">network</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">SourceIR</span><span class="o">.</span><span class="n">ATEN</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+</pre></div>
+</div>
+</div></blockquote>
+</div></blockquote>
+</li>
+</ul>
+<p>The <code class="docutils literal notranslate"><span class="pre">tensorrt_converter</span></code> (used for FX registration) and <code class="docutils literal notranslate"><span class="pre">dynamo_tensorrt_converter</span></code> are similar decorator functions with some differences.</p>
+<ol class="arabic">
+<li><p>Both register the converters in the registeries (python dictionaries) - <code class="docutils literal notranslate"><span class="pre">CONVERTERS</span></code> and <code class="docutils literal notranslate"><span class="pre">DYNAMO_CONVERTERS</span></code> respectively. These are two dictioneries which are concatenated to form the overall converter registry</p></li>
+<li><p>The dictionary is keyed on the <code class="docutils literal notranslate"><span class="pre">OpOverLoad</span></code> which is mentioned in more detail below with examples</p></li>
+<li><p>Both return the decorated converter implementation</p></li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">CONVERTERS</span></code> directly registers the decorated <code class="docutils literal notranslate"><span class="pre">converter_implementation</span></code> function, while <code class="docutils literal notranslate"><span class="pre">DYNAMO_CONVERTERS</span></code> has additionational arguments and registers the <code class="docutils literal notranslate"><span class="pre">ConverterSupport</span></code> object</p></li>
+<li><p>The additional arguments are:</p>
+<blockquote>
+<div><ol class="arabic simple">
+<li><p>key: Node target for which the converter is implemented for (for example, torch.ops.aten.leaky_relu.Tensor)</p></li>
+<li><p>enabled: Whether the converter should be enabled/cached or not</p></li>
+<li><p>capability_validator: Function which evaluates whether a node is valid for conversion by the decorated converter. It defaults to None, implying the capability_validator function is always true. This means all nodes of “key” kind can be supported by this converter by default. See <code class="docutils literal notranslate"><span class="pre">embedding</span></code> example for more details</p></li>
+<li><p>priority: Converter’s level of priority relative to other converters with the same target</p></li>
+</ol>
+</div></blockquote>
+</li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">ConverterSupport</span></code> is a compilation of <code class="docutils literal notranslate"><span class="pre">converter_implementation</span></code> and <code class="docutils literal notranslate"><span class="pre">capability_validator</span></code>.</p></li>
+</ol>
+<p>The function decorated by <code class="docutils literal notranslate"><span class="pre">tensorrt_converter</span></code> and <code class="docutils literal notranslate"><span class="pre">dynamo_tensorrt_converter</span></code> has the following arguments which are automatically generated by the trace functions mentioned above.</p>
+<ol class="arabic simple">
+<li><p>network : Node in the form of <code class="docutils literal notranslate"><span class="pre">call_module</span></code> or <code class="docutils literal notranslate"><span class="pre">call_function</span></code> having the target as the key</p></li>
+<li><p>target: Target key in the <code class="docutils literal notranslate"><span class="pre">call_module</span></code> or <code class="docutils literal notranslate"><span class="pre">call_function</span></code> above. eg: <code class="docutils literal notranslate"><span class="pre">torch.ops.aten_.leaky_relu.default</span></code>. Note that <code class="docutils literal notranslate"><span class="pre">torch.ops.aten._leaky_relu</span></code> is the <code class="docutils literal notranslate"><span class="pre">OpOverloadPacket</span></code> while <code class="docutils literal notranslate"><span class="pre">torch.ops.aten_.leaky_relu.default</span></code> is <code class="docutils literal notranslate"><span class="pre">OpOverload</span></code>.</p></li>
+<li><p>args: The arguments passed in the <code class="docutils literal notranslate"><span class="pre">call_module</span></code> or <code class="docutils literal notranslate"><span class="pre">call_function</span></code> above</p></li>
+<li><p>kwargs: The kwargs passed in the <code class="docutils literal notranslate"><span class="pre">call_module</span></code> or <code class="docutils literal notranslate"><span class="pre">call_function</span></code> above</p></li>
+<li><p>name: String containing the name of the target</p></li>
+</ol>
+<p>As a user writing new converters, one just needs to take care that the approriate arguments are extracted from the trace generated to the implementation function in the implementation lib function <code class="docutils literal notranslate"><span class="pre">activation.leaky_relu</span></code> (which we will discuss below in detail).</p>
+</div></blockquote>
+</li>
+<li><p>Operation type</p>
+<blockquote>
+<div><p>Example: <code class="docutils literal notranslate"><span class="pre">fmod</span></code></p>
+<p>It follows the same steps as the above converter. In this case the opcode is <code class="docutils literal notranslate"><span class="pre">torch.ops.aten.fmod.Scalar</span></code> or <code class="docutils literal notranslate"><span class="pre">torch.ops.aten.fmod.Tensor</span></code>.
+Hence both the opcodes are registered in <code class="docutils literal notranslate"><span class="pre">py/torch_tensorrt/dynamo/conversion/aten_ops_converters</span></code>.
+Note that <code class="docutils literal notranslate"><span class="pre">torch.ops.aten.fmod</span></code> is the <code class="docutils literal notranslate"><span class="pre">OpOverLoadPacket</span></code> while the registry is keyed on <code class="docutils literal notranslate"><span class="pre">torch.ops.aten.fmod.Scalar</span></code> or <code class="docutils literal notranslate"><span class="pre">torch.ops.aten.fmod.Tensor</span></code>, which is <code class="docutils literal notranslate"><span class="pre">OpOverLoad</span></code></p>
+<p>Example: <code class="docutils literal notranslate"><span class="pre">embedding</span></code></p>
+<p>It follows the same steps as the above converter. In this case the opcode is <code class="docutils literal notranslate"><span class="pre">torch.ops.aten.embedding.default</span></code>.
+There are some converters which have special cases to be accounted for. In those cases, one should use <code class="docutils literal notranslate"><span class="pre">capability_validators</span></code> to register the converter using <code class="docutils literal notranslate"><span class="pre">&#64;dynamo_tensorrt_converter</span></code>
+We illustrate this through <code class="docutils literal notranslate"><span class="pre">torch.ops.aten.embedding.default</span></code>. It has parameters - <code class="docutils literal notranslate"><span class="pre">scale_grad_by_freq</span></code> and <code class="docutils literal notranslate"><span class="pre">sparse</span></code> which are not currently supported by the implementation.
+In such cases we can write validator <code class="docutils literal notranslate"><span class="pre">embedding_param_validator</span></code> which implements that given those paramters the converter is not supported and register the converter by</p>
+<blockquote>
+<div></div></blockquote>
+<p>So if there is a new converter in which certain special cases are not to be supported then they can be specified in the <code class="docutils literal notranslate"><span class="pre">capability_validator</span></code>.</p>
+</div></blockquote>
+</li>
+<li><p>Evaluator type</p>
+<blockquote>
+<div><p>Example: <code class="docutils literal notranslate"><span class="pre">operator.getitem</span></code></p>
+<p>Evaluators are categorized as so since they do not make any modification to the graph. This is implemented in <code class="docutils literal notranslate"><span class="pre">py/torch_tensorrt/dynamo/conversion/op_evaluators.py</span></code>, with the corresponding <code class="docutils literal notranslate"><span class="pre">capbility_validator</span></code>.
+The opcode is <code class="docutils literal notranslate"><span class="pre">operator.getitem</span></code>.</p>
+</div></blockquote>
+</li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>Implementation Library</p>
+<blockquote>
+<div><p>The dynamo converters would be located in <code class="docutils literal notranslate"><span class="pre">py/torch_tensorrt/dynamo/conversion/impl</span></code></p>
+<ul>
+<li><p>Activation</p>
+<blockquote>
+<div><p>Example: <code class="docutils literal notranslate"><span class="pre">leaky_relu</span></code></p>
+<p>The implementation is to be placed in present in <code class="docutils literal notranslate"><span class="pre">py/torch_tensorrt/dynamo/conversion/impl/activation.py</span></code>. This is where all the activation functions are defined and implemented.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">leaky_relu</span><span class="p">(</span>
+    <span class="n">network</span><span class="p">:</span> <span class="n">TRTNetwork</span><span class="p">,</span>
+    <span class="n">target</span><span class="p">:</span> <span class="n">Target</span><span class="p">,</span>
+    <span class="n">source_ir</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">SourceIR</span><span class="p">],</span>
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">input_val</span><span class="p">:</span> <span class="n">TRTTensor</span><span class="p">,</span>
+    <span class="n">alpha</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Any</span><span class="p">],</span>
+<span class="p">):</span>
+    <span class="c1">#implementation</span>
+</pre></div>
+</div>
+<p>The implementation function has the following arguments.</p>
+<ol class="arabic simple">
+<li><p>network : <code class="docutils literal notranslate"><span class="pre">network</span></code> passed from the decorated function registration</p></li>
+<li><p>target: <code class="docutils literal notranslate"><span class="pre">target</span></code> passed from the decorated function registration</p></li>
+<li><p>source_ir: Enum attribute. <code class="docutils literal notranslate"><span class="pre">SourceIR</span></code> enum is defined in <code class="docutils literal notranslate"><span class="pre">py/torch_tensorrt/dynamo/conversion/impl/converter_utils</span></code></p></li>
+<li><p>name: <code class="docutils literal notranslate"><span class="pre">name</span></code> passed from the decorated function registration</p></li>
+<li><p>input_val: Approriate arguments extracted from the decorated function registration from args or kwargs</p></li>
+<li><p>alpha: Approriate arguments extracted from the decorated function registration from args or kwargs. If not None, it will set the alpha attribute of the created TensorRT activation layer eg: Used in leaky_relu, elu, hardtanh</p></li>
+<li><p>beta: Approriate arguments extracted from the decorated function registration from args or kwargs. If not None, it will set the beta attribute of the created TensorRT activation layer eg: Used in hardtanh</p></li>
+<li><p>dyn_range_fn: A optional function which takes the dynamic range of a TensorRT Tensor and returns the output dynamic range</p></li>
+</ol>
+<p>The implementation functions call the <code class="docutils literal notranslate"><span class="pre">convert_activation</span></code> function in <code class="docutils literal notranslate"><span class="pre">py/torch_tensorrt/dynamo/conversion/impl/activation.py</span></code>. This function will add the approriate activation layer via <code class="docutils literal notranslate"><span class="pre">network.add_activation</span></code>.</p>
+</div></blockquote>
+</li>
+<li><p>Operator</p>
+<blockquote>
+<div><p>The implementation is to be placed in <code class="docutils literal notranslate"><span class="pre">py/torch_tensorrt/dynamo/conversion/impl/elementwise/ops.py</span></code> for dynamo. This is where all the elementwise functions are defined and implemented.
+For a new operator, one should identify the category to which it belongs. Following are some examples</p>
+<ol class="arabic simple">
+<li><p>Elementwise operators like <code class="docutils literal notranslate"><span class="pre">fmod</span></code> is present in <code class="docutils literal notranslate"><span class="pre">py/torch_tensorrt/dynamo/conversion/impl/elementwise</span></code>. The <code class="docutils literal notranslate"><span class="pre">py/torch_tensorrt/dynamo/conversion/impl/elementwise/base</span></code> contains base functions for elementwise operator.</p></li>
+<li><p>Unary operators like <code class="docutils literal notranslate"><span class="pre">sqrt</span></code> will be present in <code class="docutils literal notranslate"><span class="pre">py/torch_tensorrt/dynamo/conversion/impl/unary</span></code>. The <code class="docutils literal notranslate"><span class="pre">py/torch_tensorrt/dynamo/conversion/impl/unary/base</span></code> contains base functions for unary operator.</p></li>
+<li><p>Normalization operators like <code class="docutils literal notranslate"><span class="pre">softmax</span></code>, <code class="docutils literal notranslate"><span class="pre">layer_norm</span></code>, <code class="docutils literal notranslate"><span class="pre">batch_norm</span></code> will be present in <code class="docutils literal notranslate"><span class="pre">py/torch_tensorrt/dynamo/conversion/impl/normalization</span></code>. Since there are no base operations common to all, there is no base file. But one can choose to implement a base file, if there are common functions across all normalization operations</p></li>
+<li><p>Individual operators like <code class="docutils literal notranslate"><span class="pre">slice</span></code>, <code class="docutils literal notranslate"><span class="pre">select</span></code>, <code class="docutils literal notranslate"><span class="pre">where</span></code>, <code class="docutils literal notranslate"><span class="pre">embedding</span></code> will be present in <code class="docutils literal notranslate"><span class="pre">py/torch_tensorrt/dynamo/conversion/impl/*.py</span></code>. They will have individual operator implementation with the same API structure as above but with different individual arguments</p></li>
+</ol>
+<p>Please note that the above operators would have common functions to be implemented which should be placed in
+<code class="docutils literal notranslate"><span class="pre">py/torch_tensorrt/dynamo/conversion/impl/converter_utils.py</span></code></p>
+</div></blockquote>
+</li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>Lowering type</p>
+<blockquote>
+<div><p>There are some converters which can be decomposed into suboperations and need not have seperate converter registration.
+Such converters can be implemented via <code class="docutils literal notranslate"><span class="pre">lowering</span> <span class="pre">passes</span></code></p>
+<p>Example: <code class="docutils literal notranslate"><span class="pre">addmm</span></code></p>
+<p>The decompositions are registered via <code class="docutils literal notranslate"><span class="pre">register_decomposition</span></code> in <code class="docutils literal notranslate"><span class="pre">py/torch_tensorrt/dynamo/backend/lowering/_decompositions.py</span></code>
+We define <code class="docutils literal notranslate"><span class="pre">addmm_replacement</span></code> and replace it with the torch ops, which will have their corresponding converters called.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@register_decomposition</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">aten</span><span class="o">.</span><span class="n">addmm</span><span class="p">,</span> <span class="n">registry</span><span class="o">=</span><span class="n">DECOMPOSITIONS</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">addmm_replacement</span><span class="p">(</span>
+    <span class="n">input_</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">mat1</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">mat2</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">beta</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mi">1</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+    <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
+        <span class="n">torch</span><span class="o">.</span><span class="n">mul</span><span class="p">(</span><span class="n">input_</span><span class="p">,</span> <span class="n">beta</span><span class="p">),</span> <span class="n">torch</span><span class="o">.</span><span class="n">mul</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">mat1</span><span class="p">,</span> <span class="n">mat2</span><span class="p">),</span> <span class="n">alpha</span><span class="p">)</span>
+    <span class="p">)</span>
+</pre></div>
+</div>
+<p>Note that there are some pre-existing dynamo decompositions in torch directory, in which case they should be used,
+In that case please enable the decompositions in <code class="docutils literal notranslate"><span class="pre">py/torch_tensorrt/dynamo/lowering/_decomposition_groups.py</span></code> in <code class="docutils literal notranslate"><span class="pre">torch_enabled_decompositions</span></code>.
+Similarly you can choose to disable any in <code class="docutils literal notranslate"><span class="pre">torch_disabled_decompositions</span></code>. Please note that the ones already defined in the lowering will take precedence over torch lowering ops.</p>
+</div></blockquote>
+</li>
+</ul>
+</div></blockquote>
+</section>
+<section id="tests">
+<h2>Tests<a class="headerlink" href="#tests" title="Permalink to this headline">¶</a></h2>
+<ul>
+<li><p>Dynamo testing:</p>
+<blockquote>
+<div><p>Dynamo tests are present for the lowering ops in <code class="docutils literal notranslate"><span class="pre">tests/py/dynamo/lowering/test_decompositions.py</span></code>. The above converters will soon be ported to dynamo tests</p>
+<ol class="arabic">
+<li><p>Compare the results for <code class="docutils literal notranslate"><span class="pre">fx.symbolic_trace</span></code> and <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.compile</span></code>.</p></li>
+<li><p>Test for the <code class="docutils literal notranslate"><span class="pre">expected_op</span></code> and the <code class="docutils literal notranslate"><span class="pre">unexpected_op</span></code>.</p>
+<blockquote>
+<div><ol class="arabic simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">expected_op</span></code>: Operations the operations are lowered to. eg: <code class="docutils literal notranslate"><span class="pre">mul</span></code> and <code class="docutils literal notranslate"><span class="pre">add</span></code> for <code class="docutils literal notranslate"><span class="pre">addmm</span></code></p></li>
+<li><p>Note that specify that <code class="docutils literal notranslate"><span class="pre">disable_passes=</span> <span class="pre">True</span></code> for cases where you would not want lowering passes (which should be the default when testing converters)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">unexpected_op</span></code>: Original operation. eg: <code class="docutils literal notranslate"><span class="pre">addmm</span></code> for <code class="docutils literal notranslate"><span class="pre">addmm</span></code></p></li>
+</ol>
+</div></blockquote>
+</li>
+</ol>
+</div></blockquote>
+</li>
+</ul>
+<p>The tests should fail if any of the above two conditions fail</p>
+</section>
+</section>
+
+
+             </article>
+             
+            </div>
+            <footer>
+  
+
+  
+
+    <hr>
+
+  
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2022, NVIDIA Corporation.
+
+    </p>
+  </div>
+    
+      <div>
+        Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+      </div>
+     
+
+</footer>
+
+          </div>
+        </div>
+
+        <div class="pytorch-content-right" id="pytorch-content-right">
+          <div class="pytorch-right-menu" id="pytorch-right-menu">
+            <div class="pytorch-side-scroll" id="pytorch-side-scroll-right">
+              <ul>
+<li><a class="reference internal" href="#">Dynamo Converters</a></li>
+<li><a class="reference internal" href="#steps">Steps</a><ul>
+<li><a class="reference internal" href="#operation-set">Operation Set</a></li>
+<li><a class="reference internal" href="#converter-implementation">Converter implementation</a></li>
+<li><a class="reference internal" href="#tests">Tests</a></li>
+</ul>
+</li>
+</ul>
+
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+  
+
+
+  
+
+     
+       <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+         <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+         <script src="../_static/jquery.js"></script>
+         <script src="../_static/underscore.js"></script>
+         <script src="../_static/doctools.js"></script>
+         <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js"></script>
+         <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js"></script>
+         <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+     
+
+  
+
+  <script type="text/javascript" src="../_static/js/vendor/popper.min.js"></script>
+  <script type="text/javascript" src="../_static/js/vendor/bootstrap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/list.js/1.5.0/list.min.js"></script>
+  <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+  <!-- Begin Footer -->
+
+  <div class="container-fluid docs-tutorials-resources" id="docs-tutorials-resources">
+    <div class="container">
+      <div class="row">
+        <div class="col-md-4 text-center">
+          <h2>Docs</h2>
+          <p>Access comprehensive developer documentation for PyTorch</p>
+          <a class="with-right-arrow" href="https://pytorch.org/docs/stable/index.html">View Docs</a>
+        </div>
+
+        <div class="col-md-4 text-center">
+          <h2>Tutorials</h2>
+          <p>Get in-depth tutorials for beginners and advanced developers</p>
+          <a class="with-right-arrow" href="https://pytorch.org/tutorials">View Tutorials</a>
+        </div>
+
+        <div class="col-md-4 text-center">
+          <h2>Resources</h2>
+          <p>Find development resources and get your questions answered</p>
+          <a class="with-right-arrow" href="https://pytorch.org/resources">View Resources</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="container footer-container">
+      <div class="footer-logo-wrapper">
+        <a href="https://pytorch.org/" class="footer-logo"></a>
+      </div>
+
+      <div class="footer-links-wrapper">
+        <div class="footer-links-col">
+          <ul>
+            <li class="list-title"><a href="https://pytorch.org/">PyTorch</a></li>
+            <li><a href="https://pytorch.org/get-started">Get Started</a></li>
+            <li><a href="https://pytorch.org/features">Features</a></li>
+            <li><a href="https://pytorch.org/ecosystem">Ecosystem</a></li>
+            <li><a href="https://pytorch.org/blog/">Blog</a></li>
+            <li><a href="https://github.com/pytorch/pytorch/blob/master/CONTRIBUTING.md">Contributing</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-links-col">
+          <ul>
+            <li class="list-title"><a href="https://pytorch.org/resources">Resources</a></li>
+            <li><a href="https://pytorch.org/tutorials">Tutorials</a></li>
+            <li><a href="https://pytorch.org/docs/stable/index.html">Docs</a></li>
+            <li><a href="https://discuss.pytorch.org" target="_blank">Discuss</a></li>
+            <li><a href="https://github.com/pytorch/pytorch/issues" target="_blank">Github Issues</a></li>
+            <li><a href="https://pytorch.org/assets/brand-guidelines/PyTorch-Brand-Guidelines.pdf" target="_blank">Brand Guidelines</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-links-col">
+          <ul>
+            <li class="list-title">Stay up to date</li>
+            <li><a href="https://www.facebook.com/pytorch" target="_blank">Facebook</a></li>
+            <li><a href="https://twitter.com/pytorch" target="_blank">Twitter</a></li>
+            <li><a href="https://www.youtube.com/pytorch" target="_blank">YouTube</a></li>
+            <li><a href="https://www.linkedin.com/company/pytorch" target="_blank">LinkedIn</a></li>
+          </ul>  
+          </div>
+
+        <div class="footer-links-col">
+          <ul>
+            <li class="list-title">PyTorch Podcasts</li>
+            <li><a href="https://open.spotify.com/show/6UzHKeiy368jKfQMKKvJY5" target="_blank">Spotify</a></li>
+            <li><a href="https://podcasts.apple.com/us/podcast/pytorch-developer-podcast/id1566080008" target="_blank">Apple</a></li>
+            <li><a href="https://www.google.com/podcasts?feed=aHR0cHM6Ly9mZWVkcy5zaW1wbGVjYXN0LmNvbS9PQjVGa0lsOA%3D%3D" target="_blank">Google</a></li>
+            <li><a href="https://music.amazon.com/podcasts/7a4e6f0e-26c2-49e9-a478-41bd244197d0/PyTorch-Developer-Podcast?" target="_blank">Amazon</a></li>
+          </ul>
+         </div>
+        </div>
+        
+        <div class="privacy-policy">
+          <ul>
+            <li class="privacy-policy-links"><a href="https://www.linuxfoundation.org/terms/" target="_blank">Terms</a></li>
+            <li class="privacy-policy-links">|</li>
+            <li class="privacy-policy-links"><a href="https://www.linuxfoundation.org/privacy-policy/" target="_blank">Privacy</a></li>
+          </ul>
+        </div>
+        <div class="copyright">
+        <p>© Copyright The Linux Foundation. The PyTorch Foundation is a project of The Linux Foundation.
+          For web site terms of use, trademark policy and other policies applicable to The PyTorch Foundation please see
+          <a href="https://www.linuxfoundation.org/policies/">www.linuxfoundation.org/policies/</a>. The PyTorch Foundation supports the PyTorch open source
+          project, which has been established as PyTorch Project a Series of LF Projects, LLC. For policies applicable to the PyTorch Project a Series of LF Projects, LLC,
+          please see <a href="https://www.lfprojects.org/policies/">www.lfprojects.org/policies/</a>.</p>
+      </div>
+     </div>
+
+  </footer>
+
+  <div class="cookie-banner-wrapper">
+  <div class="container">
+    <p class="gdpr-notice">To analyze traffic and optimize your experience, we serve cookies on this site. By clicking or navigating, you agree to allow our usage of cookies. As the current maintainers of this site, Facebook’s Cookies Policy applies. Learn more, including about available controls: <a href="https://www.facebook.com/policies/cookies/">Cookies Policy</a>.</p>
+    <img class="close-button" src="../_static/images/pytorch-x.svg">
+  </div>
+</div>
+
+  <!-- End Footer -->
+
+  <!-- Begin Mobile Menu -->
+
+  <div class="mobile-main-menu">
+    <div class="container-fluid">
+      <div class="container">
+        <div class="mobile-main-menu-header-container">
+          <a class="header-logo" href="https://pytorch.org/" aria-label="PyTorch"></a>
+          <a class="main-menu-close-button" href="#" data-behavior="close-mobile-menu"></a>
+        </div>
+      </div>
+    </div>
+
+    <div class="mobile-main-menu-links-container">
+      <div class="main-menu">
+        <ul>
+          <li>
+            <a href="https://pytorch.org/get-started">Get Started</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/ecosystem">Ecosystem</a>
+          </li>
+            
+          <li>
+            <a href="">Mobile</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/blog/">Blog</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/tutorials">Tutorials</a>
+          </li>
+
+          <li class="resources-mobile-menu-title">
+            Docs
+          </li>
+
+          <ul class="resources-mobile-menu-items">
+            <li>
+              <a href="https://pytorch.org/docs/stable/index.html">PyTorch</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/audio/stable/index.html">torchaudio</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/text/stable/index.html">torchtext</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/vision/stable/index.html">torchvision</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/torcharrow">torcharrow</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/data">TorchData</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/torchrec">TorchRec</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/serve/">TorchServe</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/torchx/">TorchX</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/xla">PyTorch on XLA Devices</a>
+            </li>
+          </ul>
+
+          <li class="resources-mobile-menu-title">
+            Resources
+          </li>
+            
+           <ul class="resources-mobile-menu-items">
+
+            <li>
+              <a href="https://pytorch.org/features">About</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/foundation">PyTorch Foundation</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/#community-module">Community</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/community-stories">Community Stories</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/resources">Developer Resources</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/events">Events</a>
+            </li>
+
+            <li>
+              <a href="https://discuss.pytorch.org/">Forums</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/hub">Models (Beta)</a>
+            </li>
+          </ul>
+
+          <li>
+            <a href="https://github.com/pytorch/pytorch">Github</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- End Mobile Menu -->
+
+  <script type="text/javascript" src="../_static/js/vendor/anchor.min.js"></script>
+
+  <script type="text/javascript">
+    $(document).ready(function() {
+      mobileMenu.bind();
+      mobileTOC.bind();
+      pytorchAnchors.bind();
+      sideMenus.bind();
+      scrollToAnchor.bind();
+      highlightNavigation.bind();
+      mainMenuDropdown.bind();
+      filterTags.bind();
+
+      // Add class to links that have code blocks, since we cannot create links in code blocks
+      $("article.pytorch-article a span.pre").each(function(e) {
+        $(this).closest("a").addClass("has-code");
+      });
+    })
+  </script>
+</body>
+</html>

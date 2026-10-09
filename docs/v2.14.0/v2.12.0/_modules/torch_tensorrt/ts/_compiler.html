@@ -1,0 +1,896 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>torch_tensorrt.ts._compiler &#8212; Torch-TensorRT</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../../../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=72e443bf" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery.css?v=61a4c737" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery-dataframe.css?v=e5fbc548" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/collapsible-lists/css/tree_view.css?v=a885cde7" />
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/katex@0.10.0-beta/dist/katex.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/css/custom.css?v=0cb2b9ef" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../../../_static/documentation_options.js?v=c3d35e0c"></script>
+    <script src="../../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
+    <script src="../../../_static/collapsible-lists/js/apply-collapsible-lists.js?v=660e4f45"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_modules/torch_tensorrt/ts/_compiler';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://raw.githubusercontent.com/pytorch/TensorRT/refs/heads/main/docs/versions.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = 'main';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner = false;
+        </script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Torch-TensorRT</p>
+  
+</a></div>
+    
+      <div class="navbar-item">
+<script>
+document.write(`
+  <div class="version-switcher__container dropdown">
+    <button id="pst-version-switcher-button-2"
+      type="button"
+      class="version-switcher__button btn btn-sm dropdown-toggle"
+      data-bs-toggle="dropdown"
+      aria-haspopup="listbox"
+      aria-controls="pst-version-switcher-list-2"
+      aria-label="Version switcher list"
+    >
+      Choose version  <!-- this text may get changed later by javascript -->
+      <span class="caret"></span>
+    </button>
+    <div id="pst-version-switcher-list-2"
+      class="version-switcher__menu dropdown-menu list-group-flush py-0"
+      role="listbox" aria-labelledby="pst-version-switcher-button-2">
+      <!-- dropdown will be populated by javascript on page load -->
+    </div>
+  </div>
+`);
+</script></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../tutorials/advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../tutorials/model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+        
+      
+      <div class="bd-sidebar-primary bd-sidebar hide-on-wide">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../tutorials/advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../tutorials/model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../../index.html" class="nav-link">Module code</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page">torch_tensor...</li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <h1>Source code for torch_tensorrt.ts._compiler</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt._C.ts</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">_C</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._Device</span><span class="w"> </span><span class="kn">import</span> <span class="n">Device</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._enums</span><span class="w"> </span><span class="kn">import</span> <span class="n">EngineCapability</span><span class="p">,</span> <span class="n">dtype</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._Input</span><span class="w"> </span><span class="kn">import</span> <span class="n">Input</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.ts._compile_spec</span><span class="w"> </span><span class="kn">import</span> <span class="n">_parse_compile_spec</span><span class="p">,</span> <span class="n">_parse_device</span>
+
+
+<div class="viewcode-block" id="compile">
+<a class="viewcode-back" href="../../../py_api/ts.html#torch_tensorrt.ts.compile">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">compile</span><span class="p">(</span>
+    <span class="n">module</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">ScriptModule</span><span class="p">,</span>
+    <span class="n">inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Input</span> <span class="o">|</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">input_signature</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">Input</span> <span class="o">|</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">|</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Any</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">device</span><span class="p">:</span> <span class="n">Device</span> <span class="o">=</span> <span class="n">Device</span><span class="o">.</span><span class="n">_current_device</span><span class="p">(),</span>
+    <span class="n">disable_tf32</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">sparse_weights</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">enabled_precisions</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Set</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">dtype</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">refit</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">capability</span><span class="p">:</span> <span class="n">EngineCapability</span> <span class="o">=</span> <span class="n">EngineCapability</span><span class="o">.</span><span class="n">STANDARD</span><span class="p">,</span>
+    <span class="n">num_avg_timing_iters</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="n">workspace_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="n">dla_sram_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1048576</span><span class="p">,</span>
+    <span class="n">dla_local_dram_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1073741824</span><span class="p">,</span>
+    <span class="n">dla_global_dram_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">536870912</span><span class="p">,</span>
+    <span class="n">truncate_long_and_double</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">require_full_compilation</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">min_block_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span>
+    <span class="n">torch_executed_ops</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">torch_executed_modules</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">allow_shape_tensors</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">ScriptModule</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Compile a TorchScript module for NVIDIA GPUs using TensorRT</span>
+
+<span class="sd">    Takes a existing TorchScript module and a set of settings to configure the compiler</span>
+<span class="sd">    and will convert methods to JIT Graphs which call equivalent TensorRT engines</span>
+
+<span class="sd">    Converts specifically the forward method of a TorchScript Module</span>
+
+<span class="sd">    Arguments:</span>
+<span class="sd">        module (torch.jit.ScriptModule): Source module, a result of tracing or scripting a PyTorch</span>
+<span class="sd">            ``torch.nn.Module``</span>
+
+<span class="sd">    Keyword Arguments:</span>
+<span class="sd">        inputs (List[Union(torch_tensorrt.Input, torch.Tensor)]): **Required** List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using</span>
+<span class="sd">            torch datatypes or torch_tensorrt datatypes and you can use either torch devices or the torch_tensorrt device type enum</span>
+<span class="sd">            to select device type. ::</span>
+
+<span class="sd">                input=[</span>
+<span class="sd">                    torch_tensorrt.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1</span>
+<span class="sd">                    torch_tensorrt.Input(</span>
+<span class="sd">                        min_shape=(1, 224, 224, 3),</span>
+<span class="sd">                        opt_shape=(1, 512, 512, 3),</span>
+<span class="sd">                        max_shape=(1, 1024, 1024, 3),</span>
+<span class="sd">                        dtype=torch.int32</span>
+<span class="sd">                        format=torch.channel_last</span>
+<span class="sd">                    ), # Dynamic input shape for input #2</span>
+<span class="sd">                    torch.randn((1, 3, 224, 244)) # Use an example tensor and let torch_tensorrt infer settings</span>
+<span class="sd">                ]</span>
+
+<span class="sd">        input_signature Union(List, Tuple, torch_tensorrt.Input, torch.Tensor): A formatted collection of input specifications for the module. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using</span>
+<span class="sd">            torch datatypes or torch_tensorrt datatypes and you can use either torch devices or the torch_tensorrt device type enum to select device type. **This API should be considered beta-level stable and may change in the future** ::</span>
+
+<span class="sd">                input_signature=([</span>
+<span class="sd">                    torch_tensorrt.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1</span>
+<span class="sd">                    torch_tensorrt.Input(</span>
+<span class="sd">                        min_shape=(1, 224, 224, 3),</span>
+<span class="sd">                        opt_shape=(1, 512, 512, 3),</span>
+<span class="sd">                        max_shape=(1, 1024, 1024, 3),</span>
+<span class="sd">                        dtype=torch.int32</span>
+<span class="sd">                        format=torch.channel_last</span>
+<span class="sd">                    ), # Dynamic input shape for input #2</span>
+<span class="sd">                ], torch.randn((1, 3, 224, 244))) # Use an example tensor and let torch_tensorrt infer settings for input #3</span>
+<span class="sd">        device (Union(torch_tensorrt.Device, torch.device, dict)): Target device for TensorRT engines to run on ::</span>
+
+<span class="sd">            device=torch_tensorrt.Device(&quot;dla:1&quot;, allow_gpu_fallback=True)</span>
+
+<span class="sd">        disable_tf32 (bool): Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas</span>
+<span class="sd">        sparse_weights (bool): Enable sparsity for convolution and fully connected layers.</span>
+<span class="sd">        enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels</span>
+<span class="sd">        refit (bool): Enable refitting</span>
+<span class="sd">        debug (bool): Enable debuggable engine</span>
+<span class="sd">        capability (torch_tensorrt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels</span>
+<span class="sd">        num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels</span>
+<span class="sd">        workspace_size (int): Maximum size of workspace given to TensorRT</span>
+<span class="sd">        dla_sram_size (int): Fast software managed RAM used by DLA to communicate within a layer.</span>
+<span class="sd">        dla_local_dram_size (int): Host RAM used by DLA to share intermediate tensor data across operations</span>
+<span class="sd">        dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution</span>
+<span class="sd">        truncate_long_and_double (bool): Truncate weights provided in int64 or double (float64) to int32 and float32</span>
+<span class="sd">        require_full_compilation (bool): Require modules to be compiled end to end or return an error as opposed to returning a hybrid graph where operations that cannot be run in TensorRT are run in PyTorch</span>
+<span class="sd">        min_block_size (int): The minimum number of contiguous TensorRT convertible operations in order to run a set of operations in TensorRT</span>
+<span class="sd">        torch_executed_ops (List[str]): List of aten operators that must be run in PyTorch. An error will be thrown if this list is not empty but ``require_full_compilation`` is True</span>
+<span class="sd">        torch_executed_modules (List[str]): List of modules that must be run in PyTorch. An error will be thrown if this list is not empty but ``require_full_compilation`` is True</span>
+<span class="sd">        allow_shape_tensors: (Experimental) Allow aten::size to output shape tensors using IShapeLayer in TensorRT</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        torch.jit.ScriptModule: Compiled TorchScript Module, when run it will execute via TensorRT</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+        <span class="s1">&#39;The torchscript frontend for Torch-TensorRT has been deprecated, please plan on porting to the dynamo frontend (torch_tensorrt.compile(..., ir=&quot;dynamo&quot;). Torchscript will continue to be a supported deployment format via post compilation torchscript tracing, see: https://pytorch.org/TensorRT/user_guide/saving_models.html for more details&#39;</span><span class="p">,</span>
+        <span class="ne">DeprecationWarning</span><span class="p">,</span>
+        <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">input_list</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span> <span class="k">if</span> <span class="n">inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">[]</span>
+    <span class="n">enabled_precisions_set</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">enabled_precisions</span> <span class="k">if</span> <span class="n">enabled_precisions</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="p">)</span>
+    <span class="n">torch_executed_module_list</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">torch_executed_modules</span> <span class="k">if</span> <span class="n">torch_executed_modules</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">[]</span>
+    <span class="p">)</span>
+    <span class="n">torch_executed_op_list</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">torch_executed_ops</span> <span class="k">if</span> <span class="n">torch_executed_ops</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">[]</span>
+    <span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">ScriptFunction</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+            <span class="s2">&quot;torch.jit.ScriptFunction currently is not directly supported, wrap the function in a module to compile&quot;</span>
+        <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">require_full_compilation</span> <span class="ow">and</span> <span class="p">(</span>
+        <span class="nb">len</span><span class="p">(</span><span class="n">torch_executed_module_list</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">torch_executed_op_list</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span>
+    <span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;require_full_compilation is enabled however the list of modules and ops to run in torch is not empty. Found: torch_executed_ops: </span><span class="si">{</span><span class="n">torch_executed_ops</span><span class="si">}</span><span class="s2">, torch_executed_modules: </span><span class="si">{</span><span class="n">torch_executed_modules</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+
+    <span class="n">spec</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;inputs&quot;</span><span class="p">:</span> <span class="n">input_list</span><span class="p">,</span>
+        <span class="s2">&quot;input_signature&quot;</span><span class="p">:</span> <span class="n">input_signature</span><span class="p">,</span>
+        <span class="s2">&quot;device&quot;</span><span class="p">:</span> <span class="n">device</span><span class="p">,</span>
+        <span class="s2">&quot;disable_tf32&quot;</span><span class="p">:</span> <span class="n">disable_tf32</span><span class="p">,</span>  <span class="c1"># Force FP32 layers to use traditional as FP32 format</span>
+        <span class="s2">&quot;sparse_weights&quot;</span><span class="p">:</span> <span class="n">sparse_weights</span><span class="p">,</span>  <span class="c1"># Enable sparsity for convolution and fully connected layers.</span>
+        <span class="s2">&quot;enabled_precisions&quot;</span><span class="p">:</span> <span class="n">enabled_precisions_set</span><span class="p">,</span>  <span class="c1"># Enabling FP16 kernels</span>
+        <span class="s2">&quot;refit&quot;</span><span class="p">:</span> <span class="n">refit</span><span class="p">,</span>  <span class="c1"># enable refit</span>
+        <span class="s2">&quot;debug&quot;</span><span class="p">:</span> <span class="n">debug</span><span class="p">,</span>  <span class="c1"># enable debuggable engine</span>
+        <span class="s2">&quot;capability&quot;</span><span class="p">:</span> <span class="n">capability</span><span class="p">,</span>  <span class="c1"># Restrict kernel selection to safe gpu kernels or safe dla kernels</span>
+        <span class="s2">&quot;num_avg_timing_iters&quot;</span><span class="p">:</span> <span class="n">num_avg_timing_iters</span><span class="p">,</span>  <span class="c1"># Number of averaging timing iterations used to select kernels</span>
+        <span class="s2">&quot;workspace_size&quot;</span><span class="p">:</span> <span class="n">workspace_size</span><span class="p">,</span>  <span class="c1"># Maximum size of workspace given to TensorRT</span>
+        <span class="s2">&quot;dla_sram_size&quot;</span><span class="p">:</span> <span class="n">dla_sram_size</span><span class="p">,</span>
+        <span class="s2">&quot;dla_local_dram_size&quot;</span><span class="p">:</span> <span class="n">dla_local_dram_size</span><span class="p">,</span>
+        <span class="s2">&quot;dla_global_dram_size&quot;</span><span class="p">:</span> <span class="n">dla_global_dram_size</span><span class="p">,</span>
+        <span class="s2">&quot;truncate_long_and_double&quot;</span><span class="p">:</span> <span class="n">truncate_long_and_double</span><span class="p">,</span>
+        <span class="s2">&quot;torch_fallback&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;enabled&quot;</span><span class="p">:</span> <span class="ow">not</span> <span class="n">require_full_compilation</span><span class="p">,</span>
+            <span class="s2">&quot;forced_fallback_ops&quot;</span><span class="p">:</span> <span class="n">torch_executed_op_list</span><span class="p">,</span>
+            <span class="s2">&quot;forced_fallback_modules&quot;</span><span class="p">:</span> <span class="n">torch_executed_module_list</span><span class="p">,</span>
+            <span class="s2">&quot;min_block_size&quot;</span><span class="p">:</span> <span class="n">min_block_size</span><span class="p">,</span>
+        <span class="p">},</span>
+        <span class="s2">&quot;allow_shape_tensors&quot;</span><span class="p">:</span> <span class="n">allow_shape_tensors</span><span class="p">,</span>
+    <span class="p">}</span>
+
+    <span class="n">compiled_cpp_mod</span> <span class="o">=</span> <span class="n">_C</span><span class="o">.</span><span class="n">compile_graph</span><span class="p">(</span><span class="n">module</span><span class="o">.</span><span class="n">_c</span><span class="p">,</span> <span class="n">_parse_compile_spec</span><span class="p">(</span><span class="n">spec</span><span class="p">))</span>
+    <span class="n">compiled_module</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">ScriptModule</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">_recursive</span><span class="o">.</span><span class="n">wrap_cpp_module</span><span class="p">(</span>
+        <span class="n">compiled_cpp_mod</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">compiled_module</span></div>
+
+
+
+<div class="viewcode-block" id="convert_method_to_trt_engine">
+<a class="viewcode-back" href="../../../py_api/ts.html#torch_tensorrt.ts.convert_method_to_trt_engine">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">convert_method_to_trt_engine</span><span class="p">(</span>
+    <span class="n">module</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">ScriptModule</span><span class="p">,</span>
+    <span class="n">method_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;forward&quot;</span><span class="p">,</span>
+    <span class="n">inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Input</span> <span class="o">|</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">device</span><span class="p">:</span> <span class="n">Device</span> <span class="o">=</span> <span class="n">Device</span><span class="o">.</span><span class="n">_current_device</span><span class="p">(),</span>
+    <span class="n">disable_tf32</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">sparse_weights</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">enabled_precisions</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Set</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">dtype</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">refit</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">capability</span><span class="p">:</span> <span class="n">EngineCapability</span> <span class="o">=</span> <span class="n">EngineCapability</span><span class="o">.</span><span class="n">STANDARD</span><span class="p">,</span>
+    <span class="n">num_avg_timing_iters</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="n">workspace_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="n">dla_sram_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1048576</span><span class="p">,</span>
+    <span class="n">dla_local_dram_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1073741824</span><span class="p">,</span>
+    <span class="n">dla_global_dram_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">536870912</span><span class="p">,</span>
+    <span class="n">truncate_long_and_double</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">allow_shape_tensors</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert a TorchScript module method to a serialized TensorRT engine</span>
+
+<span class="sd">    Converts a specified method of a module to a serialized TensorRT engine given a dictionary of conversion settings</span>
+
+<span class="sd">    Arguments:</span>
+<span class="sd">        module (torch.jit.ScriptModule): Source module, a result of tracing or scripting a PyTorch</span>
+<span class="sd">            ``torch.nn.Module``</span>
+
+<span class="sd">    Keyword Args:</span>
+<span class="sd">        inputs (List[Union(torch_tensorrt.Input, torch.Tensor)]): **Required** List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using</span>
+<span class="sd">            torch datatypes or torch_tensorrt datatypes and you can use either torch devices or the torch_tensorrt device type enum</span>
+<span class="sd">            to select device type. ::</span>
+
+<span class="sd">                input=[</span>
+<span class="sd">                    torch_tensorrt.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1</span>
+<span class="sd">                    torch_tensorrt.Input(</span>
+<span class="sd">                        min_shape=(1, 224, 224, 3),</span>
+<span class="sd">                        opt_shape=(1, 512, 512, 3),</span>
+<span class="sd">                        max_shape=(1, 1024, 1024, 3),</span>
+<span class="sd">                        dtype=torch.int32</span>
+<span class="sd">                        format=torch.channel_last</span>
+<span class="sd">                    ), # Dynamic input shape for input #2</span>
+<span class="sd">                    torch.randn((1, 3, 224, 244)) # Use an example tensor and let torch_tensorrt infer settings</span>
+<span class="sd">                ]</span>
+
+<span class="sd">        method_name (str): Name of method to convert</span>
+<span class="sd">        input_signature Union(List, Tuple, torch_tensorrt.Input, torch.Tensor): A formatted collection of input specifications for the module. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using</span>
+<span class="sd">            torch datatypes or torch_tensorrt datatypes and you can use either torch devices or the torch_tensorrt device type enum to select device type. **This API should be considered beta-level stable and may change in the future** ::</span>
+
+<span class="sd">                input_signature=([</span>
+<span class="sd">                    torch_tensorrt.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1</span>
+<span class="sd">                    torch_tensorrt.Input(</span>
+<span class="sd">                        min_shape=(1, 224, 224, 3),</span>
+<span class="sd">                        opt_shape=(1, 512, 512, 3),</span>
+<span class="sd">                        max_shape=(1, 1024, 1024, 3),</span>
+<span class="sd">                        dtype=torch.int32</span>
+<span class="sd">                        format=torch.channel_last</span>
+<span class="sd">                    ), # Dynamic input shape for input #2</span>
+<span class="sd">                ], torch.randn((1, 3, 224, 244))) # Use an example tensor and let torch_tensorrt infer settings for input #3</span>
+
+<span class="sd">        device (Union(torch_tensorrt.Device, torch.device, dict)): Target device for TensorRT engines to run on ::</span>
+
+<span class="sd">            device=torch_tensorrt.Device(&quot;dla:1&quot;, allow_gpu_fallback=True)</span>
+
+<span class="sd">        disable_tf32 (bool): Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas</span>
+<span class="sd">        sparse_weights (bool): Enable sparsity for convolution and fully connected layers.</span>
+<span class="sd">        enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels</span>
+<span class="sd">        refit (bool): Enable refitting</span>
+<span class="sd">        debug (bool): Enable debuggable engine</span>
+<span class="sd">        capability (torch_tensorrt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels</span>
+<span class="sd">        num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels</span>
+<span class="sd">        workspace_size (int): Maximum size of workspace given to TensorRT</span>
+<span class="sd">        dla_sram_size (int): Fast software managed RAM used by DLA to communicate within a layer.</span>
+<span class="sd">        dla_local_dram_size (int): Host RAM used by DLA to share intermediate tensor data across operations</span>
+<span class="sd">        dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution</span>
+<span class="sd">        truncate_long_and_double (bool): Truncate weights provided in int64 or double (float64) to int32 and float32</span>
+<span class="sd">        allow_shape_tensors: (Experimental) Allow aten::size to output shape tensors using IShapeLayer in TensorRT</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+        <span class="s1">&#39;The torchscript frontend for Torch-TensorRT has been deprecated, please plan on porting to the dynamo frontend (torch_tensorrt.convert_method_to_trt_engine(..., ir=&quot;dynamo&quot;). Torchscript will continue to be a supported deployment format via post compilation torchscript tracing, see: https://pytorch.org/TensorRT/user_guide/saving_models.html for more details&#39;</span><span class="p">,</span>
+        <span class="ne">DeprecationWarning</span><span class="p">,</span>
+        <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">input_list</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span> <span class="k">if</span> <span class="n">inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">[]</span>
+    <span class="n">enabled_precisions_set</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">enabled_precisions</span> <span class="k">if</span> <span class="n">enabled_precisions</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">}</span>
+    <span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">ScriptFunction</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+            <span class="s2">&quot;torch.jit.ScriptFunctions currently are not directly supported, wrap the function in a module to compile&quot;</span>
+        <span class="p">)</span>
+
+    <span class="n">compile_spec</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;inputs&quot;</span><span class="p">:</span> <span class="n">input_list</span><span class="p">,</span>
+        <span class="s2">&quot;device&quot;</span><span class="p">:</span> <span class="n">device</span><span class="p">,</span>
+        <span class="s2">&quot;disable_tf32&quot;</span><span class="p">:</span> <span class="n">disable_tf32</span><span class="p">,</span>  <span class="c1"># Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas</span>
+        <span class="s2">&quot;sparse_weights&quot;</span><span class="p">:</span> <span class="n">sparse_weights</span><span class="p">,</span>  <span class="c1"># Enable sparsity for convolution and fully connected layers.</span>
+        <span class="s2">&quot;enabled_precisions&quot;</span><span class="p">:</span> <span class="n">enabled_precisions_set</span><span class="p">,</span>  <span class="c1"># Enabling FP16 kernels</span>
+        <span class="s2">&quot;refit&quot;</span><span class="p">:</span> <span class="n">refit</span><span class="p">,</span>  <span class="c1"># enable refit</span>
+        <span class="s2">&quot;debug&quot;</span><span class="p">:</span> <span class="n">debug</span><span class="p">,</span>  <span class="c1"># enable debuggable engine</span>
+        <span class="s2">&quot;capability&quot;</span><span class="p">:</span> <span class="n">capability</span><span class="p">,</span>  <span class="c1"># Restrict kernel selection to safe gpu kernels or safe dla kernels</span>
+        <span class="s2">&quot;num_avg_timing_iters&quot;</span><span class="p">:</span> <span class="n">num_avg_timing_iters</span><span class="p">,</span>  <span class="c1"># Number of averaging timing iterations used to select kernels</span>
+        <span class="s2">&quot;workspace_size&quot;</span><span class="p">:</span> <span class="n">workspace_size</span><span class="p">,</span>  <span class="c1"># Maximum size of workspace given to TensorRT</span>
+        <span class="s2">&quot;truncate_long_and_double&quot;</span><span class="p">:</span> <span class="n">truncate_long_and_double</span><span class="p">,</span>
+        <span class="s2">&quot;allow_shape_tensors&quot;</span><span class="p">:</span> <span class="n">allow_shape_tensors</span><span class="p">,</span>
+    <span class="p">}</span>
+
+    <span class="n">engine_str</span> <span class="o">=</span> <span class="n">_C</span><span class="o">.</span><span class="n">convert_graph_to_trt_engine</span><span class="p">(</span>
+        <span class="n">module</span><span class="o">.</span><span class="n">_c</span><span class="p">,</span> <span class="n">method_name</span><span class="p">,</span> <span class="n">_parse_compile_spec</span><span class="p">(</span><span class="n">compile_spec</span><span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="kn">import</span><span class="w"> </span><span class="nn">io</span>
+
+    <span class="k">with</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span> <span class="k">as</span> <span class="n">engine_bytes</span><span class="p">:</span>
+        <span class="n">engine_bytes</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">engine_str</span><span class="p">)</span>
+        <span class="n">engine_bytearray</span> <span class="o">=</span> <span class="n">engine_bytes</span><span class="o">.</span><span class="n">getvalue</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="n">engine_bytearray</span></div>
+
+
+
+<div class="viewcode-block" id="embed_engine_in_new_module">
+<a class="viewcode-back" href="../../../py_api/ts.html#torch_tensorrt.ts.embed_engine_in_new_module">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">embed_engine_in_new_module</span><span class="p">(</span>
+    <span class="n">serialized_engine</span><span class="p">:</span> <span class="nb">bytes</span><span class="p">,</span>
+    <span class="n">input_binding_names</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">output_binding_names</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">device</span><span class="p">:</span> <span class="n">Device</span> <span class="o">=</span> <span class="n">Device</span><span class="o">.</span><span class="n">_current_device</span><span class="p">(),</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">ScriptModule</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Takes a pre-built serialized TensorRT engine and embeds it within a TorchScript module</span>
+
+<span class="sd">    Takes a pre-built serialied TensorRT engine (as bytes) and embeds it within a TorchScript module.</span>
+<span class="sd">    Registers the forward method to execute the TensorRT engine with the function signature:</span>
+
+<span class="sd">        forward(Tensor[]) -&gt; Tensor[]</span>
+
+<span class="sd">    TensorRT bindings either be explicitly specified using ``[in/out]put_binding_names`` or have names with the following format:</span>
+<span class="sd">      - [symbol].[index in input / output array]</span>
+<span class="sd">      ex.</span>
+<span class="sd">      - [x.0, x.1, x.2] -&gt; [y.0]</span>
+
+<span class="sd">    Module can be save with engine embedded with torch.jit.save and moved / loaded according to torch_tensorrt portability rules</span>
+
+<span class="sd">    Arguments:</span>
+<span class="sd">        serialized_engine (bytearray): Serialized TensorRT engine from either torch_tensorrt or TensorRT APIs</span>
+
+<span class="sd">    Keyword Arguments:</span>
+<span class="sd">        input_binding_names (List[str]): List of names of TensorRT bindings in order to be passed to the encompassing PyTorch module</span>
+<span class="sd">        output_binding_names (List[str]): List of names of TensorRT bindings in order that should be returned from the encompassing PyTorch module</span>
+<span class="sd">        device (Union(torch_tensorrt.Device, torch.device, dict)): Target device to run engine on. Must be compatible with engine provided. Default: Current active device</span>
+<span class="sd">    Returns:</span>
+<span class="sd">        torch.jit.ScriptModule: New TorchScript module with engine embedded</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">input_binding_name_list</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">input_binding_names</span> <span class="k">if</span> <span class="n">input_binding_names</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">[]</span>
+    <span class="p">)</span>
+    <span class="n">output_binding_name_list</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">output_binding_names</span> <span class="k">if</span> <span class="n">output_binding_names</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">[]</span>
+    <span class="p">)</span>
+    <span class="n">cpp_mod</span> <span class="o">=</span> <span class="n">_C</span><span class="o">.</span><span class="n">embed_engine_in_new_module</span><span class="p">(</span>
+        <span class="n">serialized_engine</span><span class="p">,</span>
+        <span class="n">_parse_device</span><span class="p">(</span><span class="n">device</span><span class="p">),</span>
+        <span class="n">input_binding_name_list</span><span class="p">,</span>
+        <span class="n">output_binding_name_list</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">wrapped_mod</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">ScriptModule</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">_recursive</span><span class="o">.</span><span class="n">wrap_cpp_module</span><span class="p">(</span><span class="n">cpp_mod</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">wrapped_mod</span></div>
+
+
+
+<div class="viewcode-block" id="check_method_op_support">
+<a class="viewcode-back" href="../../../py_api/ts.html#torch_tensorrt.ts.check_method_op_support">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">check_method_op_support</span><span class="p">(</span>
+    <span class="n">module</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">ScriptModule</span><span class="p">,</span> <span class="n">method_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;forward&quot;</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Checks to see if a method is fully supported by torch_tensorrt</span>
+
+<span class="sd">    Checks if a method of a TorchScript module can be compiled by torch_tensorrt, if not, a list of operators</span>
+<span class="sd">    that are not supported are printed out and the function returns false, else true.</span>
+
+<span class="sd">    Arguments:</span>
+<span class="sd">        module (torch.jit.ScriptModule): Source module, a result of tracing or scripting a PyTorch</span>
+<span class="sd">            ``torch.nn.Module``</span>
+<span class="sd">        method_name (str): Name of method to check</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        bool: True if supported Method</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">supported</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_C</span><span class="o">.</span><span class="n">check_method_op_support</span><span class="p">(</span><span class="n">module</span><span class="o">.</span><span class="n">_c</span><span class="p">,</span> <span class="n">method_name</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">supported</span></div>
+
+</pre></div>
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2024, NVIDIA Corporation.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>

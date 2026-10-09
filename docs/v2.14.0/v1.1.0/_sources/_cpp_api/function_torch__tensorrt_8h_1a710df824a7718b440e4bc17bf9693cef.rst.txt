@@ -1,0 +1,13 @@
+.. _exhale_function_torch__tensorrt_8h_1a710df824a7718b440e4bc17bf9693cef:
+
+Function torch_tensorrt::torchscript::embed_engine_in_new_module
+================================================================
+
+- Defined in :ref:`file_cpp_include_torch_tensorrt_torch_tensorrt.h`
+
+
+Function Documentation
+----------------------
+
+
+.. doxygenfunction:: torch_tensorrt::torchscript::embed_engine_in_new_module(const std::string&, Device)

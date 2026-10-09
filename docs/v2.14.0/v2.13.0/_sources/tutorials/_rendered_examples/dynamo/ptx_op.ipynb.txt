@@ -1,0 +1,43 @@
+{
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "\n\n# Pre-compiled PTX kernels via ``torch_tensorrt.kernels.ptx_op``\n\n``cuda_kernel_op`` compiles your CUDA C++ source internally with NVRTC. When\nyou already have PTX in hand \u2014 emitted by Triton's JIT, cached from a prior\nNVRTC run on another machine, or hand-written \u2014 use ``ptx_op`` instead. It\nskips NVRTC entirely and registers the supplied PTX directly as a TensorRT\nQuick Deployable Plugin.\n\nYou supply:\n\n* **the PTX bytes** (whatever produced them)\n* **the kernel entry symbol** inside that PTX\n* **``meta_fn`` / ``eager_fn`` / ``aot_fn``** by hand \u2014 there's no\n  :class:`KernelSpec` DSL on this path\n* optionally, an explicit PyTorch ``schema`` string (inferred from\n  ``meta_fn`` type hints if omitted)\n\nThis example walks through ``gelu`` (approximate-tanh GELU activation):\n\n1. NVRTC-compile the source to PTX *once*, manually, to simulate having\n   PTX in hand from any external source.\n2. Write ``meta_fn`` / ``eager_fn`` / ``aot_fn``.\n3. Register via :func:`ptx_op`.\n4. Run eager and Torch-TensorRT compile against a PyTorch reference.\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "import cuda.core  # noqa: F401\nimport tensorrt.plugin as trtp\nimport torch\nfrom cuda.core import Device as _Device\nfrom cuda.core import LaunchConfig as _LaunchConfig\nfrom cuda.core import Program as _Program\nfrom cuda.core import ProgramOptions as _ProgramOptions\nfrom cuda.core import launch as _cuda_launch\n\nimport torch_tensorrt\nimport torch_tensorrt.kernels as ttk\n\n# ---------------------------------------------------------------------------\n# Step 1: obtain PTX\n# ---------------------------------------------------------------------------\n# In real use, ``GELU_PTX`` could be loaded from a file, fetched from a cache,\n# or emitted by a Triton kernel's ``.asm[\"ptx\"]``. Here we NVRTC-compile a\n# small CUDA source on the fly so the example is self-contained \u2014 the point\n# of ptx_op is that this step is *separate* from registration.\n\nCU_GELU = r\"\"\"\nextern \"C\" __global__ void my_gelu(\n        const float* __restrict__ x, int n, float* __restrict__ y) {\n    int i = blockIdx.x * blockDim.x + threadIdx.x;\n    if (i < n) {\n        const float kSqrt2OverPi = 0.7978845608f;   // sqrt(2/pi)\n        const float kCubicCoef   = 0.044715f;\n        float xi = x[i];\n        float inner = kSqrt2OverPi * (xi + kCubicCoef * xi * xi * xi);\n        y[i] = 0.5f * xi * (1.f + tanhf(inner));\n    }\n}\n\"\"\"\n\n_device = _Device()\n_device.set_current()\n_opts = _ProgramOptions(\n    std=\"c++17\",\n    arch=f\"sm_{_device.arch}\",\n    include_path=[\"/usr/local/cuda/include\"],\n)\n_module = _Program(CU_GELU, code_type=\"c++\", options=_opts).compile(\n    \"ptx\", name_expressions=(\"my_gelu\",)\n)\nGELU_PTX: bytes = _module.code\n_gelu_kernel = _module.get_kernel(\"my_gelu\")\n\n\n# ---------------------------------------------------------------------------\n# Step 2: meta / eager / aot functions\n# ---------------------------------------------------------------------------\n# ``ptx_op`` does no derivation \u2014 you write each of these directly.\n#\n#   * meta_fn   : shape/dtype inference for FakeTensors (torch.compile path).\n#                  The torch op schema is inferred from its type hints if you\n#                  don't pass ``schema=`` explicitly.\n#   * eager_fn  : the CUDA launch that runs under PyTorch eager.\n#   * aot_fn    : returns (KernelLaunchParams, SymExprs) for TRT engine build.\n\n\ndef _gelu_meta(x: torch.Tensor) -> torch.Tensor:\n    return torch.empty_like(x)\n\n\nclass _PTStream:\n    \"\"\"Adapter so cuda.core.Stream uses PyTorch's current stream.\"\"\"\n\n    def __cuda_stream__(self):\n        return (0, torch.cuda.current_stream().cuda_stream)\n\n\ndef _gelu_eager(x: torch.Tensor) -> torch.Tensor:\n    y = torch.empty_like(x)\n    n = int(x.numel())\n    block = 256\n    grid = max(1, (n + block - 1) // block)\n    _cuda_launch(\n        _device.create_stream(_PTStream()),\n        _LaunchConfig(grid=(grid,), block=(block,)),\n        _gelu_kernel,\n        x.data_ptr(),\n        n,\n        y.data_ptr(),\n    )\n    return y\n\n\ndef _gelu_aot(inputs, outputs, tactic):\n    # ``inputs`` are TensorDescs with symbolic shape_expr (TRT-side algebra).\n    n = inputs[0].shape_expr.numel()\n    params = trtp.KernelLaunchParams()\n    params.grid_x = trtp.cdiv(n, 256)\n    params.block_x = 256\n    params.shared_mem = 0\n    extra = trtp.SymIntExprs(1)\n    extra[0] = trtp.SymInt32(n)\n    return params, extra\n\n\n# ---------------------------------------------------------------------------\n# Step 3: register via ptx_op\n# ---------------------------------------------------------------------------\n# After this call, ``torch.ops.ptx_ex.gelu`` exists and works in eager,\n# torch.compile, and torch_tensorrt.compile \u2014 same as ``cuda_kernel_op``.\n\nttk.ptx_op(\n    op_name=\"ptx_ex::gelu\",\n    ptx=GELU_PTX,\n    kernel_name=\"my_gelu\",\n    meta_fn=_gelu_meta,\n    eager_fn=_gelu_eager,\n    aot_fn=_gelu_aot,\n    supports_dynamic_shapes=True,\n)\n\n\n# ---------------------------------------------------------------------------\n# Step 4: drive eager + Torch-TensorRT compile\n# ---------------------------------------------------------------------------\n\n\nclass GeluModel(torch.nn.Module):\n    def forward(self, x: torch.Tensor) -> torch.Tensor:\n        return torch.ops.ptx_ex.gelu(x)\n\n\nif __name__ == \"__main__\":\n    x = torch.randn(4, 128, device=\"cuda\", dtype=torch.float32)\n    ref = torch.nn.functional.gelu(x, approximate=\"tanh\")\n    model = GeluModel().cuda().eval()\n\n    eager_out = model(x)\n    print(\n        f\"[gelu] eager matches reference: {torch.allclose(eager_out, ref, atol=1e-3)}\"\n    )\n\n    trt_model = torch_tensorrt.compile(\n        model,\n        inputs=[x],\n        enabled_precisions={torch.float32},\n        min_block_size=1,\n    )\n    with torch.no_grad():\n        for _ in range(5):\n            out = trt_model(x)\n            assert torch.allclose(out, ref, atol=1e-2, rtol=1e-2), \"gelu: mismatch\"\n    print(\"[gelu] TRT compile + run successful\")"
+      ]
+    }
+  ],
+  "metadata": {
+    "kernelspec": {
+      "display_name": "Python 3",
+      "language": "python",
+      "name": "python3"
+    },
+    "language_info": {
+      "codemirror_mode": {
+        "name": "ipython",
+        "version": 3
+      },
+      "file_extension": ".py",
+      "mimetype": "text/x-python",
+      "name": "python",
+      "nbconvert_exporter": "python",
+      "pygments_lexer": "ipython3",
+      "version": "3.11.15"
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 0
+}

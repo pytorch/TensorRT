@@ -1,0 +1,14 @@
+.. _exhale_function_namespacetorch__tensorrt_1_1logging_1a0593f776f469c20469e2f729fc7861a3:
+
+Function torch_tensorrt::logging::get_logging_prefix
+====================================================
+
+.. did not find file this was defined in
+
+
+Function Documentation
+----------------------
+
+
+.. doxygenfunction:: torch_tensorrt::logging::get_logging_prefix()
+   :project: Torch-TensorRT

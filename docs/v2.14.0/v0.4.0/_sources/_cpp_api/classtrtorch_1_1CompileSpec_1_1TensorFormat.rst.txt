@@ -1,0 +1,22 @@
+.. _exhale_class_classtrtorch_1_1CompileSpec_1_1TensorFormat:
+
+Class CompileSpec::TensorFormat
+===============================
+
+- Defined in :ref:`file_cpp_include_trtorch_trtorch.h`
+
+
+Nested Relationships
+--------------------
+
+This class is a nested type of :ref:`exhale_struct_structtrtorch_1_1CompileSpec`.
+
+
+Class Documentation
+-------------------
+
+
+.. doxygenclass:: trtorch::CompileSpec::TensorFormat
+   :members:
+   :protected-members:
+   :undoc-members:

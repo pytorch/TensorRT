@@ -1,0 +1,13 @@
+.. _exhale_define_macros_8h_1a25ee153c325dfc7466a33cbd5c1ff055:
+
+Define TRTORCH_HIDDEN
+=====================
+
+- Defined in :ref:`file_cpp_include_trtorch_macros.h`
+
+
+Define Documentation
+--------------------
+
+
+.. doxygendefine:: TRTORCH_HIDDEN

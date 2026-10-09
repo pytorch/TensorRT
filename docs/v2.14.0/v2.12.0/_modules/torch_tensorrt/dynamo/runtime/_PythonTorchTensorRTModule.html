@@ -1,0 +1,1576 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>torch_tensorrt.dynamo.runtime._PythonTorchTensorRTModule &#8212; Torch-TensorRT</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../../../../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=72e443bf" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/sg_gallery.css?v=61a4c737" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/sg_gallery-dataframe.css?v=e5fbc548" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/collapsible-lists/css/tree_view.css?v=a885cde7" />
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/katex@0.10.0-beta/dist/katex.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/css/custom.css?v=0cb2b9ef" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../../../../_static/documentation_options.js?v=c3d35e0c"></script>
+    <script src="../../../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
+    <script src="../../../../_static/collapsible-lists/js/apply-collapsible-lists.js?v=660e4f45"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_modules/torch_tensorrt/dynamo/runtime/_PythonTorchTensorRTModule';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://raw.githubusercontent.com/pytorch/TensorRT/refs/heads/main/docs/versions.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = 'main';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner = false;
+        </script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Torch-TensorRT</p>
+  
+</a></div>
+    
+      <div class="navbar-item">
+<script>
+document.write(`
+  <div class="version-switcher__container dropdown">
+    <button id="pst-version-switcher-button-2"
+      type="button"
+      class="version-switcher__button btn btn-sm dropdown-toggle"
+      data-bs-toggle="dropdown"
+      aria-haspopup="listbox"
+      aria-controls="pst-version-switcher-list-2"
+      aria-label="Version switcher list"
+    >
+      Choose version  <!-- this text may get changed later by javascript -->
+      <span class="caret"></span>
+    </button>
+    <div id="pst-version-switcher-list-2"
+      class="version-switcher__menu dropdown-menu list-group-flush py-0"
+      role="listbox" aria-labelledby="pst-version-switcher-button-2">
+      <!-- dropdown will be populated by javascript on page load -->
+    </div>
+  </div>
+`);
+</script></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../tutorials/advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../tutorials/model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+        
+      
+      <div class="bd-sidebar-primary bd-sidebar hide-on-wide">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../tutorials/advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../tutorials/model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../../../index.html" class="nav-link">Module code</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page">torch_tensor...</li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <h1>Source code for torch_tensorrt.dynamo.runtime._PythonTorchTensorRTModule</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">contextlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">nullcontext</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Tuple</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.distributed</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">dist</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.nn</span><span class="w"> </span><span class="kn">import</span> <span class="n">Module</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._Device</span><span class="w"> </span><span class="kn">import</span> <span class="n">Device</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._enums</span><span class="w"> </span><span class="kn">import</span> <span class="n">Platform</span><span class="p">,</span> <span class="n">dtype</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._features</span><span class="w"> </span><span class="kn">import</span> <span class="n">ENABLED_FEATURES</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._defaults</span><span class="w"> </span><span class="kn">import</span> <span class="n">DEBUG_LOGGING_DIR</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._settings</span><span class="w"> </span><span class="kn">import</span> <span class="n">CompilationSettings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.debug._DebuggerConfig</span><span class="w"> </span><span class="kn">import</span> <span class="n">DebuggerConfig</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.debug._supports_debugger</span><span class="w"> </span><span class="kn">import</span> <span class="n">cls_supports_debugger</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">DYNAMIC_DIM</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.logging</span><span class="w"> </span><span class="kn">import</span> <span class="n">TRT_LOGGER</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.runtime._utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">_is_switch_required</span><span class="p">,</span>
+    <span class="n">_select_rt_device</span><span class="p">,</span>
+    <span class="n">multi_gpu_device_check</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">tensorrt</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">trt</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_get_dynamic_shapes_kernel_strategy</span><span class="p">(</span><span class="n">strategy_str</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Map strategy string to TRT enum. Only called on RTX builds.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">&quot;lazy&quot;</span><span class="p">:</span> <span class="n">trt</span><span class="o">.</span><span class="n">DynamicShapesKernelSpecializationStrategy</span><span class="o">.</span><span class="n">LAZY</span><span class="p">,</span>
+        <span class="s2">&quot;eager&quot;</span><span class="p">:</span> <span class="n">trt</span><span class="o">.</span><span class="n">DynamicShapesKernelSpecializationStrategy</span><span class="o">.</span><span class="n">EAGER</span><span class="p">,</span>
+        <span class="s2">&quot;none&quot;</span><span class="p">:</span> <span class="n">trt</span><span class="o">.</span><span class="n">DynamicShapesKernelSpecializationStrategy</span><span class="o">.</span><span class="n">NONE</span><span class="p">,</span>
+    <span class="p">}</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">strategy_str</span><span class="p">,</span> <span class="n">trt</span><span class="o">.</span><span class="n">DynamicShapesKernelSpecializationStrategy</span><span class="o">.</span><span class="n">LAZY</span><span class="p">)</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">DynamicOutputAllocator</span><span class="p">(</span><span class="n">trt</span><span class="o">.</span><span class="n">IOutputAllocator</span><span class="p">):</span>  <span class="c1"># type: ignore[misc]</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">output_dtypes</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">trt</span><span class="o">.</span><span class="n">IOutputAllocator</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">buffers</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">shapes</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dtypes</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">]</span> <span class="o">=</span> <span class="n">output_dtypes</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">reallocate_output_async</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">tensor_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">memory</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">alignment</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">stream</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">Stream</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+        <span class="n">shape</span> <span class="o">=</span> <span class="p">(</span><span class="n">size</span><span class="p">,)</span>
+        <span class="k">if</span> <span class="n">tensor_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">buffers</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">buffers</span><span class="p">[</span><span class="n">tensor_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span>
+                <span class="n">shape</span><span class="p">,</span>
+                <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dtypes</span><span class="p">[</span><span class="n">tensor_name</span><span class="p">],</span>
+                <span class="n">device</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">current_device</span><span class="p">(),</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">buffers</span><span class="p">[</span><span class="n">tensor_name</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">shape</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">buffers</span><span class="p">[</span><span class="n">tensor_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span>
+                    <span class="n">shape</span><span class="p">,</span>
+                    <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dtypes</span><span class="p">[</span><span class="n">tensor_name</span><span class="p">],</span>
+                    <span class="n">device</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">current_device</span><span class="p">(),</span>
+                <span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">buffers</span><span class="p">[</span><span class="n">tensor_name</span><span class="p">]</span><span class="o">.</span><span class="n">data_ptr</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">notify_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tensor_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">shape</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">shapes</span><span class="p">[</span><span class="n">tensor_name</span><span class="p">]</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">TorchTRTRuntimeStates</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new_cudagraphs</span><span class="p">:</span> <span class="nb">bool</span><span class="p">):</span>
+        <span class="c1"># Indicates whether CUDAGraphs were enabled in the previous execute_engine</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">old_cudagraphs</span> <span class="o">=</span> <span class="n">new_cudagraphs</span>
+        <span class="c1"># Indicates whether pre-allocated output was enabled in the previous execute_engine</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">old_pre_allocated_outputs</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="c1"># Indicates whether context has changed</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">context_changed</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_runtime_states</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">new_cudagraphs</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+        <span class="n">new_pre_allocated_output</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+        <span class="n">shape_changed</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">bool</span><span class="p">,</span> <span class="nb">bool</span><span class="p">,</span> <span class="nb">bool</span><span class="p">]:</span>
+        <span class="c1"># Evaluates whether certain conditions are met to enable CUDA Graph recording or to use pre-allocated outputs</span>
+        <span class="c1"># based on the current and previous states, as well as input shape has changed</span>
+        <span class="n">need_cudagraphs_record</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">can_use_pre_allocated_outputs</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">need_cudagraphs_reset</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="c1"># CUDA Graph recording is needed if CUDA graphs is enabled and:</span>
+        <span class="c1"># - CUDA graphs were previously disabled</span>
+        <span class="c1"># - or the shape has changed</span>
+        <span class="c1"># - or the execution context has changed (e.g., weight streaming)</span>
+        <span class="k">if</span> <span class="n">new_cudagraphs</span> <span class="ow">and</span> <span class="p">(</span>
+            <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">old_cudagraphs</span> <span class="ow">or</span> <span class="n">shape_changed</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">context_changed</span>
+        <span class="p">):</span>
+            <span class="n">need_cudagraphs_record</span> <span class="o">=</span> <span class="kc">True</span>
+
+        <span class="c1"># Pre-allocated output can be used when previous and current state are true without shape change</span>
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">old_pre_allocated_outputs</span>
+            <span class="ow">and</span> <span class="n">new_pre_allocated_output</span>
+            <span class="ow">and</span> <span class="p">(</span><span class="ow">not</span> <span class="n">shape_changed</span><span class="p">)</span>
+        <span class="p">):</span>
+            <span class="n">can_use_pre_allocated_outputs</span> <span class="o">=</span> <span class="kc">True</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">new_cudagraphs</span> <span class="ow">or</span> <span class="n">shape_changed</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">context_changed</span><span class="p">:</span>
+            <span class="n">need_cudagraphs_reset</span> <span class="o">=</span> <span class="kc">True</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">old_cudagraphs</span> <span class="o">=</span> <span class="n">new_cudagraphs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">old_pre_allocated_outputs</span> <span class="o">=</span> <span class="n">new_pre_allocated_output</span>
+        <span class="c1"># reset flag</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">context_changed</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="n">need_cudagraphs_record</span><span class="p">,</span>
+            <span class="n">can_use_pre_allocated_outputs</span><span class="p">,</span>
+            <span class="n">need_cudagraphs_reset</span><span class="p">,</span>
+        <span class="p">)</span>
+
+
+<div class="viewcode-block" id="PythonTorchTensorRTModule">
+<a class="viewcode-back" href="../../../../py_api/runtime.html#torch_tensorrt.runtime.PythonTorchTensorRTModule">[docs]</a>
+<span class="nd">@cls_supports_debugger</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">PythonTorchTensorRTModule</span><span class="p">(</span><span class="n">Module</span><span class="p">):</span>  <span class="c1"># type: ignore[misc]</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;PythonTorchTensorRTModule is a PyTorch module which encompasses an arbitrary TensorRT Engine.</span>
+
+<span class="sd">    This module is backed by the Torch-TensorRT runtime and is only compatible with</span>
+<span class="sd">    FX / Dynamo / Python deployments. This module cannot be serialized to torchscript via torch.jit.trace for C++ deployment.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="PythonTorchTensorRTModule.__init__">
+<a class="viewcode-back" href="../../../../py_api/runtime.html#torch_tensorrt.runtime.PythonTorchTensorRTModule.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">serialized_engine</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bytes</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">input_binding_names</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">output_binding_names</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+        <span class="n">settings</span><span class="p">:</span> <span class="n">CompilationSettings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(),</span>
+        <span class="n">weight_name_map</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">requires_output_allocator</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">requires_native_multidevice</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">symbolic_shape_expressions</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">_debugger_config</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">DebuggerConfig</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs</span>
+<span class="sd">        a PyTorch ``torch.nn.Module`` around it. Uses TensorRT Python APIs to run the engine</span>
+
+<span class="sd">        Arguments:</span>
+<span class="sd">            serialized_engine (bytes): Serialized TensorRT engine in the form of a bytearray</span>
+<span class="sd">            input_binding_names (List[str]): List of input TensorRT engine binding names in the order they would be passed to the TRT modules</span>
+<span class="sd">            output_binding_names (List[str]): List of output TensorRT engine binding names in the order they should be returned</span>
+
+<span class="sd">        Keyword Arguments:</span>
+<span class="sd">            name (str): Name for module</span>
+<span class="sd">            settings (torch_tensorrt.dynamo.CompilationSettings): Settings used to compile engine, assumes engine was built with default compilation settings if object not passed</span>
+<span class="sd">            weight_name_map (dict): Mapping of engine weight name to state_dict weight name</span>
+<span class="sd">            requires_output_allocator (bool): Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators)</span>
+<span class="sd">            requires_native_multidevice (bool): Boolean flag indicating if the converter creates operators which require multiple devices to run (e.g. multi-device collective operations)</span>
+<span class="sd">            symbolic_shape_expressions (List[str]): List of symbolic shape expressions for each output binding</span>
+<span class="sd">        Example:</span>
+
+<span class="sd">            .. code-block:: py</span>
+
+<span class="sd">                trt_module = PythonTorchTensorRTModule(</span>
+<span class="sd">                    engine_str,</span>
+<span class="sd">                    input_binding_names=[&quot;x&quot;],</span>
+<span class="sd">                    output_binding_names=[&quot;output&quot;],</span>
+<span class="sd">                    name=&quot;my_module&quot;,</span>
+<span class="sd">                    settings=CompilationSettings(device=torch.cuda.current_device)</span>
+<span class="sd">                )</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">:</span> <span class="n">Any</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_debugger_config</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">DebuggerConfig</span><span class="p">]</span> <span class="o">=</span> <span class="n">_debugger_config</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">PythonTorchTensorRTModule</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_register_state_dict_hook</span><span class="p">(</span><span class="n">PythonTorchTensorRTModule</span><span class="o">.</span><span class="n">_on_state_dict</span><span class="p">)</span>
+
+        <span class="c1"># Run multi-gpu device check to validate engine instantiation</span>
+        <span class="n">multi_gpu_device_check</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_input_buffers</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_output_buffers</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cudagraph</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">CUDAGraph</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_caller_stream</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">Stream</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_engine_stream</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">Stream</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="c1"># TODO: Make the below a Dictionary {shape: cudagraph}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">shape_key</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="c1"># See https://github.com/pytorch/pytorch/blob/acfe237a71af609e837a34bb38048aa8acb8eb4d/torch/cuda/graphs.py#L92-L98</span>
+        <span class="c1"># Unused currently - to be used by Dynamic Shape support implementation</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">memory_pool</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">serialized_engine</span> <span class="o">=</span> <span class="n">serialized_engine</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">input_names</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">input_binding_names</span> <span class="k">if</span> <span class="n">input_binding_names</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">[]</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output_names</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">output_binding_names</span> <span class="k">if</span> <span class="n">output_binding_names</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">[]</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">initialized</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">target_device_id</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">settings</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">gpu_id</span>
+            <span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">device</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="k">else</span> <span class="n">Device</span><span class="o">.</span><span class="n">_current_device</span><span class="p">()</span><span class="o">.</span><span class="n">gpu_id</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">target_device_properties</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">get_device_properties</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">target_device_id</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">profiling_enabled</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">_debugger_config</span><span class="o">.</span><span class="n">save_engine_profile</span>
+            <span class="k">if</span> <span class="n">_debugger_config</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="k">else</span> <span class="kc">False</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">settings</span> <span class="o">=</span> <span class="n">settings</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">weight_name_map</span> <span class="o">=</span> <span class="n">weight_name_map</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">target_platform</span> <span class="o">=</span> <span class="n">Platform</span><span class="o">.</span><span class="n">current_platform</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">runtime_states</span> <span class="o">=</span> <span class="n">TorchTRTRuntimeStates</span><span class="p">(</span>
+            <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">get_cudagraphs_mode</span><span class="p">()</span>
+        <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">cudagraphs_enabled</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pre_allocated_outputs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">use_pre_allocated_outputs</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">requires_output_allocator</span> <span class="o">=</span> <span class="n">requires_output_allocator</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output_allocator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">DynamicOutputAllocator</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">use_output_allocator_outputs</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">current_device</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cudagraphs_enabled</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">get_cudagraphs_mode</span><span class="p">()</span>
+        <span class="c1"># If the output tensor is not owned by the engine (output_tensors_are_unowned=True), we need to create a new output tensor in each forward pass</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output_tensors_are_unowned</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">symbolic_shape_expressions</span> <span class="o">=</span> <span class="n">symbolic_shape_expressions</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_nccl_comm</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_has_nccl_ops</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">requires_native_multidevice</span>
+
+        <span class="c1"># Runtime cache state (TensorRT-RTX only)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">runtime_config</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">runtime_cache</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">runtime_cache_path</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">runtime_cache_path</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">serialized_engine</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">lazy_engine_init</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">setup_engine</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="PythonTorchTensorRTModule.set_output_tensors_as_unowned">
+<a class="viewcode-back" href="../../../../py_api/runtime.html#torch_tensorrt.runtime.PythonTorchTensorRTModule.set_output_tensors_as_unowned">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_output_tensors_as_unowned</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">enabled</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Flag to set if the output tensors of this engine are solely owned by the Torch-TensorRT Runtime or if they might be shared with a user.</span>
+<span class="sd">        If the tensors are not owned by the runtime, then they must be recreated on every forward call which may have implications for performance.</span>
+<span class="sd">        Typically only the final engine in a graph requires output tensors to be unowned and there are performance gains to be had for intermediate engines to manage their own standing memory.</span>
+<span class="sd">        Therefore this should only be set to True for the final module in a graph and leave false for intermediate modules.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            enabled: bool</span>
+<span class="sd">                Whether to set the flag to True.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output_tensors_are_unowned</span> <span class="o">=</span> <span class="n">enabled</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_streamable_device_memory_budget</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">streamable_weights_size</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_automatic_device_memory_budget</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">get_weight_streaming_automatic_budget</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_device_memory_budget</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">weight_streaming_budget_v2</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_device_memory_budget</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">budget_bytes</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="c1"># Recreating the context because weight streaming budget cannot be modified while there are active context.</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span>
+        <span class="n">budget_bytes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_set_device_memory_budget</span><span class="p">(</span><span class="n">budget_bytes</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_context</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">runtime_states</span><span class="o">.</span><span class="n">context_changed</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">return</span> <span class="n">budget_bytes</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_set_device_memory_budget</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">budget_bytes</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="c1"># Disable weight streaming for invalid budget size</span>
+        <span class="k">if</span> <span class="n">budget_bytes</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">budget_bytes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_streamable_device_memory_budget</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">weight_streaming_budget_v2</span> <span class="o">=</span> <span class="n">budget_bytes</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">weight_streaming_budget_v2</span> <span class="o">!=</span> <span class="n">budget_bytes</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to set weight streaming budget to </span><span class="si">{</span><span class="n">budget_bytes</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">budget_bytes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">weight_streaming_budget_v2</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_streamable_device_memory_budget</span><span class="p">()</span> <span class="o">==</span> <span class="n">budget_bytes</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Weight streaming is disabled&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">budget_bytes</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_default_device_memory_budget</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="n">budget_bytes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_automatic_device_memory_budget</span><span class="p">()</span>
+        <span class="c1"># Set automatic weight streaming budget as default when context is created</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Weight streaming budget set to </span><span class="si">{</span><span class="n">budget_bytes</span><span class="si">}</span><span class="s2">B&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_set_device_memory_budget</span><span class="p">(</span><span class="n">budget_bytes</span><span class="p">)</span>
+
+    <span class="c1"># Distributed functions</span>
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_distributed</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Check if this module is running inside an active distributed context.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">bool</span><span class="p">(</span>
+            <span class="n">dist</span><span class="o">.</span><span class="n">is_available</span><span class="p">()</span> <span class="ow">and</span> <span class="n">dist</span><span class="o">.</span><span class="n">is_initialized</span><span class="p">()</span> <span class="ow">and</span> <span class="n">dist</span><span class="o">.</span><span class="n">get_world_size</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">1</span>
+        <span class="p">)</span>
+
+<div class="viewcode-block" id="PythonTorchTensorRTModule.setup_nccl_comm">
+<a class="viewcode-back" href="../../../../py_api/runtime.html#torch_tensorrt.runtime.PythonTorchTensorRTModule.setup_nccl_comm">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">setup_nccl_comm</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Set up NCCL communicator from the active ProcessGroup.</span>
+
+<span class="sd">        Uses the process group set by torch_tensorrt.distributed.distributed_context() if</span>
+<span class="sd">        active, otherwise falls back to the default world group.</span>
+<span class="sd">        Called lazily on first forward pass for distributed engines.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.distributed._distributed</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_active_group</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_distributed</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="n">pg</span> <span class="o">=</span> <span class="n">get_active_group</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">pg</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">dist</span><span class="o">.</span><span class="n">get_backend</span><span class="p">(</span><span class="n">pg</span><span class="p">)</span> <span class="o">!=</span> <span class="s2">&quot;nccl&quot;</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                <span class="s2">&quot;Active ProcessGroup must use NCCL backend. &quot;</span>
+                <span class="s2">&quot;Use torch_tensorrt.distributed.distributed_context(group) to select a non-default group.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="n">backend</span> <span class="o">=</span> <span class="n">pg</span><span class="o">.</span><span class="n">_get_backend</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">))</span>
+
+        <span class="c1"># Force NCCL communicator initialization with a dummy collective</span>
+        <span class="c1"># Must use group=pg so the correct group&#39;s comm is initialized</span>
+        <span class="c1"># dist.all_reduce without group= only initializes the default world group.</span>
+        <span class="n">dummy</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
+        <span class="n">dist</span><span class="o">.</span><span class="n">all_reduce</span><span class="p">(</span><span class="n">dummy</span><span class="p">,</span> <span class="n">group</span><span class="o">=</span><span class="n">pg</span><span class="p">)</span>
+
+        <span class="n">comm_ptr</span> <span class="o">=</span> <span class="n">backend</span><span class="o">.</span><span class="n">_comm_ptr</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">comm_ptr</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">comm_ptr</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Failed to get NCCL communicator from ProcessGroup&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_nccl_comm</span> <span class="o">=</span> <span class="n">comm_ptr</span>
+
+        <span class="c1"># Bind communicator to TRT execution context (PyCapsule required by TRT Python API)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="kn">import</span><span class="w"> </span><span class="nn">ctypes</span>
+
+            <span class="n">ctypes</span><span class="o">.</span><span class="n">pythonapi</span><span class="o">.</span><span class="n">PyCapsule_New</span><span class="o">.</span><span class="n">restype</span> <span class="o">=</span> <span class="n">ctypes</span><span class="o">.</span><span class="n">py_object</span>
+            <span class="n">ctypes</span><span class="o">.</span><span class="n">pythonapi</span><span class="o">.</span><span class="n">PyCapsule_New</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="n">ctypes</span><span class="o">.</span><span class="n">c_void_p</span><span class="p">,</span>
+                <span class="n">ctypes</span><span class="o">.</span><span class="n">c_char_p</span><span class="p">,</span>
+                <span class="n">ctypes</span><span class="o">.</span><span class="n">c_void_p</span><span class="p">,</span>
+            <span class="p">]</span>
+            <span class="n">comm_capsule</span> <span class="o">=</span> <span class="n">ctypes</span><span class="o">.</span><span class="n">pythonapi</span><span class="o">.</span><span class="n">PyCapsule_New</span><span class="p">(</span><span class="n">comm_ptr</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="n">ok</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">set_communicator</span><span class="p">(</span><span class="n">comm_capsule</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">ok</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;TRT context.set_communicator() returned False for rank=</span><span class="si">{</span><span class="n">dist</span><span class="o">.</span><span class="n">get_rank</span><span class="p">()</span><span class="si">}</span><span class="s2">. &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;comm_ptr=</span><span class="si">{</span><span class="n">comm_ptr</span><span class="si">:</span><span class="s2">#x</span><span class="si">}</span><span class="s2">. Failed to bind NCCL communicator to TRT execution context.&quot;</span>
+                <span class="p">)</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;NCCL comm set up (rank=</span><span class="si">{</span><span class="n">dist</span><span class="o">.</span><span class="n">get_rank</span><span class="p">()</span><span class="si">}</span><span class="s2">, world_size=</span><span class="si">{</span><span class="n">dist</span><span class="o">.</span><span class="n">get_world_size</span><span class="p">()</span><span class="si">}</span><span class="s2">)&quot;</span>
+        <span class="p">)</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">setup_engine</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">target_platform</span> <span class="o">==</span> <span class="n">Platform</span><span class="o">.</span><span class="n">current_platform</span><span class="p">()</span>
+        <span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;TensorRT engine was not built to target current platform (target: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">target_platform</span><span class="si">}</span><span class="s2">, current: </span><span class="si">{</span><span class="n">Platform</span><span class="o">.</span><span class="n">current_platform</span><span class="p">()</span><span class="si">}</span><span class="s2">)&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">initialized</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="n">runtime</span> <span class="o">=</span> <span class="n">trt</span><span class="o">.</span><span class="n">Runtime</span><span class="p">(</span><span class="n">TRT_LOGGER</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">=</span> <span class="n">runtime</span><span class="o">.</span><span class="n">deserialize_cuda_engine</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">serialized_engine</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">enable_weight_streaming</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">set_default_device_memory_budget</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">create_execution_context</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_has_nccl_ops</span><span class="p">:</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.distributed._nccl_utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+                <span class="n">check_nccl_engine_requirements</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="n">check_nccl_engine_requirements</span><span class="p">()</span>
+
+            <span class="c1"># For engines with native NCCL collective layers, all ranks must</span>
+            <span class="c1"># have a live IExecutionContext before any rank executes a</span>
+            <span class="c1"># collective. Barrier here so a fast-compiling rank does not race</span>
+            <span class="c1"># ahead and issue an NCCL op while another rank is still inside</span>
+            <span class="c1"># deserialize_cuda_engine / create_execution_context.</span>
+            <span class="k">if</span> <span class="p">(</span>
+                <span class="n">dist</span><span class="o">.</span><span class="n">is_available</span><span class="p">()</span>
+                <span class="ow">and</span> <span class="n">dist</span><span class="o">.</span><span class="n">is_initialized</span><span class="p">()</span>
+                <span class="ow">and</span> <span class="n">dist</span><span class="o">.</span><span class="n">get_world_size</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">1</span>
+            <span class="p">):</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="s2">&quot;Barrier after execution context creation (distributed NCCL engine)&quot;</span>
+                <span class="p">)</span>
+                <span class="n">dist</span><span class="o">.</span><span class="n">barrier</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">tensorrt_rtx</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_setup_runtime_config</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_context</span><span class="p">()</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;Failed to create execution context&quot;</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">num_io_tensors</span> <span class="o">==</span> <span class="p">(</span>
+            <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">input_names</span><span class="p">)</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">output_names</span><span class="p">)</span>
+        <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">input_dtypes</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">dtype</span><span class="o">.</span><span class="n">_from</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">get_tensor_dtype</span><span class="p">(</span><span class="n">input_name</span><span class="p">))</span>
+            <span class="k">for</span> <span class="n">input_name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">input_names</span>
+        <span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">input_shapes</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">get_tensor_shape</span><span class="p">(</span><span class="n">input_name</span><span class="p">)</span> <span class="k">for</span> <span class="n">input_name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">input_names</span>
+        <span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output_dtypes</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">dtype</span><span class="o">.</span><span class="n">_from</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">get_tensor_dtype</span><span class="p">(</span><span class="n">output_name</span><span class="p">))</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">output_name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_names</span>
+        <span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output_shapes</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">get_tensor_shape</span><span class="p">(</span><span class="n">output_name</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">output_name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_names</span>
+        <span class="p">]</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">requires_output_allocator</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">create_output_allocator</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">get_cudagraphs_mode</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cudagraph</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">CUDAGraph</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">is_shape_inference_io</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">input_name</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">is_shape_inference_io</span><span class="p">(</span><span class="n">input_name</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">input_name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">input_names</span>
+        <span class="p">}</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_setup_runtime_config</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a RuntimeConfig with runtime cache for TensorRT-RTX.</span>
+
+<span class="sd">        The runtime cache stores JIT compilation results to avoid repeated</span>
+<span class="sd">        compilation of kernels/graphs across inference runs.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">runtime_config</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">create_runtime_config</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">runtime_config</span><span class="o">.</span><span class="n">set_execution_context_allocation_strategy</span><span class="p">(</span>
+            <span class="n">trt</span><span class="o">.</span><span class="n">ExecutionContextAllocationStrategy</span><span class="o">.</span><span class="n">STATIC</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">runtime_config</span><span class="o">.</span><span class="n">dynamic_shapes_kernel_specialization_strategy</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">_get_dynamic_shapes_kernel_strategy</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">dynamic_shapes_kernel_specialization_strategy</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Dynamic shapes kernel specialization strategy: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">dynamic_shapes_kernel_specialization_strategy</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">runtime_cache</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">runtime_config</span><span class="o">.</span><span class="n">create_runtime_cache</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_load_runtime_cache</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">runtime_config</span><span class="o">.</span><span class="n">set_runtime_cache</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">runtime_cache</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;TensorRT-RTX runtime cache configured&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_create_context</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">trt</span><span class="o">.</span><span class="n">IExecutionContext</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create an execution context, using RuntimeConfig for RTX.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">tensorrt_rtx</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">runtime_config</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">create_execution_context</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">runtime_config</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">create_execution_context</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_load_runtime_cache</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Load runtime cache from disk if it exists (with shared file lock).&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">runtime_cache</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">runtime_cache_path</span><span class="p">):</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No existing runtime cache at </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">runtime_cache_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">filelock</span><span class="w"> </span><span class="kn">import</span> <span class="n">FileLock</span>
+
+            <span class="n">lock</span> <span class="o">=</span> <span class="n">FileLock</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">runtime_cache_path</span> <span class="o">+</span> <span class="s2">&quot;.lock&quot;</span><span class="p">)</span>
+            <span class="k">with</span> <span class="n">lock</span><span class="o">.</span><span class="n">acquire</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="mi">10</span><span class="p">):</span>
+                <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">runtime_cache_path</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                    <span class="n">data</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">data</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">runtime_cache</span><span class="o">.</span><span class="n">deserialize</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loaded runtime cache from </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">runtime_cache_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to load runtime cache: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_save_runtime_cache</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Save runtime cache to disk (with exclusive file lock).&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">runtime_cache</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">host_mem</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">runtime_cache</span><span class="o">.</span><span class="n">serialize</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">host_mem</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">return</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">runtime_cache_path</span><span class="p">),</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+            <span class="kn">from</span><span class="w"> </span><span class="nn">filelock</span><span class="w"> </span><span class="kn">import</span> <span class="n">FileLock</span>
+
+            <span class="n">lock</span> <span class="o">=</span> <span class="n">FileLock</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">runtime_cache_path</span> <span class="o">+</span> <span class="s2">&quot;.lock&quot;</span><span class="p">)</span>
+            <span class="k">with</span> <span class="n">lock</span><span class="o">.</span><span class="n">acquire</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="mi">10</span><span class="p">):</span>
+                <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">runtime_cache_path</span><span class="p">,</span> <span class="s2">&quot;wb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                    <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="nb">memoryview</span><span class="p">(</span><span class="n">host_mem</span><span class="p">))</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Saved runtime cache to </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">runtime_cache_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to save runtime cache: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_check_initialized</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">initialized</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;PythonTorchTensorRTModule is not initialized.&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_on_state_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state_dict</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">_</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">state_dict</span><span class="p">[</span><span class="n">prefix</span> <span class="o">+</span> <span class="s2">&quot;engine&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">serialized_engine</span>
+        <span class="n">state_dict</span><span class="p">[</span><span class="n">prefix</span> <span class="o">+</span> <span class="s2">&quot;input_names&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">input_names</span>
+        <span class="n">state_dict</span><span class="p">[</span><span class="n">prefix</span> <span class="o">+</span> <span class="s2">&quot;output_names&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_names</span>
+        <span class="n">state_dict</span><span class="p">[</span><span class="n">prefix</span> <span class="o">+</span> <span class="s2">&quot;platform&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">target_platform</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_load_from_state_dict</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">state_dict</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+        <span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">local_metadata</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">strict</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">missing_keys</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">unexpected_keys</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">error_msgs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">serialized_engine</span> <span class="o">=</span> <span class="n">state_dict</span><span class="p">[</span><span class="n">prefix</span> <span class="o">+</span> <span class="s2">&quot;engine&quot;</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">input_names</span> <span class="o">=</span> <span class="n">state_dict</span><span class="p">[</span><span class="n">prefix</span> <span class="o">+</span> <span class="s2">&quot;input_names&quot;</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output_names</span> <span class="o">=</span> <span class="n">state_dict</span><span class="p">[</span><span class="n">prefix</span> <span class="o">+</span> <span class="s2">&quot;output_names&quot;</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">target_platform</span> <span class="o">=</span> <span class="n">state_dict</span><span class="p">[</span><span class="n">prefix</span> <span class="o">+</span> <span class="s2">&quot;platform&quot;</span><span class="p">]</span>
+
+        <span class="c1"># Run multi-gpu device check to validate engine instantiation</span>
+        <span class="n">multi_gpu_device_check</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">setup_engine</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">__getstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+        <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;engine&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;context&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="c1"># NCCLcomm cannot be pickled</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;_nccl_comm&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;runtime_config&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;runtime_cache&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">state</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">__setstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+        <span class="c1"># reset after unpickling, apbose: is this required though?</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_nccl_comm</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">setup_engine</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">__deepcopy__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">memo</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PythonTorchTensorRTModule</span><span class="p">:</span>
+        <span class="bp">cls</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span>
+        <span class="n">memo</span><span class="p">[</span><span class="nb">id</span><span class="p">(</span><span class="bp">self</span><span class="p">)]</span> <span class="o">=</span> <span class="n">result</span>
+        <span class="n">result</span><span class="o">.</span><span class="n">__setstate__</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__getstate__</span><span class="p">())</span>
+        <span class="k">return</span> <span class="n">result</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_reset_captured_graph</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">cudagraph</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cudagraph</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cudagraph</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__del__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_save_runtime_cache</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_reset_captured_graph</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">setup_input_tensors</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">contiguous_inputs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span>
+        <span class="n">cudagraphs_enabled</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+        <span class="n">need_cudagraphs_record</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">input_name</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">input_names</span><span class="p">):</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">contiguous_inputs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">is_cuda</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Detected input </span><span class="si">{</span><span class="n">input_name</span><span class="si">}</span><span class="s2"> of engine </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2"> is not on a cuda device. &quot;</span>
+                    <span class="s2">&quot;This tensor is being moved by the runtime but for performance considerations, &quot;</span>
+                    <span class="s2">&quot;ensure your inputs are all on GPU and open an issue here &quot;</span>
+                    <span class="s2">&quot;(https://github.com/pytorch/TensorRT/issues) if this warning persists.&quot;</span>
+                <span class="p">)</span>
+                <span class="n">contiguous_inputs</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">contiguous_inputs</span><span class="p">[:</span><span class="n">i</span><span class="p">]</span>
+                    <span class="o">+</span> <span class="p">[</span><span class="n">contiguous_inputs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">cuda</span><span class="p">()]</span>
+                    <span class="o">+</span> <span class="n">contiguous_inputs</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span> <span class="p">:]</span>
+                <span class="p">)</span>
+
+            <span class="k">assert</span> <span class="p">(</span>
+                <span class="n">contiguous_inputs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">input_dtypes</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+            <span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;Dtype mismatch for </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">th input(</span><span class="si">{</span><span class="n">input_name</span><span class="si">}</span><span class="s2">). Expect </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">input_dtypes</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="si">}</span><span class="s2">, got </span><span class="si">{</span><span class="n">contiguous_inputs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">dtype</span><span class="si">}</span><span class="s2">.&quot;</span>
+
+            <span class="k">if</span> <span class="n">need_cudagraphs_record</span><span class="p">:</span>
+                <span class="c1"># If cudagraphs is enabled, this memory is reserved for future cudagraph runs</span>
+                <span class="c1"># Clone is required to avoid re-using user-provided GPU memory</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_input_buffers</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">contiguous_inputs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">clone</span><span class="p">()</span>
+
+            <span class="c1"># For shape tensors, we use CPU pointers and for data tensors, we use GPU pointers</span>
+            <span class="c1"># as per TensorRT requirements</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_shape_inference_io</span><span class="p">[</span><span class="n">input_name</span><span class="p">]:</span>
+                <span class="c1"># Shape tensor inputs are casted to int64 explicitly</span>
+                <span class="c1"># Currently Torch CPU pointers are not working; numpy pointers are used instead</span>
+                <span class="c1"># to refer to underlying memory</span>
+                <span class="n">inputs_cpu</span> <span class="o">=</span> <span class="n">contiguous_inputs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">set_tensor_address</span><span class="p">(</span><span class="n">input_name</span><span class="p">,</span> <span class="n">inputs_cpu</span><span class="o">.</span><span class="n">ctypes</span><span class="o">.</span><span class="n">data</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">set_input_shape</span><span class="p">(</span>
+                    <span class="n">input_name</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">contiguous_inputs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+                <span class="p">)</span>
+                <span class="n">tensor_to_bind</span> <span class="o">=</span> <span class="n">contiguous_inputs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+                <span class="k">if</span> <span class="n">tensor_to_bind</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="c1"># Use a single persistent placeholder for empty tensors (allocated once, reused)</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_empty_tensor_placeholder&quot;</span><span class="p">):</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_empty_tensor_placeholder</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span>
+                            <span class="mi">1</span><span class="p">,</span>
+                            <span class="n">dtype</span><span class="o">=</span><span class="n">tensor_to_bind</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span>
+                            <span class="n">device</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">current_device</span><span class="p">(),</span>
+                        <span class="p">)</span>
+                    <span class="n">tensor_to_bind</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_empty_tensor_placeholder</span>
+                <span class="k">if</span> <span class="n">cudagraphs_enabled</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_input_buffers</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">copy_</span><span class="p">(</span><span class="n">contiguous_inputs</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">set_tensor_address</span><span class="p">(</span>
+                        <span class="n">input_name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_input_buffers</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">data_ptr</span><span class="p">()</span>
+                    <span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">set_tensor_address</span><span class="p">(</span>
+                        <span class="n">input_name</span><span class="p">,</span> <span class="n">tensor_to_bind</span><span class="o">.</span><span class="n">data_ptr</span><span class="p">()</span>
+                    <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">create_output_tensors</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]:</span>
+        <span class="c1"># create output tensors</span>
+        <span class="n">outputs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">for</span> <span class="n">o</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">output_names</span><span class="p">):</span>
+            <span class="n">output</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span>
+                <span class="n">size</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">output_shapes</span><span class="p">[</span><span class="n">o</span><span class="p">],</span>
+                <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">output_dtypes</span><span class="p">[</span><span class="n">o</span><span class="p">],</span>
+                <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">outputs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">output</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">outputs</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_pre_allocated_outputs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">enable</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">use_pre_allocated_outputs</span> <span class="o">=</span> <span class="n">enable</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_use_output_allocator</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">enable</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">use_output_allocator_outputs</span> <span class="o">=</span> <span class="n">enable</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">create_output_allocator</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_allocator</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">output_dtypes_dict</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">for</span> <span class="n">o</span><span class="p">,</span> <span class="n">output_name</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">output_names</span><span class="p">):</span>
+                <span class="n">output_dtypes_dict</span><span class="p">[</span><span class="n">output_name</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_dtypes</span><span class="p">[</span><span class="n">o</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">output_allocator</span> <span class="o">=</span> <span class="n">DynamicOutputAllocator</span><span class="p">(</span><span class="n">output_dtypes_dict</span><span class="p">)</span>
+
+<div class="viewcode-block" id="PythonTorchTensorRTModule.forward">
+<a class="viewcode-back" href="../../../../py_api/runtime.html#torch_tensorrt.runtime.PythonTorchTensorRTModule.forward">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">inputs</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">|</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">run_standard_execution</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">|</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+            <span class="n">shape_changed</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">validate_input_shapes</span><span class="p">(</span><span class="n">contiguous_inputs</span><span class="p">)</span>
+            <span class="p">(</span>
+                <span class="n">need_cudagraphs_record</span><span class="p">,</span>
+                <span class="n">can_use_pre_allocated_outputs</span><span class="p">,</span>
+                <span class="n">need_cudagraphs_reset</span><span class="p">,</span>
+            <span class="p">)</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">runtime_states</span><span class="o">.</span><span class="n">set_runtime_states</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">cudagraphs_enabled</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">use_pre_allocated_outputs</span><span class="p">,</span> <span class="n">shape_changed</span>
+            <span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">need_cudagraphs_reset</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_reset_captured_graph</span><span class="p">()</span>
+
+            <span class="k">if</span> <span class="n">need_cudagraphs_record</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_input_buffers</span> <span class="o">=</span> <span class="p">[</span><span class="kc">None</span><span class="p">]</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">input_names</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_output_buffers</span> <span class="o">=</span> <span class="p">[</span><span class="kc">None</span><span class="p">]</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">output_names</span><span class="p">)</span>
+
+            <span class="k">with</span> <span class="p">(</span>
+                <span class="n">torch</span><span class="o">.</span><span class="n">autograd</span><span class="o">.</span><span class="n">profiler</span><span class="o">.</span><span class="n">record_function</span><span class="p">(</span>
+                    <span class="s2">&quot;PythonTorchTensorRTModule:ProcessInputs&quot;</span>
+                <span class="p">)</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">profiling_enabled</span>
+                <span class="k">else</span> <span class="n">nullcontext</span><span class="p">()</span>
+            <span class="p">):</span>
+                <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">contiguous_inputs</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">input_names</span>
+                <span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;Wrong number of inputs, expect </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">input_names</span><span class="p">)</span><span class="si">}</span><span class="s2"> get </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">contiguous_inputs</span><span class="p">)</span><span class="si">}</span><span class="s2">.&quot;</span>
+
+                <span class="bp">self</span><span class="o">.</span><span class="n">setup_input_tensors</span><span class="p">(</span>
+                    <span class="n">contiguous_inputs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cudagraphs_enabled</span><span class="p">,</span> <span class="n">need_cudagraphs_record</span>
+                <span class="p">)</span>
+
+                <span class="k">if</span> <span class="n">shape_changed</span><span class="p">:</span>
+                    <span class="c1"># Check if input shapes can be inferred.</span>
+                    <span class="n">uninferred_input_names</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">infer_shapes</span><span class="p">()</span>
+                    <span class="k">if</span> <span class="n">uninferred_input_names</span><span class="p">:</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                            <span class="sa">f</span><span class="s2">&quot;The shapes of the inputs: </span><span class="si">{</span><span class="n">uninferred_input_names</span><span class="si">}</span><span class="s2"> cannot be inferred and could lead to undefined behavior. </span><span class="se">\</span>
+<span class="s2">                                    This could happen if the input tensor addresses/shapes haven&#39;t been configured correctly&quot;</span>
+                        <span class="p">)</span>
+
+            <span class="k">with</span> <span class="p">(</span>
+                <span class="n">torch</span><span class="o">.</span><span class="n">autograd</span><span class="o">.</span><span class="n">profiler</span><span class="o">.</span><span class="n">record_function</span><span class="p">(</span>
+                    <span class="s2">&quot;PythonTorchTensorRTModule:ProcessOutputs&quot;</span>
+                <span class="p">)</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">profiling_enabled</span>
+                <span class="k">else</span> <span class="n">nullcontext</span><span class="p">()</span>
+            <span class="p">):</span>
+                <span class="k">if</span> <span class="n">can_use_pre_allocated_outputs</span><span class="p">:</span>
+                    <span class="n">outputs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">pre_allocated_outputs</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">output_shapes</span> <span class="o">=</span> <span class="p">[</span>
+                        <span class="nb">tuple</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">get_tensor_shape</span><span class="p">(</span><span class="n">output_name</span><span class="p">))</span>
+                        <span class="k">for</span> <span class="n">output_name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_names</span>
+                    <span class="p">]</span>
+                    <span class="k">if</span> <span class="n">DYNAMIC_DIM</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_shapes</span><span class="p">:</span>
+                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                            <span class="s2">&quot;Encountered dynamic output shapes during runtime. This could mean the network has data-dependent output shapes which is not currently supported.&quot;</span>
+                        <span class="p">)</span>
+                    <span class="n">outputs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_output_tensors</span><span class="p">()</span>
+
+                <span class="k">for</span> <span class="n">o</span><span class="p">,</span> <span class="n">output_name</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">output_names</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="n">need_cudagraphs_record</span><span class="p">:</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_output_buffers</span><span class="p">[</span><span class="n">o</span><span class="p">]</span> <span class="o">=</span> <span class="n">outputs</span><span class="p">[</span><span class="n">o</span><span class="p">]</span><span class="o">.</span><span class="n">clone</span><span class="p">()</span>
+
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">cudagraphs_enabled</span><span class="p">:</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">set_tensor_address</span><span class="p">(</span>
+                            <span class="n">output_name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_output_buffers</span><span class="p">[</span><span class="n">o</span><span class="p">]</span><span class="o">.</span><span class="n">data_ptr</span><span class="p">()</span>
+                        <span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">set_tensor_address</span><span class="p">(</span>
+                            <span class="n">output_name</span><span class="p">,</span> <span class="n">outputs</span><span class="p">[</span><span class="n">o</span><span class="p">]</span><span class="o">.</span><span class="n">data_ptr</span><span class="p">()</span>
+                        <span class="p">)</span>
+
+            <span class="k">with</span> <span class="p">(</span>
+                <span class="n">torch</span><span class="o">.</span><span class="n">autograd</span><span class="o">.</span><span class="n">profiler</span><span class="o">.</span><span class="n">record_function</span><span class="p">(</span>
+                    <span class="s2">&quot;PythonTorchTensorRTModule:TensorRTRuntime&quot;</span>
+                <span class="p">)</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">profiling_enabled</span>
+                <span class="k">else</span> <span class="n">nullcontext</span><span class="p">()</span>
+            <span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_caller_stream</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">current_stream</span><span class="p">()</span>
+                <span class="k">if</span> <span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_engine_stream</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">default_stream</span><span class="p">()</span>
+                    <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_engine_stream</span> <span class="ow">is</span> <span class="kc">None</span>
+                <span class="p">):</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_engine_stream</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">Stream</span><span class="p">()</span>
+
+                <span class="bp">self</span><span class="o">.</span><span class="n">_engine_stream</span><span class="o">.</span><span class="n">wait_stream</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_caller_stream</span><span class="p">)</span>
+
+                <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">stream</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_engine_stream</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">cudagraphs_enabled</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="n">need_cudagraphs_record</span><span class="p">:</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">cudagraph</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">CUDAGraph</span><span class="p">()</span>
+
+                            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">profiling_enabled</span><span class="p">:</span>
+                                <span class="bp">self</span><span class="o">.</span><span class="n">cudagraph</span><span class="o">.</span><span class="n">enable_debug_mode</span><span class="p">()</span>
+
+                            <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">graph</span><span class="p">(</span>
+                                <span class="bp">self</span><span class="o">.</span><span class="n">cudagraph</span><span class="p">,</span> <span class="n">stream</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_engine_stream</span>
+                            <span class="p">):</span>
+                                <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">execute_async_v3</span><span class="p">(</span>
+                                    <span class="bp">self</span><span class="o">.</span><span class="n">_engine_stream</span><span class="o">.</span><span class="n">cuda_stream</span>
+                                <span class="p">)</span>
+
+                            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">profiling_enabled</span><span class="p">:</span>
+                                <span class="bp">self</span><span class="o">.</span><span class="n">cudagraph</span><span class="o">.</span><span class="n">debug_dump</span><span class="p">(</span>
+                                    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">DEBUG_LOGGING_DIR</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">_cudagraph.dot&quot;</span>
+                                <span class="p">)</span>
+
+                        <span class="bp">self</span><span class="o">.</span><span class="n">cudagraph</span><span class="o">.</span><span class="n">replay</span><span class="p">()</span>  <span class="c1"># type: ignore</span>
+
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">execute_async_v3</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_engine_stream</span><span class="o">.</span><span class="n">cuda_stream</span><span class="p">)</span>
+
+                <span class="bp">self</span><span class="o">.</span><span class="n">_caller_stream</span><span class="o">.</span><span class="n">wait_stream</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_engine_stream</span><span class="p">)</span>
+
+            <span class="c1"># When the pre-allocated output mode is turned on, for intermediate modules, we only create the output in the first execution or when shape is changed.</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">use_pre_allocated_outputs</span> <span class="ow">and</span> <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">output_tensors_are_unowned</span>
+                <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">pre_allocated_outputs</span>
+                <span class="ow">or</span> <span class="n">shape_changed</span>
+            <span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">pre_allocated_outputs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_output_tensors</span><span class="p">()</span>
+
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">cudagraphs_enabled</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">o</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">outputs</span><span class="p">):</span>
+                    <span class="n">o</span><span class="o">.</span><span class="n">copy_</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_output_buffers</span><span class="p">[</span><span class="n">idx</span><span class="p">])</span>
+
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">outputs</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">outputs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+            <span class="k">return</span> <span class="n">outputs</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">run_output_allocator</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">|</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+            <span class="k">assert</span> <span class="p">(</span>
+                <span class="ow">not</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">get_cudagraphs_mode</span><span class="p">()</span>
+            <span class="p">),</span> <span class="s2">&quot;CUDA Graphs are not compatible with OutputAllocator.&quot;</span>
+            <span class="k">with</span> <span class="p">(</span>
+                <span class="n">torch</span><span class="o">.</span><span class="n">autograd</span><span class="o">.</span><span class="n">profiler</span><span class="o">.</span><span class="n">record_function</span><span class="p">(</span>
+                    <span class="s2">&quot;PythonTorchTensorRTModule:ProcessInputs&quot;</span>
+                <span class="p">)</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">profiling_enabled</span>
+                <span class="k">else</span> <span class="n">nullcontext</span><span class="p">()</span>
+            <span class="p">):</span>
+                <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">contiguous_inputs</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">input_names</span>
+                <span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;Wrong number of inputs, expect </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">input_names</span><span class="p">)</span><span class="si">}</span><span class="s2"> get </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">contiguous_inputs</span><span class="p">)</span><span class="si">}</span><span class="s2">.&quot;</span>
+
+                <span class="bp">self</span><span class="o">.</span><span class="n">setup_input_tensors</span><span class="p">(</span><span class="n">contiguous_inputs</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+
+            <span class="k">with</span> <span class="p">(</span>
+                <span class="n">torch</span><span class="o">.</span><span class="n">autograd</span><span class="o">.</span><span class="n">profiler</span><span class="o">.</span><span class="n">record_function</span><span class="p">(</span>
+                    <span class="s2">&quot;PythonTorchTensorRTModule:SetupOutputAllocator&quot;</span>
+                <span class="p">)</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">profiling_enabled</span>
+                <span class="k">else</span> <span class="n">nullcontext</span><span class="p">()</span>
+            <span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">create_output_allocator</span><span class="p">()</span>
+                <span class="c1"># need to set output allocator every run</span>
+                <span class="k">for</span> <span class="n">output_name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_names</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">set_output_allocator</span><span class="p">(</span>
+                        <span class="n">output_name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_allocator</span>
+                    <span class="p">):</span>
+                        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                            <span class="sa">f</span><span class="s2">&quot;Failed to set output allocator for </span><span class="si">{</span><span class="n">output_name</span><span class="si">}</span><span class="s2">&quot;</span>
+                        <span class="p">)</span>
+
+            <span class="k">with</span> <span class="p">(</span>
+                <span class="n">torch</span><span class="o">.</span><span class="n">autograd</span><span class="o">.</span><span class="n">profiler</span><span class="o">.</span><span class="n">record_function</span><span class="p">(</span>
+                    <span class="s2">&quot;PythonTorchTensorRTModule:TensorRTRuntime&quot;</span>
+                <span class="p">)</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">profiling_enabled</span>
+                <span class="k">else</span> <span class="n">nullcontext</span><span class="p">()</span>
+            <span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_caller_stream</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">current_stream</span><span class="p">()</span>
+                <span class="k">if</span> <span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_engine_stream</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">default_stream</span><span class="p">()</span>
+                    <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_engine_stream</span> <span class="ow">is</span> <span class="kc">None</span>
+                <span class="p">):</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_engine_stream</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">Stream</span><span class="p">()</span>
+
+                <span class="bp">self</span><span class="o">.</span><span class="n">_engine_stream</span><span class="o">.</span><span class="n">wait_stream</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_caller_stream</span><span class="p">)</span>
+
+                <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">stream</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_engine_stream</span><span class="p">):</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">execute_async_v3</span><span class="p">(</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_engine_stream</span><span class="o">.</span><span class="n">cuda_stream</span>
+                    <span class="p">)</span>  <span class="c1"># The OutputAllocator is called by execute_async_v3()</span>
+
+                <span class="bp">self</span><span class="o">.</span><span class="n">_caller_stream</span><span class="o">.</span><span class="n">wait_stream</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_engine_stream</span><span class="p">)</span>
+
+            <span class="k">with</span> <span class="p">(</span>
+                <span class="n">torch</span><span class="o">.</span><span class="n">autograd</span><span class="o">.</span><span class="n">profiler</span><span class="o">.</span><span class="n">record_function</span><span class="p">(</span>
+                    <span class="s2">&quot;PythonTorchTensorRTModule:ProcessOutputs&quot;</span>
+                <span class="p">)</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">profiling_enabled</span>
+                <span class="k">else</span> <span class="n">nullcontext</span><span class="p">()</span>
+            <span class="p">):</span>
+                <span class="n">outputs</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_allocator</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                <span class="k">for</span> <span class="n">o</span><span class="p">,</span> <span class="n">output_name</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">output_names</span><span class="p">):</span>
+                    <span class="n">shape</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_allocator</span><span class="o">.</span><span class="n">shapes</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">output_name</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+                    <span class="n">dtype</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_dtypes</span><span class="p">[</span><span class="n">o</span><span class="p">]</span>
+                    <span class="n">output</span> <span class="o">=</span> <span class="p">(</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">output_allocator</span><span class="o">.</span><span class="n">buffers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">output_name</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+                        <span class="o">.</span><span class="n">clone</span><span class="p">()</span>
+                        <span class="o">.</span><span class="n">detach</span><span class="p">()</span>
+                    <span class="p">)</span>
+                    <span class="n">prod</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">shape</span><span class="p">)))</span>
+                    <span class="c1"># When using the OutputAllocator, the allocated buffer might be larger than the size of the output,</span>
+                    <span class="c1"># so we need to reshape the buffer to the output shape</span>
+                    <span class="n">output</span> <span class="o">=</span> <span class="n">output</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">dtype</span><span class="p">)[:</span><span class="n">prod</span><span class="p">]</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span>
+                    <span class="n">outputs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">output</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">outputs</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">outputs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+            <span class="k">return</span> <span class="n">outputs</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">cudagraphs_enabled</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">get_cudagraphs_mode</span><span class="p">()</span>
+
+        <span class="c1"># Run forward function</span>
+        <span class="n">contiguous_inputs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">(</span><span class="n">i</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="k">else</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">())</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">inputs</span>
+        <span class="p">]</span>
+        <span class="k">with</span> <span class="p">(</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">autograd</span><span class="o">.</span><span class="n">profiler</span><span class="o">.</span><span class="n">record_function</span><span class="p">(</span><span class="s2">&quot;PythonTorchTensorRTModule:Forward&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">profiling_enabled</span>
+            <span class="k">else</span> <span class="n">nullcontext</span><span class="p">()</span>
+        <span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_check_initialized</span><span class="p">()</span>
+
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_has_nccl_ops</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_nccl_comm</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">nccl_type</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="s2">&quot;native TRT collectives&quot;</span>
+                    <span class="k">if</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">native_trt_collectives</span>
+                    <span class="k">else</span> <span class="p">(</span>
+                        <span class="s2">&quot;TRT-LLM NCCL plugins&quot;</span>
+                        <span class="k">if</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">trtllm_for_nccl</span>
+                        <span class="k">else</span> <span class="s2">&quot;unknown backend&quot;</span>
+                    <span class="p">)</span>
+                <span class="p">)</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Setting up NCCL for distributed execution using </span><span class="si">{</span><span class="n">nccl_type</span><span class="si">}</span><span class="s2"> &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;(rank=</span><span class="si">{</span><span class="n">dist</span><span class="o">.</span><span class="n">get_rank</span><span class="p">()</span><span class="si">}</span><span class="s2">, world_size=</span><span class="si">{</span><span class="n">dist</span><span class="o">.</span><span class="n">get_world_size</span><span class="p">()</span><span class="si">}</span><span class="s2">)&quot;</span>
+                <span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">setup_nccl_comm</span><span class="p">()</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;NCCL setup complete, comm=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_nccl_comm</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="c1"># If in safe mode, check at each iteration for whether a switch is required</span>
+            <span class="k">if</span> <span class="p">(</span>
+                <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">_multi_device_safe_mode</span><span class="o">.</span><span class="n">_PY_RT_MULTI_DEVICE_SAFE_MODE</span>
+            <span class="p">):</span>
+                <span class="n">curr_device_id</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">current_device</span><span class="p">()</span>
+                <span class="n">curr_device_properties</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">get_device_properties</span><span class="p">(</span>
+                    <span class="n">curr_device_id</span>
+                <span class="p">)</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Current Device: cuda:</span><span class="si">{</span><span class="n">curr_device_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+                <span class="c1"># If a switch is required, move all inputs to new device and set as active device</span>
+                <span class="k">if</span> <span class="n">_is_switch_required</span><span class="p">(</span>
+                    <span class="n">curr_device_id</span><span class="p">,</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">target_device_id</span><span class="p">,</span>
+                    <span class="n">curr_device_properties</span><span class="p">,</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">target_device_properties</span><span class="p">,</span>
+                <span class="p">):</span>
+                    <span class="n">device_id</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">_select_rt_device</span><span class="p">(</span>
+                        <span class="n">curr_device_id</span><span class="p">,</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">target_device_id</span><span class="p">,</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">target_device_properties</span><span class="p">,</span>
+                    <span class="p">)</span>
+
+                    <span class="c1"># Update current device</span>
+                    <span class="n">device</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="n">device_id</span><span class="p">)</span>
+                    <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">set_device</span><span class="p">(</span><span class="n">device_id</span><span class="p">)</span>
+
+                    <span class="n">contiguous_inputs</span> <span class="o">=</span> <span class="p">[</span>
+                        <span class="n">tensor</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span> <span class="k">for</span> <span class="n">tensor</span> <span class="ow">in</span> <span class="n">contiguous_inputs</span>
+                    <span class="p">]</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Moved all input Tensors to cuda:</span><span class="si">{</span><span class="n">device_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">requires_output_allocator</span><span class="p">:</span>  <span class="c1"># engine requires OA</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">cudagraphs_enabled</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                        <span class="s2">&quot;The model contains submodules that require a dynamic output allocator at runtime, which is incompatible with CUDA Graphs. Please disable CUDA Graphs.&quot;</span>
+                    <span class="p">)</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Using the dynamic allocator runtime mode.&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">run_output_allocator</span><span class="p">()</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">use_output_allocator_outputs</span><span class="p">:</span>  <span class="c1"># users call OA context manager</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">cudagraphs_enabled</span><span class="p">:</span>
+                        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                            <span class="s2">&quot;Both CUDA Graphs and dynamic output allocation are enabled, which are incompatible runtime modes. Please disable one of the two.&quot;</span>
+                        <span class="p">)</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Using the dynamic allocator runtime mode.&quot;</span><span class="p">)</span>
+                    <span class="k">return</span> <span class="n">run_output_allocator</span><span class="p">()</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;Using the standard execution runtime mode with cudagraphs=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">cudagraphs_enabled</span><span class="si">}</span><span class="s2">.&quot;</span>
+                    <span class="p">)</span>
+                    <span class="k">return</span> <span class="n">run_standard_execution</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="PythonTorchTensorRTModule.enable_profiling">
+<a class="viewcode-back" href="../../../../py_api/runtime.html#torch_tensorrt.runtime.PythonTorchTensorRTModule.enable_profiling">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">enable_profiling</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">profiler</span><span class="p">:</span> <span class="s2">&quot;trt.IProfiler&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Enable TensorRT profiling. After calling this function, TensorRT will report</span>
+<span class="sd">        time spent on each layer in stdout for each forward run.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_check_initialized</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">profiler</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">profiler</span> <span class="o">=</span> <span class="n">trt</span><span class="o">.</span><span class="n">Profiler</span><span class="p">()</span> <span class="k">if</span> <span class="n">profiler</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">profiler</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">profiling_enabled</span> <span class="o">=</span> <span class="kc">True</span></div>
+
+
+<div class="viewcode-block" id="PythonTorchTensorRTModule.disable_profiling">
+<a class="viewcode-back" href="../../../../py_api/runtime.html#torch_tensorrt.runtime.PythonTorchTensorRTModule.disable_profiling">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">disable_profiling</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Disable TensorRT profiling.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_check_initialized</span><span class="p">()</span>
+        <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">synchronize</span><span class="p">()</span>
+        <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_context</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">profiling_enabled</span> <span class="o">=</span> <span class="kc">False</span></div>
+
+
+<div class="viewcode-block" id="PythonTorchTensorRTModule.get_layer_info">
+<a class="viewcode-back" href="../../../../py_api/runtime.html#torch_tensorrt.runtime.PythonTorchTensorRTModule.get_layer_info">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_layer_info</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Get layer info of the engine. Only support for TRT &gt; 8.2.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">inspector</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">create_engine_inspector</span><span class="p">()</span>
+        <span class="n">engine_json</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">inspector</span><span class="o">.</span><span class="n">get_engine_information</span><span class="p">(</span>
+            <span class="n">trt</span><span class="o">.</span><span class="n">LayerInformationFormat</span><span class="o">.</span><span class="n">JSON</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">engine_json</span></div>
+
+
+<div class="viewcode-block" id="PythonTorchTensorRTModule.validate_input_shapes">
+<a class="viewcode-back" href="../../../../py_api/runtime.html#torch_tensorrt.runtime.PythonTorchTensorRTModule.validate_input_shapes">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">validate_input_shapes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">inputs</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Validates the input shapes of the forward function has changed</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Representation of input shapes to a given model</span>
+        <span class="c1"># Shapes are concatenated as so:</span>
+        <span class="c1"># x: (3, 4), y: (4, 5) --&gt; Key: (3,4)(4,5)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">inputs</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">True</span>
+
+        <span class="n">new_shape_key</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+            <span class="nb">str</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">t</span><span class="o">.</span><span class="n">shape</span><span class="p">))</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot; &quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">inputs</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span>
+        <span class="p">)</span>
+
+        <span class="c1"># If the new shape key differs from the existing one,</span>
+        <span class="c1"># invalidate the old shape key and remove the CUDAGraph</span>
+        <span class="k">if</span> <span class="n">new_shape_key</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape_key</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Input shape changed </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">shape_key</span><span class="si">}</span><span class="s2"> -&gt; </span><span class="si">{</span><span class="n">new_shape_key</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">shape_key</span> <span class="o">=</span> <span class="n">new_shape_key</span>
+            <span class="k">return</span> <span class="kc">True</span>
+
+        <span class="k">return</span> <span class="kc">False</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">are_output_tensors_unowned</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_tensors_are_unowned</span></div>
+
+</pre></div>
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2024, NVIDIA Corporation.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>

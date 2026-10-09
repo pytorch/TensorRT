@@ -1,0 +1,58 @@
+
+.. _namespace_trtorch:
+
+Namespace trtorch
+=================
+
+
+.. contents:: Contents
+   :local:
+   :backlinks: none
+
+
+
+
+
+Namespaces
+----------
+
+
+- :ref:`namespace_trtorch__logging`
+
+- :ref:`namespace_trtorch__ptq`
+
+
+Classes
+-------
+
+
+- :ref:`exhale_struct_structtrtorch_1_1CompileSpec`
+
+- :ref:`exhale_struct_structtrtorch_1_1CompileSpec_1_1Device`
+
+- :ref:`exhale_struct_structtrtorch_1_1CompileSpec_1_1InputRange`
+
+- :ref:`exhale_struct_structtrtorch_1_1CompileSpec_1_1TorchFallback`
+
+- :ref:`exhale_class_classtrtorch_1_1CompileSpec_1_1DataType`
+
+- :ref:`exhale_class_classtrtorch_1_1CompileSpec_1_1Device_1_1DeviceType`
+
+
+Functions
+---------
+
+
+- :ref:`exhale_function_trtorch_8h_1ab01696cfe08b6a5293c55935a9713c25`
+
+- :ref:`exhale_function_trtorch_8h_1a3eace458ae9122f571fabfc9ef1b9e3a`
+
+- :ref:`exhale_function_trtorch_8h_1af19cb866b0520fc84b69a1cf25a52b65`
+
+- :ref:`exhale_function_trtorch_8h_1a726f6e7091b6b7be45b5a4275b2ffb10`
+
+- :ref:`exhale_function_trtorch_8h_1ac4ead1d30e521d581462bb51e283be08`
+
+- :ref:`exhale_function_trtorch_8h_1a2cf17d43ba9117b3b4d652744b4f0447`
+
+- :ref:`exhale_function_trtorch_8h_1a589ea96d16e2df44146ad0919424e00e`

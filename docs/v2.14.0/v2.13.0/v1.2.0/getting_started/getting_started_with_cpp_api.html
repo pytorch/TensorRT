@@ -1,0 +1,959 @@
+
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Using Torch-TensorRT in C++ &mdash; Torch-TensorRT master documentation</title>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <!-- <link rel="stylesheet" href="../_static/pygments.css" type="text/css" /> -->
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/collapsible-lists/css/tree_view.css" type="text/css" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Creating a TorchScript Module" href="../tutorials/creating_torchscript_module_in_python.html" />
+    <link rel="prev" title="Using Torch-TensorRT in Python" href="getting_started_with_python_api.html" />
+  <!-- Google Analytics -->
+
+  <!-- End Google Analytics -->
+
+
+
+  <script src="../_static/js/modernizr.min.js"></script>
+
+  <!-- Preload the theme fonts -->
+
+<link rel="preload" href="../_static/fonts/FreightSans/freight-sans-book.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../_static/fonts/FreightSans/freight-sans-medium.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../_static/fonts/IBMPlexMono/IBMPlexMono-Medium.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../_static/fonts/FreightSans/freight-sans-bold.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../_static/fonts/FreightSans/freight-sans-medium-italic.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../_static/fonts/IBMPlexMono/IBMPlexMono-SemiBold.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+
+<!-- Preload the katex fonts -->
+
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Math-Italic.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Main-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Main-Bold.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size1-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size4-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size2-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size3-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Caligraphic-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.2/css/all.css" integrity="sha384-vSIIfh2YWi9wW0r9iZe7RJPrKwp6bG+s9QZMoITbCckVJqGCCRhc+ccxNcdpHuYu" crossorigin="anonymous">
+</head>
+
+<div class="container-fluid header-holder tutorials-header" id="header-holder">
+  <div class="container">
+    <div class="header-container">
+      <a class="header-logo" href="https://pytorch.org/" aria-label="PyTorch"></a>
+
+      <div class="main-menu">
+        <ul>
+          <li>
+            <a href="https://pytorch.org/get-started">Get Started</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/ecosystem">Ecosystem</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/mobile">Mobile</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/blog/">Blog</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/tutorials">Tutorials</a>
+          </li>
+
+          <li>
+            <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="resource-option with-down-orange-arrow">
+                Docs
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/docs/stable/index.html">
+                  <span class="dropdown-title">PyTorch</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/audio/stable/index.html">
+                  <span class="dropdown-title">torchaudio</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/text/stable/index.html">
+                  <span class="dropdown-title">torchtext</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/vision/stable/index.html">
+                  <span class="dropdown-title">torchvision</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/torchrec">
+                  <span class="dropdown-title">TorchRec</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/data">
+                  <span class="dropdown-title">TorchData</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/serve/">
+                  <span class="dropdown-title">TorchServe</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/torchx/">
+                  <span class="dropdown-title">TorchX</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/xla">
+                  <span class="dropdown-title">PyTorch on XLA Devices</span>
+                  <p></p>
+                </a>
+            </div>
+          </li>
+
+          <li>
+            <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="resource-option with-down-arrow">
+                Resources
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="nav-dropdown-item" href="https://pytorch.org/features">
+                  <span class="dropdown-title">About</span>
+                  <p>Learn about PyTorch’s features and capabilities</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/#community-module">
+                  <span class="dropdown-title">Community</span>
+                  <p>Join the PyTorch developer community to contribute, learn, and get your questions answered.</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/resources">
+                  <span class="dropdown-title">Developer Resources</span>
+                  <p>Find resources and get questions answered</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://discuss.pytorch.org/" target="_blank">
+                  <span class="dropdown-title">Forums</span>
+                  <p>A place to discuss PyTorch code, issues, install, research</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/hub">
+                  <span class="dropdown-title">Models (Beta)</span>
+                  <p>Discover, publish, and reuse pre-trained models</p>
+                </a>
+              </div>
+            </div>
+          </li>
+
+          <li>
+            <a href="https://github.com/pytorch/pytorch">GitHub</a>
+          </li>
+        </ul>
+      </div>
+
+      <a class="main-menu-open-button" href="#" data-behavior="open-mobile-menu"></a>
+    </div>
+  </div>
+</div>
+
+<body class="pytorch-body">
+
+
+
+
+
+    <div class="table-of-contents-link-wrapper">
+      <span>Table of Contents</span>
+      <a href="#" class="toggle-table-of-contents" data-behavior="toggle-table-of-contents"></a>
+    </div>
+
+    <nav data-toggle="wy-nav-shift" class="pytorch-left-menu" id="pytorch-left-menu">
+      <div class="pytorch-side-scroll">
+        <div class="pytorch-menu pytorch-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          <div class="pytorch-left-menu-search">
+
+
+
+
+
+                <div class="version">
+                  master (1.2.0)
+                </div>
+
+
+
+
+
+
+
+
+
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search Docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+
+          </div>
+
+
+
+
+
+
+
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="getting_started_with_python_api.html">Using Torch-TensorRT in Python</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Using Torch-TensorRT in  C++</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/creating_torchscript_module_in_python.html">Creating a TorchScript Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/creating_torchscript_module_in_python.html#working-with-torchscript-in-python">Working with TorchScript in Python</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">Saving TorchScript Module to Disk</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/getting_started_with_fx_path.html">Torch-TensorRT (FX Frontend) User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/ptq.html">Post Training Quantization (PTQ)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/runtime.html">Deploying Torch-TensorRT Programs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/serving_torch_tensorrt_with_triton.html">Serving a Torch-TensorRT model with Triton</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/use_from_pytorch.html">Using Torch-TensorRT Directly From PyTorch</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/using_dla.html">DLA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/notebooks.html">Example notebooks</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Python API Documenation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/torch_tensorrt.html">torch_tensorrt</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/logging.html">torch_tensorrt.logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/ptq.html">torch_tensorrt.ptq</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/ts.html">torch_tensorrt.ts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/fx.html">torch_tensorrt.fx</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">C++ API Documenation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/torch_tensort_cpp.html">Torch-TensorRT C++ API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt.html">Namespace torch_tensorrt</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt__logging.html">Namespace torch_tensorrt::logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt__ptq.html">Namespace torch_tensorrt::ptq</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CLI Documenation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../cli/torchtrtc.html">torchtrtc</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributor Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../contributors/system_overview.html">System Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributors/writing_converters.html">Writing Converters</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributors/useful_links.html">Useful Links for Torch-TensorRT Development</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Indices</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../indices/supported_ops.html">Operators Supported</a></li>
+</ul>
+
+
+
+        </div>
+      </div>
+    </nav>
+
+    <div class="pytorch-container">
+      <div class="pytorch-page-level-bar" id="pytorch-page-level-bar">
+        <div class="pytorch-breadcrumbs-wrapper">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="pytorch-breadcrumbs">
+
+      <li>
+        <a href="../index.html">
+
+            Docs
+
+        </a> &gt;
+      </li>
+
+
+      <li>Using Torch-TensorRT in  C++</li>
+
+
+      <li class="pytorch-breadcrumbs-aside">
+
+
+            <a href="../_sources/getting_started/getting_started_with_cpp_api.rst.txt" rel="nofollow"><img src="../_static/images/view-page-source-icon.svg"></a>
+
+
+      </li>
+
+  </ul>
+
+
+</div>
+        </div>
+
+        <div class="pytorch-shortcuts-wrapper" id="pytorch-shortcuts-wrapper">
+          Shortcuts
+        </div>
+      </div>
+
+      <section data-toggle="wy-nav-shift" id="pytorch-content-wrap" class="pytorch-content-wrap">
+        <div class="pytorch-content-left">
+
+
+
+          <div class="rst-content">
+
+            <div role="main" class="main-content" itemscope="itemscope" itemtype="http://schema.org/Article">
+             <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
+
+  <section id="using-torch-tensorrt-in-c">
+<span id="getting-started-cpp"></span><h1>Using Torch-TensorRT in  C++<a class="headerlink" href="#using-torch-tensorrt-in-c" title="Permalink to this headline">¶</a></h1>
+<p>If you haven’t already, acquire a tarball of the library by following the instructions in <a class="reference internal" href="installation.html#installation"><span class="std std-ref">Installation</span></a></p>
+<section id="id1">
+<h2>Using Torch-TensorRT in C++<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h2>
+<p>Torch-TensorRT C++ API accepts TorchScript modules (generated either from <code class="docutils literal notranslate"><span class="pre">torch.jit.script</span></code> or <code class="docutils literal notranslate"><span class="pre">torch.jit.trace</span></code>) as an input and returns
+a Torchscript module (optimized using TensorRT). This requires users to use Pytorch (in python) to generate torchscript modules beforehand.
+Please refer to <a class="reference external" href="https://nvidia.github.io/Torch-TensorRT/tutorials/creating_torchscript_module_in_python.html">Creating TorchScript modules in Python</a> section to generate torchscript graphs.</p>
+<section id="torch-tensorrt-quickstart-compiling-torchscript-modules-with-torchtrtc">
+<span id="torch-tensorrt-quickstart"></span><h3>[Torch-TensorRT Quickstart] Compiling TorchScript Modules with <code class="docutils literal notranslate"><span class="pre">torchtrtc</span></code><a class="headerlink" href="#torch-tensorrt-quickstart-compiling-torchscript-modules-with-torchtrtc" title="Permalink to this headline">¶</a></h3>
+<p>An easy way to get started with Torch-TensorRT and to check if your model can be supported without extra work is to run it through
+<code class="docutils literal notranslate"><span class="pre">torchtrtc</span></code>, which supports almost all features of the compiler from the command line including post training quantization
+(given a previously created calibration cache). For example we can compile our lenet model by setting our preferred operating
+precision and input size. This new TorchScript file can be loaded into Python (note: you need to <code class="docutils literal notranslate"><span class="pre">import</span> <span class="pre">torch_tensorrt</span></code> before loading
+these compiled modules because the compiler extends the PyTorch the deserializer and runtime to execute compiled modules).</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>❯ torchtrtc -p f16 lenet_scripted.ts trt_lenet_scripted.ts <span class="s2">&quot;(1,1,32,32)&quot;</span>
+
+❯ python3
+Python <span class="m">3</span>.6.9 <span class="o">(</span>default, Apr <span class="m">18</span> <span class="m">2020</span>, <span class="m">01</span>:56:04<span class="o">)</span>
+<span class="o">[</span>GCC <span class="m">8</span>.4.0<span class="o">]</span> on linux
+Type <span class="s2">&quot;help&quot;</span>, <span class="s2">&quot;copyright&quot;</span>, <span class="s2">&quot;credits&quot;</span> or <span class="s2">&quot;license&quot;</span> <span class="k">for</span> more information.
+&gt;&gt;&gt; import torch
+&gt;&gt;&gt; import torch_tensorrt
+&gt;&gt;&gt; <span class="nv">ts_model</span> <span class="o">=</span> torch.jit.load<span class="o">(</span>“trt_lenet_scripted.ts”<span class="o">)</span>
+&gt;&gt;&gt; ts_model<span class="o">(</span>torch.randn<span class="o">((</span><span class="m">1</span>,1,32,32<span class="o">))</span>.to<span class="o">(</span>“cuda”<span class="o">)</span>.half<span class="o">())</span>
+</pre></div>
+</div>
+<p>You can learn more about <code class="docutils literal notranslate"><span class="pre">torchtrtc</span></code> usage here: <a class="reference internal" href="../cli/torchtrtc.html#torchtrtc"><span class="std std-ref">torchtrtc</span></a></p>
+</section>
+<section id="working-with-torchscript-in-c">
+<span id="ts-in-cc"></span><h3>Working with TorchScript in C++<a class="headerlink" href="#working-with-torchscript-in-c" title="Permalink to this headline">¶</a></h3>
+<p>If we are developing an application to deploy with C++, we can save either our traced or scripted module using <code class="docutils literal notranslate"><span class="pre">torch.jit.save</span></code>
+which will serialize the TorchScript code, weights and other information into a package. This is also where our dependency on Python ends.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">torch_script_module</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;lenet.jit.pt&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>From here we can now load our TorchScript module in C++</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;torch/script.h&gt;</span><span class="c1"> // One-stop header.</span><span class="cp"></span>
+
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;memory&gt;</span><span class="cp"></span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">argc</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">argv</span><span class="p">[])</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">Module</span><span class="w"> </span><span class="k">module</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="k">try</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="c1">// Deserialize the ScriptModule from a file using torch::jit::load().</span>
+<span class="w">        </span><span class="k">module</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">load</span><span class="p">(</span><span class="s">&quot;&lt;PATH TO SAVED TS MOD&gt;&quot;</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="k">catch</span><span class="w"> </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">c10</span><span class="o">::</span><span class="n">Error</span><span class="o">&amp;</span><span class="w"> </span><span class="n">e</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="n">std</span><span class="o">::</span><span class="n">cerr</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;error loading the model</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;ok</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span><span class="w"></span>
+</pre></div>
+</div>
+<p>You can do full training and inference in C++ with PyTorch / LibTorch if you would like, you can even define your modules in C++ and
+have access to the same powerful tensor library that backs PyTorch. (For more information: <a class="reference external" href="https://pytorch.org/cppdocs/">https://pytorch.org/cppdocs/</a>).
+For instance we can do inference with our LeNet module like this:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="n">mod</span><span class="p">.</span><span class="n">eval</span><span class="p">();</span><span class="w"></span>
+<span class="n">torch</span><span class="o">::</span><span class="n">Tensor</span><span class="w"> </span><span class="n">in</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">randn</span><span class="p">({</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">});</span><span class="w"></span>
+<span class="k">auto</span><span class="w"> </span><span class="n">out</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mod</span><span class="p">.</span><span class="n">forward</span><span class="p">(</span><span class="n">in</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>and to run on the GPU:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="n">mod</span><span class="p">.</span><span class="n">eval</span><span class="p">();</span><span class="w"></span>
+<span class="n">mod</span><span class="p">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">kCUDA</span><span class="p">);</span><span class="w"></span>
+<span class="n">torch</span><span class="o">::</span><span class="n">Tensor</span><span class="w"> </span><span class="n">in</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">randn</span><span class="p">({</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">},</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">kCUDA</span><span class="p">);</span><span class="w"></span>
+<span class="k">auto</span><span class="w"> </span><span class="n">out</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mod</span><span class="p">.</span><span class="n">forward</span><span class="p">(</span><span class="n">in</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>As you can see it is pretty similar to the Python API. When you call the <code class="docutils literal notranslate"><span class="pre">forward</span></code> method, you invoke the PyTorch JIT compiler, which will optimize and run your TorchScript code.</p>
+</section>
+<section id="compiling-with-torch-tensorrt-in-c">
+<span id="compile-cpp"></span><h3>Compiling with Torch-TensorRT in C++<a class="headerlink" href="#compiling-with-torch-tensorrt-in-c" title="Permalink to this headline">¶</a></h3>
+<p>We are also at the point were we can compile and optimize our module with Torch-TensorRT, but instead of in a JIT fashion we must do it ahead-of-time (AOT) i.e. before we start doing actual inference work
+since it takes a bit of time to optimize the module, it would not make sense to do this every time you run the module or even the first time you run it.</p>
+<p>With our module loaded, we can feed it into the Torch-TensorRT compiler. When we do so we must provide some information on the expected input size and also configure any additional settings.</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch/script.h&quot;</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch_tensorrt/torch_tensorrt.h&quot;</span><span class="cp"></span>
+<span class="p">...</span><span class="w"></span>
+
+<span class="w">    </span><span class="n">mod</span><span class="p">.</span><span class="n">to</span><span class="p">(</span><span class="n">at</span><span class="o">::</span><span class="n">kCUDA</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">mod</span><span class="p">.</span><span class="n">eval</span><span class="p">();</span><span class="w"></span>
+
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">in</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">randn</span><span class="p">({</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">},</span><span class="w"> </span><span class="p">{</span><span class="n">torch</span><span class="o">::</span><span class="n">kCUDA</span><span class="p">});</span><span class="w"></span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">trt_mod</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch_tensorrt</span><span class="o">::</span><span class="n">CompileGraph</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">torch_tensorrt</span><span class="o">::</span><span class="n">CompileSpec</span><span class="o">::</span><span class="n">InputRange</span><span class="o">&gt;</span><span class="p">{{</span><span class="n">in</span><span class="p">.</span><span class="n">sizes</span><span class="p">()}});</span><span class="w"></span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">out</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">trt_mod</span><span class="p">.</span><span class="n">forward</span><span class="p">({</span><span class="n">in</span><span class="p">});</span><span class="w"></span>
+</pre></div>
+</div>
+<p>Thats it! Now the graph runs primarily not with the JIT compiler but using TensorRT (though we execute the graph using the JIT runtime).</p>
+<p>We can also set settings like operating precision to run in FP16.</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch/script.h&quot;</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch_tensorrt/torch_tensorrt.h&quot;</span><span class="cp"></span>
+<span class="p">...</span><span class="w"></span>
+
+<span class="w">    </span><span class="n">mod</span><span class="p">.</span><span class="n">to</span><span class="p">(</span><span class="n">at</span><span class="o">::</span><span class="n">kCUDA</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">mod</span><span class="p">.</span><span class="n">eval</span><span class="p">();</span><span class="w"></span>
+
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">in</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">randn</span><span class="p">({</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">},</span><span class="w"> </span><span class="p">{</span><span class="n">torch</span><span class="o">::</span><span class="n">kCUDA</span><span class="p">}).</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">kHALF</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">input_sizes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">torch_tensorrt</span><span class="o">::</span><span class="n">CompileSpec</span><span class="o">::</span><span class="n">InputRange</span><span class="o">&gt;</span><span class="p">({</span><span class="n">in</span><span class="p">.</span><span class="n">sizes</span><span class="p">()});</span><span class="w"></span>
+<span class="w">    </span><span class="n">torch_tensorrt</span><span class="o">::</span><span class="n">CompileSpec</span><span class="w"> </span><span class="nf">info</span><span class="p">(</span><span class="n">input_sizes</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">info</span><span class="p">.</span><span class="n">enable_precisions</span><span class="p">.</span><span class="n">insert</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">kHALF</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">trt_mod</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch_tensorrt</span><span class="o">::</span><span class="n">CompileGraph</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span><span class="w"> </span><span class="n">info</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">out</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">trt_mod</span><span class="p">.</span><span class="n">forward</span><span class="p">({</span><span class="n">in</span><span class="p">});</span><span class="w"></span>
+</pre></div>
+</div>
+<p>And now we are running the module in FP16 precision. You can then save the module to load later.</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="n">trt_mod</span><span class="p">.</span><span class="n">save</span><span class="p">(</span><span class="s">&quot;&lt;PATH TO SAVED TRT/TS MOD&gt;&quot;</span><span class="p">)</span><span class="w"></span>
+</pre></div>
+</div>
+<p>Torch-TensorRT compiled TorchScript modules are loaded in the same way as normal TorchScript module. Make sure your deployment application is linked against <code class="docutils literal notranslate"><span class="pre">libtorchtrt.so</span></code></p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch/script.h&quot;</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch_tensorrt/torch_tensorrt.h&quot;</span><span class="cp"></span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">argc</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">argv</span><span class="p">[])</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">Module</span><span class="w"> </span><span class="k">module</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="k">try</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="c1">// Deserialize the ScriptModule from a file using torch::jit::load().</span>
+<span class="w">        </span><span class="k">module</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">load</span><span class="p">(</span><span class="s">&quot;&lt;PATH TO SAVED TRT/TS MOD&gt;&quot;</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="k">catch</span><span class="w"> </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">c10</span><span class="o">::</span><span class="n">Error</span><span class="o">&amp;</span><span class="w"> </span><span class="n">e</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="n">std</span><span class="o">::</span><span class="n">cerr</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;error loading the model</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="n">torch</span><span class="o">::</span><span class="n">Tensor</span><span class="w"> </span><span class="n">in</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">randn</span><span class="p">({</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">},</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">kCUDA</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">out</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mod</span><span class="p">.</span><span class="n">forward</span><span class="p">(</span><span class="n">in</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;ok</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+<p>If you want to save the engine produced by Torch-TensorRT to use in a TensorRT application you can use the <code class="docutils literal notranslate"><span class="pre">ConvertGraphToTRTEngine</span></code> API.</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch/script.h&quot;</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch_tensorrt/torch_tensorrt.h&quot;</span><span class="cp"></span>
+<span class="p">...</span><span class="w"></span>
+
+<span class="w">    </span><span class="n">mod</span><span class="p">.</span><span class="n">to</span><span class="p">(</span><span class="n">at</span><span class="o">::</span><span class="n">kCUDA</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">mod</span><span class="p">.</span><span class="n">eval</span><span class="p">();</span><span class="w"></span>
+
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">in</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">randn</span><span class="p">({</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">},</span><span class="w"> </span><span class="p">{</span><span class="n">torch</span><span class="o">::</span><span class="n">kCUDA</span><span class="p">}).</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">kHALF</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">input_sizes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">torch_tensorrt</span><span class="o">::</span><span class="n">CompileSpec</span><span class="o">::</span><span class="n">InputRange</span><span class="o">&gt;</span><span class="p">({</span><span class="n">in</span><span class="p">.</span><span class="n">sizes</span><span class="p">()});</span><span class="w"></span>
+<span class="w">    </span><span class="n">torch_tensorrt</span><span class="o">::</span><span class="n">CompileSpec</span><span class="w"> </span><span class="nf">info</span><span class="p">(</span><span class="n">input_sizes</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">info</span><span class="p">.</span><span class="n">enabled_precisions</span><span class="p">.</span><span class="n">insert</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">kHALF</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">trt_mod</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch_tensorrt</span><span class="o">::</span><span class="n">ConvertGraphToTRTEngine</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;forward&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">info</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">ofstream</span><span class="w"> </span><span class="n">out</span><span class="p">(</span><span class="s">&quot;/tmp/engine_converted_from_jit.trt&quot;</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">out</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">engine</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="n">out</span><span class="p">.</span><span class="n">close</span><span class="p">();</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="under-the-hood">
+<span id="id2"></span><h3>Under The Hood<a class="headerlink" href="#under-the-hood" title="Permalink to this headline">¶</a></h3>
+<p>When a module is provided to Torch-TensorRT, the compiler starts by mapping a graph like you saw above to a graph like this:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>graph(%input.2 : Tensor):
+    %2 : Float(84, 10) = prim::Constant[value=&lt;Tensor&gt;]()
+    %3 : Float(120, 84) = prim::Constant[value=&lt;Tensor&gt;]()
+    %4 : Float(576, 120) = prim::Constant[value=&lt;Tensor&gt;]()
+    %5 : int = prim::Constant[value=-1]() # x.py:25:0
+    %6 : int[] = prim::Constant[value=annotate(List[int], [])]()
+    %7 : int[] = prim::Constant[value=[2, 2]]()
+    %8 : int[] = prim::Constant[value=[0, 0]]()
+    %9 : int[] = prim::Constant[value=[1, 1]]()
+    %10 : bool = prim::Constant[value=1]() # ~/.local/lib/python3.6/site-packages/torch/nn/modules/conv.py:346:0
+    %11 : int = prim::Constant[value=1]() # ~/.local/lib/python3.6/site-packages/torch/nn/functional.py:539:0
+    %12 : bool = prim::Constant[value=0]() # ~/.local/lib/python3.6/site-packages/torch/nn/functional.py:539:0
+    %self.classifer.fc3.bias : Float(10) = prim::Constant[value= 0.0464  0.0383  0.0678  0.0932  0.1045 -0.0805 -0.0435 -0.0818  0.0208 -0.0358 [ CUDAFloatType{10} ]]()
+    %self.classifer.fc2.bias : Float(84) = prim::Constant[value=&lt;Tensor&gt;]()
+    %self.classifer.fc1.bias : Float(120) = prim::Constant[value=&lt;Tensor&gt;]()
+    %self.feat.conv2.weight : Float(16, 6, 3, 3) = prim::Constant[value=&lt;Tensor&gt;]()
+    %self.feat.conv2.bias : Float(16) = prim::Constant[value=&lt;Tensor&gt;]()
+    %self.feat.conv1.weight : Float(6, 1, 3, 3) = prim::Constant[value=&lt;Tensor&gt;]()
+    %self.feat.conv1.bias : Float(6) = prim::Constant[value= 0.0530 -0.1691  0.2802  0.1502  0.1056 -0.1549 [ CUDAFloatType{6} ]]()
+    %input0.4 : Tensor = aten::_convolution(%input.2, %self.feat.conv1.weight, %self.feat.conv1.bias, %9, %8, %9, %12, %8, %11, %12, %12, %10) # ~/.local/lib/python3.6/site-packages/torch/nn/modules/conv.py:346:0
+    %input0.5 : Tensor = aten::relu(%input0.4) # ~/.local/lib/python3.6/site-packages/torch/nn/functional.py:1063:0
+    %input1.2 : Tensor = aten::max_pool2d(%input0.5, %7, %6, %8, %9, %12) # ~/.local/lib/python3.6/site-packages/torch/nn/functional.py:539:0
+    %input0.6 : Tensor = aten::_convolution(%input1.2, %self.feat.conv2.weight, %self.feat.conv2.bias, %9, %8, %9, %12, %8, %11, %12, %12, %10) # ~/.local/lib/python3.6/site-packages/torch/nn/modules/conv.py:346:0
+    %input2.1 : Tensor = aten::relu(%input0.6) # ~/.local/lib/python3.6/site-packages/torch/nn/functional.py:1063:0
+    %x.1 : Tensor = aten::max_pool2d(%input2.1, %7, %6, %8, %9, %12) # ~/.local/lib/python3.6/site-packages/torch/nn/functional.py:539:0
+    %input.1 : Tensor = aten::flatten(%x.1, %11, %5) # x.py:25:0
+    %27 : Tensor = aten::matmul(%input.1, %4)
+    %28 : Tensor = trt::const(%self.classifer.fc1.bias)
+    %29 : Tensor = aten::add_(%28, %27, %11)
+    %input0.2 : Tensor = aten::relu(%29) # ~/.local/lib/python3.6/site-packages/torch/nn/functional.py:1063:0
+    %31 : Tensor = aten::matmul(%input0.2, %3)
+    %32 : Tensor = trt::const(%self.classifer.fc2.bias)
+    %33 : Tensor = aten::add_(%32, %31, %11)
+    %input1.1 : Tensor = aten::relu(%33) # ~/.local/lib/python3.6/site-packages/torch/nn/functional.py:1063:0
+    %35 : Tensor = aten::matmul(%input1.1, %2)
+    %36 : Tensor = trt::const(%self.classifer.fc3.bias)
+    %37 : Tensor = aten::add_(%36, %35, %11)
+    return (%37)
+(CompileGraph)
+</pre></div>
+</div>
+<p>The graph has now been transformed from a collection of modules, each managing their own parameters into a single graph with the parameters inlined
+into the graph and all of the operations laid out. Torch-TensorRT has also executed a number of optimizations and mappings to make the graph easier to translate to TensorRT.
+From here the compiler can assemble the TensorRT engine by following the dataflow through the graph.</p>
+<p>When the graph construction phase is complete, Torch-TensorRT produces a serialized TensorRT engine. From here depending on the API, this engine is returned
+to the user or moves into the graph construction phase. Here Torch-TensorRT creates a JIT Module to execute the TensorRT engine which will be instantiated and managed
+by the Torch-TensorRT runtime.</p>
+<p>Here is the graph that you get back after compilation is complete:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>graph(%self_1 : __torch__.lenet, %input_0 : Tensor):
+    %1 : ...trt.Engine = prim::GetAttr[name=&quot;lenet&quot;](%self_1)
+    %3 : Tensor[] = prim::ListConstruct(%input_0)
+    %4 : Tensor[] = trt::execute_engine(%3, %1)
+    %5 : Tensor = prim::ListUnpack(%4)
+    return (%5)
+</pre></div>
+</div>
+<p>You can see the call where the engine is executed, after extracting the attribute containing the engine and constructing a list of inputs, then returns the tensors back to the user.</p>
+</section>
+<section id="working-with-unsupported-operators">
+<span id="unsupported-ops"></span><h3>Working with Unsupported Operators<a class="headerlink" href="#working-with-unsupported-operators" title="Permalink to this headline">¶</a></h3>
+<p>Torch-TensorRT is a new library and the PyTorch operator library is quite large, so there will be ops that aren’t supported natively by the compiler. You can either use the composition techinques
+shown above to make modules are fully Torch-TensorRT supported and ones that are not and stitch the modules together in the deployment application or you can register converters for missing ops.</p>
+<blockquote>
+<div><p>You can check support without going through the full compilation pipleine using the <code class="docutils literal notranslate"><span class="pre">torch_tensorrt::CheckMethodOperatorSupport(const</span> <span class="pre">torch::jit::Module&amp;</span> <span class="pre">module,</span> <span class="pre">std::string</span> <span class="pre">method_name)</span></code> api
+to see what operators are not supported. <code class="docutils literal notranslate"><span class="pre">torchtrtc</span></code> automatically checks modules with this method before starting compilation and will print out a list of operators that are not supported.</p>
+</div></blockquote>
+<section id="registering-custom-converters">
+<span id="custom-converters"></span><h4>Registering Custom Converters<a class="headerlink" href="#registering-custom-converters" title="Permalink to this headline">¶</a></h4>
+<p>Operations are mapped to TensorRT through the use of modular converters, a function that takes a node from a the JIT graph and produces an equivalent layer or subgraph in TensorRT.
+Torch-TensorRT ships with a library of these converters stored in a registry, that will be executed depending on the node being parsed. For instance a <code class="docutils literal notranslate"><span class="pre">aten::relu(%input0.4)</span></code> instruction will trigger
+the relu converter to be run on it, producing an activation layer in the TensorRT graph. But since this library is not exhaustive you may need to write your own to get Torch-TensorRT
+to support your module.</p>
+<p>Shipped with the Torch-TensorRT distribution are the internal core API headers. You can therefore access the converter registry and add a converter for the op you need.</p>
+<p>For example, if we try to compile a graph with a build of Torch-TensorRT that doesn’t support the flatten operation (<code class="docutils literal notranslate"><span class="pre">aten::flatten</span></code>) you may see this error:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>terminate called after throwing an instance of &#39;torch_tensorrt::Error&#39;
+what():  [enforce fail at core/conversion/conversion.cpp:109] Expected converter to be true but got false
+Unable to convert node: %input.1 : Tensor = aten::flatten(%x.1, %11, %5) # x.py:25:0 (conversion.AddLayer)
+Schema: aten::flatten.using_ints(Tensor self, int start_dim=0, int end_dim=-1) -&gt; (Tensor)
+Converter for aten::flatten requested, but no such converter was found.
+If you need a converter for this operator, you can try implementing one yourself
+or request a converter: https://www.github.com/NVIDIA/Torch-TensorRT/issues
+</pre></div>
+</div>
+<p>We can register a converter for this operator in our application. All of the tools required to build a converter can be imported by including <code class="docutils literal notranslate"><span class="pre">torch_tensorrt/core/conversion/converters/converters.h</span></code>.
+We start by creating an instance of the self-registering class <code class="docutils literal notranslate"><span class="pre">torch_tensorrt::core::conversion::converters::RegisterNodeConversionPatterns()</span></code> which will register converters
+in the global converter registry, associating a function schema like <code class="docutils literal notranslate"><span class="pre">aten::flatten.using_ints(Tensor</span> <span class="pre">self,</span> <span class="pre">int</span> <span class="pre">start_dim=0,</span> <span class="pre">int</span> <span class="pre">end_dim=-1)</span> <span class="pre">-&gt;</span> <span class="pre">(Tensor)</span></code> with a lambda that
+will take the state of the conversion, the node/operation in question to convert and all of the inputs to the node and produces as a side effect a new layer in the TensorRT network.
+Arguments are passed as a vector of inspectable unions of TensorRT <code class="docutils literal notranslate"><span class="pre">ITensors</span></code> and Torch <code class="docutils literal notranslate"><span class="pre">IValues</span></code> in the order arguments are listed in the schema.</p>
+<p>Below is a implementation of a <code class="docutils literal notranslate"><span class="pre">aten::flatten</span></code> converter that we can use in our application. You have full access to the Torch and TensorRT libraries in the converter implementation. So
+for example we can quickly get the output size by just running the operation in PyTorch instead of implementing the full calculation outself like we do below for this flatten converter.</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch/script.h&quot;</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch_tensorrt/torch_tensorrt.h&quot;</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch_tensorrt/core/conversion/converters/converters.h&quot;</span><span class="cp"></span>
+
+<span class="k">static</span><span class="w"> </span><span class="k">auto</span><span class="w"> </span><span class="n">flatten_converter</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch_tensorrt</span><span class="o">::</span><span class="n">core</span><span class="o">::</span><span class="n">conversion</span><span class="o">::</span><span class="n">converters</span><span class="o">::</span><span class="n">RegisterNodeConversionPatterns</span><span class="p">()</span><span class="w"></span>
+<span class="w">    </span><span class="p">.</span><span class="n">pattern</span><span class="p">({</span><span class="w"></span>
+<span class="w">        </span><span class="s">&quot;aten::flatten.using_ints(Tensor self, int start_dim=0, int end_dim=-1) -&gt; (Tensor)&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">[](</span><span class="n">torch_tensorrt</span><span class="o">::</span><span class="n">core</span><span class="o">::</span><span class="n">conversion</span><span class="o">::</span><span class="n">ConversionCtx</span><span class="o">*</span><span class="w"> </span><span class="n">ctx</span><span class="p">,</span><span class="w"></span>
+<span class="w">           </span><span class="k">const</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">Node</span><span class="o">*</span><span class="w"> </span><span class="n">n</span><span class="p">,</span><span class="w"></span>
+<span class="w">           </span><span class="n">torch_tensorrt</span><span class="o">::</span><span class="n">core</span><span class="o">::</span><span class="n">conversion</span><span class="o">::</span><span class="n">converters</span><span class="o">::</span><span class="n">args</span><span class="o">&amp;</span><span class="w"> </span><span class="n">args</span><span class="p">)</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="k">auto</span><span class="w"> </span><span class="n">in</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="n">ITensor</span><span class="p">();</span><span class="w"></span>
+<span class="w">            </span><span class="k">auto</span><span class="w"> </span><span class="n">start_dim</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">unwrapToInt</span><span class="p">();</span><span class="w"></span>
+<span class="w">            </span><span class="k">auto</span><span class="w"> </span><span class="n">end_dim</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">args</span><span class="p">[</span><span class="mi">2</span><span class="p">].</span><span class="n">unwrapToInt</span><span class="p">();</span><span class="w"></span>
+<span class="w">            </span><span class="k">auto</span><span class="w"> </span><span class="n">in_shape</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch_tensorrt</span><span class="o">::</span><span class="n">core</span><span class="o">::</span><span class="n">util</span><span class="o">::</span><span class="n">toVec</span><span class="p">(</span><span class="n">in</span><span class="o">-&gt;</span><span class="n">getDimensions</span><span class="p">());</span><span class="w"></span>
+<span class="w">            </span><span class="k">auto</span><span class="w"> </span><span class="n">out_shape</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">flatten</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">rand</span><span class="p">(</span><span class="n">in_shape</span><span class="p">),</span><span class="w"> </span><span class="n">start_dim</span><span class="p">,</span><span class="w"> </span><span class="n">end_dim</span><span class="p">).</span><span class="n">sizes</span><span class="p">();</span><span class="w"></span>
+
+<span class="w">            </span><span class="k">auto</span><span class="w"> </span><span class="n">shuffle</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ctx</span><span class="o">-&gt;</span><span class="n">net</span><span class="o">-&gt;</span><span class="n">addShuffle</span><span class="p">(</span><span class="o">*</span><span class="n">in</span><span class="p">);</span><span class="w"></span>
+<span class="w">            </span><span class="n">shuffle</span><span class="o">-&gt;</span><span class="n">setReshapeDimensions</span><span class="p">(</span><span class="n">torch_tensorrt</span><span class="o">::</span><span class="n">core</span><span class="o">::</span><span class="n">util</span><span class="o">::</span><span class="n">toDims</span><span class="p">(</span><span class="n">out_shape</span><span class="p">));</span><span class="w"></span>
+<span class="w">            </span><span class="n">shuffle</span><span class="o">-&gt;</span><span class="n">setName</span><span class="p">(</span><span class="n">torch_tensorrt</span><span class="o">::</span><span class="n">core</span><span class="o">::</span><span class="n">util</span><span class="o">::</span><span class="n">node_info</span><span class="p">(</span><span class="n">n</span><span class="p">).</span><span class="n">c_str</span><span class="p">());</span><span class="w"></span>
+
+<span class="w">            </span><span class="k">auto</span><span class="w"> </span><span class="n">out_tensor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ctx</span><span class="o">-&gt;</span><span class="n">AssociateValueAndTensor</span><span class="p">(</span><span class="n">n</span><span class="o">-&gt;</span><span class="n">outputs</span><span class="p">()[</span><span class="mi">0</span><span class="p">],</span><span class="w"> </span><span class="n">shuffle</span><span class="o">-&gt;</span><span class="n">getOutput</span><span class="p">(</span><span class="mi">0</span><span class="p">));</span><span class="w"></span>
+<span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">});</span><span class="w"></span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="p">...</span><span class="w"></span>
+</pre></div>
+</div>
+<p>To use this converter in Python, it is recommended to use PyTorch’s <a class="reference external" href="https://pytorch.org/tutorials/advanced/cpp_extension.html#custom-c-and-cuda-extensions">C++ / CUDA Extention</a>
+template to wrap your library of converters into a <code class="docutils literal notranslate"><span class="pre">.so</span></code> that you can load with <code class="docutils literal notranslate"><span class="pre">ctypes.CDLL()</span></code> in your Python application.</p>
+<p>You can find more information on all the details of writing converters in the contributors documentation (<a class="reference internal" href="../contributors/writing_converters.html#writing-converters"><span class="std std-ref">Writing Converters</span></a>).
+If you find yourself with a large library of converter implementations, do consider upstreaming them, PRs are welcome and it would be great for the community to benefit as well.</p>
+</section>
+</section>
+</section>
+</section>
+
+
+             </article>
+
+            </div>
+            <footer>
+
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+
+        <a href="../tutorials/creating_torchscript_module_in_python.html" class="btn btn-neutral float-right" title="Creating a TorchScript Module" accesskey="n" rel="next">Next <img src="../_static/images/chevron-right-orange.svg" class="next-page"></a>
+
+
+        <a href="getting_started_with_python_api.html" class="btn btn-neutral" title="Using Torch-TensorRT in Python" accesskey="p" rel="prev"><img src="../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
+
+    </div>
+
+
+
+
+    <hr>
+
+
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2021, NVIDIA Corporation.
+
+    </p>
+  </div>
+
+      <div>
+        Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+      </div>
+
+
+</footer>
+
+          </div>
+        </div>
+
+        <div class="pytorch-content-right" id="pytorch-content-right">
+          <div class="pytorch-right-menu" id="pytorch-right-menu">
+            <div class="pytorch-side-scroll" id="pytorch-side-scroll-right">
+              <ul>
+<li><a class="reference internal" href="#">Using Torch-TensorRT in  C++</a><ul>
+<li><a class="reference internal" href="#id1">Using Torch-TensorRT in C++</a><ul>
+<li><a class="reference internal" href="#torch-tensorrt-quickstart-compiling-torchscript-modules-with-torchtrtc">[Torch-TensorRT Quickstart] Compiling TorchScript Modules with <code class="docutils literal notranslate"><span class="pre">torchtrtc</span></code></a></li>
+<li><a class="reference internal" href="#working-with-torchscript-in-c">Working with TorchScript in C++</a></li>
+<li><a class="reference internal" href="#compiling-with-torch-tensorrt-in-c">Compiling with Torch-TensorRT in C++</a></li>
+<li><a class="reference internal" href="#under-the-hood">Under The Hood</a></li>
+<li><a class="reference internal" href="#working-with-unsupported-operators">Working with Unsupported Operators</a><ul>
+<li><a class="reference internal" href="#registering-custom-converters">Registering Custom Converters</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+
+
+
+
+
+
+       <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+         <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+         <script src="../_static/jquery.js"></script>
+         <script src="../_static/underscore.js"></script>
+         <script src="../_static/doctools.js"></script>
+         <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js"></script>
+         <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js"></script>
+         <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+
+
+
+
+  <script type="text/javascript" src="../_static/js/vendor/popper.min.js"></script>
+  <script type="text/javascript" src="../_static/js/vendor/bootstrap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/list.js/1.5.0/list.min.js"></script>
+  <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  <!-- Begin Footer -->
+
+  <div class="container-fluid docs-tutorials-resources" id="docs-tutorials-resources">
+    <div class="container">
+      <div class="row">
+        <div class="col-md-4 text-center">
+          <h2>Docs</h2>
+          <p>Access comprehensive developer documentation for PyTorch</p>
+          <a class="with-right-arrow" href="https://pytorch.org/docs/stable/index.html">View Docs</a>
+        </div>
+
+        <div class="col-md-4 text-center">
+          <h2>Tutorials</h2>
+          <p>Get in-depth tutorials for beginners and advanced developers</p>
+          <a class="with-right-arrow" href="https://pytorch.org/tutorials">View Tutorials</a>
+        </div>
+
+        <div class="col-md-4 text-center">
+          <h2>Resources</h2>
+          <p>Find development resources and get your questions answered</p>
+          <a class="with-right-arrow" href="https://pytorch.org/resources">View Resources</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="container footer-container">
+      <div class="footer-logo-wrapper">
+        <a href="https://pytorch.org/" class="footer-logo"></a>
+      </div>
+
+      <div class="footer-links-wrapper">
+        <div class="footer-links-col">
+          <ul>
+            <li class="list-title"><a href="https://pytorch.org/">PyTorch</a></li>
+            <li><a href="https://pytorch.org/get-started">Get Started</a></li>
+            <li><a href="https://pytorch.org/features">Features</a></li>
+            <li><a href="https://pytorch.org/ecosystem">Ecosystem</a></li>
+            <li><a href="https://pytorch.org/blog/">Blog</a></li>
+            <li><a href="https://github.com/pytorch/pytorch/blob/master/CONTRIBUTING.md">Contributing</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-links-col">
+          <ul>
+            <li class="list-title"><a href="https://pytorch.org/resources">Resources</a></li>
+            <li><a href="https://pytorch.org/tutorials">Tutorials</a></li>
+            <li><a href="https://pytorch.org/docs/stable/index.html">Docs</a></li>
+            <li><a href="https://discuss.pytorch.org" target="_blank">Discuss</a></li>
+            <li><a href="https://github.com/pytorch/pytorch/issues" target="_blank">Github Issues</a></li>
+            <li><a href="https://pytorch.org/assets/brand-guidelines/PyTorch-Brand-Guidelines.pdf" target="_blank">Brand Guidelines</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-links-col">
+          <ul>
+            <li class="list-title">Stay up to date</li>
+            <li><a href="https://www.facebook.com/pytorch" target="_blank">Facebook</a></li>
+            <li><a href="https://twitter.com/pytorch" target="_blank">Twitter</a></li>
+            <li><a href="https://www.youtube.com/pytorch" target="_blank">YouTube</a></li>
+            <li><a href="https://www.linkedin.com/company/pytorch" target="_blank">LinkedIn</a></li>
+          </ul>
+          </div>
+
+        <div class="footer-links-col">
+          <ul>
+            <li class="list-title">PyTorch Podcasts</li>
+            <li><a href="https://open.spotify.com/show/6UzHKeiy368jKfQMKKvJY5" target="_blank">Spotify</a></li>
+            <li><a href="https://podcasts.apple.com/us/podcast/pytorch-developer-podcast/id1566080008" target="_blank">Apple</a></li>
+            <li><a href="https://www.google.com/podcasts?feed=aHR0cHM6Ly9mZWVkcy5zaW1wbGVjYXN0LmNvbS9PQjVGa0lsOA%3D%3D" target="_blank">Google</a></li>
+            <li><a href="https://music.amazon.com/podcasts/7a4e6f0e-26c2-49e9-a478-41bd244197d0/PyTorch-Developer-Podcast?" target="_blank">Amazon</a></li>
+          </ul>
+         </div>
+        </div>
+
+        <div class="privacy-policy">
+          <ul>
+            <li class="privacy-policy-links"><a href="https://www.linuxfoundation.org/terms/" target="_blank">Terms</a></li>
+            <li class="privacy-policy-links">|</li>
+            <li class="privacy-policy-links"><a href="https://www.linuxfoundation.org/privacy-policy/" target="_blank">Privacy</a></li>
+          </ul>
+        </div>
+        <div class="copyright">
+        <p>© Copyright The Linux Foundation. The PyTorch Foundation is a project of The Linux Foundation.
+          For web site terms of use, trademark policy and other policies applicable to The PyTorch Foundation please see
+          <a href="www.linuxfoundation.org/policies/">www.linuxfoundation.org/policies/</a>. The PyTorch Foundation supports the PyTorch open source
+          project, which has been established as PyTorch Project a Series of LF Projects, LLC. For policies applicable to the PyTorch Project a Series of LF Projects, LLC,
+          please see <a href="www.lfprojects.org/policies/">www.lfprojects.org/policies/</a>.</p>
+      </div>
+     </div>
+
+  </footer>
+
+  <div class="cookie-banner-wrapper">
+  <div class="container">
+    <p class="gdpr-notice">To analyze traffic and optimize your experience, we serve cookies on this site. By clicking or navigating, you agree to allow our usage of cookies. As the current maintainers of this site, Facebook’s Cookies Policy applies. Learn more, including about available controls: <a href="https://www.facebook.com/policies/cookies/">Cookies Policy</a>.</p>
+    <img class="close-button" src="../_static/images/pytorch-x.svg">
+  </div>
+</div>
+
+  <!-- End Footer -->
+
+  <!-- Begin Mobile Menu -->
+
+  <div class="mobile-main-menu">
+    <div class="container-fluid">
+      <div class="container">
+        <div class="mobile-main-menu-header-container">
+          <a class="header-logo" href="https://pytorch.org/" aria-label="PyTorch"></a>
+          <a class="main-menu-close-button" href="#" data-behavior="close-mobile-menu"></a>
+        </div>
+      </div>
+    </div>
+
+    <div class="mobile-main-menu-links-container">
+      <div class="main-menu">
+        <ul>
+          <li>
+            <a href="https://pytorch.org/get-started">Get Started</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/ecosystem">Ecosystem</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/mobile">Mobile</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/hub">PyTorch Hub</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/blog/">Blog</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/tutorials">Tutorials</a>
+          </li>
+
+          <li class="resources-mobile-menu-title">
+            Docs
+          </li>
+
+          <ul class="resources-mobile-menu-items">
+            <li>
+              <a href="https://pytorch.org/docs/stable/index.html">PyTorch</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/audio/stable/index.html">torchaudio</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/text/stable/index.html">torchtext</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/vision/stable/index.html">torchvision</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/serve/">TorchServe</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/torchx/">TorchX</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/xla">PyTorch on XLA Devices</a>
+            </li>
+          </ul>
+
+          <li class="resources-mobile-menu-title">
+            Resources
+          </li>
+
+          <ul class="resources-mobile-menu-items">
+            <li>
+              <a href="https://pytorch.org/resources">Developer Resources</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/features">About</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/hub">Models (Beta)</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/#community-module">Community</a>
+            </li>
+
+            <li>
+              <a href="https://discuss.pytorch.org/">Forums</a>
+            </li>
+          </ul>
+
+          <li>
+            <a href="https://github.com/pytorch/pytorch">Github</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- End Mobile Menu -->
+
+  <script type="text/javascript" src="../_static/js/vendor/anchor.min.js"></script>
+
+  <script type="text/javascript">
+    $(document).ready(function() {
+      mobileMenu.bind();
+      mobileTOC.bind();
+      pytorchAnchors.bind();
+      sideMenus.bind();
+      scrollToAnchor.bind();
+      highlightNavigation.bind();
+      mainMenuDropdown.bind();
+      filterTags.bind();
+
+      // Add class to links that have code blocks, since we cannot create links in code blocks
+      $("article.pytorch-article a span.pre").each(function(e) {
+        $(this).closest("a").addClass("has-code");
+      });
+    })
+  </script>
+</body>
+</html>

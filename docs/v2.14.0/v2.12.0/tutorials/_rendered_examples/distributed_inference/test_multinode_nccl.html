@@ -1,0 +1,841 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Usage &#8212; Torch-TensorRT</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../../../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=72e443bf" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery.css?v=61a4c737" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery-dataframe.css?v=e5fbc548" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/collapsible-lists/css/tree_view.css?v=a885cde7" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/nbsphinx-code-cells.css" />
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/katex@0.10.0-beta/dist/katex.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/css/custom.css?v=0cb2b9ef" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../../../_static/documentation_options.js?v=c3d35e0c"></script>
+    <script src="../../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
+    <script src="../../../_static/collapsible-lists/js/apply-collapsible-lists.js?v=660e4f45"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'tutorials/_rendered_examples/distributed_inference/test_multinode_nccl';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://raw.githubusercontent.com/pytorch/TensorRT/refs/heads/main/docs/versions.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = 'main';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner = false;
+        </script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Tensor Parallel Distributed Inference with Torch-TensorRT" href="tensor_parallel_simple_example.html" />
+    <link rel="prev" title="Torch-TensorRT Distributed Inference" href="data_parallel_gpt2.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Torch-TensorRT</p>
+  
+</a></div>
+    
+      <div class="navbar-item">
+<script>
+document.write(`
+  <div class="version-switcher__container dropdown">
+    <button id="pst-version-switcher-button-2"
+      type="button"
+      class="version-switcher__button btn btn-sm dropdown-toggle"
+      data-bs-toggle="dropdown"
+      aria-haspopup="listbox"
+      aria-controls="pst-version-switcher-list-2"
+      aria-label="Version switcher list"
+    >
+      Choose version  <!-- this text may get changed later by javascript -->
+      <span class="caret"></span>
+    </button>
+    <div id="pst-version-switcher-list-2"
+      class="version-switcher__menu dropdown-menu list-group-flush py-0"
+      role="listbox" aria-labelledby="pst-version-switcher-button-2">
+      <!-- dropdown will be populated by javascript on page load -->
+    </div>
+  </div>
+`);
+</script></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../../advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../../advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../huggingface/index.html">HuggingFace Models</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../huggingface/compile_hf_models.html">Compiling LLM models from Huggingface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../dynamo/torch_compile_stable_diffusion.html">Example: Compiling Stable Diffusion with torch.compile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../dynamo/torch_export_flux_dev.html">Example: Compiling FLUX.1-dev with the dynamo backend</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../dynamo/mutable_torchtrt_module_example.html">Example: Mutable Torch TensorRT Module</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../extensibility/index.html">Extensibility</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../extensibility/converters/index.html">Converters</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../extensibility/converters/dynamo_converters.html">Writing Dynamo Converters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../extensibility/converters/converter_registry.html">Converter Registry Internals</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../extensibility/converters/impl_subpackage.html">The <code class="docutils literal notranslate"><span class="pre">impl/</span></code> Building-Block Library</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../dynamo/auto_generate_converters.html">Example: Auto-generate a Converter for a Custom Kernel</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../dynamo/converter_overloading.html">Example: Overloading Converters with Custom Converters</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../extensibility/lowering/index.html">Lowering Passes</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../extensibility/lowering/writing_dynamo_aten_lowering_passes.html">Writing Dynamo ATen Lowering Passes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../extensibility/lowering/subgraph_builder.html">SubgraphBuilder — Cursor-Based FX Node Insertion</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../extensibility/plugins/index.html">Plugins</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../extensibility/plugins/plugins.html">Plugin System</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../dynamo/auto_generate_plugins.html">Example: Auto-generate a Plugin for a Custom Kernel</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../dynamo/custom_kernel_plugins.html">Example: Using Custom Kernels within TensorRT Engines</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../dynamo/aot_plugin.html">Automatically Generate a TensorRT AOT Plugin</a></li>
+
+
+
+
+
+
+<li class="toctree-l3"><a class="reference internal" href="../dynamo/nvrtc_aot_plugin.html">Example: Custom Kernels with NVRTC in TensorRT AOT Plugins</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../resource_memory/index.html">Resource &amp; Memory Management</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../resource_memory/resource_management.html">Resource Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../resource_memory/engine_cache.html">Engine Caching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../dynamo/engine_caching_example.html">Example: Engine Caching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../dynamo/engine_caching_bert_example.html">Example: Engine Caching (BERT)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../dynamo/weight_streaming_example.html">Example: Weight Streaming</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../dynamo/dynamic_memory_allocation.html">Example: Dynamic Memory Allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../dynamo/low_cpu_memory_compilation.html">Example: Low CPU Memory Compilation</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../compilation_analysis/index.html">Compilation &amp; Graph Analysis</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../compilation_analysis/trace.html">Tracing Models with <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.trace</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../compilation_analysis/dryrun.html">Dryrun Mode</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../dynamo/hierarchical_partitioner_example.html">Example: Hierarchical Partitioner</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../weight_refit/index.html">Weight Refitting &amp; LoRA</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../weight_refit/refit.html">Refitting TensorRT Engines with Updated Weights</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../dynamo/refit_engine_example.html">Example: Refitting Programs with New Weights</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../runtime_opt/index.html">Runtime Optimization</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../runtime_opt/cuda_graphs.html">CUDAGraphs and the Output Allocator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../dynamo/torch_export_cudagraphs.html">Example: Torch Export with Cudagraphs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../dynamo/pre_allocated_output_example.html">Example: Pre-allocated output buffer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../runtime_opt/python_runtime.html">Python Runtime</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../deployment/index.html">Deployment</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../deployment/serving_torch_tensorrt_with_triton.html">Serving a Torch-TensorRT model with Triton</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../deployment/cross_compile_windows.html">Cross-Compiling for Windows</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../dynamo/cross_runtime_compilation_for_windows.html">Example: Cross-runtime Compilation for Windows</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../deployment/distributed_inference.html">Distributed Inference</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../complex_numerics/index.html">Complex Numerics</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../complex_numerics/complex_tensors.html">Complex Tensor Support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../dynamo/torch_export_3d_rope.html">3D Rotary Position Embedding (RoPE) + Attention compiled with Torch-TensorRT</a></li>
+
+
+
+</ul>
+</details></li>
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="index.html">Example: Distributed Inference</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="data_parallel_stable_diffusion.html">Torch-TensorRT Distributed Inference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data_parallel_gpt2.html">Torch-TensorRT Distributed Inference</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">Usage</a></li>
+
+
+<li class="toctree-l2"><a class="reference internal" href="tensor_parallel_simple_example.html">Tensor Parallel Distributed Inference with Torch-TensorRT</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tensor_parallel_simple_example_mn.html">Tensor Parallel Distributed Inference with Torch-TensorRT (torchrun)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="test_multinode_export_save_load.html">Usage</a></li>
+
+
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../indices/supported_ops.html">Operators Supported</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../../advanced_usage.html" class="nav-link">Advanced Usage</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="index.html" class="nav-link">Distributed Inference</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page">Usage</li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <p>Two-node native TensorRT NCCL test.</p>
+<p>Reads RANK, WORLD_SIZE, MASTER_ADDR, MASTER_PORT from the environment so it works correctly with torchrun or plain env-var injection across nodes.</p>
+<section id="Usage">
+<h1>Usage<a class="headerlink" href="#Usage" title="Link to this heading">#</a></h1>
+<p>TRT’s dlopen(“libnccl.so”) reads LD_LIBRARY_PATH at process start, so the NCCL directory must be in LD_LIBRARY_PATH before the process launches. Use setup_nccl_for_torch_tensorrt() to locate the path, then pass it at launch time.</p>
+<p>NCCL_LIB=$(python -c “from torch_tensorrt.distributed._nccl_utils import get_nccl_library_path; print(get_nccl_library_path())”)</p>
+</section>
+<section id="Rank-0:">
+<h1>Rank 0:<a class="headerlink" href="#Rank-0:" title="Link to this heading">#</a></h1>
+<div class="line-block">
+<div class="line">LD_LIBRARY_PATH=”<span class="math notranslate nohighlight">\(NCCL_LIB:\)</span>LD_LIBRARY_PATH”</div>
+<div class="line">RANK=0 WORLD_SIZE=2 MASTER_ADDR= MASTER_PORT=29500</div>
+<div class="line">uv run python examples/distributed_inference/test_multinode_nccl.py</div>
+</div>
+</section>
+<section id="Rank-1:">
+<h1>Rank 1:<a class="headerlink" href="#Rank-1:" title="Link to this heading">#</a></h1>
+<div class="line-block">
+<div class="line">LD_LIBRARY_PATH=”<span class="math notranslate nohighlight">\(NCCL_LIB:\)</span>LD_LIBRARY_PATH”</div>
+<div class="line">RANK=1 WORLD_SIZE=2 MASTER_ADDR= MASTER_PORT=29500</div>
+<div class="line">uv run python examples/distributed_inference/test_multinode_nccl.py</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>import os
+import sys
+
+import torch
+import torch.distributed as dist
+import torch.nn as nn
+import torch.utils._pytree
+import torch_tensorrt
+from torch.distributed._tensor import Shard
+from torch.distributed._tensor.device_mesh import init_device_mesh
+from torch.distributed.tensor.parallel import (
+    ColwiseParallel,
+    RowwiseParallel,
+    parallelize_module,
+)
+from torch_tensorrt.distributed import setup_nccl_for_torch_tensorrt
+
+torch.utils._pytree.register_constant(
+    torch.distributed.tensor._dtensor_spec.DTensorSpec
+)
+
+setup_nccl_for_torch_tensorrt()
+
+rank = int(os.environ[&quot;RANK&quot;])
+world_size = int(os.environ[&quot;WORLD_SIZE&quot;])
+
+torch.cuda.set_device(0)  # one GPU per node
+dist.init_process_group(&quot;nccl&quot;, rank=rank, world_size=world_size)
+torch.manual_seed(0)
+
+device_mesh = init_device_mesh(&quot;cuda&quot;, (world_size,))
+print(f&quot;[Rank {rank}/{world_size}] distributed init OK&quot;, flush=True)
+
+
+class ToyModel(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.in_proj = nn.Linear(10, 3200)
+        self.relu = nn.ReLU()
+        self.out_proj = nn.Linear(3200, 1600)
+        self.in_proj2 = nn.Linear(1600, 500)
+        self.out_proj2 = nn.Linear(500, 100)
+
+    def forward(self, x):
+        x = self.out_proj(self.relu(self.in_proj(x)))
+        x = self.relu(x)
+        x = self.out_proj2(self.relu(self.in_proj2(x)))
+        return x
+
+
+tp_model = ToyModel().to(&quot;cuda&quot;)
+tp_model = parallelize_module(
+    tp_model,
+    device_mesh,
+    {
+        &quot;in_proj&quot;: ColwiseParallel(input_layouts=Shard(0)),
+        &quot;out_proj&quot;: RowwiseParallel(output_layouts=Shard(0)),
+        &quot;in_proj2&quot;: ColwiseParallel(input_layouts=Shard(0)),
+        &quot;out_proj2&quot;: RowwiseParallel(output_layouts=Shard(0)),
+    },
+)
+
+inp = torch.rand(20, 10, device=&quot;cuda&quot;)
+python_result = tp_model(inp)
+print(f&quot;[Rank {rank}] PyTorch baseline OK, shape={python_result.shape}&quot;, flush=True)
+
+PASSED = []
+FAILED = []
+
+for runtime, use_python in [(&quot;cpp&quot;, False), (&quot;python&quot;, True)]:
+    dist.barrier()  # ensure both ranks enter each test together
+    try:
+        trt_model = torch.compile(
+            tp_model,
+            backend=&quot;torch_tensorrt&quot;,
+            options={
+                &quot;truncate_long_and_double&quot;: True,
+                &quot;enabled_precisions&quot;: {torch.float32},
+                &quot;use_python_runtime&quot;: use_python,
+                &quot;min_block_size&quot;: 1,
+            },
+        )
+        output = trt_model(inp)
+        std = float((python_result - output).std())
+        if std &lt; 0.01:
+            print(f&quot;[Rank {rank}] PASS  {runtime} runtime  (std={std:.6f})&quot;, flush=True)
+            PASSED.append(runtime)
+        else:
+            print(
+                f&quot;[Rank {rank}] FAIL  {runtime} runtime  (std={std:.6f} &gt;= 0.01)&quot;,
+                flush=True,
+            )
+            FAILED.append(runtime)
+    except Exception as e:
+        print(f&quot;[Rank {rank}] ERROR {runtime} runtime: {e}&quot;, flush=True)
+        FAILED.append(runtime)
+
+dist.destroy_process_group()
+
+print(f&quot;[Rank {rank}] Results — passed: {PASSED}  failed: {FAILED}&quot;, flush=True)
+sys.exit(0 if not FAILED else 1)
+</pre></div>
+</div>
+</div>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="data_parallel_gpt2.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Torch-TensorRT Distributed Inference</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="tensor_parallel_simple_example.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Tensor Parallel Distributed Inference with Torch-TensorRT</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h1 nav-item toc-entry"><a class="reference internal nav-link" href="#">Usage</a></li>
+<li class="toc-h1 nav-item toc-entry"><a class="reference internal nav-link" href="#Rank-0:">Rank 0:</a></li>
+<li class="toc-h1 nav-item toc-entry"><a class="reference internal nav-link" href="#Rank-1:">Rank 1:</a></li>
+</ul>
+
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+
+  
+  <div class="tocsection editthispage">
+    <a href="https://github.com/pytorch/TensorRT/edit/main/docsrc/tutorials/_rendered_examples/distributed_inference/test_multinode_nccl.ipynb">
+      <i class="fa-solid fa-pencil"></i>
+      
+      
+        
+          Edit on GitHub
+        
+      
+    </a>
+  </div>
+</div>
+
+  <div class="sidebar-secondary-item">
+
+  <div class="tocsection sourcelink">
+    <a href="../../../_sources/tutorials/_rendered_examples/distributed_inference/test_multinode_nccl.ipynb.txt">
+      <i class="fa-solid fa-file-lines"></i> Show Source
+    </a>
+  </div>
+</div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2024, NVIDIA Corporation.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>

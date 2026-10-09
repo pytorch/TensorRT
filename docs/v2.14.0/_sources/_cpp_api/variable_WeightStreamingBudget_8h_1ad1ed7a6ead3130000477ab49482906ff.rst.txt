@@ -1,0 +1,14 @@
+.. _exhale_variable_WeightStreamingBudget_8h_1ad1ed7a6ead3130000477ab49482906ff:
+
+Variable torch_tensorrt::executorch_backend::kWeightStreamingBudgetKey
+======================================================================
+
+- Defined in :ref:`file_cpp_include_torch_tensorrt_executorch_WeightStreamingBudget.h`
+
+
+Variable Documentation
+----------------------
+
+
+.. doxygenvariable:: torch_tensorrt::executorch_backend::kWeightStreamingBudgetKey
+   :project: Torch-TensorRT

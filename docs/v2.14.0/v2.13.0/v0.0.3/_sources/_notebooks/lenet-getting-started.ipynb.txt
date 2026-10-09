@@ -1,0 +1,592 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Copyright 2019 NVIDIA Corporation. All Rights Reserved.\n",
+    "#\n",
+    "# Licensed under the Apache License, Version 2.0 (the \"License\");\n",
+    "# you may not use this file except in compliance with the License.\n",
+    "# You may obtain a copy of the License at\n",
+    "#\n",
+    "#     http://www.apache.org/licenses/LICENSE-2.0\n",
+    "#\n",
+    "# Unless required by applicable law or agreed to in writing, software\n",
+    "# distributed under the License is distributed on an \"AS IS\" BASIS,\n",
+    "# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n",
+    "# See the License for the specific language governing permissions and\n",
+    "# limitations under the License.\n",
+    "# =============================================================================="
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "<img src=\"http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png\" style=\"width: 90px; float: right;\">\n",
+    "\n",
+    "# TRTorch Getting Started - LeNet"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Overview\n",
+    "\n",
+    "In the practice of developing machine learning models, there are few tools as approachable as PyTorch for developing and experimenting in designing machine learning models. The power of PyTorch comes from its deep integration into Python, its flexibility and its approach to automatic differentiation and execution (eager execution). However, when moving from research into production, the requirements change and we may no longer want that deep Python integration and we want optimization to get the best performance we can on our deployment platform. In PyTorch 1.0, TorchScript was introduced as a method to separate your PyTorch model from Python, make it portable and optimizable. TorchScript uses PyTorch's JIT compiler to transform your normal PyTorch code which gets interpreted by the Python interpreter to an intermediate representation (IR) which can have optimizations run on it and at runtime can get interpreted by the PyTorch JIT interpreter. For PyTorch this has opened up a whole new world of possibilities, including deployment in other languages like C++. It also introduces a structured graph based format that we can use to do down to the kernel level optimization of models for inference.\n",
+    "\n",
+    "When deploying on NVIDIA GPUs TensorRT, NVIDIA's Deep Learning Optimization SDK and Runtime is able to take models from any major framework and specifically tune them to perform better on specific target hardware in the NVIDIA family be it an A100, TITAN V, Jetson Xavier or NVIDIA's Deep Learning Accelerator. TensorRT performs a couple sets of optimizations to achieve this. TensorRT fuses layers and tensors in the model graph, it then uses a large kernel library to select implementations that perform best on the target GPU. TensorRT also has strong support for reduced operating precision execution which allows users to leverage the Tensor Cores on Volta and newer GPUs as well as reducing memory and computation footprints on device.\n",
+    "\n",
+    "TRTorch is a compiler that uses TensorRT to optimize TorchScript code, compiling standard TorchScript modules into ones that internally run with TensorRT optimizations. This enables you to continue to remain in the PyTorch ecosystem, using all the great features PyTorch has such as module composability, its flexible tensor implementation, data loaders and more. TRTorch is available to use with both PyTorch and LibTorch."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Learning objectives\n",
+    "\n",
+    "This notebook demonstrates the steps for compiling a TorchScript module with TRTorch on a simple LeNet network. \n",
+    "\n",
+    "## Content\n",
+    "1. [Requirements](#1)\n",
+    "1. [Creating TorchScript modules](#2)\n",
+    "1. [Compiling with TRTorch](#3)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "<a id=\"1\"></a>\n",
+    "## 1. Requirements\n",
+    "\n",
+    "Follow the steps in `notebooks/README` to prepare a Docker container, within which you can run this notebook."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "<a id=\"2\"></a>\n",
+    "## 2. Creating TorchScript modules\n",
+    "\n",
+    "Here we create two submodules for a feature extractor and a classifier and stitch them together in a single LeNet module. In this case this is overkill but modules give us granular control over our program including where we decide to optimize and where we don't. It is also the unit that the TorchScript compiler operates on. So you can decide to only convert/optimize the feature extractor and leave the classifier in standard PyTorch or you can convert the whole thing. When compiling your module to TorchScript, there are two paths: Tracing and Scripting.  "
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import torch \n",
+    "from torch import nn\n",
+    "import torch.nn.functional as F\n",
+    "\n",
+    "class LeNetFeatExtractor(nn.Module):\n",
+    "    def __init__(self):\n",
+    "        super(LeNetFeatExtractor, self).__init__()\n",
+    "        self.conv1 = nn.Conv2d(1, 6, 3)\n",
+    "        self.conv2 = nn.Conv2d(6, 16, 3)\n",
+    "\n",
+    "    def forward(self, x):\n",
+    "        x = F.max_pool2d(F.relu(self.conv1(x)), (2, 2))\n",
+    "        x = F.max_pool2d(F.relu(self.conv2(x)), 2)\n",
+    "        return x\n",
+    "\n",
+    "class LeNetClassifier(nn.Module):\n",
+    "    def __init__(self):\n",
+    "        super(LeNetClassifier, self).__init__()\n",
+    "        self.fc1 = nn.Linear(16 * 6 * 6, 120)\n",
+    "        self.fc2 = nn.Linear(120, 84)\n",
+    "        self.fc3 = nn.Linear(84, 10)\n",
+    "\n",
+    "    def forward(self, x):\n",
+    "        x = torch.flatten(x,1)\n",
+    "        x = F.relu(self.fc1(x))\n",
+    "        x = F.relu(self.fc2(x))\n",
+    "        x = self.fc3(x)\n",
+    "        return x\n",
+    "\n",
+    "class LeNet(nn.Module):\n",
+    "    def __init__(self):\n",
+    "        super(LeNet, self).__init__()\n",
+    "        self.feat = LeNetFeatExtractor()\n",
+    "        self.classifer = LeNetClassifier()\n",
+    "\n",
+    "    def forward(self, x):\n",
+    "        x = self.feat(x)\n",
+    "        x = self.classifer(x)\n",
+    "        return x\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "Let us define a helper function to benchmark a model."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 9,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import time\n",
+    "import numpy as np\n",
+    "\n",
+    "import torch.backends.cudnn as cudnn\n",
+    "cudnn.benchmark = True\n",
+    "\n",
+    "def benchmark(model, input_shape=(1024, 1, 32, 32), dtype='fp32', nwarmup=50, nruns=10000):\n",
+    "    input_data = torch.randn(input_shape)\n",
+    "    input_data = input_data.to(\"cuda\")\n",
+    "    if dtype=='fp16':\n",
+    "        input_data = input_data.half()\n",
+    "        \n",
+    "    print(\"Warm up ...\")\n",
+    "    with torch.no_grad():\n",
+    "        for _ in range(nwarmup):\n",
+    "            features = model(input_data)\n",
+    "    torch.cuda.synchronize()\n",
+    "    print(\"Start timing ...\")\n",
+    "    timings = []\n",
+    "    with torch.no_grad():\n",
+    "        for i in range(1, nruns+1):\n",
+    "            start_time = time.time()\n",
+    "            features = model(input_data)\n",
+    "            torch.cuda.synchronize()\n",
+    "            end_time = time.time()\n",
+    "            timings.append(end_time - start_time)\n",
+    "            if i%1000==0:\n",
+    "                print('Iteration %d/%d, ave batch time %.2f ms'%(i, nruns, np.mean(timings)*1000))\n",
+    "\n",
+    "    print(\"Input shape:\", input_data.size())\n",
+    "    print(\"Output features size:\", features.size())\n",
+    "    \n",
+    "    print('Average batch time: %.2f ms'%(np.mean(timings)*1000))\n",
+    "    "
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### PyTorch model"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 10,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "LeNet(\n",
+       "  (feat): LeNetFeatExtractor(\n",
+       "    (conv1): Conv2d(1, 6, kernel_size=(3, 3), stride=(1, 1))\n",
+       "    (conv2): Conv2d(6, 16, kernel_size=(3, 3), stride=(1, 1))\n",
+       "  )\n",
+       "  (classifer): LeNetClassifier(\n",
+       "    (fc1): Linear(in_features=576, out_features=120, bias=True)\n",
+       "    (fc2): Linear(in_features=120, out_features=84, bias=True)\n",
+       "    (fc3): Linear(in_features=84, out_features=10, bias=True)\n",
+       "  )\n",
+       ")"
+      ]
+     },
+     "execution_count": 10,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "model = LeNet()\n",
+    "model.to(\"cuda\").eval()\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 11,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Warm up ...\n",
+      "Start timing ...\n",
+      "Iteration 1000/10000, ave batch time 0.93 ms\n",
+      "Iteration 2000/10000, ave batch time 0.93 ms\n",
+      "Iteration 3000/10000, ave batch time 0.93 ms\n",
+      "Iteration 4000/10000, ave batch time 0.93 ms\n",
+      "Iteration 5000/10000, ave batch time 0.93 ms\n",
+      "Iteration 6000/10000, ave batch time 0.93 ms\n",
+      "Iteration 7000/10000, ave batch time 0.93 ms\n",
+      "Iteration 8000/10000, ave batch time 0.93 ms\n",
+      "Iteration 9000/10000, ave batch time 0.93 ms\n",
+      "Iteration 10000/10000, ave batch time 0.93 ms\n",
+      "Input shape: torch.Size([1024, 1, 32, 32])\n",
+      "Output features size: torch.Size([1024, 10])\n",
+      "Average batch time: 0.93 ms\n"
+     ]
+    }
+   ],
+   "source": [
+    "benchmark(model)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "When compiling your module to TorchScript, there are two paths: Tracing and Scripting.  \n",
+    " \n",
+    "### Tracing\n",
+    "\n",
+    "Tracing follows the path of execution when the module is called and records what happens. This recording is what the TorchScript IR will describe. To trace an instance of our LeNet module, we can call torch.jit.trace  with an example input. "
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 12,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "LeNet(\n",
+       "  original_name=LeNet\n",
+       "  (feat): LeNetFeatExtractor(\n",
+       "    original_name=LeNetFeatExtractor\n",
+       "    (conv1): Conv2d(original_name=Conv2d)\n",
+       "    (conv2): Conv2d(original_name=Conv2d)\n",
+       "  )\n",
+       "  (classifer): LeNetClassifier(\n",
+       "    original_name=LeNetClassifier\n",
+       "    (fc1): Linear(original_name=Linear)\n",
+       "    (fc2): Linear(original_name=Linear)\n",
+       "    (fc3): Linear(original_name=Linear)\n",
+       "  )\n",
+       ")"
+      ]
+     },
+     "execution_count": 12,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "traced_model = torch.jit.trace(model, torch.empty([1,1,32,32]).to(\"cuda\"))\n",
+    "traced_model"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 13,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Warm up ...\n",
+      "Start timing ...\n",
+      "Iteration 1000/10000, ave batch time 0.68 ms\n",
+      "Iteration 2000/10000, ave batch time 0.68 ms\n",
+      "Iteration 3000/10000, ave batch time 0.68 ms\n",
+      "Iteration 4000/10000, ave batch time 0.68 ms\n",
+      "Iteration 5000/10000, ave batch time 0.68 ms\n",
+      "Iteration 6000/10000, ave batch time 0.68 ms\n",
+      "Iteration 7000/10000, ave batch time 0.68 ms\n",
+      "Iteration 8000/10000, ave batch time 0.68 ms\n",
+      "Iteration 9000/10000, ave batch time 0.68 ms\n",
+      "Iteration 10000/10000, ave batch time 0.68 ms\n",
+      "Input shape: torch.Size([1024, 1, 32, 32])\n",
+      "Output features size: torch.Size([1024, 10])\n",
+      "Average batch time: 0.68 ms\n"
+     ]
+    }
+   ],
+   "source": [
+    "benchmark(traced_model)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Scripting\n",
+    "\n",
+    "Scripting actually inspects your code with a compiler and  generates an equivalent TorchScript program. The difference is that since tracing simply follows the execution of your module, it cannot pick up control flow for instance, it will only follow the code path that a particular input triggers. By working from the Python code, the compiler can include these components. We can run the script compiler on our LeNet  module by calling torch.jit.script.\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 14,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "model = LeNet().to(\"cuda\").eval()\n",
+    "script_model = torch.jit.script(model)\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 15,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "RecursiveScriptModule(\n",
+       "  original_name=LeNet\n",
+       "  (feat): RecursiveScriptModule(\n",
+       "    original_name=LeNetFeatExtractor\n",
+       "    (conv1): RecursiveScriptModule(original_name=Conv2d)\n",
+       "    (conv2): RecursiveScriptModule(original_name=Conv2d)\n",
+       "  )\n",
+       "  (classifer): RecursiveScriptModule(\n",
+       "    original_name=LeNetClassifier\n",
+       "    (fc1): RecursiveScriptModule(original_name=Linear)\n",
+       "    (fc2): RecursiveScriptModule(original_name=Linear)\n",
+       "    (fc3): RecursiveScriptModule(original_name=Linear)\n",
+       "  )\n",
+       ")"
+      ]
+     },
+     "execution_count": 15,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "script_model"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 16,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Warm up ...\n",
+      "Start timing ...\n",
+      "Iteration 1000/10000, ave batch time 0.68 ms\n",
+      "Iteration 2000/10000, ave batch time 0.68 ms\n",
+      "Iteration 3000/10000, ave batch time 0.68 ms\n",
+      "Iteration 4000/10000, ave batch time 0.68 ms\n",
+      "Iteration 5000/10000, ave batch time 0.68 ms\n",
+      "Iteration 6000/10000, ave batch time 0.68 ms\n",
+      "Iteration 7000/10000, ave batch time 0.68 ms\n",
+      "Iteration 8000/10000, ave batch time 0.68 ms\n",
+      "Iteration 9000/10000, ave batch time 0.68 ms\n",
+      "Iteration 10000/10000, ave batch time 0.68 ms\n",
+      "Input shape: torch.Size([1024, 1, 32, 32])\n",
+      "Output features size: torch.Size([1024, 10])\n",
+      "Average batch time: 0.68 ms\n"
+     ]
+    }
+   ],
+   "source": [
+    "benchmark(script_model)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "<a id=\"3\"></a>\n",
+    "## 3. Compiling with TRTorch"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### TorchScript traced model\n",
+    "\n",
+    "First, we compile the TorchScript traced model with TRTorch. Notice the performance impact."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 17,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import trtorch\n",
+    "\n",
+    "compile_settings = {\n",
+    "    \"input_shapes\": [\n",
+    "        {\n",
+    "            \"min\" : [1, 1, 32, 32],\n",
+    "            \"opt\" : [1, 1, 33, 33],\n",
+    "            \"max\" : [1, 1, 34, 34],\n",
+    "        }\n",
+    "    ],\n",
+    "    \"op_precision\": torch.half # Run with FP16\n",
+    "}\n",
+    "\n",
+    "trt_ts_module = trtorch.compile(traced_model, compile_settings)\n",
+    "\n",
+    "input_data = torch.randn((1, 1, 32, 32))\n",
+    "input_data = input_data.half().to(\"cuda\")\n",
+    "\n",
+    "input_data = input_data.half()\n",
+    "result = trt_ts_module(input_data)\n",
+    "torch.jit.save(trt_ts_module, \"trt_ts_module.ts\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 18,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Warm up ...\n",
+      "Start timing ...\n",
+      "Iteration 1000/10000, ave batch time 0.24 ms\n",
+      "Iteration 2000/10000, ave batch time 0.24 ms\n",
+      "Iteration 3000/10000, ave batch time 0.24 ms\n",
+      "Iteration 4000/10000, ave batch time 0.24 ms\n",
+      "Iteration 5000/10000, ave batch time 0.24 ms\n",
+      "Iteration 6000/10000, ave batch time 0.24 ms\n",
+      "Iteration 7000/10000, ave batch time 0.23 ms\n",
+      "Iteration 8000/10000, ave batch time 0.23 ms\n",
+      "Iteration 9000/10000, ave batch time 0.23 ms\n",
+      "Iteration 10000/10000, ave batch time 0.23 ms\n",
+      "Input shape: torch.Size([1024, 1, 32, 32])\n",
+      "Output features size: torch.Size([1, 10])\n",
+      "Average batch time: 0.23 ms\n"
+     ]
+    }
+   ],
+   "source": [
+    "benchmark(trt_ts_module, dtype=\"fp16\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### TorchScript script model\n",
+    "\n",
+    "Next, we compile the TorchScript script model with TRTorch. Notice the performance impact."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 19,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import trtorch\n",
+    "\n",
+    "compile_settings = {\n",
+    "    \"input_shapes\": [\n",
+    "        {\n",
+    "            \"min\" : [1, 1, 32, 32],\n",
+    "            \"opt\" : [1, 1, 33, 33],\n",
+    "            \"max\" : [1, 1, 34, 34],\n",
+    "        }\n",
+    "    ],\n",
+    "    \"op_precision\": torch.half # Run with FP16\n",
+    "}\n",
+    "\n",
+    "trt_script_module = trtorch.compile(script_model, compile_settings)\n",
+    "\n",
+    "input_data = torch.randn((1, 1, 32, 32))\n",
+    "input_data = input_data.half().to(\"cuda\")\n",
+    "\n",
+    "input_data = input_data.half()\n",
+    "result = trt_script_module(input_data)\n",
+    "torch.jit.save(trt_script_module, \"trt_script_module.ts\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 20,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Warm up ...\n",
+      "Start timing ...\n",
+      "Iteration 1000/10000, ave batch time 0.20 ms\n",
+      "Iteration 2000/10000, ave batch time 0.20 ms\n",
+      "Iteration 3000/10000, ave batch time 0.20 ms\n",
+      "Iteration 4000/10000, ave batch time 0.21 ms\n",
+      "Iteration 5000/10000, ave batch time 0.21 ms\n",
+      "Iteration 6000/10000, ave batch time 0.21 ms\n",
+      "Iteration 7000/10000, ave batch time 0.21 ms\n",
+      "Iteration 8000/10000, ave batch time 0.21 ms\n",
+      "Iteration 9000/10000, ave batch time 0.21 ms\n",
+      "Iteration 10000/10000, ave batch time 0.21 ms\n",
+      "Input shape: torch.Size([1024, 1, 32, 32])\n",
+      "Output features size: torch.Size([1, 10])\n",
+      "Average batch time: 0.21 ms\n"
+     ]
+    }
+   ],
+   "source": [
+    "benchmark(trt_ts_module, dtype=\"fp16\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Conclusion\n",
+    "\n",
+    "In this notebook, we have walked through the complete process of compiling TorchScript models with TRTorch and test the performance impact of the optimization.\n",
+    "\n",
+    "### What's next\n",
+    "Now it's time to try TRTorch on your own model. Fill out issues at https://github.com/NVIDIA/TRTorch. Your involvement will help future development of TRTorch.\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.6.9"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 4
+}
