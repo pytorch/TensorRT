@@ -9,7 +9,7 @@ requires = [
     "ninja>=1.11.0",
     "pyyaml>=6.0",
     "cffi>=1.15.1",
-    "torch>=2.15.0.dev,<2.16.0",
+    "torch>=2.15.0,<2.16.0",
     "pybind11==2.6.2",
 ]
 build-backend = "setuptools.build_meta"
@@ -115,7 +115,7 @@ test = [
 test-ext = [
     "timm>=1.0.3",
     "transformers>=5.14.1",
-    "torchvision>=0.30.0.dev,<0.31.0",
+    "torchvision>=0.29.2,<0.30.0",
     "flashinfer-python; sys_platform == 'linux' and python_version >= '3.11' and python_version < '3.13'",
 ]
 
@@ -220,10 +220,10 @@ constraint-dependencies = [
 
 [tool.uv.sources]
 torch = [
-    { index = "pytorch-nightly-cu132" },
+    { index = "pytorch-test-cu134" },
 ]
 torchvision = [
-    { index = "pytorch-nightly-cu132" },
+    { index = "pytorch-test-cu134" },
 ]
 
 [[tool.uv.index]]
@@ -234,6 +234,11 @@ explicit = false
 [[tool.uv.index]]
 name = "pytorch-nightly-cu128"
 url = "https://download.pytorch.org/whl/nightly/cu128"
+explicit = false
+
+[[tool.uv.index]]
+name = "pytorch-test-cu134"
+url = "https://download.pytorch.org/whl/test/cu134"
 explicit = false
 
 [[tool.uv.index]]
