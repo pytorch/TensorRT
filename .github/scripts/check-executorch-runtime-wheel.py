@@ -16,6 +16,7 @@ import yaml
 from wheel.wheelfile import WheelFile
 
 from packaging.requirements import Requirement
+from packaging.specifiers import SpecifierSet
 from packaging.utils import canonicalize_name, parse_wheel_filename
 from packaging.version import Version
 
@@ -26,7 +27,7 @@ def reject(message: str) -> NoReturn:
 
 _LINKED_DISTRIBUTIONS = ("executorch", "tensorrt-cu13", "nvidia-cuda-runtime")
 # Required but not linked: ExecuTorch's Python imports it and declares it nowhere.
-_UNPINNED_DISTRIBUTIONS = ("torch",)
+_RANGED_DISTRIBUTIONS = {"torch": ">=2.16.0.dev,<2.17.0"}
 
 # The pin each remaining requirement has to agree with. These name a release series rather than an
 # exact build, so the comparison is on the leading release components the pin actually spells.
@@ -131,16 +132,19 @@ def main() -> None:
         ]
         pins = yaml.safe_load((root / "dev_dep_versions.yml").read_text())
         pinned = pins["__executorch_version__"]
-        # Present and unbounded. A bound here would have this wheel decide which PyTorch is
-        # acceptable, which ExecuTorch deliberately leaves to whoever installs it.
-        for name in _UNPINNED_DISTRIBUTIONS:
+        # The Python bindings must use the same supported Torch range as the main wheel.
+        for name, specifier in _RANGED_DISTRIBUTIONS.items():
             matched = [r for r in requirements if canonicalize_name(r.name) == name]
             if len(matched) != 1:
                 reject(f"the wheel must require {name} exactly once, found {matched}")
-            elif str(matched[0].specifier):
+            elif (
+                matched[0].specifier != SpecifierSet(specifier)
+                or matched[0].marker
+                or matched[0].extras
+                or matched[0].url
+            ):
                 reject(
-                    f"the wheel pins {matched[0]}, but {name} is required unbounded so the user "
-                    "chooses it"
+                    f"the wheel requires {matched[0]}, but {name} must require {specifier}"
                 )
         for forbidden in ("torch-tensorrt",):
             present = [
@@ -152,8 +156,8 @@ def main() -> None:
                 )
 
         # Only the three the delegate links. Neither PyTorch nor Torch-TensorRT belongs here: the
-        # library links neither, requiring Torch-TensorRT would make this wheel depend on the project
-        # that builds it, and ExecuTorch leaves the choice of PyTorch build to the user.
+        # library links neither, and requiring Torch-TensorRT would make this wheel depend on the
+        # project that builds it. The Python bindings' Torch range is checked above.
         for distribution in _LINKED_DISTRIBUTIONS:
             if distribution == "executorch":
                 # The delegate links one specific ExecuTorch build, so its requirement carries the
@@ -212,7 +216,7 @@ def main() -> None:
             str(requirement)
             for requirement in requirements
             if canonicalize_name(requirement.name)
-            not in _LINKED_DISTRIBUTIONS + _UNPINNED_DISTRIBUTIONS
+            not in _LINKED_DISTRIBUTIONS + tuple(_RANGED_DISTRIBUTIONS)
         )
         if unexpected:
             reject(f"the wheel requires more than the delegate links: {unexpected}")

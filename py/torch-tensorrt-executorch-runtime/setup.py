@@ -435,17 +435,13 @@ setup(
     # so a different build of any of them is a different binary contract, and the local label is the
     # only part of a version that names the CUDA row they have to share.
     #
-    # Neither PyTorch nor Torch-TensorRT is here, and neither is linked. Torch-TensorRT is needed
+    # Neither PyTorch nor Torch-TensorRT is linked. Torch-TensorRT is needed
     # only by the deprecated forwarder in runtime.py, which imports it lazily and already says which
     # package is missing if it is absent; naming it here also made this wheel depend on the project
-    # that builds it, which no resolver can satisfy. PyTorch arrives through ExecuTorch's Python
-    # bindings, and ExecuTorch deliberately leaves the choice of build to the user rather than
-    # pinning one, so a wheel that plugs into it has no business being stricter than it is.
+    # that builds it, which no resolver can satisfy. PyTorch is required by ExecuTorch's Python
+    # bindings and uses the same supported release range as the matching main wheel.
     install_requires=[
-        # Unpinned on purpose. The delegate links no PyTorch, but ExecuTorch's Python imports it at
-        # module level and declares it nowhere, so without the name here a delegate-only install
-        # resolves and then fails on import. A bound would be this wheel deciding for ExecuTorch.
-        "torch",
+        "torch>=2.16.0.dev,<2.17.0",
         f"executorch=={executorch_version}",
         f"{TENSORRT_DISTRIBUTION}=={public_version(tensorrt_version)}",
         f"{CUDA_RUNTIME_DISTRIBUTION}=={public_version(cuda_runtime_version)}",

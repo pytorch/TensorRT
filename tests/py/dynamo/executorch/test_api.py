@@ -2429,12 +2429,11 @@ def test_runtime_wheel_pins_its_cuda_13_dependencies(monkeypatch, cuda):
         assert metadata["version"] == "0.1.0.dev20200103+cu130"
         # Only what the delegate links, and ExecuTorch keeps the label because the delegate links one
         # specific build of it. The inference library and the CUDA runtime have no label to keep.
-        # PyTorch and Torch-TensorRT are deliberately absent: neither is linked, requiring the second
-        # would make this wheel depend on the project that builds it, and ExecuTorch leaves the choice
-        # of PyTorch build to the user rather than pinning one.
+        # PyTorch uses the supported main-wheel range for the Python bindings.
+        # Torch-TensorRT is absent because the delegate does not link it.
         assert set(metadata["install_requires"]) == {
             f"executorch=={versions['executorch']}",
-            "torch",
+            "torch>=2.16.0.dev,<2.17.0",
             f"tensorrt-cu13=={versions['tensorrt-cu13'].partition('+')[0]}",
             f"nvidia-cuda-runtime=={versions['nvidia-cuda-runtime'].partition('+')[0]}",
         }
@@ -3121,6 +3120,8 @@ def _elf_object(architecture: str) -> bytes:
         ("requires_a_mismatched_executorch_pin", False),
         ("requires_torch_tensorrt", False),
         ("pins_torch", False),
+        ("requires_unbounded_torch", False),
+        ("requires_old_torch_range", False),
         ("requires_no_tensorrt", False),
         ("requires_an_unpinned_cuda_runtime", False),
         ("requirement_carries_a_local_label", False),
@@ -3194,11 +3195,10 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
 
     package = "torch_tensorrt_executorch_runtime/"
     payload = [package + "lib/libexecutorch_backend_tensorrt.so"]
-    # The three the delegate links. PyTorch and Torch-TensorRT are not required by the wheel any more,
-    # so a fixture that lists them is testing a shape the build cannot produce.
+    # The three native dependencies plus the supported Torch range for the Python bindings.
     requires = [
         f"executorch=={installed_executorch}",
-        "torch",
+        "torch>=2.16.0.dev,<2.17.0",
         f"tensorrt-cu13=={tensorrt_version}",
         f"nvidia-cuda-runtime=={cuda_runtime_version}",
     ]
@@ -3265,7 +3265,7 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
         ]
     elif case == "requires_no_executorch":
         requires = [
-            "torch",
+            "torch>=2.16.0.dev,<2.17.0",
             f"tensorrt-cu13=={tensorrt_version}",
             f"nvidia-cuda-runtime=={cuda_runtime_version}",
         ]
@@ -3279,7 +3279,7 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
         wrong_pin = pin.rsplit(".dev", 1)[0] + ".dev20200101"
         requires = [
             f"executorch=={wrong_pin}",
-            "torch",
+            "torch>=2.16.0.dev,<2.17.0",
             f"tensorrt-cu13=={tensorrt_version}",
             f"nvidia-cuda-runtime=={cuda_runtime_version}",
         ]
@@ -3289,15 +3289,21 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
         # wheel makes it depend on its own parent, which no resolver can satisfy in general, so
         # the checker has to refuse the requirement rather than insist on it.
         requires = [
-            "torch",
+            "torch>=2.16.0.dev,<2.17.0",
             f"executorch=={installed_executorch}",
             "torch-tensorrt==2.15.0.dev20260824+cu132",
             f"tensorrt-cu13=={tensorrt_version}",
             f"nvidia-cuda-runtime=={cuda_runtime_version}",
         ]
+    elif case in {"requires_unbounded_torch", "requires_old_torch_range"}:
+        torch_requirement = (
+            "torch" if case == "requires_unbounded_torch" else "torch>=2.14.0,<2.15.0"
+        )
+        requires = [
+            torch_requirement if r.startswith("torch>") else r for r in requires
+        ]
     elif case == "pins_torch":
-        # torch is required, but unbounded, because ExecuTorch leaves the choice to whoever
-        # installs it. A pin here would take that choice away.
+        # An exact Torch pin does not match the supported main-wheel range.
         requires = [
             f"executorch=={installed_executorch}",
             "torch==2.15.0.dev20260824+cu132",
@@ -3309,7 +3315,7 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
         # it ships with the dependency missing and every content check above still passes.
         requires = [
             f"executorch=={installed_executorch}",
-            "torch",
+            "torch>=2.16.0.dev,<2.17.0",
             "nvidia-cuda-runtime==13.2.0",
         ]
     elif case == "requires_an_unpinned_cuda_runtime":
@@ -3317,7 +3323,7 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
         # built beside, which is the whole reason the metadata is read.
         requires = [
             f"executorch=={installed_executorch}",
-            "torch",
+            "torch>=2.16.0.dev,<2.17.0",
             f"tensorrt-cu13=={tensorrt_version}",
             "nvidia-cuda-runtime>=13.2.0",
         ]
@@ -3389,7 +3395,7 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
         "requires_an_unpinned_executorch": "the repository pins executorch==",
         "requires_a_mismatched_executorch_pin": "the repository pins executorch==",
         "requires_no_executorch": "the repository pins executorch==",
-        "pins_torch": "is required unbounded so the user chooses it",
+        "pins_torch": "torch must require >=2.16.0.dev,<2.17.0",
         "requires_torch_tensorrt": (
             "the wheel requires torch-tensorrt, which the delegate does not link"
         ),
