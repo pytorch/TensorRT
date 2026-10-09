@@ -45,6 +45,13 @@ python -m pip install --force-reinstall --pre ${TORCH} --index-url ${INDEX_URL} 
 # dynamo-torchao full/nightly suite
 python -m pip install torchao
 
+# MSLK release wheels are available for cu132, but not cu134. Keep nightly
+# coverage on both variants and resolve MSLK only from the selected channel.
+# Install after torch so MSLK cannot replace the PyTorch version under test.
+if [[ ${PLATFORM} == linux && (${CHANNEL} == nightly || ${CU_VERSION} == cu132) ]]; then
+    python -m pip install --pre --no-deps "mslk>=1.0.0" --index-url "${INDEX_URL}"
+fi
+
 # Prepend the venv's NVIDIA CUDA runtime libs to LD_LIBRARY_PATH.
 SITE_PACKAGES="$(python -c 'import sysconfig; print(sysconfig.get_path("platlib"))')"
 case "${CU_VERSION}" in

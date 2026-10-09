@@ -2,19 +2,34 @@ version = 1
 revision = 3
 requires-python = ">=3.11, <3.15"
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.14' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.14' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
+    "python_full_version >= '3.14' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
+    "(python_full_version >= '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (python_full_version >= '3.14' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')",
+    "python_full_version >= '3.14' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
+    "(python_full_version >= '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext') or (python_full_version >= '3.14' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext')",
+    "python_full_version >= '3.14' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
+    "(python_full_version >= '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext') or (python_full_version >= '3.14' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext')",
     "python_full_version >= '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
+    "(python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
+    "(python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext') or (python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext')",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
+    "(python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext') or (python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext')",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
     "python_full_version >= '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
     "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
     "python_full_version >= '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version < '3.12' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version < '3.12' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version < '3.12' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
+    "python_full_version < '3.12' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
+    "(python_full_version < '3.12' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (python_full_version < '3.12' and platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')",
+    "python_full_version < '3.12' and platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
+    "python_full_version < '3.12' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
+    "(python_full_version < '3.12' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext') or (python_full_version < '3.12' and platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext')",
+    "python_full_version < '3.12' and platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
+    "python_full_version < '3.12' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
+    "(python_full_version < '3.12' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext') or (python_full_version < '3.12' and platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext')",
+    "python_full_version < '3.12' and platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
     "python_full_version < '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
     "python_full_version < '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
     "python_full_version < '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
@@ -388,8 +403,8 @@ name = "cattrs"
 version = "26.2.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "attrs", marker = "(python_full_version < '3.14' and sys_platform != 'win32') or (python_full_version >= '3.14' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "typing-extensions", marker = "(python_full_version < '3.14' and sys_platform != 'win32') or (python_full_version >= '3.14' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "attrs", marker = "(python_full_version < '3.14' and platform_machine != 'aarch64' and sys_platform != 'win32') or (python_full_version >= '3.14' and platform_machine != 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "typing-extensions", marker = "(python_full_version < '3.14' and platform_machine != 'aarch64' and sys_platform != 'win32') or (python_full_version >= '3.14' and platform_machine != 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/23/75/e72b839c3dc869c990b4842f3dba730bdcdf5215f68fc7955edf849a1792/cattrs-26.2.1.tar.gz", hash = "sha256:679132bfdc225c5ee40c024fc42519954767c387f950dc6751946c586bccdc6d", size = 525617, upload-time = "2026-09-26T20:53:21.114Z" }
 wheels = [
@@ -606,15 +621,15 @@ name = "coremltools"
 version = "9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "attrs", marker = "(python_full_version < '3.14' and sys_platform != 'win32') or (python_full_version >= '3.14' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "cattrs", marker = "(python_full_version < '3.14' and sys_platform != 'win32') or (python_full_version >= '3.14' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "numpy", version = "2.4.6", source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }, marker = "(python_full_version < '3.12' and sys_platform != 'win32') or (python_full_version >= '3.12' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "numpy", version = "2.5.3", source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }, marker = "(python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'win32') or (python_full_version < '3.12' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (python_full_version >= '3.14' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "packaging", marker = "(python_full_version < '3.14' and sys_platform != 'win32') or (python_full_version >= '3.14' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "protobuf", marker = "(python_full_version < '3.14' and sys_platform != 'win32') or (python_full_version >= '3.14' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "pyaml", marker = "(python_full_version < '3.14' and sys_platform != 'win32') or (python_full_version >= '3.14' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "sympy", marker = "(python_full_version < '3.14' and sys_platform != 'win32') or (python_full_version >= '3.14' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "tqdm", marker = "(python_full_version < '3.14' and sys_platform != 'win32') or (python_full_version >= '3.14' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "attrs", marker = "(python_full_version < '3.14' and platform_machine != 'aarch64' and sys_platform != 'win32') or (python_full_version >= '3.14' and platform_machine != 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "cattrs", marker = "(python_full_version < '3.14' and platform_machine != 'aarch64' and sys_platform != 'win32') or (python_full_version >= '3.14' and platform_machine != 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }, marker = "(python_full_version < '3.12' and platform_machine != 'aarch64' and sys_platform != 'win32') or (python_full_version >= '3.12' and platform_machine != 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "numpy", version = "2.5.3", source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }, marker = "(python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine != 'aarch64' and sys_platform != 'win32') or (python_full_version < '3.12' and platform_machine != 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (python_full_version >= '3.14' and platform_machine != 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "packaging", marker = "(python_full_version < '3.14' and platform_machine != 'aarch64' and sys_platform != 'win32') or (python_full_version >= '3.14' and platform_machine != 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "protobuf", marker = "(python_full_version < '3.14' and platform_machine != 'aarch64' and sys_platform != 'win32') or (python_full_version >= '3.14' and platform_machine != 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "pyaml", marker = "(python_full_version < '3.14' and platform_machine != 'aarch64' and sys_platform != 'win32') or (python_full_version >= '3.14' and platform_machine != 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "sympy", marker = "(python_full_version < '3.14' and platform_machine != 'aarch64' and sys_platform != 'win32') or (python_full_version >= '3.14' and platform_machine != 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "tqdm", marker = "(python_full_version < '3.14' and platform_machine != 'aarch64' and sys_platform != 'win32') or (python_full_version >= '3.14' and platform_machine != 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/79/e6/8cb11a246f61736e75b20488b9c3cf9c208f500c9a3f92d717dbf592348c/coremltools-9.0.tar.gz", hash = "sha256:4ff346b29c31c4b45acd19a20e0f0a1ac65180a96776e62f15bd5c46f4926687", size = 1656978, upload-time = "2025-11-10T21:51:23.855Z" }
 wheels = [
@@ -723,17 +738,14 @@ wheels = [
 
 [[package]]
 name = "cuda-toolkit"
-version = "13.2.2"
+version = "13.4.1"
 source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }
 wheels = [
-    { url = "https://pypi.nvidia.com/cuda-toolkit/cuda_toolkit-13.2.2-py2.py3-none-any.whl", hash = "sha256:d12edc1aad1356236a2ee10c0d794b1aff5d3e79bfeca54867c3bb8e5afd87b0" },
+    { url = "https://pypi.nvidia.com/cuda-toolkit/cuda_toolkit-13.4.1-py2.py3-none-any.whl", hash = "sha256:41eeb00a40bceb745296e322a95535c1c6881d9f2c0f5c6d33a35644c2bf20aa" },
+    { url = "https://pypi.nvidia.com/cuda-toolkit/cuda_toolkit-13.4.1.0-py2.py3-none-any.whl", hash = "sha256:433c6197ebb482ad0c00ab6e1aa0d2ba5d3e817a25cb9943418d5363aaca6464" },
 ]
 
 [package.optional-dependencies]
-cublas = [
-    { name = "nvidia-cublas", marker = "(platform_machine != 'aarch64' and platform_machine != 'x86_64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'aarch64' and sys_platform != 'win32') or (platform_machine == 'x86_64' and sys_platform != 'win32') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "nvidia-cuda-nvrtc", marker = "(platform_machine != 'aarch64' and platform_machine != 'x86_64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'aarch64' and sys_platform != 'win32') or (platform_machine == 'x86_64' and sys_platform != 'win32') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-]
 cudart = [
     { name = "nvidia-cuda-runtime", marker = "(platform_machine != 'aarch64' and platform_machine != 'x86_64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'aarch64' and sys_platform != 'win32') or (platform_machine == 'x86_64' and sys_platform != 'win32') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
 ]
@@ -747,12 +759,6 @@ cufile = [
 cupti = [
     { name = "nvidia-cuda-cupti", marker = "(platform_machine != 'aarch64' and platform_machine != 'x86_64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'aarch64' and sys_platform != 'win32') or (platform_machine == 'x86_64' and sys_platform != 'win32') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
 ]
-cusolver = [
-    { name = "nvidia-cublas", marker = "(platform_machine != 'aarch64' and platform_machine != 'x86_64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'aarch64' and sys_platform != 'win32') or (platform_machine == 'x86_64' and sys_platform != 'win32') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "nvidia-cusolver", marker = "(platform_machine != 'aarch64' and platform_machine != 'x86_64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'aarch64' and sys_platform != 'win32') or (platform_machine == 'x86_64' and sys_platform != 'win32') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "nvidia-cusparse", marker = "(platform_machine != 'aarch64' and platform_machine != 'x86_64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'aarch64' and sys_platform != 'win32') or (platform_machine == 'x86_64' and sys_platform != 'win32') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "nvidia-nvjitlink", marker = "(platform_machine != 'aarch64' and platform_machine != 'x86_64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'aarch64' and sys_platform != 'win32') or (platform_machine == 'x86_64' and sys_platform != 'win32') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-]
 cusparse = [
     { name = "nvidia-cusparse", marker = "(platform_machine != 'aarch64' and platform_machine != 'x86_64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'aarch64' and sys_platform != 'win32') or (platform_machine == 'x86_64' and sys_platform != 'win32') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
     { name = "nvidia-nvjitlink", marker = "(platform_machine != 'aarch64' and platform_machine != 'x86_64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'aarch64' and sys_platform != 'win32') or (platform_machine == 'x86_64' and sys_platform != 'win32') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
@@ -765,6 +771,29 @@ nvrtc = [
 ]
 nvtx = [
     { name = "nvidia-nvtx", marker = "(platform_machine != 'aarch64' and platform_machine != 'x86_64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'aarch64' and sys_platform != 'win32') or (platform_machine == 'x86_64' and sys_platform != 'win32') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+]
+
+[[package]]
+name = "cupti-python"
+version = "13.4.0"
+source = { registry = "https://download.pytorch.org/whl/test/cu134" }
+dependencies = [
+    { name = "cuda-bindings", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "cuda-pathfinder", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }, marker = "(python_full_version < '3.12' and sys_platform != 'win32') or (python_full_version >= '3.12' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "numpy", version = "2.5.3", source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }, marker = "(python_full_version >= '3.12' and sys_platform != 'win32') or (python_full_version < '3.12' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "nvidia-cuda-cupti", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "pyelftools", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e4/ff/1355333e2669436d909bd7d5a3197a0fcb247b250f1a26a0d44d22c5da6c/cupti_python-13.4.0-cp311-cp311-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:05898f5af70fc3e1efe9b4a1fe408513cdcdfb08f98a797a5f69b21b2c432259" },
+    { url = "https://files.pythonhosted.org/packages/4b/10/7599f91d2fff05f8405d5c4367e50544f2bb6c36ffb6be6da02abe3cd179/cupti_python-13.4.0-cp311-cp311-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:c490b7f50b18074fa121940fb7357c44d42a0248ee5ca64b8a7a5aef3d8f50e6" },
+    { url = "https://files.pythonhosted.org/packages/de/b2/6b19ce1392b81520c426d21bcf42ed22797a94df13b36bb51e96094a9179/cupti_python-13.4.0-cp312-cp312-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:119878756def342f90eedd02121344e001d15026bf7a1be2c6b9a2d882b85aec" },
+    { url = "https://files.pythonhosted.org/packages/83/6a/22830508acf59c1aeefc709213b74e5a54a70223b892a6bc8113b86290e7/cupti_python-13.4.0-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:0d6c286c191c8c466dcd4dcea90fa0fd15f16288592b9039af3a367e87e3c0b5" },
+    { url = "https://files.pythonhosted.org/packages/b8/a9/f4a7206076583db3cbc9ece6cc67d8b5392db51977f1902bf5db5c11706d/cupti_python-13.4.0-cp313-cp313-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:4b82fea14349c0262e61aad00e3f6686cd1d8b027d2dabc98631722141948240" },
+    { url = "https://files.pythonhosted.org/packages/5d/97/a7cef8a95272137eaba85dd6f077152a9b4c40ad92ddd92bea5a20d19a8f/cupti_python-13.4.0-cp313-cp313-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:f317815aa08e4e2f3e9239945c139400b2415df7e2f1905a7b4ec88176318c6c" },
+    { url = "https://files.pythonhosted.org/packages/35/93/a93263c481ad9b06b8bcfbf603185c2ac6ce7d9d536727eedc2dbff1fd27/cupti_python-13.4.0-cp314-cp314-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:6830b11232536f2fbdb1a94af2e5fe865b436d12952e18050de146a648b48d92" },
+    { url = "https://files.pythonhosted.org/packages/8a/41/c807f422d0011c7e88f2b28a3a443a6eed61e0e0d1a2b6f61610d129fd69/cupti_python-13.4.0-cp314-cp314-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:38caff8baa9bafcebc82d1b04a6af58d2c0194208f86f6af13f4a498f58ff269" },
 ]
 
 [[package]]
@@ -896,7 +925,7 @@ wheels = [
 
 [[package]]
 name = "executorch"
-version = "1.6.0.dev20260925+cu132"
+version = "1.6.0.dev20260915+cu132"
 source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }
 dependencies = [
     { name = "coremltools", marker = "(python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform != 'win32') or (python_full_version >= '3.14' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine != 'x86_64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
@@ -914,6 +943,7 @@ dependencies = [
     { name = "pandas", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
     { name = "parameterized", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
     { name = "py-cpuinfo", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "pyre-extensions", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
     { name = "pytorch-tokenizers", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
     { name = "pyyaml", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
     { name = "requests", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
@@ -921,18 +951,19 @@ dependencies = [
     { name = "scikit-learn", marker = "(python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform != 'win32') or (python_full_version >= '3.14' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine != 'x86_64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
     { name = "sympy", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
     { name = "tabulate", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "torchao", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "torchao", version = "0.18.0", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine != 'x86_64' and sys_platform != 'win32') or (platform_python_implementation != 'CPython' and sys_platform != 'win32') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "torchao", version = "0.18.0+cu132", source = { registry = "https://download.pytorch.org/whl/test/cu132" }, marker = "(platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform != 'win32') or (platform_machine != 'x86_64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_python_implementation != 'CPython' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
     { name = "typing-extensions", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
 ]
 wheels = [
-    { url = "https://download.pytorch.org/whl/nightly/cu132/executorch-1.6.0.dev20260925%2Bcu132-cp311-cp311-manylinux_2_28_aarch64.whl", upload-time = "2026-09-25T12:11:18Z" },
-    { url = "https://download.pytorch.org/whl/nightly/cu132/executorch-1.6.0.dev20260925%2Bcu132-cp311-cp311-manylinux_2_28_x86_64.whl", upload-time = "2026-09-25T12:27:13Z" },
-    { url = "https://download.pytorch.org/whl/nightly/cu132/executorch-1.6.0.dev20260925%2Bcu132-cp312-cp312-manylinux_2_28_aarch64.whl", upload-time = "2026-09-25T12:11:24Z" },
-    { url = "https://download.pytorch.org/whl/nightly/cu132/executorch-1.6.0.dev20260925%2Bcu132-cp312-cp312-manylinux_2_28_x86_64.whl", upload-time = "2026-09-25T12:27:12Z" },
-    { url = "https://download.pytorch.org/whl/nightly/cu132/executorch-1.6.0.dev20260925%2Bcu132-cp313-cp313-manylinux_2_28_aarch64.whl", upload-time = "2026-09-25T12:11:24Z" },
-    { url = "https://download.pytorch.org/whl/nightly/cu132/executorch-1.6.0.dev20260925%2Bcu132-cp313-cp313-manylinux_2_28_x86_64.whl", upload-time = "2026-09-25T12:27:14Z" },
-    { url = "https://download.pytorch.org/whl/nightly/cu132/executorch-1.6.0.dev20260925%2Bcu132-cp314-cp314-manylinux_2_28_aarch64.whl", upload-time = "2026-09-25T12:11:23Z" },
-    { url = "https://download.pytorch.org/whl/nightly/cu132/executorch-1.6.0.dev20260925%2Bcu132-cp314-cp314-manylinux_2_28_x86_64.whl", upload-time = "2026-09-25T12:27:14Z" },
+    { url = "https://download.pytorch.org/whl/nightly/cu132/executorch-1.6.0.dev20260915%2Bcu132-cp311-cp311-manylinux_2_28_aarch64.whl", upload-time = "2026-09-15T12:11:31Z" },
+    { url = "https://download.pytorch.org/whl/nightly/cu132/executorch-1.6.0.dev20260915%2Bcu132-cp311-cp311-manylinux_2_28_x86_64.whl", upload-time = "2026-09-15T12:18:30Z" },
+    { url = "https://download.pytorch.org/whl/nightly/cu132/executorch-1.6.0.dev20260915%2Bcu132-cp312-cp312-manylinux_2_28_aarch64.whl", upload-time = "2026-09-15T12:11:26Z" },
+    { url = "https://download.pytorch.org/whl/nightly/cu132/executorch-1.6.0.dev20260915%2Bcu132-cp312-cp312-manylinux_2_28_x86_64.whl", upload-time = "2026-09-15T12:18:13Z" },
+    { url = "https://download.pytorch.org/whl/nightly/cu132/executorch-1.6.0.dev20260915%2Bcu132-cp313-cp313-manylinux_2_28_aarch64.whl", upload-time = "2026-09-15T12:11:26Z" },
+    { url = "https://download.pytorch.org/whl/nightly/cu132/executorch-1.6.0.dev20260915%2Bcu132-cp313-cp313-manylinux_2_28_x86_64.whl", upload-time = "2026-09-15T12:18:16Z" },
+    { url = "https://download.pytorch.org/whl/nightly/cu132/executorch-1.6.0.dev20260915%2Bcu132-cp314-cp314-manylinux_2_28_aarch64.whl", upload-time = "2026-09-15T12:11:22Z" },
+    { url = "https://download.pytorch.org/whl/nightly/cu132/executorch-1.6.0.dev20260915%2Bcu132-cp314-cp314-manylinux_2_28_x86_64.whl", upload-time = "2026-09-15T12:18:20Z" },
 ]
 
 [[package]]
@@ -1095,9 +1126,13 @@ name = "fsspec"
 version = "2026.7.0"
 source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }
 resolution-markers = [
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'linux'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux'",
+    "(python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and sys_platform == 'linux')",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux'",
     "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32'",
-    "python_full_version < '3.12' and sys_platform == 'linux'",
+    "python_full_version < '3.12' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux'",
+    "(python_full_version < '3.12' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (python_full_version < '3.12' and platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and sys_platform == 'linux')",
+    "python_full_version < '3.12' and platform_machine == 'aarch64' and sys_platform == 'linux'",
     "python_full_version < '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/00/78/f34251dadb8f3921264a1d9b8946f5e542014ee2614b285261b4e40e6775/fsspec-2026.7.0.tar.gz", hash = "sha256:c803c40f4cf860b49dea58ee3e1c33cb9c790520e233537e1340049f89b82a88" }
@@ -1115,16 +1150,27 @@ name = "fsspec"
 version = "2026.9.0"
 source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.14' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.14' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
+    "python_full_version >= '3.14' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
+    "(python_full_version >= '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (python_full_version >= '3.14' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')",
+    "python_full_version >= '3.14' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
+    "(python_full_version >= '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext') or (python_full_version >= '3.14' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext')",
+    "python_full_version >= '3.14' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
+    "(python_full_version >= '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext') or (python_full_version >= '3.14' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext')",
     "python_full_version >= '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
+    "(python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
+    "(python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext') or (python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext')",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
     "python_full_version >= '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
     "python_full_version >= '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version < '3.12' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version < '3.12' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
+    "python_full_version < '3.12' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
+    "(python_full_version < '3.12' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (python_full_version < '3.12' and platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')",
+    "python_full_version < '3.12' and platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
+    "python_full_version < '3.12' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
+    "(python_full_version < '3.12' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext') or (python_full_version < '3.12' and platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext')",
+    "python_full_version < '3.12' and platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
     "python_full_version < '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
     "python_full_version < '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
 ]
@@ -1397,7 +1443,7 @@ name = "joblib"
 version = "1.6.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "cloudpickle", marker = "(python_full_version < '3.14' and sys_platform != 'win32') or (python_full_version < '3.14' and extra == 'group-14-torch-tensorrt-quantization') or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "cloudpickle", marker = "(python_full_version < '3.14' and platform_machine != 'aarch64' and sys_platform != 'win32') or (python_full_version < '3.14' and platform_machine == 'aarch64' and extra == 'group-14-torch-tensorrt-quantization') or (python_full_version < '3.14' and sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization') or (python_full_version >= '3.14' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/d5/1d/537ab090f302b838943a1b56497dd53059b9a9b46a074936470173a2e207/joblib-1.6.0.tar.gz", hash = "sha256:2ccc96785b12046c08fd6d55839c12857831b54a3c1673ffadd2f04bfc4eda03", size = 327903, upload-time = "2026-08-31T09:39:04.122Z" }
 wheels = [
@@ -1767,28 +1813,6 @@ wheels = [
 ]
 
 [[package]]
-name = "mslk"
-version = "2026.9.9+cu132"
-source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }
-dependencies = [
-    { name = "numpy", version = "2.4.6", source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }, marker = "(python_full_version < '3.12' and sys_platform != 'win32' and extra == 'group-14-torch-tensorrt-quantization') or (python_full_version >= '3.12' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "numpy", version = "2.5.3", source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }, marker = "(python_full_version >= '3.12' and sys_platform != 'win32' and extra == 'group-14-torch-tensorrt-quantization') or (python_full_version < '3.12' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-]
-wheels = [
-    { url = "https://download.pytorch.org/whl/nightly/cu132/mslk-2026.9.9%2Bcu132-cp311-cp311-manylinux_2_28_aarch64.whl", upload-time = "2026-09-09T14:12:58Z" },
-    { url = "https://download.pytorch.org/whl/nightly/cu132/mslk-2026.9.9%2Bcu132-cp311-cp311-manylinux_2_28_x86_64.whl", upload-time = "2026-09-09T15:12:51Z" },
-    { url = "https://download.pytorch.org/whl/nightly/cu132/mslk-2026.9.9%2Bcu132-cp312-cp312-manylinux_2_28_aarch64.whl", upload-time = "2026-09-09T14:12:49Z" },
-    { url = "https://download.pytorch.org/whl/nightly/cu132/mslk-2026.9.9%2Bcu132-cp312-cp312-manylinux_2_28_x86_64.whl", upload-time = "2026-09-09T15:12:49Z" },
-    { url = "https://download.pytorch.org/whl/nightly/cu132/mslk-2026.9.9%2Bcu132-cp313-cp313-manylinux_2_28_aarch64.whl", upload-time = "2026-09-09T14:13:04Z" },
-    { url = "https://download.pytorch.org/whl/nightly/cu132/mslk-2026.9.9%2Bcu132-cp313-cp313-manylinux_2_28_x86_64.whl", upload-time = "2026-09-09T15:12:58Z" },
-    { url = "https://download.pytorch.org/whl/nightly/cu132/mslk-2026.9.9%2Bcu132-cp314-cp314-manylinux_2_28_aarch64.whl", upload-time = "2026-09-09T14:12:47Z" },
-    { url = "https://download.pytorch.org/whl/nightly/cu132/mslk-2026.9.9%2Bcu132-cp314-cp314-manylinux_2_28_x86_64.whl", upload-time = "2026-09-09T15:12:56Z" },
-    { url = "https://download.pytorch.org/whl/nightly/cu132/mslk-2026.9.9%2Bcu132-cp314-cp314t-manylinux_2_28_aarch64.whl", upload-time = "2026-09-09T14:12:52Z" },
-    { url = "https://download.pytorch.org/whl/nightly/cu132/mslk-2026.9.9%2Bcu132-cp314-cp314t-manylinux_2_28_x86_64.whl", upload-time = "2026-09-09T15:13:00Z" },
-    { url = "https://download.pytorch.org/whl/nightly/cu132/mslk-2026.9.9%2Bcu132-py3-none-win_amd64.whl", upload-time = "2026-09-09T12:05:57Z" },
-]
-
-[[package]]
 name = "multidict"
 version = "6.9.1"
 source = { registry = "https://pypi.org/simple" }
@@ -2075,7 +2099,9 @@ name = "networkx"
 version = "3.6.1"
 source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }
 resolution-markers = [
-    "python_full_version < '3.12' and sys_platform == 'linux'",
+    "python_full_version < '3.12' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux'",
+    "(python_full_version < '3.12' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (python_full_version < '3.12' and platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and sys_platform == 'linux')",
+    "python_full_version < '3.12' and platform_machine == 'aarch64' and sys_platform == 'linux'",
     "python_full_version < '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/6a/51/63fe664f3908c97be9d2e4f1158eb633317598cfa6e1fc14af5383f17512/networkx-3.6.1.tar.gz", hash = "sha256:26b7c357accc0c8cde558ad486283728b65b6a95d85ee1cd66bafab4c8168509" }
@@ -2088,13 +2114,22 @@ name = "networkx"
 version = "3.7"
 source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.14' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.14' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
+    "python_full_version >= '3.14' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
+    "(python_full_version >= '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (python_full_version >= '3.14' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')",
+    "python_full_version >= '3.14' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
+    "(python_full_version >= '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext') or (python_full_version >= '3.14' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext')",
+    "python_full_version >= '3.14' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
+    "(python_full_version >= '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext') or (python_full_version >= '3.14' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext')",
     "python_full_version >= '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
+    "(python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
+    "(python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext') or (python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext')",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
+    "(python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext') or (python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext')",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
     "python_full_version >= '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
     "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
     "python_full_version >= '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
@@ -2157,7 +2192,9 @@ name = "numpy"
 version = "2.4.6"
 source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }
 resolution-markers = [
-    "python_full_version < '3.12' and sys_platform == 'linux'",
+    "python_full_version < '3.12' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux'",
+    "(python_full_version < '3.12' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (python_full_version < '3.12' and platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and sys_platform == 'linux')",
+    "python_full_version < '3.12' and platform_machine == 'aarch64' and sys_platform == 'linux'",
     "python_full_version < '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/d0/ad/fed0499ce6a338d2a03ebae59cd15093910c8875328855781952abf6c2fe/numpy-2.4.6.tar.gz", hash = "sha256:f3a3570c4a2a16746ac2c31a7c7c7b0c186b95ce902e33db6f28094ed7387dda" }
@@ -2202,13 +2239,22 @@ name = "numpy"
 version = "2.5.3"
 source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.14' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.14' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
+    "python_full_version >= '3.14' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
+    "(python_full_version >= '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (python_full_version >= '3.14' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')",
+    "python_full_version >= '3.14' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
+    "(python_full_version >= '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext') or (python_full_version >= '3.14' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext')",
+    "python_full_version >= '3.14' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
+    "(python_full_version >= '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext') or (python_full_version >= '3.14' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext')",
     "python_full_version >= '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
+    "(python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
+    "(python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext') or (python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext')",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
+    "(python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext') or (python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext')",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
     "python_full_version >= '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
     "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
     "python_full_version >= '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
@@ -2239,15 +2285,14 @@ wheels = [
 
 [[package]]
 name = "nvidia-cublas"
-version = "13.4.1.3"
+version = "13.8.1.7"
 source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }
 dependencies = [
     { name = "nvidia-cuda-nvrtc", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
 ]
 wheels = [
-    { url = "https://pypi.nvidia.com/nvidia-cublas/nvidia_cublas-13.4.1.3-py3-none-manylinux_2_27_aarch64.whl", hash = "sha256:4eb1472bf92b741e7cf24da7978dde251b58ddec2092d9f6a04f3623eb4e9a15" },
-    { url = "https://pypi.nvidia.com/nvidia-cublas/nvidia_cublas-13.4.1.3-py3-none-manylinux_2_27_x86_64.whl", hash = "sha256:a5917cb642cfb07f4a0231ee16aec7e2e0357d8cb8b1b78a0c9c68dba3e6afc7" },
-    { url = "https://pypi.nvidia.com/nvidia-cublas/nvidia_cublas-13.4.1.3-py3-none-win_amd64.whl", hash = "sha256:7e7f780caf07bde7b36b0d25bdad29e8ccbacfc4b75066907bdb601af1e6d4aa" },
+    { url = "https://pypi.nvidia.com/nvidia-cublas/nvidia_cublas-13.8.1.7-py3-none-manylinux_2_27_aarch64.whl", hash = "sha256:803b9974cd7164a481d0b11c25826498d383d0ef0c372573bc6577a344ddf74e" },
+    { url = "https://pypi.nvidia.com/nvidia-cublas/nvidia_cublas-13.8.1.7-py3-none-manylinux_2_27_x86_64.whl", hash = "sha256:c11a27fd4379510e5b1f84b367a2514d1e52fe5cc13442117a0e0a1addee3cf2" },
 ]
 
 [[package]]
@@ -2262,32 +2307,32 @@ wheels = [
 
 [[package]]
 name = "nvidia-cuda-cupti"
-version = "13.2.86"
+version = "13.4.58"
 source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }
 wheels = [
-    { url = "https://pypi.nvidia.com/nvidia-cuda-cupti/nvidia_cuda_cupti-13.2.86-py3-none-manylinux_2_25_aarch64.whl", hash = "sha256:d9a5c133f73fcb9013f3ada0da6fb54d4117618d81f3f5a0419417ea6ee829d4" },
-    { url = "https://pypi.nvidia.com/nvidia-cuda-cupti/nvidia_cuda_cupti-13.2.86-py3-none-manylinux_2_25_x86_64.whl", hash = "sha256:8fa29f15dd8336181f961764d9d95236fc6b931dd0c8fcf8cd70aab0c310b586" },
-    { url = "https://pypi.nvidia.com/nvidia-cuda-cupti/nvidia_cuda_cupti-13.2.86-py3-none-win_amd64.whl", hash = "sha256:10837e2910753a7726c0243aa113e2bd65c0edee6f6f3e097db1757a8eac2c9e" },
+    { url = "https://pypi.nvidia.com/nvidia-cuda-cupti/nvidia_cuda_cupti-13.4.58-py3-none-manylinux_2_25_aarch64.whl", hash = "sha256:b6fa6525b6314a10c7adffcf4f2b0b2987580547672ba6e07054b38c0516d91a" },
+    { url = "https://pypi.nvidia.com/nvidia-cuda-cupti/nvidia_cuda_cupti-13.4.58-py3-none-manylinux_2_25_x86_64.whl", hash = "sha256:97203894e99c68ba120eaef7327449a7573634a0f774cf75679718d5f6b50609" },
+    { url = "https://pypi.nvidia.com/nvidia-cuda-cupti/nvidia_cuda_cupti-13.4.58-py3-none-win_amd64.whl", hash = "sha256:7692ab22ff59852807c7e5946505b31b5943e56964f6afb6d7f572e668a92607" },
 ]
 
 [[package]]
 name = "nvidia-cuda-nvrtc"
-version = "13.2.86"
+version = "13.4.59"
 source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }
 wheels = [
-    { url = "https://pypi.nvidia.com/nvidia-cuda-nvrtc/nvidia_cuda_nvrtc-13.2.86-py3-none-manylinux2010_x86_64.manylinux_2_12_x86_64.whl", hash = "sha256:8111c5130e967b78222ea2124145f8efe9ce201b752b2579a2513100a53be1c5" },
-    { url = "https://pypi.nvidia.com/nvidia-cuda-nvrtc/nvidia_cuda_nvrtc-13.2.86-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:1e5d7b411a2eb83f5c71c98d58133a763fc9fa86a4241ee320c5c4782d9ad1fd" },
-    { url = "https://pypi.nvidia.com/nvidia-cuda-nvrtc/nvidia_cuda_nvrtc-13.2.86-py3-none-win_amd64.whl", hash = "sha256:bf070582c2d8b03f681cea8d34a9de900d808607deb813a826ecb3a585606f9a" },
+    { url = "https://pypi.nvidia.com/nvidia-cuda-nvrtc/nvidia_cuda_nvrtc-13.4.59-py3-none-manylinux2010_x86_64.manylinux_2_12_x86_64.whl", hash = "sha256:f6cb36996797989976bd021d89e263be379668be7a4249cc95a3d11590bda652" },
+    { url = "https://pypi.nvidia.com/nvidia-cuda-nvrtc/nvidia_cuda_nvrtc-13.4.59-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:da5e1ba65f402b2fdf1c4bfcb16e27df47e8ade27f7936b1524cb10cdd61a1c8" },
+    { url = "https://pypi.nvidia.com/nvidia-cuda-nvrtc/nvidia_cuda_nvrtc-13.4.59-py3-none-win_amd64.whl", hash = "sha256:93755e0f94e717c61168fb348ab5e2f5c67aa2f918416b1786f55ff813f6923d" },
 ]
 
 [[package]]
 name = "nvidia-cuda-runtime"
-version = "13.2.86"
+version = "13.4.49"
 source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }
 wheels = [
-    { url = "https://pypi.nvidia.com/nvidia-cuda-runtime/nvidia_cuda_runtime-13.2.86-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:37844957894bfdecf90243568d21a2cb251b66106915b71459a23c8e6ef2da69" },
-    { url = "https://pypi.nvidia.com/nvidia-cuda-runtime/nvidia_cuda_runtime-13.2.86-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:3498247680dfddce31bad102af7e3e26fc795342a3cac64722bb0fa95e7f60f0" },
-    { url = "https://pypi.nvidia.com/nvidia-cuda-runtime/nvidia_cuda_runtime-13.2.86-py3-none-win_amd64.whl", hash = "sha256:b26f5dd86e67f0eb404ae679185e1c49fe546fa9a47b32dee31312f65ccfe764" },
+    { url = "https://pypi.nvidia.com/nvidia-cuda-runtime/nvidia_cuda_runtime-13.4.49-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:7497eabb284aad39c47b7b469f681578dcc6aa4ebabd838c042b9bcf5f6d0abe" },
+    { url = "https://pypi.nvidia.com/nvidia-cuda-runtime/nvidia_cuda_runtime-13.4.49-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:0b228cc646acda27e9b512b8b94417c3ff8b3d24a0ad9b1d6603dc6c2a908046" },
+    { url = "https://pypi.nvidia.com/nvidia-cuda-runtime/nvidia_cuda_runtime-13.4.49-py3-none-win_amd64.whl", hash = "sha256:65953fd8e1ac0477d088befb2e6c725c2f848996e6fd49c23241ab1a7c800c29" },
 ]
 
 [[package]]
@@ -2305,55 +2350,55 @@ wheels = [
 
 [[package]]
 name = "nvidia-cudnn-frontend"
-version = "1.30.0"
+version = "1.31.0"
 source = { registry = "https://pypi.nvidia.com/" }
 dependencies = [
     { name = "apache-tvm-ffi", marker = "python_full_version < '3.14' and sys_platform != 'win32'" },
     { name = "nvidia-cutlass-dsl", extra = ["cu13"], marker = "(python_full_version < '3.14' and sys_platform != 'win32' and extra == 'group-14-torch-tensorrt-test-ext') or (python_full_version >= '3.14' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
 ]
 wheels = [
-    { url = "https://pypi.nvidia.com/nvidia-cudnn-frontend/nvidia_cudnn_frontend-1.30.0-cp311-cp311-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:ec4544f36676e7cf4c79eed7bf5745cda3f2ba439ebc5321497986986ea936b5" },
-    { url = "https://pypi.nvidia.com/nvidia-cudnn-frontend/nvidia_cudnn_frontend-1.30.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:98d3b5e3ef9c951a69ca36978f7b421e744895a810167577d1f57f3926a0202f" },
-    { url = "https://pypi.nvidia.com/nvidia-cudnn-frontend/nvidia_cudnn_frontend-1.30.0-cp311-cp311-win_amd64.whl", hash = "sha256:4f5290d303b6394e51ae1b6f9621b5a46cd4d2edba10e99ad493dfbdfa75e130" },
-    { url = "https://pypi.nvidia.com/nvidia-cudnn-frontend/nvidia_cudnn_frontend-1.30.0-cp312-cp312-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:279d227a226429288ae9e4e88db744ce144ae69605f63a286dc84ae180869a6e" },
-    { url = "https://pypi.nvidia.com/nvidia-cudnn-frontend/nvidia_cudnn_frontend-1.30.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:5dda72db38ea0c39f158ebffa9596eefab21ce7cc6a12824490ab8b6cb60e76d" },
-    { url = "https://pypi.nvidia.com/nvidia-cudnn-frontend/nvidia_cudnn_frontend-1.30.0-cp312-cp312-win_amd64.whl", hash = "sha256:f32d9eb83326ab1da8860f90b693a95f745e7bb1f3b01d0a0006efbe388ede32" },
-    { url = "https://pypi.nvidia.com/nvidia-cudnn-frontend/nvidia_cudnn_frontend-1.30.0-cp313-cp313-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:d15f9fae2d895885f494e00fad32662c9dee4f96737659ca1022537ede47ccf3" },
-    { url = "https://pypi.nvidia.com/nvidia-cudnn-frontend/nvidia_cudnn_frontend-1.30.0-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:5a8d9afec0ca248dbcae803eff745f0de1830a61f2c316d9a965d20146013674" },
-    { url = "https://pypi.nvidia.com/nvidia-cudnn-frontend/nvidia_cudnn_frontend-1.30.0-cp313-cp313-win_amd64.whl", hash = "sha256:ba442e9a60afda200662fee7945c0c685727b16f8d16bf41d43607d06375d152" },
-    { url = "https://pypi.nvidia.com/nvidia-cudnn-frontend/nvidia_cudnn_frontend-1.30.0-cp314-cp314-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:04e5617829c051d584906b4c026642b142dd6e40b225f8ee2fa3c4525e1c065b" },
-    { url = "https://pypi.nvidia.com/nvidia-cudnn-frontend/nvidia_cudnn_frontend-1.30.0-cp314-cp314-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:8794fd90dac0ef7effc1753496cd1ec8a1983a9edb8447d405aeadbf1267bf64" },
-    { url = "https://pypi.nvidia.com/nvidia-cudnn-frontend/nvidia_cudnn_frontend-1.30.0-cp314-cp314-win_amd64.whl", hash = "sha256:1afaa66c75cd555938d36c8e17ac5d13709113dee881f4eb5a60c9521776eb1d" },
-    { url = "https://pypi.nvidia.com/nvidia-cudnn-frontend/nvidia_cudnn_frontend-1.30.0-cp314-cp314t-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:a0b3267e5b35b4d71cf821c2f09bcd1d96e74a7691e670ba620f85e8b2144507" },
-    { url = "https://pypi.nvidia.com/nvidia-cudnn-frontend/nvidia_cudnn_frontend-1.30.0-cp314-cp314t-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:6ceb0e56c55eebf86c8ac835b27c938a1c42ec4a307702cf85508d0ae6a7d3e2" },
-    { url = "https://pypi.nvidia.com/nvidia-cudnn-frontend/nvidia_cudnn_frontend-1.30.0-cp314-cp314t-win_amd64.whl", hash = "sha256:8cd9b68acb34f69e9463ce058e8bdcc5462135123e1b50cf6a5eac3f0b573eb9" },
+    { url = "https://pypi.nvidia.com/nvidia-cudnn-frontend/nvidia_cudnn_frontend-1.31.0-cp311-cp311-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:5d1ae02680c2e75e32f12a7c1a189082aaac6864451d64f4c4c2c9ba0616504e" },
+    { url = "https://pypi.nvidia.com/nvidia-cudnn-frontend/nvidia_cudnn_frontend-1.31.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:be3831ed007147d4720f7821501aeb448456074615326363ec2ea3ad6e6c45d3" },
+    { url = "https://pypi.nvidia.com/nvidia-cudnn-frontend/nvidia_cudnn_frontend-1.31.0-cp311-cp311-win_amd64.whl", hash = "sha256:f9a04bd0b5fc0ca5bdff4a0a423b443c8edc879aa2ae954ce8c328eb6a5c9fc4" },
+    { url = "https://pypi.nvidia.com/nvidia-cudnn-frontend/nvidia_cudnn_frontend-1.31.0-cp312-cp312-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:47d1a5432f59a2a7d0f903727c0d244e1413a20686b98d8e3890919c5d82a508" },
+    { url = "https://pypi.nvidia.com/nvidia-cudnn-frontend/nvidia_cudnn_frontend-1.31.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:3171f102254136418f24b4470dfa5419f34b03d9d792a4b773cf65c7a37e6bf8" },
+    { url = "https://pypi.nvidia.com/nvidia-cudnn-frontend/nvidia_cudnn_frontend-1.31.0-cp312-cp312-win_amd64.whl", hash = "sha256:786c7dc590d436338c55b74e3204fc2adb4739acafb1a5e46ce032282e601e2e" },
+    { url = "https://pypi.nvidia.com/nvidia-cudnn-frontend/nvidia_cudnn_frontend-1.31.0-cp313-cp313-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:b01d93e6ed709c349aa33a3db32075910ffccccd40b017aa293d93a6172c64b6" },
+    { url = "https://pypi.nvidia.com/nvidia-cudnn-frontend/nvidia_cudnn_frontend-1.31.0-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:8095ca4f3bc86e44e5da16584e951a0c33030962d9f647baa20cc1a848188b68" },
+    { url = "https://pypi.nvidia.com/nvidia-cudnn-frontend/nvidia_cudnn_frontend-1.31.0-cp313-cp313-win_amd64.whl", hash = "sha256:a30b02bd92415a82c448ad988b7c5cbb96bd9654d88b4137a7ac37db5aa7ac9a" },
+    { url = "https://pypi.nvidia.com/nvidia-cudnn-frontend/nvidia_cudnn_frontend-1.31.0-cp314-cp314-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:0d5f26cc1f9a2869f7ec05b2155e1e04bcb271a4b7272a310fddad7f34e8347a" },
+    { url = "https://pypi.nvidia.com/nvidia-cudnn-frontend/nvidia_cudnn_frontend-1.31.0-cp314-cp314-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:9f9ca9fd86103057bb80d40f848090a3dd2d39758596b0555f024b90f062009b" },
+    { url = "https://pypi.nvidia.com/nvidia-cudnn-frontend/nvidia_cudnn_frontend-1.31.0-cp314-cp314-win_amd64.whl", hash = "sha256:1168c10f7dabbaa261b34794ef51a7ec5f5d1c6d73156e765045ca62bc6d7bfd" },
+    { url = "https://pypi.nvidia.com/nvidia-cudnn-frontend/nvidia_cudnn_frontend-1.31.0-cp314-cp314t-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:11286b8798f417b43532a676cf881aa11181ba9b4b726ab048cd3286b53f7d31" },
+    { url = "https://pypi.nvidia.com/nvidia-cudnn-frontend/nvidia_cudnn_frontend-1.31.0-cp314-cp314t-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:640205cc0eab9df478e3c46a068bf0fe407ef185a2614e710c0d4f9f64c4efc0" },
+    { url = "https://pypi.nvidia.com/nvidia-cudnn-frontend/nvidia_cudnn_frontend-1.31.0-cp314-cp314t-win_amd64.whl", hash = "sha256:dc2cd889dc72e16768b773f15f53af1fac7646173c4a1e57f41c673dd45c52b0" },
 ]
 
 [[package]]
 name = "nvidia-cufft"
-version = "12.2.0.57"
+version = "12.4.0.34"
 source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }
 dependencies = [
     { name = "nvidia-nvjitlink", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
 ]
 wheels = [
-    { url = "https://pypi.nvidia.com/nvidia-cufft/nvidia_cufft-12.2.0.57-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:1ed438568ae1088ba2c25789d10205d4104b8b140b7bd942e39a787947a0fb74" },
-    { url = "https://pypi.nvidia.com/nvidia-cufft/nvidia_cufft-12.2.0.57-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:34da27fadf3979b0b042c43823f0530be8408b86df31ee0108e1ca0b621d4ef6" },
-    { url = "https://pypi.nvidia.com/nvidia-cufft/nvidia_cufft-12.2.0.57-py3-none-win_amd64.whl", hash = "sha256:89b78b2b60d6ca1fb7dab7d1a4af135d69d586d18a216ca84e51db5901cd41d0" },
+    { url = "https://pypi.nvidia.com/nvidia-cufft/nvidia_cufft-12.4.0.34-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:faf25c648f0999f14a5ce31cafd98aa166ebaeee993370b0ef60b86863f99119" },
+    { url = "https://pypi.nvidia.com/nvidia-cufft/nvidia_cufft-12.4.0.34-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:dcfd1c860e242b03518eeb30d21deb8c9496e6660b0d3f5485a2ffc492a7185a" },
+    { url = "https://pypi.nvidia.com/nvidia-cufft/nvidia_cufft-12.4.0.34-py3-none-win_amd64.whl", hash = "sha256:a62fc7d3a21869baec8bad95a66625c70a8321672c41ea2218fcf55e07f5ad4b" },
 ]
 
 [[package]]
 name = "nvidia-cufile"
-version = "1.17.1.22"
+version = "1.19.0.109"
 source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }
 wheels = [
-    { url = "https://pypi.nvidia.com/nvidia-cufile/nvidia_cufile-1.17.1.22-py3-none-manylinux_2_27_aarch64.whl", hash = "sha256:bec33d7f1f12691dce330275246587569c2ed90b1ce43b0f94b3e1ce9268744b" },
-    { url = "https://pypi.nvidia.com/nvidia-cufile/nvidia_cufile-1.17.1.22-py3-none-manylinux_2_27_x86_64.whl", hash = "sha256:87feaf8c3ad20d3d03a01933181801ff6892bace5c8f0b1e4b48f319d3e62d36" },
+    { url = "https://pypi.nvidia.com/nvidia-cufile/nvidia_cufile-1.19.0.109-py3-none-manylinux_2_27_aarch64.whl", hash = "sha256:c68cd21b6c9c31b35e72626d5792446e4839e89139a74e4e6a05645f5785355b" },
+    { url = "https://pypi.nvidia.com/nvidia-cufile/nvidia_cufile-1.19.0.109-py3-none-manylinux_2_27_x86_64.whl", hash = "sha256:ef4dc0702f678699d7667cb7f170849dc2061dc16851d7e6cdf72670111660f6" },
 ]
 
 [[package]]
 name = "nvidia-cusolver"
-version = "12.2.0.11"
+version = "12.3.2.15"
 source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }
 dependencies = [
     { name = "nvidia-cublas", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
@@ -2361,22 +2406,22 @@ dependencies = [
     { name = "nvidia-nvjitlink", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
 ]
 wheels = [
-    { url = "https://pypi.nvidia.com/nvidia-cusolver/nvidia_cusolver-12.2.0.11-py3-none-manylinux_2_27_aarch64.whl", hash = "sha256:8be097fca28de6be0990ab216ee9b804dd51077e1d1d83acf6c9850650bdc64d" },
-    { url = "https://pypi.nvidia.com/nvidia-cusolver/nvidia_cusolver-12.2.0.11-py3-none-manylinux_2_27_x86_64.whl", hash = "sha256:fab5778f6769947389a1a6abc07e635576825a08c0ffc68c3ae7f1392c794b42" },
-    { url = "https://pypi.nvidia.com/nvidia-cusolver/nvidia_cusolver-12.2.0.11-py3-none-win_amd64.whl", hash = "sha256:364511c9974ef1fcde2ca197caebfe0994ece2cb33bc27117eeb88b8cee5c46d" },
+    { url = "https://pypi.nvidia.com/nvidia-cusolver/nvidia_cusolver-12.3.2.15-py3-none-manylinux_2_27_aarch64.whl", hash = "sha256:a2a87b02aa59a88220f6c2d28589decb167ba3a575dfe90ec490cac841fe788f" },
+    { url = "https://pypi.nvidia.com/nvidia-cusolver/nvidia_cusolver-12.3.2.15-py3-none-manylinux_2_27_x86_64.whl", hash = "sha256:0e401b1ae1e484e5e17218b919f9a17ba3c273ab11e788a8bdedcdc245d98af3" },
+    { url = "https://pypi.nvidia.com/nvidia-cusolver/nvidia_cusolver-12.3.2.15-py3-none-win_amd64.whl", hash = "sha256:a05f3ecb2e2df22117173e49e3c57e80ecbb8f4f1fc8b28750fb0d019be65bb8" },
 ]
 
 [[package]]
 name = "nvidia-cusparse"
-version = "12.7.10.12"
+version = "12.8.6.49"
 source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }
 dependencies = [
     { name = "nvidia-nvjitlink", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
 ]
 wheels = [
-    { url = "https://pypi.nvidia.com/nvidia-cusparse/nvidia_cusparse-12.7.10.12-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:597eff2cd83e3ab1d1e3a0dce9c9c879d77cf64ec2659bfdb5af6a5d02e7aaa9" },
-    { url = "https://pypi.nvidia.com/nvidia-cusparse/nvidia_cusparse-12.7.10.12-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:25907c75e4db1581685f06f61cc6cdecc04611765516a52373e0a18ebd69fa00" },
-    { url = "https://pypi.nvidia.com/nvidia-cusparse/nvidia_cusparse-12.7.10.12-py3-none-win_amd64.whl", hash = "sha256:6b1e82056a0865c5b4f5da6adbebb15244e9a2b8aeea0838a9cf725e16523c53" },
+    { url = "https://pypi.nvidia.com/nvidia-cusparse/nvidia_cusparse-12.8.6.49-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:3bf4f2e34e8cfe0c691a4afd7bd479bee49f44dc5fa4940d9d54f720cbd6f2f3" },
+    { url = "https://pypi.nvidia.com/nvidia-cusparse/nvidia_cusparse-12.8.6.49-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:f740691172baae1d498f754cfbb565933c7dbcd7b16544d69fa666283d0715d7" },
+    { url = "https://pypi.nvidia.com/nvidia-cusparse/nvidia_cusparse-12.8.6.49-py3-none-win_amd64.whl", hash = "sha256:7578698de43ca4f72371076adcba460182c4ae5b2263a094d6e70bc59db7fe10" },
 ]
 
 [[package]]
@@ -2587,12 +2632,12 @@ wheels = [
 
 [[package]]
 name = "nvidia-nvtx"
-version = "13.2.86"
+version = "13.4.49"
 source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }
 wheels = [
-    { url = "https://pypi.nvidia.com/nvidia-nvtx/nvidia_nvtx-13.2.86-py3-none-manylinux1_x86_64.manylinux_2_5_x86_64.whl", hash = "sha256:968ce72baee2a01791c7d3254000eac81f24677b0b91c62d21b449a1f309c245" },
-    { url = "https://pypi.nvidia.com/nvidia-nvtx/nvidia_nvtx-13.2.86-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:1c6ae1be92fba569dd271f7b9b3056f99f5642726dc6c53d1b93ae4110c398fb" },
-    { url = "https://pypi.nvidia.com/nvidia-nvtx/nvidia_nvtx-13.2.86-py3-none-win_amd64.whl", hash = "sha256:7f3f430a87bb1e2db3371832d21a5c1efcf77bef7cacfd772fd71649e121cd58" },
+    { url = "https://pypi.nvidia.com/nvidia-nvtx/nvidia_nvtx-13.4.49-py3-none-manylinux1_x86_64.manylinux_2_5_x86_64.whl", hash = "sha256:ddb11f33842a0155ea52be98c5763634ca8cc7f8e859117a4ee8306abc9922da" },
+    { url = "https://pypi.nvidia.com/nvidia-nvtx/nvidia_nvtx-13.4.49-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:b8aa907e71a84183de6a33df169de91eedd14a898895abcf1b10319267273157" },
+    { url = "https://pypi.nvidia.com/nvidia-nvtx/nvidia_nvtx-13.4.49-py3-none-win_amd64.whl", hash = "sha256:b81df65b135cfaafb0ff1bc6a9eef6c597c62c5805fc1437e659d88b9b39717f" },
 ]
 
 [[package]]
@@ -2919,7 +2964,7 @@ name = "pyaml"
 version = "26.7.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pyyaml", marker = "(python_full_version < '3.14' and sys_platform != 'win32') or (python_full_version >= '3.14' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "pyyaml", marker = "(python_full_version < '3.14' and platform_machine != 'aarch64' and sys_platform != 'win32') or (python_full_version >= '3.14' and platform_machine != 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/15/6a/acfdf17de0d6947b419da8696e02b781b18de2cf49e0472298b50e1f0711/pyaml-26.7.0.tar.gz", hash = "sha256:11cda3a796efc6dbce0d56836be56cfd26289dad07bcd78e9904086729929c93", size = 30669, upload-time = "2026-07-04T00:34:38.532Z" }
 wheels = [
@@ -2961,16 +3006,16 @@ wheels = [
 
 [[package]]
 name = "pycparser"
-version = "3.0"
+version = "3.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/1b/7d/92392ff7815c21062bea51aa7b87d45576f649f16458d78b7cf94b9ab2e6/pycparser-3.0.tar.gz", hash = "sha256:600f49d217304a5902ac3c37e1281c9fe94e4d0489de643a9504c5cdfdfc6b29", size = 103492, upload-time = "2026-01-21T14:26:51.89Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ac/d3/eb1d3bc30dda12f7e69640ae2ac8cb10240b71fb73024ad528b7d2ae73da/pycparser-3.1.tar.gz", hash = "sha256:b3fc6dec06a8b2fefa0ed4ff92285306a5e3be9987bc5603c9edbdc4e492418f", size = 105946, upload-time = "2026-10-08T12:26:34.349Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0c/c3/44f3fbbfa403ea2a7c779186dc20772604442dde72947e7d01069cbe98e3/pycparser-3.0-py3-none-any.whl", hash = "sha256:b727414169a36b7d524c1c3e31839a521725078d7b2ff038656844266160a992", size = 48172, upload-time = "2026-01-21T14:26:50.693Z" },
+    { url = "https://files.pythonhosted.org/packages/99/ce/b3ae9ee0324d991c860187be2a6ee436d27a3d02397eaddbb101ec901f3d/pycparser-3.1-py3-none-any.whl", hash = "sha256:f09d358c840bd147b79e55f2bc494f18ea869dc897f5852a8f5766b74f787882", size = 48709, upload-time = "2026-10-08T12:26:32.97Z" },
 ]
 
 [[package]]
 name = "pydantic"
-version = "2.14.0b2"
+version = "2.14.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "annotated-types", marker = "python_full_version < '3.14'" },
@@ -2978,86 +3023,86 @@ dependencies = [
     { name = "typing-extensions", marker = "python_full_version < '3.14'" },
     { name = "typing-inspection", marker = "python_full_version < '3.14'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/71/56/c23c581326c4167c8e5697d9fe3c5df599092f985cc338c812b8e2a0c412/pydantic-2.14.0b2.tar.gz", hash = "sha256:bb3b4bdb0c69e0eb349e43f07eddfd755547cae3aab3df34cc4c95caa44a5077", size = 888412, upload-time = "2026-09-09T21:55:06.583Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/6b/fb/6e44b63b26efea1cec48c26d8362313310202ef5ed6e7a52f1669e64e2cd/pydantic-2.14.0.tar.gz", hash = "sha256:8a51a7aaddd60f55566d1f07bdd87b92b463903f39a8f26b71a06314cd1548ae", size = 898613, upload-time = "2026-10-08T14:34:48.341Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/95/e7/daa2cf6bc551f9434b7e3d8ba3d747baa2a9d24dd5f6572c3742924431ad/pydantic-2.14.0b2-py3-none-any.whl", hash = "sha256:4556c932fb3dbb7e9ac773bee241b2eb7058a2f9ff1d850d45d7d11cb6e54b68", size = 484647, upload-time = "2026-09-09T21:55:04.669Z" },
+    { url = "https://files.pythonhosted.org/packages/2d/eb/9146591cc819d040475bf7f2be786710c7f7eb8083693bf859728da2ca9c/pydantic-2.14.0-py3-none-any.whl", hash = "sha256:15fab1bea6f1dc5003b54fc2ecab230c1fd1dbade2acd4addc52d81e32416d4b", size = 487109, upload-time = "2026-10-08T14:34:46.864Z" },
 ]
 
 [[package]]
 name = "pydantic-core"
-version = "2.49.0"
+version = "2.50.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "typing-extensions", marker = "python_full_version < '3.14'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/0b/31/2de1e4f86615a3c1f598934dc9d557d473d87820c33c23582c7aaa6e145a/pydantic_core-2.49.0.tar.gz", hash = "sha256:67440399d87a2c160ddff9dc013d12812785cfde18b648a295d57043f034a9fb", size = 500092, upload-time = "2026-09-09T21:30:48.931Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e6/6d/196e8c819e0e934f35a1a33b3530396feadb0af4ca38fe9f995249e55794/pydantic_core-2.50.0.tar.gz", hash = "sha256:84d2d38f7d163c4dec292f379e9de1960c661795442aca6c90d706436cb3749e", size = 513355, upload-time = "2026-10-08T14:30:58.245Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/56/a4/7e372cc1e78e40715e3ba7ca1f04d8b9ea2fb49e708dd5ec7a2df58ab51d/pydantic_core-2.49.0-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:ca9c34cc98ce7776d4a1468dd281eb39a3af6fbb75faac5d69bd4c0ef22a2621", size = 2012730, upload-time = "2026-09-09T21:25:58.858Z" },
-    { url = "https://files.pythonhosted.org/packages/6c/c7/01941f8201d2a3ec3392eb671831e377bed8fc21a1c99d1dfe70ef105150/pydantic_core-2.49.0-cp311-cp311-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:f7e577bc4d08eb25c06f32f19726e3b2bbbb01a719873efbd4514ef7dc372729", size = 2137283, upload-time = "2026-09-09T21:26:00.994Z" },
-    { url = "https://files.pythonhosted.org/packages/1a/01/7daaa33ef7b533ee7bfdbf95a218ed445d44d1d76932e80ecc11a3ca58d0/pydantic_core-2.49.0-cp311-cp311-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:39b16867c2d305bb6997ecbaa09a6edec79be1f7dfa51e12778abd8d32275911", size = 2322731, upload-time = "2026-09-09T21:26:02.506Z" },
-    { url = "https://files.pythonhosted.org/packages/e2/ea/b45afe63b2ebf3a63328b06176dba8245b3ac0b1474825651f1c04bf692b/pydantic_core-2.49.0-cp311-cp311-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:b26764004a7bd6450769c47a470b0ce8984146baae7d0063ca70bfdbbb0e56dc", size = 2342044, upload-time = "2026-09-09T21:26:04.204Z" },
-    { url = "https://files.pythonhosted.org/packages/4b/1f/12a0ff783d322e3089bd03c48de67c6a05f76ad4977bb5e4ebc8cd8f1019/pydantic_core-2.49.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:bc3472058534dec5fe414cd7de626ecbc20330effe05de66cbfe36c6aaeb0d78", size = 2127552, upload-time = "2026-09-09T21:26:05.814Z" },
-    { url = "https://files.pythonhosted.org/packages/eb/3d/bee31ba68a049816e5bd7f91cee0003192564c0d52172a5070586c7408f7/pydantic_core-2.49.0-cp311-cp311-manylinux_2_31_riscv64.whl", hash = "sha256:890b0dabdac056908c45b79e07e6dfb51c1dbd7e769d7a4878cdfaf7d1e9ec76", size = 2209105, upload-time = "2026-09-09T21:26:07.632Z" },
-    { url = "https://files.pythonhosted.org/packages/bc/36/bc9d9c918c3deba1f537727e5e087a516b776c494753c006f9f3214ad81a/pydantic_core-2.49.0-cp311-cp311-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:477cdaf34c8ff40a17183397ea16be355c89b58a6939128ede251d75581ccde2", size = 2271407, upload-time = "2026-09-09T21:26:09.457Z" },
-    { url = "https://files.pythonhosted.org/packages/5a/e6/5912ea38252bc3ce33a0229c139c8e84cc085a89e484f775786dc64ea172/pydantic_core-2.49.0-cp311-cp311-musllinux_1_1_aarch64.whl", hash = "sha256:813c1243fd93ee720edbfe771d9bf0cc5bc6d9bddc0acafb4c0085796471c2a4", size = 2251184, upload-time = "2026-09-09T21:26:11.53Z" },
-    { url = "https://files.pythonhosted.org/packages/79/b9/9d51975d11fc2f3b2cc012a8459697e3c45266f7438ab44e6759f85ffbcc/pydantic_core-2.49.0-cp311-cp311-musllinux_1_1_armv7l.whl", hash = "sha256:aec1570d4986f4ab000b0adac485c4b6bf5520b12305bae3defbe6a5e4816d55", size = 2414876, upload-time = "2026-09-09T21:26:13.56Z" },
-    { url = "https://files.pythonhosted.org/packages/ca/36/d553f456dd0442e44648441c50dbb132e85e3470bdc0df3c814da111cea0/pydantic_core-2.49.0-cp311-cp311-musllinux_1_1_x86_64.whl", hash = "sha256:3a3e9b4167b5d7a355863846494b046af5071cbfc4f30c8554634b2796eb163f", size = 2427404, upload-time = "2026-09-09T21:26:15.281Z" },
-    { url = "https://files.pythonhosted.org/packages/86/92/0d56b7f8447d082ba3c9875fc1e14d2ec147fa62d9ac3e0ac33324799252/pydantic_core-2.49.0-cp311-cp311-win_amd64.whl", hash = "sha256:dc35dfc110dd744e709824ea56453ca2ff8e4f8175c950485d4916f19689b4c6", size = 2132496, upload-time = "2026-09-09T21:26:18.857Z" },
-    { url = "https://files.pythonhosted.org/packages/2a/60/3d7d48466a29ddaf4c309738aac30351999a1e4e4c67fb7a60d2811cec28/pydantic_core-2.49.0-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:3928d009bdedbfe7eff17f1ec75871612b91786106c529137ea58d70770d02cf", size = 2004830, upload-time = "2026-09-09T21:26:26.544Z" },
-    { url = "https://files.pythonhosted.org/packages/37/a2/cf8f81cb66f8bf22479c20181e065c261505a631249bfe7ccbf388e44371/pydantic_core-2.49.0-cp312-cp312-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:3c0cf7c39364028404ef953adaa126aaa037a20bdbb4c073c7f3b88814c30a34", size = 2136153, upload-time = "2026-09-09T21:26:28.293Z" },
-    { url = "https://files.pythonhosted.org/packages/d5/5b/b1b8e068a58115207a4fd3ac867f6bb987fe4c01f72e1e4abd095d622b87/pydantic_core-2.49.0-cp312-cp312-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:8846c1f9c02ec0b73ccaaa1fccecf98f323f2b230a7c6cb19c3917f35d38c4b7", size = 2317923, upload-time = "2026-09-09T21:26:30.011Z" },
-    { url = "https://files.pythonhosted.org/packages/39/34/57b12d984390a1bef5fd05485c272b3c2caab5f1df540a3d4fa58e89d1bf/pydantic_core-2.49.0-cp312-cp312-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:6d1433f3d022d1f946bda84bf50b83d9f0f77599e6bfe96c53b384a760b116fd", size = 2388730, upload-time = "2026-09-09T21:26:31.901Z" },
-    { url = "https://files.pythonhosted.org/packages/ae/75/3617980928a5979d10a691c48f83ca93af3b670006f0ae3bf1abd5e70c30/pydantic_core-2.49.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:5a807d09a516f93614bbc8e83401afdbe7325373d36ec54727f3f5147a57dd52", size = 2127340, upload-time = "2026-09-09T21:26:33.736Z" },
-    { url = "https://files.pythonhosted.org/packages/b6/8f/20841611caebb79d458a95a95ac99aff22dc8a0be479b6e8ee7bf6671244/pydantic_core-2.49.0-cp312-cp312-manylinux_2_31_riscv64.whl", hash = "sha256:7f2ff0f42e14b2694d99743dd8c808faa9fad989236e3b6bb6f0e19ab036d9b0", size = 2211512, upload-time = "2026-09-09T21:26:35.799Z" },
-    { url = "https://files.pythonhosted.org/packages/fb/82/9890e2eabd7dfa795e7bdebd80bea25273dffce0cc43651b0d4cf433bd0e/pydantic_core-2.49.0-cp312-cp312-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:bdd922cbe6ba23c3c827f75ca692f881885009c83c7d0fc1fe0520d80ca36b33", size = 2265679, upload-time = "2026-09-09T21:26:37.672Z" },
-    { url = "https://files.pythonhosted.org/packages/b2/1a/3cfd422fe675448a414ab8ebb684609e054777d1de2aa721d34d3c73d58b/pydantic_core-2.49.0-cp312-cp312-musllinux_1_1_aarch64.whl", hash = "sha256:119505798feabc587642e03579a9acff7da6ef6816a70ef2de50960037b4b0c8", size = 2255757, upload-time = "2026-09-09T21:26:39.543Z" },
-    { url = "https://files.pythonhosted.org/packages/7d/72/50b50de05ee97189ac2ad1b483bf6e9890990f69e6d6ba4446190af2e7f3/pydantic_core-2.49.0-cp312-cp312-musllinux_1_1_armv7l.whl", hash = "sha256:45137bb8182ae8b8631550d54d82d654db7e8bcbff2a8ebce5e56c85e25fc7ab", size = 2414108, upload-time = "2026-09-09T21:26:41.325Z" },
-    { url = "https://files.pythonhosted.org/packages/ab/30/a585471174fbd895a746773164ddd9d5e6ea61334f7830704f8e86ba2b0a/pydantic_core-2.49.0-cp312-cp312-musllinux_1_1_x86_64.whl", hash = "sha256:c8b4390b0e79235acb8c4d2337e76efdf00fd17936b19227726ec63f23840acb", size = 2444515, upload-time = "2026-09-09T21:26:43.524Z" },
-    { url = "https://files.pythonhosted.org/packages/1f/dc/576e960becae81fac4ce27ff1e69c91d4a18b72a5c37ab2174256a1b94f0/pydantic_core-2.49.0-cp312-cp312-win_amd64.whl", hash = "sha256:5ab1f5555c083b9bc6aae809beb00aef77e81a10dbbd16a6da9ad239620468cd", size = 2128514, upload-time = "2026-09-09T21:26:47.426Z" },
-    { url = "https://files.pythonhosted.org/packages/2e/f8/852096d493b446d37c1c0434b771ff829f14e9ceba96e39a16b14d0cbbbf/pydantic_core-2.49.0-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:52984e1335adb925c6089a44d167668a1f8cc6bbbca25657936e51922c0d07bc", size = 2005006, upload-time = "2026-09-09T21:26:56.232Z" },
-    { url = "https://files.pythonhosted.org/packages/be/99/0911e956999d4eb740c820723ae9ea1a86f666d603e50caaa138ad4ba0ea/pydantic_core-2.49.0-cp313-cp313-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:60c30f0977f6bf6d74c81f5c797f862724cf59ad5d7ff37f3eab9595994f6261", size = 2135332, upload-time = "2026-09-09T21:26:58.173Z" },
-    { url = "https://files.pythonhosted.org/packages/e8/31/fbadd17f9bdb7c320584b94eed43e8b52286cab2bf8af97e37b806f2ba28/pydantic_core-2.49.0-cp313-cp313-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:7a4b87881bcdde33caa8d1900cef4166ea34575f1926c390b8f486ce911cba82", size = 2319233, upload-time = "2026-09-09T21:27:00.059Z" },
-    { url = "https://files.pythonhosted.org/packages/70/38/091912dac9a37c0a553c7387288ad36e17699b77b00d89547268bbc93a99/pydantic_core-2.49.0-cp313-cp313-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:062c2a4b2de23bfa10418fafe63d8873c9f95780dcd5bf6ae66537b44e40f3ed", size = 2388379, upload-time = "2026-09-09T21:27:02.279Z" },
-    { url = "https://files.pythonhosted.org/packages/11/48/4f0ba347b15e1971c1ce5b048ef0df24f87a20eec45f96deddc784b25b2a/pydantic_core-2.49.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:60550432855bc323ce9aa813e14e0bf2b806de59727aab850a1c83c0fd7dc0c1", size = 2126710, upload-time = "2026-09-09T21:27:04.774Z" },
-    { url = "https://files.pythonhosted.org/packages/dd/55/1b587572a9e16c4196b77b0bf74c3067bb77d0cb7e4b4150fdc744548b01/pydantic_core-2.49.0-cp313-cp313-manylinux_2_31_riscv64.whl", hash = "sha256:0bb4a60b0abdb41c237e28fd8c86e223d2994143ed863d0168c0b03b759d2620", size = 2210332, upload-time = "2026-09-09T21:27:06.959Z" },
-    { url = "https://files.pythonhosted.org/packages/7c/87/4f7e8ef8ed5f95aca29b31965108be32c6391387f1427f3f88feba5957da/pydantic_core-2.49.0-cp313-cp313-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:c33ecdec5779328131e575ec133ea4a134370058c9a8f6b7c80761c5f992389b", size = 2264337, upload-time = "2026-09-09T21:27:08.858Z" },
-    { url = "https://files.pythonhosted.org/packages/75/8d/bf40b611d4c6d484e2e7ce8be3664d760df3f55e32f46af43ec01b44809f/pydantic_core-2.49.0-cp313-cp313-musllinux_1_1_aarch64.whl", hash = "sha256:2b72dc8f8dba268bcb040c2cb715e96de9a69299d1d0b60ca4e12517f10b8834", size = 2255174, upload-time = "2026-09-09T21:27:10.954Z" },
-    { url = "https://files.pythonhosted.org/packages/65/df/4be4c84c959f7c8308ed2bb191463f849c2cf72b14bf6885aada3b636a6f/pydantic_core-2.49.0-cp313-cp313-musllinux_1_1_armv7l.whl", hash = "sha256:64804fc948c723dbf763a40d0747e7a73807667148831a836e5b856259247837", size = 2413239, upload-time = "2026-09-09T21:27:13.128Z" },
-    { url = "https://files.pythonhosted.org/packages/b9/ec/4714e02f5062eea4340fff4317b4459f7ab808388cc38dade286ac525e97/pydantic_core-2.49.0-cp313-cp313-musllinux_1_1_x86_64.whl", hash = "sha256:4a801a8410e16e22a231aef577127fcf02c85ee237a1b73cb0790173be700b3e", size = 2444760, upload-time = "2026-09-09T21:27:15.51Z" },
-    { url = "https://files.pythonhosted.org/packages/ed/c1/31a54f336c4fe510d9fa8ad1f7aa1e7f83f5e0f634c0bb193d1527bc984d/pydantic_core-2.49.0-cp313-cp313-win_amd64.whl", hash = "sha256:92503a642b207cf9d085f4f79f9b66c972208262bb1b12bca95c3a0c6deddea3", size = 2126186, upload-time = "2026-09-09T21:27:19.624Z" },
-    { url = "https://files.pythonhosted.org/packages/d2/4c/edf528826d9ebb0f88deb93c34268f54df5d3257cd13362487f298ea3489/pydantic_core-2.49.0-cp314-cp314-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:3aa610f5abbe154fb35eca0b060351b9f8b6e5e7de63a0ab8a3f14f9304c01f3", size = 2004633, upload-time = "2026-09-09T21:27:27.907Z" },
-    { url = "https://files.pythonhosted.org/packages/6e/0a/cd70b06da4f63c1d76ee1b7e504d41662d89800e9649c6f70f22496324b2/pydantic_core-2.49.0-cp314-cp314-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:0c3f75d3b7a818d57ae45693358508d1d0e809ac2dae05bf5bbd3c687bc75110", size = 2136175, upload-time = "2026-09-09T21:27:29.955Z" },
-    { url = "https://files.pythonhosted.org/packages/68/84/911f9e0f9fa390c3517ab31ed229a6f2fb60b613d0b71d048d21507d912f/pydantic_core-2.49.0-cp314-cp314-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:ea008d686f2c3b0fb9a306a4ea81201344cd4e1a93026017d469b1211721dd46", size = 2320312, upload-time = "2026-09-09T21:27:32.299Z" },
-    { url = "https://files.pythonhosted.org/packages/1f/f3/82b749d1180afcfdb976d2e31379d9653a1bb8f1a018a5bdb1596c06ca7c/pydantic_core-2.49.0-cp314-cp314-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:db9453ac96ef4e0e9da1ce1b62e5595af1ad2d55bd1dcdfef595d0515d2d3995", size = 2392477, upload-time = "2026-09-09T21:27:34.574Z" },
-    { url = "https://files.pythonhosted.org/packages/f7/dc/263439af9455b0f6843f31ab5426fb5f6c52d1597fe11409b93897513c08/pydantic_core-2.49.0-cp314-cp314-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:82f8bd51e8d3baebf622b52469bdc316c6c1c6e48102d33c76611f37f5924582", size = 2128505, upload-time = "2026-09-09T21:27:36.908Z" },
-    { url = "https://files.pythonhosted.org/packages/2a/b2/99e7adc24a9dca37475a07c50f3137533bc963ad266094f2d275a5b83f36/pydantic_core-2.49.0-cp314-cp314-manylinux_2_31_riscv64.whl", hash = "sha256:7e912019d9262611ea419a0e440e552b5d41f3671d2d88b96a99ef67b6d3ad71", size = 2212881, upload-time = "2026-09-09T21:27:39.085Z" },
-    { url = "https://files.pythonhosted.org/packages/1e/69/79662301198f80737cebd9b3f8eda6c8d3cdabd93efd0053264bbc182570/pydantic_core-2.49.0-cp314-cp314-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:98e0f4f424fed81b72345b8a249ab8a6bf40f2faf5caa96b8bede344a755ec61", size = 2265650, upload-time = "2026-09-09T21:27:41.496Z" },
-    { url = "https://files.pythonhosted.org/packages/e4/67/21fbb7eb70874417894bf166b07e79f4029209098341e24b5b85b95d26ff/pydantic_core-2.49.0-cp314-cp314-musllinux_1_1_aarch64.whl", hash = "sha256:13b5a234f4f0332f509396c8127c92b90674e4f2636d9d67a7be1a8537e2439c", size = 2255195, upload-time = "2026-09-09T21:27:43.756Z" },
-    { url = "https://files.pythonhosted.org/packages/25/4f/79f2969dc9dff3831198b74dddf96a779e6ff1084f189b7e42e1518afd8d/pydantic_core-2.49.0-cp314-cp314-musllinux_1_1_armv7l.whl", hash = "sha256:0014dd75b23f336314956bed232bda1b0138be774bb66746f9c01f7a651d6532", size = 2413459, upload-time = "2026-09-09T21:27:46.095Z" },
-    { url = "https://files.pythonhosted.org/packages/f6/3c/005f9e218963016e1005f5b7529472020f4d7761f0cdf7c78ab01365a14e/pydantic_core-2.49.0-cp314-cp314-musllinux_1_1_x86_64.whl", hash = "sha256:6aef64b4b948db5c243d184a92326a4666b0467d9f6503f68d048b23ba18a928", size = 2447705, upload-time = "2026-09-09T21:27:48.227Z" },
-    { url = "https://files.pythonhosted.org/packages/57/6e/592912b19c96b911e728813696919a2a34258f99187da1e54aa3222b06a5/pydantic_core-2.49.0-cp314-cp314-pyemscripten_2026_0_wasm32.whl", hash = "sha256:62535ce2294441c986da1aeb743f7255ac99f3e0a3119bd8c44b36406d9f3721", size = 1449332, upload-time = "2026-09-09T21:27:50.776Z" },
-    { url = "https://files.pythonhosted.org/packages/71/f3/c20ea92e062444088edec728a7b8137ac40cd1b47815e8b4ee2537a7263d/pydantic_core-2.49.0-cp314-cp314-win_amd64.whl", hash = "sha256:46836736bca8a7ebab55d0ea76cd04e89bae0ea3d6dcfdedcd1bb1b1244a4239", size = 2125812, upload-time = "2026-09-09T21:27:55.731Z" },
-    { url = "https://files.pythonhosted.org/packages/4e/27/464e6fe3ce304097aeaf235d6b49f6e5b3942ce7ee2d7f3c0ff95852bc8b/pydantic_core-2.49.0-cp314-cp314t-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:0e9956faf9840dbdce5a88c2a68fd28c3cdb16eac41ac5f85831291762021805", size = 1983674, upload-time = "2026-09-09T21:28:05.42Z" },
-    { url = "https://files.pythonhosted.org/packages/17/c1/1592b13ff09cf9e1fc24fa3c155a128ad243e55ffe8d7ba8a1545308864f/pydantic_core-2.49.0-cp314-cp314t-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:40ca7e5bddc63dea88aa3f9778d75dffe725d79d167398dde33f41f10034a0eb", size = 2129030, upload-time = "2026-09-09T21:28:08.143Z" },
-    { url = "https://files.pythonhosted.org/packages/79/1a/f0cb73de00dd07cee65cedfe4ed96422c77b701910bb7f6d20da3bb2061c/pydantic_core-2.49.0-cp314-cp314t-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:801d35337e6f732db4598e5a7cccb235be6bbac6ec03734e6bd731412e2fbbc1", size = 2325512, upload-time = "2026-09-09T21:28:10.67Z" },
-    { url = "https://files.pythonhosted.org/packages/13/de/4c94babffc9e3c38e245cf2423c6ad771d7f6770836137c512821a5e95ff/pydantic_core-2.49.0-cp314-cp314t-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:f45d6552e58e13015105bea5b8c6d012ac547e1b3c5d653b094daacc8c7de1d6", size = 2389562, upload-time = "2026-09-09T21:28:13.035Z" },
-    { url = "https://files.pythonhosted.org/packages/f9/46/cc3601e94e27dff17be89b1975aac7cf467c3a32c660583bde72334a6343/pydantic_core-2.49.0-cp314-cp314t-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:a716ed58512bd33bd9736e245db15acfec542e54d10623b9faa42632404efcc8", size = 2119392, upload-time = "2026-09-09T21:28:15.424Z" },
-    { url = "https://files.pythonhosted.org/packages/74/6c/acc23893ffea42c2c28704ce07585b7dfe9567d926986274cd259991573e/pydantic_core-2.49.0-cp314-cp314t-manylinux_2_31_riscv64.whl", hash = "sha256:ab7a65a669a03400507b4e573119ba3b26e156797526e71669476de8605bbe1d", size = 2200986, upload-time = "2026-09-09T21:28:17.869Z" },
-    { url = "https://files.pythonhosted.org/packages/9c/6b/feffbe58197b8adf7cf7589bc936957cdf72829274bccf04fea94024434d/pydantic_core-2.49.0-cp314-cp314t-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:ab51a50fbe2bd45c649dc0e8624fbef5cb9553e046ad1cf7fb658b6c8b0273de", size = 2255820, upload-time = "2026-09-09T21:28:20.475Z" },
-    { url = "https://files.pythonhosted.org/packages/f9/0e/e8bdbe7da6b89944b5b5073ed9ab5d20a56fe836feb796106b33ad8199db/pydantic_core-2.49.0-cp314-cp314t-musllinux_1_1_aarch64.whl", hash = "sha256:813081b90803d858f6917f46b16fc4b47de679a2e76058570a4a46344305b650", size = 2247706, upload-time = "2026-09-09T21:28:23.169Z" },
-    { url = "https://files.pythonhosted.org/packages/d8/c1/24c9ce6048e25889fe79437dc44609744e75fb9ff7e3adb6200e9c36496e/pydantic_core-2.49.0-cp314-cp314t-musllinux_1_1_armv7l.whl", hash = "sha256:e2b3e73c7a6cf2ed5ac8ab57aece1feff46c709c60cc88602bebd29f733ad340", size = 2406668, upload-time = "2026-09-09T21:28:25.745Z" },
-    { url = "https://files.pythonhosted.org/packages/52/54/28431d4efba9c8a014544124f871374a8d0ab8eade90d11e821b8058856f/pydantic_core-2.49.0-cp314-cp314t-musllinux_1_1_x86_64.whl", hash = "sha256:ee165057e76dc133b18726f2283036d3cccdbe70613b940d73c729d51b011b81", size = 2451737, upload-time = "2026-09-09T21:28:28.361Z" },
-    { url = "https://files.pythonhosted.org/packages/db/e4/7075959e0d511fc9c3a87002bb7148a4c706d33897d32d6dc50a9a2543ed/pydantic_core-2.49.0-cp314-cp314t-win_amd64.whl", hash = "sha256:ce79aaa77a6fc6f2784f3c87933aca2e61b6cec5a89d91c730fc051379f181a5", size = 2106247, upload-time = "2026-09-09T21:28:33.214Z" },
-    { url = "https://files.pythonhosted.org/packages/49/04/eec0dc008a249c93dd2ad2d0896fb337460f4b303044dd9c727bd0d59f08/pydantic_core-2.49.0-graalpy311-graalpy242_311_native-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:5a8c26d1a86d4f078d363e6b97608db340deb6336dd2bbbf45b8f0f88c1db4d1", size = 2060544, upload-time = "2026-09-09T21:30:05.686Z" },
-    { url = "https://files.pythonhosted.org/packages/17/36/d5afa40a4744c0c81aef989a847db2f9680325dd87a315e1f725618cacfb/pydantic_core-2.49.0-graalpy311-graalpy242_311_native-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:7fd7218d785928c2c57b5f4c3682745f106b4192b7647372c1e6d1109d309c81", size = 2209448, upload-time = "2026-09-09T21:30:08.595Z" },
-    { url = "https://files.pythonhosted.org/packages/0c/f3/902a5a45472e8575ee4234cd8373067c40a4ebfbce7683bdb74b6d91c4eb/pydantic_core-2.49.0-graalpy312-graalpy250_312_native-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:8c658588d0f4d59a668e8f0e854672a528a92018ad379b40886723a429ca9273", size = 2061334, upload-time = "2026-09-09T21:30:17.64Z" },
-    { url = "https://files.pythonhosted.org/packages/bb/76/35ecc880919aa3c7629df4b652e9b478270bd9d4040aea21e82e112e735b/pydantic_core-2.49.0-graalpy312-graalpy250_312_native-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:327648d97e9d64e1a4a9be16e882715fa6fb2fe83c405f577018beedb0e699d5", size = 2214176, upload-time = "2026-09-09T21:30:20.482Z" },
-    { url = "https://files.pythonhosted.org/packages/48/6e/f342ae1e51ede0c315a95c2a574a5cafd1dcca1a2eb396556b5884ddf5da/pydantic_core-2.49.0-pp311-pypy311_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:5597c5695fbc75cf5d624b7600eebfb0e1f2280e4e7a1aa3ecc2636ce5156d64", size = 2206088, upload-time = "2026-09-09T21:30:29.717Z" },
-    { url = "https://files.pythonhosted.org/packages/38/72/4c53969e2b52fbd0a1b1837c1e7607ae7a3d939253d1c54f573d39952670/pydantic_core-2.49.0-pp311-pypy311_pp73-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:e2d59dc834612f4846d823d29d90d9de5527efdb46b51fa661e9dcfe853e8211", size = 2272511, upload-time = "2026-09-09T21:30:32.604Z" },
-    { url = "https://files.pythonhosted.org/packages/c6/be/c856f7f82a9c104685a71edb14f14e955f04b7bab672b46716e440729c9d/pydantic_core-2.49.0-pp311-pypy311_pp73-musllinux_1_1_aarch64.whl", hash = "sha256:f391937c761ae69e5416b8900a8441b78baa334349e068be9d72ebb3006d62aa", size = 2256595, upload-time = "2026-09-09T21:30:35.725Z" },
-    { url = "https://files.pythonhosted.org/packages/a8/2f/cdd13179f0a3e30be411b8dacef8d47b6b293e31d24e4fae07310a5917a2/pydantic_core-2.49.0-pp311-pypy311_pp73-musllinux_1_1_armv7l.whl", hash = "sha256:3c6cba4051e8b473151e2f745e70d2f5e9e24389c38be835d5dca90a5ff31389", size = 2414012, upload-time = "2026-09-09T21:30:39.164Z" },
-    { url = "https://files.pythonhosted.org/packages/35/d6/0a59f0d413ab5b3bce02188dac20747e303030628a0fbbdb7ecef5e739e8/pydantic_core-2.49.0-pp311-pypy311_pp73-musllinux_1_1_x86_64.whl", hash = "sha256:f4052ef252d9225562f73c6235a8606ea3735f7f24a07c6dc08af3567eb2031b", size = 2432714, upload-time = "2026-09-09T21:30:42.152Z" },
-    { url = "https://files.pythonhosted.org/packages/f1/77/78d84c52585658b76fc52e556e6929e4653ff4c6f051b6859a9ba2cf5788/pydantic_core-2.49.0-pp311-pypy311_pp73-win_amd64.whl", hash = "sha256:a7826bda0f21625499db4c9b46a60025f2c83f7b6139c777a21e9c2c5e1a67c5", size = 2282285, upload-time = "2026-09-09T21:30:45.221Z" },
+    { url = "https://files.pythonhosted.org/packages/f5/80/226019008a041da423dc59d34f980b2b6e60a71971d07a8f52e10fc4747a/pydantic_core-2.50.0-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:a7080928078ff56c07da393392f772054e93a39c8033dc9c04547bd949f9b614", size = 2050325, upload-time = "2026-10-08T14:26:16.081Z" },
+    { url = "https://files.pythonhosted.org/packages/b9/29/11c98cd9c49338f64aeb3d6e166c99b65d8949f00f285c5b66de75ade316/pydantic_core-2.50.0-cp311-cp311-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:4b1bae96f41806b14dd8bb1568d39b5e33b5af7fb27f7be36c78b8fa84708917", size = 2189027, upload-time = "2026-10-08T14:26:17.581Z" },
+    { url = "https://files.pythonhosted.org/packages/cf/b7/af7d9c4de715cc13e947d1135b73f0c181bce2f01e9f1d9e3c428f9ee31c/pydantic_core-2.50.0-cp311-cp311-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:8facaf0a16121ac82cc403a71399a061b74624c1ae2034eec9ed6169c5d16ecb", size = 2388815, upload-time = "2026-10-08T14:26:19.306Z" },
+    { url = "https://files.pythonhosted.org/packages/26/87/cd95dcd4d066180b2e22eff3dca01ac3af56607f9ecc43b7ba0748496f47/pydantic_core-2.50.0-cp311-cp311-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:610e9f483ac53c5cc59c2d3687224029b54eb494feec2d40a2bcfdd187635192", size = 2431821, upload-time = "2026-10-08T14:26:20.958Z" },
+    { url = "https://files.pythonhosted.org/packages/f0/14/7122b78e9915e7dd50f9dcec6041a4e32874907b41b9e0880db2f1c7ae1a/pydantic_core-2.50.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:ac223ea031905319a64d0df116979ae438b42d6265862a3d63c9f9808c2905a7", size = 2157622, upload-time = "2026-10-08T14:26:22.947Z" },
+    { url = "https://files.pythonhosted.org/packages/97/86/fcddead5bda54fc8efa0d80dbba5962e9a91193570e227404c7593707833/pydantic_core-2.50.0-cp311-cp311-manylinux_2_31_riscv64.whl", hash = "sha256:75b451ec5e64a1d4b803317f34710131742ff2e42f4bf5403f597d0af857d7d8", size = 2254921, upload-time = "2026-10-08T14:26:24.607Z" },
+    { url = "https://files.pythonhosted.org/packages/6c/e8/041d1c3e3e1f203a656ce592f8c1548e1ef2b0939d19c5ce66432c30e4bd/pydantic_core-2.50.0-cp311-cp311-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:7eee44c3f1f8acc220a743a5ed5588949a4f18b33df4cfbef2b1277470285401", size = 2268163, upload-time = "2026-10-08T14:26:26.207Z" },
+    { url = "https://files.pythonhosted.org/packages/8a/ac/f515994ef1351e883276e85af0a50d839ead9d0d22743fa2c6dfd552f7ce/pydantic_core-2.50.0-cp311-cp311-musllinux_1_1_aarch64.whl", hash = "sha256:f44107b5fdfecc03438feb165431652c8006650471326e53dd86d4c19124f5c5", size = 2302005, upload-time = "2026-10-08T14:26:27.808Z" },
+    { url = "https://files.pythonhosted.org/packages/04/6c/b970c4c87d92c4c974a5c5dc16bcf747f89b4e5729c5c45131267ef0421b/pydantic_core-2.50.0-cp311-cp311-musllinux_1_1_armv7l.whl", hash = "sha256:718d05d4e078c7828f40ad3e310870fe4b837d93a32e7e8497a080c1f1040490", size = 2465387, upload-time = "2026-10-08T14:26:29.529Z" },
+    { url = "https://files.pythonhosted.org/packages/4a/84/c0a92f97f9de7f133dfe694d0e8ca033a1c90fdf692dc69dfee3bf8a2e7b/pydantic_core-2.50.0-cp311-cp311-musllinux_1_1_x86_64.whl", hash = "sha256:031867348c98ab49c6d3a16ad39738369ea48da59900d76d71c1e64de71fe79b", size = 2478673, upload-time = "2026-10-08T14:26:31.898Z" },
+    { url = "https://files.pythonhosted.org/packages/c4/1f/89184f13b9ebaf6d8710cd0d1cfb466d7dc829de23468ab471b543dd07eb/pydantic_core-2.50.0-cp311-cp311-win_amd64.whl", hash = "sha256:90874428bc6678b26434336c77931c9734ecebedf50132c179205e5a9908761d", size = 2176278, upload-time = "2026-10-08T14:26:35.388Z" },
+    { url = "https://files.pythonhosted.org/packages/67/d4/e2808af12de4809dd6a4b532e3877baa5f1000df51bd8ebb8756450c6c92/pydantic_core-2.50.0-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:ae45853d25a23fba56681d2f9ed41f3e3f12f0a3b2393fefa08ff6406320a1f5", size = 2048432, upload-time = "2026-10-08T14:26:43.593Z" },
+    { url = "https://files.pythonhosted.org/packages/18/58/46ad42a321051585d89f4e563b115015332caf79ba4e96f2785715c7f52d/pydantic_core-2.50.0-cp312-cp312-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:bd841dcf394ff261c26763a9d7be754176d4f1e6d26cb2a5d5331e91b6b56a5f", size = 2173565, upload-time = "2026-10-08T14:26:45.299Z" },
+    { url = "https://files.pythonhosted.org/packages/92/69/541206e657ecea865e5f6d49a4a0d8062586d05da482d9d7ed77fdcdfc86/pydantic_core-2.50.0-cp312-cp312-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:c2e97985641fe53ad7824d1b5bfeb7990a5ff788c4559ee44d7522642560ddc2", size = 2361974, upload-time = "2026-10-08T14:26:47.024Z" },
+    { url = "https://files.pythonhosted.org/packages/f6/c0/cf4850441d0d3d3736abe5e8b6fcb49a50166aa0651ed8444172f81f4b4f/pydantic_core-2.50.0-cp312-cp312-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:7987866a2569396e6765c54d643fd6a7b3b234e89ee8d45a3729a7b4b2726145", size = 2440817, upload-time = "2026-10-08T14:26:48.937Z" },
+    { url = "https://files.pythonhosted.org/packages/ca/e2/2f793fa2f1b338aa03124efd4362956c84d7bf1b331dc86050bc0151e67d/pydantic_core-2.50.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:f187030fc3d62c668feb0f09e92852e0eb414d7fcefc4748f2e67d245aade37e", size = 2160358, upload-time = "2026-10-08T14:26:50.74Z" },
+    { url = "https://files.pythonhosted.org/packages/db/00/35e314c08e721ec1f070408a4e41926b90347ecd2863c08c78daad5f8a16/pydantic_core-2.50.0-cp312-cp312-manylinux_2_31_riscv64.whl", hash = "sha256:d187f43d1c5b844adc871c5b8c22b4aa12a116aaca4e9bd1521bc9ce479aae1f", size = 2231416, upload-time = "2026-10-08T14:26:52.733Z" },
+    { url = "https://files.pythonhosted.org/packages/0f/3a/6f7c36afe35a9eca24e5f74f33ca641ac8cf308aae4ac7af4e585d464a40/pydantic_core-2.50.0-cp312-cp312-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:cb4fcaabb28cabf21396a9b816b9afe091f8c776805fdf03e2cbc606b64dfa7c", size = 2242496, upload-time = "2026-10-08T14:26:54.485Z" },
+    { url = "https://files.pythonhosted.org/packages/8d/af/77adf30285836c25f6a927e170df45f8dd4af713c89135b22abcbf3c6d67/pydantic_core-2.50.0-cp312-cp312-musllinux_1_1_aarch64.whl", hash = "sha256:1751e92d56fbb623b937d73985e500b1a2b1053e56f718a6c564660d99bb9cb0", size = 2279176, upload-time = "2026-10-08T14:26:56.432Z" },
+    { url = "https://files.pythonhosted.org/packages/08/37/4e2a05247f82b59337bf45e9bb14aed85e2d83aecd21e49ad6cedf91882b/pydantic_core-2.50.0-cp312-cp312-musllinux_1_1_armv7l.whl", hash = "sha256:70df7ff903aea05383298715ea53551c8f27c8f70cbe54ba7f05606cd822e7e4", size = 2450488, upload-time = "2026-10-08T14:26:58.218Z" },
+    { url = "https://files.pythonhosted.org/packages/85/e6/75f25906212ecb94d69a0c8ed16f5c4ac312dc9961c2e93ff2a7fdf9a07a/pydantic_core-2.50.0-cp312-cp312-musllinux_1_1_x86_64.whl", hash = "sha256:24302bf47319a64e5c5c7c29e971d2b7a20a190c64e59035a3df9582dec636fa", size = 2476664, upload-time = "2026-10-08T14:26:59.98Z" },
+    { url = "https://files.pythonhosted.org/packages/3f/7b/5ebf3e62f5d0f6e3503ffdfffd7d0c2f8d45690afd37fa0cfdcb1786d7d6/pydantic_core-2.50.0-cp312-cp312-win_amd64.whl", hash = "sha256:1541c334af5d42cb9eb03862a9b4d2cfbfc670fd05172ec51f3ce02d704550f1", size = 2171536, upload-time = "2026-10-08T14:27:03.797Z" },
+    { url = "https://files.pythonhosted.org/packages/89/db/a9852fa8780acca5dd81a21bb66d4b2fb41c39dc5672cec66c32cc7f13e9/pydantic_core-2.50.0-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:d1d084e92d0f4a096a5155b23d1ac603db8073ef98a3d1384badf1455e5ae742", size = 2047340, upload-time = "2026-10-08T14:27:11.85Z" },
+    { url = "https://files.pythonhosted.org/packages/90/82/cd174e776e71ebcb1d289a57cb3e89565123a84c5708865e12efa82313f9/pydantic_core-2.50.0-cp313-cp313-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:f0af2d2f745ec00a6616c4dfba4477f9156ccfb45690f6ffa5fd34f42e871ed4", size = 2173461, upload-time = "2026-10-08T14:27:13.948Z" },
+    { url = "https://files.pythonhosted.org/packages/5a/5c/9c4b2aea09ec7b7af966e79631b1970f1adeb6a8ed001bc8bb64a2d1c23d/pydantic_core-2.50.0-cp313-cp313-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:2f28a5a299d4cefd1066a6883d22600b9ae3606f881c3015d255784634647580", size = 2362629, upload-time = "2026-10-08T14:27:15.909Z" },
+    { url = "https://files.pythonhosted.org/packages/28/d9/93afd007b61c50425c3c8f0402425779341c8d498bd224e5788eaf419c4c/pydantic_core-2.50.0-cp313-cp313-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:bdd70c2d9e73bca09fad54605dfeaae2b4e770b2800c65f5f5342901ed567b9f", size = 2440134, upload-time = "2026-10-08T14:27:17.716Z" },
+    { url = "https://files.pythonhosted.org/packages/c9/93/a4ef199535547aaa7c5d2cbf009a1d6a2b252885b14c6e70404e1c661716/pydantic_core-2.50.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:e58acd43ac8d3905659c1d5309318dd576243e723dd7c3b5dd4f555479b77d4b", size = 2158480, upload-time = "2026-10-08T14:27:19.618Z" },
+    { url = "https://files.pythonhosted.org/packages/de/20/f216e028d3bfbd9f8c67f7a2f0f8db04240926f630e2e66a5a8ac45fe00d/pydantic_core-2.50.0-cp313-cp313-manylinux_2_31_riscv64.whl", hash = "sha256:5a07c644047f5abc268b4c39f8cb5a30e08a3c349228cb70142c7d3ed87587c0", size = 2231837, upload-time = "2026-10-08T14:27:21.742Z" },
+    { url = "https://files.pythonhosted.org/packages/56/3f/57a6acf26e0acb82238ba4e25b35cbd6013b1d74eac99c4f358ff56bf6d6/pydantic_core-2.50.0-cp313-cp313-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:8ad8dad549cd1645be591a50b4573995ee7e018f6619ddc2bc6ea44b2ad9f694", size = 2242240, upload-time = "2026-10-08T14:27:23.564Z" },
+    { url = "https://files.pythonhosted.org/packages/94/41/f5f4014b40f91db4479e87dc038ac48a460a60baadea7ff9c942bc64dc62/pydantic_core-2.50.0-cp313-cp313-musllinux_1_1_aarch64.whl", hash = "sha256:1773001198030e16f946a7ff7760fc3ebd45b12150f66fd0f433780043dc13d8", size = 2277852, upload-time = "2026-10-08T14:27:25.517Z" },
+    { url = "https://files.pythonhosted.org/packages/f8/fa/485e4db093e10f29676fc696abf9d88f3626ee520e99cc488fb091222db9/pydantic_core-2.50.0-cp313-cp313-musllinux_1_1_armv7l.whl", hash = "sha256:8ab9e74878172948e0426e3d27fba333fd6a1c3f9456d8e75643e8e6868ac1a1", size = 2450132, upload-time = "2026-10-08T14:27:27.493Z" },
+    { url = "https://files.pythonhosted.org/packages/d3/48/fd07063cfc65e498528cea59b27b979eb5c890a54dcf5bb19ab0a589516d/pydantic_core-2.50.0-cp313-cp313-musllinux_1_1_x86_64.whl", hash = "sha256:e15bb1535f68a27f28e579ba3a8f74e7b05d350c45f5622b76a311d5a19ae48a", size = 2477011, upload-time = "2026-10-08T14:27:29.972Z" },
+    { url = "https://files.pythonhosted.org/packages/5e/50/dbdb3ba6699d494e59db2f145aeb97990e28d1503bc9f7bdd57eb4c15677/pydantic_core-2.50.0-cp313-cp313-win_amd64.whl", hash = "sha256:4f96ccd9368ecbf6685d8f6981584ab72b4f0ffd20685e747737e7e340277b8d", size = 2169974, upload-time = "2026-10-08T14:27:34.692Z" },
+    { url = "https://files.pythonhosted.org/packages/26/c8/f44ea3f1b00288f715e2320cbcd0f604104325370ef4bee42c5ed2ab076e/pydantic_core-2.50.0-cp314-cp314-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:d8354fbbe2abf0fb724b9303bef43bfd9b7a2779332813fa6d6559983954e7d8", size = 2049144, upload-time = "2026-10-08T14:27:43.695Z" },
+    { url = "https://files.pythonhosted.org/packages/74/5c/2f5cf84ceaf6d7c351737124aebc135f50ce48a9dd28d2b5283103face54/pydantic_core-2.50.0-cp314-cp314-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:00963fde61cf8880d9e7b5635a9830e0591edfa45168447fdc5b47635c0f6437", size = 2173456, upload-time = "2026-10-08T14:27:45.792Z" },
+    { url = "https://files.pythonhosted.org/packages/97/de/dc0bd815a328e62b72bb93b5f3c762939670d4119fd27405b454970833da/pydantic_core-2.50.0-cp314-cp314-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:1bbd7da16d8b2912cc56c9d0b85c4998a6cbf39b220f81c0d8c397c64672ae0e", size = 2365204, upload-time = "2026-10-08T14:27:48.117Z" },
+    { url = "https://files.pythonhosted.org/packages/ca/a5/458c4a29f52fdecb16b192fb27f117359da9c9c58401ebfd956637822dca/pydantic_core-2.50.0-cp314-cp314-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:ed557fa2744617eac3e34dd39b85037efbf23cd33f06851c00fdb8f18ad8f4c2", size = 2445007, upload-time = "2026-10-08T14:27:50.637Z" },
+    { url = "https://files.pythonhosted.org/packages/98/14/0c0e72e0663be91a456167a2f7ed49c65195b388e8f1e8b2bb5083b27458/pydantic_core-2.50.0-cp314-cp314-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:59f816dc04e99627a5a6352ae51dfb30e603f2cb0b7009c91dc640c533def014", size = 2159911, upload-time = "2026-10-08T14:27:52.881Z" },
+    { url = "https://files.pythonhosted.org/packages/62/7f/64af6921e17ed04dda0e07ebbd394b29fb557d33618cb0f3f81ec59c0508/pydantic_core-2.50.0-cp314-cp314-manylinux_2_31_riscv64.whl", hash = "sha256:779b6c74526596a86d38248dedaecfb7851bbaf319c234be042c57acddd2c8c4", size = 2235761, upload-time = "2026-10-08T14:27:55.194Z" },
+    { url = "https://files.pythonhosted.org/packages/82/11/b6ff9f7207af629094f4deac947d04be3812d5c95054010ad8f710a052f0/pydantic_core-2.50.0-cp314-cp314-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:21b62d45f327eb0802f842c132fda6d01a8376a8077922dc4dda69011c64d34a", size = 2243726, upload-time = "2026-10-08T14:27:57.336Z" },
+    { url = "https://files.pythonhosted.org/packages/8e/37/6f7101f3c746a1686987a32875ae2f7c19f518d783979cee1a8a32e0a9ef/pydantic_core-2.50.0-cp314-cp314-musllinux_1_1_aarch64.whl", hash = "sha256:4f31af62efd1fd0257735b72e6716b32d4f207654adeabfe524d44baf1bb6bed", size = 2277158, upload-time = "2026-10-08T14:27:59.714Z" },
+    { url = "https://files.pythonhosted.org/packages/d2/74/67fe208f3ec7f5d8c47bf7cba70019a84b1cffad947ebc8caef14271b54f/pydantic_core-2.50.0-cp314-cp314-musllinux_1_1_armv7l.whl", hash = "sha256:933f2d639eb81a3e1f145aec415453cc00983236629933f028d9507222583a2e", size = 2450059, upload-time = "2026-10-08T14:28:02.17Z" },
+    { url = "https://files.pythonhosted.org/packages/cd/10/4a9c56a69f5841bdd94ffff5876a12ad2733209d5b89cadb67638d69e7c7/pydantic_core-2.50.0-cp314-cp314-musllinux_1_1_x86_64.whl", hash = "sha256:c05d035e72530f6b00297941b0162218601542b76870c3bf2756bd87f16fc538", size = 2479142, upload-time = "2026-10-08T14:28:04.494Z" },
+    { url = "https://files.pythonhosted.org/packages/bf/c1/30d36746051e42bb67df986ee874f787526edb99205f6b1583c33dd81202/pydantic_core-2.50.0-cp314-cp314-pyemscripten_2026_0_wasm32.whl", hash = "sha256:ab3f95f737fc1b258b8210308fc02ce1442cf5950cf6d30b09ad89ab9e8afebd", size = 1483929, upload-time = "2026-10-08T14:28:06.527Z" },
+    { url = "https://files.pythonhosted.org/packages/ea/6f/a5a5baf99509c998e0f2335d66b815880c7d6c63231c8e4017b237d6837d/pydantic_core-2.50.0-cp314-cp314-win_amd64.whl", hash = "sha256:63263d64884688554fb025a3906c7b00573980cfee75f9afeb86239d577384bc", size = 2170939, upload-time = "2026-10-08T14:28:11.08Z" },
+    { url = "https://files.pythonhosted.org/packages/d3/f1/860bb499f7cdf4bb453e8080af5bc182487f2f025d94baeee29c907bde6f/pydantic_core-2.50.0-cp314-cp314t-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:158749408ee19682b8a2a7e7135cced7f41d6f2f9de96088b1b1609858a6a158", size = 2022761, upload-time = "2026-10-08T14:28:20.197Z" },
+    { url = "https://files.pythonhosted.org/packages/89/fd/f571420436e79b9f7cc8f8ec534dee1759c240b4dc086737608f14d05c93/pydantic_core-2.50.0-cp314-cp314t-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:dcbd1fe5083315243447c13f7252ae9fe9d128b1ae2857e3a916c609235dd863", size = 2192910, upload-time = "2026-10-08T14:28:22.502Z" },
+    { url = "https://files.pythonhosted.org/packages/cc/94/b47c4a01ea978a7a3d02551e3625f0344ae1352d67ea78011c2eca5e39e4/pydantic_core-2.50.0-cp314-cp314t-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:0fdeda6272d60b1f6fb63f6a3dade55e274af62e1514d24a6549a12150c385cc", size = 2390178, upload-time = "2026-10-08T14:28:24.861Z" },
+    { url = "https://files.pythonhosted.org/packages/77/61/d109f26b3ee4443cca220eaaa4f3fbcf78ff07aeb577becc37d9224db63f/pydantic_core-2.50.0-cp314-cp314t-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:8b16e164205a90b1050d2f5469f8a7829db7698ad198c69e6aab6cbfb5648b87", size = 2464453, upload-time = "2026-10-08T14:28:27.383Z" },
+    { url = "https://files.pythonhosted.org/packages/de/a4/7be2f608f6f8e7655155057a82a7e2f135ad9b37fcbadd34fdf11b1ade24/pydantic_core-2.50.0-cp314-cp314t-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:17a5ca9c197788a6424749a09a3dce824cb2c17b72f835f8a5e330935b973609", size = 2150682, upload-time = "2026-10-08T14:28:29.65Z" },
+    { url = "https://files.pythonhosted.org/packages/80/ef/a8d867f6d3981c232d0f3c2254458cdee8471de7bff3f7edd252cc00c30c/pydantic_core-2.50.0-cp314-cp314t-manylinux_2_31_riscv64.whl", hash = "sha256:01340f4fbb4f854b1f36a6fe9dcd2b26c8936aead4e4ad1205624ac025c875fc", size = 2245995, upload-time = "2026-10-08T14:28:31.934Z" },
+    { url = "https://files.pythonhosted.org/packages/9f/a6/7297a39c8814beab877be5ba4f594c2e166108cdd20c1f1c51fb71d5389e/pydantic_core-2.50.0-cp314-cp314t-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:99e203d5c2a814facef78dcd993b0fb7a933124a3475a38979fc09cceae210b7", size = 2264090, upload-time = "2026-10-08T14:28:34.298Z" },
+    { url = "https://files.pythonhosted.org/packages/c3/65/634fc407eaf61abec0d015d6fd4fd8456c18c71358e984f60b0a05092d49/pydantic_core-2.50.0-cp314-cp314t-musllinux_1_1_aarch64.whl", hash = "sha256:2092ce156f92aff17e3345baba2b7c0c1701f32ba922c5de71bd6248fbe164e3", size = 2293708, upload-time = "2026-10-08T14:28:36.725Z" },
+    { url = "https://files.pythonhosted.org/packages/3a/04/b87fcf8062b8907c77769385a4340a814fe359660593dbbe4d8f3f7e9e61/pydantic_core-2.50.0-cp314-cp314t-musllinux_1_1_armv7l.whl", hash = "sha256:74cbb6cbd74445ca279668790e0c10eccac0428fd79fe061fce6c9e3982ad3fe", size = 2468464, upload-time = "2026-10-08T14:28:39.109Z" },
+    { url = "https://files.pythonhosted.org/packages/77/f4/d7aacec95f9e00dcbad84bee2fd0fc081ae292d380dc8a3268e4103de957/pydantic_core-2.50.0-cp314-cp314t-musllinux_1_1_x86_64.whl", hash = "sha256:42fff617cb0b08505d8123d71e6e7a8e54210d9007498f564855bd843ce984b1", size = 2511897, upload-time = "2026-10-08T14:28:41.681Z" },
+    { url = "https://files.pythonhosted.org/packages/27/4e/cd10a1fbd1ba1d730871e382ec2ac550487465c7c9be1a72b3f4f9181817/pydantic_core-2.50.0-cp314-cp314t-win_amd64.whl", hash = "sha256:980c81c2ec53ea9eb2227c14b3e6de35670b2de163b638f2a803e90a3bd5bbb0", size = 2148359, upload-time = "2026-10-08T14:28:46.47Z" },
+    { url = "https://files.pythonhosted.org/packages/42/f2/727d2b23ff6ca67c9c050c4ff4e5abd7b599d9ebcd819a74141d3b11c7c1/pydantic_core-2.50.0-graalpy311-graalpy242_311_native-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:50920d66aaab60dbc6023c3035d55fbabfa58b6d205d0b39d47d820c4a7a13a8", size = 2108552, upload-time = "2026-10-08T14:30:17.774Z" },
+    { url = "https://files.pythonhosted.org/packages/4a/da/a4321058eea61f0504366668a09472a4c37514be30cce77967c35ab7ffaa/pydantic_core-2.50.0-graalpy311-graalpy242_311_native-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:586699b43066ca6038f96bd71d0eff0b6c292929e3d66ff63d5dc79d0f06d589", size = 2267745, upload-time = "2026-10-08T14:30:20.619Z" },
+    { url = "https://files.pythonhosted.org/packages/0f/49/679293741809cf835290bccf80216aebfcf5d94cb84a34709f18b21abfd5/pydantic_core-2.50.0-graalpy312-graalpy250_312_native-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:ad9185366893714cd4514ae5e1a098227704fa395cb41a7855d75968ecedc826", size = 2109280, upload-time = "2026-10-08T14:30:29.216Z" },
+    { url = "https://files.pythonhosted.org/packages/f5/49/76f167aec9b9d77a82e38131539ca6c6fcf69d720965f76eda20b87b454d/pydantic_core-2.50.0-graalpy312-graalpy250_312_native-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:0def1dc09802a790e4a1b3cbc4401f0b53c58f273ce3671df9867f7bdf1fbe20", size = 2269313, upload-time = "2026-10-08T14:30:32.096Z" },
+    { url = "https://files.pythonhosted.org/packages/aa/57/c2aea271192d8c4b81afeea9d61de8f5dc8686a1fcd1ace80e70a482fbce/pydantic_core-2.50.0-pp311-pypy311_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:ee9913fa2b5bfa6111c11158cf481bb13544f8bd5d10382fb6ee2612b16fcf28", size = 2259611, upload-time = "2026-10-08T14:30:40.581Z" },
+    { url = "https://files.pythonhosted.org/packages/35/88/32128d5498b95722fe914a21a25f59edd7dc8917474f47924005682532a8/pydantic_core-2.50.0-pp311-pypy311_pp73-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:ad3532291deedfdfcad3cf5d351d0076d646c68a0c63869a1bebf87c22159600", size = 2268636, upload-time = "2026-10-08T14:30:43.511Z" },
+    { url = "https://files.pythonhosted.org/packages/8e/37/7dae31279e07aaa63dd4b17756f4ebd5647aed6bee5581ee3b3e85d82a0c/pydantic_core-2.50.0-pp311-pypy311_pp73-musllinux_1_1_aarch64.whl", hash = "sha256:9279f4be22bc3765dd9f61f5b4d38d9cb219d167bbd6f2e0ffa3368b1b71b4d1", size = 2305416, upload-time = "2026-10-08T14:30:46.386Z" },
+    { url = "https://files.pythonhosted.org/packages/10/2a/61e47defbd490618fcde2641f80d5c077f2961de62e88500edacb49297f9/pydantic_core-2.50.0-pp311-pypy311_pp73-musllinux_1_1_armv7l.whl", hash = "sha256:3b2f3e44af4c6512dd73557621385a71b18094c8be81d60e5a8e73a8ce96b7f4", size = 2466713, upload-time = "2026-10-08T14:30:49.214Z" },
+    { url = "https://files.pythonhosted.org/packages/61/57/81327752c007834d684b0b7d20ce00087206f512c7347a6236fd89ef0223/pydantic_core-2.50.0-pp311-pypy311_pp73-musllinux_1_1_x86_64.whl", hash = "sha256:593dd4f24abeb3ed90222f98bc6eefcac68cd5aa96fc7745f93862a802952bce", size = 2481971, upload-time = "2026-10-08T14:30:52.088Z" },
+    { url = "https://files.pythonhosted.org/packages/48/c3/e321d3a4b2737372cf775ffdd1a02428c7d2791ee5afc9f228793a0ee245/pydantic_core-2.50.0-pp311-pypy311_pp73-win_amd64.whl", hash = "sha256:b123f9d8702106f39dc3af63a031ca8b5279862a3747ec6c03ca49dbe78b71b9", size = 2337958, upload-time = "2026-10-08T14:30:55.045Z" },
 ]
 
 [[package]]
@@ -3092,6 +3137,15 @@ wheels = [
 ]
 
 [[package]]
+name = "pyelftools"
+version = "0.33"
+source = { registry = "https://download.pytorch.org/whl/test/cu134" }
+sdist = { url = "https://files.pythonhosted.org/packages/a3/11/767522582afab1b884d277de0e6e011640cb9d7292a38694b4b1a1df1ae8/pyelftools-0.33.tar.gz", hash = "sha256:660d82dcbeb8e83d1702bd97f223f761625da06111c0cc988eac6b8ab0c1b61f" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/46/2a/f9697576603dae937727827505a6126a066affb227034e77e6f9068910da/pyelftools-0.33-py3-none-any.whl", hash = "sha256:f215ad5f47d3f1373a21496a6c9e0707c622840d0622f23ff7ce08678b020036" },
+]
+
+[[package]]
 name = "pygments"
 version = "2.21.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3107,6 +3161,19 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/e4/11/b213bebff182584360cb8d17c72c1677fec5c5c228de439e63bcf8ab1c8f/pyparsing-3.3.3.tar.gz", hash = "sha256:928ae7e20211f3b6f3915a72f06a0cfd29ab9d24279dd6346b6b1a7146397d36", size = 1050487, upload-time = "2026-09-20T20:59:05.609Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/38/bb/d215ee7c73b61497b28a5503f9f53523f294fcc936762b7caf90e0c1c2b5/pyparsing-3.3.3-py3-none-any.whl", hash = "sha256:ece8c00a69cf01b45d0b1dedabb469c90d8caf996d4fda40f147627a122849a4", size = 126420, upload-time = "2026-09-20T20:59:04.025Z" },
+]
+
+[[package]]
+name = "pyre-extensions"
+version = "0.0.32"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "typing-extensions", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "typing-inspect", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a7/53/5bc2532536e921c48366ad1047c1344ccef6afa5e84053f0f6e20a453767/pyre_extensions-0.0.32.tar.gz", hash = "sha256:5396715f14ea56c4d5fd0a88c57ca7e44faa468f905909edd7de4ad90ed85e55", size = 10852, upload-time = "2024-11-22T19:26:44.152Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a4/7a/9812cb8be9828ab688203c5ac5f743c60652887f0c00995a6f6f19f912bd/pyre_extensions-0.0.32-py3-none-any.whl", hash = "sha256:a63ba6883ab02f4b1a9f372ed4eb4a2f4c6f3d74879aa2725186fdfcfe3e5c68", size = 12766, upload-time = "2024-11-22T19:26:42.465Z" },
 ]
 
 [[package]]
@@ -3596,13 +3663,13 @@ name = "scikit-learn"
 version = "1.9.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "joblib", marker = "(python_full_version < '3.14' and sys_platform != 'win32') or (python_full_version >= '3.14' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "narwhals", marker = "(python_full_version < '3.14' and sys_platform != 'win32') or (python_full_version >= '3.14' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "numpy", version = "2.4.6", source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }, marker = "(python_full_version < '3.12' and sys_platform != 'win32') or (python_full_version >= '3.12' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "numpy", version = "2.5.3", source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }, marker = "(python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'win32') or (python_full_version < '3.12' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (python_full_version >= '3.14' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.12' and sys_platform != 'win32') or (python_full_version >= '3.12' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "scipy", version = "1.18.1", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'win32') or (python_full_version < '3.12' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (python_full_version >= '3.14' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "threadpoolctl", marker = "(python_full_version < '3.14' and sys_platform != 'win32') or (python_full_version >= '3.14' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "joblib", marker = "(python_full_version < '3.14' and platform_machine != 'aarch64' and sys_platform != 'win32') or (python_full_version >= '3.14' and platform_machine != 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "narwhals", marker = "(python_full_version < '3.14' and platform_machine != 'aarch64' and sys_platform != 'win32') or (python_full_version >= '3.14' and platform_machine != 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }, marker = "(python_full_version < '3.12' and platform_machine != 'aarch64' and sys_platform != 'win32') or (python_full_version >= '3.12' and platform_machine != 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "numpy", version = "2.5.3", source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }, marker = "(python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine != 'aarch64' and sys_platform != 'win32') or (python_full_version < '3.12' and platform_machine != 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (python_full_version >= '3.14' and platform_machine != 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.12' and platform_machine != 'aarch64' and sys_platform != 'win32') or (python_full_version >= '3.12' and platform_machine != 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "scipy", version = "1.18.1", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine != 'aarch64' and sys_platform != 'win32') or (python_full_version < '3.12' and platform_machine != 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (python_full_version >= '3.14' and platform_machine != 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "threadpoolctl", marker = "(python_full_version < '3.14' and platform_machine != 'aarch64' and sys_platform != 'win32') or (python_full_version >= '3.14' and platform_machine != 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/d2/eb/eaf5e07fcc0da7149b0e084f24e54edd7441b9a89ce7e034032ae97fe3a0/scikit_learn-1.9.1.tar.gz", hash = "sha256:629cada3e33e2b9bf376cdc7614a47a4140b8aedc1d836579e359736fbd82977", size = 7786908, upload-time = "2026-09-10T18:34:04.679Z" }
 wheels = [
@@ -3628,11 +3695,13 @@ name = "scipy"
 version = "1.17.1"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version < '3.12' and sys_platform == 'linux'",
+    "python_full_version < '3.12' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux'",
+    "(python_full_version < '3.12' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (python_full_version < '3.12' and platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and sys_platform == 'linux')",
+    "python_full_version < '3.12' and platform_machine == 'aarch64' and sys_platform == 'linux'",
     "python_full_version < '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32'",
 ]
 dependencies = [
-    { name = "numpy", version = "2.4.6", source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }, marker = "(python_full_version < '3.12' and sys_platform != 'win32') or (python_full_version < '3.12' and extra == 'group-14-torch-tensorrt-quantization') or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }, marker = "(python_full_version < '3.12' and platform_machine != 'aarch64' and sys_platform != 'win32') or (python_full_version < '3.12' and platform_machine == 'aarch64' and extra == 'group-14-torch-tensorrt-quantization') or (python_full_version < '3.12' and sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization') or (python_full_version >= '3.12' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/7a/97/5a3609c4f8d58b039179648e62dd220f89864f56f7357f5d4f45c29eb2cc/scipy-1.17.1.tar.gz", hash = "sha256:95d8e012d8cb8816c226aef832200b1d45109ed4464303e997c5b13122b297c0", size = 30573822, upload-time = "2026-02-23T00:26:24.851Z" }
 wheels = [
@@ -3673,11 +3742,13 @@ name = "scipy"
 version = "1.18.1"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'linux'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux'",
+    "(python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and sys_platform == 'linux')",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux'",
     "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32'",
 ]
 dependencies = [
-    { name = "numpy", version = "2.5.3", source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }, marker = "(python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'win32') or (python_full_version >= '3.12' and python_full_version < '3.14' and extra == 'group-14-torch-tensorrt-quantization') or (python_full_version < '3.12' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (python_full_version >= '3.14' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "numpy", version = "2.5.3", source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }, marker = "(python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine != 'aarch64' and sys_platform != 'win32') or (python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'aarch64' and extra == 'group-14-torch-tensorrt-quantization') or (python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization') or (python_full_version < '3.12' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (python_full_version >= '3.14' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/7e/74/66de6258867beb2ef08f35f9f2ac017a52cacd5081714d239ff1a442d458/scipy-1.18.1.tar.gz", hash = "sha256:52c4b7422442aba924d03ad4019852b08a92e64ea187b933135687bfe2747307", size = 30781235, upload-time = "2026-08-21T23:28:50.599Z" }
 wheels = [
@@ -3900,7 +3971,7 @@ name = "tensorrt"
 version = "11.3.0.99"
 source = { registry = "https://pypi.nvidia.com/" }
 dependencies = [
-    { name = "tensorrt-cu13", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "tensorrt-cu13", marker = "(python_full_version < '3.14' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (python_full_version < '3.14' and platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (python_full_version >= '3.14' and platform_machine != 'x86_64' and sys_platform != 'win32') or (python_full_version >= '3.14' and platform_python_implementation != 'CPython' and sys_platform != 'win32') or (platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'aarch64' and sys_platform != 'win32') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
 ]
 sdist = { url = "https://pypi.nvidia.com/tensorrt/tensorrt-11.3.0.99.tar.gz", hash = "sha256:ce458d7e613126179a0389b8485295050d3c96d3fad8205386f4a475c935a40b" }
 
@@ -4022,9 +4093,13 @@ name = "tokenizers"
 version = "0.23.0rc0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'linux'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux'",
+    "(python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and sys_platform == 'linux')",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux'",
     "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32'",
-    "python_full_version < '3.12' and sys_platform == 'linux'",
+    "python_full_version < '3.12' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux'",
+    "(python_full_version < '3.12' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (python_full_version < '3.12' and platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and sys_platform == 'linux')",
+    "python_full_version < '3.12' and platform_machine == 'aarch64' and sys_platform == 'linux'",
     "python_full_version < '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32'",
 ]
 dependencies = [
@@ -4051,10 +4126,15 @@ name = "tokenizers"
 version = "0.23.2"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform == 'linux'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'linux'",
+    "python_full_version >= '3.14' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux'",
+    "(python_full_version >= '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux') or (python_full_version >= '3.14' and platform_python_implementation != 'CPython' and sys_platform == 'linux')",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux'",
+    "(python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and sys_platform == 'linux')",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux'",
     "python_full_version >= '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32'",
-    "python_full_version < '3.12' and sys_platform == 'linux'",
+    "python_full_version < '3.12' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux'",
+    "(python_full_version < '3.12' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (python_full_version < '3.12' and platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and sys_platform == 'linux')",
+    "python_full_version < '3.12' and platform_machine == 'aarch64' and sys_platform == 'linux'",
     "python_full_version < '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32'",
 ]
 dependencies = [
@@ -4078,18 +4158,21 @@ wheels = [
 
 [[package]]
 name = "torch"
-version = "2.15.0.dev20261005+cu132"
-source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }
+version = "2.15.0+cu134"
+source = { registry = "https://download.pytorch.org/whl/test/cu134" }
 dependencies = [
     { name = "cuda-bindings", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "cuda-toolkit", extra = ["cublas", "cudart", "cufft", "cufile", "cupti", "cusolver", "cusparse", "nvjitlink", "nvrtc", "nvtx"], marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "cuda-toolkit", extra = ["cudart", "cufft", "cufile", "cupti", "cusparse", "nvjitlink", "nvrtc", "nvtx"], marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "cupti-python", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
     { name = "filelock" },
     { name = "fsspec", version = "2026.7.0", source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }, marker = "(python_full_version < '3.14' and extra == 'group-14-torch-tensorrt-quantization') or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
     { name = "fsspec", version = "2026.9.0", source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }, marker = "python_full_version >= '3.14' or extra != 'group-14-torch-tensorrt-quantization' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
     { name = "jinja2" },
     { name = "networkx", version = "3.6.1", source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }, marker = "python_full_version < '3.12' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
     { name = "networkx", version = "3.7", source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }, marker = "python_full_version >= '3.12' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "nvidia-cublas", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
     { name = "nvidia-cudnn-cu13", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "nvidia-cusolver", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
     { name = "nvidia-cusparselt-cu13", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
     { name = "nvidia-nccl-cu13", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
     { name = "nvidia-nvshmem-cu13", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
@@ -4099,21 +4182,21 @@ dependencies = [
     { name = "typing-extensions" },
 ]
 wheels = [
-    { url = "https://download-r2.pytorch.org/whl/nightly/cu132/torch-2.15.0.dev20261005%2Bcu132-cp311-cp311-manylinux_2_28_aarch64.whl", upload-time = "2026-10-05T11:56:04Z" },
-    { url = "https://download-r2.pytorch.org/whl/nightly/cu132/torch-2.15.0.dev20261005%2Bcu132-cp311-cp311-manylinux_2_28_x86_64.whl", upload-time = "2026-10-05T11:08:43Z" },
-    { url = "https://download-r2.pytorch.org/whl/nightly/cu132/torch-2.15.0.dev20261005%2Bcu132-cp311-cp311-win_amd64.whl", upload-time = "2026-10-05T14:22:20Z" },
-    { url = "https://download-r2.pytorch.org/whl/nightly/cu132/torch-2.15.0.dev20261005%2Bcu132-cp312-cp312-manylinux_2_28_aarch64.whl", upload-time = "2026-10-05T11:55:44Z" },
-    { url = "https://download-r2.pytorch.org/whl/nightly/cu132/torch-2.15.0.dev20261005%2Bcu132-cp312-cp312-manylinux_2_28_x86_64.whl", upload-time = "2026-10-05T11:09:32Z" },
-    { url = "https://download-r2.pytorch.org/whl/nightly/cu132/torch-2.15.0.dev20261005%2Bcu132-cp312-cp312-win_amd64.whl", upload-time = "2026-10-05T14:26:24Z" },
-    { url = "https://download-r2.pytorch.org/whl/nightly/cu132/torch-2.15.0.dev20261005%2Bcu132-cp313-cp313-manylinux_2_28_aarch64.whl", upload-time = "2026-10-05T11:55:44Z" },
-    { url = "https://download-r2.pytorch.org/whl/nightly/cu132/torch-2.15.0.dev20261005%2Bcu132-cp313-cp313-manylinux_2_28_x86_64.whl", upload-time = "2026-10-05T11:09:20Z" },
-    { url = "https://download-r2.pytorch.org/whl/nightly/cu132/torch-2.15.0.dev20261005%2Bcu132-cp313-cp313-win_amd64.whl", upload-time = "2026-10-05T14:23:36Z" },
-    { url = "https://download-r2.pytorch.org/whl/nightly/cu132/torch-2.15.0.dev20261005%2Bcu132-cp314-cp314-manylinux_2_28_aarch64.whl", upload-time = "2026-10-05T11:55:51Z" },
-    { url = "https://download-r2.pytorch.org/whl/nightly/cu132/torch-2.15.0.dev20261005%2Bcu132-cp314-cp314-manylinux_2_28_x86_64.whl", upload-time = "2026-10-05T11:08:47Z" },
-    { url = "https://download-r2.pytorch.org/whl/nightly/cu132/torch-2.15.0.dev20261005%2Bcu132-cp314-cp314-win_amd64.whl", upload-time = "2026-10-05T14:24:24Z" },
-    { url = "https://download-r2.pytorch.org/whl/nightly/cu132/torch-2.15.0.dev20261005%2Bcu132-cp314-cp314t-manylinux_2_28_aarch64.whl", upload-time = "2026-10-05T11:55:46Z" },
-    { url = "https://download-r2.pytorch.org/whl/nightly/cu132/torch-2.15.0.dev20261005%2Bcu132-cp314-cp314t-manylinux_2_28_x86_64.whl", upload-time = "2026-10-05T11:08:56Z" },
-    { url = "https://download-r2.pytorch.org/whl/nightly/cu132/torch-2.15.0.dev20261005%2Bcu132-cp314-cp314t-win_amd64.whl", upload-time = "2026-10-05T14:25:01Z" },
+    { url = "https://download.pytorch.org/whl/test/cu134/torch-2.15.0%2Bcu134-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:0c40509022a17e14dfd7cc052d45120320745baa4a157e8cc9be79d28cefac36", upload-time = "2026-10-09T02:55:50Z" },
+    { url = "https://download.pytorch.org/whl/test/cu134/torch-2.15.0%2Bcu134-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:58b667cc481494d47fab16ec76918a3216e328566c7b170188960d44d261d368", upload-time = "2026-10-09T02:17:31Z" },
+    { url = "https://download.pytorch.org/whl/test/cu134/torch-2.15.0%2Bcu134-cp311-cp311-win_amd64.whl", hash = "sha256:a48416e33181d204fd7b92c93456872f9e16f851fe331eb128480eeb84cac9d5", upload-time = "2026-10-07T04:41:14Z" },
+    { url = "https://download.pytorch.org/whl/test/cu134/torch-2.15.0%2Bcu134-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:11357b12594503c1b90761b5e6bf72bb86819922a00152f5567e8cb390a5194f", upload-time = "2026-10-09T02:55:53Z" },
+    { url = "https://download.pytorch.org/whl/test/cu134/torch-2.15.0%2Bcu134-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:e6f79ff343e7c1b72bee50acd0928584372a01041e3a69d8f898010bce92c6c6", upload-time = "2026-10-09T02:17:05Z" },
+    { url = "https://download.pytorch.org/whl/test/cu134/torch-2.15.0%2Bcu134-cp312-cp312-win_amd64.whl", hash = "sha256:91d7404c0ffe5540395d4003b84d537acf32669a0bf5edb2a7bcd623f4d87e1b", upload-time = "2026-10-07T04:40:53Z" },
+    { url = "https://download.pytorch.org/whl/test/cu134/torch-2.15.0%2Bcu134-cp313-cp313-manylinux_2_28_aarch64.whl", hash = "sha256:1a35aaed470da6b47158e5049e3cac25d148f65901b77f9c7d031614ccab25bc", upload-time = "2026-10-09T02:55:59Z" },
+    { url = "https://download.pytorch.org/whl/test/cu134/torch-2.15.0%2Bcu134-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:1750e73389d41a65ef984eb1e38288f285d6eb1d62b5322865fa60ec8ca4fdaf", upload-time = "2026-10-09T02:17:14Z" },
+    { url = "https://download.pytorch.org/whl/test/cu134/torch-2.15.0%2Bcu134-cp313-cp313-win_amd64.whl", hash = "sha256:eaeb2d742733369a8c9d2ec68f3020a2edcc453814cb324bbf0131cf0b5e44fc", upload-time = "2026-10-07T04:40:02Z" },
+    { url = "https://download.pytorch.org/whl/test/cu134/torch-2.15.0%2Bcu134-cp314-cp314-manylinux_2_28_aarch64.whl", hash = "sha256:3f6550f0f66a8803cb2f2b3e8cc2c013291eb8ec21f865bbb049ceb5fe97c63e", upload-time = "2026-10-09T02:55:58Z" },
+    { url = "https://download.pytorch.org/whl/test/cu134/torch-2.15.0%2Bcu134-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:e5d60657b9edd673659e4bef41adb7f574e6324489bf57a3d7a644873b592300", upload-time = "2026-10-09T02:17:34Z" },
+    { url = "https://download.pytorch.org/whl/test/cu134/torch-2.15.0%2Bcu134-cp314-cp314-win_amd64.whl", hash = "sha256:497e0b1698413623a94b3ba7e3e012ff391af6bd873c595b6d54d0738e9005f5", upload-time = "2026-10-07T04:42:06Z" },
+    { url = "https://download.pytorch.org/whl/test/cu134/torch-2.15.0%2Bcu134-cp314-cp314t-manylinux_2_28_aarch64.whl", hash = "sha256:bfc48b88a0dbebbcb56c8da8a629a373187fd89423f79ee2875053a11b4e827e", upload-time = "2026-10-09T02:55:58Z" },
+    { url = "https://download.pytorch.org/whl/test/cu134/torch-2.15.0%2Bcu134-cp314-cp314t-manylinux_2_28_x86_64.whl", hash = "sha256:cde7be114cd8acf67e3bfb1613ac05f364330315acdc6a797726fb5924711dc3", upload-time = "2026-10-09T02:16:53Z" },
+    { url = "https://download.pytorch.org/whl/test/cu134/torch-2.15.0%2Bcu134-cp314-cp314t-win_amd64.whl", hash = "sha256:ff26869145db47ec8bedf25e09409ae29492c3d1ac111e18c996f44a527e32f6", upload-time = "2026-10-07T04:41:31Z" },
 ]
 
 [[package]]
@@ -4199,9 +4282,9 @@ lint = [
     { name = "wheel" },
 ]
 quantization = [
-    { name = "mslk", marker = "sys_platform != 'win32'" },
     { name = "nvidia-modelopt", extra = ["hf"], marker = "(python_full_version < '3.13' and extra == 'group-14-torch-tensorrt-quantization') or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "torchao" },
+    { name = "torchao", version = "0.18.0", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine != 'x86_64' and extra == 'group-14-torch-tensorrt-quantization') or (platform_python_implementation != 'CPython' and extra == 'group-14-torch-tensorrt-quantization') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization') or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "torchao", version = "0.18.0+cu132", source = { registry = "https://download.pytorch.org/whl/test/cu132" }, marker = "(platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform != 'win32' and extra == 'group-14-torch-tensorrt-quantization') or (platform_machine != 'x86_64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_python_implementation != 'CPython' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
 ]
 test = [
     { name = "expecttest" },
@@ -4236,7 +4319,7 @@ requires-dist = [
     { name = "tensorrt-cu13", marker = "platform_machine != 'aarch64' or sys_platform != 'linux'", specifier = ">=11.3.0,<11.4.0" },
     { name = "tensorrt-cu13-bindings", marker = "platform_machine != 'aarch64' or sys_platform != 'linux'", specifier = ">=11.3.0,<11.4.0" },
     { name = "tensorrt-cu13-libs", marker = "platform_machine != 'aarch64' or sys_platform != 'linux'", specifier = ">=11.3.0,<11.4.0" },
-    { name = "torch", specifier = ">=2.15.0.dev0,<2.16.0", index = "https://download.pytorch.org/whl/nightly/cu132" },
+    { name = "torch", specifier = ">=2.15.0,<2.16.0", index = "https://download.pytorch.org/whl/test/cu134" },
     { name = "torch-tensorrt-executorch-runtime", marker = "sys_platform == 'linux' and extra == 'all'" },
     { name = "torch-tensorrt-executorch-runtime", marker = "sys_platform == 'linux' and extra == 'executorch'" },
     { name = "typing-extensions", specifier = ">=4.7.0" },
@@ -4300,7 +4383,6 @@ lint = [
     { name = "wheel", specifier = ">=0.40.0" },
 ]
 quantization = [
-    { name = "mslk", marker = "sys_platform == 'linux'", specifier = ">=1.0.0" },
     { name = "nvidia-modelopt", extras = ["hf"], marker = "python_full_version >= '3.10' and python_full_version < '3.13'", specifier = ">=0.44.0" },
     { name = "torchao" },
 ]
@@ -4320,38 +4402,67 @@ test = [
 test-ext = [
     { name = "flashinfer-python", marker = "python_full_version >= '3.11' and python_full_version < '3.13' and sys_platform == 'linux'" },
     { name = "timm", specifier = ">=1.0.3" },
-    { name = "torchvision", specifier = ">=0.30.0.dev0,<0.31.0", index = "https://download.pytorch.org/whl/nightly/cu132" },
+    { name = "torchvision", specifier = ">=0.29.2,<0.30.0", index = "https://download.pytorch.org/whl/test/cu134" },
     { name = "transformers", specifier = ">=5.14.1" },
 ]
 
 [[package]]
 name = "torch-tensorrt-executorch-runtime"
-version = "0.2.0.dev20261006+cu132"
+version = "0.2.0.dev20260920+cu132"
 source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }
 dependencies = [
     { name = "executorch", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "nvidia-cuda-runtime", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
     { name = "tensorrt-cu13", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
     { name = "torch", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "torch-tensorrt", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
 ]
 wheels = [
-    { url = "https://download.pytorch.org/whl/nightly/cu132/torch_tensorrt_executorch_runtime-0.2.0.dev20261006%2Bcu132-py3-none-manylinux_2_28_x86_64.whl", upload-time = "2026-10-06T12:17:05Z" },
-    { url = "https://download.pytorch.org/whl/nightly/cu132/torch_tensorrt_executorch_runtime-0.2.0.dev20261006%2Bcu132-py3-none-manylinux_2_35_aarch64.whl", upload-time = "2026-10-06T12:04:35Z" },
+    { url = "https://download.pytorch.org/whl/nightly/cu132/torch_tensorrt_executorch_runtime-0.2.0.dev20260920%2Bcu132-cp311-cp311-manylinux_2_28_aarch64.whl", upload-time = "2026-09-20T12:29:49Z" },
+    { url = "https://download.pytorch.org/whl/nightly/cu132/torch_tensorrt_executorch_runtime-0.2.0.dev20260920%2Bcu132-cp311-cp311-manylinux_2_28_x86_64.whl", upload-time = "2026-09-20T12:34:42Z" },
+    { url = "https://download.pytorch.org/whl/nightly/cu132/torch_tensorrt_executorch_runtime-0.2.0.dev20260920%2Bcu132-cp312-cp312-manylinux_2_28_aarch64.whl", upload-time = "2026-09-20T12:29:45Z" },
+    { url = "https://download.pytorch.org/whl/nightly/cu132/torch_tensorrt_executorch_runtime-0.2.0.dev20260920%2Bcu132-cp312-cp312-manylinux_2_28_x86_64.whl", upload-time = "2026-09-20T12:34:32Z" },
+    { url = "https://download.pytorch.org/whl/nightly/cu132/torch_tensorrt_executorch_runtime-0.2.0.dev20260920%2Bcu132-cp313-cp313-manylinux_2_28_aarch64.whl", upload-time = "2026-09-20T12:29:46Z" },
+    { url = "https://download.pytorch.org/whl/nightly/cu132/torch_tensorrt_executorch_runtime-0.2.0.dev20260920%2Bcu132-cp313-cp313-manylinux_2_28_x86_64.whl", upload-time = "2026-09-20T12:34:46Z" },
+    { url = "https://download.pytorch.org/whl/nightly/cu132/torch_tensorrt_executorch_runtime-0.2.0.dev20260920%2Bcu132-cp314-cp314-manylinux_2_28_aarch64.whl", upload-time = "2026-09-20T12:29:44Z" },
+    { url = "https://download.pytorch.org/whl/nightly/cu132/torch_tensorrt_executorch_runtime-0.2.0.dev20260920%2Bcu132-cp314-cp314-manylinux_2_28_x86_64.whl", upload-time = "2026-09-20T12:34:42Z" },
 ]
 
 [[package]]
 name = "torchao"
 version = "0.18.0"
 source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "(python_full_version >= '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux') or (python_full_version >= '3.14' and platform_python_implementation != 'CPython' and sys_platform == 'linux')",
+    "python_full_version >= '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32'",
+    "(python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and sys_platform == 'linux')",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32'",
+    "(python_full_version < '3.12' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (python_full_version < '3.12' and platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and sys_platform == 'linux')",
+    "python_full_version < '3.12' and platform_machine == 'aarch64' and sys_platform == 'linux'",
+    "python_full_version < '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32'",
+]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/19/55/ed9ad98f0f09d5a1124d09830043d13a39e63539f9590d2bdb6d71cbc4a4/torchao-0.18.0-cp310-abi3-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:6540b148e40ba81cbd4de86392225a076a1591146e9cebb099b3b234ba9feebe", size = 3372585, upload-time = "2026-08-03T19:43:10.993Z" },
     { url = "https://files.pythonhosted.org/packages/c4/4d/485477bb8f05bd501016059c6d8abd742f830cb1b24ab7704e086c7cc35a/torchao-0.18.0-py3-none-any.whl", hash = "sha256:5c2b4485341bf28b7fed2c4fc95b9f298e209f41685350f067de85527a05585e", size = 1369798, upload-time = "2026-08-03T19:43:12.649Z" },
 ]
 
 [[package]]
+name = "torchao"
+version = "0.18.0+cu132"
+source = { registry = "https://download.pytorch.org/whl/test/cu132" }
+resolution-markers = [
+    "python_full_version >= '3.14' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux'",
+    "python_full_version < '3.12' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux'",
+]
+wheels = [
+    { url = "https://download.pytorch.org/whl/test/cu132/torchao-0.18.0%2Bcu132-cp310-abi3-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:6de70ebe3a5ccc6113361723dabc08990fde4d5a3505ab0b9913e145609b6e12", upload-time = "2026-07-31T14:39:44Z" },
+]
+
+[[package]]
 name = "torchvision"
-version = "0.30.0.dev20261007+cu132"
-source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }
+version = "0.29.2+cu134"
+source = { registry = "https://download.pytorch.org/whl/test/cu134" }
 dependencies = [
     { name = "numpy", version = "2.4.6", source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }, marker = "(python_full_version < '3.12' and extra == 'group-14-torch-tensorrt-test-ext') or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
     { name = "numpy", version = "2.5.3", source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }, marker = "(python_full_version >= '3.12' and extra == 'group-14-torch-tensorrt-test-ext') or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
@@ -4359,21 +4470,9 @@ dependencies = [
     { name = "torch" },
 ]
 wheels = [
-    { url = "https://download-r2.pytorch.org/whl/nightly/cu132/torchvision-0.30.0.dev20261007%2Bcu132-cp311-cp311-manylinux_2_28_aarch64.whl", upload-time = "2026-10-07T11:53:52Z" },
-    { url = "https://download-r2.pytorch.org/whl/nightly/cu132/torchvision-0.30.0.dev20261007%2Bcu132-cp311-cp311-manylinux_2_28_x86_64.whl", upload-time = "2026-10-07T12:00:33Z" },
-    { url = "https://download-r2.pytorch.org/whl/nightly/cu132/torchvision-0.30.0.dev20261007%2Bcu132-cp311-cp311-win_amd64.whl", upload-time = "2026-10-07T12:16:44Z" },
-    { url = "https://download-r2.pytorch.org/whl/nightly/cu132/torchvision-0.30.0.dev20261007%2Bcu132-cp312-cp312-manylinux_2_28_aarch64.whl", upload-time = "2026-10-07T11:53:46Z" },
-    { url = "https://download-r2.pytorch.org/whl/nightly/cu132/torchvision-0.30.0.dev20261007%2Bcu132-cp312-cp312-manylinux_2_28_x86_64.whl", upload-time = "2026-10-07T12:00:26Z" },
-    { url = "https://download-r2.pytorch.org/whl/nightly/cu132/torchvision-0.30.0.dev20261007%2Bcu132-cp312-cp312-win_amd64.whl", upload-time = "2026-10-07T12:16:40Z" },
-    { url = "https://download-r2.pytorch.org/whl/nightly/cu132/torchvision-0.30.0.dev20261007%2Bcu132-cp313-cp313-manylinux_2_28_aarch64.whl", upload-time = "2026-10-07T11:53:55Z" },
-    { url = "https://download-r2.pytorch.org/whl/nightly/cu132/torchvision-0.30.0.dev20261007%2Bcu132-cp313-cp313-manylinux_2_28_x86_64.whl", upload-time = "2026-10-07T12:00:32Z" },
-    { url = "https://download-r2.pytorch.org/whl/nightly/cu132/torchvision-0.30.0.dev20261007%2Bcu132-cp313-cp313-win_amd64.whl", upload-time = "2026-10-07T12:16:44Z" },
-    { url = "https://download-r2.pytorch.org/whl/nightly/cu132/torchvision-0.30.0.dev20261007%2Bcu132-cp314-cp314-manylinux_2_28_aarch64.whl", upload-time = "2026-10-07T11:53:47Z" },
-    { url = "https://download-r2.pytorch.org/whl/nightly/cu132/torchvision-0.30.0.dev20261007%2Bcu132-cp314-cp314-manylinux_2_28_x86_64.whl", upload-time = "2026-10-07T12:00:30Z" },
-    { url = "https://download-r2.pytorch.org/whl/nightly/cu132/torchvision-0.30.0.dev20261007%2Bcu132-cp314-cp314-win_amd64.whl", upload-time = "2026-10-07T12:16:42Z" },
-    { url = "https://download-r2.pytorch.org/whl/nightly/cu132/torchvision-0.30.0.dev20261007%2Bcu132-cp314-cp314t-manylinux_2_28_aarch64.whl", upload-time = "2026-10-07T11:53:52Z" },
-    { url = "https://download-r2.pytorch.org/whl/nightly/cu132/torchvision-0.30.0.dev20261007%2Bcu132-cp314-cp314t-manylinux_2_28_x86_64.whl", upload-time = "2026-10-07T12:00:19Z" },
-    { url = "https://download-r2.pytorch.org/whl/nightly/cu132/torchvision-0.30.0.dev20261007%2Bcu132-cp314-cp314t-win_amd64.whl", upload-time = "2026-10-07T12:16:57Z" },
+    { url = "https://download.pytorch.org/whl/test/cu134/torchvision-0.29.2%2Bcu134-py3-none-manylinux_2_28_aarch64.whl", hash = "sha256:9037dcbc9decf1998509af35f38ef455b409e5a88df665c0edfc23b83f0a168b", upload-time = "2026-10-08T14:12:47Z" },
+    { url = "https://download.pytorch.org/whl/test/cu134/torchvision-0.29.2%2Bcu134-py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:612ea23f854221caf87c7adef8e29ef1bdc2005d7a0fa8678d147d0a9cba610c", upload-time = "2026-10-08T14:22:11Z" },
+    { url = "https://download.pytorch.org/whl/test/cu134/torchvision-0.29.2%2Bcu134-py3-none-win_amd64.whl", hash = "sha256:55176364ecb5eecb1e84e0e2c88eb4c0c3256ef73496fb4da3b13b3f9f0322f6", upload-time = "2026-10-08T14:38:34Z" },
 ]
 
 [[package]]
@@ -4432,9 +4531,13 @@ name = "transformers"
 version = "5.14.1"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'linux'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux'",
+    "(python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and sys_platform == 'linux')",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux'",
     "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32'",
-    "python_full_version < '3.12' and sys_platform == 'linux'",
+    "python_full_version < '3.12' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux'",
+    "(python_full_version < '3.12' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (python_full_version < '3.12' and platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and sys_platform == 'linux')",
+    "python_full_version < '3.12' and platform_machine == 'aarch64' and sys_platform == 'linux'",
     "python_full_version < '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32'",
 ]
 dependencies = [
@@ -4459,10 +4562,15 @@ name = "transformers"
 version = "5.19.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform == 'linux'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'linux'",
+    "python_full_version >= '3.14' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux'",
+    "(python_full_version >= '3.14' and platform_machine != 'x86_64' and sys_platform == 'linux') or (python_full_version >= '3.14' and platform_python_implementation != 'CPython' and sys_platform == 'linux')",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux'",
+    "(python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and sys_platform == 'linux')",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'aarch64' and sys_platform == 'linux'",
     "python_full_version >= '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32'",
-    "python_full_version < '3.12' and sys_platform == 'linux'",
+    "python_full_version < '3.12' and platform_machine == 'x86_64' and platform_python_implementation == 'CPython' and sys_platform == 'linux'",
+    "(python_full_version < '3.12' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (python_full_version < '3.12' and platform_machine == 'x86_64' and platform_python_implementation != 'CPython' and sys_platform == 'linux')",
+    "python_full_version < '3.12' and platform_machine == 'aarch64' and sys_platform == 'linux'",
     "python_full_version < '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32'",
 ]
 dependencies = [
@@ -4484,21 +4592,15 @@ wheels = [
 
 [[package]]
 name = "triton"
-version = "3.9.0+gitaad2a60d"
+version = "3.9.0+gitfc8d31a5"
 source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }
 wheels = [
-    { url = "https://download-r2.pytorch.org/whl/nightly/triton-3.9.0%2Bgitaad2a60d-cp311-cp311-linux_aarch64.whl", upload-time = "2026-10-05T17:41:35Z" },
-    { url = "https://download-r2.pytorch.org/whl/nightly/triton-3.9.0%2Bgitaad2a60d-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", upload-time = "2026-10-05T17:41:37Z" },
-    { url = "https://download-r2.pytorch.org/whl/nightly/triton-3.9.0%2Bgitaad2a60d-cp312-abi3-linux_aarch64.whl", upload-time = "2026-10-05T17:41:39Z" },
-    { url = "https://download-r2.pytorch.org/whl/nightly/triton-3.9.0%2Bgitaad2a60d-cp312-abi3-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", upload-time = "2026-10-05T17:41:41Z" },
-    { url = "https://download-r2.pytorch.org/whl/nightly/triton-3.9.0%2Bgitaad2a60d-cp312-cp312-linux_aarch64.whl", upload-time = "2026-10-05T02:16:19Z" },
-    { url = "https://download-r2.pytorch.org/whl/nightly/triton-3.9.0%2Bgitaad2a60d-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", upload-time = "2026-10-05T02:16:23Z" },
-    { url = "https://download-r2.pytorch.org/whl/nightly/triton-3.9.0%2Bgitaad2a60d-cp313-cp313-linux_aarch64.whl", upload-time = "2026-10-05T02:16:27Z" },
-    { url = "https://download-r2.pytorch.org/whl/nightly/triton-3.9.0%2Bgitaad2a60d-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", upload-time = "2026-10-05T02:16:30Z" },
-    { url = "https://download-r2.pytorch.org/whl/nightly/triton-3.9.0%2Bgitaad2a60d-cp314-cp314-linux_aarch64.whl", upload-time = "2026-10-05T02:16:34Z" },
-    { url = "https://download-r2.pytorch.org/whl/nightly/triton-3.9.0%2Bgitaad2a60d-cp314-cp314-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", upload-time = "2026-10-05T02:16:38Z" },
-    { url = "https://download-r2.pytorch.org/whl/nightly/triton-3.9.0%2Bgitaad2a60d-cp314-cp314t-linux_aarch64.whl", upload-time = "2026-10-05T17:41:44Z" },
-    { url = "https://download-r2.pytorch.org/whl/nightly/triton-3.9.0%2Bgitaad2a60d-cp314-cp314t-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", upload-time = "2026-10-05T17:41:46Z" },
+    { url = "https://download-r2.pytorch.org/whl/nightly/triton-3.9.0%2Bgitfc8d31a5-cp311-cp311-linux_aarch64.whl", upload-time = "2026-10-07T08:39:07Z" },
+    { url = "https://download-r2.pytorch.org/whl/nightly/triton-3.9.0%2Bgitfc8d31a5-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", upload-time = "2026-10-07T08:39:10Z" },
+    { url = "https://download-r2.pytorch.org/whl/nightly/triton-3.9.0%2Bgitfc8d31a5-cp312-abi3-linux_aarch64.whl", upload-time = "2026-10-07T08:39:12Z" },
+    { url = "https://download-r2.pytorch.org/whl/nightly/triton-3.9.0%2Bgitfc8d31a5-cp312-abi3-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", upload-time = "2026-10-07T08:39:14Z" },
+    { url = "https://download-r2.pytorch.org/whl/nightly/triton-3.9.0%2Bgitfc8d31a5-cp314-cp314t-linux_aarch64.whl", upload-time = "2026-10-07T08:39:17Z" },
+    { url = "https://download-r2.pytorch.org/whl/nightly/triton-3.9.0%2Bgitfc8d31a5-cp314-cp314t-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", upload-time = "2026-10-07T08:39:19Z" },
 ]
 
 [[package]]
@@ -4523,6 +4625,18 @@ source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }
 sdist = { url = "https://files.pythonhosted.org/packages/f6/cc/6253133b5bb138fc3306cebfbda2c520f545d36b5be2c7255cc528bb45d6/typing_extensions-4.16.0.tar.gz", hash = "sha256:dc983d19a509c94dba722ee6abd33940f7c05a89e243c47e907eb4db6f1a43e5" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/49/d3/b8441a820a491ddfc024b0b0cf0393375b75ea13866d9c66727e54c2fc80/typing_extensions-4.16.0-py3-none-any.whl", hash = "sha256:481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8" },
+]
+
+[[package]]
+name = "typing-inspect"
+version = "0.9.0"
+source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }
+dependencies = [
+    { name = "mypy-extensions", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "typing-extensions", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+]
+wheels = [
+    { url = "https://download.pytorch.org/whl/nightly/typing_inspect-0.9.0-py3-none-any.whl", upload-time = "2024-09-23T23:19:43Z" },
 ]
 
 [[package]]
@@ -4571,7 +4685,7 @@ wheels = [
 
 [[package]]
 name = "virtualenv"
-version = "21.14.5"
+version = "21.14.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "distlib" },
@@ -4580,9 +4694,9 @@ dependencies = [
     { name = "platformdirs" },
     { name = "python-discovery" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c4/f9/f323b3b6058cff3853b31cf6a49c0425ed797bf9611572ec10d065e08bac/virtualenv-21.14.5.tar.gz", hash = "sha256:c4cb6c13e46b57225a999c7e22a09b163393878facc7ac4c059a57f46faa1647", size = 5467127, upload-time = "2026-10-02T17:42:25.613Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/92/f3/589727d02bc832750cfa00ced4315d127535a22a6d7cfcb369b2fe219a2e/virtualenv-21.14.6.tar.gz", hash = "sha256:c6b74616e64bffa9532cfa9dfd54ffbab0dc9b999df2bb8ec0d75e559b983661", size = 5467961, upload-time = "2026-10-08T14:49:57.376Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/df/93/084f10ebbecdedf7902ed68fbecc903f0e9c5742155bfffb05eccbc071da/virtualenv-21.14.5-py3-none-any.whl", hash = "sha256:b0651e0174982bba17cc6f0aaa2ef496730cb85a3f35eb5d1119d1c904f7d1da", size = 5487482, upload-time = "2026-10-02T17:42:23.38Z" },
+    { url = "https://files.pythonhosted.org/packages/c9/1f/e5182163bcee149dda4eec823d88b0f51f2c0c531b12da896f666f0b80c1/virtualenv-21.14.6-py3-none-any.whl", hash = "sha256:eb1a20c5878569b69667f6a1af03458a8512b3afa7be771a2dafe92fdca05bb9", size = 5487469, upload-time = "2026-10-08T14:49:54.988Z" },
 ]
 
 [[package]]
