@@ -60,6 +60,7 @@ from torch.fx.passes.tools_common import CALLABLE_NODE_OPS
 from torch_tensorrt.dynamo.partitioning._atomic_subgraphs import (
     get_node_in_fusion_pattern,
 )
+from torch_tensorrt.dynamo.utils import release_host_and_device_memory
 
 logger = logging.getLogger(__name__)
 
@@ -544,6 +545,10 @@ def resource_partition(
     Returns:
         torch.fx.GraphModule: Final graph with resource-constrained subgraphs.
     """
+
+    # The per-engine budget is cpu_memory_budget minus the process RSS, so hand back memory
+    # that is already free (unreferenced objects, the CUDA cache, glibc's freed heap) first.
+    release_host_and_device_memory()
 
     # Construct
     for name, _ in gm.named_children():

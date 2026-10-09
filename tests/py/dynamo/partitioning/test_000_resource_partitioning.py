@@ -19,6 +19,7 @@ from torch_tensorrt.dynamo.lowering import (
 from torch_tensorrt.dynamo.lowering.passes import post_lowering, pre_export_lowering
 from torch_tensorrt.dynamo.partitioning._resource_partitioner import (
     ResourcePartitioner,
+    resource_partition,
 )
 
 # Fixed RSS value to make memory-budget calculations deterministic.
@@ -174,6 +175,32 @@ class TestResourcePartitioning(TestCase):
                 subgraph_of[getitem.args[0]],
                 f"{getitem.name} was split from its producer {getitem.args[0].name}",
             )
+
+    def test_memory_is_released_before_the_budget_reads_rss(self):
+        model = nn.Sequential(nn.Linear(64, 64), nn.ReLU()).eval().cuda()
+        inputs = [torch.randn((8, 64)).cuda()]
+        settings = CompilationSettings(
+            min_block_size=1, enable_resource_partitioning=True
+        )
+        exported_program = pre_export_lowering(
+            torch.export.export(model, tuple(inputs)), settings
+        ).run_decompositions(get_decompositions(False))
+        gm = post_lowering(exported_program.module(), settings)
+        partitioned_module, _ = partitioning.fast_partition(gm, min_block_size=1)
+
+        calls = []
+        _mock_mem = mock.MagicMock()
+        _mock_mem.rss = _FIXED_RSS_BYTES
+        with mock.patch(
+            "torch_tensorrt.dynamo.partitioning._resource_partitioner.release_host_and_device_memory",
+            side_effect=lambda: calls.append("release"),
+        ), mock.patch("psutil.Process") as mock_proc:
+            mock_proc.return_value.memory_info.side_effect = lambda: (
+                calls.append("rss") or _mock_mem
+            )
+            resource_partition(partitioned_module, cpu_memory_budget=2 * 1024**3)
+
+        self.assertEqual(calls, ["release", "rss"])
 
 
 if __name__ == "__main__":
