@@ -24,7 +24,7 @@ def remove_input_alias_fixing_clones(
     pass and reproduces the condition below to predict whether a mutated buffer's
     write will reach the converter reading a direct network input. Loosening the
     condition -- or deleting the pass, as the TODO above invites -- invalidates that
-    prediction, and a mis-prediction is not a lost optimization: the write is filed
+    prediction, and a misprediction is not a lost optimization: the write is filed
     copy-back, its value re-attached as a graph output, the engine aliases the buffer
     anyway, and the compiled module raises on every call. Keep the two in step, or
     update the classifier in the same change. ``compile()`` cross-checks the
@@ -55,6 +55,6 @@ def remove_input_alias_fixing_clones(
 
     if modified_graph:
         gm = clean_up_graph_after_modifications(gm)
-        logger.debug(f"Removed auxiliary clone nodes for placeholders:\n{gm.graph}")
+        logger.debug("Removed auxiliary clone nodes for placeholders:\n%s", gm.graph)
 
     return gm
