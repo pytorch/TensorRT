@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 # Base image starts with CUDA
-ARG BASE_IMG=nvidia/cuda:13.4.0-devel-ubuntu24.04
+ARG BASE_IMG=nvidia/cuda:13.4.2-devel-ubuntu24.04
 FROM ${BASE_IMG} as base
 ARG BASE_IMG
 ENV BASE_IMG=${BASE_IMG}
