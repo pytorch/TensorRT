@@ -176,6 +176,7 @@ def test_linear_fp8_static():
     importlib.util.find_spec("triton") is None,
     "TorchAO INT4 dependencies require Triton, which is unavailable",
 )
+@unittest.skipIf(importlib.util.find_spec("mslk") is None, "MSLK not installed")
 @unittest.skipIf(not torch.cuda.is_available(), "CUDA is required")
 def test_linear_int4_woq():
     import sys
