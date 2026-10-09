@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Any
 
 import torch
-import torch.nn as nn
 import torch_tensorrt
 from torch_tensorrt.hf.exporters.ops import _as_tuple, record_engine
 from torch_tensorrt.hf.exporters.spec import ComponentBundle
@@ -28,7 +27,6 @@ _TRT_COMPILE_KEYS = frozenset(DEFAULT_TRT_SETTINGS) | {
 
 
 def compile_component(
-    module: nn.Module,
     bundle: ComponentBundle,
     *,
     name: str,
@@ -36,22 +34,28 @@ def compile_component(
     dryrun: bool = False,
     trt_settings: dict[str, Any] | None = None,
 ) -> tuple[str, tuple[torch.Tensor, ...]]:
-    """Export one wrapper, compile it, write ``engine_dir/<name>/``.
+    """Export one component, compile it, write ``engine_dir/<name>/``.
 
     Returns ``(engine_dir, example_outputs)`` from a patched eager run so the
     exporter can chain components without a second unpatched forward.
 
-    ``dryrun`` records the patched eager module for ``execute_engine`` and
-    leaves the patch in place. A real compile restores HF attention after the
-    TensorRT module is recorded.
+    Family setattr is owned by ``EdgeSpec.apply_patches``, not this helper.
+    ``dryrun`` records the patched eager module for ``execute_engine``.
     """
-    module = module.eval()
+    from torch_tensorrt.hf.exporters.plugin.attn_patches import (
+        set_language_mask_type,
+    )
+
+    module = bundle.module.eval()
     trace_args = tuple(bundle.trace_args)
     save_args = tuple(bundle.save_args)
     execute_args = tuple(bundle.execute_args or save_args)
     out_dir = Path(engine_dir) / name
     out_dir.mkdir(parents=True, exist_ok=True)
     engine_path = str(out_dir)
+
+    if bundle.context_attention_mask_type is not None:
+        set_language_mask_type(bundle.context_attention_mask_type)
 
     patched = bundle.patch_fn(module) if bundle.patch_fn is not None else None
     try:
