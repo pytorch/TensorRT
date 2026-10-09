@@ -218,19 +218,18 @@ else:
 # That also makes this range prefer a release as soon as one exists, since 1.5.0 sorts above
 # every 1.5.0.devN, so nothing here changes on the day it ships.
 _executorch_major, _executorch_minor = __executorch_version__.split(".")[:2]
-# Linux-only, and not incidentally: the delegate is a Linux shared object, ExecuTorch publishes
-# CUDA wheels for no other platform, and the feature is documented Linux-only. Without the marker
-# the extra also has to resolve for the win32 entry in pyproject.toml's uv required-environments,
-# where the only candidates are PyPI's, which stop at 1.4.1 -- so raising this floor above that
-# makes `uv lock` fail outright rather than pick something older.
+# ExecuTorch CUDA wheels support Linux and Windows x86-64. Windows ARM64 is
+# excluded until ExecuTorch publishes a matching runtime wheel.
 EXECUTORCH_REQUIREMENT = (
     f"executorch>={__executorch_version__},"
     f"<{_executorch_major}.{int(_executorch_minor) + 1}; "
-    "platform_system == 'Linux'"
+    "(platform_system == 'Linux' or "
+    "(platform_system == 'Windows' and platform_machine == 'AMD64'))"
 )
 # No version: the delegate pins ExecuTorch itself, so a mismatch is refused from its side.
 EXECUTORCH_RUNTIME_REQUIREMENT = (
-    "torch-tensorrt-executorch-runtime; platform_system == 'Linux'"
+    "torch-tensorrt-executorch-runtime; (platform_system == 'Linux' or "
+    "(platform_system == 'Windows' and platform_machine == 'AMD64'))"
 )
 # The companion is the only thing named here. It pins the exact ExecuTorch it was
 # compiled against, so naming a range beside it states the version twice, and the

@@ -1273,12 +1273,12 @@ def test_export_rejects_inputs_and_arg_inputs(monkeypatch):
 
 
 @pytest.mark.unit
-def test_export_rejects_non_linux_platform(monkeypatch):
+def test_export_rejects_unsupported_platform(monkeypatch):
     export_module, lower = _patch_lowering(monkeypatch)
-    monkeypatch.setattr(export_module.platform, "system", lambda: "Windows")
+    monkeypatch.setattr(export_module.platform, "system", lambda: "Darwin")
     graph_module = torch.fx.GraphModule(torch.nn.Module(), torch.fx.Graph())
 
-    with pytest.raises(ValueError, match="only supported on Linux"):
+    with pytest.raises(ValueError, match="supports Linux and Windows x86-64"):
         export_module.export(graph_module)
 
     lower.assert_not_called()

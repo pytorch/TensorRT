@@ -32,15 +32,22 @@ for a path, in its readme and in its CMake package, set the variable above first
 from __future__ import annotations
 
 import ctypes
+import importlib.metadata
 import os
+import sys
 import threading
 import warnings
 from types import ModuleType
-from typing import Any
+from typing import Any, cast
 
 BACKEND_NAME = "TensorRTBackend"
 # The same name ExecuTorch gives its own delegates, and the exact filename the wheel ships.
 _DELEGATE_LIBRARY = "libexecutorch_backend_tensorrt.so"
+if sys.platform == "win32":
+    _DELEGATE_LIBRARY = "executorch_backend_tensorrt.dll"
+
+# Keep AddDllDirectory handles alive for subsequent CUDA model loads too.
+_dll_directories: list[Any] = []
 
 _delegate: ctypes.CDLL | None = None
 # Registration happens in the delegate's static initializer, so it takes effect inside dlopen,
@@ -56,6 +63,33 @@ class DelegateCompatibilityError(ImportError):
 
 
 _EXTENSION_CUDA_LIBRARY = "libexecutorch_extension_cuda.so"
+if sys.platform == "win32":
+    _EXTENSION_CUDA_LIBRARY = "executorch_extension_cuda.dll"
+
+
+def _configure_windows_dll_search() -> None:
+    if sys.platform != "win32" or _dll_directories:
+        return
+    paths = [os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib")]
+    for distribution, relative in (
+        ("executorch", "executorch/lib"),
+        ("executorch", "executorch/backends/cuda"),
+        ("tensorrt-cu13-libs", "tensorrt_libs"),
+        ("torch", "torch/lib"),
+    ):
+        try:
+            paths.append(
+                str(importlib.metadata.distribution(distribution).locate_file(relative))
+            )
+        except importlib.metadata.PackageNotFoundError:
+            continue
+    # CUDA runtime pip wheels are Linux-only; Windows uses the toolkit DLLs.
+    for variable in ("CUDA_PATH", "CUDA_HOME"):
+        if root := os.environ.get(variable):
+            paths.append(os.path.join(root, "bin"))
+    for path in dict.fromkeys(os.path.abspath(path) for path in paths):
+        if os.path.isdir(path):
+            _dll_directories.append(os.add_dll_directory(path))
 
 
 def _extension_cuda_present() -> bool:
@@ -136,6 +170,7 @@ def register() -> None:
 def _register_locked() -> None:
     global _delegate
 
+    _configure_windows_dll_search()
     try:
         import executorch.extension.pybindings.portable_lib  # noqa: F401
     except ImportError as error:
@@ -214,17 +249,20 @@ def _register_locked() -> None:
         try:
             # Eagerly, so a missing dependency surfaces here as an OSError this code can explain,
             # rather than later as a failed lookup with nothing to say about the cause.
-            loaded = ctypes.CDLL(path, mode=os.RTLD_NOW | os.RTLD_LOCAL)
+            loaded = (
+                ctypes.CDLL(path)
+                if sys.platform == "win32"
+                else ctypes.CDLL(path, mode=os.RTLD_NOW | os.RTLD_LOCAL)
+            )
         except OSError as error:
             # A present CUDA extension can also fail to load because of an ABI mismatch.
             if (
-                "libexecutorch_extension_cuda" in str(error)
-                and not _extension_cuda_present()
-            ):
+                "executorch_extension_cuda" in str(error) or sys.platform == "win32"
+            ) and not _extension_cuda_present():
                 raise DelegateCompatibilityError(
                     f"Could not load the Torch-TensorRT ExecuTorch delegate from {path}. This "
-                    "requires a CUDA build of executorch, which ships "
-                    "libexecutorch_extension_cuda.so; a CPU build satisfies the version pin but "
+                    f"requires a CUDA build of executorch, which ships {_EXTENSION_CUDA_LIBRARY}; "
+                    "a CPU build satisfies the version pin but "
                     "not this dependency. Install torch, executorch, torch-tensorrt, and this "
                     "package from the same release matrix."
                 ) from error
@@ -270,6 +308,28 @@ def _delegate_already_loaded(path: str) -> ctypes.CDLL | None:
     it, and a build without it answers ``None`` here, the same answer as a library that is not
     loaded.
     """
+    if sys.platform == "win32":
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel.GetModuleHandleW.argtypes = [ctypes.c_wchar_p]
+        kernel.GetModuleHandleW.restype = ctypes.c_void_p
+        kernel.GetModuleFileNameW.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_wchar_p,
+            ctypes.c_uint,
+        ]
+        kernel.GetModuleFileNameW.restype = ctypes.c_uint
+        handle = kernel.GetModuleHandleW(path)
+        if not handle:
+            return None
+        filename = ctypes.create_unicode_buffer(32768)
+        size = kernel.GetModuleFileNameW(handle, filename, len(filename))
+        if not size or size >= len(filename):
+            return None
+        if os.path.normcase(os.path.realpath(filename.value)) != os.path.normcase(
+            os.path.realpath(path)
+        ):
+            return None
+        return ctypes.CDLL(path, handle=handle)
     noload = getattr(os, "RTLD_NOLOAD", None)
     if noload is None:
         return None
@@ -294,7 +354,7 @@ def _registered_backend_names() -> list[str]:
             f"package pins. Underlying error: {error}"
         ) from error
 
-    return _get_registered_backend_names()
+    return cast(list[str], _get_registered_backend_names())
 
 
 def activate() -> ModuleType:
@@ -314,7 +374,7 @@ def activate() -> ModuleType:
     register()
     from executorch.extension.pybindings import portable_lib
 
-    return portable_lib
+    return cast(ModuleType, portable_lib)
 
 
 def get_runtime() -> Any:

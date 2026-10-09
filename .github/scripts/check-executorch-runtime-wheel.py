@@ -7,7 +7,9 @@ import argparse
 import ast
 import importlib.metadata
 import re
+import subprocess
 import sys
+import tempfile
 from email.parser import BytesParser
 from pathlib import Path
 from typing import NoReturn
@@ -40,6 +42,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("wheel", type=Path)
     parser.add_argument("--architecture", choices=("x86_64", "aarch64"), required=True)
+    parser.add_argument("--platform", choices=("linux", "windows"), default="linux")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[2]
     source = root / "py/torch-tensorrt-executorch-runtime/setup.py"
@@ -51,25 +54,73 @@ def main() -> None:
             getattr(target, "id", None) == "DELEGATE_LIBRARY" for target in node.targets
         )
     ]
+    windows = args.platform == "windows"
+    if windows:
+        if args.architecture != "x86_64":
+            reject("Windows ExecuTorch supports x86_64 only")
+        library = "executorch_backend_tensorrt.dll"
+    linked_distributions = (
+        ("executorch", "tensorrt-cu13") if windows else _LINKED_DISTRIBUTIONS
+    )
     with WheelFile(args.wheel) as archive:
         names = archive.namelist()
-        objects = sorted(name for name in names if re.search(r"\.so(\.\d+)*$", name))
+        objects = sorted(
+            name for name in names if re.search(r"\.(?:so(?:\.\d+)*|dll|pyd)$", name)
+        )
         expected = f"torch_tensorrt_executorch_runtime/lib/{library}"
         if objects != [expected]:
             reject(f"expected {expected} and no other shared libraries, got {objects}")
         # The platform tag is a claim about the payload, and until now nothing read the payload
         # to check it, so a wheel tagged for one architecture could carry a library built for
         # the other and pass. The ELF header names the machine in two bytes at offset 18.
-        header = archive.read(expected)[:20]
+        payload = archive.read(expected)
+        if windows:
+            if len(payload) < 64 or payload[:2] != b"MZ":
+                reject(f"{expected} is not a PE object")
+            pe_offset = int.from_bytes(payload[60:64], "little")
+            if (
+                payload[pe_offset : pe_offset + 4] != b"PE\0\0"
+                or len(payload) < pe_offset + 6
+            ):
+                reject(f"{expected} has no valid PE header")
+            machine = int.from_bytes(payload[pe_offset + 4 : pe_offset + 6], "little")
+            if machine != 0x8664:
+                reject(f"{expected} has PE machine {hex(machine)}, expected x86_64")
+            import_library = (
+                "torch_tensorrt_executorch_runtime/lib/executorch_backend_tensorrt.lib"
+            )
+            imports = sorted(name for name in names if name.endswith(".lib"))
+            if imports != [import_library]:
+                reject(f"expected only the delegate import library, got {imports}")
+            with tempfile.TemporaryDirectory() as directory:
+                native = Path(directory) / library
+                native.write_bytes(payload)
+                dependencies = subprocess.check_output(
+                    ["dumpbin", "/DEPENDENTS", str(native)], text=True
+                ).lower()
+                for dependency in (
+                    "executorch.dll",
+                    "executorch_extension_cuda.dll",
+                    "nvinfer_11.dll",
+                    "cudart64_13.dll",
+                ):
+                    if dependency not in dependencies:
+                        reject(f"the delegate does not import {dependency}")
+                exports = subprocess.check_output(
+                    ["dumpbin", "/EXPORTS", str(native)], text=True
+                )
+                if "torch_tensorrt_owns_executorch_registration" not in exports:
+                    reject("the delegate exports no registration ownership query")
+        header = payload[:20]
         # Length first: slicing past the end is not an error and int.from_bytes accepts a short
         # slice, so a truncated object read as the tagged machine and passed.
         if len(header) < 20:
             reject(f"{expected} is {len(header)} bytes, too short for an ELF header")
-        if header[:4] != b"\x7fELF":
+        if not windows and header[:4] != b"\x7fELF":
             reject(f"{expected} is not an ELF object")
         machine = int.from_bytes(header[18:20], "little")
         wanted = {"x86_64": 0x3E, "aarch64": 0xB7}[args.architecture]
-        if machine != wanted:
+        if not windows and machine != wanted:
             names_by_machine = {0x3E: "x86_64", 0xB7: "aarch64"}
             reject(
                 f"{expected} is built for "
@@ -108,7 +159,11 @@ def main() -> None:
         # C++ runtime symbols the delegate references are not absorbed statically the way they are
         # on x86, and the wheel genuinely needs the newer baseline.
         floor = {"x86_64": "2_28", "aarch64": "2_35"}[args.architecture]
-        expected_tag = f"py3-none-manylinux_{floor}_{args.architecture}"
+        expected_tag = (
+            "py3-none-win_amd64"
+            if windows
+            else f"py3-none-manylinux_{floor}_{args.architecture}"
+        )
         if {str(tag) for tag in tags} != {expected_tag}:
             reject(f"expected retagged tag {expected_tag}, got {tags}")
         wheel_metadata = BytesParser().parsebytes(
@@ -142,19 +197,21 @@ def main() -> None:
                     f"the wheel pins {matched[0]}, but {name} is required unbounded so the user "
                     "chooses it"
                 )
-        for forbidden in ("torch-tensorrt",):
+        for forbidden_distribution in ("torch-tensorrt",):
             present = [
-                r for r in requirements if canonicalize_name(r.name) == forbidden
+                r
+                for r in requirements
+                if canonicalize_name(r.name) == forbidden_distribution
             ]
             if present:
                 reject(
-                    f"the wheel requires {forbidden}, which the delegate does not link: {present}"
+                    f"the wheel requires {forbidden_distribution}, which the delegate does not link: {present}"
                 )
 
         # Only the three the delegate links. Neither PyTorch nor Torch-TensorRT belongs here: the
         # library links neither, requiring Torch-TensorRT would make this wheel depend on the project
         # that builds it, and ExecuTorch leaves the choice of PyTorch build to the user.
-        for distribution in _LINKED_DISTRIBUTIONS:
+        for distribution in linked_distributions:
             if distribution == "executorch":
                 # The delegate links one specific ExecuTorch build, so its requirement carries the
                 # label naming that build. Without it the requirement is satisfied by a
@@ -212,7 +269,7 @@ def main() -> None:
             str(requirement)
             for requirement in requirements
             if canonicalize_name(requirement.name)
-            not in _LINKED_DISTRIBUTIONS + _UNPINNED_DISTRIBUTIONS
+            not in linked_distributions + _UNPINNED_DISTRIBUTIONS
         )
         if unexpected:
             reject(f"the wheel requires more than the delegate links: {unexpected}")

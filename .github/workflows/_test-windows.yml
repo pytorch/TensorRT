@@ -110,6 +110,7 @@ jobs:
       # entry); empty params + use-rtx=false for the standard build.
       use-rtx: ${{ inputs.use-rtx }}
       python-only: ${{ inputs.python-only }}
+      build-executorch-runtime: ${{ !inputs.python-only && !inputs.use-rtx }}
       build-flavor: ${{ inputs.build-flavor }}
       wheel-build-params: ${{ inputs.use-rtx && '--use-rtx' || '' }}
       timeout: 120
@@ -156,4 +157,10 @@ jobs:
       # inner `python -m pytest` it spawns inherits that env.
       script: |
         set -euo pipefail
+        if [[ "${{ matrix.suite }}" == "executorch-windows" ]]; then
+          python -m pip install pyyaml --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" -r packaging/executorch_pin.txt
+          runtime_wheels=("${RUNNER_TEMP}"/artifacts/torch_tensorrt_executorch_runtime-*.whl)
+          [[ ${#runtime_wheels[@]} -eq 1 && -f "${runtime_wheels[0]}" ]]
+          python -m pip install --no-deps "${runtime_wheels[0]}"
+        fi
         packaging/vc_env_helper.bat python -m tests.ci run "${{ matrix.suite }}" --variant "${{ matrix.variant }}"

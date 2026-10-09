@@ -82,7 +82,15 @@ target_link_libraries(executorch_backend_tensorrt PRIVATE
 # put the artifact above the platform its wheel is tagged for. This is a compile option rather than
 # the CXX_STANDARD property because the forwarded flag arrives in CMAKE_CXX_FLAGS, and only an option
 # on the target is placed after it on the command line.
-target_compile_options(executorch_backend_tensorrt PRIVATE -std=c++17)
+if(WIN32)
+  # ExecuTorch's Windows headers require C++20 and the DLLs use the shared CRT.
+  target_compile_features(executorch_backend_tensorrt PRIVATE cxx_std_20)
+  set_property(TARGET executorch_backend_tensorrt PROPERTY
+    MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+  target_compile_options(executorch_backend_tensorrt PRIVATE /EHsc /bigobj)
+else()
+  target_compile_options(executorch_backend_tensorrt PRIVATE -std=c++17)
+endif()
 
 # Link the C++ runtime dynamically, the way ExecuTorch's own delegates and every other shared object
 # in the process (libtorch, libc10, libnvinfer) already do. The build toolchain is newer than the
@@ -141,6 +149,7 @@ endif()
 # meant the ineffective one could drift without any signal.
 #
 # This delegate requires CUDA 13, whose runtime wheel uses the shared cu13 directory.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 set(TORCH_TENSORRT_DELEGATE_RUNPATH
   "$ORIGIN"
   "$ORIGIN/../../executorch/lib"
@@ -158,6 +167,7 @@ elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$")
 else()
   message(FATAL_ERROR "Unsupported companion architecture: ${CMAKE_SYSTEM_PROCESSOR}")
 endif()
+
 set_target_properties(executorch_backend_tensorrt PROPERTIES
   BUILD_WITH_INSTALL_RPATH ON
   INSTALL_RPATH "${TORCH_TENSORRT_DELEGATE_RUNPATH}")
@@ -196,6 +206,8 @@ else()
     "environment, so exporting that name has no effect.")
 endif()
 
+endif() # Linux RUNPATH and patchelf
+
 # The same spelling consumers use for ExecuTorch's own delegates, so a project that builds this
 # in-tree and links executorch::backend_cuda can link executorch::backend_tensorrt without
 # learning a second convention.
@@ -212,9 +224,16 @@ add_library(executorch::backend_tensorrt ALIAS executorch_backend_tensorrt)
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   target_link_options(executorch_backend_tensorrt INTERFACE
     "LINKER:--push-state,--no-as-needed,$<TARGET_FILE:executorch_backend_tensorrt>,--pop-state")
+elseif(WIN32)
+  # Retain a registration-only DLL in the consumer's import table.
+  target_link_options(executorch_backend_tensorrt INTERFACE
+    "LINKER:/INCLUDE:torch_tensorrt_owns_executorch_registration")
 endif()
 
-install(TARGETS executorch_backend_tensorrt LIBRARY DESTINATION lib)
+install(TARGETS executorch_backend_tensorrt
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION lib
+  ARCHIVE DESTINATION lib)
 
 # The delegate has to resolve register_backend from the shipped runtime rather than carry its
 # own copy, because a private copy would register into a registry nothing queries. Undefined is
@@ -231,7 +250,7 @@ if(NOT TORCH_TENSORRT_READELF AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
     "binutils, or configure with -DTORCH_TENSORRT_READELF=/path/to/readelf. find_program() "
     "reads a cache entry, not the environment, so exporting that name has no effect.")
 endif()
-if(TORCH_TENSORRT_READELF)
+if(TORCH_TENSORRT_READELF AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
   add_custom_command(TARGET executorch_backend_tensorrt POST_BUILD
     COMMAND sh
       "${CMAKE_CURRENT_LIST_DIR}/check_imports_executorch_runtime.sh"

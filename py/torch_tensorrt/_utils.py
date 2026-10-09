@@ -50,6 +50,13 @@ def executorch_install_channel() -> str | None:
     return f"cu{major}{minor}"
 
 
+def is_platform_supported_for_executorch() -> bool:
+    return platform.system() == "Linux" or (
+        platform.system() == "Windows"
+        and platform.machine().lower() in {"amd64", "x86_64"}
+    )
+
+
 def executorch_install_command() -> str:
     """Return an install command, or guidance for an unsupported CUDA build.
 
@@ -57,11 +64,9 @@ def executorch_install_command() -> str:
     may still change dependencies to satisfy it. --pre permits prerelease candidates.
     """
     channel = executorch_install_channel()
-    # The extra carries a Linux marker, so off Linux that pip command resolves to nothing,
-    # installs nothing and still succeeds, sending the user back to the same error.
-    if channel is None or not sys.platform.startswith("linux"):
+    if channel is None or not is_platform_supported_for_executorch():
         return (
-            f"This ExecuTorch integration requires Linux with a PyTorch CUDA "
+            f"This ExecuTorch integration requires Linux or Windows x86-64 with a PyTorch CUDA "
             f"{EXECUTORCH_CUDA_MAJOR} build. Use matching PyTorch, ExecuTorch and "
             "Torch-TensorRT wheels in a fresh environment."
         )
