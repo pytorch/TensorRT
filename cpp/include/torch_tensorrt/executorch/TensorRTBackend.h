@@ -136,10 +136,12 @@ inline constexpr char kSharedEnginesKey[] = "use_shared_engines";
 // load option of this name, a boolean passed to Module::load, which overrides everything else.
 // Otherwise an explicit process option of false refuses recording. Then the program's compile spec,
 // b"1" or b"0", overrides the process default, which is false unless set. Any other compile spec
-// value, or the key twice, fails the load. Engines with pooled
-// scratch or aliased outputs, GPUs without stream-ordered memory, and drivers older than CUDA 12.5 keep
-// ordinary enqueueV3. Caller streams in the current ordinary context can replay, as can a call with
-// no caller stream. Green context and other context streams take the plain path and keep the graph.
+// value, or the key twice, fails the load. Engines with aliased outputs, GPUs without stream-ordered
+// memory, and drivers older than CUDA 12.5 keep ordinary enqueueV3. An engine on the shared activation
+// scratch pool drops its recorded graph whenever the pool hands it a different buffer, and pays the
+// same stable I/O buffers and copies as any other replaying engine. Caller streams in the current
+// ordinary context can replay, as can a call with no caller stream. Green context and other context
+// streams take the plain path, and the graph is kept unless the scratch buffer or the shapes changed.
 inline constexpr char kCudaGraphsKey[] = "use_cuda_graphs";
 
 class TensorRTBackend final : public ::executorch::runtime::BackendInterface {

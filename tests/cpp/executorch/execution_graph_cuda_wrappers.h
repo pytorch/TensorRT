@@ -32,6 +32,8 @@ struct CudaCalls {
   size_t fail_malloc_call = 0;
   size_t free_calls = 0;
   size_t memcpy_calls = 0;
+  // The copy with this 1-based count fails without being queued.
+  size_t fail_memcpy_call = 0;
   // The next this many captures fail.
   size_t fail_captures = 0;
   bool disable_memory_pools = false;

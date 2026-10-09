@@ -83,6 +83,8 @@ cc_test(
     }),
     deps = [
         "//cpp:tensorrt_executorch_backend",
+        "//cpp:tensorrt_executorch_shared_scratch_pool",
+        "//cpp:tensorrt_executorch_shared_scratch_pool_test_hooks",
         "@executorch//:executorch_core",
         "@executorch//:executorch_headers",
         "@executorch//:extension_cuda",

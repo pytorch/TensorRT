@@ -475,14 +475,22 @@ set_option("TensorRTBackend", options.view());
 ### When recording is unsafe
 
 Recording can recur throughout an engine's lifetime. Every input shape change
-starts another warmup and recording cycle. A failed recording is retried on the
-next call, up to three failures for that set of shapes. A shape change resets
-that budget, so loading everything before the first replay does not end the risk.
+starts another warmup and recording cycle. So does a growth of the shared
+activation scratch pool: when any engine on a device needs more than the pool
+holds, every engine on that device's pool records again. That can happen long
+after warm-up, for example when a program loads later or a dynamic engine sees a
+larger shape, so warming up every shape does not end the risk for those engines.
+A failed recording is retried on the next call, up to three failures for that
+set of shapes. A shape change resets that budget, so loading everything before
+the first replay does not end the risk.
 
 A lock shared across this backend prevents recording from overlapping its own
 engine and execution context creation and destruction. Loading or destroying a
 program through this backend is protected from this recording race. A handle
-must still not be destroyed while it is executing.
+must still not be destroyed while it is executing. An engine on the shared
+activation scratch pool records while it holds its device's pool lock, so while
+a load or destroy holds the shared lock, every pooled engine on that device waits
+for it too, whichever device the load is for.
 
 The lock does not cover work outside this backend. Creating or destroying a
 TensorRT engine or execution context elsewhere in the process remains unsafe
@@ -503,26 +511,34 @@ Each engine keeps one stable device buffer per input and output, and every call
 that runs through the graph copies each input in and each output out. For an
 engine with few kernels, or with large inputs or outputs, these copies can cost
 more than the launches they save. Shapes that change on every call never replay
-and still pay the copies.
+and still pay the copies. Engines on the shared activation scratch pool pay this
+too, so turning replay on for a model split into many small engines adds these
+buffers back for every engine. For example, four pooled engines with a 4 MiB
+input and a 4 MiB output each keep 32 MiB of these buffers next to the shared
+scratch, and make 8 copies per round.
 
 ### How it works
 
 The first call with a set of input shapes runs on the stable buffers with an
 ordinary launch, the second records the graph on a private stream and launches
 it on the caller's stream, and later calls replay. A shape change starts this
-again. Changing the caller stream does not restart recording when the stream is
-in the same current CUDA context and is not a green context stream. This includes
-the legacy default stream and the default stream for each thread. A call with no
-caller stream replays on `cudaStreamPerThread`. `execute()` waits for the stream
-before it returns, as it always does.
+again. So does a new activation scratch buffer: an engine on the shared
+activation scratch pool records against the buffer the pool hands it, and when a
+larger request from any engine moves the pool to a new buffer, the engine's next
+call drops the old graph and starts this cycle again. Changing the caller stream
+does not restart recording when the stream is in the same current CUDA context
+and is not a green context stream. This includes the legacy default stream and
+the default stream for each thread. A call with no caller stream replays on
+`cudaStreamPerThread`. `execute()` waits for the stream before it returns, as it
+always does.
 
-Engines with aliased outputs or pooled activation scratch, GPUs without support
-for stream ordered memory, and drivers older than CUDA 12.5 keep the ordinary
-path. Each reason is logged once at load or first call. A call on a green context
-stream or a stream from another context also takes the ordinary path and keeps
-the recorded graph for the next compatible call. Taking the ordinary path does
-not guarantee that a stream from another context works with the engine; the call
-can still fail.
+Engines with aliased outputs, GPUs without support for stream ordered memory,
+and drivers older than CUDA 12.5 keep the ordinary path. Each reason is logged
+once at load or first call. A call on a green context stream or a stream from
+another context also takes the ordinary path, and the recorded graph is kept for
+the next compatible call unless the scratch buffer or the shapes changed. Taking
+the ordinary path does not guarantee that a stream from another context works
+with the engine; the call can still fail.
 
 If allocating a graph buffer fails, the engine uses the ordinary path until an
 input shape changes. Host staging allocations can still fail with
@@ -572,6 +588,10 @@ whose contexts should use the pool, and read the `use_shared_activation_scratch`
 bullet of the caller-stream contract above: contexts sharing a buffer do not run
 concurrently on the device. The pool never shrinks, so the largest scratch it was
 ever asked for stays allocated until the process exits.
+
+Turning on `use_cuda_graphs` as well adds memory back: each replaying engine
+keeps its own stable buffer for every input and output, as "What it costs" under
+CUDA graph replay describes.
 
 A call that asks for nothing never grows a pool that already holds a buffer: it is
 handed that buffer, whatever size it is. Against an empty pool it does allocate,
