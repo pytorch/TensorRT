@@ -540,15 +540,14 @@ def test_derived_requirements_match_the_pin(monkeypatch) -> None:
             for element in getattr(value, "elts", [])
             if isinstance(element, ast.Name)
         ]
-        assert named.count("EXECUTORCH_RUNTIME_REQUIREMENT") == 1, (
+        assert named.count("EXECUTORCH_REQUIREMENT") == 1, (
             f"extra {getattr(key, 'value', key)!r} does not reference "
-            f"EXECUTORCH_RUNTIME_REQUIREMENT exactly once: {named}. The companion "
-            "carries the ExecuTorch version, so every published extra has to name it."
+            f"EXECUTORCH_REQUIREMENT exactly once: {named}. The authoring extra "
+            "must follow the source pin without waiting for a companion wheel."
         )
-        assert "EXECUTORCH_REQUIREMENT" not in named, (
-            f"extra {getattr(key, 'value', key)!r} states the ExecuTorch version a second "
-            f"time: {named}. The companion pins the exact build it was compiled against, and "
-            "a range here cannot agree with it on the day the pin moves."
+        assert "EXECUTORCH_RUNTIME_REQUIREMENT" not in named, (
+            f"extra {getattr(key, 'value', key)!r} depends on the native companion: "
+            f"{named}. Install its matching build separately."
         )
 
     # The doc build reads the pin through shell substitution, outside the literal scan.
