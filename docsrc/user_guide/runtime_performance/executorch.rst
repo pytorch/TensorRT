@@ -29,22 +29,32 @@ program, so the whole model stays on the GPU.
 Installation
 -------------
 
-One command installs everything. The ``executorch`` extra brings the delegate wheel and a
-CUDA build of ExecuTorch, and Torch-TensorRT brings PyTorch. Take the release build unless
-you need something that has not shipped yet.
+One command installs everything. The ``executorch`` extra brings the delegate and a CUDA
+build of ExecuTorch, and Torch-TensorRT brings PyTorch. Take the release build unless you
+need something that has not shipped yet.
 
 Release builds
 ^^^^^^^^^^^^^^^
 
 .. code-block:: bash
 
-    pip install "torch-tensorrt[executorch]" \
-      --index-url https://download.pytorch.org/whl/cu132 \
-      --extra-index-url https://pypi.org/simple \
-      --extra-index-url https://pypi.nvidia.com
+    pip install "torch-tensorrt[executorch]"
 
-Swap ``cu132`` for the channel that matches your CUDA, such as ``cu134`` for CUDA 13.4. Keep
-PyTorch, ExecuTorch and Torch-TensorRT on the same channel.
+That is the whole install. Every wheel it needs is on PyPI, including the CUDA builds of
+PyTorch and ExecuTorch, so there is no index to name.
+
+TensorRT is the one piece pip fetches from NVIDIA during the install step, so the machine
+needs network access at that point. Adding ``--extra-index-url https://pypi.nvidia.com``
+takes it straight from NVIDIA instead, which is faster and works in a wheels-only install.
+
+For a different CUDA, point pip at the matching PyTorch channel and keep all three packages
+on it:
+
+.. code-block:: bash
+
+    pip install "torch-tensorrt[executorch]" \
+      --index-url https://download.pytorch.org/whl/cu134 \
+      --extra-index-url https://pypi.org/simple
 
 Nightly builds
 ^^^^^^^^^^^^^^^
@@ -55,12 +65,12 @@ To pick up a change before it ships, or to report a problem against ``main``:
 
     pip install --pre --upgrade "torch-tensorrt[executorch]" \
       --index-url https://download.pytorch.org/whl/nightly/cu132 \
-      --extra-index-url https://pypi.org/simple \
-      --extra-index-url https://pypi.nvidia.com
+      --extra-index-url https://pypi.org/simple
 
 * ``--pre`` is required. Without it pip takes the stable release instead.
 * ``--upgrade`` is required if a nightly is already installed, or pip keeps the old one and
   tells you nothing.
+* PyPI stays in the list because TensorRT is not published on the nightly channel.
 
 You get the newest delegate nightly plus the one ExecuTorch build it was compiled against.
 That ExecuTorch is often a few days older than the newest on the channel. This is correct,
@@ -72,12 +82,8 @@ What the extra installs
 * ``torch-tensorrt-executorch-runtime``, one shared library holding the TensorRT delegate.
   It names the ExecuTorch it was built against, 1.6 for this release, so pip picks a
   matching one. Install a different one by hand and the delegate refuses it at import.
-* A CUDA build of ExecuTorch. A CPU-only build installs and then fails on import.
-
-Naming NVIDIA's index is what gets you a prebuilt TensorRT. Leave it out and pip falls
-back to a placeholder package on PyPI that fetches the same files during the install
-step. That works when the machine can reach ``pypi.nvidia.com``, but it is slower, it
-breaks in an offline or wheels-only install, and the error it gives is hard to read.
+* ExecuTorch 1.6, which is a CUDA build. An older ExecuTorch from PyPI is CPU only, and a
+  CPU-only build installs and then fails on import.
 
 Use a fresh virtual environment. To export a coalesced program you also need a CUDA toolkit,
 because ExecuTorch's CUDA backend compiles the leftover operators with ``nvcc``.
