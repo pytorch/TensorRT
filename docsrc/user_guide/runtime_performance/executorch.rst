@@ -74,8 +74,10 @@ What the extra installs
   matching one. Install a different one by hand and the delegate refuses it at import.
 * A CUDA build of ExecuTorch. A CPU-only build installs and then fails on import.
 
-All three indexes are needed. Without NVIDIA's index pip tries to build the inference
-library from source, and fails after about twenty minutes.
+Naming NVIDIA's index is what gets you a prebuilt TensorRT. Leave it out and pip falls
+back to a placeholder package on PyPI that fetches the same files during the install
+step. That works when the machine can reach ``pypi.nvidia.com``, but it is slower, it
+breaks in an offline or wheels-only install, and the error it gives is hard to read.
 
 Use a fresh virtual environment. To export a coalesced program you also need a CUDA toolkit,
 because ExecuTorch's CUDA backend compiles the leftover operators with ``nvcc``.
