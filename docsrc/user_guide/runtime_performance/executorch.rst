@@ -29,31 +29,22 @@ program, so the whole model stays on the GPU.
 Installation
 -------------
 
-One command installs everything. The ``executorch`` extra brings the delegate and a CUDA
-build of ExecuTorch, and Torch-TensorRT brings PyTorch. Take the release build unless you
-need something that has not shipped yet.
-
-Release builds
-^^^^^^^^^^^^^^^
+One command installs everything, because every wheel it needs is on PyPI:
 
 .. code-block:: bash
 
     pip install "torch-tensorrt[executorch]"
 
-That is the whole install. Every wheel it needs is on PyPI, including the CUDA builds of
-PyTorch and ExecuTorch, so there is no index to name.
+The ``executorch`` extra brings the delegate and a CUDA build of ExecuTorch, and
+Torch-TensorRT brings PyTorch.
 
-TensorRT is the one piece pip fetches from NVIDIA during the install step, so the machine
-needs network access at that point. Adding ``--extra-index-url https://pypi.nvidia.com``
-takes it straight from NVIDIA instead, which is faster and works in a wheels-only install.
-
-For a different CUDA, point pip at the matching PyTorch channel and keep all three packages
-on it:
+To pin a CUDA version, point pip at the matching PyTorch channel and keep all three
+packages on it:
 
 .. code-block:: bash
 
     pip install "torch-tensorrt[executorch]" \
-      --index-url https://download.pytorch.org/whl/cu134 \
+      --index-url https://download.pytorch.org/whl/cu132 \
       --extra-index-url https://pypi.org/simple
 
 Nightly builds
@@ -72,10 +63,8 @@ To pick up a change before it ships, or to report a problem against ``main``:
   tells you nothing.
 * PyPI stays in the list because TensorRT is not published on the nightly channel.
 
-You get the newest delegate nightly plus the one ExecuTorch build it was compiled against.
-The delegate names that build exactly, so the ExecuTorch you end up with is often a few
-days older than the newest one published. This is correct, not a stale resolve, and asking
-for a newer one by hand will not resolve at all.
+The delegate names one exact ExecuTorch build, so you get that one rather than the newest.
+Asking for a newer one by hand will not resolve.
 
 What the extra installs
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -83,8 +72,7 @@ What the extra installs
 * ``torch-tensorrt-executorch-runtime``, one shared library holding the TensorRT delegate.
   It names the ExecuTorch it was built against, 1.6 for this release, so pip picks a
   matching one. Install a different one by hand and the delegate refuses it at import.
-* ExecuTorch 1.6, which is a CUDA build. An older ExecuTorch from PyPI is CPU only, and a
-  CPU-only build installs and then fails on import.
+* ExecuTorch 1.6, the CUDA build.
 
 Use a fresh virtual environment. To export a coalesced program you also need a CUDA toolkit,
 because ExecuTorch's CUDA backend compiles the leftover operators with ``nvcc``.
