@@ -3,6 +3,8 @@
 
 """Tests for how much host and device memory compilation holds on to."""
 
+import copy
+import io
 import os
 import platform
 import unittest
@@ -181,6 +183,78 @@ class TestEngineSetupMemory(unittest.TestCase):
         for w in self.weights:
             expected = expected @ w.cuda().T
         torch.testing.assert_close(module(x), expected, rtol=2e-2, atol=2e-2)
+
+
+@unittest.skipIf(
+    not ENABLED_FEATURES.torch_tensorrt_runtime,
+    "the Python runtime engine keeps its own copy of the plan",
+)
+class TestPlanRetention(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.plan, cls.weights = _build_plan(width=512, layers=4)
+        cls.x = torch.randn(4, 512, dtype=torch.float16, device="cuda")
+        expected = cls.x
+        for w in cls.weights:
+            expected = expected @ w.cuda().T
+        cls.expected = expected
+
+    def _module(self, plan: Any = None) -> TorchTensorRTModule:
+        return TorchTensorRTModule(
+            serialized_engine=self.plan if plan is None else plan,
+            input_binding_names=["x"],
+            output_binding_names=["y"],
+            name="retention_probe",
+            settings=CompilationSettings(),
+        )
+
+    def _check(self, module: TorchTensorRTModule) -> None:
+        torch.testing.assert_close(module(self.x), self.expected, rtol=2e-2, atol=2e-2)
+
+    def test_plan_is_dropped_after_setup(self):
+        module = self._module()
+        self.assertIsNone(module._serialized_engine)
+        # Still readable on demand, and still a working plan.
+        plan = module.serialized_engine
+        self.assertIsInstance(plan, bytes)
+        self._check(self._module(plan))
+
+    def test_lazy_init_keeps_the_plan_until_setup(self):
+        module = TorchTensorRTModule(
+            serialized_engine=self.plan,
+            input_binding_names=["x"],
+            output_binding_names=["y"],
+            name="retention_probe",
+            settings=CompilationSettings(lazy_engine_init=True),
+        )
+        self.assertIs(module._serialized_engine, self.plan)
+        module.setup_engine()
+        self.assertIsNone(module._serialized_engine)
+        self._check(module)
+
+    def test_state_dict_round_trips_twice(self):
+        restored = TorchTensorRTModule()
+        restored.load_state_dict(self._module().state_dict())
+        self._check(restored)
+        # A module restored through load_state_dict can be saved again.
+        again = TorchTensorRTModule()
+        again.load_state_dict(restored.state_dict())
+        self._check(again)
+
+    def test_pickle_carries_one_copy_of_the_plan(self):
+        buf = io.BytesIO()
+        torch.save(self._module(), buf)
+        # The engine pickles its plan base64-encoded (4/3 of its size); the module
+        # used to pickle a second, raw copy next to it.
+        self.assertLess(buf.tell(), 1.6 * len(self.plan))
+        buf.seek(0)
+        self._check(torch.load(buf, weights_only=False))
+
+    def test_deepcopy(self):
+        module = self._module()
+        clone = copy.deepcopy(module)
+        self.assertIs(clone.engine, module.engine)
+        self._check(clone)
 
 
 if __name__ == "__main__":

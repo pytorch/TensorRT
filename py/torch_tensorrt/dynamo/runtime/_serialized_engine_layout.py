@@ -126,14 +126,24 @@ def create_cpp_engine(serialized_info: Sequence[Any]) -> Any:
     """
     info = list(serialized_info)
     plan = info[ENGINE_IDX]
-    if isinstance(plan, str) or memoryview(plan).nbytes == 0:
+    if isinstance(plan, torch.Tensor):
+        plan_tensor = plan
+    elif isinstance(plan, str) or memoryview(plan).nbytes == 0:
         return torch.classes.tensorrt.Engine(info)
+    else:
+        with warnings.catch_warnings():
+            # The plan is only read, so a read-only buffer such as bytes is fine.
+            warnings.filterwarnings(
+                "ignore", message="The given buffer is not writable"
+            )
+            plan_tensor = torch.frombuffer(plan, dtype=torch.uint8)
     info[ENGINE_IDX] = ""
-    with warnings.catch_warnings():
-        # The plan is only read, so a read-only buffer such as bytes is fine.
-        warnings.filterwarnings("ignore", message="The given buffer is not writable")
-        plan_tensor = torch.frombuffer(plan, dtype=torch.uint8)
     return torch.classes.tensorrt.Engine.from_engine_tensor(info, plan_tensor)
+
+
+def plan_buffer(plan: Any) -> Any:
+    """A buffer-protocol view of a plan held as ``bytes``, ``IHostMemory`` or a uint8 tensor."""
+    return plan.numpy() if isinstance(plan, torch.Tensor) else plan
 
 
 def serialize_binding_names(binding_names: List[str]) -> str:
