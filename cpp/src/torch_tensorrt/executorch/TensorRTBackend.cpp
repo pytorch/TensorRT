@@ -1247,13 +1247,28 @@ Result<DelegateHandle*> TensorRTBackend::init(
   std::size_t engine_size = header.engine_size;
   std::optional<FreeableBuffer> named_engine;
   if (!header.engine_key.empty()) {
+    // A program exported with external_engine_data keeps its engines in a .ptd file, so a
+    // missing map or key most likely means that file was not passed at load.
     const auto* named_data = context.get_named_data_map();
     TORCHTRT_ET_CHECK_NOT_NULL(
-        named_data, Error::InvalidProgram, "TensorRTBackend::init: engine is named data but the program has none");
+        named_data,
+        Error::InvalidExternalData,
+        "TensorRTBackend::init: the TensorRT engine is named data, but the program has none. If it was exported with external_engine_data, load it together with its .ptd file.");
     auto engine_buffer = named_data->get_data(header.engine_key);
     if (!engine_buffer.ok()) {
-      ET_LOG(Error, "TensorRTBackend::init: named engine '%s' not found", header.engine_key.c_str());
-      return engine_buffer.error();
+      if (engine_buffer.error() != Error::NotFound) {
+        ET_LOG(
+            Error,
+            "TensorRTBackend::init: failed to read TensorRT engine '%s' from named data: %s",
+            header.engine_key.c_str(),
+            ::executorch::runtime::to_string(engine_buffer.error()));
+        return engine_buffer.error();
+      }
+      ET_LOG(
+          Error,
+          "TensorRTBackend::init: the program's data has no TensorRT engine with key '%s'. If it was exported with external_engine_data, load it together with the .ptd file written with it.",
+          header.engine_key.c_str());
+      return Error::InvalidExternalData;
     }
     named_engine.emplace(std::move(engine_buffer.get()));
     engine_data = named_engine->data();

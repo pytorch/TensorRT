@@ -121,9 +121,11 @@ std::vector<std::uint8_t> named_engine_blob(const std::string& key) {
 }
 
 // A program's named data, held in memory. Counts the buffers it handed out that were freed, so a case
-// can check that init releases its host copy of an engine once the engine is loaded.
+// can check that init releases its host copy of an engine once the engine is loaded. A read error
+// other than Ok fails every read with it, like a .ptd file that cannot be read.
 class InMemoryNamedData : public NamedDataMap {
  public:
+  explicit InMemoryNamedData(Error read_error = Error::Ok) : read_error_(read_error) {}
   void add(const std::string& key, std::vector<std::uint8_t> bytes) {
     entries_[key] = std::move(bytes);
   }
@@ -135,6 +137,9 @@ class InMemoryNamedData : public NamedDataMap {
     return Error::NotImplemented;
   }
   Result<FreeableBuffer> get_data(std::string_view key) const override {
+    if (read_error_ != Error::Ok) {
+      return read_error_;
+    }
     const auto it = entries_.find(std::string(key));
     if (it == entries_.end()) {
       return Error::NotFound;
@@ -160,6 +165,7 @@ class InMemoryNamedData : public NamedDataMap {
 
  private:
   std::map<std::string, std::vector<std::uint8_t>> entries_;
+  Error read_error_;
   mutable std::atomic<int> freed_{0};
 };
 
@@ -1379,12 +1385,21 @@ TEST_F(SharedEnginesTest, AnEngineStoredAsNamedDataLoadsAndItsHostCopyIsFreed) {
 }
 
 // The key comes from the blob, so a program whose named data lacks it, or that has none, fails at load.
+// With external_engine_data that is a program loaded without its .ptd file, hence InvalidExternalData.
 TEST_F(SharedEnginesTest, ANamedEngineTheProgramDoesNotHoldFailsToLoad) {
   InMemoryNamedData named;
   Handle missing_key;
-  EXPECT_NE(missing_key.load(named_engine_blob("tensorrt_engine_absent"), nullptr, {}, &named), Error::Ok);
+  EXPECT_EQ(
+      missing_key.load(named_engine_blob("tensorrt_engine_absent"), nullptr, {}, &named), Error::InvalidExternalData);
   Handle no_named_data;
-  EXPECT_EQ(no_named_data.load(named_engine_blob("tensorrt_engine_absent")), Error::InvalidProgram);
+  EXPECT_EQ(no_named_data.load(named_engine_blob("tensorrt_engine_absent")), Error::InvalidExternalData);
+}
+
+// Any other read failure keeps its own error, so the caller learns what actually went wrong.
+TEST_F(SharedEnginesTest, ANamedEngineKeepsItsReadError) {
+  InMemoryNamedData unreadable(Error::AccessFailed);
+  Handle handle;
+  EXPECT_EQ(handle.load(named_engine_blob("tensorrt_engine_test"), nullptr, {}, &unreadable), Error::AccessFailed);
 }
 
 } // namespace

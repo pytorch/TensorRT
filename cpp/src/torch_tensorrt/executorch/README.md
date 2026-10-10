@@ -337,6 +337,19 @@ apart, loading an ordinary engine that has weights asks TensorRT for its strippe
 size, and TensorRT logs one warning per engine that it was not built with
 `kSTRIP_PLAN`. The backend forwards it at Info level, and it is harmless.
 
+## Engines in a .ptd file
+
+A program exported with `external_engine_data=` keeps its engines in a `.ptd` file
+next to the `.pte`. Load it with that file, for example
+`Module module("model.pte", "engines.ptd");`. Without the file, or with one that
+lacks the engine, loading returns `Error::InvalidExternalData`. A program that shares
+`aoti_cuda_blob.ptd` with the CUDA backend can fail first in that backend, with
+`Error::NotFound`.
+
+The engine is GPU code, so treat the `.ptd` as trusted input, just like the `.pte`.
+Each engine is stored under a key made from its sha256, but the key is only a name:
+nothing checks the engine against it at load.
+
 ## Shared engines
 
 Loading the same program twice in one process, for example once per robot arm, used to
