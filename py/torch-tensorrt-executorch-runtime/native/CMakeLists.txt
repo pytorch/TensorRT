@@ -83,6 +83,11 @@ target_link_libraries(executorch_backend_tensorrt PRIVATE
 # the CXX_STANDARD property because the forwarded flag arrives in CMAKE_CXX_FLAGS, and only an option
 # on the target is placed after it on the command line.
 if(WIN32)
+  # Windows Python bindings do not load ExecuTorch's CUDA backend, whose
+  # initializer normally registers the device allocator. TensorRT programs
+  # still need it for device-planned buffers and host/device copy operators.
+  target_sources(executorch_backend_tensorrt PRIVATE
+    "${TORCH_TENSORRT_SOURCE_DIR}/cpp/src/torch_tensorrt/executorch/RegisterCudaDeviceAllocator.cpp")
   # ExecuTorch's Windows headers require C++20 and the DLLs use the shared CRT.
   target_compile_features(executorch_backend_tensorrt PRIVATE cxx_std_20)
   set_property(TARGET executorch_backend_tensorrt PROPERTY
