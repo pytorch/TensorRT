@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import io
 import logging
 from typing import Any, Dict, List, NamedTuple, Optional, Sequence, Tuple
 
@@ -34,7 +33,9 @@ logger = logging.getLogger(__name__)
 
 
 class SerializedInterpreterResult(NamedTuple):
-    serialized_engine: bytes
+    # The plan as TensorRT returned it (``tensorrt.IHostMemory``) or as bytes. It is as
+    # large as the weights, so it is not copied into bytes just to change its type.
+    serialized_engine: Any
     input_names: List[str]
     output_names: List[str]
     requires_output_allocator: bool
@@ -188,11 +189,7 @@ def pull_cached_engine(
             if hasattr(trt.SerializationFlag, "INCLUDE_REFIT"):
                 serialization_config.set_flag(trt.SerializationFlag.INCLUDE_REFIT)
             serialized_engine = engine.serialize_with_config(serialization_config)
-
             del engine
-            with io.BytesIO() as engine_bytes:
-                engine_bytes.write(serialized_engine)
-                serialized_engine = engine_bytes.getvalue()
 
         return SerializedInterpreterResult(
             serialized_engine=serialized_engine,
@@ -380,12 +377,9 @@ def _interpret_module_to_result_impl(
             )
 
     serialized_engine = interpreter_result.engine.serialize()
-    with io.BytesIO() as engine_bytes:
-        engine_bytes.write(serialized_engine)
-        serialized_engine = engine_bytes.getvalue()
-        logger.debug(
-            f"CPU memory usage after serializing engine: {get_cpu_memory_usage()} MB"
-        )
+    logger.debug(
+        f"CPU memory usage after serializing engine: {get_cpu_memory_usage()} MB"
+    )
 
     serialized_interpreter_result = SerializedInterpreterResult(
         serialized_engine=serialized_engine,

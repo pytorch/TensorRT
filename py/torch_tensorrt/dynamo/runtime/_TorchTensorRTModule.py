@@ -187,6 +187,12 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.name = name
         self.hardware_compatible = settings.hardware_compatible
         self.settings = copy.deepcopy(settings)
+        if serialized_engine is not None and (
+            settings.lazy_engine_init or settings.enable_cross_compile_for_windows
+        ):
+            # Held until the engine is set up, and the module may be pickled or deep
+            # copied before then, which TensorRT's buffer type does not support.
+            serialized_engine = bytes(plan_buffer(serialized_engine))
         self.serialized_engine = serialized_engine
         self.engine: Optional[Any] = None
         self.requires_output_allocator = requires_output_allocator
@@ -475,6 +481,9 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         if not ENABLED_FEATURES.torch_tensorrt_runtime:
             from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
 
+            # The Python runtime takes the plan as bytes and keeps it.
+            if not isinstance(self._serialized_engine, (bytes, bytearray)):
+                self._serialized_engine = bytes(plan_buffer(self._serialized_engine))
             self.engine = TRTEngine(
                 self._pack_engine_info(),
                 profile_execution=self.profiling_enabled,
