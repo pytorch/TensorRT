@@ -429,7 +429,7 @@ def test_the_opt_out_env_var_suppresses_the_import_side_effect(monkeypatch):
         (" true ", False),
         ("1", True),
         ("true", True),
-        ("TrUe", True),
+        ("tRUE", True),
         ("yes", True),
         ("YES", True),
         ("on", True),
@@ -469,7 +469,13 @@ def test_registration_opt_out_rejects_missing_on_control(monkeypatch, tmp_path):
     checks = [
         node
         for node in tree.body
-        if isinstance(node, ast.If) and isinstance(node.test, ast.Compare)
+        if isinstance(node, ast.If)
+        and isinstance(node.test, ast.Compare)
+        and any(
+            isinstance(child, ast.Constant)
+            and child.value == "TORCH_TENSORRT_SKIP_DELEGATE_REGISTRATION"
+            for child in ast.walk(node.test)
+        )
     ]
     assert len(checks) == 1
     values = checks[0].test.comparators[0].elts

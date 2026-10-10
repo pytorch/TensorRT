@@ -245,6 +245,8 @@ add_library(torchtrt_executorch_backend ALIAS executorch_backend_tensorrt_backen
 add_dependencies(executorch_backend_tensorrt_backend executorch_trt_backend)
 
 if(MSVC)
+    target_link_options(executorch_backend_tensorrt_backend INTERFACE
+        "LINKER:/WHOLEARCHIVE:$<TARGET_FILE:executorch_trt_backend>")
     target_link_libraries(executorch_backend_tensorrt_backend
         INTERFACE
             executorch_trt_backend

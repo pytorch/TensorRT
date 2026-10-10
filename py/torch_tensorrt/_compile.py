@@ -1118,9 +1118,11 @@ def save(
         raise ValueError(
             f"The AOT Inductor format is only supported on Linux, {platform.system()} is not a supported platform for this format"
         )
-    if output_format == "executorch" and platform.system() != "Linux":
+    from torch_tensorrt._utils import is_platform_supported_for_executorch
+
+    if output_format == "executorch" and not is_platform_supported_for_executorch():
         raise ValueError(
-            f"The executorch format is only supported on Linux, {platform.system()} is not a supported platform for this format"
+            f"The executorch format supports Linux and Windows x86-64, {platform.system()} is not a supported platform for this format"
         )
     if not file_path:
         raise ValueError("File path cannot be empty. Please provide a valid file path")

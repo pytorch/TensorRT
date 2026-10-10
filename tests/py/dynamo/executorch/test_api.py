@@ -475,7 +475,7 @@ def test_cmake_discovery_rejects_removed_guards(monkeypatch, tmp_path, removed):
     if removed == "required":
         text, count = re.subn(
             r"find_package_handle_standard_args\(\s*executorch_backend_tensorrt\s*"
-            r"REQUIRED_VARS EXECUTORCH_BACKEND_TENSORRT_BACKEND_LIBRARY\s*\)",
+            r"REQUIRED_VARS \$\{_executorch_backend_tensorrt_required_vars\}\s*\)",
             "",
             text,
         )
@@ -946,7 +946,7 @@ def test_the_wheel_ships_a_cmake_package_for_cpp_consumers():
     assert (
         "SHARED IMPORTED" in config_text
     ), "the config does not define an imported shared library target"
-    assert "/lib/libexecutorch_backend_tensorrt.so" in config_text, (
+    assert "/lib/${_executorch_backend_tensorrt_filename}" in config_text, (
         "the config does not look for the delegate under lib/, where the wheel installs it and "
         "where ExecuTorch keeps its own backends"
     )
@@ -1018,7 +1018,11 @@ def test_the_wheel_ships_a_cmake_package_for_cpp_consumers():
         "the config never calls find_package_handle_standard_args, so a prefix with no delegate "
         "still reports success"
     )
-    assert "REQUIRED_VARS EXECUTORCH_BACKEND_TENSORRT_BACKEND_LIBRARY" in config_text, (
+    assert (
+        "REQUIRED_VARS ${_executorch_backend_tensorrt_required_vars}" in config_text
+        and "set(_executorch_backend_tensorrt_required_vars EXECUTORCH_BACKEND_TENSORRT_BACKEND_LIBRARY)"
+        in config_text
+    ), (
         "the library is not listed in REQUIRED_VARS, so find_package succeeds when the delegate is "
         "absent and exports a target with an empty IMPORTED_LOCATION"
     )
@@ -1923,7 +1927,9 @@ def test_the_guard_is_wired_into_the_build():
     assert (
         not disabled
     ), "TORCH_TENSORRT_READELF is reassigned before the guard block, so the guard may never run"
-    assert enclosing == ["TORCH_TENSORRT_READELF"], (
+    assert enclosing == [
+        'TORCH_TENSORRT_READELF AND CMAKE_SYSTEM_NAME STREQUAL "Linux"'
+    ], (
         "the guard's POST_BUILD command must be reached whenever readelf exists, but it sits "
         f"under {enclosing}"
     )

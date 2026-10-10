@@ -91,6 +91,10 @@ on:
         default: false
         type: boolean
         required: false
+      build-executorch-runtime:
+        description: "Build the standard TensorRT ExecuTorch companion wheel on Windows x64"
+        default: false
+        type: boolean
       build-flavor:
         description: "Caller-defined build flavor used to isolate concurrent builds"
         default: "default"
@@ -476,6 +480,44 @@ jobs:
           else
             ${CONDA_RUN} ${ENV_SCRIPT} python setup.py bdist_wheel ${BUILD_PARAMS}
           fi
+      - name: Build the ExecuTorch runtime wheel
+        if: ${{ inputs.build-executorch-runtime && inputs.architecture == 'x64' && !inputs.cross-compile && !inputs.python-only && !inputs.use-rtx && !inputs.is-release-tarball }}
+        working-directory: ${{ inputs.repository }}
+        run: |
+          set -euxo pipefail
+          source "${BUILD_ENV_FILE}"
+          case "${CU_VERSION}" in cu132|cu134) ;; *) echo "Unsupported ExecuTorch CUDA row: ${CU_VERSION}" >&2; exit 1 ;; esac
+          ${CONDA_RUN} python -m pip install --no-deps dist/torch_tensorrt-*.whl
+          # Windows uses torchao's Python-only nightly wheel from the CPU index.
+          ${CONDA_RUN} python -m pip install --pre "cmake>=3.28" ninja pyyaml "wheel>=0.40" \
+            --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" \
+            --extra-index-url "https://download.pytorch.org/whl/nightly/cpu" \
+            -r packaging/executorch_pin.txt
+          # The core build has fetched the TensorRT SDK containing headers and import libraries.
+          bazel_output="$(${CONDA_RUN} bazel info output_base --config=windows)"
+          export TensorRT_ROOT="$(${CONDA_RUN} python -c 'import pathlib, sys; roots = [p.parent.parent for p in pathlib.Path(sys.argv[1], "external").glob("**/include/NvInfer.h") if (p.parent.parent / "lib/nvinfer_11.lib").is_file()]; sys.exit("TensorRT SDK not found in Bazel external dependencies") if len(roots) != 1 else print(roots[0])' "${bazel_output}")"
+          # Install only the dependency group selected by the main wheel, preserving Torch.
+          ${CONDA_RUN} python packaging/install_executorch_tensorrt.py
+          main_version="$(sed 's/a0$//' version.txt)"
+          runtime_version="$(<py/torch-tensorrt-executorch-runtime/version.txt)"
+          if [[ "${BUILD_VERSION}" != "${main_version}"* ]]; then
+            echo "Unexpected torch-tensorrt build version: ${BUILD_VERSION}" >&2; exit 1
+          fi
+          if [[ ${{ inputs.is-release-wheel }} == true ]]; then
+            companion_suffix="${BUILD_VERSION#"${main_version}"}"
+            companion_suffix="${companion_suffix%+*}"
+          else
+            companion_suffix="${BUILD_VERSION#"${main_version}"}"
+            companion_suffix="${companion_suffix%+*}+${CU_VERSION}"
+          fi
+          export TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION="${runtime_version}${companion_suffix}"
+          # clang-cl needs the same Visual Studio environment as ExecuTorch's own CUDA build.
+          ${CONDA_RUN} packaging/vc_env_helper.bat python -m pip wheel \
+            --no-build-isolation --no-deps --wheel-dir dist py/torch-tensorrt-executorch-runtime
+          runtime_wheels=(dist/torch_tensorrt_executorch_runtime-*.whl)
+          [[ ${#runtime_wheels[@]} -eq 1 && -f "${runtime_wheels[0]}" ]]
+          ${CONDA_RUN} packaging/vc_env_helper.bat python .github/scripts/check-executorch-runtime-wheel.py \
+            "${runtime_wheels[0]}" --architecture x86_64 --platform windows
       - name: Build the wheel (python-build-package) Arm64
         if: ${{ inputs.build-platform == 'python-build-package' && inputs.architecture == 'arm64' }}
         env:
@@ -532,11 +574,17 @@ jobs:
         run: |
           source "${BUILD_ENV_FILE}"
           set -x
-          WHEEL_NAME=$(ls "${{ inputs.repository }}/dist/")
+          if [[ "$USE_TRT_RTX" == true ]]; then
+            core_wheels=("${{ inputs.repository }}"/dist/torch_tensorrt_rtx-*.whl)
+          else
+            core_wheels=("${{ inputs.repository }}"/dist/torch_tensorrt-*.whl)
+          fi
+          [[ ${#core_wheels[@]} -eq 1 && -f "${core_wheels[0]}" ]]
+          WHEEL_NAME="${core_wheels[0]}"
           echo "$WHEEL_NAME"
           nvidia-smi
           nvcc --version
-          ${CONDA_RUN} pip install "${{ inputs.repository }}/dist/$WHEEL_NAME"
+          ${CONDA_RUN} pip install "$WHEEL_NAME"
           ${CONDA_RUN} python -m pip list
 
           if [[ $USE_TRT_RTX == true ]]; then
