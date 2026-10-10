@@ -172,6 +172,36 @@ class TestWhereConverter(DispatchTestCase):
         condition = torch.tensor([[True, False, True, False]])
         self.run_test(Where(), (condition, x, y))
 
+    @parameterized.expand(
+        [
+            (torch.int64, torch.int64),
+            (torch.int64, torch.int32),
+            (torch.int32, torch.int64),
+        ]
+    )
+    def test_int64_promotion(self, x_dtype, y_dtype):
+        class Where(nn.Module):
+            def forward(self, condition, x, y):
+                return torch.ops.aten.where.self(condition, x, y)
+
+        # Values outside the int32 range: narrowing to int32 would wrap them.
+        big = [2**40 + 5, -(2**35), 2**31, -(2**31) - 1]
+        small = [0, 1, -2, 3]
+        x = torch.tensor([big if x_dtype == torch.int64 else small], dtype=x_dtype)
+        y = torch.tensor(
+            [small if y_dtype == torch.int32 else big[::-1]], dtype=y_dtype
+        )
+        condition = torch.tensor([[True, False, True, False]])
+        self.run_test(Where(), (condition, x, y))
+
+    def test_int64_with_scalar_other(self):
+        class WhereScalar(nn.Module):
+            def forward(self, x):
+                return torch.where(x > 0, x, 0)
+
+        x = torch.tensor([[2**40 + 5, -(2**35), 9, -1]], dtype=torch.int64)
+        self.run_test(WhereScalar(), (x,), use_dynamo_tracer=True, enable_passes=True)
+
 
 class TestWhereBoolDtypePreservation(DispatchTestCase):
     def test_where_bool_bool_output_is_bool_not_int32(self):
