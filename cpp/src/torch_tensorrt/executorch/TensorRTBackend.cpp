@@ -377,6 +377,16 @@ Error load_engine(
   if (engine == nullptr) {
     return report_load_error("deserialize TensorRT engine");
   }
+  // A plan serialized without its weights (built with strip_engine_weights=True, or saved with
+  // EXCLUDE_WEIGHTS) deserializes and runs without an error, but computes with placeholder weights,
+  // and this backend never refits. TensorRT reports -1 for a plan that carries its weights, and 0 or
+  // more for a stripped one, including one whose missing weights are all zero bytes long.
+  if (engine->getEngineStat(nvinfer1::EngineStat::kSTRIPPED_WEIGHTS_SIZE) >= 0) {
+    ET_LOG(
+        Error,
+        "TensorRTBackend::init: the TensorRT engine was serialized without its weights, and this backend cannot refit them. Export with strip_engine_weights=False.");
+    return Error::InvalidProgram;
+  }
   const Error err = apply_weight_streaming_budget(*engine, request);
   if (err != Error::Ok) {
     return report_load_error("set TensorRT weight streaming budget");
