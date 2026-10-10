@@ -31,7 +31,33 @@ Installation
 -------------
 
 One command installs everything. The ``executorch`` extra brings the delegate wheel and a
-CUDA build of ExecuTorch, and Torch-TensorRT brings PyTorch:
+CUDA build of ExecuTorch, and Torch-TensorRT brings PyTorch. Take the release build unless
+you need something that has not shipped yet.
+
+Release builds
+^^^^^^^^^^^^^^^
+
+.. code-block:: bash
+
+    pip install "torch-tensorrt[executorch]" \
+      --index-url https://download.pytorch.org/whl/cu132 \
+      --extra-index-url https://pypi.org/simple \
+      --extra-index-url https://pypi.nvidia.com
+
+Swap ``cu132`` for the channel that matches your CUDA, such as ``cu134`` for CUDA 13.4. Keep
+PyTorch, ExecuTorch and Torch-TensorRT on the same channel.
+
+.. note::
+
+    Torch-TensorRT 2.15 is the first release whose ``executorch`` extra pulls the delegate
+    wheel. On 2.14 the extra installs ExecuTorch but not the delegate, so use a nightly
+    until 2.15 is out.
+
+Nightly builds
+^^^^^^^^^^^^^^^
+
+Nightlies carry delegate changes before a release does. Use one to pick up something that
+has just landed, or to report a problem against current ``main``:
 
 .. code-block:: bash
 
@@ -40,13 +66,15 @@ CUDA build of ExecuTorch, and Torch-TensorRT brings PyTorch:
       --extra-index-url https://pypi.org/simple \
       --extra-index-url https://pypi.nvidia.com
 
-Swap ``cu132`` for the channel that matches your CUDA, such as ``cu134`` for CUDA 13.4. Keep
-PyTorch, ExecuTorch and Torch-TensorRT on the same channel.
+``--pre`` is required here. Without it pip ignores the nightly and takes the stable
+Torch-TensorRT from the public index instead.
 
-All three indexes are needed, and so is ``--pre``. Without ``--pre`` pip takes the stable
-Torch-TensorRT from the public index, which is far older. Without NVIDIA's index the
-inference library resolves to a source distribution, and pip spends around twenty minutes
-trying to build it before failing.
+What the extra installs
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+All three indexes are needed either way. Without NVIDIA's index the inference library
+resolves to a source distribution, and pip spends around twenty minutes trying to build it
+before failing.
 
 The extra installs a companion wheel, ``torch-tensorrt-executorch-runtime``. It ships one
 shared library holding the TensorRT delegate, which registers itself with the ExecuTorch
