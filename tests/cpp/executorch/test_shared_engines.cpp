@@ -53,7 +53,6 @@ constexpr char kRequireCudaEnvVar[] = "TORCHTRT_EXECUTORCH_REQUIRE_CUDA";
 // A square matmul against a constant matrix: the constant is the weights the engines share, and
 // it is large enough for weight streaming to have something to stream.
 constexpr int kDim = 512;
-constexpr std::size_t kMatElems = static_cast<std::size_t>(kDim) * kDim;
 constexpr int kMaxBatch = 64;
 
 // Bounds every wait for another thread, so a partner that never arrives fails the case by name
@@ -113,7 +112,19 @@ struct BuildOptions {
   float weight_scale = 1.0f;
   bool dynamic_batch = false;
   bool weight_streaming = false;
+  bool strip_weights = false;
+  int dim = kDim;
 };
+
+std::vector<float> matmul_weights(float weight_scale, int dim = kDim) {
+  std::vector<float> w(static_cast<std::size_t>(dim) * dim);
+  for (int i = 0; i < dim; ++i) {
+    for (int j = 0; j < dim; ++j) {
+      w[static_cast<std::size_t>(i) * dim + j] = weight_scale * static_cast<float>((i * 7 + j * 3) % 17 - 8) / 64.0f;
+    }
+  }
+  return w;
+}
 
 // output[b] = relu(input[b] x W), W[i][j] = weight_scale * ((i * 7 + j * 3) % 17 - 8) / 64.
 // Two engines that differ only in weight_scale differ only in their weight bytes, so they are the
@@ -131,18 +142,13 @@ std::vector<std::uint8_t> build_matmul_blob(const BuildOptions& options) {
     return {};
   }
   const std::int64_t batch = options.dynamic_batch ? -1 : 1;
-  nvinfer1::ITensor* input = network->addInput("input_0", nvinfer1::DataType::kFLOAT, nvinfer1::Dims2{batch, kDim});
+  nvinfer1::ITensor* input =
+      network->addInput("input_0", nvinfer1::DataType::kFLOAT, nvinfer1::Dims2{batch, options.dim});
   // Read by buildSerializedNetwork, so it lives until this returns.
-  std::vector<float> w(kMatElems);
-  for (int i = 0; i < kDim; ++i) {
-    for (int j = 0; j < kDim; ++j) {
-      w[static_cast<std::size_t>(i) * kDim + j] =
-          options.weight_scale * static_cast<float>((i * 7 + j * 3) % 17 - 8) / 64.0f;
-    }
-  }
+  const std::vector<float> w = matmul_weights(options.weight_scale, options.dim);
   nvinfer1::IConstantLayer* weights = network->addConstant(
-      nvinfer1::Dims2{kDim, kDim},
-      nvinfer1::Weights{nvinfer1::DataType::kFLOAT, w.data(), static_cast<std::int64_t>(kMatElems)});
+      nvinfer1::Dims2{options.dim, options.dim},
+      nvinfer1::Weights{nvinfer1::DataType::kFLOAT, w.data(), static_cast<std::int64_t>(w.size())});
   if (input == nullptr || weights == nullptr) {
     return {};
   }
@@ -164,6 +170,10 @@ std::vector<std::uint8_t> build_matmul_blob(const BuildOptions& options) {
   }
   if (options.weight_streaming) {
     config->setFlag(nvinfer1::BuilderFlag::kWEIGHT_STREAMING);
+  }
+  if (options.strip_weights) {
+    config->setFlag(nvinfer1::BuilderFlag::kREFIT);
+    config->setFlag(nvinfer1::BuilderFlag::kSTRIP_PLAN);
   }
   if (options.dynamic_batch) {
     nvinfer1::IOptimizationProfile* profile = builder->createOptimizationProfile();
@@ -404,6 +414,7 @@ class SharedEnginesTest : public ::testing::Test {
     other_weights_blob_ = build_matmul_blob({0.5f, false, false});
     dynamic_blob_ = build_matmul_blob({1.0f, true, false});
     streaming_blob_ = build_matmul_blob({1.0f, false, true});
+    stripped_blob_ = build_matmul_blob({1.0f, false, false, true});
   }
 
   void SetUp() override {
@@ -418,7 +429,9 @@ class SharedEnginesTest : public ::testing::Test {
     last_trt_error.clear();
     load_error.clear();
     reported_trt_error.clear();
-    ASSERT_FALSE(blob_.empty() || other_weights_blob_.empty() || dynamic_blob_.empty() || streaming_blob_.empty())
+    ASSERT_FALSE(
+        blob_.empty() || other_weights_blob_.empty() || dynamic_blob_.empty() || streaming_blob_.empty() ||
+        stripped_blob_.empty())
         << "TensorRT could not build the fixture engines";
   }
 
@@ -426,12 +439,14 @@ class SharedEnginesTest : public ::testing::Test {
   static std::vector<std::uint8_t> other_weights_blob_;
   static std::vector<std::uint8_t> dynamic_blob_;
   static std::vector<std::uint8_t> streaming_blob_;
+  static std::vector<std::uint8_t> stripped_blob_;
 };
 
 std::vector<std::uint8_t> SharedEnginesTest::blob_;
 std::vector<std::uint8_t> SharedEnginesTest::other_weights_blob_;
 std::vector<std::uint8_t> SharedEnginesTest::dynamic_blob_;
 std::vector<std::uint8_t> SharedEnginesTest::streaming_blob_;
+std::vector<std::uint8_t> SharedEnginesTest::stripped_blob_;
 
 // Runs without a GPU, so a key that ignored the bytes, the device or the budget fails there too.
 // The size changes the hashed bytes as well, so dropping it alone cannot show without a collision.
@@ -510,6 +525,73 @@ TEST_F(SharedEnginesTest, EnginesWithDifferentWeightsOfTheSameSizeAreNotShared) 
   ASSERT_FALSE(out.empty());
   ASSERT_FALSE(out_other.empty());
   EXPECT_NE(out, out_other);
+}
+
+// A plan without its weights runs without an error and returns wrong results, so it has to fail the
+// load. Sharing on and off are two paths into the deserializer, and both must refuse it. The same
+// engine serialized with its weights is the control: it loads and matches the ordinary engine.
+TEST_F(SharedEnginesTest, APlanSerializedWithoutItsWeightsIsRefused) {
+  const BackendOption private_load = sharing_option(false);
+  Handle shared;
+  Handle unshared;
+  EXPECT_EQ(shared.load(stripped_blob_), Error::InvalidProgram);
+  EXPECT_EQ(unshared.load(stripped_blob_, nullptr, {&private_load, 1}), Error::InvalidProgram);
+
+  static BuilderLogger logger;
+  TRTUniquePtr<nvinfer1::IRuntime> runtime(nvinfer1::createInferRuntime(logger));
+  const std::size_t offset = plan_offset(stripped_blob_);
+  TRTUniquePtr<nvinfer1::ICudaEngine> engine(
+      runtime->deserializeCudaEngine(stripped_blob_.data() + offset, stripped_blob_.size() - offset));
+  ASSERT_NE(engine, nullptr);
+  ASSERT_GE(engine->getEngineStat(nvinfer1::EngineStat::kSTRIPPED_WEIGHTS_SIZE), 0);
+  TRTUniquePtr<nvinfer1::IRefitter> refitter(nvinfer1::createInferRefitter(*engine, logger));
+  ASSERT_NE(refitter, nullptr);
+  const char* name = nullptr;
+  ASSERT_EQ(refitter->getAllWeights(1, &name), 1) << "the matmul has one refittable weight";
+  const std::vector<float> w = matmul_weights(1.0f);
+  ASSERT_TRUE(refitter->setNamedWeights(
+      name, nvinfer1::Weights{nvinfer1::DataType::kFLOAT, w.data(), static_cast<std::int64_t>(w.size())}));
+  ASSERT_TRUE(refitter->refitCudaEngine());
+  TRTUniquePtr<nvinfer1::ISerializationConfig> config(engine->createSerializationConfig());
+  config->clearFlag(nvinfer1::SerializationFlag::kEXCLUDE_WEIGHTS);
+  config->setFlag(nvinfer1::SerializationFlag::kINCLUDE_REFIT);
+  TRTUniquePtr<nvinfer1::IHostMemory> full(engine->serializeWithConfig(*config));
+  ASSERT_NE(full, nullptr);
+  const auto with_weights =
+      wrap_engine_plan(static_cast<const std::uint8_t*>(full->data()), full->size(), blob_metadata(0));
+
+  // Two builds may pick different kernels, so they agree only within rounding. A plan computing with
+  // placeholder weights misses by whole units.
+  Handle reference;
+  Handle restored;
+  ASSERT_EQ(reference.load(blob_), Error::Ok);
+  ASSERT_EQ(restored.load(with_weights), Error::Ok);
+  const auto expected = reference.run(1, 7);
+  const auto actual = restored.run(1, 7);
+  ASSERT_FALSE(expected.empty());
+  ASSERT_EQ(actual.size(), expected.size());
+  for (std::size_t i = 0; i < expected.size(); ++i) {
+    ASSERT_NEAR(actual[i], expected[i], 1e-2f * (1.0f + std::abs(expected[i]))) << "element " << i;
+  }
+}
+
+// A small stripped matmul reports 0 stripped weight bytes, though it still lacks its weights. A stripped
+// plan with no weights at all reports the same 0, so it is refused too: the two cannot be told apart.
+TEST_F(SharedEnginesTest, AStrippedPlanThatReportsZeroIsRefused) {
+  const auto stripped = build_matmul_blob({1.0f, false, false, true, 64});
+  ASSERT_FALSE(stripped.empty());
+  static BuilderLogger logger;
+  TRTUniquePtr<nvinfer1::IRuntime> runtime(nvinfer1::createInferRuntime(logger));
+  const std::size_t offset = plan_offset(stripped);
+  TRTUniquePtr<nvinfer1::ICudaEngine> engine(
+      runtime->deserializeCudaEngine(stripped.data() + offset, stripped.size() - offset));
+  ASSERT_NE(engine, nullptr);
+  ASSERT_EQ(engine->getEngineStat(nvinfer1::EngineStat::kSTRIPPED_WEIGHTS_SIZE), 0);
+  const BackendOption private_load = sharing_option(false);
+  Handle shared;
+  Handle unshared;
+  EXPECT_EQ(shared.load(stripped), Error::InvalidProgram);
+  EXPECT_EQ(unshared.load(stripped, nullptr, {&private_load, 1}), Error::InvalidProgram);
 }
 
 TEST_F(SharedEnginesTest, TheEngineIsFreedWithItsLastHandle) {
