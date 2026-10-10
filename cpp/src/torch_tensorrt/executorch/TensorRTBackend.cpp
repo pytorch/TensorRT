@@ -1238,16 +1238,47 @@ Result<DelegateHandle*> TensorRTBackend::init(
   }
 
   const void* engine_data = TensorRTBlobHeader::engine_data(processed->data(), header);
+  uint64_t engine_size = header.engine_size;
+  // Freed right after the engine is built from it, since TensorRT keeps its own copy.
+  std::optional<FreeableBuffer> external_engine;
+  if (!header.engine_key.empty()) {
+    const auto* data_map = context.get_named_data_map();
+    if (data_map == nullptr) {
+      ET_LOG(
+          Error,
+          "TensorRTBackend::init: the TensorRT engine is stored in an external data file (.ptd), but none was provided. Load the program together with its .ptd file.");
+      return Error::InvalidExternalData;
+    }
+    Result<FreeableBuffer> read = data_map->get_data(header.engine_key);
+    if (!read.ok()) {
+      if (read.error() != Error::NotFound) {
+        ET_LOG(
+            Error,
+            "TensorRTBackend::init: failed to read TensorRT engine '%s' from the external data file: %s",
+            header.engine_key.c_str(),
+            ::executorch::runtime::to_string(read.error()));
+        return read.error();
+      }
+      ET_LOG(
+          Error,
+          "TensorRTBackend::init: the program's data has no TensorRT engine with key '%s'. Load the program together with the .ptd file written with it.",
+          header.engine_key.c_str());
+      return Error::InvalidExternalData;
+    }
+    external_engine.emplace(std::move(read.get()));
+    engine_data = external_engine->data();
+    engine_size = external_engine->size();
+  }
   const bool share = !share_spec.ok() || share_spec.get();
   Error err;
   {
     const std::shared_lock<std::shared_mutex> capture_lock(cuda_graph_capture_mutex());
     if (share) {
-      err = acquire_shared_engine(
-          *runtime, engine_data, header.engine_size, handle->device_id, ws_request, handle->engine);
+      err = acquire_shared_engine(*runtime, engine_data, engine_size, handle->device_id, ws_request, handle->engine);
     } else {
-      err = load_engine(*runtime, engine_data, header.engine_size, ws_request, handle->engine);
+      err = load_engine(*runtime, engine_data, engine_size, ws_request, handle->engine);
     }
+    external_engine.reset();
     if (err != Error::Ok) {
       return err;
     }

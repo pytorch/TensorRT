@@ -6,7 +6,8 @@
 The ExecuTorch runtime path must not depend on libtorch, TorchScript custom
 classes, or the Torch-TensorRT C++ runtime ABI.  This module therefore emits a
 small standalone blob that contains JSON metadata plus raw TensorRT engine
-bytes.  The C++ ExecuTorch backend parses the same layout directly.
+bytes, or no bytes and the engine's key in an ExecuTorch .ptd file.  The C++
+ExecuTorch backend parses the same layout directly.
 """
 
 import dataclasses
@@ -31,6 +32,15 @@ def _align_to_16(offset: int) -> int:
     return (offset + 15) & ~15
 
 
+def _check_engine_source(engine_size: int, engine_key: str) -> None:
+    # The C++ parser refuses a blob with both or neither, so the writer and the reader do too.
+    if not isinstance(engine_key, str) or bool(engine_size) == bool(engine_key):
+        raise ValueError(
+            "A TensorRT blob carries exactly one of engine bytes and an engine_key, "
+            f"got {engine_size} engine bytes and engine_key {engine_key!r}"
+        )
+
+
 @dataclass
 class TensorRTIOBinding:
     name: str
@@ -51,6 +61,9 @@ class TensorRTBlobMetadata:
     device_id: int = 0
     serialized_metadata: str = ""
     target_platform: str = ""
+    # Named-data key of an engine kept outside the blob, in an ExecuTorch .ptd file. Empty when the
+    # engine bytes follow the metadata in the blob itself.
+    engine_key: str = ""
 
     def to_json(self) -> bytes:
         # Keep field order stable because the C++ parser is intentionally small.
@@ -80,6 +93,10 @@ class TensorRTBlobMetadata:
             "serialized_metadata": self.serialized_metadata,
             "target_platform": self.target_platform,
         }
+        # Written only when set, so a blob that carries its engine stays byte-identical to one
+        # written before this field existed.
+        if self.engine_key:
+            data["engine_key"] = self.engine_key
         return json.dumps(data, separators=(",", ":")).encode("utf-8")
 
     @classmethod
@@ -96,6 +113,14 @@ class TensorRTBlobMetadata:
             b["output"]: (b["input"], b.get("kind", "kv_cache_update"))
             for b in parsed.get("aliased_io", [])
         }
+        engine_key = parsed.get("engine_key", "")
+        # Present, the key must be a non-empty string, as the C++ parser requires.
+        if "engine_key" in parsed and (
+            not isinstance(engine_key, str) or not engine_key
+        ):
+            raise ValueError(
+                f"engine_key must be a non-empty string, got {engine_key!r}"
+            )
         return cls(
             io_bindings=io_bindings,
             aliased_io=aliased_io,
@@ -103,6 +128,7 @@ class TensorRTBlobMetadata:
             device_id=parsed.get("device_id", 0),
             serialized_metadata=parsed.get("serialized_metadata", ""),
             target_platform=parsed.get("target_platform", ""),
+            engine_key=engine_key,
         )
 
 
@@ -110,6 +136,9 @@ def serialize_engine(
     engine_bytes: Union[bytes, bytearray, memoryview],
     metadata: TensorRTBlobMetadata,
 ) -> bytes:
+    engine_size = memoryview(engine_bytes).nbytes
+    # The C++ parser refuses any other blob, so refuse to write one.
+    _check_engine_source(engine_size, metadata.engine_key)
     metadata_json = metadata.to_json()
     metadata_offset = HEADER_SIZE
     engine_offset = _align_to_16(metadata_offset + len(metadata_json))
@@ -120,7 +149,7 @@ def serialize_engine(
         metadata_offset,
         len(metadata_json),
         engine_offset,
-        memoryview(engine_bytes).nbytes,
+        engine_size,
         reserved,
     )
     padding = b"\x00" * (engine_offset - metadata_offset - len(metadata_json))
@@ -152,5 +181,6 @@ def deserialize_engine(blob: bytes) -> Tuple[bytes, TensorRTBlobMetadata]:
     metadata = TensorRTBlobMetadata.from_json(
         blob[metadata_offset : metadata_offset + metadata_size]
     )
+    _check_engine_source(engine_size, metadata.engine_key)
     engine = blob[engine_offset : engine_offset + engine_size]
     return engine, metadata

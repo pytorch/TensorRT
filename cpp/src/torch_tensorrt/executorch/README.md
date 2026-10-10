@@ -334,6 +334,17 @@ An engine serialized without its weights, for example compiled with
 `Error::InvalidProgram`, since this backend cannot refit it. A stripped engine
 with no weights at all is refused too, because TensorRT reports it the same way.
 
+## Engines in a .ptd file
+
+A program exported with `external_engine_data=` keeps its engines in a `.ptd` file
+next to the `.pte`. Load it with that file, for example
+`Module module("model.pte", "engines.ptd");`. Without the file, or with one that
+lacks the engine, loading returns `Error::InvalidExternalData`.
+
+The engine is GPU code, so treat the `.ptd` as trusted input, just like the `.pte`.
+Each engine is stored under a key made from its sha256, but the key is only a name:
+nothing checks the engine against it at load.
+
 ## Shared engines
 
 Loading the same program twice in one process, for example once per robot arm, used to
