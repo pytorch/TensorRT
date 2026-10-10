@@ -124,11 +124,22 @@ void ExecutionGraph::release_buffers(cudaStream_t stream) {
   }
 }
 
-Error ExecutionGraph::enqueue(EngineHandle& handle, cudaStream_t stream, const std::vector<size_t>& binding_bytes) {
+Error ExecutionGraph::enqueue(
+    EngineHandle& handle,
+    cudaStream_t stream,
+    const std::vector<size_t>& binding_bytes,
+    const void* scratch) {
   auto& context = *handle.exec_ctx;
   const size_t count = handle.num_inputs + handle.num_outputs;
   if (binding_bytes.size() != count) {
     return Error::InvalidArgument;
+  }
+  // A recorded graph keeps the scratch address it was recorded with. The shared pool frees that
+  // buffer when it grows, so a graph recorded on another buffer must not be replayed. This call
+  // then runs as a warm-up, and a later call records on the new buffer.
+  if (scratch != scratch_) {
+    reset_graph();
+    scratch_ = scratch;
   }
   std::vector<const void*> caller_ptrs(count);
   std::vector<nvinfer1::Dims> shapes;
@@ -209,6 +220,8 @@ Error ExecutionGraph::enqueue(EngineHandle& handle, cudaStream_t stream, const s
     // Only this handle can submit to this stream, so capture cannot absorb another caller's work.
     if (error == cudaSuccess) {
       {
+        // A pooled caller holds its device's pool lock here, so a load or destroy holding this lock
+        // also stalls every pooled engine on that device.
         const std::unique_lock<std::shared_mutex> capture_lock(cuda_graph_capture_mutex());
         error = cudaStreamBeginCapture(capture_stream_, cudaStreamCaptureModeThreadLocal);
         if (error == cudaSuccess) {

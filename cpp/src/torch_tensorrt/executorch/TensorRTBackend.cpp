@@ -512,10 +512,6 @@ Error initialize_engine_io(EngineHandle& handle) {
 // Called once the aliased outputs are known. Each reason replay stays off is logged, because a caller
 // who turned it on expects it.
 void enable_cuda_graphs(EngineHandle& handle) {
-  if (handle.claims_pooled_scratch) {
-    ET_LOG(Info, "TensorRTBackend::init: CUDA graph replay is off for an engine on pooled activation scratch");
-    return;
-  }
   if (handle.num_aliased_outputs > 0) {
     ET_LOG(Info, "TensorRTBackend::init: CUDA graph replay is off for an engine with aliased outputs");
     return;
@@ -1890,6 +1886,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // in between drops it through the destructor, which runs ahead of the device
   // restore above, so its free lands on the right device.
   SharedScratchClaim scratch_claim;
+  void* scratch_buffer = nullptr;
   if (pooled_scratch) {
     const size_t need = ctx->updateDeviceMemorySizeForShapes();
     // The substitution for a zero is made here and once: the same figure has to
@@ -1900,12 +1897,12 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     // under some shape has to be given a buffer whatever this call's shapes need,
     // or enqueueV3 refuses it.
     const size_t scratch_bytes = need == 0 ? kMinPooledScratchBytes : need;
-    void* pool = nullptr;
-    const Error scratch_err = claim_shared_scratch(scratch_claim, engine->device_id, scratch_bytes, stream, pool);
+    const Error scratch_err =
+        claim_shared_scratch(scratch_claim, engine->device_id, scratch_bytes, stream, scratch_buffer);
     if (scratch_err != Error::Ok) {
       return scratch_err;
     }
-    if (!install_pooled_scratch(*ctx, pool, scratch_bytes, engine->device_id)) {
+    if (!install_pooled_scratch(*ctx, scratch_buffer, scratch_bytes, engine->device_id)) {
       return Error::InvalidState;
     }
   }
@@ -1915,9 +1912,16 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // ------------------------------------------------------------------
   // Armed before the launch, so a partial launch still drains what it submitted.
   drain_on_early_return.arm();
-  const Error enqueue_err = engine->execution_graph ? engine->execution_graph->enqueue(*engine, stream, binding_bytes)
-                                                    : enqueue_plain(*ctx, stream);
+  const Error enqueue_err = engine->execution_graph
+      ? engine->execution_graph->enqueue(*engine, stream, binding_bytes, scratch_buffer)
+      : enqueue_plain(*ctx, stream);
   if (enqueue_err != Error::Ok) {
+    // A failed enqueue may still have submitted work that uses the pooled buffer:
+    // a partial enqueueV3, or the graph path's output copy failing after the
+    // engine ran. Drained under the lock for the reason given at the record below.
+    if (pooled_scratch) {
+      (void)cudaStreamSynchronize(stream);
+    }
     return enqueue_err;
   }
 
@@ -1932,9 +1936,9 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       // has to happen with the device's pool lock still held and the guard's
       // destructor runs after the claim's. Releasing first would hand the buffer
       // to a claimant with nothing ordering it against the enqueue this call just
-      // submitted, which is the silent-corruption case the lock exists for. It is
-      // the one place a pooled call holds the lock across a host wait, so another
-      // pooled engine on this device waits out this inference.
+      // submitted, which is the silent-corruption case the lock exists for. Like
+      // the failed enqueue above, it makes another pooled engine on this device
+      // wait out this inference.
       (void)cudaStreamSynchronize(stream);
       return mark_err;
     }

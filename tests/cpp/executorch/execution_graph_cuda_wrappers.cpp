@@ -99,8 +99,10 @@ cudaError_t __wrap_cudaMemcpyAsync(
     cudaMemcpyKind kind,
     cudaStream_t stream) {
   if (active_calls) {
-    ++active_calls->memcpy_calls;
     active_calls->operations.push_back({CudaCallKind::Copy, stream});
+    if (++active_calls->memcpy_calls == active_calls->fail_memcpy_call) {
+      return cudaErrorInvalidValue;
+    }
   }
   return __real_cudaMemcpyAsync(destination, source, bytes, kind, stream);
 }

@@ -33,12 +33,16 @@ class ExecutionGraph {
 
   // Requires the engine's device and a context to be current and the handle lock to be held. The
   // caller drains the stream before it releases that lock. binding_bytes holds one byte count per
-  // binding, the inputs and then the outputs. Rebind every address before each call. Returns Ok
-  // after submission, before the stream is drained.
+  // binding, the inputs and then the outputs. scratch is the pooled activation scratch this call
+  // installed on the context, or null when it installed none. The caller holds the pool's claim
+  // until the stream is drained or the enqueue is recorded on the pool's handoff event, so the
+  // buffer stays live for the work submitted here. Rebind every address before each call. Returns
+  // Ok after submission, before the stream is drained.
   ::executorch::runtime::Error enqueue(
       EngineHandle& handle,
       cudaStream_t stream,
-      const std::vector<size_t>& binding_bytes);
+      const std::vector<size_t>& binding_bytes,
+      const void* scratch);
 
   bool is_captured() const {
     return graph_exec_ != nullptr;
@@ -51,6 +55,8 @@ class ExecutionGraph {
   std::vector<void*> buffers_;
   std::vector<size_t> capacities_;
   std::vector<nvinfer1::Dims> shapes_;
+  // Borrowed: the pool frees it on another engine's call. Compared, never dereferenced.
+  const void* scratch_ = nullptr;
   cudaGraphExec_t graph_exec_ = nullptr;
   cudaStream_t capture_stream_ = nullptr;
   int failed_captures_ = 0;

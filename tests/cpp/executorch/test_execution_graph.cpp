@@ -5,6 +5,8 @@
 
 #include "execution_graph_cuda_wrappers.h"
 #include "torch_tensorrt/executorch/ExecutionGraph.h"
+#include "torch_tensorrt/executorch/SharedScratchPool.h"
+#include "torch_tensorrt/executorch/SharedScratchPoolTestHooks.h"
 #include "torch_tensorrt/executorch/TensorRTBackend.h"
 
 #include <cudaTypedefs.h>
@@ -124,7 +126,7 @@ std::vector<uint8_t> build_blob(bool alias) {
 }
 
 // Two softmaxes over different axes keep the chain from fusing into one pass, so the engine needs scratch.
-std::vector<uint8_t> build_scratch_blob() {
+std::vector<uint8_t> build_scratch_blob(int32_t rows, int32_t cols) {
   static TRTLogger logger;
   TRTUniquePtr<nvinfer1::IBuilder> builder(nvinfer1::createInferBuilder(logger));
   if (!builder) {
@@ -135,7 +137,7 @@ std::vector<uint8_t> build_scratch_blob() {
   if (!network || !config) {
     return {};
   }
-  auto* input = network->addInput("input_0", nvinfer1::DataType::kFLOAT, nvinfer1::Dims2{8, 32});
+  auto* input = network->addInput("input_0", nvinfer1::DataType::kFLOAT, nvinfer1::Dims2{rows, cols});
   auto* over_cols = input ? network->addSoftMax(*input) : nullptr;
   if (!over_cols) {
     return {};
@@ -1003,47 +1005,54 @@ TEST_F(ExecutionGraphReplayTest, BlockingAndDefaultStreamsReplay) {
   EXPECT_EQ(cudaStreamDestroy(blocking), cudaSuccess);
 }
 
-TEST_F(ExecutionGraphReplayTest, GreenContextStreamRunsPlainAndKeepsTheGraph) {
-  const auto get_resource = driver_entry<PFN_cuDeviceGetDevResource_v12040>("cuDeviceGetDevResource", 12040);
-  const auto generate_desc = driver_entry<PFN_cuDevResourceGenerateDesc_v12040>("cuDevResourceGenerateDesc", 12040);
-  const auto create_green = driver_entry<PFN_cuGreenCtxCreate_v12040>("cuGreenCtxCreate", 12040);
-  const auto destroy_green = driver_entry<PFN_cuGreenCtxDestroy_v12040>("cuGreenCtxDestroy", 12040);
-  const auto create_stream = driver_entry<PFN_cuGreenCtxStreamCreate_v12050>("cuGreenCtxStreamCreate", 12050);
-  const auto get_context = driver_entry<PFN_cuStreamGetCtx_v12050>("cuStreamGetCtx", 12050);
-  ASSERT_NE(get_resource, nullptr);
-  ASSERT_NE(generate_desc, nullptr);
-  ASSERT_NE(create_green, nullptr);
-  ASSERT_NE(destroy_green, nullptr);
-  ASSERT_NE(create_stream, nullptr);
-  ASSERT_NE(get_context, nullptr);
-
-  struct GreenStream {
-    CUgreenCtx context = nullptr;
-    cudaStream_t stream = nullptr;
-    PFN_cuGreenCtxDestroy_v12040 destroy;
-    ~GreenStream() {
-      if (stream) {
-        EXPECT_EQ(cudaStreamDestroy(stream), cudaSuccess);
-      }
-      if (context) {
-        EXPECT_EQ(destroy(context), CUDA_SUCCESS);
-      }
+// A non-blocking stream on a green context, which the graph path does not replay on.
+struct GreenStream {
+  ~GreenStream() {
+    if (stream) {
+      EXPECT_EQ(cudaStreamDestroy(stream), cudaSuccess);
     }
-  } green{nullptr, nullptr, destroy_green};
-  CUdevResource resource{};
-  CUdevResourceDesc descriptor{};
-  ASSERT_EQ(get_resource(0, &resource, CU_DEV_RESOURCE_TYPE_SM), CUDA_SUCCESS);
-  ASSERT_EQ(generate_desc(&descriptor, &resource, 1), CUDA_SUCCESS);
-  ASSERT_EQ(create_green(&green.context, descriptor, 0, CU_GREEN_CTX_DEFAULT_STREAM), CUDA_SUCCESS);
-  ASSERT_EQ(create_stream(&green.stream, green.context, CU_STREAM_NON_BLOCKING, 0), CUDA_SUCCESS);
-  CUcontext context = nullptr;
-  CUgreenCtx observed_green = nullptr;
-  ASSERT_EQ(get_context(green.stream, &context, &observed_green), CUDA_SUCCESS);
-  ASSERT_EQ(observed_green, green.context);
-  ASSERT_NE(observed_green, nullptr);
-  unsigned int flags = 0;
-  ASSERT_EQ(cudaStreamGetFlags(green.stream, &flags), cudaSuccess);
-  ASSERT_NE(flags & cudaStreamNonBlocking, 0u);
+    if (context) {
+      EXPECT_EQ(destroy(context), CUDA_SUCCESS);
+    }
+  }
+
+  void create() {
+    const auto get_resource = driver_entry<PFN_cuDeviceGetDevResource_v12040>("cuDeviceGetDevResource", 12040);
+    const auto generate_desc = driver_entry<PFN_cuDevResourceGenerateDesc_v12040>("cuDevResourceGenerateDesc", 12040);
+    const auto create_green = driver_entry<PFN_cuGreenCtxCreate_v12040>("cuGreenCtxCreate", 12040);
+    destroy = driver_entry<PFN_cuGreenCtxDestroy_v12040>("cuGreenCtxDestroy", 12040);
+    const auto create_stream = driver_entry<PFN_cuGreenCtxStreamCreate_v12050>("cuGreenCtxStreamCreate", 12050);
+    const auto get_context = driver_entry<PFN_cuStreamGetCtx_v12050>("cuStreamGetCtx", 12050);
+    ASSERT_NE(get_resource, nullptr);
+    ASSERT_NE(generate_desc, nullptr);
+    ASSERT_NE(create_green, nullptr);
+    ASSERT_NE(destroy, nullptr);
+    ASSERT_NE(create_stream, nullptr);
+    ASSERT_NE(get_context, nullptr);
+    CUdevResource resource{};
+    CUdevResourceDesc descriptor{};
+    ASSERT_EQ(get_resource(0, &resource, CU_DEV_RESOURCE_TYPE_SM), CUDA_SUCCESS);
+    ASSERT_EQ(generate_desc(&descriptor, &resource, 1), CUDA_SUCCESS);
+    ASSERT_EQ(create_green(&context, descriptor, 0, CU_GREEN_CTX_DEFAULT_STREAM), CUDA_SUCCESS);
+    ASSERT_EQ(create_stream(&stream, context, CU_STREAM_NON_BLOCKING, 0), CUDA_SUCCESS);
+    CUcontext owner = nullptr;
+    CUgreenCtx observed_green = nullptr;
+    ASSERT_EQ(get_context(stream, &owner, &observed_green), CUDA_SUCCESS);
+    ASSERT_EQ(observed_green, context);
+    ASSERT_NE(observed_green, nullptr);
+    unsigned int flags = 0;
+    ASSERT_EQ(cudaStreamGetFlags(stream, &flags), cudaSuccess);
+    ASSERT_NE(flags & cudaStreamNonBlocking, 0u);
+  }
+
+  CUgreenCtx context = nullptr;
+  cudaStream_t stream = nullptr;
+  PFN_cuGreenCtxDestroy_v12040 destroy = nullptr;
+};
+
+TEST_F(ExecutionGraphReplayTest, GreenContextStreamRunsPlainAndKeepsTheGraph) {
+  GreenStream green;
+  ASSERT_NO_FATAL_FAILURE(green.create());
 
   LoadedGraphEngine plain, graph;
   ASSERT_NO_FATAL_FAILURE(load_pair(plain, graph));
@@ -1066,31 +1075,157 @@ TEST_F(ExecutionGraphReplayTest, GreenContextStreamRunsPlainAndKeepsTheGraph) {
   EXPECT_EQ(calls.launches, std::vector<cudaStream_t>(1, streams_[0]));
 }
 
-TEST_F(ExecutionGraphTest, PooledScratchEnginesStayPlain) {
-  const auto blob = build_scratch_blob();
-  ASSERT_FALSE(blob.empty());
+// The pool frees its old buffer when a larger request grows it, so a graph recorded on that buffer
+// must not replay.
+TEST_F(ExecutionGraphReplayTest, PooledScratchRecordsAgainWhenThePoolGrows) {
+  const auto small_blob = build_scratch_blob(8, 32);
+  const auto large_blob = build_scratch_blob(64, 256);
+  ASSERT_FALSE(small_blob.empty());
+  ASSERT_FALSE(large_blob.empty());
+  ASSERT_TRUE(reset_shared_scratch_pool_for_testing());
   BackendOption options[] = {option(kScratchOption, true), option(kGraphOption, true)};
   ASSERT_EQ(set_options({options, 2}), Error::Ok);
-  LoadedGraphEngine engine;
-  ASSERT_EQ(engine.load(blob), Error::Ok);
-  ASSERT_TRUE(engine.handle()->claims_pooled_scratch);
-  EXPECT_EQ(engine.handle()->execution_graph, nullptr);
-  std::vector<float> input(8 * 32, 1.0f), output(8 * 32, -1.0f);
-  CudaCalls calls;
-  for (int i = 0; i < 4; ++i) {
-    SizesType sizes[] = {8, 32};
-    TensorImpl input_impl(ScalarType::Float, 2, sizes, input.data());
-    TensorImpl output_impl(ScalarType::Float, 2, sizes, output.data());
-    EValue input_value{Tensor(&input_impl)};
-    EValue output_value{Tensor(&output_impl)};
-    EValue* args[] = {&input_value, &output_value};
-    ASSERT_EQ(engine.run({args, 2}, streams_[0]), Error::Ok);
+  {
+    LoadedGraphEngine smaller, larger;
+    ASSERT_EQ(smaller.load(small_blob), Error::Ok);
+    ASSERT_EQ(larger.load(large_blob), Error::Ok);
+    ASSERT_TRUE(smaller.handle()->claims_pooled_scratch);
+    ASSERT_TRUE(larger.handle()->claims_pooled_scratch);
+    const int device = smaller.handle()->device_id;
+    const auto run = [&](LoadedGraphEngine& engine, SizesType rows, SizesType cols) {
+      std::vector<float> input(static_cast<size_t>(rows) * cols, 1.0f), output(input.size(), -1.0f);
+      ASSERT_EQ(engine.run(input.data(), output.data(), rows, cols, streams_[0]), Error::Ok);
+      for (float value : output) {
+        ASSERT_FLOAT_EQ(value, 1.0f / rows);
+      }
+    };
+    for (int i = 0; i < 3; ++i) {
+      ASSERT_NO_FATAL_FAILURE(run(smaller, 8, 32));
+    }
+    ASSERT_TRUE(smaller.is_captured());
+    const size_t capacity = shared_scratch_capacity_for_testing(device);
+    ASSERT_NO_FATAL_FAILURE(run(larger, 64, 256));
+    ASSERT_GT(shared_scratch_capacity_for_testing(device), capacity) << "the larger engine did not grow the pool";
+
+    CudaCalls calls;
+    ASSERT_NO_FATAL_FAILURE(run(smaller, 8, 32));
+    EXPECT_FALSE(smaller.is_captured()) << "the graph recorded on the freed buffer was kept";
+    EXPECT_TRUE(calls.launches.empty());
+    for (int i = 0; i < 3; ++i) {
+      ASSERT_NO_FATAL_FAILURE(run(smaller, 8, 32));
+      ASSERT_NO_FATAL_FAILURE(run(larger, 64, 256));
+    }
+    EXPECT_TRUE(smaller.is_captured());
+    EXPECT_TRUE(larger.is_captured());
+    EXPECT_EQ(calls.captures.size(), 2u);
+    EXPECT_EQ(calls.launches, std::vector<cudaStream_t>(6, streams_[0]));
+  }
+  EXPECT_TRUE(reset_shared_scratch_pool_for_testing());
+}
+
+// A call with no caller stream and a call on a green context stream take different paths from an
+// ordinary caller stream, so a pool growth has to drop the graph on both.
+TEST_F(ExecutionGraphReplayTest, PooledScratchGrowthDropsTheGraphOnOtherStreamShapes) {
+  GreenStream green;
+  ASSERT_NO_FATAL_FAILURE(green.create());
+  const auto small_blob = build_scratch_blob(8, 32);
+  const auto large_blob = build_scratch_blob(64, 256);
+  ASSERT_FALSE(small_blob.empty());
+  ASSERT_FALSE(large_blob.empty());
+  BackendOption options[] = {option(kScratchOption, true), option(kGraphOption, true)};
+  ASSERT_EQ(set_options({options, 2}), Error::Ok);
+  const auto run = [](LoadedGraphEngine& engine, SizesType rows, SizesType cols, std::optional<cudaStream_t> stream) {
+    std::vector<float> input(static_cast<size_t>(rows) * cols, 1.0f), output(input.size(), -1.0f);
+    ASSERT_EQ(engine.run(input.data(), output.data(), rows, cols, stream), Error::Ok);
+    for (float value : output) {
+      ASSERT_FLOAT_EQ(value, 1.0f / rows);
+    }
+  };
+  const std::pair<std::optional<cudaStream_t>, std::optional<cudaStream_t>> cases[] = {
+      {std::nullopt, std::nullopt}, {streams_[0], green.stream}};
+  for (const auto& [record_on, after_growth_on] : cases) {
+    SCOPED_TRACE(after_growth_on.has_value() ? "green context stream" : "no caller stream");
+    ASSERT_TRUE(reset_shared_scratch_pool_for_testing());
+    LoadedGraphEngine smaller, larger;
+    ASSERT_EQ(smaller.load(small_blob), Error::Ok);
+    ASSERT_EQ(larger.load(large_blob), Error::Ok);
+    ASSERT_TRUE(smaller.handle()->claims_pooled_scratch);
+    ASSERT_TRUE(larger.handle()->claims_pooled_scratch);
+    for (int i = 0; i < 3; ++i) {
+      ASSERT_NO_FATAL_FAILURE(run(smaller, 8, 32, record_on));
+    }
+    ASSERT_TRUE(smaller.is_captured());
+    const int device = smaller.handle()->device_id;
+    const size_t capacity = shared_scratch_capacity_for_testing(device);
+    ASSERT_NO_FATAL_FAILURE(run(larger, 64, 256, streams_[1]));
+    ASSERT_GT(shared_scratch_capacity_for_testing(device), capacity) << "the larger engine did not grow the pool";
+    {
+      CudaCalls calls;
+      ASSERT_NO_FATAL_FAILURE(run(smaller, 8, 32, after_growth_on));
+      EXPECT_FALSE(smaller.is_captured()) << "the graph recorded on the freed buffer was kept";
+      ASSERT_NO_FATAL_FAILURE(run(smaller, 8, 32, record_on));
+      EXPECT_EQ(calls.launches.size(), calls.captures.size()) << "a graph recorded on the freed buffer was replayed";
+    }
+    for (int i = 0; i < 2; ++i) {
+      ASSERT_NO_FATAL_FAILURE(run(smaller, 8, 32, record_on));
+    }
+    EXPECT_TRUE(smaller.is_captured());
+  }
+  EXPECT_TRUE(reset_shared_scratch_pool_for_testing());
+}
+
+// The output copy runs after the graph launch, so when it fails the engine's work is still queued on
+// the pooled buffer. The stream has to drain before the pool's lock is released.
+TEST_F(ExecutionGraphReplayTest, AFailedPooledReplayDrainsBeforeReleasingThePool) {
+  const auto blob = build_scratch_blob(8, 32);
+  ASSERT_FALSE(blob.empty());
+  ASSERT_TRUE(reset_shared_scratch_pool_for_testing());
+  BackendOption options[] = {option(kScratchOption, true), option(kGraphOption, true)};
+  ASSERT_EQ(set_options({options, 2}), Error::Ok);
+  {
+    LoadedGraphEngine engine;
+    ASSERT_EQ(engine.load(blob), Error::Ok);
+    ASSERT_TRUE(engine.handle()->claims_pooled_scratch);
+    std::vector<float> input(kMaxElements, 1.0f), output(kMaxElements, -1.0f);
+    for (int i = 0; i < 2; ++i) {
+      ASSERT_EQ(engine.run(input.data(), output.data(), 8, 32, streams_[0]), Error::Ok);
+    }
+    ASSERT_TRUE(engine.is_captured());
+    SharedScratchDevice& device = scratch_pool().get(engine.handle()->device_id);
+    bool launched = false;
+    std::optional<bool> held_at_drain;
+    CudaCalls calls;
+    calls.after_launch = [&](cudaStream_t) {
+      launched = true;
+      calls.fail_memcpy_call = calls.memcpy_calls + 1;
+    };
+    calls.before_synchronize = [&](cudaStream_t stream) {
+      if (!launched || held_at_drain.has_value()) {
+        return;
+      }
+      EXPECT_EQ(stream, streams_[0]);
+      // try_lock on the thread that owns the lock is undefined, so the probe runs on another thread.
+      held_at_drain = !std::async(std::launch::async, [&] {
+                         const bool lock_free = device.mu.try_lock();
+                         if (lock_free) {
+                           device.mu.unlock();
+                         }
+                         return lock_free;
+                       }).get();
+    };
+    EXPECT_EQ(engine.run(input.data(), output.data(), 8, 32, streams_[0]), Error::Internal);
+    calls.after_launch = nullptr;
+    calls.before_synchronize = nullptr;
+    ASSERT_TRUE(launched);
+    ASSERT_TRUE(held_at_drain.has_value()) << "the failed call never drained its stream";
+    EXPECT_TRUE(*held_at_drain) << "the pool's lock was released with the failed call's work still queued";
+    output.assign(output.size(), -1.0f);
+    ASSERT_EQ(engine.run(input.data(), output.data(), 8, 32, streams_[0]), Error::Ok);
     for (float value : output) {
       ASSERT_FLOAT_EQ(value, 1.0f / 8);
     }
   }
-  EXPECT_TRUE(calls.captures.empty());
-  EXPECT_TRUE(calls.launches.empty());
+  EXPECT_TRUE(reset_shared_scratch_pool_for_testing());
 }
 
 TEST_F(ExecutionGraphTest, MissingMemoryPoolSupportDisablesReplayAtInitialization) {
