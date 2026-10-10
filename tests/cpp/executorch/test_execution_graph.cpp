@@ -4,6 +4,7 @@
  */
 
 #include "execution_graph_cuda_wrappers.h"
+#include "torch_tensorrt/executorch/EngineHandle.h"
 #include "torch_tensorrt/executorch/ExecutionGraph.h"
 #include "torch_tensorrt/executorch/TensorRTBackend.h"
 
@@ -16,6 +17,7 @@
 #include <executorch/runtime/platform/runtime.h>
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -73,7 +75,7 @@ std::vector<uint8_t> wrap_plan(const nvinfer1::IHostMemory& plan, const std::str
   return blob;
 }
 
-std::vector<uint8_t> build_blob(bool alias) {
+std::vector<uint8_t> build_blob(bool alias, int profiles = 1) {
   static TRTLogger logger;
   TRTUniquePtr<nvinfer1::IBuilder> builder(nvinfer1::createInferBuilder(logger));
   if (!builder) {
@@ -103,12 +105,14 @@ std::vector<uint8_t> build_blob(bool alias) {
   }
   sum->getOutput(0)->setName("output_0");
   network->markOutput(*sum->getOutput(0));
-  auto* profile = builder->createOptimizationProfile();
-  if (!profile || !profile->setDimensions("input_0", nvinfer1::OptProfileSelector::kMIN, nvinfer1::Dims2{1, 2}) ||
-      !profile->setDimensions("input_0", nvinfer1::OptProfileSelector::kOPT, nvinfer1::Dims2{2, 8}) ||
-      !profile->setDimensions("input_0", nvinfer1::OptProfileSelector::kMAX, nvinfer1::Dims2{8, 32}) ||
-      config->addOptimizationProfile(profile) < 0) {
-    return {};
+  for (int p = 0; p < profiles; ++p) {
+    auto* profile = builder->createOptimizationProfile();
+    if (!profile || !profile->setDimensions("input_0", nvinfer1::OptProfileSelector::kMIN, nvinfer1::Dims2{1, 2}) ||
+        !profile->setDimensions("input_0", nvinfer1::OptProfileSelector::kOPT, nvinfer1::Dims2{2, 8}) ||
+        !profile->setDimensions("input_0", nvinfer1::OptProfileSelector::kMAX, nvinfer1::Dims2{8, 32}) ||
+        config->addOptimizationProfile(profile) < 0) {
+      return {};
+    }
   }
   TRTUniquePtr<nvinfer1::IHostMemory> plan(builder->buildSerializedNetwork(*network, *config));
   if (!plan) {
@@ -966,6 +970,39 @@ TEST_F(ExecutionGraphReplayTest, ShapeChangesResetAndRecaptureIncludingEqualByte
     ASSERT_NO_FATAL_FAILURE(compare(plain, graph, 0, shape[0], shape[1], seed + 2, streams_[0]));
     ASSERT_TRUE(graph.is_captured());
   }
+}
+
+// A graph replays the kernels of the profile it was captured under, so switching
+// profiles at an unchanged shape must drop it rather than replay the old profile.
+TEST_F(ExecutionGraphReplayTest, ProfileSwitchAtTheSameShapeResetsAndRecaptures) {
+  const auto two_profiles = build_blob(false, 2);
+  ASSERT_FALSE(two_profiles.empty());
+  LoadedGraphEngine graph;
+  ASSERT_EQ(graph.load(two_profiles), Error::Ok);
+  ASSERT_NE(graph.handle()->execution_graph, nullptr);
+  std::vector<float> input(16), output(16);
+  auto run_on = [&](int32_t profile, float base) {
+    for (size_t i = 0; i < input.size(); ++i) {
+      input[i] = base + static_cast<float>(i);
+    }
+    std::fill(output.begin(), output.end(), -1.0f);
+    OptimizationProfileGuard guard{profile};
+    ASSERT_EQ(graph.run(input.data(), output.data(), 2, 8, streams_[0]), Error::Ok);
+    ASSERT_EQ(cudaStreamSynchronize(streams_[0]), cudaSuccess);
+    for (size_t i = 0; i < input.size(); ++i) {
+      ASSERT_FLOAT_EQ(output[i], input[i] * 2.0f + 1.0f) << "profile " << profile << " element " << i;
+    }
+    EXPECT_EQ(graph.handle()->profiles.active, profile);
+  };
+  ASSERT_NO_FATAL_FAILURE(run_on(0, 0.0f));
+  ASSERT_NO_FATAL_FAILURE(run_on(0, 10.0f));
+  ASSERT_TRUE(graph.is_captured());
+  ASSERT_NO_FATAL_FAILURE(run_on(1, 20.0f));
+  EXPECT_FALSE(graph.is_captured()) << "a graph captured under profile 0 survived the switch to profile 1";
+  ASSERT_NO_FATAL_FAILURE(run_on(1, 30.0f));
+  EXPECT_TRUE(graph.is_captured());
+  ASSERT_NO_FATAL_FAILURE(run_on(1, 40.0f));
+  EXPECT_TRUE(graph.is_captured());
 }
 
 TEST_F(ExecutionGraphReplayTest, StreamChangesKeepTheGraph) {

@@ -103,16 +103,23 @@ on enter and restored on exit, so blocks nest cleanly.
     with optimization_profile(trt_model, PREFILL_IDX):
         logits = trt_model(prefill_ids)     # seq == 256
 
-Pass ``"auto"`` to let Torch-TensorRT choose from the input shapes. Auto-selection
-is **lazy / first-working**: it scans profiles in index order and uses the first
-whose ``[min, max]`` contains the input. Order matters when profiles overlap --
-declaring ``decode`` first lets it win the ``seq == 1`` overlap:
+Pass ``"auto"`` to let Torch-TensorRT choose from the input shapes.
+Auto-selection is **sticky first-fit**: it keeps the active profile as long as
+that profile still accepts the input, and only when it does not does it rescan
+from index 0 and take the lowest profile that fits.
 
 .. code-block:: python
 
     with optimization_profile(trt_model, "auto"):
-        trt_model(decode_ids)    # seq == 1   -> index 0 (decode) accepts -> decode
-        trt_model(prefill_ids)   # seq == 256 -> index 0 rejects -> index 1 (prefill)
+        trt_model(decode_ids)    # seq == 1   -> profile 0 is active and accepts -> decode
+        trt_model(prefill_ids)   # seq == 256 -> profile 0 rejects -> rescan -> prefill
+        trt_model(decode_ids)    # seq == 1   -> prefill still accepts it -> stays on prefill
+
+Order therefore decides overlaps only on a rescan, not on every call: ``decode``
+declared first wins ``seq == 1`` when the scan runs, but a call that arrives
+while ``prefill`` is active keeps ``prefill``, since its range covers ``seq == 1``
+too. Pin explicitly wherever the regime matters more than avoiding a switch --
+a decode loop entered right after a prefill is exactly that case.
 
 Profiles, graph breaks, and serialization
 -----------------------------------------
@@ -131,11 +138,11 @@ Profiles, graph breaks, and serialization
 Why it helps: a worked latency example
 --------------------------------------
 
-The example :ref:`multi_optimization_profiles` compiles ``google/gemma-3-1b-it``
-twice -- once with a single profile (tuned at the prefill length) and once with
-separate decode/prefill profiles -- then compares per-call latency. The
-multi-profile engine dedicates a **static** profile (``seq`` pinned to 1) to
-decode, letting TensorRT specialize that path (measured on an NVIDIA A40, FP16):
+A multi-profile engine dedicates a **static** profile (``seq`` pinned to 1) to
+decode, letting TensorRT specialize that path. Compiling ``google/gemma-3-1b-it``
+twice -- once with a single profile tuned at the prefill length, once with
+separate decode/prefill profiles -- and comparing per-call latency (NVIDIA A40,
+FP16, Python runtime) gives:
 
 .. code-block:: text
 
@@ -150,13 +157,23 @@ while decode -- the regime executed once per generated token -- is faster. Exact
 numbers depend on the model and GPU; the takeaway is that one engine can be tuned
 well for *both* regimes instead of compromising on a single ``opt`` shape.
 
+The runnable example :ref:`multi_optimization_profiles` measures a related but
+different thing. It compiles **once** and pins the two profiles of that single
+engine in turn, so what it reports is the worth of the active profile with the
+engine held fixed: 1.30x on decode on the same A40, a larger win than the 1.14x
+above, where the decode baseline came from its own single-profile build. Use the
+two-engine numbers to decide whether multiple profiles are worth adopting, and
+the example's to see what selecting between them is worth per call. The
+ExecuTorch delegate is measured separately in
+``examples/executorch_reference_runner/README.md``; that is a different runtime,
+so those numbers are not comparable with either of these.
+
 .. note::
 
    Because the model has two dynamic inputs (``input_ids`` and ``position_ids``),
    the example passes one profiled ``Input`` for each, both declaring the same
-   profiles. The HuggingFace attention path also needs a TensorRT-friendly SDPA
-   lowering (``tools/llm/torchtrt_ext/register_sdpa``), and ``gemma-3-1b-it`` is a
-   gated model requiring Hugging Face authentication.
+   profiles. ``gemma-3-1b-it`` is a gated model requiring Hugging Face
+   authentication.
 
 .. seealso::
 

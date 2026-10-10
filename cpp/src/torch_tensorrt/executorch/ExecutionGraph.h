@@ -9,6 +9,7 @@
 #include <cuda_runtime.h>
 #include <executorch/runtime/core/error.h>
 
+#include <cstdint>
 #include <shared_mutex>
 #include <vector>
 
@@ -51,6 +52,7 @@ class ExecutionGraph {
   std::vector<void*> buffers_;
   std::vector<size_t> capacities_;
   std::vector<nvinfer1::Dims> shapes_;
+  int32_t profile_ = -1;
   cudaGraphExec_t graph_exec_ = nullptr;
   cudaStream_t capture_stream_ = nullptr;
   int failed_captures_ = 0;

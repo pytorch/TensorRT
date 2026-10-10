@@ -4,7 +4,7 @@
  */
 
 #include "torch_tensorrt/executorch/ExecutionGraph.h"
-#include "torch_tensorrt/executorch/TensorRTBackend.h"
+#include "EngineHandle.h"
 
 #include <cudaTypedefs.h>
 #include <executorch/runtime/platform/log.h>
@@ -133,7 +133,12 @@ Error ExecutionGraph::enqueue(EngineHandle& handle, cudaStream_t stream, const s
   std::vector<const void*> caller_ptrs(count);
   std::vector<nvinfer1::Dims> shapes;
   shapes.reserve(count);
-  bool changed = shapes_.size() != count;
+  // A graph replays the kernels of the profile it was captured under, so a
+  // profile switch with unchanged shapes must recapture just like a shape change.
+  // ponytail: one graph per handle, so alternating profiles every call never
+  // replays; a graph per profile is the upgrade if that pattern matters.
+  const int32_t profile = context.getOptimizationProfile();
+  bool changed = shapes_.size() != count || profile != profile_;
   for (size_t i = 0; i < count; ++i) {
     const char* name = binding_name(handle, i).c_str();
     caller_ptrs[i] = context.getTensorAddress(name);
@@ -152,6 +157,7 @@ Error ExecutionGraph::enqueue(EngineHandle& handle, cudaStream_t stream, const s
     capture_failed_ = false;
     failed_captures_ = 0;
     shapes_ = std::move(shapes);
+    profile_ = profile;
   }
   // The graph and its buffers do not depend on the caller stream, so a call that cannot replay keeps them.
   if (capture_failed_ || !can_replay_on(stream)) {

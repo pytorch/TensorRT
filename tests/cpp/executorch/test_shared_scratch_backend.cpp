@@ -62,6 +62,7 @@
 // job is the standard channel having been cancelled, which the same workflow
 // already carries a comment about.
 
+#include "torch_tensorrt/executorch/EngineHandle.h"
 #include "torch_tensorrt/executorch/PooledScratchInstall.h"
 #include "torch_tensorrt/executorch/SharedScratchPool.h"
 #include "torch_tensorrt/executorch/SharedScratchPoolTestHooks.h"

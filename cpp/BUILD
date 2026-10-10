@@ -340,12 +340,12 @@ cc_library(
     name = "tensorrt_executorch_execution_graph_headers",
     hdrs = ["src/torch_tensorrt/executorch/ExecutionGraph.h"],
     strip_include_prefix = "src",
-    visibility = ["//visibility:private"],
     target_compatible_with = select({
         ":linux_x86_64": [],
         ":sbsa": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
+    visibility = ["//visibility:private"],
     deps = ["@cuda//:cuda_headers"] + select({
         ":linux_x86_64": [
             "@executorch//:executorch_headers",
@@ -360,8 +360,32 @@ cc_library(
 )
 
 cc_library(
+    name = "tensorrt_executorch_optimization_profile_selection",
+    hdrs = [
+        "include/torch_tensorrt/executorch/OptimizationProfileSelection.h",
+    ],
+    strip_include_prefix = "include",
+    # The header includes <NvInfer.h>, so it cannot build where the deps below
+    # resolve to an empty list.
+    target_compatible_with = select({
+        ":linux_x86_64": [],
+        ":sbsa": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = select({
+        ":linux_x86_64": ["@tensorrt//:nvinfer"],
+        ":sbsa": ["@tensorrt_sbsa//:nvinfer"],
+        "//conditions:default": [],
+    }),
+)
+
+cc_library(
     name = "tensorrt_executorch_backend",
     srcs = [
+        # Private, deliberately not in hdrs: EngineHandle grows fields as the
+        # backend gains features and is never installed, so nothing outside this
+        # library may depend on its layout.
+        "src/torch_tensorrt/executorch/EngineHandle.h",
         "src/torch_tensorrt/executorch/ExecutionGraph.cpp",
         "src/torch_tensorrt/executorch/TensorRTBackend.cpp",
     ],
@@ -381,6 +405,7 @@ cc_library(
         ":tensorrt_executorch_binding_names",
         ":tensorrt_executorch_blob_header",
         ":tensorrt_executorch_execution_graph_headers",
+        ":tensorrt_executorch_optimization_profile_selection",
         ":tensorrt_executorch_pooled_scratch_install",
         ":tensorrt_executorch_shared_engine_key",
         ":tensorrt_executorch_shared_scratch_pool",
@@ -403,10 +428,28 @@ cc_library(
     alwayslink = True,
 )
 
+# For tests that inspect a live handle's state. testonly keeps the private
+# EngineHandle layout from becoming something a shipped target can depend on.
+cc_library(
+    name = "tensorrt_executorch_engine_handle_test_access",
+    testonly = True,
+    hdrs = [
+        "src/torch_tensorrt/executorch/EngineHandle.h",
+    ],
+    strip_include_prefix = "src",
+    target_compatible_with = select({
+        ":linux_x86_64": [],
+        ":sbsa": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [":tensorrt_executorch_backend"],
+)
+
 filegroup(
     name = "executorch_backend_source_files",
     srcs = [
         "src/torch_tensorrt/executorch/CMakeLists.txt",
+        "src/torch_tensorrt/executorch/EngineHandle.h",
         "src/torch_tensorrt/executorch/ExecutionGraph.cpp",
         "src/torch_tensorrt/executorch/ExecutionGraph.h",
         "src/torch_tensorrt/executorch/PooledScratchInstall.cpp",
@@ -433,6 +476,7 @@ filegroup(
 filegroup(
     name = "executorch_api_headers",
     srcs = [
+        "include/torch_tensorrt/executorch/OptimizationProfileSelection.h",
         "include/torch_tensorrt/executorch/TensorRTBackend.h",
         "include/torch_tensorrt/executorch/TensorRTBindingNames.h",
         "include/torch_tensorrt/executorch/TensorRTBlobHeader.h",
