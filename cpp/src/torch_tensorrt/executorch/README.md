@@ -329,6 +329,14 @@ device memory in bytes, or the memory query error if those figures are unavailab
 These figures are not the failed allocation size. Loading does not clear a caller's
 pending CUDA error to classify TensorRT failures.
 
+An engine serialized without its weights, for example compiled with
+`immutable_weights=False, strip_engine_weights=True`, is refused with
+`Error::InvalidProgram`, since this backend cannot refit it. A stripped engine
+with no weights at all loads, since it has nothing to restore. To tell the two
+apart, loading an ordinary engine that has weights asks TensorRT for its stripped
+size, and TensorRT logs one warning per engine that it was not built with
+`kSTRIP_PLAN`. The backend forwards it at Info level, and it is harmless.
+
 ## Shared engines
 
 Loading the same program twice in one process, for example once per robot arm, used to
