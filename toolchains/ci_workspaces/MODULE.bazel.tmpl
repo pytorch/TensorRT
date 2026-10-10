@@ -108,10 +108,10 @@ http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "ht
 http_archive(
     name = "tensorrt",
     build_file = "@//third_party/tensorrt/archive:BUILD",
-    strip_prefix = "TensorRT-11.3.0.99",
+    strip_prefix = "TensorRT-11.4.0.106",
     type = "tar.zst",
     urls = [
-        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/11.3.0/tars/TensorRT-Enterprise-11.3.0.99-Linux-x86_64-cuda-${TENSORRT_CUDA_VERSION_UPPER_BOUND}-Release-external.tar.zst",
+        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/11.4.0/tars/TensorRT-Enterprise-11.4.0.106-Linux-x86_64-cuda-${TENSORRT_CUDA_VERSION_UPPER_BOUND}-Release-external.tar.zst",
     ],
 )
 
@@ -138,10 +138,10 @@ http_archive(
 http_archive(
     name = "tensorrt_sbsa",
     build_file = "@//third_party/tensorrt/archive:BUILD",
-    strip_prefix = "TensorRT-11.3.0.99",
+    strip_prefix = "TensorRT-11.4.0.106",
     type = "tar.zst",
     urls = [
-        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/11.3.0/tars/TensorRT-Enterprise-11.3.0.99-Linux-aarch64-cuda-13.4-Release-external.tar.zst",
+        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/11.4.0/tars/TensorRT-Enterprise-11.4.0.106-Linux-aarch64-cuda-13.4-Release-external.tar.zst",
     ],
 )
 
@@ -157,9 +157,9 @@ http_archive(
 http_archive(
     name = "tensorrt_win",
     build_file = "@//third_party/tensorrt/archive:BUILD",
-    strip_prefix = "TensorRT-11.3.0.99",
+    strip_prefix = "TensorRT-11.4.0.106",
     urls = [
-        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/11.3.0/zip/TensorRT-Enterprise-11.3.0.99-Windows-amd64-cuda-${TENSORRT_CUDA_VERSION_UPPER_BOUND}-Release-external.zip",
+        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/11.4.0/zip/TensorRT-Enterprise-11.4.0.106-Windows-amd64-cuda-${TENSORRT_CUDA_VERSION_UPPER_BOUND}-Release-external.zip",
     ],
 )
 

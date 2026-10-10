@@ -228,20 +228,12 @@ EXECUTORCH_REQUIREMENT = (
     f"<{_executorch_major}.{int(_executorch_minor) + 1}; "
     "platform_system == 'Linux'"
 )
-# No version: the delegate pins ExecuTorch itself, so a mismatch is refused from its side.
-EXECUTORCH_RUNTIME_REQUIREMENT = (
-    "torch-tensorrt-executorch-runtime; platform_system == 'Linux'"
-)
-# The companion is the only thing named here. It pins the exact ExecuTorch it was
-# compiled against, so naming a range beside it states the version twice, and the
-# two statements cannot both hold on the day the pin moves: the range asks for the
-# new build while every published companion still asks for the previous one, and a
-# resolver has nothing left to choose. Leaving the companion as the single source
-# of the version keeps a bump resolvable, and a mismatch is still refused, by the
-# companion itself at import rather than by a range here.
+# Install the native companion separately from the matching build artifacts. Its
+# exact ABI dependencies can lag the source pins while a new nightly is building,
+# so resolving it here would prevent locking or installing the current project.
 EXTRAS_REQUIRE = {
-    "executorch": [EXECUTORCH_RUNTIME_REQUIREMENT],
-    "all": [EXECUTORCH_RUNTIME_REQUIREMENT],
+    "executorch": [EXECUTORCH_REQUIREMENT],
+    "all": [EXECUTORCH_REQUIREMENT],
 }
 
 if "--ci" in sys.argv:
@@ -1020,10 +1012,10 @@ def get_tensorrt_requirements():
     # TensorRT does not build wheels for Tegra, so SBSA takes the plain `tensorrt`
     # package from the tarball install; everywhere else takes the CUDA 13 trio.
     return [
-        f"tensorrt>=11.3.0,<11.4.0; {SBSA_MARKER}",
-        f"tensorrt-cu13>=11.3.0,<11.4.0; {NON_SBSA_MARKER}",
-        f"tensorrt-cu13-bindings>=11.3.0,<11.4.0; {NON_SBSA_MARKER}",
-        f"tensorrt-cu13-libs>=11.3.0,<11.4.0; {NON_SBSA_MARKER}",
+        f"tensorrt>=11.4.0,<11.5.0; {SBSA_MARKER}",
+        f"tensorrt-cu13>=11.4.0,<11.5.0; {NON_SBSA_MARKER}",
+        f"tensorrt-cu13-bindings>=11.4.0,<11.5.0; {NON_SBSA_MARKER}",
+        f"tensorrt-cu13-libs>=11.4.0,<11.5.0; {NON_SBSA_MARKER}",
     ]
 
 
