@@ -55,13 +55,28 @@ has just landed, or to report a problem against current ``main``:
 
 .. code-block:: bash
 
-    pip install --pre "torch-tensorrt[executorch]" \
+    pip install --pre --upgrade "torch-tensorrt[executorch]" \
       --index-url https://download.pytorch.org/whl/nightly/cu132 \
       --extra-index-url https://pypi.org/simple \
       --extra-index-url https://pypi.nvidia.com
 
-``--pre`` is required here. Without it pip ignores the nightly and takes the stable
-Torch-TensorRT from the public index instead.
+``--pre`` is required. Without it pip ignores the nightly channel and takes the stable
+Torch-TensorRT from the public index instead. ``--upgrade`` matters on a machine that
+already has a nightly, because pip leaves a satisfied requirement alone and you would keep
+an older build without being told.
+
+That command gives you the newest delegate nightly, and the one ExecuTorch build that
+delegate was compiled against. Two things follow, and both look like pip misbehaving when
+they are not.
+
+The delegate wheel is published less often than the rest of the channel, so the newest one
+is usually a few days behind the newest ``torch-tensorrt``.
+
+ExecuTorch is held at the build named in the delegate's own requirements, even when the
+channel already has a newer nightly. The delegate links against that exact revision, so a
+newer ExecuTorch is not an upgrade here, it is a mismatch. Asking for one by hand makes the
+install unresolvable rather than fixing anything. To move ExecuTorch forward, wait for a
+delegate nightly built against it.
 
 What the extra installs
 ^^^^^^^^^^^^^^^^^^^^^^^^
