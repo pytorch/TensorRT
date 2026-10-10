@@ -4,4 +4,4 @@
 # a fresh environment to check the published wheel's own requirement is satisfiable. It lives here
 # for the same reason as the exact pin: a bump must not touch a workflow file.
 # pin-check: range-ok
-executorch>=1.6.0.dev20261008,<1.7
+executorch>=1.6.0.dev20261009,<1.7
