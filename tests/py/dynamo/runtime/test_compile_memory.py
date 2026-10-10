@@ -6,10 +6,67 @@
 import os
 import platform
 import unittest
+from typing import Any, Callable, List, Tuple
 from unittest import mock
 
 import torch
+from torch_tensorrt import ENABLED_FEATURES
 from torch_tensorrt.dynamo import utils
+from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
+from torch_tensorrt.logging import TRT_LOGGER
+
+import tensorrt as trt
+
+
+def _proc_status(field: str) -> int:
+    with open("/proc/self/status") as f:
+        for line in f:
+            if line.startswith(field + ":"):
+                return int(line.split()[1]) * 1024
+    raise KeyError(field)
+
+
+def _peak_rss_growth(fn: Callable[[], Any]) -> Tuple[Any, int]:
+    """Run ``fn``; return its result and how far RSS rose above its starting point.
+
+    Uses the kernel's high-water mark (reset through ``/proc/self/clear_refs``), so
+    nothing is missed between samples. Freed memory that glibc still holds would absorb
+    a copy without raising RSS, hiding it, so that is returned to the OS first.
+    """
+    malloc_trim = utils._glibc_malloc_trim()
+    if malloc_trim is not None:
+        malloc_trim(0)
+    with open("/proc/self/clear_refs", "w") as f:
+        f.write("5")
+    before = _proc_status("VmRSS")
+    result = fn()
+    return result, _proc_status("VmHWM") - before
+
+
+def _build_plan(width: int = 2048, layers: int = 8) -> Tuple[bytes, List[torch.Tensor]]:
+    """A plan for ``x @ w.T`` chained over ``layers`` fp16 weights, plus the weights."""
+    weights = [
+        torch.randn(width, width, dtype=torch.float16) * width**-0.5
+        for _ in range(layers)
+    ]
+    builder = trt.Builder(TRT_LOGGER)
+    flags = 0
+    if not ENABLED_FEATURES.tensorrt_rtx:
+        flags = 1 << int(trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED)
+    net = builder.create_network(flags)
+    t = net.add_input("x", trt.float16, (4, width))
+    for w in weights:
+        c = net.add_constant(
+            (width, width), trt.Weights(trt.float16, w.data_ptr(), w.numel())
+        )
+        t = net.add_matrix_multiply(
+            t, trt.MatrixOperation.NONE, c.get_output(0), trt.MatrixOperation.TRANSPOSE
+        ).get_output(0)
+    t.name = "y"
+    net.mark_output(t)
+    plan = builder.build_serialized_network(net, builder.create_builder_config())
+    return bytes(plan), weights
 
 
 class TestTrimHostHeap(unittest.TestCase):
@@ -95,6 +152,35 @@ class TestDeallocateModule(unittest.TestCase):
         self.assertGreater(len(reserved_while_moving), 4)
         self.assertLess(reserved_while_moving[-2], reserved_while_moving[0])
         self.assertLessEqual(torch.cuda.memory_allocated(), before - 8 * layer_bytes)
+
+
+@unittest.skipIf(platform.system() != "Linux", "measures RSS through /proc")
+class TestEngineSetupMemory(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.plan, cls.weights = _build_plan()
+
+    def _module(self) -> TorchTensorRTModule:
+        return TorchTensorRTModule(
+            serialized_engine=self.plan,
+            input_binding_names=["x"],
+            output_binding_names=["y"],
+            name="memory_probe",
+            settings=CompilationSettings(),
+        )
+
+    def test_setup_does_not_copy_the_plan(self):
+        self._module()  # warm up: load runtime libraries and kernels once
+        module, growth = _peak_rss_growth(self._module)
+        # The engine's weights go to the GPU. Host memory should not hold another copy
+        # of the plan; it used to hold two while it was converted for the C++ runtime.
+        self.assertLess(growth, len(self.plan) // 2)
+
+        x = torch.randn(4, 2048, dtype=torch.float16, device="cuda")
+        expected = x
+        for w in self.weights:
+            expected = expected @ w.cuda().T
+        torch.testing.assert_close(module(x), expected, rtol=2e-2, atol=2e-2)
 
 
 if __name__ == "__main__":

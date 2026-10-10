@@ -10,6 +10,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -231,10 +232,16 @@ struct TRTEngine : torch::CustomClassHolder {
       const std::unordered_map<std::string, AliasedIOSpec>& aliased_io = {});
 
   TRTEngine(std::vector<std::string> serialized_info);
+  // Same as above, but the TensorRT plan comes from serialized_engine and
+  // serialized_info[ENGINE_IDX] is ignored. Lets callers hand over a plan they already
+  // hold (e.g. a Python bytes object) without copying it into a std::string.
+  TRTEngine(const std::vector<std::string>& serialized_info, std::string_view serialized_engine);
 
+  // serialized_engine is only read during construction, so it may point into a buffer
+  // the caller owns.
   TRTEngine(
       const std::string& mod_name,
-      const std::string& serialized_engine,
+      std::string_view serialized_engine,
       const RTDevice& cuda_device,
       const std::vector<std::string>& in_binding_names,
       const std::vector<std::string>& out_binding_names,
