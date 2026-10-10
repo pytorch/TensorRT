@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
+import operator
 import unittest.mock as mock
 
 import torch
@@ -115,6 +116,64 @@ class TestResourcePartitioning(TestCase):
             partitioner._verify_all_fusion_nodes_in_same_subgraph(new_subgraphs)
 
             break
+
+    def test_split_keeps_getitem_with_multi_output_producer(self):
+        # LayerNorm affine weights are the only weights here, so every size-driven cut
+        # lands right after a native_layer_norm, whose tuple output only its getitem reads.
+        class net(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.norms = nn.ModuleList(nn.LayerNorm(4096) for _ in range(6))
+
+            def forward(self, x):
+                for norm in self.norms:
+                    x = torch.relu(norm(x))
+                return x
+
+        model = net().eval().cuda()
+        inputs = [torch.randn((8, 4096)).cuda()]
+        settings = CompilationSettings(
+            min_block_size=1,
+            immutable_weights=True,
+            reuse_cached_engines=False,
+            enable_resource_partitioning=True,
+        )
+        exported_program = pre_export_lowering(
+            torch.export.export(model, tuple(inputs)), settings
+        ).run_decompositions(get_decompositions(False))
+        gm = post_lowering(exported_program.module(), settings)
+        partitioned_module, _ = partitioning.fast_partition(
+            gm, min_block_size=1, skip_fusion=True
+        )
+        name, submodule = next(
+            (n, m) for n, m in partitioned_module.named_children() if "_run_on_acc" in n
+        )
+
+        _mock_mem = mock.MagicMock()
+        _mock_mem.rss = _FIXED_RSS_BYTES
+        with mock.patch("psutil.Process") as mock_proc:
+            mock_proc.return_value.memory_info.return_value = _mock_mem
+            partitioner = ResourcePartitioner(
+                submodule,
+                submodule_name=name,
+                cpu_memory_budget=2 * 1024 * 1024 * 1024,
+            )
+        subgraphs = partitioner.put_nodes_into_subgraphs()
+        norm_bytes = 2 * 4096 * 4
+        subgraphs = partitioner.break_subgraphs(
+            subgraphs, subgraph_size_budget=norm_bytes * 3 // 2
+        )
+
+        self.assertGreater(len(subgraphs), 1)
+        subgraph_of = {n: i for i, s in enumerate(subgraphs) for n in s.nodes}
+        getitems = [n for n in subgraph_of if n.target is operator.getitem]
+        self.assertTrue(getitems)
+        for getitem in getitems:
+            self.assertEqual(
+                subgraph_of[getitem],
+                subgraph_of[getitem.args[0]],
+                f"{getitem.name} was split from its producer {getitem.args[0].name}",
+            )
 
 
 if __name__ == "__main__":
