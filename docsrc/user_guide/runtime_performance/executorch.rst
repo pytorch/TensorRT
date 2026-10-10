@@ -73,8 +73,9 @@ To pick up a change before it ships, or to report a problem against ``main``:
 * PyPI stays in the list because TensorRT is not published on the nightly channel.
 
 You get the newest delegate nightly plus the one ExecuTorch build it was compiled against.
-That ExecuTorch is often a few days older than the newest on the channel. This is correct,
-not a stale resolve, and asking for a newer one by hand will not resolve at all.
+The delegate names that build exactly, so the ExecuTorch you end up with is often a few
+days older than the newest one published. This is correct, not a stale resolve, and asking
+for a newer one by hand will not resolve at all.
 
 What the extra installs
 ^^^^^^^^^^^^^^^^^^^^^^^^
