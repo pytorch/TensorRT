@@ -47,12 +47,6 @@ Release builds
 Swap ``cu132`` for the channel that matches your CUDA, such as ``cu134`` for CUDA 13.4. Keep
 PyTorch, ExecuTorch and Torch-TensorRT on the same channel.
 
-.. note::
-
-    Torch-TensorRT 2.15 is the first release whose ``executorch`` extra pulls the delegate
-    wheel. On 2.14 the extra installs ExecuTorch but not the delegate, so use a nightly
-    until 2.15 is out.
-
 Nightly builds
 ^^^^^^^^^^^^^^^
 
@@ -79,6 +73,10 @@ before failing.
 The extra installs a companion wheel, ``torch-tensorrt-executorch-runtime``. It ships one
 shared library holding the TensorRT delegate, which registers itself with the ExecuTorch
 runtime from the ``executorch`` distribution rather than bundling a runtime of its own.
+
+That companion names the ExecuTorch it was built against, 1.6 for this release, so pip
+resolves a matching ``executorch`` for you. Install a different one by hand and the delegate
+refuses it at import, rather than loading and going wrong later.
 
 A CUDA build of ExecuTorch is required at run time, not only to build against. A processor
 only build installs and then fails on import. Use a fresh virtual environment so the install
