@@ -22,15 +22,20 @@ def test_windows_export_and_execute(tmp_path):
     ), "The Windows ExecuTorch lane requires a CUDA device"
     assert torch.version.cuda in {"13.2", "13.4"}
 
-    import torch_tensorrt_executorch_runtime
     from executorch.runtime import Runtime
 
     runtime = Runtime.get()
+    assert runtime.backend_registry.is_available("XnnpackBackend")
+    existing_backends = set(runtime.backend_registry.registered_backend_names)
+
+    import torch_tensorrt_executorch_runtime
+
     assert runtime.backend_registry.is_available(
         torch_tensorrt_executorch_runtime.BACKEND_NAME
     )
-    # These must survive loading an out-of-tree delegate as well.
-    assert runtime.backend_registry.is_available("CudaBackend")
+    # Windows Python bindings do not load CudaBackend. Preserve every backend
+    # the installed ExecuTorch wheel registered before loading our delegate.
+    assert existing_backends <= set(runtime.backend_registry.registered_backend_names)
     assert runtime.backend_registry.is_available("XnnpackBackend")
 
     class Model(torch.nn.Module):
