@@ -4,12 +4,14 @@
 # ExecuTorch TensorRT backend: serialize engines to a libtorch-free runtime blob.
 
 import copy
+import hashlib
 import json
 import operator
 from typing import Any, Container, Iterable, List, Optional, Set, final
 
 import torch
 import torch.fx
+from executorch.exir._serialize._named_data_store import NamedDataStore
 from executorch.exir.backend.backend_details import (
     BackendDetails,
     CompileSpec,
@@ -49,6 +51,14 @@ _BINDING_DELIM = "%"
 # short of its aliased outputs is a bug, not a zero-copy program, and stays an
 # error.
 ZERO_COPY_KV_COMPILE_SPEC_KEY = "zero_copy_kv"
+
+# CompileSpec key naming the ExecuTorch data file (.ptd) that receives each engine of the
+# method, so the .pte keeps only the engine's key. The value is the file name without the
+# .ptd extension. Absent, every engine is embedded in the .pte as before.
+EXTERNAL_ENGINE_DATA_COMPILE_SPEC_KEY = "external_engine_data"
+
+# The alignment an embedded engine gets inside the blob.
+_EXTERNAL_ENGINE_ALIGNMENT = 16
 
 
 def _schema_name(target: Any) -> str:
@@ -481,6 +491,29 @@ def _elided_output_names(compile_specs: List[CompileSpec]) -> Optional[Set[str]]
     return None
 
 
+def _external_engine_tag(compile_specs: List[CompileSpec]) -> Optional[str]:
+    """The .ptd file name export asked engines to be written to, or ``None``."""
+    tags = [
+        spec.value
+        for spec in compile_specs
+        if getattr(spec, "key", None) == EXTERNAL_ENGINE_DATA_COMPILE_SPEC_KEY
+    ]
+    if not tags:
+        return None
+    if len(tags) > 1:
+        raise ValueError(
+            "TensorRT ExecuTorch backend: compile spec "
+            f"'{EXTERNAL_ENGINE_DATA_COMPILE_SPEC_KEY}' must appear at most once."
+        )
+    tag = bytes(tags[0]).decode("utf-8")
+    if not tag:
+        raise ValueError(
+            "TensorRT ExecuTorch backend: compile spec "
+            f"'{EXTERNAL_ENGINE_DATA_COMPILE_SPEC_KEY}' names no data file."
+        )
+    return tag
+
+
 def _get_str(engine_info: List[Any], index: int, default: str = "") -> str:
     if index < 0 or index >= len(engine_info):
         return default
@@ -497,7 +530,8 @@ class TensorRTBackend(BackendDetails):  # type: ignore[misc]
     """Backend that serializes TensorRT engines for the native ExecuTorch runtime.
 
     The partition contains a single execute_engine node; we extract the engine
-    and metadata and encode them as a standalone blob. The C++ runtime
+    and metadata and encode them as a standalone blob, or, with
+    external_engine_data, put the engine in a .ptd file and its key in the blob. The C++ runtime
     backend parses that blob directly without the legacy Torch-TensorRT C++ runtime.
     """
 
@@ -588,5 +622,22 @@ class TensorRTBackend(BackendDetails):  # type: ignore[misc]
             serialized_metadata=_get_str(engine_info, SERIALIZED_METADATA_IDX),
             target_platform=_get_str(engine_info, TARGET_PLATFORM_IDX),
         )
-        blob = serialize_engine(engine_info[ENGINE_IDX], metadata)
-        return PreprocessResult(processed_bytes=blob)
+        external_tag = _external_engine_tag(compile_specs)
+        if external_tag is None:
+            blob = serialize_engine(engine_info[ENGINE_IDX], metadata)
+            return PreprocessResult(processed_bytes=blob)
+
+        # Keyed by content, so the key names one engine across every method and partition.
+        engine = bytes(engine_info[ENGINE_IDX])
+        metadata.engine_key = hashlib.sha256(engine).hexdigest() + "_trt_engine"
+        store = NamedDataStore()
+        store.add_named_data(
+            metadata.engine_key,
+            engine,
+            _EXTERNAL_ENGINE_ALIGNMENT,
+            external_tag,
+        )
+        return PreprocessResult(
+            processed_bytes=serialize_engine(b"", metadata),
+            data_store_output=store.get_named_data_store_output(),
+        )

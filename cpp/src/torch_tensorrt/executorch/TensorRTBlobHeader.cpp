@@ -221,6 +221,7 @@ bool parse_metadata_json(const std::string& json, bool expects_aliased_io, Tenso
   out.aliased_io.clear();
   out.hardware_compatible = false;
   out.device_id = 0;
+  out.engine_key.clear();
 
   const std::size_t bindings_pos = find_top_level_key(json, "\"io_bindings\"");
   if (bindings_pos == std::string::npos) {
@@ -476,8 +477,22 @@ bool parse_metadata_json(const std::string& json, bool expects_aliased_io, Tenso
   }
   const std::size_t hw_key = find_top_level_key(json, "\"hardware_compatible\"");
   const std::size_t device_key = find_top_level_key(json, "\"device_id\"");
-  return parse_bool_after_key(json, hw_key, "\"hardware_compatible\"", out.hardware_compatible) &&
-      parse_int_after_key(json, device_key, "\"device_id\"", out.device_id);
+  if (!parse_bool_after_key(json, hw_key, "\"hardware_compatible\"", out.hardware_compatible) ||
+      !parse_int_after_key(json, device_key, "\"device_id\"", out.device_id)) {
+    return false;
+  }
+  // Optional: absent in a blob that carries its engine. Present, it must be a non-empty string,
+  // since an empty key would read as "engine in the blob" while the blob holds none.
+  const std::size_t engine_key = find_top_level_key(json, "\"engine_key\"");
+  if (engine_key == std::string::npos) {
+    return true;
+  }
+  const std::size_t engine_key_colon = json.find(':', engine_key);
+  if (engine_key_colon == std::string::npos) {
+    return false;
+  }
+  return parse_string(json, skip_ws(json, engine_key_colon + 1), out.engine_key) != std::string::npos &&
+      !out.engine_key.empty();
 }
 
 } // namespace

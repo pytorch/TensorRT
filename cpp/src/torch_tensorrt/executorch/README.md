@@ -323,6 +323,11 @@ Loading returns `Error::MemoryAllocationFailed` when TensorRT's last error conta
 weight streaming budget application and execution context creation. Other TensorRT
 load failures return `Error::InvalidProgram`.
 
+A program exported with `external_engine_data=` keeps its engines in a `.ptd` file.
+Load it with that file, for example `Module module("model.pte", "engines.ptd");`.
+Without the file, or with one that lacks the engine, loading returns
+`Error::InvalidExternalData`.
+
 The log names the failed operation and preserves up to 1023 characters of the
 TensorRT reason across short lines. Allocation failures include free and total
 device memory in bytes, or the memory query error if those figures are unavailable.

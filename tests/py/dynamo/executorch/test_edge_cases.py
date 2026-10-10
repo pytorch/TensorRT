@@ -59,7 +59,7 @@ def test_save_as_executorch_uses_public_lowering_and_persists_data(
         backend_config=backend_config,
     )
 
-    # The complete set of lowering options _save_as_executorch forwards. The seven this
+    # The complete set of lowering options _save_as_executorch forwards. The eight this
     # test does not pass are still forwarded explicitly, as None or False rather than
     # left out. backend_config is absent by design -- it is not a lowering option and is
     # routed to to_executorch() below.
@@ -74,6 +74,7 @@ def test_save_as_executorch_uses_public_lowering_and_persists_data(
         weight_streaming_budget_per_engine=None,
         use_cuda_graphs=None,
         zero_copy_kv=False,
+        external_engine_data=None,
     )
     # With zero_copy_kv off the caller's backend_config reaches to_executorch()
     # exactly as given: save() wraps it only to install the un-staging pass.

@@ -16,6 +16,7 @@
 #include <cuda_runtime.h>
 
 #include <executorch/extension/cuda/caller_stream.h>
+#include <executorch/runtime/core/named_data_map.h>
 #include <executorch/runtime/platform/platform.h>
 #include <executorch/runtime/platform/runtime.h>
 
@@ -94,7 +95,9 @@ std::vector<std::uint8_t> wrap_engine_plan(
   write_field(blob, 12, engine_offset);
   write_field(blob, 16, static_cast<std::uint64_t>(plan_size));
   std::memcpy(blob.data() + kHeaderSize, metadata.data(), metadata.size());
-  std::memcpy(blob.data() + engine_offset, plan, plan_size);
+  if (plan_size != 0) {
+    std::memcpy(blob.data() + engine_offset, plan, plan_size);
+  }
   return blob;
 }
 
@@ -302,10 +305,11 @@ class Handle {
   Error load(
       const std::vector<std::uint8_t>& blob,
       const char* budget = nullptr,
-      Span<const BackendOption> options = {}) {
+      Span<const BackendOption> options = {},
+      const NamedDataMap* data_map = nullptr) {
     std::vector<std::uint8_t> bytes = blob;
     FreeableBuffer processed(bytes.data(), bytes.size(), nullptr);
-    BackendInitContext init_context(&arena_, nullptr, nullptr, nullptr, options);
+    BackendInitContext init_context(&arena_, nullptr, nullptr, data_map, options);
     CompileSpec spec{"weight_streaming_budget", {nullptr, 0}};
     if (budget != nullptr) {
       spec.value.buffer = const_cast<char*>(budget);
@@ -396,6 +400,75 @@ void expect_two_loads_to_share(const std::vector<std::uint8_t>& blob) {
   ASSERT_EQ(a.load(blob), Error::Ok);
   ASSERT_EQ(b.load(blob), Error::Ok);
   EXPECT_EQ(a.engine(), b.engine());
+}
+
+// One named entry, the way an ExecuTorch .ptd file presents it. Each read gets its own copy, which is
+// overwritten when freed, so a backend that read the engine after freeing it would fail.
+class OneEntryDataMap final : public NamedDataMap {
+ public:
+  OneEntryDataMap(std::string key, std::vector<std::uint8_t> data) : key_(std::move(key)), data_(std::move(data)) {}
+
+  Result<const TensorLayout> get_tensor_layout(std::string_view) const override {
+    return Error::NotImplemented;
+  }
+  Result<FreeableBuffer> get_data(std::string_view key) const override {
+    reads_.fetch_add(1);
+    if (key != key_) {
+      return Error::NotFound;
+    }
+    live_buffers_.fetch_add(1);
+    auto* copy = new std::uint8_t[data_.size()];
+    std::memcpy(copy, data_.data(), data_.size());
+    return FreeableBuffer(
+        copy,
+        data_.size(),
+        [](void* context, void* data, std::size_t size) {
+          std::memset(data, 0xA5, size);
+          delete[] static_cast<std::uint8_t*>(data);
+          static_cast<std::atomic<int>*>(context)->fetch_sub(1);
+        },
+        &live_buffers_);
+  }
+  Error load_data_into(std::string_view, void*, std::size_t) const override {
+    return Error::NotImplemented;
+  }
+  Result<std::uint32_t> get_num_keys() const override {
+    return 1;
+  }
+  Result<const char*> get_key(std::uint32_t index) const override {
+    if (index != 0) {
+      return Error::InvalidArgument;
+    }
+    return key_.c_str();
+  }
+
+  int live_buffers() const {
+    return live_buffers_.load();
+  }
+  int reads() const {
+    return reads_.load();
+  }
+
+ private:
+  std::string key_;
+  std::vector<std::uint8_t> data_;
+  mutable std::atomic<int> live_buffers_{0};
+  mutable std::atomic<int> reads_{0};
+};
+
+constexpr char kEngineKey[] = "engine_in_a_data_file";
+
+// The blob export writes for an engine kept in a .ptd file: the metadata names the key, and no
+// engine bytes follow it.
+std::vector<std::uint8_t> external_engine_blob(const char* key = kEngineKey) {
+  std::string metadata = blob_metadata(0);
+  metadata.pop_back();
+  metadata += std::string(R"(,"engine_key":")") + key + "\"}";
+  return wrap_engine_plan(nullptr, 0, metadata);
+}
+
+std::vector<std::uint8_t> plan_of(const std::vector<std::uint8_t>& blob) {
+  return {blob.begin() + static_cast<std::ptrdiff_t>(plan_offset(blob)), blob.end()};
 }
 
 class SharedEnginesTest : public ::testing::Test {
@@ -592,6 +665,54 @@ TEST_F(SharedEnginesTest, TheEngineIsFreedWithItsLastHandle) {
   Handle reloaded;
   ASSERT_EQ(reloaded.load(blob_), Error::Ok);
   EXPECT_FALSE(reloaded.run(1, 5).empty());
+}
+
+// The same engine bytes, read from a data file instead of the blob, give the same engine: it runs to
+// the same result bit for bit, and a load of the embedded blob shares it.
+TEST_F(SharedEnginesTest, AnEngineInADataFileRunsLikeTheSameEngineInTheBlob) {
+  const OneEntryDataMap data_map(kEngineKey, plan_of(blob_));
+  Handle external;
+  ASSERT_EQ(external.load(external_engine_blob(), nullptr, {}, &data_map), Error::Ok);
+  EXPECT_EQ(data_map.live_buffers(), 0) << "init must free the engine bytes once the engine is built";
+  Handle embedded;
+  ASSERT_EQ(embedded.load(blob_), Error::Ok);
+  EXPECT_EQ(external.engine(), embedded.engine());
+  const auto expected = embedded.run(1, 11);
+  ASSERT_FALSE(expected.empty());
+  EXPECT_EQ(external.run(1, 11), expected);
+  const BackendOption private_load = sharing_option(false);
+  Handle private_external;
+  ASSERT_EQ(private_external.load(external_engine_blob(), nullptr, {&private_load, 1}, &data_map), Error::Ok);
+  EXPECT_EQ(data_map.live_buffers(), 0);
+  EXPECT_EQ(private_external.run(1, 11), expected);
+}
+
+TEST_F(SharedEnginesTest, AnEngineInADataFileFailsClearlyWithoutTheFile) {
+  Handle no_file;
+  EXPECT_EQ(no_file.load(external_engine_blob()), Error::InvalidExternalData);
+  const OneEntryDataMap other_file("some_other_key", plan_of(blob_));
+  Handle wrong_file;
+  EXPECT_EQ(wrong_file.load(external_engine_blob(), nullptr, {}, &other_file), Error::InvalidExternalData);
+}
+
+// The guard reads the engine, so it applies wherever the bytes came from.
+TEST_F(SharedEnginesTest, AStrippedEngineInADataFileIsRefused) {
+  const OneEntryDataMap data_map(kEngineKey, plan_of(stripped_blob_));
+  Handle handle;
+  EXPECT_EQ(handle.load(external_engine_blob(), nullptr, {}, &data_map), Error::InvalidProgram);
+  EXPECT_EQ(data_map.reads(), 1) << "refused before the engine was read, so the guard never ran";
+  EXPECT_EQ(data_map.live_buffers(), 0);
+}
+
+TEST_F(SharedEnginesTest, ABlobNamingAnExternalEngineMustCarryNoEngineBytes) {
+  std::string metadata = blob_metadata(0);
+  metadata.pop_back();
+  metadata += std::string(R"(,"engine_key":")") + kEngineKey + "\"}";
+  const auto plan = plan_of(blob_);
+  const auto both = wrap_engine_plan(plan.data(), plan.size(), metadata);
+  const OneEntryDataMap data_map(kEngineKey, plan);
+  Handle handle;
+  EXPECT_EQ(handle.load(both, nullptr, {}, &data_map), Error::InvalidProgram);
 }
 
 // The budget is fixed before the first context and TensorRT refuses to move it after, so loads

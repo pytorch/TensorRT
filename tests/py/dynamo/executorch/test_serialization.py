@@ -159,6 +159,10 @@ def test_to_json_writes_every_scalar_after_both_arrays():
     )
     for key in ('"hardware_compatible"', '"device_id"'):
         assert text.index(key) > arrays_end, f"{key} is written before an array"
+    keyed = TensorRTBlobMetadata.from_json(metadata.to_json())
+    keyed.engine_key = "abc_trt_engine"
+    keyed_text = keyed.to_json().decode("utf-8")
+    assert keyed_text.index('"engine_key"') > arrays_end
 
     # Read back through the writer's own reader as well, so the ordering
     # assertion is made about a payload that is otherwise correct.
@@ -167,3 +171,19 @@ def test_to_json_writes_every_scalar_after_both_arrays():
     assert restored.device_id == 6
     assert restored.aliased_io == {"out_k": ("in_k", "kv_cache_update")}
     assert [b.name for b in restored.io_bindings] == ["in_k", "out_k"]
+
+
+@pytest.mark.unit
+def test_engine_key_round_trips_and_is_absent_when_unset():
+    metadata = TensorRTBlobMetadata(
+        io_bindings=[
+            TensorRTIOBinding(name="x"),
+            TensorRTIOBinding(name="y", is_input=False),
+        ]
+    )
+    assert "engine_key" not in json.loads(metadata.to_json())
+
+    metadata.engine_key = "abc_trt_engine"
+    engine, restored = deserialize_engine(serialize_engine(b"", metadata))
+    assert engine == b""
+    assert restored.engine_key == "abc_trt_engine"
