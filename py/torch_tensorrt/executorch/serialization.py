@@ -6,7 +6,8 @@
 The ExecuTorch runtime path must not depend on libtorch, TorchScript custom
 classes, or the Torch-TensorRT C++ runtime ABI.  This module therefore emits a
 small standalone blob that contains JSON metadata plus raw TensorRT engine
-bytes.  The C++ ExecuTorch backend parses the same layout directly.
+bytes, or no bytes and the engine's key in an ExecuTorch .ptd file.  The C++
+ExecuTorch backend parses the same layout directly.
 """
 
 import dataclasses
@@ -51,6 +52,9 @@ class TensorRTBlobMetadata:
     device_id: int = 0
     serialized_metadata: str = ""
     target_platform: str = ""
+    # Named-data key of an engine kept outside the blob, in an ExecuTorch .ptd file. Empty when the
+    # engine bytes follow the metadata in the blob itself.
+    engine_key: str = ""
 
     def to_json(self) -> bytes:
         # Keep field order stable because the C++ parser is intentionally small.
@@ -80,6 +84,10 @@ class TensorRTBlobMetadata:
             "serialized_metadata": self.serialized_metadata,
             "target_platform": self.target_platform,
         }
+        # Written only when set, so a blob that carries its engine stays byte-identical to one
+        # written before this field existed.
+        if self.engine_key:
+            data["engine_key"] = self.engine_key
         return json.dumps(data, separators=(",", ":")).encode("utf-8")
 
     @classmethod
@@ -103,6 +111,7 @@ class TensorRTBlobMetadata:
             device_id=parsed.get("device_id", 0),
             serialized_metadata=parsed.get("serialized_metadata", ""),
             target_platform=parsed.get("target_platform", ""),
+            engine_key=parsed.get("engine_key", ""),
         )
 
 

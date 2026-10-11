@@ -725,6 +725,7 @@ _EXECUTORCH_SAVE_OPTIONS: Dict[str, Any] = {
     "weight_streaming_budget_per_engine": None,
     "use_cuda_graphs": None,
     "zero_copy_kv": False,
+    "external_engine_data": None,
 }
 
 
@@ -832,7 +833,8 @@ def save(
         kwargs: Additional format-specific kwargs. ``partitioners=``,
                 ``compile_specs=``, ``backend_config=``, ``constant_methods=``,
                 ``transform_passes=``, ``compile_config=``, ``generate_etrecord=``,
-                ``weight_streaming_budget_per_engine=`` and ``zero_copy_kv=`` are
+                ``weight_streaming_budget_per_engine=``, ``zero_copy_kv=`` and
+                ``external_engine_data=`` are
                 only used with ``output_format="executorch"``; otherwise they are
                 ignored with a warning. Pass ``compile_specs=[CompileSpec("target_device",
                 b"cuda:<i>")]`` to override the default target device (``cuda:0``).
@@ -876,6 +878,10 @@ def save(
                 :func:`torch_tensorrt.executorch.check_zero_copy_kv` on the
                 finalized program before writing the file, so a single
                 ``zero_copy_kv=True`` is enough.
+                ``external_engine_data=`` (default ``None``) takes a file name and
+                writes every TensorRT engine to ``<name>.ptd`` next to the ``.pte``
+                instead of into it. Pass that file as the program's data file when
+                loading. See :func:`torch_tensorrt.executorch.export`.
     """
     if isinstance(module, CudaGraphsTorchTensorRTModule):
         module = module.compiled_module
@@ -915,6 +921,7 @@ def save(
         "weight_streaming_budget_per_engine"
     ]
     executorch_zero_copy_kv = executorch_options["zero_copy_kv"]
+    executorch_external_engine_data = executorch_options["external_engine_data"]
 
     if output_format not in accepted_formats:
         raise ValueError(
@@ -1109,6 +1116,11 @@ def save(
             "use_cuda_graphs= is only used with output_format='executorch' and will "
             f"be ignored for output_format='{output_format}'."
         )
+    if executorch_external_engine_data is not None and output_format != "executorch":
+        logger.warning(
+            "external_engine_data= is only used with output_format='executorch' and "
+            f"will be ignored for output_format='{output_format}'."
+        )
     if executorch_zero_copy_kv and output_format != "executorch":
         logger.warning(
             "zero_copy_kv= is only used with output_format='executorch' and will "
@@ -1209,6 +1221,7 @@ def save(
                     weight_streaming_budget_per_engine=executorch_weight_streaming_budget_per_engine,
                     use_cuda_graphs=use_cuda_graphs,
                     zero_copy_kv=executorch_zero_copy_kv,
+                    external_engine_data=executorch_external_engine_data,
                 )
             else:
                 raise RuntimeError(
@@ -1328,6 +1341,7 @@ def save(
                         weight_streaming_budget_per_engine=executorch_weight_streaming_budget_per_engine,
                         use_cuda_graphs=use_cuda_graphs,
                         zero_copy_kv=executorch_zero_copy_kv,
+                        external_engine_data=executorch_external_engine_data,
                     )
                 else:
                     raise RuntimeError(
@@ -1456,6 +1470,7 @@ def save(
                         weight_streaming_budget_per_engine=executorch_weight_streaming_budget_per_engine,
                         use_cuda_graphs=use_cuda_graphs,
                         zero_copy_kv=executorch_zero_copy_kv,
+                        external_engine_data=executorch_external_engine_data,
                     )
                 else:
                     raise RuntimeError(
@@ -1529,6 +1544,7 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
         ),
         use_cuda_graphs=kwargs.get("use_cuda_graphs"),
         zero_copy_kv=zero_copy_kv,
+        external_engine_data=kwargs.get("external_engine_data"),
     )
     # Unlike the direct export()+to_executorch() path -- where the two steps
     # belong to different owners and pairing them is the caller's job -- save()

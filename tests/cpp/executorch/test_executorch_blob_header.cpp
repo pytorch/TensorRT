@@ -759,6 +759,38 @@ TEST(ExecuTorchTensorRTBlobHeader, RejectsUnknownFutureMagic) {
   EXPECT_FALSE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
 }
 
+TEST(ExecuTorchTensorRTBlobHeader, ReadsTheKeyOfAnEngineKeptInADataFile) {
+  // The writer's key order, with the key last, and no engine bytes after the metadata.
+  const std::string metadata = R"({"io_bindings":[{"name":"x","is_input":true}],"aliased_io":[],)"
+                               R"("hardware_compatible":false,"device_id":0,"serialized_metadata":"",)"
+                               R"("target_platform":"","engine_key":"0123abcd_trt_engine"})";
+  const auto blob = make_blob(metadata, 0);
+
+  TensorRTBlobHeader header;
+  ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
+  EXPECT_EQ(header.engine_key, "0123abcd_trt_engine");
+  EXPECT_EQ(header.engine_size, 0u);
+}
+
+TEST(ExecuTorchTensorRTBlobHeader, LeavesTheKeyEmptyForAnEngineInTheBlob) {
+  TensorRTBlobHeader header;
+  header.engine_key = "left over from an earlier parse";
+  const auto blob = make_blob(VALID_METADATA);
+  ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
+  EXPECT_TRUE(header.engine_key.empty());
+}
+
+TEST(ExecuTorchTensorRTBlobHeader, RejectsAnEngineKeyThatIsEmptyOrNotAString) {
+  // Either would read as an engine in the blob, while the blob carries none.
+  for (const char* value : {R"("")", "7", "null"}) {
+    const std::string metadata =
+        std::string(R"({"io_bindings":[{"name":"x","is_input":true}],"engine_key":)") + value + "}";
+    const auto blob = make_blob(metadata, 0);
+    TensorRTBlobHeader header;
+    EXPECT_FALSE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header)) << value;
+  }
+}
+
 } // namespace
 } // namespace executorch_backend
 } // namespace torch_tensorrt

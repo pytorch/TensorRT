@@ -377,6 +377,16 @@ Error load_engine(
   if (engine == nullptr) {
     return report_load_error("deserialize TensorRT engine");
   }
+  // A plan serialized without its weights (built with strip_engine_weights=True, or saved with
+  // EXCLUDE_WEIGHTS) deserializes and runs without an error, but computes with placeholder weights,
+  // and this backend never refits. TensorRT reports -1 for a plan that carries its weights; a
+  // stripped plan can report 0, so 0 is refused too.
+  if (engine->getEngineStat(nvinfer1::EngineStat::kSTRIPPED_WEIGHTS_SIZE) >= 0) {
+    ET_LOG(
+        Error,
+        "TensorRTBackend::init: the TensorRT engine was serialized without its weights, and this backend cannot refit them. Export with strip_engine_weights=False.");
+    return Error::InvalidProgram;
+  }
   const Error err = apply_weight_streaming_budget(*engine, request);
   if (err != Error::Ok) {
     return report_load_error("set TensorRT weight streaming budget");
@@ -1227,16 +1237,52 @@ Result<DelegateHandle*> TensorRTBackend::init(
   }
 
   const void* engine_data = TensorRTBlobHeader::engine_data(processed->data(), header);
+  uint64_t engine_size = header.engine_size;
+  const auto* data_map = context.get_named_data_map();
+  if (!header.engine_key.empty()) {
+    if (header.engine_size != 0) {
+      ET_LOG(Error, "TensorRTBackend::init: blob names an external engine and also carries engine bytes");
+      return Error::InvalidProgram;
+    }
+    if (data_map == nullptr) {
+      ET_LOG(
+          Error,
+          "TensorRTBackend::init: the TensorRT engine is stored in an external data file (.ptd), but none was provided. Load the program together with its .ptd file.");
+      return Error::InvalidExternalData;
+    }
+  }
+  // Freed once the engine is built from it, like `processed` below, since TensorRT keeps its own copy.
+  Result<FreeableBuffer> external_engine =
+      header.engine_key.empty() ? Result<FreeableBuffer>(FreeableBuffer()) : data_map->get_data(header.engine_key);
+  if (!external_engine.ok()) {
+    if (external_engine.error() != Error::NotFound) {
+      ET_LOG(
+          Error,
+          "TensorRTBackend::init: failed to read TensorRT engine '%s' from the external data file: %s",
+          header.engine_key.c_str(),
+          ::executorch::runtime::to_string(external_engine.error()));
+      return external_engine.error();
+    }
+    ET_LOG(
+        Error,
+        "TensorRTBackend::init: the program's data has no TensorRT engine with key '%s'. Load the program together with the .ptd file written with it.",
+        header.engine_key.c_str());
+    return Error::InvalidExternalData;
+  }
+  if (!header.engine_key.empty()) {
+    engine_data = external_engine->data();
+    engine_size = external_engine->size();
+  }
   const bool share = !share_spec.ok() || share_spec.get();
   Error err;
   {
     const std::shared_lock<std::shared_mutex> capture_lock(cuda_graph_capture_mutex());
     if (share) {
-      err = acquire_shared_engine(
-          *runtime, engine_data, header.engine_size, handle->device_id, ws_request, handle->engine);
+      err = acquire_shared_engine(*runtime, engine_data, engine_size, handle->device_id, ws_request, handle->engine);
     } else {
-      err = load_engine(*runtime, engine_data, header.engine_size, ws_request, handle->engine);
+      err = load_engine(*runtime, engine_data, engine_size, ws_request, handle->engine);
     }
+    external_engine->Free();
     if (err != Error::Ok) {
       return err;
     }

@@ -95,7 +95,11 @@ def test_examples_use_the_module_loader(
 
     class _Loader:
         def create_module(self, spec):
-            return types.ModuleType(spec.name)
+            module = types.ModuleType(spec.name)
+            # Recorded, so teardown removes this stand-in rather than leaving it for a later test
+            # in the same process to import in place of the real package.
+            monkeypatch.setitem(sys.modules, spec.name, module)
+            return module
 
         def exec_module(self, module):
             return None

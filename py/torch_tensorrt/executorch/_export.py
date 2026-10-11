@@ -326,6 +326,50 @@ def _apply_use_cuda_graphs(
         specs.append(CompileSpec(CUDA_GRAPHS_COMPILE_SPEC_KEY, spec_value))
 
 
+def _apply_external_engine_data(
+    method_compile_specs: dict[str, list[Any]],
+    external_engine_data: str | None,
+) -> None:
+    """Point every method's TensorRT engines at the named .ptd file, rejecting raw specs."""
+    from executorch.exir.backend.compile_spec_schema import CompileSpec
+    from torch_tensorrt.executorch.backend import EXTERNAL_ENGINE_DATA_COMPILE_SPEC_KEY
+
+    for name, specs in method_compile_specs.items():
+        if any(
+            getattr(spec, "key", None) == EXTERNAL_ENGINE_DATA_COMPILE_SPEC_KEY
+            for spec in specs
+        ):
+            raise ValueError(
+                f"compile_specs for {name!r} carries a "
+                f"CompileSpec({EXTERNAL_ENGINE_DATA_COMPILE_SPEC_KEY!r}, ...). Pass "
+                "external_engine_data= instead."
+            )
+    if external_engine_data is None:
+        return
+    # The name becomes <name>.ptd beside the .pte, so it may not leave that directory.
+    if (
+        not isinstance(external_engine_data, str)
+        or not external_engine_data
+        or external_engine_data in (".", "..")
+        or "/" in external_engine_data
+        or "\\" in external_engine_data
+        or "\0" in external_engine_data
+        # ExecuTorch appends .ptd only when missing, so "x.ptd" would share x.ptd with another
+        # backend's "x" data and the second write would replace the first.
+        or external_engine_data.endswith(".ptd")
+    ):
+        raise ValueError(
+            "external_engine_data must be a non-empty file name without a directory or the "
+            f".ptd extension, got {external_engine_data!r}."
+        )
+    for specs in method_compile_specs.values():
+        specs.append(
+            CompileSpec(
+                EXTERNAL_ENGINE_DATA_COMPILE_SPEC_KEY, external_engine_data.encode()
+            )
+        )
+
+
 def _apply_zero_copy_kv(
     program_map: dict[str, ExportedProgram],
 ) -> dict[str, list[str]]:
@@ -456,6 +500,7 @@ def export(
     generate_etrecord: bool = False,
     weight_streaming_budget_per_engine: int | None = None,
     use_cuda_graphs: bool | None = None,
+    external_engine_data: str | None = None,
 ) -> "EdgeProgramManager":
     """Prepare TensorRT-compiled programs for composable ExecuTorch lowering.
 
@@ -584,6 +629,16 @@ def export(
             unset so the runtime default applies. A load-time option overrides this
             value. Non-booleans and raw ``CompileSpec("use_cuda_graphs", ...)`` entries
             are rejected; use this keyword instead.
+        external_engine_data (Optional[str]): Write every TensorRT engine to an
+            ExecuTorch data file named ``<external_engine_data>.ptd`` instead of into
+            the ``.pte``, which then holds only a key per engine. The engine is the
+            same bytes either way. Load the program with that file as its data file,
+            for example ``Runtime.get().load_program(pte, data_path=ptd)``; without it
+            the method fails to load. That loader takes one data file, so when another
+            backend in the program writes its own ``.ptd`` (the CUDA backend writes
+            ``aoti_cuda_blob.ptd``), pass that name to share it. ``to_executorch()`` keeps the file in memory
+            until ``write_tensor_data_to_file()`` writes it, which ``torch_tensorrt.save``
+            does next to the ``.pte``. None, the default, embeds every engine.
 
     Returns:
         executorch.exir.EdgeProgramManager: The Edge program, ready for inspection,
@@ -664,6 +719,7 @@ def export(
         method_compile_specs, weight_streaming_budget_per_engine
     )
     _apply_use_cuda_graphs(method_compile_specs, use_cuda_graphs)
+    _apply_external_engine_data(method_compile_specs, external_engine_data)
 
     if constant_methods is not None:
         invalid = [

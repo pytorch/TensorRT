@@ -251,7 +251,6 @@ def test_preprocess_hands_the_engine_to_the_blob_without_copying_it(monkeypatch)
     # the engine tensor into bytes first would hold one more copy at the same time,
     # and an engine can be several gigabytes.
     import numpy as np
-
     from torch_tensorrt.executorch import backend as backend_module
 
     engine_tensor = _engine_tensor(b"engine-bytes")
@@ -854,3 +853,77 @@ def test_elided_output_names_reads_the_list_the_partitioner_writes():
 
     assert _elided_output_names(specs) == {"kv0"}
     assert _elided_output_names([]) is None
+
+
+def _external_engine_spec(tag=b"engines"):
+    from torch_tensorrt.executorch.backend import EXTERNAL_ENGINE_DATA_COMPILE_SPEC_KEY
+
+    return CompileSpec(EXTERNAL_ENGINE_DATA_COMPILE_SPEC_KEY, tag)
+
+
+def _simple_engine_program(payload):
+    engine_info = [""] * SERIALIZATION_LEN
+    engine_info[ENGINE_IDX] = _engine_tensor(payload)
+    engine_info[DEVICE_IDX] = "0%8%0%0%GPU"
+    engine_info[INPUT_BINDING_NAMES_IDX] = "x"
+    engine_info[OUTPUT_BINDING_NAMES_IDX] = "y"
+    return _build_edge_program(engine_info)
+
+
+@pytest.mark.unit
+def test_preprocess_moves_the_engine_to_the_named_data_file():
+    payload = b"engine-bytes"
+    embedded = TensorRTBackend.preprocess(_simple_engine_program(payload), [])
+    result = TensorRTBackend.preprocess(
+        _simple_engine_program(payload), [_external_engine_spec()]
+    )
+
+    engine, metadata = deserialize_engine(result.processed_bytes)
+    assert engine == b""
+    store = result.data_store_output
+    assert not store.pte_data
+    assert list(store.external_data) == ["engines"]
+    entry = store.external_data["engines"][metadata.engine_key]
+    # The same bytes the embedded blob carries, not a re-serialized engine.
+    assert (
+        bytes(store.buffers[entry.buffer_index])
+        == deserialize_engine(embedded.processed_bytes)[0]
+    )
+    assert entry.alignment % 16 == 0
+    _, embedded_metadata = deserialize_engine(embedded.processed_bytes)
+    embedded_metadata.engine_key = metadata.engine_key
+    assert metadata == embedded_metadata
+
+
+@pytest.mark.unit
+def test_preprocess_keys_the_engine_by_its_content():
+    keys = [
+        deserialize_engine(
+            TensorRTBackend.preprocess(
+                _simple_engine_program(payload), [_external_engine_spec()]
+            ).processed_bytes
+        )[1].engine_key
+        for payload in (b"engine-a", b"engine-a", b"engine-b")
+    ]
+    assert keys[0] == keys[1] != keys[2]
+
+
+@pytest.mark.unit
+def test_preprocess_without_the_spec_embeds_the_engine_and_writes_no_key():
+    result = TensorRTBackend.preprocess(_simple_engine_program(b"engine-bytes"), [])
+    assert result.data_store_output is None
+    assert b"engine_key" not in result.processed_bytes
+    assert deserialize_engine(result.processed_bytes)[0] == b"engine-bytes"
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "specs, message",
+    [
+        ([_external_engine_spec(), _external_engine_spec()], "at most once"),
+        ([_external_engine_spec(b"")], "names no data file"),
+    ],
+)
+def test_preprocess_rejects_a_malformed_external_engine_spec(specs, message):
+    with pytest.raises(ValueError, match=message):
+        TensorRTBackend.preprocess(_simple_engine_program(b"engine-bytes"), specs)
