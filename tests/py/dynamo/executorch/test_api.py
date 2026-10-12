@@ -2612,7 +2612,7 @@ def test_driveos_packaging_selects_driveos_bazel_config():
 
 
 @pytest.mark.unit
-def test_driveos_sdk_discovery_has_no_absolute_path_dependency():
+def test_driveos_cuda_discovery_and_cmake_use_standard_root_hints():
     cuda_rule = _DRIVE_CUDA_REPOSITORY_RULE.read_text()
     assert 'ctx.os.environ.get("TORCHTRT_DRIVE_CUDA_ROOT"' in cuda_rule
     assert 'ctx.os.environ.get("TORCHTRT_DRIVE_CUDA_LIB_DIR"' in cuda_rule
@@ -2628,7 +2628,8 @@ def test_driveos_sdk_discovery_has_no_absolute_path_dependency():
     assert "build:driveos --//toolchains/dep_collection:compute_libs=driveos" in bazelrc
 
     tensorrt_finder = _TENSORRT_CMAKE_FINDER.read_text()
-    assert "ENV{TORCHTRT_TENSORRT_ROOT}" in tensorrt_finder
+    assert "TORCHTRT_TENSORRT_ROOT" not in tensorrt_finder
+    assert 'PATHS "${TensorRT_ROOT}" NO_DEFAULT_PATH' in tensorrt_finder
     assert "${CMAKE_LIBRARY_ARCHITECTURE}" in tensorrt_finder
     assert 'PATHS "/usr"' not in tensorrt_finder
 
@@ -2638,11 +2639,15 @@ def test_runtime_wheel_selects_driveos_bazel_config():
     source = ast.unparse(
         _class_method_def(_runtime_setup_tree(), "BazelBuild", "_build")
     )
-    assert "build_config = 'driveos' if TARGET_PLATFORM == 'driveos' else 'linux'" in source
+    assert (
+        "build_config = 'driveos' if TARGET_PLATFORM == 'driveos' else 'linux'"
+        in source
+    )
 
 
 @pytest.mark.unit
-def test_tensorrt_cmake_finder_parses_enterprise_version_macros(tmp_path):
+@pytest.mark.parametrize("root_hint", ["TensorRT_ROOT", "CMAKE_PREFIX_PATH"])
+def test_tensorrt_cmake_finder_parses_enterprise_version_macros(tmp_path, root_hint):
     cmake = shutil.which("cmake")
     if cmake is None:
         pytest.skip("CMake is required to exercise FindTensorRT.cmake")
@@ -2678,7 +2683,7 @@ def test_tensorrt_cmake_finder_parses_enterprise_version_macros(tmp_path):
                 "cmake_minimum_required(VERSION 3.18)",
                 "project(test_find_tensorrt LANGUAGES NONE)",
                 f'list(PREPEND CMAKE_MODULE_PATH "{_REPO_ROOT / "cmake/Modules"}")',
-                f'set(TensorRT_ROOT "{tensorrt_root}")',
+                f'set({root_hint} "{tensorrt_root}")',
                 "find_package(TensorRT 10.16.1 EXACT REQUIRED)",
                 'file(WRITE "${CMAKE_BINARY_DIR}/version.txt" "${TensorRT_VERSION_STRING}")',
             )
