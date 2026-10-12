@@ -217,21 +217,23 @@ conflicts = [
 constraint-dependencies = [
     "transformers>=5.14.1",
 ]
-# The Windows companion is built by CI but is not yet available on the package
-# indexes. Keep the development lock resolvable until it is published; Windows
-# CI installs its freshly built wheel directly. Remove this override once a
-# Windows companion is available. Wheel metadata in setup.py still supports it.
-override-dependencies = [
-    "torch-tensorrt-executorch-runtime; sys_platform == 'linux'",
-]
 
 [tool.uv.sources]
+torchao = [
+    # Match the Windows companion build's Python-only torchao nightly.
+    { index = "pytorch-nightly-cpu", marker = "sys_platform == 'win32'" },
+]
 torch = [
     { index = "pytorch-nightly-cu132" },
 ]
 torchvision = [
     { index = "pytorch-nightly-cu132" },
 ]
+
+[[tool.uv.index]]
+name = "pytorch-nightly-cpu"
+url = "https://download.pytorch.org/whl/nightly/cpu"
+explicit = true
 
 [[tool.uv.index]]
 name = "pytorch-nightly-cu132"

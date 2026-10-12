@@ -649,7 +649,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
         trt_node: torch.fx.Node = super().run_node(n)
 
-        if n.op == "get_attr":
+        if n.op == "get_attr" and isinstance(trt_node, torch.Tensor):
             self.const_mapping[str(n)] = (tuple(trt_node.shape), str(trt_node.dtype))
 
         _LOGGER.info(
@@ -824,9 +824,13 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         else:
             return converter(self.ctx, target, args, kwargs, self._cur_node_name)
 
-    def get_attr(self, target: str, args: Any, kwargs: Any) -> torch.Tensor:
+    def get_attr(self, target: str, args: Any, kwargs: Any) -> Any:
         with _disable_current_modes(), unset_fake_temporarily():
             frozen_attr = self.fetch_attr(target)
+            # Cond (and other higher-order ops) store branch graphs as module
+            # attributes. Those must be passed through to the converter.
+            if isinstance(frozen_attr, torch.nn.Module):
+                return frozen_attr
             if isinstance(frozen_attr, torch.nn.Parameter):
                 constant_tensor = frozen_attr.data
             else:

@@ -232,6 +232,90 @@ def test_unsupported_launch_directives_fail_closed(directive):
     assert unsupported_launch_directive(ptx) == directive
 
 
+@pytest.mark.parametrize(
+    "driver,compiler,accepted",
+    [
+        ((13, 0), (13, 2), False),
+        ((13, 1), (13, 2), False),
+        ((13, 2), (13, 1), False),
+        ((13, 2), (13, 2), True),
+        ((13, 2), (13, 3), False),
+        ((13, 4), (13, 2), True),
+        ((13, 4), (13, 4), True),
+    ],
+)
+def test_cutile_driver_compiler_compatibility(
+    monkeypatch, caplog, driver, compiler, accepted
+):
+    from torch_tensorrt.kernels import _cutile
+
+    monkeypatch.setattr(_cutile, "_cutile_driver_version", lambda: driver)
+    monkeypatch.setattr(_cutile, "_cutile_compiler_version", lambda: compiler)
+    if accepted:
+        with caplog.at_level("INFO", logger=_cutile.__name__):
+            assert _cutile.validate_cutile_toolchain("ns::op") == driver
+        assert f"Use CUDA Toolkit 13.2 through {driver[0]}.{driver[1]}" in caplog.text
+    else:
+        with pytest.raises(RuntimeError, match="13.2"):
+            _cutile.validate_cutile_toolchain("ns::op")
+
+
+def test_cutile_rejects_old_driver_before_compilation(monkeypatch):
+    from torch_tensorrt.kernels import _cutile
+
+    monkeypatch.setattr(_cutile, "validate_kernel_parameters", lambda *args: None)
+    monkeypatch.setattr(_cutile, "_cutile_driver_version", lambda: (13, 0))
+
+    def unexpected():
+        pytest.fail("cuTile compilation must not start on an unsupported driver")
+
+    monkeypatch.setattr(_cutile, "_cutile_import", unexpected)
+    monkeypatch.setattr(_cutile, "_cutile_compiler_version", unexpected)
+    with pytest.raises(RuntimeError, match="PTX ISA 9.2"):
+        _cutile.compile_cutile_to_ptx("ns::op", object(), _validate(SIG_1IN_1OUT), {})
+
+
+def test_cutile_cannot_cap_ptx_below_minimum(monkeypatch):
+    from torch_tensorrt.kernels import _cutile
+
+    monkeypatch.setattr(_cutile, "validate_kernel_parameters", lambda *args: None)
+    with pytest.raises(ValueError, match="at least 92"):
+        _cutile.compile_cutile_to_ptx(
+            "ns::op", object(), _validate(SIG_1IN_1OUT), {}, max_ptx_version=90
+        )
+
+
+def test_cutile_unknown_driver_fails_closed(monkeypatch):
+    from torch_tensorrt.kernels import _cutile
+
+    def unavailable():
+        raise RuntimeError("driver unavailable")
+
+    monkeypatch.setattr(_cutile, "_cutile_driver_version", unavailable)
+    with pytest.raises(RuntimeError, match="cannot determine driver PTX support"):
+        _cutile.validate_cutile_toolchain("ns::op")
+
+
+def test_cutile_selected_compiler_version(monkeypatch):
+    compilation = pytest.importorskip("cuda.tile._compile")
+    from torch_tensorrt.kernels import _cutile
+
+    monkeypatch.setattr(
+        compilation,
+        "_find_compiler_bin",
+        lambda: SimpleNamespace(path="/chosen/tileiras"),
+    )
+
+    def run(command, **kwargs):
+        assert command == ["/chosen/tileiras", "--version"]
+        return SimpleNamespace(
+            stdout="Cuda compilation tools, release 13.2, V13.2.78", stderr=""
+        )
+
+    monkeypatch.setattr(_cutile.subprocess, "run", run)
+    assert _cutile._cutile_compiler_version() == (13, 2)
+
+
 def test_driver_verification_fails_closed(monkeypatch):
     from cuda.bindings import driver as cuda
 
