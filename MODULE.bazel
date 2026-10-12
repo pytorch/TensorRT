@@ -251,14 +251,10 @@ http_archive(
     ],
 )
 
-# DRIVE builds must use the target SDK, never the normal SBSA archive.
-drive_tensorrt_repository = use_repo_rule(
-    "//toolchains:drive_tensorrt_repository.bzl",
-    "drive_tensorrt_repository",
-)
-
-drive_tensorrt_repository(
+# Use the container's target-compatible TensorRT installation, as in MODULE.bazel.ngc.
+new_local_repository(
     name = "tensorrt_driveos",
+    path = "/usr/",
     build_file = "@//third_party/tensorrt/local:BUILD",
 )
 

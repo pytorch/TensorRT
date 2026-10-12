@@ -120,16 +120,17 @@ auto results = trt_mod.forward({input_tensor});
 ### Building on DRIVE OS
 
 DRIVE OS builds use dedicated `@cuda_driveos` and `@tensorrt_driveos` repositories
-with the platform TensorRT 10.16 installation. Normal Linux, JetPack, and Windows
-builds retain their existing repositories. In an NVIDIA runtime-enabled build container,
-provide the injected DRIVE CUDA root; an additional CUDA target-library
-directory may be provided when the required library is not present below that
-root. The build consumes the common and Thor-specific header trees directly;
+with a target-compatible TensorRT 10.16 development installation under `/usr`
+in the build container, following the existing NGC layout. Normal Linux, JetPack,
+and Windows builds retain their existing repositories. In an NVIDIA
+runtime-enabled build container, provide the injected DRIVE CUDA root; an
+additional CUDA target-library directory may be provided when the required
+library is not present below that root. The build consumes the common and
+Thor-specific header trees directly;
 it does not require a merged CUDA toolkit directory.
 
 ```bash
 TORCHTRT_DRIVE_CUDA_ROOT=/path/to/injected/drive-cuda \
-TORCHTRT_TENSORRT_ROOT=/path/to/tensorrt-10.16-sdk-root \
 TORCHTRT_TARGET_PLATFORM=driveos \
 python -m pip install --pre --editable '.[executorch]' \
   --index-url https://download.pytorch.org/whl/nightly/cu132 \
@@ -145,13 +146,19 @@ override that search when a build container supplies CUDA target libraries
 separately. Preserve any other container CUDA libraries required at runtime
 outside paths that NVIDIA runtime injection masks.
 
-`TORCHTRT_TENSORRT_ROOT` must contain `include/aarch64-linux-gnu/NvInfer.h`
-and `lib/aarch64-linux-gnu/libnvinfer.so`, matching the DRIVE SDK layout.
-The Bazel DRIVE repository requires this local SDK and fails if it is missing;
-it never falls back to downloading the SBSA TensorRT archive. This checks the
-layout, not the TensorRT version or ABI: use the SDK matching the deployment
-target. Normal SBSA builds continue to use `@tensorrt_sbsa` and ignore this
-environment variable for Bazel repository selection.
+The container's TensorRT development installation must provide
+`/usr/include/aarch64-linux-gnu/NvInfer.h` and
+`/usr/lib/aarch64-linux-gnu/libnvinfer.so`. The Bazel DRIVE repository uses
+`new_local_repository(path = "/usr/")` with the existing local TensorRT BUILD
+file; no TensorRT root environment variable is required. This only exposes
+installed files to Bazel: it does not copy or install anything into `/usr`,
+and it never falls back to downloading the SBSA TensorRT archive. The path
+does not guarantee version or ABI compatibility: use a container whose TensorRT
+SDK matches the deployment target. Normal SBSA builds continue to use
+`@tensorrt_sbsa` unchanged.
+
+The CMake reference runner discovers TensorRT through standard system search
+paths. CMake users can still specify `-DTensorRT_ROOT=...` for a non-system SDK.
 
 The resulting package requires PyTorch 2.15 nightly and TensorRT 10.16. The
 DRIVE configuration is opt-in and does not change the conventional CUDA
