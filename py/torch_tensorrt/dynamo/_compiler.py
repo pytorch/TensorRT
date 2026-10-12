@@ -129,6 +129,9 @@ def cross_compile_for_windows(
     use_distributed_mode_trace: bool = _defaults.USE_DISTRIBUTED_MODE_TRACE,
     enable_resource_partitioning: bool = _defaults.ENABLE_RESOURCE_PARTITIONING,
     cpu_memory_budget: Optional[int] = _defaults.CPU_MEMORY_BUDGET,
+    resource_partition_engine_cap: Optional[
+        int
+    ] = _defaults.RESOURCE_PARTITION_ENGINE_CAP,
     dynamically_allocate_resources: bool = _defaults.DYNAMICALLY_ALLOCATE_RESOURCES,
     decompose_attention: bool = _defaults.DECOMPOSE_ATTENTION,
     disabled_constant_fold_exclusions: Collection[
@@ -214,6 +217,7 @@ def cross_compile_for_windows(
         use_distributed_mode_trace (bool):  Using aot_autograd to trace the graph. This is enabled when DTensors or distributed tensors are present in distributed model
         enable_resource_partitioning (bool): Enable resource-aware partitioning. This is useful when the model is large and the CPU memory is limited.
         cpu_memory_budget (Optional[int]): The maximum amount of CPU memory to use for the compilation. If the compilation requires more memory than this budget, the compilation will fail.
+        resource_partition_engine_cap (Optional[int]): With resource partitioning, the weight bytes per TensorRT engine the partitioner splits to, used instead of the budget derived from ``cpu_memory_budget`` and the process's resident memory, so the same model and cap always give the same split. ``cpu_memory_budget`` is then not needed.
         dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.
         decompose_attention (bool): Whether to decompose attention layers into smaller operations
             instead of using the attention converters. When combined with ``use_fp32_acc=True``,
@@ -381,6 +385,7 @@ def cross_compile_for_windows(
         "use_distributed_mode_trace": use_distributed_mode_trace,
         "enable_resource_partitioning": enable_resource_partitioning,
         "cpu_memory_budget": cpu_memory_budget,
+        "resource_partition_engine_cap": resource_partition_engine_cap,
         "dynamically_allocate_resources": dynamically_allocate_resources,
         "decompose_attention": decompose_attention,
         "disabled_constant_fold_exclusions": disabled_constant_fold_exclusions,
@@ -513,6 +518,9 @@ def compile(
         torch.utils.data.DataLoader
     ] = _defaults.AUTOCAST_CALIBRATION_DATALOADER,
     cpu_memory_budget: Optional[int] = _defaults.CPU_MEMORY_BUDGET,
+    resource_partition_engine_cap: Optional[
+        int
+    ] = _defaults.RESOURCE_PARTITION_ENGINE_CAP,
     enable_resource_partitioning: bool = _defaults.ENABLE_RESOURCE_PARTITIONING,
     dynamically_allocate_resources: bool = _defaults.DYNAMICALLY_ALLOCATE_RESOURCES,
     decompose_attention: bool = _defaults.DECOMPOSE_ATTENTION,
@@ -622,6 +630,7 @@ def compile(
         autocast_calibration_dataloader (Optional[torch.utils.data.DataLoader]): The dataloader to use for autocast calibration. Default is None.
         enable_resource_partitioning (bool): Enable resource-aware partitioning. This is useful when the model is large and the CPU memory is limited.
         cpu_memory_budget (Optional[int]): The maximum amount of CPU memory to use for the compilation. If the compilation requires more memory than this budget, the compilation will fail.
+        resource_partition_engine_cap (Optional[int]): With resource partitioning, the weight bytes per TensorRT engine the partitioner splits to, used instead of the budget derived from ``cpu_memory_budget`` and the process's resident memory, so the same model and cap always give the same split. ``cpu_memory_budget`` is then not needed.
         dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.
         decompose_attention (bool): Whether to decompose attention layers into smaller operations
             instead of using the attention converters. When combined with ``use_fp32_acc=True``,
@@ -835,6 +844,7 @@ def compile(
         "autocast_calibration_dataloader": autocast_calibration_dataloader,
         "enable_resource_partitioning": enable_resource_partitioning,
         "cpu_memory_budget": cpu_memory_budget,
+        "resource_partition_engine_cap": resource_partition_engine_cap,
         "dynamically_allocate_resources": dynamically_allocate_resources,
         "decompose_attention": decompose_attention,
         "disabled_constant_fold_exclusions": disabled_constant_fold_exclusions,
@@ -1509,6 +1519,7 @@ def compile_module(
         partitioned_module = resource_partition(
             partitioned_module,
             cpu_memory_budget=settings.cpu_memory_budget,
+            engine_cap=settings.resource_partition_engine_cap,
         )
 
     dryrun_tracker.unsupported_ops = supported_ops.fallback_operators

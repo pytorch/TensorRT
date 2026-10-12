@@ -205,6 +205,21 @@ How the budget is computed:
 4. Any subgraph whose estimated footprint exceeds this budget is split iteratively
    until all pieces fit.
 
+Because the budget depends on the process's resident memory when partitioning starts,
+the same model can split differently from run to run (for example when a weight is
+memory-mapped and not yet resident). To fix the split, set the per-engine size directly
+with ``resource_partition_engine_cap`` (bytes of weights per engine); ``cpu_memory_budget``
+is then not needed:
+
+.. code-block:: python
+
+    trt_gm = torch_tensorrt.compile(
+        model,
+        arg_inputs=inputs,
+        enable_resource_partitioning=True,
+        resource_partition_engine_cap=512 * 1024**2,  # about 512 MiB of weights per engine
+    )
+
 The splitter keeps **atomic subgraphs** (operator fusions) intact. It will not split a
 fused ``conv → bn → relu`` pattern across a boundary, migrating the whole fusion to
 whichever side contains the most of its nodes.
