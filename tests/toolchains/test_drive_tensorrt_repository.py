@@ -94,6 +94,23 @@ class TensorRTSelectionTest(unittest.TestCase):
                     "driveos", (REPO / "third_party/tensorrt/archive/BUILD").read_text()
                 )
 
+    def test_drive_allocator_uses_upstream_cuda_extension(self):
+        target = named_call(
+            (REPO / "cpp/BUILD").read_text(),
+            "tensorrt_executorch_cuda_device_allocator",
+        )
+        deps = next(k.value for k in target.keywords if k.arg == "deps")
+        selections = ast.literal_eval(deps.args[0])
+        self.assertEqual(selections[":driveos"], selections[":sbsa"])
+        self.assertIn("@executorch//:extension_cuda", selections[":driveos"])
+        self.assertNotIn(
+            "@executorch//:executorch_cuda_allocator", selections[":driveos"]
+        )
+        extension = named_call(
+            (REPO / "third_party/executorch/BUILD").read_text(), "extension_cuda"
+        )
+        self.assertEqual(extension.func.id, "cc_library")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

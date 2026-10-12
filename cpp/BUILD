@@ -183,8 +183,8 @@ cc_library(
             "@executorch//:extension_cuda",
         ],
         ":driveos": [
-            "@executorch//:executorch_cuda_allocator",
             "@executorch//:executorch_headers",
+            "@executorch//:extension_cuda",
         ],
         "//conditions:default": [],
     }),
