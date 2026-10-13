@@ -1422,6 +1422,14 @@ def compile_module(
             "Some nodes do not have metadata (shape and dtype information). This could lead to problems sometimes if the graph has PyTorch and TensorRT segments."
         )
 
+    if (
+        settings.resource_partition_engine_cap is not None
+        and not settings.enable_resource_partitioning
+    ):
+        logger.warning(
+            "resource_partition_engine_cap has no effect without enable_resource_partitioning=True."
+        )
+
     # Every computational op is TRT-legal: skip AccNodesFinder / tag / split and
     # convert the lowered graph as a single engine. Mixed graphs still partition.
     if (
@@ -1515,15 +1523,14 @@ def compile_module(
             require_full_compilation=enforce_full_compilation,
         )
 
-    if settings.resource_partition_engine_cap is not None:
-        if not settings.enable_resource_partitioning:
-            logger.warning(
-                "resource_partition_engine_cap has no effect without enable_resource_partitioning=True."
-            )
-        elif settings.cpu_memory_budget is not None:
-            logger.warning(
-                "resource_partition_engine_cap is set, so cpu_memory_budget is not used for the split."
-            )
+    if (
+        settings.enable_resource_partitioning
+        and settings.resource_partition_engine_cap is not None
+        and settings.cpu_memory_budget is not None
+    ):
+        logger.warning(
+            "resource_partition_engine_cap is set, so cpu_memory_budget is not used for the split."
+        )
     if settings.enable_resource_partitioning:
         partitioned_module = resource_partition(
             partitioned_module,
