@@ -281,6 +281,7 @@ def interpret_module_to_result(
         input_binding_names=input_binding_names,
         output_binding_names=output_binding_names,
         skip_conversion_validation=skip_conversion_validation,
+        serialize_engine=serialize_engine,
     )
 
 
@@ -293,6 +294,7 @@ def _interpret_module_to_result_impl(
     input_binding_names: Optional[Sequence[str]] = None,
     output_binding_names: Optional[Sequence[str]] = None,
     skip_conversion_validation: bool = False,
+    serialize_engine: bool = True,
 ) -> SerializedInterpreterResult:
     """Interpret an FX module to a TRTInterpreterResult (single build, no GPT sweep)."""
 
