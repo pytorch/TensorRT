@@ -197,13 +197,30 @@ Or set it via ``CompilationSettings``:
 
 How the budget is computed:
 
-1. ``ResourcePartitioner`` queries available system memory via ``psutil``.
+1. ``ResourcePartitioner`` reads the process's resident memory (RSS) via ``psutil``, or the
+   available system memory when ``cpu_memory_budget`` is not set.
 2. It estimates the parameter footprint of each TRT subgraph by summing ``get_attr``
    tensor byte sizes.
-3. The per-engine budget is ``available_memory // ENGINE_COMPILATION_MEMORY_USAGE_MULTIPLIER``
+3. The per-engine budget is ``(cpu_memory_budget - RSS) // ENGINE_COMPILATION_MEMORY_USAGE_MULTIPLIER``,
+   or ``available_memory // ENGINE_COMPILATION_MEMORY_USAGE_MULTIPLIER`` without a budget
    (default multiplier: 4, accounting for TensorRT's internal copies during build).
 4. Any subgraph whose estimated footprint exceeds this budget is split iteratively
    until all pieces fit.
+
+Because the budget depends on the process's resident memory when partitioning starts,
+the same model can split differently from run to run (for example when a weight is
+memory-mapped and not yet resident). To fix the split, set the per-engine size directly
+with ``resource_partition_engine_cap`` (bytes of weights per engine); ``cpu_memory_budget``
+is then not needed:
+
+.. code-block:: python
+
+    trt_gm = torch_tensorrt.compile(
+        model,
+        arg_inputs=inputs,
+        enable_resource_partitioning=True,
+        resource_partition_engine_cap=512 * 1024**2,  # about 512 MiB of weights per engine
+    )
 
 The splitter keeps **atomic subgraphs** (operator fusions) intact. It will not split a
 fused ``conv → bn → relu`` pattern across a boundary, migrating the whole fusion to
@@ -268,7 +285,10 @@ All partitioning behaviour is controlled via ``CompilationSettings``:
      - Run resource partitioning after capability partitioning.
    * - ``cpu_memory_budget``
      - ``None``
-     - Byte budget per TRT engine during build. ``None`` uses available system memory.
+     - Host memory budget for the build; each engine gets ``(budget - RSS) / 4``. ``None`` uses available system memory.
+   * - ``resource_partition_engine_cap``
+     - ``None``
+     - Target weight bytes per engine; when set, used instead of the RSS-derived budget.
 
 ----
 
