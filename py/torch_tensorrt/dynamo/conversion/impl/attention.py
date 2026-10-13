@@ -57,6 +57,27 @@ def _maybe_set_fp8_softmax(
     return True
 
 
+def _qkv_as_trt_tensors(
+    ctx: ConversionContext,
+    name: str,
+    query: Union[TRTTensor, torch.Tensor],
+    key: Union[TRTTensor, torch.Tensor],
+    value: Union[TRTTensor, torch.Tensor],
+) -> Tuple[TRTTensor, TRTTensor, TRTTensor]:
+    """Make query, key and value ITensors.
+
+    Constant folding hands an operand over as a frozen torch.Tensor when it depends
+    only on weights and constants: keys and values of a cross-attention over a fixed
+    context such as pre-tokenized text, or learned latent queries. add_shape and
+    add_attention_v2 accept only ITensors.
+    """
+    return (
+        get_trt_tensor(ctx, query, f"{name}_query"),
+        get_trt_tensor(ctx, key, f"{name}_key"),
+        get_trt_tensor(ctx, value, f"{name}_value"),
+    )
+
+
 def _normalize_attention_mask_rank(
     ctx: ConversionContext,
     mask: TRTTensor,
@@ -272,6 +293,8 @@ def scaled_dot_product_attention(
     Returns:
         TRTTensor: Attention output tensor with shape [batch, heads, seq_len, head_dim]
     """
+    query, key, value = _qkv_as_trt_tensors(ctx, name, query, key, value)
+
     # When FP8 softmax normalization is active (modelopt FP8 MHA pattern) TRT's
     # FP8 MHA fusion requires the Q/DQ output to feed IAttention via a single
     # same-dtype Mul; any HALF<->FLOAT cast inserted by the default dynamic
@@ -392,6 +415,8 @@ def scaled_dot_product_efficient_attention(
     is_causal: bool = False,
     scale: Optional[float] = None,
 ) -> Tuple[TRTTensor, Optional[TRTTensor], Optional[TRTTensor], Optional[TRTTensor]]:
+    query, key, value = _qkv_as_trt_tensors(ctx, name, query, key, value)
+
     fp8_norm_active = (
         ctx.current_node is not None
         and ctx.current_node.meta.get("_fp8_softmax_scale") is not None
