@@ -8,9 +8,7 @@ from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo._weight_release import (
     WeightReleaser,
     parameter_storages,
-    register_release_handler,
     release_storage,
-    unregister_release_handler,
     weight_storages,
 )
 
@@ -85,25 +83,6 @@ def test_releaser_releases_unread_parameters_only():
     assert unread.untyped_storage().nbytes() == 0
     assert used.untyped_storage().nbytes() > 0
     assert holder.buf.untyped_storage().nbytes() > 0  # buffers are never candidates
-
-
-def test_release_handler_takes_precedence():
-    weight = _param()
-    seen = []
-
-    def handler(storage):
-        seen.append(storage.data_ptr())
-        return True
-
-    register_release_handler(handler)
-    try:
-        assert release_storage(weight.untyped_storage()) == weight.numel() * 4
-    finally:
-        unregister_release_handler(handler)
-    assert seen == [weight.untyped_storage().data_ptr()]
-    assert (
-        weight.untyped_storage().nbytes() > 0
-    )  # the handler, not resize_, owned the release
 
 
 def test_non_resizable_storage_is_skipped():

@@ -13,28 +13,12 @@ dropping references cannot free what the caller's model still points to.
 
 import logging
 from collections import Counter
-from typing import Callable, Dict, Iterable, List
+from typing import Dict, Iterable
 
 import torch
 from torch.utils._python_dispatch import is_traceable_wrapper_subclass
 
 logger = logging.getLogger(__name__)
-
-# A handler returns True if it released the storage (for example, by dropping the pages of a
-# memory-mapped weight); release_storage falls back to resizing the storage to zero.
-ReleaseHandler = Callable[[torch.UntypedStorage], bool]
-_release_handlers: List[ReleaseHandler] = []
-
-
-def register_release_handler(handler: ReleaseHandler) -> None:
-    """Let a storage owner release its own storages (for example, file-backed weights)."""
-    if handler not in _release_handlers:
-        _release_handlers.append(handler)
-
-
-def unregister_release_handler(handler: ReleaseHandler) -> None:
-    if handler in _release_handlers:
-        _release_handlers.remove(handler)
 
 
 def _get_attr(module: torch.nn.Module, target: str) -> object:
@@ -84,9 +68,6 @@ def release_storage(storage: torch.UntypedStorage) -> int:
     nbytes = int(storage.nbytes())
     if nbytes == 0:
         return 0
-    for handler in _release_handlers:
-        if handler(storage):
-            return nbytes
     try:
         storage.resize_(0)
     except RuntimeError as e:  # e.g. a non-resizable storage over an external buffer
