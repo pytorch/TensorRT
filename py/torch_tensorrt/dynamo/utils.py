@@ -15,6 +15,7 @@ import warnings
 from dataclasses import fields, replace
 from enum import Enum
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     Dict,
@@ -28,6 +29,7 @@ from typing import (
 import numpy as np
 import psutil
 import sympy
+import tensorrt as trt
 import torch
 from torch._subclasses.fake_tensor import FakeScriptObject, FakeTensor
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
@@ -39,13 +41,14 @@ from torch_tensorrt._Input import Input
 from torch_tensorrt._utils import is_tensorrt_version_supported
 from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._defaults import default_device
-from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
-import tensorrt as trt
 from packaging import version
 
 from .types import TRTDataType
+
+if TYPE_CHECKING:
+    from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +57,13 @@ DYNAMIC_DIM = -1
 RTOL = 5e-3
 ATOL = 5e-3
 CPU_DEVICE = "cpu"
+
+
+def canonicalize_setting_value(value: Any) -> str:
+    """Stringify a setting without depending on unordered collection order."""
+    if isinstance(value, (set, frozenset)):
+        return str(sorted(str(element) for element in value))
+    return str(value)
 
 
 class Frameworks(Enum):

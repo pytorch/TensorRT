@@ -29,10 +29,11 @@ from torch_tensorrt._Input import Input
 from torch_tensorrt._version import __version__ as torch_tensorrt_version
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache, DiskEngineCache
 from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.utils import canonicalize_setting_value
 
 logger = logging.getLogger(__name__)
 
-_CACHE_FORMAT_VERSION = 5
+_CACHE_FORMAT_VERSION = 1
 # Prefix blob keys so graph entries can share a BaseEngineCache with engines
 # without colliding. Underscore (not colon) so DiskEngineCache can use the key
 # as a directory name on Windows.
@@ -50,12 +51,6 @@ _NON_SEMANTIC_SETTINGS = {
 
 class BypassLoweringCache(Exception):
     """Raised when the lowered GraphModule cannot be serialized, matching Inductor's bypass."""
-
-
-def _canonicalize_setting_value(value: Any) -> str:
-    if isinstance(value, (set, frozenset)):
-        return str(sorted(str(element) for element in value))
-    return str(value)
 
 
 _LITERAL_TYPES = (int, float, bool, str, type(None), bytes)
@@ -459,8 +454,69 @@ def _update_tensor_hash(hasher: Any, tensor: torch.Tensor) -> None:
         hasher.update(str(flat.tolist()).encode())
 
 
-def _canonical_graph(gm: torch.fx.GraphModule) -> Tuple[str, ...]:
-    return tuple(node.format_node() for node in gm.graph.nodes)
+def _stable_node_ids(gm: torch.fx.GraphModule) -> Dict[str, str]:
+    """Number nodes in graph order so a re-export with new names hashes the same."""
+    return {node.name: f"n{index}" for index, node in enumerate(gm.graph.nodes)}
+
+
+def _stable_value(value: Any, ids: Dict[str, str]) -> Any:
+    if isinstance(value, torch.fx.Node):
+        return ids[value.name]
+    if isinstance(value, (list, tuple)):
+        return tuple(_stable_value(item, ids) for item in value)
+    if isinstance(value, dict):
+        encoded = {
+            _stable_value(key, ids): _stable_value(item, ids)
+            for key, item in value.items()
+        }
+        return tuple(sorted(encoded.items(), key=lambda item: repr(item[0])))
+    if isinstance(value, slice):
+        return (
+            "slice",
+            _stable_value(value.start, ids),
+            _stable_value(value.stop, ids),
+            _stable_value(value.step, ids),
+        )
+    return value
+
+
+def _stable_target(node: torch.fx.Node, ids: Dict[str, str]) -> str:
+    # A placeholder's target is its original name. Number it with the node.
+    # get_attr targets are weight names and stay as written.
+    if node.op == "placeholder":
+        return ids[node.name]
+    return str(node.target)
+
+
+def _canonical_graph(gm: torch.fx.GraphModule, ids: Dict[str, str]) -> Tuple[str, ...]:
+    """Structure of the graph with stable node ids. Arguments are kept."""
+    return tuple(
+        f"{ids[node.name]} {node.op} {_stable_target(node, ids)} "
+        f"args={_stable_value(node.args, ids)!r} "
+        f"kwargs={_stable_value(node.kwargs, ids)!r}"
+        for node in gm.graph.nodes
+    )
+
+
+def _canonical_signature(
+    exported_program: torch.export.ExportedProgram, ids: Dict[str, str]
+) -> Tuple[Tuple[str, ...], Tuple[str, ...]]:
+    """Signature with node names replaced by the same ids. Weight names stay."""
+    signature = exported_program.graph_signature
+
+    def line(spec: Any) -> str:
+        name = ids.get(spec.arg.name, spec.arg.name)
+        value = getattr(spec.arg, "value", None)
+        persistent = getattr(spec, "persistent", None)
+        return (
+            f"{name}: {spec.kind.name} target={spec.target!r} "
+            f"persistent={persistent!r} value={value!r}"
+        )
+
+    return (
+        tuple(line(spec) for spec in signature.input_specs),
+        tuple(line(spec) for spec in signature.output_specs),
+    )
 
 
 def _canonical_settings(settings: CompilationSettings) -> Tuple[Tuple[str, str], ...]:
@@ -471,7 +527,7 @@ def _canonical_settings(settings: CompilationSettings) -> Tuple[Tuple[str, str],
         values.append(
             (
                 setting.name,
-                _canonicalize_setting_value(getattr(settings, setting.name)),
+                canonicalize_setting_value(getattr(settings, setting.name)),
             )
         )
     return tuple(values)
@@ -541,13 +597,14 @@ class DiskLoweringCache:
         """
         start = time.perf_counter()
         hasher = hashlib.sha256()
+        node_ids = _stable_node_ids(exported_program.graph_module)
         metadata = (
             _CACHE_FORMAT_VERSION,
             torch.__version__,
             torch_tensorrt_version,
             trt.__version__,
-            _canonical_graph(exported_program.graph_module),
-            str(exported_program.graph_signature),
+            _canonical_graph(exported_program.graph_module, node_ids),
+            _canonical_signature(exported_program, node_ids),
             str(exported_program.range_constraints),
             tuple(str(value) for value in arg_inputs),
             tuple(

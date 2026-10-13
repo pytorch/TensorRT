@@ -37,6 +37,28 @@ class _Linear(torch.nn.Module):
         return value @ self.weight
 
 
+class _Add(torch.nn.Module):
+    def forward(self, left: torch.Tensor, right: torch.Tensor) -> torch.Tensor:
+        return left + right
+
+
+class _AddReversed(torch.nn.Module):
+    def forward(self, left: torch.Tensor, right: torch.Tensor) -> torch.Tensor:
+        return right + left
+
+
+def _rename_graph_nodes(exported_program: torch.export.ExportedProgram) -> None:
+    """Give every node a new name, including the names stored on the signature."""
+    graph_module = exported_program.graph_module
+    signature = exported_program.graph_signature
+    for node in list(graph_module.graph.nodes):
+        old = node.name
+        new = f"renamed_{old}"
+        node.name = new
+        signature.replace_all_uses(old, new)
+    graph_module.recompile()
+
+
 class TestDiskLoweringCache(unittest.TestCase):
     def setUp(self) -> None:
         self.inputs = (torch.randn(2, 4),)
@@ -99,6 +121,39 @@ class TestDiskLoweringCache(unittest.TestCase):
         )
 
         self.assertNotEqual(first, second)
+
+    def test_key_ignores_renamed_nodes(self) -> None:
+        exported_program = torch.export.export(_Linear().eval(), self.inputs)
+        first = DiskLoweringCache.get_hash(
+            exported_program, self.input_specs, {}, self.settings
+        )
+        _rename_graph_nodes(exported_program)
+        second = DiskLoweringCache.get_hash(
+            exported_program, self.input_specs, {}, self.settings
+        )
+
+        self.assertEqual(first, second)
+
+    def test_key_differs_when_add_inputs_are_swapped(self) -> None:
+        inputs = (torch.randn(2, 4), torch.randn(2, 4))
+        input_specs = (
+            Input(inputs[0].shape, dtype=torch.float32),
+            Input(inputs[1].shape, dtype=torch.float32),
+        )
+        forward = DiskLoweringCache.get_hash(
+            torch.export.export(_Add().eval(), inputs),
+            input_specs,
+            {},
+            self.settings,
+        )
+        reversed_add = DiskLoweringCache.get_hash(
+            torch.export.export(_AddReversed().eval(), inputs),
+            input_specs,
+            {},
+            self.settings,
+        )
+
+        self.assertNotEqual(forward, reversed_add)
 
     def _cache(self, directory: str) -> DiskLoweringCache:
         return DiskLoweringCache(DiskEngineCache(directory, _TEST_CACHE_SIZE))
