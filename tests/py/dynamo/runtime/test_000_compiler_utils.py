@@ -6,6 +6,8 @@ import unittest
 import torch
 import torch_tensorrt
 from torch_tensorrt.dynamo.utils import (
+    check_module_output,
+    check_output_equal,
     get_torch_tensor,
     prepare_inputs,
     to_torch_device,
@@ -243,6 +245,43 @@ class TestDeprecatedInputsAlias(unittest.TestCase):
 
         with self.assertRaises(AssertionError):
             torch_tensorrt.save(M(), arg_inputs=(), inputs=(torch.randn(2, 3),))
+
+
+class TestCheckOutputEqual(unittest.TestCase):
+    def test_sequence_compares_every_element(self):
+        a = torch.ones(3)
+        for container in (list, tuple):
+            self.assertTrue(check_output_equal(container([a, a]), container([a, a])))
+            self.assertFalse(
+                check_output_equal(container([a, a]), container([a, a + 1]))
+            )
+            self.assertFalse(
+                check_output_equal(container([a, a]), container([a + 1, a]))
+            )
+
+    def test_empty_sequence_is_equal(self):
+        self.assertTrue(check_output_equal([], []))
+        self.assertTrue(check_output_equal((), ()))
+
+    def test_dict_matches_values_by_key(self):
+        a, b = torch.zeros(2), torch.ones(2)
+        self.assertTrue(check_output_equal({"x": a, "y": b}, {"y": b, "x": a}))
+        self.assertFalse(check_output_equal({"x": a, "y": b}, {"x": a, "y": a}))
+
+    def test_nested_tolerances_are_forwarded(self):
+        a = torch.ones(3)
+        b = a + 5e-2
+        self.assertFalse(check_output_equal([a], [b]))
+        self.assertTrue(check_output_equal([a], [b], rtol=1.0, atol=1.0))
+        self.assertTrue(check_output_equal({"k": [a]}, {"k": [b]}, rtol=1.0, atol=1.0))
+
+    def test_check_module_output_without_kwargs(self):
+        class M(torch.nn.Module):
+            def forward(self, x):
+                return x + 1
+
+        x = torch.ones(2)
+        self.assertTrue(check_module_output(M(), M(), (x,)))
 
 
 if __name__ == "__main__":

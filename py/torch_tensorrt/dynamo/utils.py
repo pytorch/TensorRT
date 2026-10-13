@@ -879,7 +879,7 @@ def check_module_output(
 ) -> bool:
     old_outputs, new_outputs = (
         refitted_module(*arg_inputs),
-        new_module(*arg_inputs, **kwarg_inputs),
+        new_module(*arg_inputs, **(kwarg_inputs or {})),
     )
     if type(old_outputs) != type(new_outputs):
         logger.warning("The output types are different. Output check is skipped.")
@@ -908,15 +908,15 @@ def check_output_equal(
         if len(output1) != len(output2):
             return False
         for a, b in zip(output1, output2):
-            if not check_output_equal(a, b):
+            if not check_output_equal(a, b, rtol, atol):
                 return False
-            return True
+        return True
 
     elif isinstance(output1, dict):
         if output1.keys() != output2.keys():
             return False
-        for a, b in zip(output1.values(), output2.values()):
-            if not check_output_equal(a, b):
+        for key in output1:
+            if not check_output_equal(output1[key], output2[key], rtol, atol):
                 return False
         return True
 
