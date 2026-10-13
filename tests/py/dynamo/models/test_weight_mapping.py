@@ -3,6 +3,7 @@
 
 import gc
 import json
+import mmap
 import struct
 
 import pytest
@@ -88,6 +89,20 @@ def test_strict_raises_on_missing_names_and_changes_nothing(tmp_path):
     with pytest.raises(ValueError, match="not in"):
         map_weights(model, tmp_path / "w.safetensors", strict=True)
     assert model["proj"].weight.is_meta
+
+
+def test_strict_does_not_require_non_persistent_buffers(tmp_path):
+    torch.manual_seed(0)
+    ref = torch.nn.Linear(8, 8)
+    ref.register_buffer("inv_freq", torch.rand(4), persistent=False)
+    pytest.importorskip("safetensors.torch").save_file(
+        ref.state_dict(), str(tmp_path / "sd.safetensors")
+    )  # the usual checkpoint: state_dict() leaves inv_freq out
+    model = torch.nn.Linear(8, 8)
+    model.register_buffer("inv_freq", torch.rand(4), persistent=False)
+    with map_weights(model, tmp_path / "sd.safetensors", strict=True) as mapping:
+        assert mapping.missing == ["inv_freq"] and not mapping.still_meta
+        torch.testing.assert_close(model.weight, ref.weight)
 
 
 def test_dtype_mismatch_casts_or_raises(tmp_path):
@@ -179,8 +194,9 @@ def test_safetensors_package_file_maps(tmp_path):
 class _TwoBuffers(torch.nn.Module):
     def __init__(self):
         super().__init__()
-        self.register_buffer("a", torch.arange(4096, dtype=torch.float32))  # 4 pages
-        self.register_buffer("b", -torch.arange(4096, dtype=torch.float32))
+        n = mmap.PAGESIZE  # float32: 4 pages each, whatever the page size
+        self.register_buffer("a", torch.arange(n, dtype=torch.float32))
+        self.register_buffer("b", -torch.arange(n, dtype=torch.float32))
 
 
 def test_release_drops_only_its_own_pages(tmp_path):
@@ -198,13 +214,16 @@ def test_release_drops_only_its_own_pages(tmp_path):
         )  # b's pages were re-read from the file
         assert not release_mapped_storage(torch.ones(4).untyped_storage())
         storage = model.b.untyped_storage()
-    assert not mapping.contains(storage.data_ptr())
-    assert not release_mapped_storage(storage)  # closed: no longer tracked
+    assert not mapping.contains(storage.data_ptr())  # the handle let go of the mapping
+    assert release_mapped_storage(
+        storage
+    )  # but the views keep it mapped and releasable
 
 
 def test_unclosed_mappings_are_freed_with_their_views(tmp_path):
     _reference(tmp_path / "w.safetensors")
     gc.collect()
+    release_mapped_storage(torch.ones(1).untyped_storage())  # prunes dead entries
     before = len(_weight_mapping._live_mappings)
     for _ in range(3):
         with torch.device("meta"):

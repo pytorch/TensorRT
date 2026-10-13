@@ -86,14 +86,9 @@ class MappedWeights:
         return mm is not None and self._base <= data_ptr < self._base + len(mm)
 
     def close(self) -> None:
-        """Stop tracking the mapping (``release_mapped_storage`` no longer drops its pages). The file
-        stays mapped while tensors still view it and is unmapped once they are gone."""
-        mm, self._mm = self._mm, None
-        if mm is not None:
-            with _lock:
-                _live_mappings[:] = [
-                    e for e in _live_mappings if e[2]() not in (None, mm)
-                ]
+        """Drop this handle's reference to the mapping. The file stays mapped (and its pages
+        releasable) while tensors still view it, and is unmapped once they are gone."""
+        self._mm = None
 
     def __enter__(self) -> "MappedWeights":
         return self
@@ -207,10 +202,11 @@ def map_weights(
         path: The safetensors file. Each tensor's dtype must equal the model's for a zero-copy view;
             ``save_weights_for_mapping`` writes a model's weights as they are after loading.
         key_map: Checkpoint name for a model name: a callable or a mapping (names not in it unchanged).
-        strict: Raise unless every tensor of the model is mapped without a copy (no name missing from the
-            checkpoint, no dtype mismatch). Otherwise a dtype mismatch is cast into new memory and listed
-            in ``copied``, and missing names are listed in ``missing``. A shape mismatch always raises.
-            Nothing is changed if this raises.
+        strict: Raise unless every tensor in the model's ``state_dict`` is mapped without a copy: no
+            name missing from the checkpoint (as ``load_state_dict(strict=True)``; non-persistent
+            buffers are not required) and no dtype mismatch. Otherwise a dtype mismatch is cast into
+            new memory and listed in ``copied``, and missing names are listed in ``missing``. A shape
+            mismatch always raises. Nothing is changed if this raises.
 
     Returns:
         A ``MappedWeights`` handle: mapped and copied tensors, names missing from the checkpoint, and
@@ -245,7 +241,10 @@ def map_weights(
             raise ValueError(
                 f"{name}: checkpoint shape {meta.get('shape')} != model shape {list(like.shape)}"
             )
-        begin, end = meta.get("data_offsets", (None, None))
+        offsets = meta.get("data_offsets")
+        begin, end = (
+            offsets if isinstance(offsets, list) and len(offsets) == 2 else (None, None)
+        )
         if not (
             isinstance(begin, int)
             and isinstance(end, int)
@@ -253,7 +252,7 @@ def map_weights(
             and end - begin == like.numel() * dtype.itemsize
         ):
             raise ValueError(
-                f"{name}: invalid data_offsets {meta.get('data_offsets')} for {meta['dtype']} {meta['shape']}"
+                f"{name}: invalid data_offsets {offsets} for {meta.get('dtype')} {meta.get('shape')}"
             )
         if dtype != like.dtype and strict:
             raise ValueError(
@@ -287,10 +286,14 @@ def map_weights(
         result.missing += names
         if tensor.is_meta:
             result.still_meta += names
-    if strict and result.missing:
-        raise ValueError(
-            f"{len(result.missing)} tensors are not in {path}: {result.missing[:8]}"
-        )
+    # Like load_state_dict(strict=True), only persistent names are required: non-persistent buffers
+    # (e.g. rotary frequencies) are never in a checkpoint; those left on meta are in still_meta.
+    persistent = set(
+        model.state_dict if isinstance(model, ExportedProgram) else model.state_dict()
+    )
+    required = [name for name in result.missing if name in persistent]
+    if strict and required:
+        raise ValueError(f"{len(required)} tensors are not in {path}: {required[:8]}")
 
     with torch.no_grad():
         for tensor, refs, view in plan:
