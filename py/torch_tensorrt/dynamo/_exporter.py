@@ -440,6 +440,14 @@ def create_trt_exp_program(
     assert output_nodes
     _output_node = output_nodes[0]
     output_nodes = _output_node.args[0]
+    # A single output can be a bare Node rather than a 1-tuple: the retrace in
+    # complex_decomposition_adapter leaves the graph that way for a model whose
+    # complex tensors are all intermediates. The program needs the flat tuple form;
+    # the user-facing out_spec built below still returns the output unwrapped.
+    bare_output = isinstance(output_nodes, torch.fx.Node)
+    if bare_output:
+        output_nodes = [output_nodes]
+        _output_node.args = (tuple(output_nodes),)
 
     # Copy-back mutable buffers (non-KV, e.g. a convolution-state ring-buffer):
     # lift_mutated_buffers appended each buffer's new-value as a trailing graph output. Tag it
@@ -545,7 +553,10 @@ def create_trt_exp_program(
             in_spec = pytree.tree_flatten((example_args, example_kwargs))[1]
         # out_spec describes the user-visible return structure only; buffer
         # mutations are stripped before unflatten.
-        out_spec = pytree.tree_flatten(tuple(user_output_nodes))[1]
+        if bare_output and len(user_output_nodes) == 1:
+            out_spec = pytree.tree_flatten(user_output_nodes[0])[1]
+        else:
+            out_spec = pytree.tree_flatten(tuple(user_output_nodes))[1]
         assert in_spec.num_leaves == len(input_nodes), (
             f"create_trt_exp_program: in_spec has {in_spec.num_leaves} leaves but "
             f"the graph has {len(input_nodes)} input placeholder(s)"
