@@ -37,6 +37,18 @@ from torch_tensorrt.dynamo.types import Shape
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 
 
+def _clamp_slice_bound(bound: int, dim_size: int) -> int:
+    """Normalize a static slice bound the way Python slicing does.
+
+    A negative bound counts from the end, and a bound outside the axis clamps to
+    [0, dim_size]. get_positive_dim wraps instead (bound % dim_size), which is right
+    for a dimension index but turns x[-15:] on a 10-long axis into x[5:].
+    """
+    if bound < 0:
+        return max(bound + dim_size, 0)
+    return min(bound, dim_size)
+
+
 def slice_op(  # TODO: This should be slice not whatever is in base
     ctx: ConversionContext,
     target: Target,
@@ -157,8 +169,8 @@ def slice_op(  # TODO: This should be slice not whatever is in base
     output_shape = list(input.shape)
 
     if input.shape[dim] != -1 and isinstance(start, int) and isinstance(stop, int):
-        start = get_positive_dim(start, input.shape[dim])
-        stop = get_positive_dim(stop, input.shape[dim])
+        start = _clamp_slice_bound(start, input.shape[dim])
+        stop = _clamp_slice_bound(stop, input.shape[dim])
         start_slice[dim] = start
     else:
         # the start and stop or None is dynamic along dim or or start or stop is an ITensor
@@ -272,7 +284,7 @@ def slice_op(  # TODO: This should be slice not whatever is in base
             layer.set_input(3, stride_slice_tensor)
             return layer.get_output(0)
 
-    output_shape[dim] = math.ceil((stop - start) / step)
+    output_shape[dim] = max(math.ceil((stop - start) / step), 0)
     return slice(
         ctx, target, source_ir, name, input, start_slice, output_shape, stride_slice
     )
