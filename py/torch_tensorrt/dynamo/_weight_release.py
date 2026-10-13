@@ -16,6 +16,7 @@ from collections import Counter
 from typing import Callable, Dict, Iterable, List
 
 import torch
+from torch.utils._python_dispatch import is_traceable_wrapper_subclass
 
 logger = logging.getLogger(__name__)
 
@@ -43,8 +44,17 @@ def _get_attr(module: torch.nn.Module, target: str) -> object:
     return obj
 
 
+def _add_storage(found: Dict[int, torch.UntypedStorage], tensor: torch.Tensor) -> None:
+    if tensor.is_meta or is_traceable_wrapper_subclass(tensor):
+        return  # a wrapper subclass's storage is a placeholder; its inner tensors are not reachable here
+    storage = tensor.untyped_storage()
+    if storage.nbytes():
+        found[storage.data_ptr()] = storage
+
+
 def weight_storages(gm: torch.fx.GraphModule) -> Dict[int, torch.UntypedStorage]:
-    """The storages read by ``gm``'s ``get_attr`` nodes, keyed by data pointer (tied weights collapse)."""
+    """The storages read by ``gm``'s own ``get_attr`` nodes (not its submodules'), keyed by data
+    pointer (tied weights collapse)."""
     found: Dict[int, torch.UntypedStorage] = {}
     for node in gm.graph.nodes:
         if node.op != "get_attr":
@@ -53,10 +63,8 @@ def weight_storages(gm: torch.fx.GraphModule) -> Dict[int, torch.UntypedStorage]
             value = _get_attr(gm, str(node.target))
         except AttributeError:
             continue
-        if isinstance(value, torch.Tensor) and not value.is_meta:
-            storage = value.untyped_storage()
-            if storage.nbytes():
-                found[storage.data_ptr()] = storage
+        if isinstance(value, torch.Tensor):
+            _add_storage(found, value)
     return found
 
 
@@ -67,10 +75,7 @@ def parameter_storages(module: torch.nn.Module) -> Dict[int, torch.UntypedStorag
     """
     found: Dict[int, torch.UntypedStorage] = {}
     for tensor in module.parameters():
-        if not tensor.is_meta:
-            storage = tensor.untyped_storage()
-            if storage.nbytes():
-                found[storage.data_ptr()] = storage
+        _add_storage(found, tensor)
     return found
 
 
@@ -91,22 +96,20 @@ def release_storage(storage: torch.UntypedStorage) -> int:
 
 
 class WeightReleaser:
-    """Counts, for each weight storage, the partitions that read it, and releases a storage once the
-    last TensorRT partition that reads it has been built. Storages read by PyTorch partitions are
-    counted but never decremented, so they are never released."""
+    """Counts, for each weight storage, the graphs that read it, and releases a storage once the last
+    TensorRT partition that reads it has been built. Graphs that run in PyTorch (PyTorch partitions,
+    the partitioned module's own graph) are counted but never built, so their storages are never
+    released."""
 
-    def __init__(self, partitions: Iterable[torch.fx.GraphModule]):
+    def __init__(self, readers: Iterable[torch.fx.GraphModule]):
         self.uses: Counter[int] = Counter()
-        for partition in partitions:
-            self.uses.update(weight_storages(partition).keys())
+        for reader in readers:
+            self.uses.update(weight_storages(reader).keys())
 
-    def release_unread(
-        self, candidates: Dict[int, torch.UntypedStorage], keep: Iterable[int] = ()
-    ) -> int:
-        """Release the candidate storages that no partition reads (and that are not in ``keep``)."""
-        kept = set(self.uses) | set(keep)
+    def release_unread(self, candidates: Dict[int, torch.UntypedStorage]) -> int:
+        """Release the candidate storages that no graph reads."""
         released = sum(
-            release_storage(s) for ptr, s in candidates.items() if ptr not in kept
+            release_storage(s) for ptr, s in candidates.items() if ptr not in self.uses
         )
         if released:
             logger.info(
@@ -118,8 +121,13 @@ class WeightReleaser:
         """Record that a TensorRT partition reading ``storages`` has been built; release the ones done."""
         released = 0
         for ptr, storage in storages.items():
+            if ptr not in self.uses:
+                continue  # not counted at partition time (e.g. rebound since): another reader may hold it
             self.uses[ptr] -= 1
-            if self.uses[ptr] <= 0:
+            if self.uses[ptr] == 0:
+                del self.uses[
+                    ptr
+                ]  # a later allocation at this address is a different storage
                 released += release_storage(storage)
         if released:
             logger.info(

@@ -632,7 +632,9 @@ def compile(
         dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.
         release_weights_after_build (bool): Release the memory of each model weight once the last TensorRT engine that reads it is built,
             and of weights no partition reads before the first build, so compilation holds only the weights still to be built. The source
-            module shares that memory and must not be used afterwards. Weights read by subgraphs that run in PyTorch are kept.
+            module shares that memory and must not be used afterwards, even if compilation fails. Weights read by subgraphs that run in
+            PyTorch are kept. Applies to ``torch_tensorrt.dynamo.compile``; no effect under ``torch.compile``, and not supported by
+            ``MutableTorchTensorRTModule``.
         decompose_attention (bool): Whether to decompose attention layers into smaller operations
             instead of using the attention converters. When combined with ``use_fp32_acc=True``,
             decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only
@@ -1293,6 +1295,14 @@ def _build_user_symbol_bounds(
     return user_symbol_bounds
 
 
+def _warn_if_refit_source_released(settings: CompilationSettings) -> None:
+    if settings.strip_engine_weights and not settings.immutable_weights:
+        logger.warning(
+            "release_weights_after_build releases the source weights; engines built with "
+            "strip_engine_weights must be refit from a freshly loaded checkpoint."
+        )
+
+
 @fn_supports_debugger  # type: ignore[misc]
 def compile_module(
     gm: torch.fx.GraphModule,
@@ -1446,13 +1456,25 @@ def compile_module(
             gm,
             user_symbol_bounds=user_symbol_bounds,
         )
-        return convert_module(
+        single_releaser = None
+        single_weights: Dict[int, torch.UntypedStorage] = {}
+        if settings.release_weights_after_build:
+            _warn_if_refit_source_released(settings)
+            single_releaser = WeightReleaser([gm])
+            single_releaser.release_unread(parameter_storages(gm))
+            single_weights = weight_storages(gm)
+        single_module = convert_module(
             gm,
             convert_inputs,
             settings=settings,
             name="_run_on_acc_0",
             engine_cache=engine_cache,
         )
+        if single_releaser is not None and single_releaser.built(
+            single_weights, "_run_on_acc_0"
+        ):
+            release_host_and_device_memory()
+        return single_module
 
     # Store the original input spec for later use
     original_in_spec = getattr(gm, "_in_spec", None)
@@ -1573,16 +1595,19 @@ def compile_module(
 
     weight_releaser = None
     if settings.release_weights_after_build and not settings.dryrun:
+        _warn_if_refit_source_released(settings)
+        # The partitioned module's own graph runs in PyTorch: it counts as a reader that is never built.
         weight_releaser = WeightReleaser(
-            sub
-            for _, sub in partitioned_module.named_children()
-            if isinstance(sub, torch.fx.GraphModule)
+            [partitioned_module]
+            + [
+                sub
+                for _, sub in partitioned_module.named_children()
+                if isinstance(sub, torch.fx.GraphModule)
+            ]
         )
         # The lowered module still holds weights no partition reads (for example a model head the
         # traced function never calls); nothing needs them once partitioning is done.
-        weight_releaser.release_unread(
-            parameter_storages(gm), keep=weight_storages(partitioned_module)
-        )
+        weight_releaser.release_unread(parameter_storages(gm))
 
     # Here we delete the frozen parameters from the graph module. Note this does not affect the submodules. We are going to delete the frozen parameters from the submodules in the convert_module function.
     # This is done to release CPU memory.
@@ -1694,8 +1719,9 @@ def compile_module(
             )
 
             trt_modules[name] = trt_module
-            if weight_releaser is not None:
-                weight_releaser.built(submodule_weights, name)
+            if weight_releaser is not None and weight_releaser.built(
+                submodule_weights, name
+            ):
                 release_host_and_device_memory()
 
             if _debugger_config:

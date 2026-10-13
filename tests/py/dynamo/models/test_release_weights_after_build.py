@@ -63,6 +63,17 @@ def test_releaser_releases_after_the_last_reader():
     assert torch_side.untyped_storage().nbytes() > 0
 
 
+def test_storage_rebound_after_counting_is_kept():
+    shared = _param()
+    first, second = _traced(shared), _traced(shared)
+    releaser = WeightReleaser([first, second])
+    shared.data = shared.data.clone()  # e.g. moved between devices after partitioning
+    releaser.built(weight_storages(first), "first")
+    assert (
+        shared.untyped_storage().nbytes() > 0
+    )  # unknown to the releaser: second may still read it
+
+
 def test_releaser_releases_unread_parameters_only():
     used, unread = _param(), _param()
     holder = torch.nn.Module()
@@ -112,15 +123,18 @@ class _TwoEngines(torch.nn.Module):
         )  # noqa: E731
         self.w_a, self.w_b, self.w_shared = p(16, 16), p(16, 16), p(16)
         self.w_torch, self.unused_head = p(16), p(16, 1000)
+        self.register_buffer("bias", torch.randn(16))
 
     def forward(self, x):
-        y = x @ self.w_a + self.w_shared
+        y = x @ self.w_a + self.w_shared + self.bias
         y = torch.sin(y * self.w_torch)  # aten.mul / aten.sin run in PyTorch
         return y @ self.w_b + self.w_shared
 
 
+@pytest.mark.parametrize("use_fast_partitioner", [True, False])
 @pytest.mark.parametrize("release", [True, False])
-def test_compile_releases_weights(release):
+def test_compile_releases_weights(release, use_fast_partitioner):
+    torch.manual_seed(0)
     model = _TwoEngines().eval().cuda()
     x = torch.randn(4, 16, device="cuda")
     with torch.no_grad():
@@ -131,15 +145,44 @@ def test_compile_releases_weights(release):
         arg_inputs=[x],
         min_block_size=1,
         torch_executed_ops={torch.ops.aten.sin.default, torch.ops.aten.mul.Tensor},
+        use_fast_partitioner=use_fast_partitioner,
         release_weights_after_build=release,
     )
     with torch.no_grad():
-        actual = trt_gm(x)
-    torch.testing.assert_close(actual, expected, rtol=1e-3, atol=1e-3)
+        for _ in range(2):  # TF32 matmuls in the engines
+            torch.testing.assert_close(trt_gm(x), expected, rtol=1e-2, atol=1e-2)
 
     state = ep.state_dict
-    for name in ("w_a", "w_b", "w_shared", "unused_head"):
+    # A read-only buffer read by an engine is a weight like any other: released after its build.
+    for name in ("w_a", "w_b", "w_shared", "unused_head", "bias"):
         assert (state[name].untyped_storage().nbytes() == 0) == release, name
     assert (
         state["w_torch"].untyped_storage().nbytes() > 0
     )  # read by the PyTorch partition
+
+
+def test_single_engine_fast_path_releases_weights():
+    model = torch.nn.Linear(16, 16).eval().cuda()
+    model.unused_head = torch.nn.Linear(16, 1000).cuda()
+    x = torch.randn(4, 16, device="cuda")
+    with torch.no_grad():
+        expected = model(x)
+    ep = torch.export.export(model, (x,))
+    trt_gm = torch_tensorrt.dynamo.compile(
+        ep,
+        arg_inputs=[x],
+        min_block_size=1,
+        require_full_compilation=True,
+        release_weights_after_build=True,
+    )
+    with torch.no_grad():
+        torch.testing.assert_close(trt_gm(x), expected, rtol=1e-3, atol=1e-3)
+    for name, tensor in ep.state_dict.items():
+        assert tensor.untyped_storage().nbytes() == 0, name
+
+
+def test_mutable_module_rejects_release():
+    with pytest.raises(ValueError, match="release_weights_after_build"):
+        torch_tensorrt.MutableTorchTensorRTModule(
+            torch.nn.Linear(4, 4).cuda(), release_weights_after_build=True
+        )
