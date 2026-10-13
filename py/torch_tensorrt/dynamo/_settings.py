@@ -51,6 +51,7 @@ from torch_tensorrt.dynamo._defaults import (
     OPTIMIZATION_LEVEL,
     PASS_THROUGH_BUILD_FAILURES,
     REFIT_IDENTICAL_ENGINE_WEIGHTS,
+    RELEASE_WEIGHTS_AFTER_BUILD,
     REQUIRE_FULL_COMPILATION,
     REUSE_CACHED_ENGINES,
     SPARSE_WEIGHTS,
@@ -151,6 +152,14 @@ class CompilationSettings:
         autocast_calibration_dataloader (Optional[torch.utils.data.DataLoader]): The dataloader to use for autocast calibration. Default is None.
         offload_module_to_cpu (bool): Offload the model to CPU to reduce memory footprint during compilation
         dynamically_allocate_resources (bool): Dynamically allocate resources for TensorRT engines
+        release_weights_after_build (bool): Release the memory of each model weight once the last
+            TensorRT engine that reads it is built, and of weights no partition reads before the first
+            build, so compilation holds only the weights still to be built. The model's tensors share
+            that memory, so the source module (and an ``ExportedProgram`` exported from it) must not be
+            used after compilation, even if compilation fails. Weights read by subgraphs that run in
+            PyTorch are kept. Applies to ``torch_tensorrt.dynamo.compile``; no effect under
+            ``torch.compile`` (parameters arrive as graph inputs), and not supported by
+            ``MutableTorchTensorRTModule``. Default is False.
         decompose_attention (bool): Whether to decompose attention layers into smaller operations
             instead of using the attention converters. When combined with ``use_fp32_acc=True``,
             decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only
@@ -236,6 +245,7 @@ class CompilationSettings:
     enable_resource_partitioning: bool = ENABLE_RESOURCE_PARTITIONING
     cpu_memory_budget: Optional[int] = CPU_MEMORY_BUDGET
     dynamically_allocate_resources: bool = DYNAMICALLY_ALLOCATE_RESOURCES
+    release_weights_after_build: bool = RELEASE_WEIGHTS_AFTER_BUILD
     decompose_attention: bool = DECOMPOSE_ATTENTION
     disabled_constant_fold_exclusions: Collection[str] = (
         DISABLED_CONSTANT_FOLD_EXCLUSIONS
@@ -290,6 +300,7 @@ class CompilationSettings:
             )
         )
         state.setdefault("fallback_data_dependent_ops", FALLBACK_DATA_DEPENDENT_OPS)
+        state.setdefault("release_weights_after_build", RELEASE_WEIGHTS_AFTER_BUILD)
         state.setdefault("build_route", BUILD_ROUTE)
         state.setdefault("tune_build_routes", TUNE_BUILD_ROUTES)
         state.setdefault("tune_build_route_file", TUNE_BUILD_ROUTE_FILE)
