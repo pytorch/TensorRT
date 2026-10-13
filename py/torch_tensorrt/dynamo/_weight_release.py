@@ -125,9 +125,8 @@ class WeightReleaser:
                 continue  # not counted at partition time (e.g. rebound since): another reader may hold it
             self.uses[ptr] -= 1
             if self.uses[ptr] == 0:
-                del self.uses[
-                    ptr
-                ]  # a later allocation at this address is a different storage
+                # A later allocation at this address is a different storage.
+                del self.uses[ptr]
                 released += release_storage(storage)
         if released:
             logger.info(

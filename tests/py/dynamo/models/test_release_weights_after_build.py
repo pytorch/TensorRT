@@ -181,6 +181,29 @@ def test_single_engine_fast_path_releases_weights():
         assert tensor.untyped_storage().nbytes() == 0, name
 
 
+def test_mutated_buffer_survives_release():
+    class _State(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.w = torch.nn.Parameter(torch.randn(16, 16), requires_grad=False)
+            self.register_buffer("state", torch.zeros(4, 16))
+
+        def forward(self, x):
+            y = x @ self.w + self.state
+            self.state.copy_(y)
+            return y * 2  # returning y itself trips an unrelated lowering error on main
+
+    x = torch.randn(4, 16, device="cuda")
+    ep = torch.export.export(_State().eval().cuda(), (x,))
+    trt_gm = torch_tensorrt.dynamo.compile(
+        ep, arg_inputs=[x], min_block_size=1, release_weights_after_build=True
+    )
+    assert ep.state_dict["w"].untyped_storage().nbytes() == 0
+    # Lifted into an engine input, not read through get_attr: never released.
+    buffers = list(trt_gm.buffers())
+    assert buffers and all(b.untyped_storage().nbytes() > 0 for b in buffers)
+
+
 def test_mutable_module_rejects_release():
     with pytest.raises(ValueError, match="release_weights_after_build"):
         torch_tensorrt.MutableTorchTensorRTModule(

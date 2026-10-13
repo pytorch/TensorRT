@@ -158,7 +158,8 @@ class CompilationSettings:
             that memory, so the source module (and an ``ExportedProgram`` exported from it) must not be
             used after compilation, even if compilation fails. Weights read by subgraphs that run in
             PyTorch are kept. Applies to ``torch_tensorrt.dynamo.compile``; no effect under
-            ``torch.compile`` (parameters arrive as graph inputs). Default is False.
+            ``torch.compile`` (parameters arrive as graph inputs), and not supported by
+            ``MutableTorchTensorRTModule``. Default is False.
         decompose_attention (bool): Whether to decompose attention layers into smaller operations
             instead of using the attention converters. When combined with ``use_fp32_acc=True``,
             decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only
