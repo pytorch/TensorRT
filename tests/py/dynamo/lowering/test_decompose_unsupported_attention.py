@@ -1,6 +1,9 @@
+from unittest import mock
+
 import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase, run_tests
+from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion.aten_ops_converters import (
     scaled_dot_product_attention_validator,
@@ -13,6 +16,45 @@ from ..testing_utilities import lower_graph_testing
 
 
 class TestDecomposeUnsupportedAttention(TestCase):
+    def test_turing_fp32_attention_left_intact_for_pytorch_fallback(self):
+        class SDPA(nn.Module):
+            def forward(self, q, k, v):
+                return torch.ops.aten.scaled_dot_product_attention.default(q, k, v)
+
+        # Also cover MLA shapes: shape-based decomposition must not override a
+        # hardware rejection, even when K and V have different head dimensions.
+        for value_head_dim in (8, 4):
+            with (
+                self.subTest(value_head_dim=value_head_dim),
+                mock.patch(
+                    "torch_tensorrt._features.ENABLED_FEATURES",
+                    ENABLED_FEATURES._replace(tensorrt_rtx=True),
+                ),
+            ):
+                inputs = (
+                    torch.randn(1, 2, 4, 8),
+                    torch.randn(1, 2, 4, 8),
+                    torch.randn(1, 2, 4, value_head_dim),
+                )
+                gm = torch.export.export(SDPA(), inputs).module()
+                settings = CompilationSettings(
+                    decompose_attention=False,
+                    target_compute_capabilities=[(7, 5)],
+                )
+                sdpa = next(
+                    n
+                    for n in gm.graph.nodes
+                    if n.target == torch.ops.aten.scaled_dot_product_attention.default
+                )
+                self.assertFalse(scaled_dot_product_attention_validator(sdpa, settings))
+                original_graph = str(gm.graph)
+
+                gm = decompose_unsupported_attention(gm, settings)
+
+                self.assertEqual(str(gm.graph), original_graph)
+                self.assertFalse(scaled_dot_product_attention_validator(sdpa, settings))
+                self.assertEqual(gm(*inputs), SDPA()(*inputs))
+
     def test_mla_kv_head_dim_mismatch_is_decomposed(self):
         # MLA: K head dim = nope + rope, V head dim = v only.
         b, h, s, d_k, d_v = 1, 2, 4, 6, 4
