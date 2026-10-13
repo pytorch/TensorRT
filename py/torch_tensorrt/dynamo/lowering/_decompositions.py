@@ -251,6 +251,11 @@ def select_scatter_decomposition(
     dim: int,
     index: int,
 ) -> torch.Tensor:
+    # Normalize before forming index + 1: index=-1 would otherwise become the
+    # empty slice [-1:0] rather than the last element.
+    dim = get_positive_dim(dim, input_tensor.dim())
+    if index < 0:
+        index = index + input_tensor.shape[dim]
     src_tensor = torch.unsqueeze(src_tensor, dim)
     return torch.slice_scatter(input_tensor, src_tensor, dim, index, index + 1, 1)
 
