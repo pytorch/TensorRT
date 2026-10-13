@@ -67,8 +67,8 @@ This can exceed system limits when compiling large models.
 
    The per-engine budget is ``(cpu_memory_budget - resident memory) / 4``. Resident memory
    is the process's RSS when partitioning runs, so it includes weights held on the host
-   (all of them when you compile on the CPU, see below): set ``cpu_memory_budget`` above
-   that. Without ``cpu_memory_budget``, the budget is the available system memory divided
+   (on a CPU compile, every weight already read into memory, see below): set
+   ``cpu_memory_budget`` above that. Without ``cpu_memory_budget``, the budget is the available system memory divided
    by 4. See :ref:`low_cpu_memory_compilation` for a runnable example.
 
    Each engine boundary adds a little latency. A split that cuts through a region reusing
@@ -127,24 +127,26 @@ By default, Torch-TensorRT may consume up to **2x** the model size in GPU memory
    than ``min_block_size``) use the model's tensors, so move the compiled module to the GPU
    before running it. Only those layers' weights move, and since they are the model's own
    tensors, they move in the original model too; moving the original model back to the
-   CPU moves them out of the compiled module. With a model on the CPU,
-   ``offload_module_to_cpu=True`` has nothing to offload, but it makes the compiler move the
-   layers that run in PyTorch to ``device`` for you, which replaces the ``.cuda()`` call.
+   CPU moves them out of the compiled module.
+
+   With a model on the CPU, ``offload_module_to_cpu=True`` has nothing to offload, but it
+   makes the compiler move the layers that run in PyTorch to ``device`` for you, which
+   replaces the ``.cuda()`` call.
 
    Tensors the model creates as it runs (``torch.arange``, ``torch.zeros``, ``torch.full``,
    even with ``device=x.device``) are recorded on the CPU when it is exported on the CPU.
    Inside a TensorRT engine that does not matter, but such an operator left to PyTorch still
    creates its tensor on the CPU and fails with a device mismatch that ``.cuda()`` does not
-   fix. Use ``dryrun=True`` to see which operators run in PyTorch.
+   fix. Use ``dryrun=True`` (see :ref:`dryrun`) to see which operators run in PyTorch.
 
    .. note::
 
       Code that enables autocast only for CUDA tensors (``torch.autocast("cuda", ...)``, or
       autocast gated on ``tensor.is_cuda``) does not apply while the model runs on the CPU
       during export, which can leave low-precision weights next to FP32 activations and fail
-      with a dtype mismatch during export or conversion (for example ``IMatrixMultiplyLayer
-      must have same input types``). Wrap those regions in ``torch.autocast("cpu",
-      dtype=...)`` for the export.
+      with a dtype mismatch during export or conversion (for example
+      ``IMatrixMultiplyLayer must have same input types``). Wrap those regions in
+      ``torch.autocast("cpu", dtype=...)`` for the export.
 
 ----
 
