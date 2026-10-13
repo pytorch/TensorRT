@@ -29,7 +29,16 @@ Functions
 
 .. autofunction:: refit_module_weights
 
+.. autofunction:: map_weights
+
+.. autofunction:: save_weights_for_mapping
+
+.. autofunction:: release_mapped_storage
+
 Classes
 --------
 
 .. autoclass:: CompilationSettings
+
+.. autoclass:: MappedWeights
+    :members: close
