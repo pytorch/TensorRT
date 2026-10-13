@@ -197,10 +197,12 @@ Or set it via ``CompilationSettings``:
 
 How the budget is computed:
 
-1. ``ResourcePartitioner`` queries available system memory via ``psutil``.
+1. ``ResourcePartitioner`` reads the process's resident memory (RSS) via ``psutil``, or the
+   available system memory when ``cpu_memory_budget`` is not set.
 2. It estimates the parameter footprint of each TRT subgraph by summing ``get_attr``
    tensor byte sizes.
-3. The per-engine budget is ``available_memory // ENGINE_COMPILATION_MEMORY_USAGE_MULTIPLIER``
+3. The per-engine budget is ``(cpu_memory_budget - RSS) // ENGINE_COMPILATION_MEMORY_USAGE_MULTIPLIER``,
+   or ``available_memory // ENGINE_COMPILATION_MEMORY_USAGE_MULTIPLIER`` without a budget
    (default multiplier: 4, accounting for TensorRT's internal copies during build).
 4. Any subgraph whose estimated footprint exceeds this budget is split iteratively
    until all pieces fit.
@@ -283,7 +285,10 @@ All partitioning behaviour is controlled via ``CompilationSettings``:
      - Run resource partitioning after capability partitioning.
    * - ``cpu_memory_budget``
      - ``None``
-     - Byte budget per TRT engine during build. ``None`` uses available system memory.
+     - Host memory budget for the build; each engine gets ``(budget - RSS) / 4``. ``None`` uses available system memory.
+   * - ``resource_partition_engine_cap``
+     - ``None``
+     - Target weight bytes per engine; when set, used instead of the RSS-derived budget.
 
 ----
 

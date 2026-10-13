@@ -266,6 +266,14 @@ class CompilationSettings:
                 self.disabled_constant_fold_exclusions
             )
         )
+        if (
+            self.resource_partition_engine_cap is not None
+            and self.resource_partition_engine_cap <= 0
+        ):
+            raise ValueError(
+                "resource_partition_engine_cap must be a positive number of bytes, "
+                f"got {self.resource_partition_engine_cap}"
+            )
         if self.target_compute_capabilities:
             from torch_tensorrt._features import ENABLED_FEATURES
 

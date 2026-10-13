@@ -73,7 +73,7 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
     - an original `torch.fx.GraphModule` (`module`)
     - a capability-partitioned `GraphModule` (`partitioned_module`) containing
       submodules that delineate accelerated vs non-accelerated regions
-    - a CPU memory budget in bytes (`cpu_memory_budget`)
+    - a CPU memory budget in bytes (`cpu_memory_budget`), or a fixed per-engine size (`engine_cap`)
 
     It maps nodes from `module` into subgraphs according to `partitioned_module`
     and then splits oversized accelerated subgraphs so that each resulting TRT
@@ -199,8 +199,8 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
     ) -> int:
         """Compute the per-engine size budget in bytes.
 
-        Uses explicit `cpu_memory_budget` minus used RSS
-        divided by a safety multiplier.
+        Uses explicit `cpu_memory_budget` minus used RSS (or available memory without a budget)
+        divided by a safety multiplier; with `engine_cap` set, this is the cap.
 
         Args:
             engine_compilation_memory_usage_multiplier: Safety divisor applied to
@@ -247,8 +247,8 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
                 )
             elif self.engine_cap is not None:
                 raise ValueError(
-                    f"resource_partition_engine_cap ({self.engine_cap // (1024 * 1024)} MB) would split the model "
-                    + f"({sum(sizes) // (1024 * 1024)} MB) into more than {MAX_NUM_OF_ENGINES} engines. "
+                    f"resource_partition_engine_cap ({self.engine_cap / 2**20:.2f} MiB) would split the model "
+                    + f"({sum(sizes) / 2**20:.2f} MiB) into more than {MAX_NUM_OF_ENGINES} engines. "
                     + "Consider setting resource_partition_engine_cap to a larger value."
                 )
             else:
@@ -550,7 +550,7 @@ def resource_partition(
         partitioned_module: Capability-partitioned `GraphModule` indicating
             accelerated vs non-accelerated regions.
         cpu_memory_budget: CPU memory budget in bytes for engine compilation.
-            Use -1 to base the budget on currently available system memory.
+            Use None to base the budget on currently available system memory.
         engine_cap: The weight bytes per engine to split to. When set, it is used
             instead of ``cpu_memory_budget`` minus the process's resident memory, so
             the split does not depend on what the process happens to hold.
