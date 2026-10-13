@@ -424,6 +424,28 @@ def _remove_lifted_engine_placeholder(
         exported_program.constants.pop(engine_target, None)
 
 
+def replace_reshape_copy(exported_program: Any) -> None:
+    """Turn aten._reshape_copy left outside the engines into aten.reshape.
+
+    Torch-TensorRT lowers aten.view to aten._reshape_copy, which ExecuTorch has no
+    kernel for, so to_executorch failed ("Missing out variants: aten::_reshape_copy")
+    whenever such a node stayed in PyTorch, for example a view with more dimensions
+    than TensorRT allows. aten.reshape computes the same values, and to_edge lowers
+    it to ops ExecuTorch runs: a view where the input allows one, a copy where not.
+    Rewrites the given program's graph in place, so pass it a staged copy.
+    """
+    graph_module = exported_program.graph_module
+    replaced = False
+    for node in graph_module.graph.nodes:
+        if node.op == "call_function" and (
+            node.target == torch.ops.aten._reshape_copy.default
+        ):
+            node.target = torch.ops.aten.reshape.default
+            replaced = True
+    if replaced:
+        graph_module.recompile()
+
+
 def replace_execute_engine(
     exported_program: Any, resolved: dict[str, list[Any]] | None = None
 ) -> Any:
