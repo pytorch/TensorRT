@@ -65,12 +65,18 @@ This can exceed system limits when compiling large models.
           cpu_memory_budget=16 * 1024**3,  # bytes
       )
 
-   The per-engine budget is ``(cpu_memory_budget - resident memory) / 4``. More engines
-   cost a little latency per engine boundary, and more if a split cuts through a region
-   that reuses the same weights, such as an unrolled loop: each engine then holds its own
-   copy of those weights. For a 3B-parameter policy with a 10-step unrolled denoising loop
-   compiled into 16 engines, the engines totaled 10.9 GB against 5.3 GB as one engine (GPU
-   memory at inference: 11.5 GB against 5.5 GB), and inference was 2% slower.
+   The per-engine budget is ``(cpu_memory_budget - resident memory) / 4``. Resident memory
+   is the process's RSS when partitioning runs, so it includes weights held on the host
+   (all of them when you compile on the CPU, see below): set ``cpu_memory_budget`` above
+   that. Without ``cpu_memory_budget``, the budget is the available system memory divided
+   by 4. See :ref:`low_cpu_memory_compilation` for a runnable example.
+
+   Each engine boundary adds a little latency. A split that cuts through a region reusing
+   the same weights, such as an unrolled loop, also costs memory: every engine that uses
+   those weights carries its own copy. For a 3B-parameter model with a 10-step unrolled
+   denoising loop compiled into 16 engines, the engines totaled 10.9 GB against 5.3 GB as
+   one engine (GPU memory at inference: 11.5 GB against 5.5 GB), and inference was 2%
+   slower.
 
 GPU Memory
 ^^^^^^^^^^
@@ -101,7 +107,8 @@ By default, Torch-TensorRT may consume up to **2x** the model size in GPU memory
    Keep the model on the CPU: export it with CPU example inputs and compile the
    ``ExportedProgram`` with inputs on the GPU. TensorRT takes weights from host memory, and
    the converters pass a CPU weight's own memory to it instead of copying it, so the model
-   never has a copy on the GPU and the host holds about the same as before:
+   never has a copy on the GPU. Unlike option 1, no model copy is added on the host: host
+   memory stays about where a compile on the GPU puts it.
 
    .. code-block:: python
 
@@ -116,17 +123,28 @@ By default, Torch-TensorRT may consume up to **2x** the model size in GPU memory
    memory (Jetson), since the sum of both is what has to fit.
 
    TensorRT engines carry their own copy of their weights; layers that run in PyTorch
-   (operators TensorRT does not convert) use the model's tensors, so move the compiled
-   module to the GPU before running it. Only those layers' weights move, and since they
-   are the model's own tensors, they move in the original model too.
+   (operators without a converter, listed in ``torch_executed_ops``, or in blocks smaller
+   than ``min_block_size``) use the model's tensors, so move the compiled module to the GPU
+   before running it. Only those layers' weights move, and since they are the model's own
+   tensors, they move in the original model too; moving the original model back to the
+   CPU moves them out of the compiled module. With a model on the CPU,
+   ``offload_module_to_cpu=True`` has nothing to offload, but it makes the compiler move the
+   layers that run in PyTorch to ``device`` for you, which replaces the ``.cuda()`` call.
+
+   Tensors the model creates as it runs (``torch.arange``, ``torch.zeros``, ``torch.full``,
+   even with ``device=x.device``) are recorded on the CPU when it is exported on the CPU.
+   Inside a TensorRT engine that does not matter, but such an operator left to PyTorch still
+   creates its tensor on the CPU and fails with a device mismatch that ``.cuda()`` does not
+   fix. Use ``dryrun=True`` to see which operators run in PyTorch.
 
    .. note::
 
       Code that enables autocast only for CUDA tensors (``torch.autocast("cuda", ...)``, or
       autocast gated on ``tensor.is_cuda``) does not apply while the model runs on the CPU
       during export, which can leave low-precision weights next to FP32 activations and fail
-      with a dtype mismatch. Wrap those regions in ``torch.autocast("cpu", dtype=...)`` for
-      the export.
+      with a dtype mismatch during export or conversion (for example ``IMatrixMultiplyLayer
+      must have same input types``). Wrap those regions in ``torch.autocast("cpu",
+      dtype=...)`` for the export.
 
 ----
 
