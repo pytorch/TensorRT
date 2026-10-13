@@ -284,6 +284,34 @@ class TestRemoveSymIntNodes(TestCase):
         self.assertTrue(True)
 
 
+class TestPreDispatchSideEffects(TestCase):
+    def test_vmap_survives_assert_removal(self):
+        # The dtype casts put _assert_tensor_metadata nodes in the exported graph, and
+        # removing them runs dead-code elimination over the whole graph while the vmap's
+        # nesting calls (used by nothing, kept for their side effect) are still in it.
+        # transformers builds attention masks this way.
+        class VmapMask(torch.nn.Module):
+            def forward(self, x, y):
+                mask = torch.vmap(lambda row: row > 0)(x)
+                return (x * mask).to(torch.float16) + y.to(torch.float16)
+
+        model = VmapMask().eval().cuda()
+        inputs = (
+            torch.randn(4, 8).cuda(),
+            torch.randn(4, 8, dtype=torch.float64).cuda(),
+        )
+        exported = torch.export.export(model, inputs)
+        trt_module = torch_tensorrt.dynamo.compile(
+            exported,
+            arg_inputs=list(inputs),
+            min_block_size=1,
+            truncate_double=True,
+        )
+        torch.testing.assert_close(
+            trt_module(*inputs), model(*inputs), rtol=1e-3, atol=1e-3
+        )
+
+
 class TestNormalizeNegativeSliceStop(TestCase):
     def test_normalizes_negative_symbolic_start_bound(self):
         from torch_tensorrt.dynamo.lowering.passes.normalize_negative_slice_stop import (
