@@ -99,8 +99,8 @@ class MappedWeights:
 
 def release_mapped_storage(storage: torch.UntypedStorage) -> bool:
     """Drop the resident pages of a storage that views a file mapped by ``map_weights``. True if the
-    storage is in a mapping; False for any other storage (the caller can release it another way).
-    """
+    storage is in a mapping; False for any other storage. ``release_weights_after_build`` calls this
+    for each weight whose last engine is built."""
     ptr, nbytes = storage.data_ptr(), storage.nbytes()
     if not nbytes:
         return False
@@ -123,15 +123,6 @@ def release_mapped_storage(storage: torch.UntypedStorage) -> bool:
                 mm.madvise(mmap.MADV_DONTNEED, lo, hi - lo)
         return True
     return False
-
-
-try:
-    from torch_tensorrt.dynamo._weight_release import register_release_handler
-except ImportError:  # release_weights_after_build is not available in this build
-    pass
-else:
-    # Let release_weights_after_build drop mapped weights' pages instead of resizing their storage.
-    register_release_handler(release_mapped_storage)
 
 
 def _read_header(path: str) -> Tuple[Dict[str, Dict[str, Any]], int]:
@@ -211,7 +202,7 @@ def map_weights(
     Returns:
         A ``MappedWeights`` handle: mapped and copied tensors, names missing from the checkpoint, and
         ``close()``. A mapped tensor is resident only while it is read; ``release_mapped_storage`` (used by
-        ``release_weights_after_build`` when available) drops its pages again.
+        ``release_weights_after_build``) drops its pages again.
     """
     path = os.fspath(path)
     header, start = _read_header(path)

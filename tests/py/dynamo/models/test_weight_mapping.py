@@ -11,10 +11,12 @@ import torch
 import torch_tensorrt
 from torch_tensorrt.dynamo import (
     _weight_mapping,
+    _weight_release,
     map_weights,
     release_mapped_storage,
     save_weights_for_mapping,
 )
+from torch_tensorrt.dynamo._weight_release import release_storage
 
 
 class _Tied(torch.nn.Module):
@@ -233,6 +235,45 @@ def test_unclosed_mappings_are_freed_with_their_views(tmp_path):
     gc.collect()
     release_mapped_storage(torch.ones(1).untyped_storage())  # prunes dead entries
     assert len(_weight_mapping._live_mappings) == before
+
+
+def test_release_storage_drops_pages_of_mapped_weights(tmp_path):
+    ref = _reference(tmp_path / "w.safetensors")
+    with torch.device("meta"):
+        model = _Tied()
+    with map_weights(model, tmp_path / "w.safetensors"):
+        mapped = model.proj.weight.untyped_storage()
+        assert (
+            release_storage(mapped) == mapped.nbytes() > 0
+        )  # pages dropped, not resized
+        torch.testing.assert_close(model.proj.weight, ref.proj.weight)
+    plain = torch.ones(4).untyped_storage()
+    assert release_storage(plain) == 16 and plain.nbytes() == 0  # resize_(0) as before
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="needs CUDA")
+def test_release_weights_after_build_with_mapped_weights(tmp_path, monkeypatch):
+    calls = []
+
+    def spy(storage):
+        calls.append(release_mapped_storage(storage))
+        return calls[-1]
+
+    monkeypatch.setattr(_weight_release, "release_mapped_storage", spy)
+    ref = _reference(tmp_path / "w.safetensors")
+    with torch.device("meta"):
+        model = _Tied().eval()
+    with map_weights(model, tmp_path / "w.safetensors", strict=True):
+        x = torch.randn(3, 8)
+        ep = torch.export.export(model, (x,))
+    trt = torch_tensorrt.dynamo.compile(
+        ep, inputs=[x.cuda()], min_block_size=1, release_weights_after_build=True
+    )
+    torch.testing.assert_close(trt(x.cuda()).cpu(), ref(x), rtol=1e-3, atol=1e-3)
+    assert calls and all(calls)  # every released weight was a mapped one
+    torch.testing.assert_close(
+        model.proj.weight, ref.proj.weight
+    )  # re-read from the file
 
 
 @pytest.mark.unit
