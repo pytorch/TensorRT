@@ -122,6 +122,16 @@ By default, Torch-TensorRT may consume up to **2x** the model size in GPU memory
    being built and the engines already built. This also matters where CPU and GPU share
    memory (Jetson), since the sum of both is what has to fit.
 
+   The engine is the same as a GPU compile's, so latency doesn't change. For ResNet-50, ViT,
+   BERT, GPT-2 and a 4-layer Llama, the engines were byte-identical with a shared timing
+   cache. Constant folding runs where the constants are, here on the CPU, so a float32 folded
+   constant can differ from a GPU compile's in the last bit. bfloat16, float16 and float64
+   constants match exactly.
+
+   Use ``torch.export`` and ``torch_tensorrt.dynamo.compile`` as above:
+   ``torch_tensorrt.compile(model, ir="dynamo", ...)`` doesn't accept a model on the CPU
+   (``FakeTensorDeviceMismatchError``).
+
    TensorRT engines carry their own copy of their weights; layers that run in PyTorch
    (operators without a converter, listed in ``torch_executed_ops``, or in blocks smaller
    than ``min_block_size``) use the model's tensors, so move the compiled module to the GPU
@@ -132,12 +142,6 @@ By default, Torch-TensorRT may consume up to **2x** the model size in GPU memory
    With a model on the CPU, ``offload_module_to_cpu=True`` has nothing to offload, but it
    makes the compiler move the layers that run in PyTorch to ``device`` for you, which
    replaces the ``.cuda()`` call.
-
-   Tensors the model creates as it runs (``torch.arange``, ``torch.zeros``, ``torch.full``,
-   even with ``device=x.device``) are recorded on the CPU when it is exported on the CPU.
-   Inside a TensorRT engine that does not matter, but such an operator left to PyTorch still
-   creates its tensor on the CPU and fails with a device mismatch that ``.cuda()`` does not
-   fix. Use ``dryrun=True`` (see :ref:`dryrun`) to see which operators run in PyTorch.
 
    .. note::
 
