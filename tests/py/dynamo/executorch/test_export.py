@@ -862,8 +862,8 @@ def test_save_leaves_no_lowered_program_alive(tmp_path):
     """A saved program's delegates, and so its engines, must not outlive save()."""
     from executorch.exir.lowered_backend_module import LoweredBackendModule
 
+    # No gc.collect() of its own: save() has to hand the memory back before it returns.
     def live_lowered_modules():
-        gc.collect()
         return sum(isinstance(o, LoweredBackendModule) for o in gc.get_objects())
 
     class AddOne(torch.nn.Module):
