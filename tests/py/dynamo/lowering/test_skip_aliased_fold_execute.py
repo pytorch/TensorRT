@@ -7,6 +7,7 @@ import torch
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes.constant_folding import (
     _MAX_CONSTANT_FOLD_BYTES,
+    _node_output_nbytes,
     _TorchTensorRTConstantFolder,
     constant_fold,
     skip_large_aliased_view_fold,
@@ -137,6 +138,22 @@ class TestSkipAliasedFoldExecute(unittest.TestCase):
         rows = 513
         gm = _exported_gm(_RuntimePermute(), torch.ones(rows, rows))
         permute_node = _node_for_target(gm, torch.ops.aten.permute.default)
+        self.assertFalse(skip_large_aliased_view_fold(gm, permute_node))
+
+    def test_symbolic_output_size_does_not_specialize_dynamic_shape(self) -> None:
+        rows = 513
+        dynamic_rows = torch.export.Dim("rows", min=2, max=1024)
+        gm = torch.export.export(
+            _RuntimePermute(),
+            (torch.ones(rows, rows),),
+            dynamic_shapes=({0: dynamic_rows},),
+        ).module()
+        permute_node = _node_for_target(gm, torch.ops.aten.permute.default)
+
+        self.assertTrue(
+            any(isinstance(dim, torch.SymInt) for dim in permute_node.meta["val"].shape)
+        )
+        self.assertEqual(_node_output_nbytes(permute_node), 0)
         self.assertFalse(skip_large_aliased_view_fold(gm, permute_node))
 
     def test_skip_fn_false_for_unsupported_views(self) -> None:

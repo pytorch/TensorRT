@@ -72,9 +72,13 @@ def _is_module_attr_view(gm: torch.fx.GraphModule, node: torch.fx.Node) -> bool:
 
 
 def _node_output_nbytes(node: torch.fx.Node) -> int:
-    """Output bytes from export metadata, or zero when unavailable."""
+    """Output bytes from static export metadata, or zero when unavailable."""
     value = node.meta.get("val")
     if not isinstance(value, torch.Tensor):
+        return 0
+    # Converting a symbolic numel to int guards it to the example shape. That
+    # silently turns dynamic TensorRT input dimensions into static dimensions.
+    if any(isinstance(dim, torch.SymInt) for dim in value.shape):
         return 0
     try:
         return int(value.numel() * value.element_size())
