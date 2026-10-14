@@ -106,6 +106,12 @@ def quantize(
 
             amax = to_torch(amax, None)
             scale = torch.divide(amax, max_bound)
+            # A zero amax (calibration only saw zeros, e.g. a fully dead ReLU) would
+            # give a zero scale, and TRT's quantize then divides by zero -> NaN.
+            # Treat amax=0 as amax=1 instead, which matches ModelOpt's fake quant.
+            scale = torch.where(
+                amax == 0, torch.full_like(scale, 1.0 / max_bound), scale
+            )
             scale = get_trt_tensor(ctx, scale, name + "_scale", dtype=torch.float32)
         else:
             scale = impl.elementwise.div(

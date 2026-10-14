@@ -507,6 +507,9 @@ def test_base_fp8(ir):
         """Simple calibration function for testing."""
         model(input_tensor)
 
+    # Unseeded, ~3% of draws leave every ReLU output at zero, so linear2 calibrates
+    # amax=0 (see the zero-amax guard in conversion/impl/quantize.py).
+    torch.manual_seed(0)
     input_tensor = torch.randn(1, 10).cuda()
     model = SimpleNetwork().eval().cuda()
     quant_cfg = mtq.FP8_DEFAULT_CFG
