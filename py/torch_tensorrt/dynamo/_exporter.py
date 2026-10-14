@@ -1045,6 +1045,9 @@ def inline_trt_modules(
                 # The engine is still on disk (engine_output_dir): pass it as a uint8 buffer mapped
                 # from its file, the form the ExecuTorch backend packs, so it is never loaded on the
                 # GPU and its pages are read only when the backend copies them into the program.
+                # A Python-only build registers the placeholder op only with meta_ops.
+                import torch_tensorrt.dynamo.runtime.meta_ops.register_meta_ops  # noqa: F401
+
                 path = trt_module.serialized_engine_path
                 engine_tensor = torch.from_file(
                     path, shared=False, size=os.path.getsize(path), dtype=torch.uint8
