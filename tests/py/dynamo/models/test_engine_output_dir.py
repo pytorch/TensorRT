@@ -107,6 +107,30 @@ def test_executorch_save_reads_engines_from_their_files(tmp_path, monkeypatch):
     assert abs(len(pte) - len(mem)) < 1024
 
 
+@pytest.mark.skipif(not os.path.exists("/proc/self/maps"), reason="reads /proc")
+def test_executorch_backend_drops_only_engine_file_pages(tmp_path):
+    pytest.importorskip("executorch.exir")
+    from torch_tensorrt.executorch.backend import _drop_engine_file_pages
+
+    def rss_file_mib():
+        status = dict(line.split(":", 1) for line in open("/proc/self/status"))
+        return int(status["RssFile"].split()[0]) / 1024
+
+    data = os.urandom(64 << 20)
+    path = tmp_path / "x.engine"
+    path.write_bytes(data)
+    engine = torch.from_file(str(path), shared=False, size=len(data), dtype=torch.uint8)
+    assert engine.numpy().tobytes() == data
+    before = rss_file_mib()
+    _drop_engine_file_pages(engine)
+    assert before - rss_file_mib() > 60
+    assert engine.numpy().tobytes() == data
+
+    anonymous = torch.frombuffer(bytearray(data), dtype=torch.uint8)
+    _drop_engine_file_pages(anonymous)
+    assert anonymous.numpy().tobytes() == data
+
+
 def test_engine_files_are_not_needed_in_memory_mode(tmp_path):
     _, _, trt, engines = _compile(tmp_path)
     assert all(m.serialized_engine_path is None for m in engines)
