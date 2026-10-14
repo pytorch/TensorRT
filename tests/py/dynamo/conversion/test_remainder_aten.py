@@ -42,6 +42,46 @@ class TestRemainderConverter(DispatchTestCase):
 
     @parameterized.expand(
         [
+            # large magnitudes where input * scalar overflows the integer dtype
+            ("int64_pos_divisor", torch.int64, 5950571286963681280, 196613),
+            ("int64_neg_divisor", torch.int64, 5950571286963681280, -196613),
+            ("int32_pos_divisor", torch.int32, 2**30, 7),
+            ("int32_neg_divisor", torch.int32, 2**30, -7),
+        ]
+    )
+    def test_remainder_scalar_large_int(self, _, dtype, big, scalar):
+        class Remainder(nn.Module):
+            def forward(self, lhs_val):
+                return torch.ops.aten.remainder.Scalar(lhs_val, scalar)
+
+        inputs = [torch.tensor([big, -big, big - 1, 7, -7, 0], dtype=dtype)]
+        self.run_test(
+            Remainder(),
+            inputs,
+        )
+
+    @parameterized.expand(
+        [
+            ("int64", torch.int64, 5950571286963681280, 196613),
+            ("int32", torch.int32, 2**30, 7),
+        ]
+    )
+    def test_remainder_tensor_large_int(self, _, dtype, big, d):
+        class Remainder(nn.Module):
+            def forward(self, lhs_val, rhs_val):
+                return torch.ops.aten.remainder.Tensor(lhs_val, rhs_val)
+
+        inputs = [
+            torch.tensor([big, -big, big, -big, 7], dtype=dtype),
+            torch.tensor([d, d, -d, -d, -3], dtype=dtype),
+        ]
+        self.run_test(
+            Remainder(),
+            inputs,
+        )
+
+    @parameterized.expand(
+        [
             ("1d", (5,)),
             ("2d", (2, 1)),
             ("3d", (2, 1, 2)),
