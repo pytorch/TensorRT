@@ -858,6 +858,38 @@ def test_python_only_build_can_export_a_pte(tmp_path):
 
 
 @pytest.mark.unit
+def test_save_leaves_no_lowered_program_alive(tmp_path):
+    """A saved program's delegates, and so its engines, must not outlive save()."""
+    from executorch.exir.lowered_backend_module import LoweredBackendModule
+
+    def live_lowered_modules():
+        gc.collect()
+        return sum(isinstance(o, LoweredBackendModule) for o in gc.get_objects())
+
+    class AddOne(torch.nn.Module):
+        def forward(self, value):
+            return value + 1
+
+    example = (torch.randn(2, 3, 4, 4, device="cuda"),)
+    compiled = torch_tensorrt.dynamo.compile(
+        torch.export.export(AddOne().eval().cuda(), example),
+        arg_inputs=example,
+        min_block_size=1,
+    )
+    before = live_lowered_modules()
+
+    torch_tensorrt.save(
+        compiled,
+        str(tmp_path / "add_one.pte"),
+        output_format="executorch",
+        arg_inputs=example,
+        retrace=False,
+    )
+
+    assert live_lowered_modules() == before
+
+
+@pytest.mark.unit
 def test_export_preserves_independent_method_mapping(monkeypatch):
     prefill = FakeExportedProgram()
     decode = FakeExportedProgram()

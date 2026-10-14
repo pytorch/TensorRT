@@ -1560,6 +1560,23 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
         # persist the ETRecord as "<pte_base>_etrecord.bin" next to the .pte.
         etrecord_path = os.path.splitext(file_path)[0] + "_etrecord.bin"
         executorch_program.get_etrecord().save(etrecord_path)
+    _release_lowering_caches()
+
+
+def _release_lowering_caches() -> None:
+    """Drop the process-wide cache entries that point at the lowered program once it is written.
+
+    to_backend's graph check memoizes ``is_same_node`` on FX nodes, and FakeTensorMode's
+    dispatch cache keys entries on the ``executorch_call_delegate`` arguments. Both keep
+    the lowered modules, and with them every serialized engine, alive after save()
+    returns, so each saved program stays resident until the process exits. Clearing
+    them frees nothing still in use; they refill on demand.
+    """
+    from executorch.exir.backend.utils import is_same_node
+    from torch._subclasses.fake_tensor import FakeTensorMode
+
+    is_same_node.cache_clear()
+    FakeTensorMode.cache_clear()
 
 
 def _normalize_engine_constants_to_python(exp_program: "ExportedProgram") -> None:
