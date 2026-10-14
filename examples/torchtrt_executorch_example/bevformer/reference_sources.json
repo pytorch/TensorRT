@@ -1,0 +1,23 @@
+{
+  "versions": {
+    "bevformer": "66b65f3a1f58caf0507cb2a971b9c0e7f842376c",
+    "mmdetection": "v2.14.0",
+    "mmcv": "v1.4.0",
+    "torchvision": "v0.10.1"
+  },
+  "sha256": {
+    "upstream/mmdet/resnet.py": "b200eb889837bfcb31bf8e7082f452ecc44bd277dd8b08fc9f1deed05cfe5490",
+    "upstream/mmdet/fpn.py": "ccf649237a0715b1af43e4c42ff18b89141d7a7ca22cb95b6f9aeeb06906d18e",
+    "upstream/mmdet/positional_encoding.py": "a8d69a71eec49de8bf916a5918389afdf7be77cc2d78bb5bb182dd2f7dc16640",
+    "upstream/mmcv/transformer.py": "3cf9188ab4c741daf6738abd38d46d18595e3a7531f905d40f5c092a4041e08d",
+    "upstream/mmcv/multi_scale_deform_attn.py": "7562d8039a09cb8ac92b20508ceb9e9396bf186e62c029b0753060583ead25e1",
+    "upstream/torchvision/functional.py": "8d7959cdeeb3145517fcafe72c509c0fdef29b7852b1dbeed8ac89d81c40bab2",
+    "upstream/torchvision/functional_tensor.py": "291122e87673a2dc20b9320aecae375d1c2dd0b7b8089986da6e7e3874cbe9fa",
+    "upstream/BEVFormer/projects/mmdet3d_plugin/bevformer/modules/encoder.py": "ebcf1e68f3807832c9fe7a45cbaf1d747cc2a196f14cd48019e06c751e849009",
+    "upstream/BEVFormer/projects/mmdet3d_plugin/bevformer/modules/decoder.py": "f6d270db1f5c6dc8751c9ca97effc534eb38e1daf14bc2d83eb9df06a3a41d91",
+    "upstream/BEVFormer/projects/mmdet3d_plugin/bevformer/modules/transformer.py": "5bc369a36ec323c6e3d67f4fc8b0ca7628bb4748e336832a8cd50422fc01c62d",
+    "upstream/BEVFormer/projects/mmdet3d_plugin/bevformer/modules/temporal_self_attention.py": "c4c893779f9ba61d1397c8e691ca730d22e0e83ba88eef6c4f583c6f3975cce2",
+    "upstream/BEVFormer/projects/mmdet3d_plugin/bevformer/modules/spatial_cross_attention.py": "045ac69d3baec715f2d73065ea50dd799b214b4de1d7e030e5907e36a82b47de",
+    "upstream/BEVFormer/projects/mmdet3d_plugin/bevformer/dense_heads/bevformer_head.py": "e655b6d8ee6fecc27724f70017362c2bf7abbe95a49319c1dbcfbbc3129243b0"
+  }
+}
