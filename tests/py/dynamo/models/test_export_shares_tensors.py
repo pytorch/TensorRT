@@ -44,3 +44,27 @@ def test_export_shares_the_compiled_modules_tensors():
     assert any("_run_on_acc" in name for name, _ in trt.named_children())
     with torch.no_grad():
         torch.testing.assert_close(trt(x), model(x), rtol=1e-2, atol=1e-2)
+
+
+def test_save_inplace_inlines_the_module_itself(tmp_path):
+    torch.manual_seed(0)
+    model = _WithPyTorchLayer().eval().cuda()
+    x = torch.randn(4, 64, device="cuda")
+    trt = torch_tensorrt.dynamo.compile(
+        torch.export.export(model, (x,)),
+        arg_inputs=[x],
+        min_block_size=1,
+        torch_executed_ops={torch.ops.aten.mul.Tensor},
+    )
+    path = str(tmp_path / "model.ep")
+    torch_tensorrt.save(trt, path, arg_inputs=[x], retrace=False, inplace=True)
+
+    # The module was inlined in place: its engine and PyTorch submodules are gone.
+    assert not any(
+        "_run_on_acc" in name or "_run_on_gpu" in name
+        for name, _ in trt.named_children()
+    )
+    with torch.no_grad():
+        torch.testing.assert_close(
+            torch.export.load(path).module()(x), model(x), rtol=1e-2, atol=1e-2
+        )

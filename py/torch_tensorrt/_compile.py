@@ -744,6 +744,7 @@ def save(
     pickle_protocol: int = 2,
     dynamic_shapes: Optional[Dict[str, Any]] = None,
     use_cuda_graphs: bool | None = None,
+    inplace: bool = False,
     **kwargs: Any,
 ) -> None:
     """
@@ -829,6 +830,10 @@ def save(
                 option overrides this value. Non-booleans are rejected for ExecuTorch;
                 other formats ignore non-None values with a warning. Use this keyword,
                 not a raw ``CompileSpec("use_cuda_graphs", ...)``.
+        inplace (bool): When ``module`` is a compiled ``torch.fx.GraphModule`` that save() inlines
+                (``retrace=False``, or ``retrace=True`` with dynamic shapes), inline it in place
+                instead of on a copy. This skips copying the module's graph and submodules, but
+                ``module`` can't be run or saved again afterwards. Default False.
         kwargs: Additional format-specific kwargs. ``partitioners=``,
                 ``compile_specs=``, ``backend_config=``, ``constant_methods=``,
                 ``transform_passes=``, ``compile_config=``, ``generate_etrecord=``,
@@ -1252,12 +1257,18 @@ def save(
                 _use_legacy = (
                     use_legacy_exporter if use_legacy_exporter is not None else True
                 )
+                # Read before the export: with inplace=True it deletes the engine submodules.
+                has_aliased_io = any(
+                    getattr(sub, "aliased_io", None)
+                    for _sub_name, sub in module.named_modules()
+                )
                 exp_program = export(
                     module,
                     arg_inputs=arg_tensors,
                     kwarg_inputs=kwarg_tensors,
                     dynamic_shapes=dynamic_shapes,
                     use_legacy_exporter=_use_legacy,
+                    inplace=inplace,
                 )
 
                 from torch_tensorrt.dynamo._exporter import (
@@ -1294,10 +1305,7 @@ def save(
                         **kwargs,
                     )
                 elif output_format == "aot_inductor":
-                    if any(
-                        getattr(sub, "aliased_io", None)
-                        for _sub_name, sub in module.named_modules()
-                    ):
+                    if has_aliased_io:
                         logger.warning(
                             "Module has TensorRT engine(s) with aliased I/O (e.g. KV-cache), "
                             "but output_format='aot_inductor' does not declare those aliased "
@@ -1344,6 +1352,11 @@ def save(
                     if node.op == "placeholder" and "val" in node.meta
                     for dim in getattr(node.meta["val"], "shape", [])
                 )
+                # Read before the export: with inplace=True it deletes the engine submodules.
+                has_aliased_io = any(
+                    getattr(sub, "aliased_io", None)
+                    for _sub_name, sub in module.named_modules()
+                )
                 _use_legacy = False
                 if has_symbolic_metadata and dynamic_shapes is not None:
                     from torch_tensorrt.dynamo._exporter import export
@@ -1365,6 +1378,7 @@ def save(
                         kwarg_inputs=kwarg_tensors,
                         dynamic_shapes=dynamic_shapes,
                         use_legacy_exporter=_use_legacy,
+                        inplace=inplace,
                     )
                 else:
                     # Regular GraphModule or no dynamic shapes - retrace normally
@@ -1403,10 +1417,7 @@ def save(
                     else module.meta.get("_copyback_mutation_buffers", [])
                 )
 
-                if output_format == "aot_inductor" and any(
-                    getattr(sub, "aliased_io", None)
-                    for _sub_name, sub in module.named_modules()
-                ):
+                if output_format == "aot_inductor" and has_aliased_io:
                     logger.warning(
                         "Module has TensorRT engine(s) with aliased I/O (e.g. KV-cache), "
                         "but output_format='aot_inductor' does not declare those aliased "
