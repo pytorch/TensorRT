@@ -22,7 +22,6 @@ from typing import (
     Set,
     Tuple,
     Union,
-    cast,
 )
 
 import torch
@@ -575,14 +574,11 @@ def convert_method_to_trt_engine(
             module, torchtrt_arg_inputs, kwarg_inputs=torchtrt_kwarg_inputs, **kwargs
         )
 
-        return cast(
-            bytes,
-            dynamo_convert_exported_program_to_serialized_trt_engine(
-                exp_program,
-                arg_inputs=tuple(normalized_arg_inputs),
-                kwarg_inputs=torchtrt_kwarg_inputs,
-                **kwargs,
-            ),
+        return dynamo_convert_exported_program_to_serialized_trt_engine(
+            exp_program,
+            arg_inputs=tuple(normalized_arg_inputs),
+            kwarg_inputs=torchtrt_kwarg_inputs,
+            **kwargs,
         )
     elif target_ir == _IRType.torch_compile:
         raise RuntimeError(
@@ -1258,6 +1254,7 @@ def save(
                     kwarg_inputs=kwarg_tensors,
                     dynamic_shapes=dynamic_shapes,
                     use_legacy_exporter=_use_legacy,
+                    engines_from_files=output_format == "executorch",
                 )
 
                 from torch_tensorrt.dynamo._exporter import (
@@ -1365,6 +1362,7 @@ def save(
                         kwarg_inputs=kwarg_tensors,
                         dynamic_shapes=dynamic_shapes,
                         use_legacy_exporter=_use_legacy,
+                        engines_from_files=output_format == "executorch",
                     )
                 else:
                     # Regular GraphModule or no dynamic shapes - retrace normally
