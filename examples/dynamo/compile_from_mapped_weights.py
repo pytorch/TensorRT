@@ -64,9 +64,9 @@ class MLP(torch.nn.Module):
 # Write the weights once
 # ----------------------
 #
-# Any safetensors file maps if its tensors have the names and dtypes the model uses (``key_map``
-# translates names). ``save_weights_for_mapping`` is for checkpoints whose loader casts, e.g. stored in
-# float32 and run in bfloat16: it writes the weights as they are after loading, a tied weight once.
+# Any safetensors file maps if its tensors have the names, dtypes and shapes the model uses.
+# ``save_weights_for_mapping`` is for checkpoints whose loader casts, e.g. stored in float32 and run in
+# bfloat16: it writes the weights as they are after loading, a tied weight once.
 
 torch.manual_seed(0)
 reference = MLP().eval()
@@ -78,8 +78,8 @@ print(f"wrote {os.path.getsize(path) / 2**20:.0f} MiB of weights to {path}")
 # Build the model without its weights and map them
 # ------------------------------------------------
 #
-# On ``meta`` the model allocates nothing. ``strict=True`` raises unless every tensor in the model's
-# ``state_dict`` is mapped without a copy. Mapping doesn't read the weights, so none of the file is
+# On ``meta`` the model allocates nothing. ``strict=True`` raises if a tensor in the model's
+# ``state_dict`` is missing from the file. Mapping doesn't read the weights, so none of the file is
 # resident yet.
 
 with torch.device("meta"):
@@ -87,8 +87,8 @@ with torch.device("meta"):
 
 mapping = map_weights(model, path, strict=True)
 print(
-    f"mapped {mapping.mapped_bytes / 2**20:.0f} MiB, {len(mapping.missing)} missing, "
-    f"{len(mapping.copied)} copied; resident: {resident_mib(path):.0f} MiB"
+    f"mapped {mapping.mapped_bytes / 2**20:.0f} MiB, {len(mapping.missing)} missing; "
+    f"resident: {resident_mib(path):.0f} MiB"
 )
 
 # %%

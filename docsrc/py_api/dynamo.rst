@@ -48,4 +48,3 @@ Weight mapping: compile from a safetensors checkpoint's weights in place (see th
 .. autofunction:: release_mapped_storage
 
 .. autoclass:: MappedWeights
-    :members: close

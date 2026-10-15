@@ -195,14 +195,13 @@ zero-copy views of a safetensors file:
 - **Compile on the CPU.** Mapped weights are CPU tensors, so keep the model and its example inputs on
   the CPU for ``torch.export``. TensorRT takes weights as host pointers and reads each one in place:
   there's no GPU copy and no host copy of the weights.
-- **Checkpoints.** Any safetensors file maps if its tensors have the names and dtypes the model uses.
-  ``key_map`` translates names. ``save_weights_for_mapping`` is for checkpoints whose loader casts, for
-  example stored in float32 and run in bfloat16. It writes a tied weight once and keeps the model's
-  dtypes.
-- **strict=True** raises unless every tensor in the model's ``state_dict`` is mapped without a copy, and
-  leaves the model unchanged on error. Non-persistent buffers, such as rotary frequencies, aren't
-  required. On a ``meta``-built model, a buffer the file lacks stays on ``meta`` and is listed in
-  ``mapping.still_meta``, so recompute it or write it with ``save_weights_for_mapping``.
+- **Checkpoints.** Any safetensors file maps if its tensors have the names, dtypes and shapes the model
+  uses; a mismatch raises. ``save_weights_for_mapping`` is for checkpoints whose loader casts, for
+  example stored in float32 and run in bfloat16. It writes the weights as loaded, a tied weight once.
+- **Missing names** are listed in ``mapping.missing`` and left as they were (still on ``meta`` if the
+  model was built there). ``strict=True`` raises instead for any name in the model's ``state_dict``;
+  non-persistent buffers, such as rotary frequencies, aren't required, so recompute those or write them
+  with ``save_weights_for_mapping``. On any error the model is left unchanged.
 - **The file must stay in place** while the model or its weights are in use. ``map_weights`` maps it
   copy-on-write and never writes to it. A write to a released weight is lost when its pages are dropped.
 - **Releasing pages uses** ``madvise(MADV_DONTNEED)`` **(POSIX).** Elsewhere the mapping works, but the
