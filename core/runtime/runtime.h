@@ -5,9 +5,11 @@
 
 #pragma once
 #include <array>
+#include <cstdint>
 #include <map>
 #include <memory>
 #include <mutex>
+#include <string>
 #include <unordered_map>
 #include <utility>
 #include "ATen/core/function_schema.h"
@@ -35,6 +37,34 @@ typedef enum {
 } CudaGraphsMode;
 
 extern CudaGraphsMode CUDAGRAPHS_MODE;
+
+// Process-wide profiling configuration. Unlike the per-engine TorchBind methods,
+// this state is reachable when engines are owned by an opaque AOTInductor package.
+// Engines compare ``generation`` immediately before execution and apply a newer
+// snapshot lazily, so changing the setting works both before and after package
+// loading without maintaining a global registry of engine pointers.
+struct GlobalProfilingConfig {
+  bool enabled;
+  std::string profile_format;
+  std::string profile_path_prefix;
+  uint64_t generation;
+};
+
+GlobalProfilingConfig get_global_profiling_config();
+
+uint64_t get_global_profiling_generation() noexcept;
+
+bool get_profile_execution();
+
+void set_profile_execution(bool enabled);
+
+std::string get_profile_format();
+
+void set_profile_format(const std::string& profile_format);
+
+std::string get_profile_path_prefix();
+
+void set_profile_path_prefix(const std::string& profile_path_prefix);
 
 typedef enum {
   ABI_TARGET_IDX = 0,
