@@ -499,11 +499,9 @@ def test_derived_requirements_match_the_pin(monkeypatch) -> None:
     version = _versions()["__executorch_version__"]
     major, minor = _release_line(version)
 
-    # The Linux marker is part of the requirement: the extra has to resolve for the win32 entry
-    # in pyproject.toml's uv required-environments, where the only candidates are PyPI's and they
-    # stop below this floor, so without it `uv lock` fails outright.
+    # The integration supports Linux and Windows x86-64; Windows ARM64 is excluded.
     assert _setup_py_requirement(version) == (
-        f"executorch>={version},<{major}.{int(minor) + 1}; platform_system == 'Linux'"
+        f"executorch>={version},<{major}.{int(minor) + 1}; (platform_system == 'Linux' or (platform_system == 'Windows' and platform_machine == 'AMD64'))"
     )
     assert _runner_requirement(REPO_ROOT) == f"executorch=={version}"
 
@@ -850,11 +848,17 @@ def test_runner_channel_check_detects_removed_validator(monkeypatch):
         )
 
 
-def _load_utils_channel_helpers(fake_cuda: str | None, platform: str = "linux"):
+def _load_utils_channel_helpers(
+    fake_cuda: str | None, platform: str = "linux", machine: str = "x86_64"
+):
     """Execute the real helpers without importing their torch and TensorRT dependencies."""
     source = (REPO_ROOT / "py/torch_tensorrt/_utils.py").read_text(encoding="utf-8")
     tree = ast.parse(source)
-    wanted = {"executorch_install_channel", "executorch_install_command"}
+    wanted = {
+        "executorch_install_channel",
+        "executorch_install_command",
+        "is_platform_supported_for_executorch",
+    }
     functions = [
         node
         for node in tree.body
@@ -879,8 +883,14 @@ def _load_utils_channel_helpers(fake_cuda: str | None, platform: str = "linux"):
     }
     namespace: dict[str, object] = {
         "torch": type("torch", (), {"version": _Version}),
-        # The helpers consult the platform, because the extra carries a Linux marker.
+        # Match the platform and architecture consulted by the support helper.
         "sys": type("sys", (), {"platform": platform}),
+        "platform": types.SimpleNamespace(
+            system=lambda: {"linux": "Linux", "win32": "Windows", "darwin": "Darwin"}[
+                platform
+            ],
+            machine=lambda: machine,
+        ),
         **constants,
     }
     module = ast.Module(body=functions, type_ignores=[])
@@ -1039,7 +1049,7 @@ def test_derived_requirements_roll_the_minor_over(tmp_path: Path) -> None:
 
     assert (
         _setup_py_requirement(version)
-        == f"executorch>={version},<1.10; platform_system == 'Linux'"
+        == f"executorch>={version},<1.10; (platform_system == 'Linux' or (platform_system == 'Windows' and platform_machine == 'AMD64'))"
     )
     # No upper bound to roll over, but it must still track the pin it is given.
     assert _runner_requirement(tmp_path) == f"executorch=={version}"
@@ -1254,16 +1264,32 @@ def _assert_development_lock_matches_pin(lock: dict, version: str) -> None:
     assert all(
         SpecifierSet(r.get("specifier", "")) == expected for r in recorded
     ), f"the project records a stale ExecuTorch range: {recorded}; expected {expected}"
-    assert {
-        str(Requirement(f"executorch; {r['marker']}").marker) for r in recorded
-    } == {
-        str(
-            Requirement(
-                f'executorch; sys_platform == "linux" and extra == "{extra}"'
-            ).marker
+
+    # uv normalizes marker ordering. Compare their behavior on supported and
+    # unsupported platforms rather than requiring one spelling of the expression.
+    def marker_behavior(marker: str) -> tuple[bool, ...]:
+        parsed_marker = Requirement(f"executorch; {marker}").marker
+        return tuple(
+            parsed_marker.evaluate(
+                {"sys_platform": platform, "platform_machine": machine, "extra": extra}
+            )
+            for platform, machine in (
+                ("linux", "x86_64"),
+                ("linux", "aarch64"),
+                ("win32", "AMD64"),
+                ("win32", "ARM64"),
+                ("darwin", "x86_64"),
+            )
+            for extra in ("executorch", "all", "")
+        )
+
+    assert {marker_behavior(r["marker"]) for r in recorded} == {
+        marker_behavior(
+            f'(sys_platform == "linux" or (sys_platform == "win32" and '
+            f'platform_machine == "AMD64")) and extra == "{extra}"'
         )
         for extra in ("executorch", "all")
-    }, f"the ExecuTorch extras must be Linux-only: {recorded}"
+    }, f"the ExecuTorch extras must support Linux and Windows x86-64: {recorded}"
     assert not any(
         r["name"] == "torch-tensorrt-executorch-runtime"
         for r in roots[0].get("metadata", {}).get("requires-dist", [])
@@ -1289,6 +1315,7 @@ def test_the_lockfile_executorch_matches_the_pin():
         "missing",
         "range",
         "marker",
+        "linux_only",
         "older",
         "minor",
         "companion",
@@ -1306,7 +1333,10 @@ def test_development_lock_guard_rejects_drift(local, mutation):
         {
             "name": "executorch",
             "specifier": f">={version},<{upper}",
-            "marker": f"sys_platform == 'linux' and extra == '{extra}'",
+            "marker": (
+                "(sys_platform == 'linux' or (sys_platform == 'win32' and "
+                f"platform_machine == 'AMD64')) and extra == '{extra}'"
+            ),
         }
         for extra in ("executorch", "all")
     ]
@@ -1324,6 +1354,8 @@ def test_development_lock_guard_rejects_drift(local, mutation):
         recorded[0]["specifier"] = f">={version}"
     elif mutation == "marker":
         recorded[0]["marker"] = "extra == 'all'"
+    elif mutation == "linux_only":
+        recorded[0]["marker"] = "sys_platform == 'linux' and extra == 'executorch'"
     elif mutation == "later":
         package["version"] = (
             f"{parsed.major}.{parsed.minor}.{parsed.micro + 1}.dev1" + local
@@ -2686,16 +2718,25 @@ def test_the_stable_track_may_repin_below_an_inherited_nightly() -> None:
     assert "--allow-downgrade" in step["run"], step["run"]
 
 
-@pytest.mark.parametrize("platform", ["win32", "darwin"])
+@pytest.mark.parametrize("platform,machine", [("win32", "ARM64"), ("darwin", "x86_64")])
 @pytest.mark.unit
 def test_the_install_message_does_not_hand_a_no_op_command_to_other_platforms(
     platform: str,
+    machine: str,
 ) -> None:
-    """The extra is Linux only, so that command would resolve to nothing and still succeed."""
-    _, command = _load_utils_channel_helpers("13.2", platform=platform)
+    """Unsupported platforms must receive guidance rather than a no-op install command."""
+    _, command = _load_utils_channel_helpers("13.2", platform=platform, machine=machine)
     message = command()
     assert "pip install" not in message, message
     assert "Linux" in message, message
+
+
+@pytest.mark.parametrize("machine", ["AMD64", "x86_64"])
+@pytest.mark.unit
+def test_the_install_message_supports_windows_x64(machine: str) -> None:
+    _, command = _load_utils_channel_helpers("13.2", platform="win32", machine=machine)
+    assert 'pip install --pre "torch_tensorrt[executorch]"' in command()
+    assert "nightly/cu132" in command()
 
 
 @pytest.mark.parametrize("agree", [True, False])
