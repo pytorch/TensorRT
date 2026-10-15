@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=0866734c"></script>
+    <script src="../_static/documentation_options.js?v=a71228c4"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -599,7 +599,8 @@ subgraph compilations are complete.</p></li>
 <blockquote>
 <div><p>TRT compilation can use up to 5× the model size in CPU memory.</p>
 <ul class="simple">
-<li><p>Set <code class="docutils literal notranslate"><span class="pre">TORCHTRT_ENABLE_BUILDER_MALLOC_TRIM=1</span></code> to reduce to ~3× model size.</p></li>
+<li><p>Make sure <code class="docutils literal notranslate"><span class="pre">TORCHTRT_ENABLE_BUILDER_MALLOC_TRIM</span></code> is not set to <code class="docutils literal notranslate"><span class="pre">0</span></code>; trimming
+the builder’s freed memory is on by default on Linux.</p></li>
 <li><p>Disable <code class="docutils literal notranslate"><span class="pre">offload_module_to_cpu</span></code> (<code class="docutils literal notranslate"><span class="pre">False</span></code>) to drop another 1× copy.</p></li>
 </ul>
 </div></blockquote>

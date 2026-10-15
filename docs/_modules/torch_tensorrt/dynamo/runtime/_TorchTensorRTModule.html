@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../../_static/documentation_options.js?v=0866734c"></script>
+    <script src="../../../../_static/documentation_options.js?v=a71228c4"></script>
     <script src="../../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -607,6 +607,7 @@ document.write(`
         <span class="n">requires_native_multidevice</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="n">symbolic_shape_expressions</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">aliased_io</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">num_user_outputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">):</span>
 <span class="w">        </span><span class="sd">"""Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs</span>
 <span class="sd">        a PyTorch ``torch.nn.Module`` around it. Uses the Torch-TensorRT runtime extension to run the engines</span>
@@ -679,6 +680,7 @@ document.write(`
         <span class="bp">self</span><span class="o">.</span><span class="n">requires_native_multidevice</span> <span class="o">=</span> <span class="n">requires_native_multidevice</span>
         <span class="c1"># Map of output binding name -&gt; (input binding name, kind_str)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">aliased_io</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">aliased_io</span> <span class="ow">or</span> <span class="p">{})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_user_outputs</span> <span class="o">=</span> <span class="n">num_user_outputs</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">target_platform</span> <span class="o">=</span> <span class="p">(</span>
             <span class="n">Platform</span><span class="o">.</span><span class="n">current_platform</span><span class="p">()</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">enable_cross_compile_for_windows</span>
@@ -725,6 +727,7 @@ document.write(`
         <span class="n">metadata</span> <span class="o">=</span> <span class="p">{</span>
             <span class="s2">"settings"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="p">,</span>
             <span class="s2">"inout_symexprs"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">symbolic_shape_expressions</span><span class="p">,</span>
+            <span class="s2">"num_user_outputs"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_user_outputs</span><span class="p">,</span>
             <span class="s2">"output_tensors_are_unowned"</span><span class="p">:</span> <span class="p">(</span>
                 <span class="kc">False</span>
                 <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="ow">is</span> <span class="kc">None</span>
@@ -835,7 +838,9 @@ document.write(`
         <span class="n">rs_resolved</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_resolve_runtime_cache</span><span class="p">(</span><span class="n">rs</span><span class="p">)</span>
         <span class="c1"># 2. Push to the engine if it exists; if not we stash for later.</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_send_to_engine</span><span class="p">(</span><span class="n">rs_resolved</span><span class="p">)</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.runtime._runtime_config</span><span class="w"> </span><span class="kn">import</span> <span class="n">_send_settings_to_engine</span>
+
+            <span class="n">_send_settings_to_engine</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="p">,</span> <span class="n">rs_resolved</span><span class="p">)</span>
         <span class="c1"># 3. Store the resolved form so reads agree with what the engine sees.</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_runtime_settings</span> <span class="o">=</span> <span class="n">rs_resolved</span>
 
@@ -910,28 +915,6 @@ document.write(`
 <span class="sd">        engine has no way to hold the same underlying ``IRuntimeCache``).</span>
 <span class="sd">        """</span>
         <span class="k">return</span> <span class="ow">not</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torch_tensorrt_runtime</span> <span class="ow">or</span> <span class="n">w</span><span class="o">.</span><span class="n">is_cpp_runtime</span><span class="p">()</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">_send_to_engine</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rs</span><span class="p">:</span> <span class="n">RuntimeSettings</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Push ``rs`` to whichever engine flavor is attached."""</span>
-        <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._TRTEngine</span><span class="w"> </span><span class="kn">import</span> <span class="n">TRTEngine</span>
-        <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.runtime._runtime_cache</span><span class="w"> </span><span class="kn">import</span> <span class="n">_to_torchbind_handle</span>
-        <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.runtime._runtime_config</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-            <span class="n">_CUDA_GRAPH_STRATEGY_MAP</span><span class="p">,</span>
-            <span class="n">_DYNAMIC_SHAPES_KERNEL_STRATEGY_MAP</span><span class="p">,</span>
-        <span class="p">)</span>
-
-        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="p">,</span> <span class="n">TRTEngine</span><span class="p">):</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">update_runtime_settings</span><span class="p">(</span><span class="n">rs</span><span class="p">)</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="c1"># Strategies cross the boundary as ints (TorchBind ``int64_t``,</span>
-            <span class="c1"># mirroring the nvinfer1 enum integers on the cpp side).</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">get_engine</span><span class="p">()</span><span class="o">.</span><span class="n">update_runtime_settings</span><span class="p">(</span>
-                <span class="n">_DYNAMIC_SHAPES_KERNEL_STRATEGY_MAP</span><span class="p">[</span>
-                    <span class="n">rs</span><span class="o">.</span><span class="n">dynamic_shapes_kernel_specialization_strategy</span>
-                <span class="p">],</span>
-                <span class="n">_CUDA_GRAPH_STRATEGY_MAP</span><span class="p">[</span><span class="n">rs</span><span class="o">.</span><span class="n">cuda_graph_strategy</span><span class="p">],</span>
-                <span class="n">_to_torchbind_handle</span><span class="p">(</span><span class="n">rs</span><span class="o">.</span><span class="n">runtime_cache</span><span class="p">),</span>
-            <span class="p">)</span>
 
 <div class="viewcode-block" id="TorchTensorRTModule.setup_engine">
 <a class="viewcode-back" href="../../../../py_api/runtime.html#torch_tensorrt.runtime.TorchTensorRTModule.setup_engine">[docs]</a>
@@ -1064,6 +1047,10 @@ document.write(`
             <span class="n">metadata</span> <span class="o">=</span> <span class="n">TorchTensorRTModule</span><span class="o">.</span><span class="n">decode_metadata</span><span class="p">(</span><span class="n">serialized_metadata</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">settings</span> <span class="o">=</span> <span class="n">metadata</span><span class="p">[</span><span class="s2">"settings"</span><span class="p">]</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">symbolic_shape_expressions</span> <span class="o">=</span> <span class="n">metadata</span><span class="p">[</span><span class="s2">"inout_symexprs"</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">num_user_outputs</span> <span class="o">=</span> <span class="n">metadata</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"num_user_outputs"</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">aliased_io</span> <span class="o">=</span> <span class="n">deserialize_aliased_io</span><span class="p">(</span>
+                <span class="nb">str</span><span class="p">(</span><span class="n">serialized_engine_info</span><span class="p">[</span><span class="n">ALIASED_IO_IDX</span><span class="p">])</span>
+            <span class="p">)</span>
 
             <span class="c1"># RuntimeSettings are NOT serialized; the reset leaves no runtime</span>
             <span class="c1"># cache, matching the freshly-built engine below. A caller who wants</span>
@@ -1237,7 +1224,8 @@ document.write(`
         <span class="c1">#</span>
         <span class="c1"># This also avoids the need for type-checking inputs, since they are now explicitly casted to Torch tensors</span>
         <span class="n">input_tensors</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">inputs</span><span class="p">:</span>
+        <span class="n">input_info</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">symbolic_shape_expressions</span> <span class="ow">or</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"inputs"</span><span class="p">,</span> <span class="p">[])</span>
+        <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">inputs</span><span class="p">):</span>
             <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
                 <span class="k">if</span> <span class="ow">not</span> <span class="n">i</span><span class="o">.</span><span class="n">is_cuda</span><span class="p">:</span>
                     <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
@@ -1248,7 +1236,19 @@ document.write(`
                     <span class="n">i</span> <span class="o">=</span> <span class="n">i</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
                 <span class="n">input_tensors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
-                <span class="n">input_tensors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">())</span>
+                <span class="c1"># A scalar produced by a preceding Torch subgraph. Its binding rank is not</span>
+                <span class="c1"># always the same: an integer index is declared rank 1 while a float is</span>
+                <span class="c1"># declared rank 0, so build it at the rank this binding records rather than</span>
+                <span class="c1"># a fixed one.</span>
+                <span class="n">scalar_tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+                <span class="n">declared_rank</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">input_info</span><span class="p">[</span><span class="n">index</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"binding_rank"</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">index</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">input_info</span><span class="p">)</span>
+                    <span class="k">else</span> <span class="mi">0</span>
+                <span class="p">)</span>
+                <span class="k">while</span> <span class="n">scalar_tensor</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">&lt;</span> <span class="n">declared_rank</span><span class="p">:</span>
+                    <span class="n">scalar_tensor</span> <span class="o">=</span> <span class="n">scalar_tensor</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+                <span class="n">input_tensors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">scalar_tensor</span><span class="o">.</span><span class="n">cuda</span><span class="p">())</span>
 
         <span class="n">outputs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">execute_engine</span><span class="p">(</span>
             <span class="nb">list</span><span class="p">(</span><span class="n">input_tensors</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span>
@@ -1258,12 +1258,14 @@ document.write(`
         <span class="c1"># satisfy the network-output requirement of aliased layers (e.g.</span>
         <span class="c1"># IKVCacheUpdateLayer). Truncate to the user-facing count; mutation</span>
         <span class="c1"># effects are visible on the corresponding input tensors. The</span>
-        <span class="c1"># boundary is derived from output_binding_names + aliased_io — no</span>
-        <span class="c1"># extra state needed.</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">aliased_io</span><span class="p">:</span>
-            <span class="n">n</span> <span class="o">=</span> <span class="n">user_output_count</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">output_binding_names</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">aliased_io</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">n</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">outputs</span><span class="p">):</span>
-                <span class="n">outputs</span> <span class="o">=</span> <span class="n">outputs</span><span class="p">[:</span><span class="n">n</span><span class="p">]</span>
+        <span class="c1"># explicit count also preserves aliased tensors returned by the user.</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_user_outputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">outputs</span> <span class="o">=</span> <span class="n">outputs</span><span class="p">[:</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_user_outputs</span><span class="p">]</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">aliased_io</span><span class="p">:</span>
+            <span class="c1"># Legacy serialized modules did not carry an explicit count.</span>
+            <span class="n">outputs</span> <span class="o">=</span> <span class="n">outputs</span><span class="p">[</span>
+                <span class="p">:</span> <span class="n">user_output_count</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">output_binding_names</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">aliased_io</span><span class="p">)</span>
+            <span class="p">]</span>
 
         <span class="n">output_info</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">symbolic_shape_expressions</span> <span class="ow">or</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"outputs"</span><span class="p">,</span> <span class="p">[])</span>
         <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">info</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">output_info</span><span class="p">):</span>

@@ -113,10 +113,11 @@ the build matrix currently covers `cu132` and `cu134`, on both architectures. Or
 release and JetPack builds retain their separate CUDA 12 support.
 
 ## Install
-One command. The `executorch` extra brings this wheel and a CUDA build of ExecuTorch, and
-Torch-TensorRT brings PyTorch. Swap `cu132` for `cu134` if you run CUDA 13.4:
+Install the matching companion wheel explicitly alongside Torch-TensorRT. The
+`executorch` extra brings a CUDA build of ExecuTorch, and Torch-TensorRT brings
+PyTorch. Swap `cu132` for `cu134` if you run CUDA 13.4:
 ```bash
-python -m pip install --pre "torch-tensorrt[executorch]" \
+python -m pip install --pre "torch-tensorrt[executorch]" torch-tensorrt-executorch-runtime \
   --index-url https://download.pytorch.org/whl/nightly/cu132 \
   --extra-index-url https://pypi.org/simple \
   --extra-index-url https://pypi.nvidia.com

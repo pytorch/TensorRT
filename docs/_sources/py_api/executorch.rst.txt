@@ -37,6 +37,8 @@ Functions
 
 .. autofunction:: export
 .. autofunction:: get_edge_compile_config
+.. autofunction:: zero_copy_backend_config
+.. autofunction:: check_zero_copy_kv
 
 Classes
 --------
