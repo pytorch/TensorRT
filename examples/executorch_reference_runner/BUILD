@@ -5,6 +5,17 @@ load("@rules_cc//cc:defs.bzl", "cc_binary")
 
 package(default_visibility = ["//visibility:public"])
 
+config_setting(
+    name = "driveos",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:linux",
+    ],
+    flag_values = {
+        "//toolchains/dep_collection:compute_libs": "driveos",
+    },
+)
+
 filegroup(
     name = "source_files",
     srcs = [
@@ -66,12 +77,14 @@ cc_binary(
         "//cpp:tensorrt_executorch_backend",
         "//cpp:tensorrt_executorch_cuda_device_allocator",
         "//cpp:tensorrt_executorch_device_copy_kernels",
-        "@cuda//:cudart",
         "@executorch//:executorch_core",
         "@executorch//:executorch_file_data_loader",
         # Included and called directly (CallerStreamGuard), so declared directly
         # rather than reached through a transitive header, matching the sibling
         # runner above.
         "@executorch//:extension_cuda",
-    ],
+    ] + select({
+        ":driveos": ["@cuda_driveos//:cudart"],
+        "//conditions:default": ["@cuda//:cudart"],
+    }),
 )
