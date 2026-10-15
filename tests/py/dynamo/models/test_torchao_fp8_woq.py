@@ -18,12 +18,14 @@ def _has_fp8_gpu() -> bool:
 
 
 def _has_mslk() -> bool:
-    # TorchAO's Int4Tensor raises "Requires mslk >= 1.0.0" without it.
+    # TorchAO's Int4Tensor.from_hp raises "Requires mslk >= 1.0.0" when this import
+    # fails; it does not check the version. A Python-only MSLK install
+    # (MSLK_PYTHON_ONLY=1) reports 0.0.0 but provides it, so test the import itself.
     try:
-        from torchao.utils import is_mslk_version_at_least
-    except ImportError:
-        return importlib.util.find_spec("mslk") is not None
-    return is_mslk_version_at_least("1.0.0")
+        from mslk.quantize.shuffle import int4_row_quantize_zp  # noqa: F401
+    except Exception:
+        return False
+    return True
 
 
 def _promote_float8_woq(model: torch.nn.Module) -> torch.nn.Module:
