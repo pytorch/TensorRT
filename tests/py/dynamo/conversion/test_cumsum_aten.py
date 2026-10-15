@@ -144,7 +144,7 @@ class TestCumsumConverter(DispatchTestCase):
         """
         if not is_tensorrt_version_supported("10.8.0"):
             self.skipTest(
-                "exact integer cumsum needs the cumulative layer (TensorRT >= 10.8)"
+                "exact integer cumsum needs the cumulativTensorRT-RTX on Windowse layer (TensorRT >= 10.8)"
             )
 
         class Cumsum(nn.Module):
