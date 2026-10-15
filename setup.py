@@ -1012,10 +1012,10 @@ def get_tensorrt_requirements():
     # TensorRT does not build wheels for Tegra, so SBSA takes the plain `tensorrt`
     # package from the tarball install; everywhere else takes the CUDA 13 trio.
     return [
-        f"tensorrt>=11.3.0,<11.4.0; {SBSA_MARKER}",
-        f"tensorrt-cu13>=11.3.0,<11.4.0; {NON_SBSA_MARKER}",
-        f"tensorrt-cu13-bindings>=11.3.0,<11.4.0; {NON_SBSA_MARKER}",
-        f"tensorrt-cu13-libs>=11.3.0,<11.4.0; {NON_SBSA_MARKER}",
+        f"tensorrt>=11.4.0,<11.5.0; {SBSA_MARKER}",
+        f"tensorrt-cu13>=11.4.0,<11.5.0; {NON_SBSA_MARKER}",
+        f"tensorrt-cu13-bindings>=11.4.0,<11.5.0; {NON_SBSA_MARKER}",
+        f"tensorrt-cu13-libs>=11.4.0,<11.5.0; {NON_SBSA_MARKER}",
     ]
 
 
