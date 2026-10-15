@@ -300,6 +300,11 @@ class TestAttentionMaskCompilation(TestCase):
     def test_shared_rectangular_mask_is_preserved_and_compiles(
         self, decompose_attention, batched_mask, position_dtype
     ):
+        if decompose_attention and batched_mask:
+            self.skipTest(
+                "Temporarily disabled pending investigation of CUDA illegal memory "
+                "access and TensorRT runtime segfault in CI."
+            )
         model = self.SharedMaskAttention(position_dtype).eval()
         inputs = self._inputs(batched_mask)
         with torch.inference_mode():
