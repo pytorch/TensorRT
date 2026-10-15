@@ -207,7 +207,17 @@ def test_main_uses_selected_channel(monkeypatch, channel):
         f"https://download.pytorch.org/whl/nightly/{channel}",
     ]
     queried = [args[-1].rsplit("/", 1)[-1] for args in calls]
-    assert sorted(queried) == updater.delegate_channels()
+    assert sorted(set(queried)) == updater.delegate_channels()
+    targets = {
+        (args[args.index("--platform") + 1], args[args.index("--python-version") + 1])
+        for args in calls
+        if "--platform" in args
+    }
+    assert targets == {
+        (platform, python)
+        for platform in updater.delegate_platforms()
+        for python in ("3.11", "3.12", "3.13")
+    }
 
 
 @pytest.mark.unit

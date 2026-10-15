@@ -2,28 +2,14 @@ version = 1
 revision = 3
 requires-python = ">=3.11, <3.15"
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.11.5' and python_full_version < '3.12' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version < '3.11.5' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.14' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.11.5' and python_full_version < '3.12' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version < '3.11.5' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.14' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.11.5' and python_full_version < '3.12' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version < '3.11.5' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.11.5' and python_full_version < '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version < '3.11.5' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.11.5' and python_full_version < '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version < '3.11.5' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.11.5' and python_full_version < '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version < '3.11.5' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
+    "python_full_version >= '3.14' and sys_platform == 'linux'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'linux'",
+    "python_full_version >= '3.11.5' and python_full_version < '3.12' and sys_platform == 'linux'",
+    "python_full_version < '3.11.5' and sys_platform == 'linux'",
+    "python_full_version >= '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32'",
+    "python_full_version >= '3.11.5' and python_full_version < '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32'",
+    "python_full_version < '3.11.5' and platform_machine == 'AMD64' and sys_platform == 'win32'",
 ]
 supported-markers = [
     "sys_platform == 'linux'",
@@ -219,8 +205,8 @@ name = "anyio"
 version = "4.15.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "idna", marker = "sys_platform != 'win32' or extra == 'group-14-torch-tensorrt-quantization' or extra == 'group-14-torch-tensorrt-test-ext'" },
-    { name = "typing-extensions", marker = "sys_platform != 'win32' or extra == 'group-14-torch-tensorrt-quantization' or extra == 'group-14-torch-tensorrt-test-ext'" },
+    { name = "idna" },
+    { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/a9/d2/f4d173e22df740bc37b1db102b386ba719b66e95b0f0d751f556b387e6d2/anyio-4.15.1.tar.gz", hash = "sha256:9f28306018cbd6d329e64a36d58256edff76dd996fe423bc957326e578b82a94", size = 276966, upload-time = "2026-09-05T10:42:39.44Z" }
 wheels = [
@@ -921,29 +907,30 @@ version = "1.6.0.dev20261015+cu132"
 source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }
 dependencies = [
     { name = "coremltools", marker = "(python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform != 'win32') or (python_full_version >= '3.14' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine != 'x86_64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "expecttest", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "flatbuffers", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "hydra-core", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "hypothesis", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "kgb", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "mpmath", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "numpy", version = "2.4.6", source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }, marker = "(python_full_version < '3.12' and sys_platform != 'win32') or (python_full_version >= '3.12' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "numpy", version = "2.5.4", source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }, marker = "(python_full_version >= '3.12' and sys_platform != 'win32') or (python_full_version < '3.12' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "expecttest" },
+    { name = "flatbuffers" },
+    { name = "hydra-core" },
+    { name = "hypothesis" },
+    { name = "kgb" },
+    { name = "mpmath" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }, marker = "python_full_version < '3.12' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "numpy", version = "2.5.4", source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }, marker = "python_full_version >= '3.12' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
     { name = "nvidia-cuda-runtime", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "omegaconf", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "packaging", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "pandas", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "parameterized", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "py-cpuinfo", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "pytorch-tokenizers", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "pyyaml", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "requests", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "ruamel-yaml", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "omegaconf" },
+    { name = "packaging" },
+    { name = "pandas" },
+    { name = "parameterized" },
+    { name = "py-cpuinfo" },
+    { name = "pytorch-tokenizers" },
+    { name = "pyyaml" },
+    { name = "requests" },
+    { name = "ruamel-yaml" },
     { name = "scikit-learn", marker = "(python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform != 'win32') or (python_full_version >= '3.14' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine != 'x86_64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "sympy", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "tabulate", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "sympy" },
+    { name = "tabulate" },
+    { name = "torchao", version = "0.19.0.dev20261015+cpu", source = { registry = "https://download.pytorch.org/whl/nightly/cpu" }, marker = "sys_platform == 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
     { name = "torchao", version = "0.19.0.dev20261015+cu132", source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }, marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "typing-extensions", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "typing-extensions" },
 ]
 wheels = [
     { url = "https://download.pytorch.org/whl/nightly/cu132/executorch-1.6.0.dev20261015%2Bcu132-cp311-cp311-manylinux_2_28_aarch64.whl", upload-time = "2026-10-15T12:09:37Z" },
@@ -1005,7 +992,7 @@ wheels = [
 
 [[package]]
 name = "flashinfer-python"
-version = "0.7.2rc3"
+version = "0.7.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "apache-tvm-ffi", marker = "sys_platform != 'win32'" },
@@ -1027,9 +1014,9 @@ dependencies = [
     { name = "torch", marker = "sys_platform != 'win32'" },
     { name = "tqdm", marker = "sys_platform != 'win32'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/79/0d/c5829dd55986dc94a795d8b212dba5761b65a4aa8c4aee33f0a23657f70d/flashinfer_python-0.7.2rc3.tar.gz", hash = "sha256:445840176db31bc5a1a147daef7902bf7666e23b370e8e6913d364178896ca69", size = 54393035, upload-time = "2026-10-13T08:01:51.753Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/99/6a/98196fdb0de49e3b7f2b51352d38308aa7ae39656a36d482e767b126d922/flashinfer_python-0.7.2.tar.gz", hash = "sha256:31646a6c1a9a5268056ddd31f377fbb57adf0f68ba6c7714a3a3f348bd1d1454", size = 54382644, upload-time = "2026-10-15T20:55:39.607Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/20/8e/8cbc335f286abcef24f38a66c288693a8dacec6acc1ed8f2782d9b444423/flashinfer_python-0.7.2rc3-py3-none-any.whl", hash = "sha256:2d888b47db9da2c41a4c547fa0f5d16762c417e4b76f5235d575a8e7f4805d81", size = 65194234, upload-time = "2026-10-13T08:01:46.883Z" },
+    { url = "https://files.pythonhosted.org/packages/04/7c/6d46e4f529186472929c4b05d006a39ef14649dcf7c8d5c98eed59a27f1d/flashinfer_python-0.7.2-py3-none-any.whl", hash = "sha256:770550a0aa92b2f10e6c9a1f048dd43713f0f3bb6a12710186fcf8e4e9c99bd8", size = 65195219, upload-time = "2026-10-15T20:55:34.71Z" },
 ]
 
 [[package]]
@@ -1148,7 +1135,8 @@ resolution-markers = [
     "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'linux'",
     "python_full_version >= '3.11.5' and python_full_version < '3.12' and sys_platform == 'linux'",
     "python_full_version < '3.11.5' and sys_platform == 'linux'",
-    "python_full_version >= '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32'",
+    "python_full_version >= '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32'",
     "python_full_version >= '3.11.5' and python_full_version < '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32'",
     "python_full_version < '3.11.5' and platform_machine == 'AMD64' and sys_platform == 'win32'",
 ]
@@ -1218,8 +1206,8 @@ name = "httpcore2"
 version = "2.13.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "h11", marker = "(sys_platform != 'win32' and extra != 'group-14-torch-tensorrt-quantization') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-test-ext') or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "truststore", marker = "(sys_platform != 'win32' and extra != 'group-14-torch-tensorrt-quantization') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-test-ext') or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "h11", marker = "extra == 'group-14-torch-tensorrt-test-ext' or extra != 'group-14-torch-tensorrt-quantization'" },
+    { name = "truststore", marker = "extra == 'group-14-torch-tensorrt-test-ext' or extra != 'group-14-torch-tensorrt-quantization'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/cb/f3/1db7aa2bc2524062192bb0e0323969492d1883152a232fe36eea65f4e35c/httpcore2-2.13.1.tar.gz", hash = "sha256:e0aa977abe17e69a3b820a24542a6fa88702676d83880b8d194dcd18408e5103", size = 68071, upload-time = "2026-09-23T07:47:22.372Z" }
 wheels = [
@@ -1245,11 +1233,11 @@ name = "httpx2"
 version = "2.13.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "anyio", marker = "(sys_platform != 'win32' and extra != 'group-14-torch-tensorrt-quantization') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-test-ext') or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "httpcore2", marker = "(sys_platform != 'win32' and extra != 'group-14-torch-tensorrt-quantization') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-test-ext') or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "idna", marker = "(sys_platform != 'win32' and extra != 'group-14-torch-tensorrt-quantization') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-test-ext') or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "truststore", marker = "(sys_platform != 'win32' and extra != 'group-14-torch-tensorrt-quantization') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-test-ext') or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "typing-extensions", marker = "(python_full_version < '3.13' and sys_platform != 'win32' and extra != 'group-14-torch-tensorrt-quantization') or (python_full_version < '3.13' and sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-test-ext') or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "anyio", marker = "extra == 'group-14-torch-tensorrt-test-ext' or extra != 'group-14-torch-tensorrt-quantization'" },
+    { name = "httpcore2", marker = "extra == 'group-14-torch-tensorrt-test-ext' or extra != 'group-14-torch-tensorrt-quantization'" },
+    { name = "idna", marker = "extra == 'group-14-torch-tensorrt-test-ext' or extra != 'group-14-torch-tensorrt-quantization'" },
+    { name = "truststore", marker = "extra == 'group-14-torch-tensorrt-test-ext' or extra != 'group-14-torch-tensorrt-quantization'" },
+    { name = "typing-extensions", marker = "(python_full_version < '3.13' and extra != 'group-14-torch-tensorrt-quantization') or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/d5/44/474bef2a0e9d90f1715d32cb98b0738695ca17ba324095fb2497ed7fbd59/httpx2-2.13.1.tar.gz", hash = "sha256:e48744a19e3af5ee48313d0ce5fe941d5422fae5705ea922a4aabf94d7800dfa", size = 100405, upload-time = "2026-09-23T07:47:23.052Z" }
 wheels = [
@@ -1265,6 +1253,7 @@ resolution-markers = [
     "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'linux'",
     "python_full_version >= '3.11.5' and python_full_version < '3.12' and sys_platform == 'linux'",
     "python_full_version < '3.11.5' and sys_platform == 'linux'",
+    "python_full_version >= '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32'",
     "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32'",
     "python_full_version >= '3.11.5' and python_full_version < '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32'",
     "python_full_version < '3.11.5' and platform_machine == 'AMD64' and sys_platform == 'win32'",
@@ -1294,20 +1283,21 @@ resolution-markers = [
     "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'linux'",
     "python_full_version >= '3.11.5' and python_full_version < '3.12' and sys_platform == 'linux'",
     "python_full_version < '3.11.5' and sys_platform == 'linux'",
-    "python_full_version >= '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32'",
+    "python_full_version >= '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32'",
     "python_full_version >= '3.11.5' and python_full_version < '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32'",
     "python_full_version < '3.11.5' and platform_machine == 'AMD64' and sys_platform == 'win32'",
 ]
 dependencies = [
-    { name = "click", marker = "(sys_platform != 'win32' and extra != 'group-14-torch-tensorrt-quantization') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-test-ext') or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "filelock", marker = "(sys_platform != 'win32' and extra != 'group-14-torch-tensorrt-quantization') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-test-ext') or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "fsspec", version = "2026.9.0", source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }, marker = "(sys_platform != 'win32' and extra != 'group-14-torch-tensorrt-quantization') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-test-ext') or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "hf-xet", marker = "(platform_machine != 'AMD64' and platform_machine != 'ARM64' and platform_machine != 'aarch64' and platform_machine != 'amd64' and platform_machine != 'arm64' and platform_machine != 'x86_64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'AMD64' and sys_platform != 'win32' and extra != 'group-14-torch-tensorrt-quantization') or (platform_machine == 'ARM64' and sys_platform != 'win32' and extra != 'group-14-torch-tensorrt-quantization') or (platform_machine == 'aarch64' and sys_platform != 'win32' and extra != 'group-14-torch-tensorrt-quantization') or (platform_machine == 'amd64' and sys_platform != 'win32' and extra != 'group-14-torch-tensorrt-quantization') or (platform_machine == 'arm64' and sys_platform != 'win32' and extra != 'group-14-torch-tensorrt-quantization') or (platform_machine == 'x86_64' and sys_platform != 'win32' and extra != 'group-14-torch-tensorrt-quantization') or (platform_machine == 'AMD64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'ARM64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'amd64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'arm64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'x86_64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "httpx2", marker = "(sys_platform != 'win32' and extra != 'group-14-torch-tensorrt-quantization') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-test-ext') or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "packaging", marker = "(sys_platform != 'win32' and extra != 'group-14-torch-tensorrt-quantization') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-test-ext') or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "pyyaml", marker = "(sys_platform != 'win32' and extra != 'group-14-torch-tensorrt-quantization') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-test-ext') or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "tqdm", marker = "(sys_platform != 'win32' and extra != 'group-14-torch-tensorrt-quantization') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-test-ext') or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "typing-extensions", marker = "(sys_platform != 'win32' and extra != 'group-14-torch-tensorrt-quantization') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-test-ext') or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "click", marker = "extra == 'group-14-torch-tensorrt-test-ext' or extra != 'group-14-torch-tensorrt-quantization'" },
+    { name = "filelock", marker = "extra == 'group-14-torch-tensorrt-test-ext' or extra != 'group-14-torch-tensorrt-quantization'" },
+    { name = "fsspec", version = "2026.9.0", source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }, marker = "extra == 'group-14-torch-tensorrt-test-ext' or extra != 'group-14-torch-tensorrt-quantization'" },
+    { name = "hf-xet", marker = "(platform_machine != 'AMD64' and platform_machine != 'ARM64' and platform_machine != 'aarch64' and platform_machine != 'amd64' and platform_machine != 'arm64' and platform_machine != 'x86_64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'AMD64' and extra != 'group-14-torch-tensorrt-quantization') or (platform_machine == 'ARM64' and extra != 'group-14-torch-tensorrt-quantization') or (platform_machine == 'aarch64' and extra != 'group-14-torch-tensorrt-quantization') or (platform_machine == 'amd64' and extra != 'group-14-torch-tensorrt-quantization') or (platform_machine == 'arm64' and extra != 'group-14-torch-tensorrt-quantization') or (platform_machine == 'x86_64' and extra != 'group-14-torch-tensorrt-quantization') or (platform_machine == 'AMD64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'ARM64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'aarch64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'amd64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'arm64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (platform_machine == 'x86_64' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-test-ext') or (sys_platform == 'win32' and extra != 'group-14-torch-tensorrt-quantization')" },
+    { name = "httpx2", marker = "extra == 'group-14-torch-tensorrt-test-ext' or extra != 'group-14-torch-tensorrt-quantization'" },
+    { name = "packaging", marker = "extra == 'group-14-torch-tensorrt-test-ext' or extra != 'group-14-torch-tensorrt-quantization'" },
+    { name = "pyyaml", marker = "extra == 'group-14-torch-tensorrt-test-ext' or extra != 'group-14-torch-tensorrt-quantization'" },
+    { name = "tqdm", marker = "extra == 'group-14-torch-tensorrt-test-ext' or extra != 'group-14-torch-tensorrt-quantization'" },
+    { name = "typing-extensions", marker = "extra == 'group-14-torch-tensorrt-test-ext' or extra != 'group-14-torch-tensorrt-quantization'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/12/47/6858d63643e66fb4f6585c3cfd4029c0b2bc1ae21688cee9b3335f20a10d/huggingface_hub-2.2.0.tar.gz", hash = "sha256:5d1b47537394e4215cb858aa12fd493d0f7ef7f58990f5dcd24bc173107b2871", size = 1041026, upload-time = "2026-10-08T15:30:59.971Z" }
 wheels = [
@@ -1319,7 +1309,7 @@ name = "hydra-core"
 version = "1.4.0rc1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "omegaconf", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "omegaconf" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/eb/44/f2aa54343593132838e9f72992fcef627d168a6b2a4a7f4e4bca3e0ad96f/hydra_core-1.4.0rc1.tar.gz", hash = "sha256:a00aa0b9ba4ce3f012fdda5b600b535c1a40bc8b6c894de4b1c4fb3d5b2fedf8", size = 3373272, upload-time = "2026-10-10T07:46:48.444Z" }
 wheels = [
@@ -1328,70 +1318,70 @@ wheels = [
 
 [[package]]
 name = "hypothesis"
-version = "6.169.4"
+version = "6.170.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "sortedcontainers", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "sortedcontainers" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/68/08/605de498d3ea896d2c7fb2df365ce9eee72f91e16d715185cf74104a42d8/hypothesis-6.169.4.tar.gz", hash = "sha256:fff94830fcfdd6d52b035603b347807b808ba4ccfbd2b5ddeed958a69b8f4f92", size = 510348, upload-time = "2026-10-15T10:31:23.599Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/28/34/ac16750eff35320c3f8e0dc1514a7ce534a823cd7f75b2cb804a3b1677ea/hypothesis-6.170.0.tar.gz", hash = "sha256:8a130d8a84819798d0bc217ac53b12ebe1f08c97ac35fae8e4ec97348d633427", size = 517248, upload-time = "2026-10-15T19:22:31.265Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/24/7f/76c9f5e2617e59ee4f4b70401eb8cf55ed5cf3487084dcd6cce1bc513747/hypothesis-6.169.4-cp311-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:b642f8b6ac503aacf008ed15a345c8d9ad9744aa1e8988073069b3650397c206", size = 1113930, upload-time = "2026-10-15T10:30:51.35Z" },
-    { url = "https://files.pythonhosted.org/packages/59/98/4a140478304e92e9549cdb345a8e2171cbfbcea01353c4ca95c0dec9c87f/hypothesis-6.169.4-cp311-abi3-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:c0ccff8557bb9f1bf16498b44b58f919425d48a9f98dbb3bcfdc6741431a329d", size = 1144037, upload-time = "2026-10-15T10:31:12.085Z" },
-    { url = "https://files.pythonhosted.org/packages/4e/87/b66bea45173e3d1625943d091f684326bf4b8d8f0abe13bd2ad4f5cbd6bd/hypothesis-6.169.4-cp311-abi3-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:ad59ffc62d0783b71eb74d21110374d40022f7ef9a612e3fb515f1296dd1683b", size = 1138665, upload-time = "2026-10-15T10:30:42.256Z" },
-    { url = "https://files.pythonhosted.org/packages/0a/36/7fa75288f978de25223653069bedf6db2df032d8c740e0dd11c935a3bee0/hypothesis-6.169.4-cp311-abi3-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:0e8a6531a9c35f90b6e568c76f01864afcd843ed81176972a054a59c06d8aa4e", size = 1190819, upload-time = "2026-10-15T10:29:14.588Z" },
-    { url = "https://files.pythonhosted.org/packages/e2/60/3e75b2d29836ca7040b219b7b06d47a4d8112caf904a8280d223656c9f3a/hypothesis-6.169.4-cp311-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:aa3c30cdcda393c03b793730b009286c35178f9c168fea0b826bf5de75bccadf", size = 1156277, upload-time = "2026-10-15T10:30:32.157Z" },
-    { url = "https://files.pythonhosted.org/packages/74/5b/c8a73ae96d88af19d1916a1b7c7c5bba737d7fb2ce04b7993623d4551cc7/hypothesis-6.169.4-cp311-abi3-manylinux_2_31_riscv64.whl", hash = "sha256:2bcd2b4b5c450140f1eb01c64e34cbf9b0d38945f4e3f14dfbd6414223e274e7", size = 1112612, upload-time = "2026-10-15T10:29:28.734Z" },
-    { url = "https://files.pythonhosted.org/packages/87/a5/ca41cdd75397004780e530c3020c6251730ced91438822ab9d4bcb97c124/hypothesis-6.169.4-cp311-abi3-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:9741f3d8c745e63d4983bafe22c2b86775b15cbc6240b1d573a32f7c19f92971", size = 1151593, upload-time = "2026-10-15T10:31:09.993Z" },
-    { url = "https://files.pythonhosted.org/packages/85/79/ee289a90941b7d19f57f7a2cbb3af572cac4c3ef8f618dea7daef1512283/hypothesis-6.169.4-cp311-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:648def6839475f8102d1478b9dd180be4a452d2857b386cc11769ada0a664714", size = 1289056, upload-time = "2026-10-15T10:30:49.302Z" },
-    { url = "https://files.pythonhosted.org/packages/01/e9/23f650d679995db2cd736a0b8c1d187cb2ac0197cc093f873bb8ff59c8be/hypothesis-6.169.4-cp311-abi3-musllinux_1_2_armv7l.whl", hash = "sha256:eb054618ca65e316152234686db05f4706d5528004622492becdb6d896f03d6a", size = 1417276, upload-time = "2026-10-15T10:29:54.424Z" },
-    { url = "https://files.pythonhosted.org/packages/16/16/613d992068a11dac9483edc0b4ff6aece2612940f79123362d20454dd727/hypothesis-6.169.4-cp311-abi3-musllinux_1_2_i686.whl", hash = "sha256:1bb8bb867ae69f17eca1670372366ba6cf9ccd30ff3cdef700c01ebe2cac83bf", size = 1371191, upload-time = "2026-10-15T10:31:16.238Z" },
-    { url = "https://files.pythonhosted.org/packages/2f/dc/6f3ce75ddc5a1b18cc08f5c9ebc976b695b3e36337b17c0f1619e39dba45/hypothesis-6.169.4-cp311-abi3-musllinux_1_2_ppc64le.whl", hash = "sha256:8c5c9aae5415295e57852c6352636be8ee613c1ea1ec9090a661a2a57ffedaa3", size = 1268007, upload-time = "2026-10-15T10:29:31.282Z" },
-    { url = "https://files.pythonhosted.org/packages/31/47/4c84869b53f5d431a76ea2d768ceeb42cb5e4f22ee1219d73648e3a063b5/hypothesis-6.169.4-cp311-abi3-musllinux_1_2_riscv64.whl", hash = "sha256:d61393b47600931fe8414133d298d08e65520c44f507d2f7eca3db027f1e7d8e", size = 1282972, upload-time = "2026-10-15T10:30:03.742Z" },
-    { url = "https://files.pythonhosted.org/packages/7d/eb/8818e6569e7b62dfb1bed12a53eddc904523f5bf4dc39c53031a69121659/hypothesis-6.169.4-cp311-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:6b01c585898c23590eaa19ba7864bd0bdaaf6b8e7d7da5155a6e08c9b3628568", size = 1322874, upload-time = "2026-10-15T10:29:18.401Z" },
-    { url = "https://files.pythonhosted.org/packages/3b/d5/7ba525a0958941431ed6b7f7e5b045650d1a2cfc3a3d0b9cc62ba7b19f92/hypothesis-6.169.4-cp311-abi3-win_amd64.whl", hash = "sha256:bdf4ef75e64773904ca9272e816072078a43eb1a2b5bfedf446fafbb944eb164", size = 683683, upload-time = "2026-10-15T10:29:48.065Z" },
-    { url = "https://files.pythonhosted.org/packages/75/a4/415116df75d253d914cc8956c827756920a55a7f9aad465c21fc283380fa/hypothesis-6.169.4-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:b4a9e4ce25a587c699f06a70ca83021ff7a13ce2d891773b175e5dc0db2cd840", size = 1114662, upload-time = "2026-10-15T10:31:05.726Z" },
-    { url = "https://files.pythonhosted.org/packages/81/cf/a7e4e08f8ceb595a559e9cda5f25618839f1cfa428a092b88cae3ad4f556/hypothesis-6.169.4-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:2756b9bf0a8b309e2030a9c3baf4285149063dc1a0852aea87a27c70350478da", size = 1156747, upload-time = "2026-10-15T10:29:35.945Z" },
-    { url = "https://files.pythonhosted.org/packages/33/8f/891e50c74728bb8275929295ef636a9a65dfba5fa3cb5704deca50f4e0f9/hypothesis-6.169.4-cp311-cp311-musllinux_1_2_aarch64.whl", hash = "sha256:d8e65c8673b2a6d1ca626fc4fe37157d61f50d41452d6533d6f8ed8ed183d4d1", size = 1289460, upload-time = "2026-10-15T10:30:57.731Z" },
-    { url = "https://files.pythonhosted.org/packages/cf/a7/516f245c2eb4b8919d8d4f8a7d43bc336f915e6f6b20a2d9c6f87c68d60a/hypothesis-6.169.4-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:1a2d941de990c32981de7189a2fea492b74244ac3b0d2ddbb9d45ec483c10d6f", size = 1323506, upload-time = "2026-10-15T10:29:49.679Z" },
-    { url = "https://files.pythonhosted.org/packages/7c/16/beec1f0d9a645cfdf11b0ffa2224b57d038442abe9bf06701ff37f281916/hypothesis-6.169.4-cp311-cp311-win_amd64.whl", hash = "sha256:d91c07de4f4b267203621a5b95467cb8a6679383775fa864bce5f0219a209483", size = 683640, upload-time = "2026-10-15T10:29:43.786Z" },
-    { url = "https://files.pythonhosted.org/packages/87/63/9e81d3cf0cfc0ba2376990d9a10ef94abdda9bc31b567ef1749cf01ce1bb/hypothesis-6.169.4-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:e08e9a602a8a103080fca82ba225238fb61d1a3b1e20d458ef2bd8fb1025bbbb", size = 1113078, upload-time = "2026-10-15T10:29:32.84Z" },
-    { url = "https://files.pythonhosted.org/packages/54/27/73f699d0fc7626cde6781919a3b73f03088972ed09ee20773626bfc67e9f/hypothesis-6.169.4-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4993b8c96d4a89bc12a4515d49cceb236014b7cfd3f728a81992646b286c88a3", size = 1155855, upload-time = "2026-10-15T10:29:27.534Z" },
-    { url = "https://files.pythonhosted.org/packages/e8/04/a9a9207ced4301b7841fdfd37aa4f8cd7ed51597bf7f05320a7b4fa6e32e/hypothesis-6.169.4-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:831b06b9394e457901a189fd2fd0626d5f624b9831fff7c910662b3285b7af2d", size = 1288009, upload-time = "2026-10-15T10:29:09.048Z" },
-    { url = "https://files.pythonhosted.org/packages/c0/da/94f5991d81ce46583ec6d6825be795c6c6ebcb076965fe4e3f277d6b51ce/hypothesis-6.169.4-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:203f9a4962d0dbf1e2d414a017d9be2150891d036fd48eaa8e61e4e7da7af6a2", size = 1322386, upload-time = "2026-10-15T10:29:26.258Z" },
-    { url = "https://files.pythonhosted.org/packages/d0/98/edcdaef0e6436ea0937423dddf858e58763615f8bf6922c9ee5a731499d1/hypothesis-6.169.4-cp312-cp312-win_amd64.whl", hash = "sha256:25c388630aeea767dbac7307dbdb6c1b64b04cafb4c7316db98748d72a4d900c", size = 681224, upload-time = "2026-10-15T10:29:39.215Z" },
-    { url = "https://files.pythonhosted.org/packages/7e/63/4ca5c4ada7012b33b44d6949a2318d2087efb6cb7b33c9e99294f984208b/hypothesis-6.169.4-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:8fb41a75d75c5472341857e483b3e4a5a9c59e80c84b32fda7213db6325a4cac", size = 1112915, upload-time = "2026-10-15T10:29:46.691Z" },
-    { url = "https://files.pythonhosted.org/packages/fc/bd/96e129bf16c0cfac3c872ab5d937954fb6f13d9a17b8c5e6cc8db7ceb1d8/hypothesis-6.169.4-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:912f17f4175ae3619e4782a2726d918d9a764ccd5be4026c7135af836c09c249", size = 1155819, upload-time = "2026-10-15T10:29:57.692Z" },
-    { url = "https://files.pythonhosted.org/packages/06/35/6e82e31d2c2c7a3338aa7e69ec787918fe5ef490c3ac6317b4307ca3ec75/hypothesis-6.169.4-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:5f9fba1eadd1ed0f7895d5a43cacfa98cdd2df32006f0e0443ae00876dc27c89", size = 1287896, upload-time = "2026-10-15T10:29:23.59Z" },
-    { url = "https://files.pythonhosted.org/packages/8b/ab/367c82fa7db7a2683cb45c08cc5fc2afe27438d5783691d511236ef4929a/hypothesis-6.169.4-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:0dae2fa073f4ebdee0df8f2066a5a26d2ee1b590f3455c081db178b9f41ab285", size = 1322365, upload-time = "2026-10-15T10:29:37.717Z" },
-    { url = "https://files.pythonhosted.org/packages/47/fe/0b3d49172917545c5d78638d9f12091725b669ab0a84199611ae5edd871b/hypothesis-6.169.4-cp313-cp313-win_amd64.whl", hash = "sha256:48a2261b2ec1211f2ccfbc8d1b70d604a267d318176fd26c95d1c49d66fbc21f", size = 681247, upload-time = "2026-10-15T10:29:16.004Z" },
-    { url = "https://files.pythonhosted.org/packages/65/44/95c7d29f9ec06fd62bb872cad39271ed58a70494bed05b95211919b7808f/hypothesis-6.169.4-cp314-cp314-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:7a9d8601e5301b0dc7959849459d2fa3cb0cac7c90579be29518afd28648b99d", size = 1113493, upload-time = "2026-10-15T10:29:40.742Z" },
-    { url = "https://files.pythonhosted.org/packages/95/13/92547d5be70ab25b5cda5c168edafabdf0c15583a2e7ecc6b6c91ffa317b/hypothesis-6.169.4-cp314-cp314-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:d9e7054a30cbe56aec3b57fd031b8392a5ab0cfeef83a46b43dae68706ae8547", size = 1156042, upload-time = "2026-10-15T10:30:55.689Z" },
-    { url = "https://files.pythonhosted.org/packages/39/ad/c1951ff053b70f1149cb19cf9bd356d90bade701c65e13492775e68e1c33/hypothesis-6.169.4-cp314-cp314-musllinux_1_2_aarch64.whl", hash = "sha256:ae6c1fd2fb4382c292c0b8b0ce50b860ff9bba2619a9cbdd22d14a572edc0583", size = 1288075, upload-time = "2026-10-15T10:30:45.153Z" },
-    { url = "https://files.pythonhosted.org/packages/7b/2e/65e6c2fab8d56bf90739a8958b2e1aeae02e2768cf5a3b8d369097984a78/hypothesis-6.169.4-cp314-cp314-musllinux_1_2_x86_64.whl", hash = "sha256:f1fe3c5f8b93d43198a48f0366ebd14f793c7a74e6445e374ee426b98906842c", size = 1322561, upload-time = "2026-10-15T10:29:19.904Z" },
-    { url = "https://files.pythonhosted.org/packages/25/ae/88caed2c00f87801528ced758977ea31cb46e9ba59dda7acf6e43ad13c20/hypothesis-6.169.4-cp314-cp314-pyemscripten_2026_0_wasm32.whl", hash = "sha256:13286330366f84440c43e98251b0b954327cbe0092aa9d58653f30701a28bc0e", size = 623445, upload-time = "2026-10-15T10:31:03.8Z" },
-    { url = "https://files.pythonhosted.org/packages/03/2b/328ea2f2dad1c10bb1a77e6f23e61c36ef2bedb28d2278922743649447f6/hypothesis-6.169.4-cp314-cp314-win_amd64.whl", hash = "sha256:54da17ce3a2a63914f64dad17c27691f963d95329fc0e994bcc0056b123759fb", size = 681111, upload-time = "2026-10-15T10:30:30.047Z" },
-    { url = "https://files.pythonhosted.org/packages/1c/01/da037745322ad5f6e9fd8c2b6f4979bae7202aaf3db17dcd92e1b8a5eddb/hypothesis-6.169.4-cp314-cp314t-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:1e9f1e68e79d46ee77e712143fac62e8a2cae571fbda472d0b76cb3e201d6b0d", size = 1111375, upload-time = "2026-10-15T10:30:19.774Z" },
-    { url = "https://files.pythonhosted.org/packages/11/92/07d284406afc6da6a172a87f09dfc4f0bbafbc5722f3002c31c8121f0284/hypothesis-6.169.4-cp314-cp314t-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4dfba1314bb29d017714b03ec5f8446eee88d25e47daf255bfbf4ca59b8c0b52", size = 1154932, upload-time = "2026-10-15T10:30:09.139Z" },
-    { url = "https://files.pythonhosted.org/packages/4e/e0/546a66ce1b13a84c52859e831a9ca738fe037e75753943fad8eddbd6e9a1/hypothesis-6.169.4-cp314-cp314t-musllinux_1_2_aarch64.whl", hash = "sha256:870cc479d97ee460c4cbe77f859ca5a7ace17d7e84e4dbfe931e7e17506f1ec5", size = 1286257, upload-time = "2026-10-15T10:31:14.137Z" },
-    { url = "https://files.pythonhosted.org/packages/0c/91/b96de8c37888991caddb7ceb63b5d61d20c0380111d8b0d31559c9750e1a/hypothesis-6.169.4-cp314-cp314t-musllinux_1_2_x86_64.whl", hash = "sha256:07e004588c9f4e979027884bc67fdc00e99a8cbdda12d0475688f7c3ebccbb35", size = 1321420, upload-time = "2026-10-15T10:30:07.356Z" },
-    { url = "https://files.pythonhosted.org/packages/f7/9a/afee88e54c0418a7c56e8f2ed2e0f13f107a2ebcc66a5ce16f9945b2a18d/hypothesis-6.169.4-cp314-cp314t-win_amd64.whl", hash = "sha256:eb5547163b347ea3d408b975c7f5e0c9ac3151f515d18c8ab2a62a3bad0904da", size = 680829, upload-time = "2026-10-15T10:31:18.549Z" },
-    { url = "https://files.pythonhosted.org/packages/6f/2d/c618db5c4f554745b35113ee40867b6b3ee0893af6c904d2d2be9a64d74c/hypothesis-6.169.4-cp315-abi3.abi3t-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:9441537eafa9ecabe7aeb2666ac825848b861797e71b48770749a550b9a4d642", size = 1110622, upload-time = "2026-10-15T10:30:12.574Z" },
-    { url = "https://files.pythonhosted.org/packages/fb/07/800c94fb6b9baa54641ede7f2cf8bb9a47ceb1618d17f0344e1230dcdd19/hypothesis-6.169.4-cp315-abi3.abi3t-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:57e5c1f778b86bbcb7efe619cd599b58f666bb108b89af51cce47063ce946e5c", size = 1141943, upload-time = "2026-10-15T10:31:21.349Z" },
-    { url = "https://files.pythonhosted.org/packages/b1/5e/6f07363c2480ecb4e3f465be0ce1bf844cbae701f54a86d2c0b1fe4908b2/hypothesis-6.169.4-cp315-abi3.abi3t-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:7e7912f74d795ff3b1ea6fba6f3631ddeb3135ac6133ea28403a955dc4ce7f56", size = 1135162, upload-time = "2026-10-15T10:31:01.867Z" },
-    { url = "https://files.pythonhosted.org/packages/cf/57/198252e145adb8adce6287943743bdca17a82739a284d4f7714d56929c2a/hypothesis-6.169.4-cp315-abi3.abi3t-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:61bc8ff29762d155331f86bc269b05d7ddbf431718682a7caa87635a8c7dfecd", size = 1188871, upload-time = "2026-10-15T10:29:10.662Z" },
-    { url = "https://files.pythonhosted.org/packages/d6/e0/76af10cb67760196af649a65e198bd01cde6c3febd810e3fcb764bb52875/hypothesis-6.169.4-cp315-abi3.abi3t-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:405c7c907ee9357e84b52744cc9190773f72195c952c943cd428b21e05fb15ad", size = 1153998, upload-time = "2026-10-15T10:30:23.695Z" },
-    { url = "https://files.pythonhosted.org/packages/5f/3c/6a82fa733f7064ec9327ebbb29206f6b117ad2f6d6caa827a3fb35e64002/hypothesis-6.169.4-cp315-abi3.abi3t-manylinux_2_31_riscv64.whl", hash = "sha256:b74ab3d6ca94e0ca0f511a976d23cffd94b1fa58303aa434b199a414daf8e157", size = 1109148, upload-time = "2026-10-15T10:30:36.41Z" },
-    { url = "https://files.pythonhosted.org/packages/3d/72/d1aa4d8f8182c7070928197a7fe5af0f749f57eaa031ff477df1cd391eee/hypothesis-6.169.4-cp315-abi3.abi3t-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:e41d113fd357a980bcbeb162c45918439802b241862cbd1dacb4f29c2cd93aa9", size = 1147749, upload-time = "2026-10-15T10:30:38.465Z" },
-    { url = "https://files.pythonhosted.org/packages/ab/9d/caf85f3230879fa93c25e487c994b12c5aa79fd2abdf957fb507d9f7b296/hypothesis-6.169.4-cp315-abi3.abi3t-musllinux_1_2_aarch64.whl", hash = "sha256:acb7522deaf7cb7171e7c8e8a562e79e8cf4e1d02f0f082dd07df4212a99cdd3", size = 1285087, upload-time = "2026-10-15T10:30:01.658Z" },
-    { url = "https://files.pythonhosted.org/packages/5e/50/ff5e8587ff73d5922b603c636261b928184a25655456fd5819fc06f9eb61/hypothesis-6.169.4-cp315-abi3.abi3t-musllinux_1_2_armv7l.whl", hash = "sha256:d50e1b5248e2ccd6e6cf5bbe3b45fcb72b04c096a43223b7a8cc44fabf120c6c", size = 1414741, upload-time = "2026-10-15T10:29:25.01Z" },
-    { url = "https://files.pythonhosted.org/packages/66/34/bc4b5be1414f01a25dfa704d929708bb3d9dab3b712a07a76710d0f4347a/hypothesis-6.169.4-cp315-abi3.abi3t-musllinux_1_2_i686.whl", hash = "sha256:d0cb5dbaec5ebedf0e3279fe8865276b83ef311ce19894d692cb39ef76bdec29", size = 1367849, upload-time = "2026-10-15T10:30:34.505Z" },
-    { url = "https://files.pythonhosted.org/packages/a3/8e/669e4560c8cb9c11df0f918c5b83bf1688bccef91e676212ddd76a385255/hypothesis-6.169.4-cp315-abi3.abi3t-musllinux_1_2_ppc64le.whl", hash = "sha256:aa68d8d85529b959dce997dae72fee0dbd475310608ad36fd9e453e416fd6eda", size = 1263685, upload-time = "2026-10-15T10:30:14.558Z" },
-    { url = "https://files.pythonhosted.org/packages/82/c6/760ef1808e4716184f652ffbadf33dc65959f2232b933b0fd8d0d40824f6/hypothesis-6.169.4-cp315-abi3.abi3t-musllinux_1_2_riscv64.whl", hash = "sha256:672d4a4a44eac3e82198fc49af3c8dc04986e97b5acd7c8842a0355add80c885", size = 1280956, upload-time = "2026-10-15T10:29:22.301Z" },
-    { url = "https://files.pythonhosted.org/packages/48/e6/ba1b7fe62ee17f7a9d0ed891b71f4fea2f30325822d760c4f4b6225b7dc5/hypothesis-6.169.4-cp315-abi3.abi3t-musllinux_1_2_x86_64.whl", hash = "sha256:27c0a2ddfc9094ec47b54f366f7f268e0e045d140d51d3ad98f77a628839bdd4", size = 1320698, upload-time = "2026-10-15T10:29:59.331Z" },
-    { url = "https://files.pythonhosted.org/packages/05/e5/4526350c272de26223e874bb8f61383907487fbdc15eb93cec2b10033eb3/hypothesis-6.169.4-cp315-abi3.abi3t-win_amd64.whl", hash = "sha256:1f62fd2f957b28ef230d105939066850f0b79ff56423ef6c92c7d9a6eeea5032", size = 680564, upload-time = "2026-10-15T10:30:47.28Z" },
-    { url = "https://files.pythonhosted.org/packages/cc/d3/3a5724fbcacffa89177baa00e0dd18c1df9c222c88167a66c6b381149604/hypothesis-6.169.4-pp311-pypy311_pp73-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:9fe2fe9c534d8bb3f06753fbc38b00b7396527e8edb91cbdc0b4038eaea7cb8c", size = 1114344, upload-time = "2026-10-15T10:30:05.512Z" },
-    { url = "https://files.pythonhosted.org/packages/5b/44/fa273ae15294ad39ab042ec49b3eb8fb40fa10bbcbaa82a40e68fa8022d1/hypothesis-6.169.4-pp311-pypy311_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4e52b66d6ce03425bb4306b8243d093dfe07555d82beb48e8bd6011f9a53eea6", size = 1157063, upload-time = "2026-10-15T10:30:59.716Z" },
-    { url = "https://files.pythonhosted.org/packages/81/c1/741732716487e23e4c306609233f8a7d18b319e6e98c96b414d404847134/hypothesis-6.169.4-pp311-pypy311_pp73-win_amd64.whl", hash = "sha256:789a4c1e1222746df8c05e57cc05626ba216bcf7deabdc8ea10160dd8699a2a4", size = 684255, upload-time = "2026-10-15T10:31:07.788Z" },
+    { url = "https://files.pythonhosted.org/packages/2f/da/a054cf744054f78e84806463bd5307148abc94c56ff0dd74f0a6ecda8281/hypothesis-6.170.0-cp311-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:0e9a44831e3e3561e3e02553cd77ce3ad38ac69449a392e38a6430669ca2f645", size = 1120013, upload-time = "2026-10-15T19:20:15.211Z" },
+    { url = "https://files.pythonhosted.org/packages/9f/73/a60b1f45511657b2c80d4d5bf9a7cebea2e1e0677e3a534c8655b5440349/hypothesis-6.170.0-cp311-abi3-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:05d08a97fefad42f3592f906f9e7e56175f18bbc8e94eda29388fa6d4cba3d98", size = 1150222, upload-time = "2026-10-15T19:22:02.377Z" },
+    { url = "https://files.pythonhosted.org/packages/3a/f9/2e574ac33b0f26b9cdcd3e5a48c78390135bb66702f2b6ea2e26d302af9d/hypothesis-6.170.0-cp311-abi3-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:52545fd38b5ca8608304d48e350d59916b7d3b914b1f6ddb7f149f5f6ad29685", size = 1144689, upload-time = "2026-10-15T19:22:15.011Z" },
+    { url = "https://files.pythonhosted.org/packages/75/9e/a56873113d0602b78071b8cd1c7f0d108cb12e172fa4ce74faa2f7a6c266/hypothesis-6.170.0-cp311-abi3-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:1279589a39e515e6509bb5ed5ad0988e05439b3fe90eb45c6558fda8c6e43355", size = 1196994, upload-time = "2026-10-15T19:20:38.305Z" },
+    { url = "https://files.pythonhosted.org/packages/b3/96/b95033f9ef4f54f9cb3db1b3c1908134b4f427151e163feda9735c886ba8/hypothesis-6.170.0-cp311-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:1b1351aa1a70933e1a660ef985449be88a13be75f594c4d12ed73911a1204ca1", size = 1163217, upload-time = "2026-10-15T19:21:46.813Z" },
+    { url = "https://files.pythonhosted.org/packages/0c/3e/a2d77c963cab9e0b44ab8662f30fb6749a978dd743548058d519e8d510aa/hypothesis-6.170.0-cp311-abi3-manylinux_2_31_riscv64.whl", hash = "sha256:c44c6ee92c96c6ce3daf861da558c1951f7dc2efc28265a96667082af4a589af", size = 1118752, upload-time = "2026-10-15T19:20:27.446Z" },
+    { url = "https://files.pythonhosted.org/packages/9d/24/f7387742daef67378160e4fbd5690d3425895c91d7997d866b0ccb374f38/hypothesis-6.170.0-cp311-abi3-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:c6f675faaaed977a222fec176556be698bca4c47f42b4683f1c74a0622df1ef4", size = 1157751, upload-time = "2026-10-15T19:21:13.628Z" },
+    { url = "https://files.pythonhosted.org/packages/8a/e0/ba3279ee32a80447daea861f76291e16fbecdb2e5e4099bcc6f638931a4e/hypothesis-6.170.0-cp311-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:fd6ac12bde88e02b797ddd25612164173729024a35789efac4ae6cdd2e50a86c", size = 1295141, upload-time = "2026-10-15T19:21:24.262Z" },
+    { url = "https://files.pythonhosted.org/packages/16/65/79ceee6ef661be898111ae52d2024e6a6bfd79b51210b54d435c67d69b54/hypothesis-6.170.0-cp311-abi3-musllinux_1_2_armv7l.whl", hash = "sha256:be557fa08b066e7f477aebe585595dd5362d9672e219030d7a6f653cc84a058c", size = 1423414, upload-time = "2026-10-15T19:22:12.971Z" },
+    { url = "https://files.pythonhosted.org/packages/2c/4d/dc7bf7c6f93aae0d8449d4ce08695588e93613386d5a1d7cf1d238c3d0d7/hypothesis-6.170.0-cp311-abi3-musllinux_1_2_i686.whl", hash = "sha256:8d1521a32ba252bd57f0a188f73b9e6dc8f1879e7cc12e78acf511dd24b86296", size = 1377322, upload-time = "2026-10-15T19:20:35.436Z" },
+    { url = "https://files.pythonhosted.org/packages/dd/81/82d05250686c6437873914bc5060bb02adf7ea0c5041f42370e5dacb0e4e/hypothesis-6.170.0-cp311-abi3-musllinux_1_2_ppc64le.whl", hash = "sha256:428f78f87cf3b97001775829fa4cd3cd8bdb293128a8261334d0d95c60394b50", size = 1274086, upload-time = "2026-10-15T19:21:39.01Z" },
+    { url = "https://files.pythonhosted.org/packages/3c/c2/6d3776409565d1638a3411850fbe0974023d2636ebe122d57da78d8960ad/hypothesis-6.170.0-cp311-abi3-musllinux_1_2_riscv64.whl", hash = "sha256:696393b22cf089def4962c5213f7dfe2d34c7d56609441312a190b8f75ab49a5", size = 1289117, upload-time = "2026-10-15T19:22:00.403Z" },
+    { url = "https://files.pythonhosted.org/packages/23/8a/4a807ce1b7e2cdabb1741a3d01248867dce5fd3fe91d9debe352872cd2e8/hypothesis-6.170.0-cp311-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:21964516f44cc2763a0cce66f970e0f06f57743592365e2176aa58965684e442", size = 1328945, upload-time = "2026-10-15T19:21:37.169Z" },
+    { url = "https://files.pythonhosted.org/packages/e7/25/6a2f19f4fd37f5ace63aae8596fd1ab04760f38aea0e62d32729766bcd54/hypothesis-6.170.0-cp311-abi3-win_amd64.whl", hash = "sha256:f486ec5cc1e9fe8105ed59c39a39edd5ab0c36c5952519241a49caea4d1eaa10", size = 689417, upload-time = "2026-10-15T19:21:20.633Z" },
+    { url = "https://files.pythonhosted.org/packages/52/b2/74b894e13ba0b8d5ef19d9adfa76e1c510f4c4085621f547def6c9ccde1e/hypothesis-6.170.0-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:2b7322da2f58b821d23d29188ae63fa619598b50ba35fe302be5cdab50f70426", size = 1120786, upload-time = "2026-10-15T19:20:46.356Z" },
+    { url = "https://files.pythonhosted.org/packages/dc/c7/8e93a40a36806052163e03dad9c44ab7d24110f0fec6b9ec614b76fdba91/hypothesis-6.170.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:8d0e917a11c03aa51f72bb765dd3e0dc1d818814c6d5248d7ce3786fb17cbfab", size = 1163560, upload-time = "2026-10-15T19:21:54.421Z" },
+    { url = "https://files.pythonhosted.org/packages/3f/00/ac11fdf1398ac66c8d6e4cb18e0c15e92d09c27b9ee54ebe1ff0a186325a/hypothesis-6.170.0-cp311-cp311-musllinux_1_2_aarch64.whl", hash = "sha256:47e586ea2e0458232d3d392a2b4587287dfe39581c8721ca5cb3d196df1b135d", size = 1295559, upload-time = "2026-10-15T19:22:10.488Z" },
+    { url = "https://files.pythonhosted.org/packages/9d/51/ec00bdb180478f0fcdd763da10cf9dddcbf7b0274141fe0ce151628c23f5/hypothesis-6.170.0-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:66e6ab9c412ed4e169be172bd92b0bce6d71e8c01224d90f979539e348c2de49", size = 1329598, upload-time = "2026-10-15T19:20:55.26Z" },
+    { url = "https://files.pythonhosted.org/packages/cb/eb/2646b001ff48a96e68c24fece6c7f32c2a2a857ea69b102654aff68c77ee/hypothesis-6.170.0-cp311-cp311-win_amd64.whl", hash = "sha256:0c3313e1d53fdb416deb622eb33b4b4a21cfbbf4a7fb12cd25336a6cf43d052a", size = 689520, upload-time = "2026-10-15T19:20:36.854Z" },
+    { url = "https://files.pythonhosted.org/packages/70/a6/a0fb0ad3bddf5fa63ec770315c50fc7e1bb601deee40890d9b42bacb9dba/hypothesis-6.170.0-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:c19dd6d8bb87a287ab4f220361d03ff83a881e027613dd126bf70f1dde68077c", size = 1119145, upload-time = "2026-10-15T19:20:47.747Z" },
+    { url = "https://files.pythonhosted.org/packages/14/94/855d54ef5e0e77d3a284be01e76913113ef81e8300d562098dbee9b26c50/hypothesis-6.170.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:13be368fd3aa29bd199c79dc459e18b1d6b4cb0687419bcd751f22a2e1b773a9", size = 1162826, upload-time = "2026-10-15T19:20:58.662Z" },
+    { url = "https://files.pythonhosted.org/packages/71/64/845606c2bc232f24f35a2b734f88b3972f29add4487e742a3b9df30ef0fa/hypothesis-6.170.0-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:482b8a838f22c1e68244b0a8a0d304074fa3d93b2b06636290afaf4160710d35", size = 1294121, upload-time = "2026-10-15T19:20:31.626Z" },
+    { url = "https://files.pythonhosted.org/packages/cb/e0/6832a8912ec9cd8265d1129e62494edd0f6f850d541fea9bd8716342f93e/hypothesis-6.170.0-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:f0fe1f8436c80f51ceeb079a2b4c9a17251958c4413576a4bf75ed3d509af4d7", size = 1328504, upload-time = "2026-10-15T19:20:30.391Z" },
+    { url = "https://files.pythonhosted.org/packages/c3/5e/8d33571de4bf6b34d106e9f83b8854a95bf5ce417133e573a84e6349f205/hypothesis-6.170.0-cp312-cp312-win_amd64.whl", hash = "sha256:55b6e697e01ee086b8e84012f4537433b4aed009b608b98a5cc74fb49419b8bd", size = 686851, upload-time = "2026-10-15T19:21:56.297Z" },
+    { url = "https://files.pythonhosted.org/packages/84/bb/37037389c74f00be4e4304a62a6ebddfbe39ca5fbbecd54176f8d1b85ea1/hypothesis-6.170.0-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:29f76c1ee769aa2332f24eeb919bc1c244f5735f059935b006dbe2062732a583", size = 1119028, upload-time = "2026-10-15T19:21:44.987Z" },
+    { url = "https://files.pythonhosted.org/packages/28/1e/23efaa7e598db19814c4cf4fd48fa3eed9d3eab9c606d2f92541c693ead0/hypothesis-6.170.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:903b4c5aff5b1fac94b67cc8305c98b9bdc463fe4088ff2dbf2e1011e58df0f3", size = 1162710, upload-time = "2026-10-15T19:20:25.986Z" },
+    { url = "https://files.pythonhosted.org/packages/df/dd/54e5d70e8a49a1b19f750bf81da6c8f470285e350e5d712ea40b6d4c8de1/hypothesis-6.170.0-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:0d79a164fa5435f76066f9a6950a302f8c7d4fe1ea8359e97d3a6e55389d669c", size = 1294013, upload-time = "2026-10-15T19:21:25.898Z" },
+    { url = "https://files.pythonhosted.org/packages/dd/8e/fbbc4381934392c6c79b9ce156632ad6063088c0b25be83dd66db7b32ed1/hypothesis-6.170.0-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:cc777364d5ac32fcf8e543d48a28c0208f7d37ba59c0ba0652a99cb013b7be9c", size = 1328509, upload-time = "2026-10-15T19:21:43.022Z" },
+    { url = "https://files.pythonhosted.org/packages/d5/a7/9e1929e950838086b1ecd586e3e5b4bab1598c07f18e4a4fcacf5c665868/hypothesis-6.170.0-cp313-cp313-win_amd64.whl", hash = "sha256:da54bd690b66c4ee39b59a33b1ee7c18ac1cc1424e865c254d02e4aace5ab6d9", size = 686821, upload-time = "2026-10-15T19:21:15.366Z" },
+    { url = "https://files.pythonhosted.org/packages/25/9e/fa85de24dfd2763cbb44504b3bcbfb87910e851978eda0cdcaca9e984a0d/hypothesis-6.170.0-cp314-cp314-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:0104a8a2ffd19cfb3bc288ba36f19f909b16ac6649ccbb6fac46568cf4a085af", size = 1119642, upload-time = "2026-10-15T19:21:02.072Z" },
+    { url = "https://files.pythonhosted.org/packages/84/3d/8e4ed8810c055ad4d7b816851f9af752fa557310542edf71477bb61a9973/hypothesis-6.170.0-cp314-cp314-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:40d0694321e1b94af3ae44f5882656748ef7a942edddf76ac6b50dfeb77d9c52", size = 1162970, upload-time = "2026-10-15T19:21:17.251Z" },
+    { url = "https://files.pythonhosted.org/packages/b5/8a/3f7d208966b8936cde509ee561bf17af50d98a97bbb4ca4833d747c6038d/hypothesis-6.170.0-cp314-cp314-musllinux_1_2_aarch64.whl", hash = "sha256:2d710217820c69b43d4024625a724108b2ca2d76b413db3165689ccf56eae096", size = 1294193, upload-time = "2026-10-15T19:21:05.44Z" },
+    { url = "https://files.pythonhosted.org/packages/32/d0/101f3e7beb4462c7e6461e58024831e6b5a7fbf4e23e6bee50f1d1fb2c0f/hypothesis-6.170.0-cp314-cp314-musllinux_1_2_x86_64.whl", hash = "sha256:7fc5d8835f2452fc54a80edbb254694e57c882fe76bd564acaa87075b33f8f89", size = 1328726, upload-time = "2026-10-15T19:20:19.756Z" },
+    { url = "https://files.pythonhosted.org/packages/c3/88/bfb1c008c322f2d4cd125a422588e5c26699aefbf3c21f74271f2c1d4074/hypothesis-6.170.0-cp314-cp314-pyemscripten_2026_0_wasm32.whl", hash = "sha256:75bb5680dce495d101433894036dbbe0b1881a20086f5849a4bfd2021ab29834", size = 629588, upload-time = "2026-10-15T19:20:21.051Z" },
+    { url = "https://files.pythonhosted.org/packages/36/67/e6486e46220db66d7782a93de0e3acdd46db109b2d06c81418c530358a67/hypothesis-6.170.0-cp314-cp314-win_amd64.whl", hash = "sha256:bfe3af3268ad2fab622bad92de56e5882afe82e89de73e70d473e975fd640fad", size = 686612, upload-time = "2026-10-15T19:20:40.337Z" },
+    { url = "https://files.pythonhosted.org/packages/2d/7c/7cf90f53def1175f7100131005da3064469479527bb7066d71a0f980938a/hypothesis-6.170.0-cp314-cp314t-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:e426559ad55d31f2fc576c5fc22cccd34d5c3afa657bea52969d9d89e08c1d21", size = 1117464, upload-time = "2026-10-15T19:22:22.317Z" },
+    { url = "https://files.pythonhosted.org/packages/9a/32/74191cbc13744de2d6a391d0b221a14ec4e1eb2581852c4482171b53441c/hypothesis-6.170.0-cp314-cp314t-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4b39fbb7994370c8983f2feb82849952224a6b6ba54b23dcda809bcce8ed7097", size = 1161854, upload-time = "2026-10-15T19:21:40.833Z" },
+    { url = "https://files.pythonhosted.org/packages/4b/8a/60deab7d8f6fe2bc9090128bc7ff7f912bbb3889a26d04f1382ae8a058ce/hypothesis-6.170.0-cp314-cp314t-musllinux_1_2_aarch64.whl", hash = "sha256:26210717736c7bf114a61de427caf0b9e5a1a58b16c677c3f3290b2a0abc91c9", size = 1292381, upload-time = "2026-10-15T19:21:08.692Z" },
+    { url = "https://files.pythonhosted.org/packages/43/c3/c7952ab8fe365d7ba2313f9965eb27e1c099f2d07a5d2aaf5cd52af8a57e/hypothesis-6.170.0-cp314-cp314t-musllinux_1_2_x86_64.whl", hash = "sha256:5b790d93c7b8da357f9ba124fd4b85a031f5337f4de7940eb7f7b30b2100b498", size = 1327517, upload-time = "2026-10-15T19:22:24.579Z" },
+    { url = "https://files.pythonhosted.org/packages/d4/b8/6f6816eef873d29d8e565b88dbe00a219838580bd82fc997141d64a34cb8/hypothesis-6.170.0-cp314-cp314t-win_amd64.whl", hash = "sha256:a2bfe211194033df37cec193cc829c471804c9feebb1fa7c1ab345fc96ebffcd", size = 686739, upload-time = "2026-10-15T19:22:08.497Z" },
+    { url = "https://files.pythonhosted.org/packages/86/28/38457c35916a9ebdcd137dcee50a1d049d798274fafe83b0f6e0dbc3785b/hypothesis-6.170.0-cp315-abi3.abi3t-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:743ed0ab04f026e8cb7d35261645c0e42c7e502420d171f3fe692ae77537596e", size = 1116718, upload-time = "2026-10-15T19:20:24.734Z" },
+    { url = "https://files.pythonhosted.org/packages/02/f0/f6de764e44aa14f3b9435204b36aaf2816c83de199303e3c48922989d39f/hypothesis-6.170.0-cp315-abi3.abi3t-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:3a241214e8a0233db06c8a34b7f0412a254941dc371e3cfc71dd2ff1573d02a9", size = 1148078, upload-time = "2026-10-15T19:21:22.356Z" },
+    { url = "https://files.pythonhosted.org/packages/e7/d7/125698cbdeb22afb309d48fa5fd49d5840a2a2c2a10e1742bb04084b93ae/hypothesis-6.170.0-cp315-abi3.abi3t-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:8546a73492d2c0d8e13a81d403c347eab3f8cafb99124c971f434a7dbc216b5f", size = 1141257, upload-time = "2026-10-15T19:21:58.44Z" },
+    { url = "https://files.pythonhosted.org/packages/9e/79/1b4a059d62666003016bdd85e82926f138358756942665a4c96916ab4fdc/hypothesis-6.170.0-cp315-abi3.abi3t-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:7beb9833609f7ec25f72cf313acecb88f5ba36d617f670c05a6607312e54ba78", size = 1194914, upload-time = "2026-10-15T19:20:28.739Z" },
+    { url = "https://files.pythonhosted.org/packages/8d/a9/974f66138bc804427bc77a1e9cb440c7c49b00b445285c85194dd00c93db/hypothesis-6.170.0-cp315-abi3.abi3t-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:7663bb361ec485428306f2a0c05d8b7c267e93e8de88a0becc805387e553a67e", size = 1161104, upload-time = "2026-10-15T19:22:06.461Z" },
+    { url = "https://files.pythonhosted.org/packages/ee/c1/ac3f4e7cf5fddcded5096aa1d3b4e44bd11134b5effba12f6e0ee7cf3574/hypothesis-6.170.0-cp315-abi3.abi3t-manylinux_2_31_riscv64.whl", hash = "sha256:643dfbd83c7bb948b41b2cb02ad3cb77c84d7ad0ff726ea36ce85fa50800db93", size = 1115259, upload-time = "2026-10-15T19:20:41.596Z" },
+    { url = "https://files.pythonhosted.org/packages/57/58/d4d851ee5a87d74c18b91f0b42fba799300326e6e147509db6e37972e405/hypothesis-6.170.0-cp315-abi3.abi3t-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:d5a4299faa9b8330a001218709ced04222b5c1aef3d68e763701f5288bfe8f82", size = 1153808, upload-time = "2026-10-15T19:21:29.57Z" },
+    { url = "https://files.pythonhosted.org/packages/a1/1f/e4bbbf29f27a31998f57c4091230e6c80ac7705df1bb13d99299e6ff99a4/hypothesis-6.170.0-cp315-abi3.abi3t-musllinux_1_2_aarch64.whl", hash = "sha256:bc545dd5d00240c6e991679650e4c9042b5b6f7c0d387edcb2cd79ecdfd6c1d9", size = 1291344, upload-time = "2026-10-15T19:22:19.586Z" },
+    { url = "https://files.pythonhosted.org/packages/f4/e5/6092b183186ee805099426d23f26302975b02e75e21656932f861a295050/hypothesis-6.170.0-cp315-abi3.abi3t-musllinux_1_2_armv7l.whl", hash = "sha256:499d26cd1f704eb0f2f1a7e1664a58694c3d0807e516105205b0988bb5471ab4", size = 1420818, upload-time = "2026-10-15T19:20:43.289Z" },
+    { url = "https://files.pythonhosted.org/packages/a9/a1/9b195e42401fd1e4cfb225df69020555127830d9b98752278027c5924791/hypothesis-6.170.0-cp315-abi3.abi3t-musllinux_1_2_i686.whl", hash = "sha256:a05eace1e176c17ad69d81018e694cc73f69b236d7c9d69d64b25d4dadb311fa", size = 1373961, upload-time = "2026-10-15T19:21:52.478Z" },
+    { url = "https://files.pythonhosted.org/packages/d4/e7/3bb5d0795ab4f23f1d42430943fa35480a08e05d163baf9a3f11874f7885/hypothesis-6.170.0-cp315-abi3.abi3t-musllinux_1_2_ppc64le.whl", hash = "sha256:61a26b90803fb5b9af2436bbeafa21e2d992d4a40cd743e210f2014d72bfdb02", size = 1269791, upload-time = "2026-10-15T19:21:27.814Z" },
+    { url = "https://files.pythonhosted.org/packages/d0/3b/48fdde00af5f308344c54877804d387e1244ebbf321b0bfa34b0c051c16e/hypothesis-6.170.0-cp315-abi3.abi3t-musllinux_1_2_riscv64.whl", hash = "sha256:069d626362239fc57d255eeac9a6124c6a5aa7d1fce5c7d434e2b09903276466", size = 1287152, upload-time = "2026-10-15T19:20:49.189Z" },
+    { url = "https://files.pythonhosted.org/packages/28/02/c7a71cb183bdfa8fb0d45b6520b79d0892794c9e6ccd32046bb9ff63b3d0/hypothesis-6.170.0-cp315-abi3.abi3t-musllinux_1_2_x86_64.whl", hash = "sha256:7f412171d4eeca96dfdbf907abfc97443291643e151b080fef9cc0af34fb1a7f", size = 1326796, upload-time = "2026-10-15T19:20:18.491Z" },
+    { url = "https://files.pythonhosted.org/packages/fa/d8/15596e63b4942f12dad66ea3525aa3ce5f85d4a9e43e1f5069077d8669f3/hypothesis-6.170.0-cp315-abi3.abi3t-win_amd64.whl", hash = "sha256:4323d81560a5089378ccb03c5ed5b39407afed0adfd3b072fd5927ac61fce4aa", size = 686456, upload-time = "2026-10-15T19:21:00.52Z" },
+    { url = "https://files.pythonhosted.org/packages/12/34/60f81e7768b866a78469efb75f77ef82b05da46294546f1bb2b551d9ffb4/hypothesis-6.170.0-pp311-pypy311_pp73-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:4e3f82f0cdb92344ea6cab4b0f86c05a1c559207f35eb4a7fc405eb71788e773", size = 1120454, upload-time = "2026-10-15T19:21:31.498Z" },
+    { url = "https://files.pythonhosted.org/packages/ce/b2/09f0d5ce6d97cb1058b667f12e0ba68337f8df4f4f3c0b6b6aaac901796c/hypothesis-6.170.0-pp311-pypy311_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:580361025e0af7a54e4d12458b8d928c12374c42b6d8cbd89232e228e014b991", size = 1163877, upload-time = "2026-10-15T19:21:48.601Z" },
+    { url = "https://files.pythonhosted.org/packages/6d/a2/80df4d8b21ae36da29080b8200366c66f8d46320ba05409aab94c01f523d/hypothesis-6.170.0-pp311-pypy311_pp73-win_amd64.whl", hash = "sha256:3966333f685d6bb79709c7ccba7546bdea3795430e492cdcebf4908049876e1b", size = 690015, upload-time = "2026-10-15T19:22:29.208Z" },
 ]
 
 [[package]]
@@ -2158,16 +2148,10 @@ name = "networkx"
 version = "3.7"
 source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.14' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.14' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
+    "python_full_version >= '3.14' and sys_platform == 'linux'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'linux'",
+    "python_full_version >= '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/dc/76/3af777226b63a5e64a6b36b1ec5855c14e2b94a37096d4760e595fc43511/networkx-3.7.tar.gz", hash = "sha256:fd77a511bd90f39f3d016351345b52cf5319b813bdca01de3f755d3cca62e96a" }
 wheels = [
@@ -2274,16 +2258,10 @@ name = "numpy"
 version = "2.5.4"
 source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.14' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.14' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
+    "python_full_version >= '3.14' and sys_platform == 'linux'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'linux'",
+    "python_full_version >= '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/95/b0/c7453d0b6e2073c3264468b106ee1563750cecc910965e67357e3698c83e/numpy-2.5.4.tar.gz", hash = "sha256:9a94cf751c9ad8ebaa835bcd3d40dacf8534ad086b88c38029b65123c7999d2a" }
 wheels = [
@@ -2671,7 +2649,7 @@ name = "omegaconf"
 version = "2.4.1rc1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pyyaml", marker = "sys_platform != 'win32' or extra == 'group-14-torch-tensorrt-quantization'" },
+    { name = "pyyaml" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/e6/d2/ceaf43a3d56161d8ffd612fdd67a57177903eb509966193fb6cf4254f9fe/omegaconf-2.4.1rc1.tar.gz", hash = "sha256:188bdbcc0ffcc8d7a94e6b6cb0a54bfdbb6b9c48a480fdb5baf787f9ccbcf56b", size = 3554167, upload-time = "2026-10-13T17:23:53.373Z" }
 wheels = [
@@ -2692,10 +2670,10 @@ name = "pandas"
 version = "3.1.0rc0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "numpy", version = "2.4.6", source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }, marker = "(python_full_version < '3.12' and sys_platform != 'win32') or (python_full_version < '3.12' and extra == 'group-14-torch-tensorrt-quantization') or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "numpy", version = "2.5.4", source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }, marker = "(python_full_version >= '3.12' and sys_platform != 'win32') or (python_full_version >= '3.12' and extra == 'group-14-torch-tensorrt-quantization') or (python_full_version < '3.12' and extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "python-dateutil", marker = "sys_platform != 'win32' or extra == 'group-14-torch-tensorrt-quantization'" },
-    { name = "tzdata", marker = "(sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization') or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }, marker = "python_full_version < '3.12' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "numpy", version = "2.5.4", source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }, marker = "python_full_version >= '3.12' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "python-dateutil" },
+    { name = "tzdata", marker = "sys_platform == 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/4b/90/d794d66759e957c0016c907f84b3b8d306e3eeda94f11715ca49a91946a3/pandas-3.1.0rc0.tar.gz", hash = "sha256:f974ad866f5fadbaf7741bd8f5b6e07815dfa04839853deb262da2663819b40b", size = 5910300, upload-time = "2026-09-30T13:58:28.678Z" }
 wheels = [
@@ -2835,11 +2813,11 @@ wheels = [
 
 [[package]]
 name = "platformdirs"
-version = "4.13.0"
+version = "4.13.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/80/a8/66d45abadff219e36e2a824181b8f6a67e7ed4572934d6252c71c29d5731/platformdirs-4.13.0.tar.gz", hash = "sha256:1aa0b0d3f224c1f07c295121e312a5a24a180d6ae5a8425ea1784b3e3863e9c0", size = 61094, upload-time = "2026-10-11T02:05:24.109Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/16/35/146546aa5b9286a83248d29c51781476bbb4b0a608523361120059e0f7ed/platformdirs-4.13.1.tar.gz", hash = "sha256:ee77cf2d36d5a515b2acf68ede6434cf3a8fc70b822bb6b3264d01b96c69a8e0", size = 61458, upload-time = "2026-10-15T21:56:08.441Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/8d/15/1633010b26e88e872c93b67c0b6c5e174fb74cb6fb5c1472b4d51d4a8f22/platformdirs-4.13.0-py3-none-any.whl", hash = "sha256:3dbcf4cd708f21cf876c4eaa90e58412bc4f033d87143f41b1493ff77c25b7e1", size = 32724, upload-time = "2026-10-11T02:05:22.776Z" },
+    { url = "https://files.pythonhosted.org/packages/aa/0f/ac79a4e8394193bb228abaaf1c520f629b6ada7fcb75e58cdc8c6acce321/platformdirs-4.13.1-py3-none-any.whl", hash = "sha256:4902b4ad355cb0b202c746b29580ab67c5c2d918e30e3d006353465b82ec3ecc", size = 32737, upload-time = "2026-10-15T21:56:07.059Z" },
 ]
 
 [[package]]
@@ -2938,15 +2916,15 @@ wheels = [
 
 [[package]]
 name = "protobuf"
-version = "7.36.2"
+version = "7.37.0rc1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/d9/89/5b8517baa72f84a67b8a307ba953c91057af618bf40bf676f3c03551f8f0/protobuf-7.36.2.tar.gz", hash = "sha256:497d0463ff3316681da6c0b9e8d06cb465d61abce00b613ab42226175644d1bb", size = 512737, upload-time = "2026-09-17T20:07:59.326Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/49/13/6fab38f7340b150fee5a05e4a7e6330d7cef67a3ed9ebd8fabd76cdaf0f5/protobuf-7.37.0rc1.tar.gz", hash = "sha256:063e00a1c0a477f7f2ab0f7f2f3dfe306c146fb843a2d6503bec1d45c9771f9e", size = 542343, upload-time = "2026-10-15T19:06:21.281Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b6/ea/91fdf7c2b8bbd49cde056f00a9df6773532987e1c00fe2830b895af95c7e/protobuf-7.36.2-cp310-abi3-manylinux2014_aarch64.whl", hash = "sha256:e11e1f0180583a2af89db6a2ecd9e8dc40aa6d2988ca175bfd0e6d12ea72d74e", size = 344219, upload-time = "2026-09-17T20:07:52.914Z" },
-    { url = "https://files.pythonhosted.org/packages/17/ab/5fd5f8ece73fad885c5a09aa849b32d70472f954ba3a92d3bb5974ea953b/protobuf-7.36.2-cp310-abi3-manylinux2014_s390x.whl", hash = "sha256:f4fee11ec330d238b34a05c9b675f693c20415d1c5bd7d5320cc2f8a798eb9cf", size = 357223, upload-time = "2026-09-17T20:07:53.985Z" },
-    { url = "https://files.pythonhosted.org/packages/db/f3/3996583dd2906297a637af12114deddf7658af6e683fedb83be061983fb5/protobuf-7.36.2-cp310-abi3-manylinux2014_x86_64.whl", hash = "sha256:89f23aa53c24553a2416fd4fd1ec06f74fa42b14b546d8883128813f775bbfd2", size = 343223, upload-time = "2026-09-17T20:07:54.931Z" },
-    { url = "https://files.pythonhosted.org/packages/8a/55/b77bda4e5e5f5971fb51b07663694690e9afdb9402136c16a522bd621cad/protobuf-7.36.2-cp310-abi3-win_amd64.whl", hash = "sha256:a300819d441e078a5608c0d3c709796bb548136058fda017ae51d425b44fd353", size = 456514, upload-time = "2026-09-17T20:07:57.188Z" },
-    { url = "https://files.pythonhosted.org/packages/e4/04/d52c7016b04b6c5108f26691f9d33ec82a9b65d041f1a9c771137693d618/protobuf-7.36.2-py3-none-any.whl", hash = "sha256:bdb3a345d48db958e6ce1f18e508beb0cc981d64f24088427549c866cd039f1e", size = 179806, upload-time = "2026-09-17T20:07:58.211Z" },
+    { url = "https://files.pythonhosted.org/packages/07/e6/3339b7b7aedd23cbfa3fd0b14c26dd782d445fa9f5df2eb57bafef9f1051/protobuf-7.37.0rc1-cp310-abi3-manylinux2014_aarch64.whl", hash = "sha256:988664eb7758ab503de13f702810bf5a10f173bc8a4c23c75d200536bc16211b", size = 359478, upload-time = "2026-10-15T19:06:14.065Z" },
+    { url = "https://files.pythonhosted.org/packages/2f/1f/9c4901d89250795f236fa89726c0d3aa4e24bda7c8da12cba04540b8533b/protobuf-7.37.0rc1-cp310-abi3-manylinux2014_s390x.whl", hash = "sha256:32e582ecb85c0531388dd177014da2fa4bf1aa6a7a1a217c68460d73b4bd8c02", size = 377611, upload-time = "2026-10-15T19:06:15.269Z" },
+    { url = "https://files.pythonhosted.org/packages/8c/da/4daefb726c24b26dde21d8ff5150dfc3c50716b8621a57d73e5c96cf6475/protobuf-7.37.0rc1-cp310-abi3-manylinux2014_x86_64.whl", hash = "sha256:8a72dc39100b755c2153dbb30a829914b94181642f95bf54f461e8684a532493", size = 360670, upload-time = "2026-10-15T19:06:16.406Z" },
+    { url = "https://files.pythonhosted.org/packages/47/56/3fea290f7ab831156ce71d60c03a99fa9f8cc26d5600904eed75f3540d86/protobuf-7.37.0rc1-cp310-abi3-win_amd64.whl", hash = "sha256:afc657946f69cf9c8d9194356dd890803232c1e1c5f5514cfe8c8618187ac7a1", size = 473722, upload-time = "2026-10-15T19:06:18.82Z" },
+    { url = "https://files.pythonhosted.org/packages/de/0a/c3f826ea06144fb9a3ba288c7b5267e8ea4cfcfcc85d8b4fddf1a9870247/protobuf-7.37.0rc1-py3-none-any.whl", hash = "sha256:bd29a590f690e5e521aeeaa5f26d7aed05b69f61a35b2083bde58b4832025354", size = 181464, upload-time = "2026-10-15T19:06:20.052Z" },
 ]
 
 [[package]]
@@ -3326,10 +3304,10 @@ name = "pytorch-tokenizers"
 version = "1.5.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "sentencepiece", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "tiktoken", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "tokenizers", version = "0.23.0rc0", source = { registry = "https://pypi.org/simple" }, marker = "(sys_platform != 'win32' and extra == 'group-14-torch-tensorrt-quantization') or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "tokenizers", version = "0.23.3", source = { registry = "https://pypi.org/simple" }, marker = "(sys_platform != 'win32' and extra != 'group-14-torch-tensorrt-quantization') or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "sentencepiece" },
+    { name = "tiktoken" },
+    { name = "tokenizers", version = "0.23.0rc0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-14-torch-tensorrt-quantization'" },
+    { name = "tokenizers", version = "0.23.3", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-14-torch-tensorrt-test-ext' or extra != 'group-14-torch-tensorrt-quantization'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/9d/b7/cf3bc4809b630e0e339bf7783937e757b7aef94b9e984cc171feca7fd489/pytorch_tokenizers-1.5.0-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:6594694666a3f0679ead16b262ca80c3efcef53db2d3ec9e852c0d6ede47f09f", size = 1452233, upload-time = "2026-09-14T17:36:02.35Z" },
@@ -3872,22 +3850,12 @@ name = "soupsieve"
 version = "3.0.3"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.14' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.11.5' and python_full_version < '3.12' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.14' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.11.5' and python_full_version < '3.12' and sys_platform == 'linux' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.14' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.11.5' and python_full_version < '3.12' and sys_platform == 'linux' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.11.5' and python_full_version < '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.11.5' and python_full_version < '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
-    "python_full_version >= '3.11.5' and python_full_version < '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-14-torch-tensorrt-quantization' and extra != 'group-14-torch-tensorrt-test-ext'",
+    "python_full_version >= '3.14' and sys_platform == 'linux'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'linux'",
+    "python_full_version >= '3.11.5' and python_full_version < '3.12' and sys_platform == 'linux'",
+    "python_full_version >= '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32'",
+    "python_full_version >= '3.11.5' and python_full_version < '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/5e/77/2dcfa996b01702ab8fd0763d84098f6a640d6162a328f1c04c2697579a1a/soupsieve-3.0.3.tar.gz", hash = "sha256:7dcf6022eed0399eb9934a75e020148f7a2024c37b7dfcd3cf2c5505d69c364e", size = 115923, upload-time = "2026-10-12T13:21:17.696Z" }
 wheels = [
@@ -4070,8 +4038,8 @@ name = "tiktoken"
 version = "0.14.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "regex", marker = "sys_platform != 'win32' or extra == 'group-14-torch-tensorrt-quantization'" },
-    { name = "requests", marker = "sys_platform != 'win32' or extra == 'group-14-torch-tensorrt-quantization'" },
+    { name = "regex" },
+    { name = "requests" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/66/62/167a842aa0429d45f5e797354fd4343a96f6043d67d0513c675c7b8d36e6/tiktoken-0.14.0.tar.gz", hash = "sha256:231dec90efcdccf1b565a1416107736f1e09b1a08fe736ef9d6363e626d03874", size = 38898, upload-time = "2026-08-17T19:49:49.514Z" }
 wheels = [
@@ -4139,6 +4107,7 @@ resolution-markers = [
     "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'linux'",
     "python_full_version >= '3.11.5' and python_full_version < '3.12' and sys_platform == 'linux'",
     "python_full_version < '3.11.5' and sys_platform == 'linux'",
+    "python_full_version >= '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32'",
     "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32'",
     "python_full_version >= '3.11.5' and python_full_version < '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32'",
     "python_full_version < '3.11.5' and platform_machine == 'AMD64' and sys_platform == 'win32'",
@@ -4171,12 +4140,13 @@ resolution-markers = [
     "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'linux'",
     "python_full_version >= '3.11.5' and python_full_version < '3.12' and sys_platform == 'linux'",
     "python_full_version < '3.11.5' and sys_platform == 'linux'",
-    "python_full_version >= '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32'",
+    "python_full_version >= '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32'",
     "python_full_version >= '3.11.5' and python_full_version < '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32'",
     "python_full_version < '3.11.5' and platform_machine == 'AMD64' and sys_platform == 'win32'",
 ]
 dependencies = [
-    { name = "huggingface-hub", version = "2.2.0", source = { registry = "https://pypi.org/simple" }, marker = "(sys_platform != 'win32' and extra != 'group-14-torch-tensorrt-quantization') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-test-ext') or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "huggingface-hub", version = "2.2.0", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'group-14-torch-tensorrt-test-ext' or extra != 'group-14-torch-tensorrt-quantization'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/e0/7c/2cabb2174e772636683008f2c5621949b645da7d303c596589e84516a184/tokenizers-0.23.3.tar.gz", hash = "sha256:cded33237c77caeef62944d32aa9a7ef42bdce2b3497e18d137e072a8c4be438", size = 385286, upload-time = "2026-10-09T10:16:55.759Z" }
 wheels = [
@@ -4262,10 +4232,10 @@ dependencies = [
 
 [package.optional-dependencies]
 all = [
-    { name = "executorch", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "executorch" },
 ]
 executorch = [
-    { name = "executorch", marker = "sys_platform != 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "executorch" },
 ]
 
 [package.dev-dependencies]
@@ -4326,7 +4296,7 @@ lint = [
 ]
 quantization = [
     { name = "nvidia-modelopt", extra = ["hf"], marker = "(python_full_version < '3.13' and extra == 'group-14-torch-tensorrt-quantization') or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
-    { name = "torchao", version = "0.18.0", source = { registry = "https://pypi.org/simple" }, marker = "(sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization') or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "torchao", version = "0.19.0.dev20261015+cpu", source = { registry = "https://download.pytorch.org/whl/nightly/cpu" }, marker = "(sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization') or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
     { name = "torchao", version = "0.19.0.dev20261015+cu132", source = { registry = "https://download.pytorch.org/whl/nightly/cu132" }, marker = "(sys_platform != 'win32' and extra == 'group-14-torch-tensorrt-quantization') or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
 ]
 test = [
@@ -4354,25 +4324,17 @@ test-ext = [
 [package.metadata]
 requires-dist = [
     { name = "dllist" },
-    { name = "executorch", marker = "sys_platform == 'linux' and extra == 'all'", specifier = ">=1.6.0.dev20261009,<1.7" },
-    { name = "executorch", marker = "sys_platform == 'linux' and extra == 'executorch'", specifier = ">=1.6.0.dev20261009,<1.7" },
+    { name = "executorch", marker = "(platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'all') or (sys_platform == 'linux' and extra == 'all')", specifier = ">=1.6.0.dev20261009,<1.7" },
+    { name = "executorch", marker = "(platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'executorch') or (sys_platform == 'linux' and extra == 'executorch')", specifier = ">=1.6.0.dev20261009,<1.7" },
     { name = "filelock" },
     { name = "numpy" },
     { name = "packaging", specifier = ">=23" },
     { name = "psutil" },
-<<<<<<< HEAD
-    { name = "tensorrt", marker = "platform_machine == 'aarch64' and sys_platform == 'linux'", specifier = ">=11.3.0,<11.4.0" },
-    { name = "tensorrt-cu13", marker = "platform_machine != 'aarch64' or sys_platform != 'linux'", specifier = ">=11.3.0,<11.4.0" },
-    { name = "tensorrt-cu13-bindings", marker = "platform_machine != 'aarch64' or sys_platform != 'linux'", specifier = ">=11.3.0,<11.4.0" },
-    { name = "tensorrt-cu13-libs", marker = "platform_machine != 'aarch64' or sys_platform != 'linux'", specifier = ">=11.3.0,<11.4.0" },
-    { name = "torch", specifier = ">=2.15.0,<2.16.0", index = "https://download.pytorch.org/whl/test/cu134" },
-=======
     { name = "tensorrt", marker = "platform_machine == 'aarch64' and sys_platform == 'linux'", specifier = ">=11.4.0,<11.5.0" },
     { name = "tensorrt-cu13", marker = "platform_machine != 'aarch64' or sys_platform != 'linux'", specifier = ">=11.4.0,<11.5.0" },
     { name = "tensorrt-cu13-bindings", marker = "platform_machine != 'aarch64' or sys_platform != 'linux'", specifier = ">=11.4.0,<11.5.0" },
     { name = "tensorrt-cu13-libs", marker = "platform_machine != 'aarch64' or sys_platform != 'linux'", specifier = ">=11.4.0,<11.5.0" },
-    { name = "torch", specifier = ">=2.16.0.dev0,<2.17.0", index = "https://download.pytorch.org/whl/nightly/cu132" },
->>>>>>> 613b552c1f (Upgrade TensorRT from 11.3 to 11.4 (#4845))
+    { name = "torch", specifier = ">=2.15.0,<2.16.0", index = "https://download.pytorch.org/whl/test/cu134" },
     { name = "typing-extensions", specifier = ">=4.7.0" },
 ]
 provides-extras = ["executorch", "all"]
@@ -4435,7 +4397,8 @@ lint = [
 ]
 quantization = [
     { name = "nvidia-modelopt", extras = ["hf"], marker = "python_full_version >= '3.10' and python_full_version < '3.13'", specifier = ">=0.44.0" },
-    { name = "torchao" },
+    { name = "torchao", marker = "sys_platform != 'win32'" },
+    { name = "torchao", marker = "sys_platform == 'win32'", index = "https://download.pytorch.org/whl/nightly/cpu" },
 ]
 test = [
     { name = "expecttest", specifier = "==0.1.6" },
@@ -4459,8 +4422,8 @@ test-ext = [
 
 [[package]]
 name = "torchao"
-version = "0.18.0"
-source = { registry = "https://pypi.org/simple" }
+version = "0.19.0.dev20261015+cpu"
+source = { registry = "https://download.pytorch.org/whl/nightly/cpu" }
 resolution-markers = [
     "python_full_version >= '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32'",
     "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32'",
@@ -4468,8 +4431,8 @@ resolution-markers = [
     "python_full_version < '3.11.5' and platform_machine == 'AMD64' and sys_platform == 'win32'",
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/19/55/ed9ad98f0f09d5a1124d09830043d13a39e63539f9590d2bdb6d71cbc4a4/torchao-0.18.0-cp310-abi3-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:6540b148e40ba81cbd4de86392225a076a1591146e9cebb099b3b234ba9feebe", size = 3372585, upload-time = "2026-08-03T19:43:10.993Z" },
-    { url = "https://files.pythonhosted.org/packages/c4/4d/485477bb8f05bd501016059c6d8abd742f830cb1b24ab7704e086c7cc35a/torchao-0.18.0-py3-none-any.whl", hash = "sha256:5c2b4485341bf28b7fed2c4fc95b9f298e209f41685350f067de85527a05585e", size = 1369798, upload-time = "2026-08-03T19:43:12.649Z" },
+    { url = "https://download.pytorch.org/whl/nightly/cpu/torchao-0.19.0.dev20261015%2Bcpu-cp310-abi3-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", upload-time = "2026-10-15T00:35:28Z" },
+    { url = "https://download.pytorch.org/whl/nightly/cpu/torchao-0.19.0.dev20261015%2Bcpu-py3-none-any.whl", upload-time = "2026-10-15T00:30:00Z" },
 ]
 
 [[package]]
@@ -4538,7 +4501,7 @@ name = "tqdm"
 version = "4.70.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "(sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-quantization') or (sys_platform == 'win32' and extra == 'group-14-torch-tensorrt-test-ext') or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
+    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'group-14-torch-tensorrt-quantization' and extra == 'group-14-torch-tensorrt-test-ext')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/0d/ea/b2a5bd54b28a324dae8211928b2d730b6547500342c7e6c6dea08bd0a485/tqdm-4.70.1.tar.gz", hash = "sha256:cefd0eca11b2a37a3aee776544d4f4ae913f02688135b5556b8788dfa474afc4", size = 171846, upload-time = "2026-09-11T07:25:16.601Z" }
 wheels = [
@@ -4592,7 +4555,8 @@ resolution-markers = [
     "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'linux'",
     "python_full_version >= '3.11.5' and python_full_version < '3.12' and sys_platform == 'linux'",
     "python_full_version < '3.11.5' and sys_platform == 'linux'",
-    "python_full_version >= '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32'",
+    "python_full_version >= '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32'",
     "python_full_version >= '3.11.5' and python_full_version < '3.12' and platform_machine == 'AMD64' and sys_platform == 'win32'",
     "python_full_version < '3.11.5' and platform_machine == 'AMD64' and sys_platform == 'win32'",
 ]

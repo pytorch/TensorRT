@@ -364,6 +364,15 @@ _L2: list[Suite] = [
         platforms=("linux-x86_64",),
     ),
     Suite(
+        "executorch-windows",
+        tier="l2",
+        lanes=("full", "nightly"),
+        paths=("executorch/test_windows_runtime.py",),
+        jobs="1",
+        variants=("standard",),
+        platforms=("windows",),
+    ),
+    Suite(
         # Standard: automatic plugins and the in-place regression tests.
         # RTX: the whole automatic_plugin
         # directory, except the Linux-only FlashInfer test below.
