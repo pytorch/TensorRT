@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=0866734c"></script>
+    <script src="../_static/documentation_options.js?v=a71228c4"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -848,6 +848,174 @@ compare the kernel timelines for the TRT model vs the baseline.</p>
 </table>
 </div>
 </section>
+<hr class="docutils" />
+<section id="global-performance-tuning">
+<h2>Global Performance Tuning<a class="headerlink" href="#global-performance-tuning" title="Link to this heading">#</a></h2>
+<p>TensorRT’s
+<a class="reference external" href="https://docs.nvidia.com/deeplearning/tensorrt/latest/performance/tuning.html">Global Performance Tuning</a>
+searches internal builder knobs, collectively called a <em>build route</em>, for a faster
+engine. Torch-TensorRT exposes this capability for Dynamo TRT partitions.</p>
+<p>The feature requires a TensorRT build with Global Performance Tuning support. It is
+available starting with TensorRT 11.1 and is currently unavailable with TensorRT-RTX
+or on Windows. Check the installed build before configuring a sweep:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo</span><span class="w"> </span><span class="kn">import</span> <span class="n">is_global_perf_tuning_available</span>
+
+<span class="k">if</span> <span class="ow">not</span> <span class="n">is_global_perf_tuning_available</span><span class="p">():</span>
+    <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">"Global Performance Tuning is unavailable"</span><span class="p">)</span>
+</pre></div>
+</div>
+<section id="discovering-and-applying-build-routes">
+<h3>Discovering and applying build routes<a class="headerlink" href="#discovering-and-applying-build-routes" title="Link to this heading">#</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">get_all_build_routes()</span></code> is the Torch-TensorRT equivalent of
+<code class="docutils literal notranslate"><span class="pre">trtexec</span> <span class="pre">--helpBuildRoute</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_all_build_routes</span>
+
+<span class="n">knobs</span> <span class="o">=</span> <span class="n">get_all_build_routes</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"tuner version:"</span><span class="p">,</span> <span class="n">knobs</span><span class="p">[</span><span class="s2">"tuner_version"</span><span class="p">])</span>
+<span class="k">for</span> <span class="n">knob</span> <span class="ow">in</span> <span class="n">knobs</span><span class="p">[</span><span class="s2">"tuner_options"</span><span class="p">]:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">knob</span><span class="p">[</span><span class="s2">"allowed_values"</span><span class="p">],</span> <span class="n">knob</span><span class="p">[</span><span class="s2">"default_value"</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>A route is a space-separated sequence of <code class="docutils literal notranslate"><span class="pre">-knob=value</span></code> tokens. Using <code class="docutils literal notranslate"><span class="pre">build_route</span></code>
+to apply a known route without running a search:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="n">model</span><span class="p">,</span>
+    <span class="n">ir</span><span class="o">=</span><span class="s2">"dynamo"</span><span class="p">,</span>
+    <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
+    <span class="n">build_route</span><span class="o">=</span><span class="s2">"-slice_fusion=off -kgen:codegen:cuda_tile=1"</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>Route expressions use brackets to provide the values to search. They can contain
+Boolean values, finite enums, or an explicit subset of an open-ended integer knob:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>-match_ragged_mha=[on|off]
+-kgen:codegen:cuda_tile=[0|1|2|3]
+-cask_fusion:num_tactics=[10|20]
+-peep:max=[1|2]
+</pre></div>
+</div>
+<p>For an open-ended knob, Torch-TensorRT searches only the values explicitly listed in
+the expression; it does not invent a range. A fixed token such as
+<code class="docutils literal notranslate"><span class="pre">-slice_fusion=off</span></code> is included in every route and does not increase the number of
+trials.</p>
+</section>
+<section id="running-a-sweep">
+<h3>Running a sweep<a class="headerlink" href="#running-a-sweep" title="Link to this heading">#</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="n">model</span><span class="p">,</span>
+    <span class="n">ir</span><span class="o">=</span><span class="s2">"dynamo"</span><span class="p">,</span>
+    <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
+    <span class="n">tune_build_routes</span><span class="o">=</span><span class="p">(</span>
+        <span class="s2">"-match_ragged_mha=[on|off] "</span>
+        <span class="s2">"-kgen:codegen:cuda_tile=[0|1|2|3]"</span>
+    <span class="p">),</span>
+    <span class="n">tuning_search</span><span class="o">=</span><span class="s2">"mixed"</span><span class="p">,</span>
+    <span class="n">accuracy_threshold</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span>
+    <span class="n">accuracy_algorithm</span><span class="o">=</span><span class="s2">"cos"</span><span class="p">,</span>
+    <span class="n">tuning_cache_file</span><span class="o">=</span><span class="s2">"/tmp/torch_trt_tune.jsonl"</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>Tuning is performed independently for each TRT partition. Use
+<code class="docutils literal notranslate"><span class="pre">require_full_compilation=True</span></code> when the model should be tuned as one engine, which
+is closest to whole-network <code class="docutils literal notranslate"><span class="pre">trtexec</span></code> behavior.</p>
+<p>The search algorithms are:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">fast</span></code>: build one baseline, then change one knob at a time. For knobs with
+<code class="docutils literal notranslate"><span class="pre">n_i</span></code> candidate values, this produces <code class="docutils literal notranslate"><span class="pre">1</span> <span class="pre">+</span> <span class="pre">sum(n_i</span> <span class="pre">-</span> <span class="pre">1)</span></code> trials.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">full</span></code>: build the Cartesian product of all candidate values. This produces
+<code class="docutils literal notranslate"><span class="pre">product(n_i)</span></code> trials and can become expensive quickly.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">mixed</span></code>: run <code class="docutils literal notranslate"><span class="pre">fast</span></code> first, then build combinations of only the knobs for which
+at least one one-at-a-time value was faster than the baseline. Duplicate routes
+between the two phases are not rebuilt.</p></li>
+</ul>
+<p>If the TensorRT default for a knob is not present in the expression, <code class="docutils literal notranslate"><span class="pre">fast</span></code> and
+<code class="docutils literal notranslate"><span class="pre">mixed</span></code> use the first listed value as that knob’s baseline. Timing comparisons are
+strict; any finite value below the baseline marks the knob as improved. Small timing
+fluctuations can therefore expand a <code class="docutils literal notranslate"><span class="pre">mixed</span></code> search. Use <code class="docutils literal notranslate"><span class="pre">full</span></code> for exhaustive,
+repeatable route coverage, and start with <code class="docutils literal notranslate"><span class="pre">fast</span></code> when compile time matters.</p>
+<p><code class="docutils literal notranslate"><span class="pre">tuning_dry_run=True</span></code> prints the expanded routes without building engines. It
+requires <code class="docutils literal notranslate"><span class="pre">tune_build_routes</span></code> or <code class="docutils literal notranslate"><span class="pre">tune_build_route_file</span></code> and cannot be combined
+with <code class="docutils literal notranslate"><span class="pre">mixed</span></code>.</p>
+</section>
+<section id="process-isolation">
+<h3>Process isolation<a class="headerlink" href="#process-isolation" title="Link to this heading">#</a></h3>
+<p>Each trial is built, checked, and benchmarked in a fresh process created with the
+Python <code class="docutils literal notranslate"><span class="pre">spawn</span></code> start method. A TensorRT or driver abort terminates only that child.
+The parent checks the child exit status and the atomically published result before
+continuing to the next route.</p>
+<p>Because <code class="docutils literal notranslate"><span class="pre">spawn</span></code> imports the main module in each child, executable scripts must use
+the standard entry-point guard:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">():</span>
+    <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">"__main__"</span><span class="p">:</span>
+    <span class="n">main</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>Without this guard, a child can execute the compile call again while it is still
+starting, causing a multiprocessing bootstrapping error.</p>
+</section>
+<section id="input-samples-accuracy-and-timing">
+<h3>Input samples, accuracy, and timing<a class="headerlink" href="#input-samples-accuracy-and-timing" title="Link to this heading">#</a></h3>
+<p>Torch-TensorRT materializes one deterministic set of example tensors in the parent
+and uses it for every route. Generated samples use a local fixed seed without
+changing the application’s RNG state.</p>
+<p>When <code class="docutils literal notranslate"><span class="pre">accuracy_threshold</span></code> is set, eager Torch reference outputs are computed once
+before the sweep. The outputs are moved to CPU for safe transfer and moved to the
+target GPU in each child for comparison with that trial’s TRT outputs. Nested
+<code class="docutils literal notranslate"><span class="pre">list</span></code>, <code class="docutils literal notranslate"><span class="pre">tuple</span></code>, and <code class="docutils literal notranslate"><span class="pre">dict</span></code> outputs are checked tensor by tensor. If any output
+has a non-finite loss or exceeds the threshold, that route cannot win. Setting
+<code class="docutils literal notranslate"><span class="pre">accuracy_threshold=None</span></code> skips both reference execution and accuracy checking.</p>
+<p>Supported metrics are <code class="docutils literal notranslate"><span class="pre">l0</span></code>, <code class="docutils literal notranslate"><span class="pre">l1</span></code>, <code class="docutils literal notranslate"><span class="pre">l2</span></code>, <code class="docutils literal notranslate"><span class="pre">lInf</span></code>, and <code class="docutils literal notranslate"><span class="pre">cos</span></code>; lower is better.
+<code class="docutils literal notranslate"><span class="pre">accuracy_atol</span></code> and <code class="docutils literal notranslate"><span class="pre">accuracy_rtol</span></code> apply only to <code class="docutils literal notranslate"><span class="pre">l0</span></code>. Each successful route is
+warmed up three times and measured ten times with CUDA events. The recorded
+<code class="docutils literal notranslate"><span class="pre">gpu_time</span></code> is the median latency in milliseconds.</p>
+</section>
+<section id="cache-and-resume">
+<h3>Cache and resume<a class="headerlink" href="#cache-and-resume" title="Link to this heading">#</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">tuning_cache_file</span></code> is a base path. For example, <code class="docutils literal notranslate"><span class="pre">/tmp/tune.jsonl</span></code> produces one
+<code class="docutils literal notranslate"><span class="pre">/tmp/tune.&lt;partition_key&gt;.jsonl</span></code> file per TRT partition. The first JSONL row stores
+the sweep configuration and later rows store each completed trial.</p>
+<p>Resume an interrupted sweep by supplying only the same base path:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="n">model</span><span class="p">,</span>
+    <span class="n">ir</span><span class="o">=</span><span class="s2">"dynamo"</span><span class="p">,</span>
+    <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
+    <span class="n">tuning_continue</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">tuning_cache_file</span><span class="o">=</span><span class="s2">"/tmp/torch_trt_tune.jsonl"</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>Do not combine <code class="docutils literal notranslate"><span class="pre">tuning_continue=True</span></code> with a new route expression or
+<code class="docutils literal notranslate"><span class="pre">tuning_dry_run</span></code>. Mixed-search phases are reconstructed from the global iteration
+indices and the completed fast-phase results.</p>
+<p>The cache deliberately uses a lightweight graph fingerprint and a simple,
+<code class="docutils literal notranslate"><span class="pre">trtexec</span></code>-like JSONL layout. It is not interchangeable with a <code class="docutils literal notranslate"><span class="pre">trtexec</span></code> cache and
+does not fully identify weights, input profiles, compilation settings, or hardware.
+Use a different base path, or remove the old partition files, after changing any of
+those inputs.</p>
+</section>
+<section id="failures-and-resource-usage">
+<h3>Failures and resource usage<a class="headerlink" href="#failures-and-resource-usage" title="Link to this heading">#</a></h3>
+<p>Some knob values are model-dependent and may fail to build. Failed children and
+accuracy failures are recorded with <code class="docutils literal notranslate"><span class="pre">crash=true</span></code> or a non-empty <code class="docutils literal notranslate"><span class="pre">error_message</span></code>
+and are excluded from winner selection. If all routes fail, tuning raises an error
+instead of returning an invalid engine.</p>
+<p>Trial payload and result files are temporary and are removed after each candidate.
+Only the current winner’s engine bytes are retained during a new sweep. When engine
+caching is enabled and the engine is eligible for weight stripping/refit, only the
+final winner is inserted into the configured Engine Cache.</p>
+<p><code class="docutils literal notranslate"><span class="pre">tuning_timeout_s</span></code> limits search time. When the remaining budget expires, the
+active child is killed and recorded as failed, and no additional search trial is
+started. Use <code class="docutils literal notranslate"><span class="pre">-1</span></code> to disable the timeout.</p>
+<p>Build-route performance is specific to the model, input profile, GPU, and TensorRT
+version. Re-tune after changing any of them. Full and mixed sweeps can multiply
+compilation time, especially for models with multiple TRT partitions.</p>
+<p>See <span class="xref std std-ref">global_perf_tuning_attention_example</span> for a runnable attention example.</p>
+</section>
+</section>
 </section>
 
 
@@ -906,6 +1074,15 @@ compare the kernel timelines for the TRT model vs the baseline.</p>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#memory-and-throughput-tradeoffs">Memory and Throughput Tradeoffs</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#profiling-with-nsight">Profiling with Nsight</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#benchmarking-checklist">Benchmarking Checklist</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#global-performance-tuning">Global Performance Tuning</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#discovering-and-applying-build-routes">Discovering and applying build routes</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#running-a-sweep">Running a sweep</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#process-isolation">Process isolation</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#input-samples-accuracy-and-timing">Input samples, accuracy, and timing</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#cache-and-resume">Cache and resume</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#failures-and-resource-usage">Failures and resource usage</a></li>
+</ul>
+</li>
 </ul>
   </nav></div>
 

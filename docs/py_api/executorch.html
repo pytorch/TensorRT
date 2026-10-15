@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=0866734c"></script>
+    <script src="../_static/documentation_options.js?v=a71228c4"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -485,6 +485,9 @@ document.write(`
 <li class="toctree-l3"><a class="reference internal" href="../_cpp_api/function_torch__tensorrt_8h_1a6e19490a08fb1553c9dd347a5ae79db9.html">Function torch_tensorrt::torchscript::compile</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../_cpp_api/function_torch__tensorrt_8h_1ae8d56472106eeef37fbe51ff7f40c9b2.html">Function torch_tensorrt::torchscript::convert_method_to_trt_engine</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../_cpp_api/function_torch__tensorrt_8h_1a81f9783517335dda877d8cfcf38987c9.html">Function torch_tensorrt::torchscript::embed_engine_in_new_module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/variable_TensorRTBackend_8h_1a27092406344aaf7c875381e8b55088b0.html">Variable torch_tensorrt::executorch_backend::kCudaGraphsKey</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/variable_TensorRTBackend_8h_1aaa620d42a4544b852fdf716ec5f90954.html">Variable torch_tensorrt::executorch_backend::kSharedActivationScratchKey</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_cpp_api/variable_TensorRTBackend_8h_1a76e2f00695cc5f8173af78f35180e3e9.html">Variable torch_tensorrt::executorch_backend::kSharedEnginesKey</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../_cpp_api/variable_WeightStreamingBudget_8h_1ad1ed7a6ead3130000477ab49482906ff.html">Variable torch_tensorrt::executorch_backend::kWeightStreamingBudgetKey</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../_cpp_api/define_macros_8h_1a18d295a837ac71add5578860b55e5502.html">Define STR</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../_cpp_api/define_macros_8h_1a31398a6d4d27e28817afb0f0139e909e.html">Define TORCH_TENSORRT_MAJOR_VERSION</a></li>
@@ -590,7 +593,7 @@ single <code class="docutils literal notranslate"><span class="pre">.pte</span><
 <h2>Functions<a class="headerlink" href="#functions" title="Link to this heading">#</a></h2>
 <dl class="py function">
 <dt class="sig sig-object py" id="torch_tensorrt.executorch.export">
-<span class="sig-prename descclassname"><span class="pre">torch_tensorrt.executorch.</span></span><span class="sig-name descname"><span class="pre">export</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">source</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ExportedProgram</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">torch.fx.GraphModule</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Mapping</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">ExportedProgram</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inputs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">arg_inputs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kwarg_inputs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Mapping</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dynamic_shapes</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">retrace</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">transform_passes</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">partitioners</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'Partitioner'</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Mapping</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'Partitioner'</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">compile_specs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'CompileSpec'</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Mapping</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'CompileSpec'</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">compile_config</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">EdgeCompileConfig</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">constant_methods</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Mapping</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">generate_etrecord</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weight_streaming_budget_per_engine</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">EdgeProgramManager</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/executorch/_export.html#export"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.executorch.export" title="Link to this definition">#</a></dt>
+<span class="sig-prename descclassname"><span class="pre">torch_tensorrt.executorch.</span></span><span class="sig-name descname"><span class="pre">export</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">source</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ExportedProgram</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">torch.fx.GraphModule</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Mapping</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">ExportedProgram</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inputs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">arg_inputs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kwarg_inputs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Mapping</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dynamic_shapes</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">retrace</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">transform_passes</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">partitioners</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'Partitioner'</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Mapping</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'Partitioner'</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">compile_specs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'CompileSpec'</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Mapping</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'CompileSpec'</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">compile_config</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">EdgeCompileConfig</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">constant_methods</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Mapping</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">zero_copy_kv</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">generate_etrecord</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weight_streaming_budget_per_engine</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_cuda_graphs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">EdgeProgramManager</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/executorch/_export.html#export"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.executorch.export" title="Link to this definition">#</a></dt>
 <dd><p>Prepare TensorRT-compiled programs for composable ExecuTorch lowering.</p>
 <p>TensorRT claims engine nodes first. Additional partitioners run afterward in
 caller-provided order. The returned EdgeProgramManager is the standard
@@ -611,6 +614,31 @@ Sharing one instance across methods is rejected when its specs name a method, be
 every method sharing it would be tagged with the same name. Sharing an instance whose
 specs name no method is not rejected here, but a backend that reads its own method
 name from its specs, such as the CUDA backend, then raises during lowering.</p>
+<p><code class="docutils literal notranslate"><span class="pre">zero_copy_kv=True</span></code> lets a TensorRT engine update an aliased mutable buffer
+– a KV cache – in place, instead of ExecuTorch handing the delegate a
+staging copy and copying the engine’s result back afterwards. It is opt-in
+rather than automatic for two reasons: the resulting <code class="docutils literal notranslate"><span class="pre">.pte</span></code> needs a
+runtime that understands a delegate with its aliased outputs elided, so
+producing one silently would break an older runner; and it is only half the
+change. Finalize such a program with
+<code class="docutils literal notranslate"><span class="pre">to_executorch(torch_tensorrt.executorch.zero_copy_backend_config(config))</span></code>
+– without it the buffer is still staged and its updates would be discarded.</p>
+<p><strong>Nothing here enforces that pairing.</strong> The manager returned is ExecuTorch’s
+own, and its <code class="docutils literal notranslate"><span class="pre">to_executorch</span></code> finalizes whatever config it is given: with
+an ordinary one it succeeds and writes a <code class="docutils literal notranslate"><span class="pre">.pte</span></code> whose caches never update
+– for a KV cache, wrong output rather than a crash. Finalizing a
+<code class="docutils literal notranslate"><span class="pre">zero_copy_kv=True</span></code> export yourself therefore owes two calls that nothing
+checks: pass
+<code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">torch_tensorrt.executorch.zero_copy_backend_config()</span></code> as the config,
+and hand the program it returns to
+<code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">torch_tensorrt.executorch.check_zero_copy_kv()</span></code>, which reads back what
+the config alone cannot say. <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.save(output_format=&quot;executorch&quot;,</span>
+<span class="pre">zero_copy_kv=True)</span></code> owns both ends and does both for you.</p>
+<p>Only a buffer the engine declares aliased is affected. A method may hold both
+kinds at once: a mutable buffer with no aliasing available – a convolution
+state, say – keeps its staging copy and the copy-back that writes it, while
+the aliased caches beside it go zero-copy. The two are told apart by the
+engine’s own <code class="docutils literal notranslate"><span class="pre">aliased_io</span></code>, not by the graph, in which they look identical.</p>
 <p><code class="docutils literal notranslate"><span class="pre">generate_etrecord=True</span></code> is outside the payload sharing described above. It makes
 ExecuTorch deep copy the whole program, so peak memory grows by roughly the size of
 the program including engines.</p>
@@ -653,6 +681,15 @@ Defaults to <code class="xref cpp cpp-func docutils literal notranslate"><span c
 <li><p><strong>constant_methods</strong> (<em>Dict</em><em>[</em><em>str</em><em>, </em><em>Any</em><em>]</em>) – Methods returning a constant, such as a vocab
 size. Keys must be valid Python identifiers and must not name a method of
 <code class="docutils literal notranslate"><span class="pre">source</span></code>.</p></li>
+<li><p><strong>zero_copy_kv</strong> (<em>bool</em>) – Let a TensorRT engine write its aliased mutable buffer –
+a KV cache – in place, instead of receiving a staging copy that ExecuTorch
+copies back. Requires finalizing the returned program with
+<code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">torch_tensorrt.executorch.zero_copy_backend_config()</span></code>, and checking
+the result with
+<code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">torch_tensorrt.executorch.check_zero_copy_kv()</span></code>; neither is enforced,
+and finalizing without the config leaves the buffer staged and every
+update discarded. <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.save(output_format=&quot;executorch&quot;,</span>
+<span class="pre">zero_copy_kv=True)</span></code> owns both steps and needs only the one flag.</p></li>
 <li><p><strong>generate_etrecord</strong> (<em>bool</em>) – Ask ExecuTorch for an ETRecord for later debugging.
 This copies the whole program, engines included.</p></li>
 <li><p><strong>weight_streaming_budget_per_engine</strong> (<em>Optional</em><em>[</em><em>python:int</em><em>]</em>) – Bytes of engine weights that
@@ -667,6 +704,11 @@ TensorRT’s own automatic budget, sized against free memory on the device it
 actually loads on. This is a different unit from
 <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.runtime.weight_streaming(...).device_budget</span></code>, which is a
 program total split proportionally across engines.</p></li>
+<li><p><strong>use_cuda_graphs</strong> (<em>Optional</em><em>[</em><em>bool</em><em>]</em>) – Bake CUDA graph replay on (True) or off
+(False) into every method’s TensorRT compile specs. None leaves the choice
+unset so the runtime default applies. A load-time option overrides this
+value. Non-booleans and raw <code class="docutils literal notranslate"><span class="pre">CompileSpec(&quot;use_cuda_graphs&quot;,</span> <span class="pre">...)</span></code> entries
+are rejected; use this keyword instead.</p></li>
 </ul>
 </dd>
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
@@ -683,6 +725,226 @@ further transformation, or <code class="docutils literal notranslate"><span clas
 <dt class="sig sig-object py" id="torch_tensorrt.executorch.get_edge_compile_config">
 <span class="sig-prename descclassname"><span class="pre">torch_tensorrt.executorch.</span></span><span class="sig-name descname"><span class="pre">get_edge_compile_config</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">EdgeCompileConfig</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/executorch.html#get_edge_compile_config"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.executorch.get_edge_compile_config" title="Link to this definition">#</a></dt>
 <dd><p>Return the EdgeCompileConfig used for Torch-TensorRT ExecuTorch export.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch_tensorrt.executorch.zero_copy_backend_config">
+<span class="sig-prename descclassname"><span class="pre">torch_tensorrt.executorch.</span></span><span class="sig-name descname"><span class="pre">zero_copy_backend_config</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">config</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ExecutorchBackendConfig</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ExecutorchBackendConfig</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/executorch/_zero_copy.html#zero_copy_backend_config"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.executorch.zero_copy_backend_config" title="Link to this definition">#</a></dt>
+<dd><p>Build the <code class="docutils literal notranslate"><span class="pre">ExecutorchBackendConfig</span></code> a zero-copy KV program needs.</p>
+<p>This is the second half of <code class="docutils literal notranslate"><span class="pre">export(...,</span> <span class="pre">zero_copy_kv=True)</span></code>. Export has
+already removed ExecuTorch’s copy-back of the aliased buffers; this installs
+the pass that removes their staging, so the engine writes the caller’s
+buffer instead of a scratch copy that is thrown away.</p>
+<p>The feature is split across two calls because <code class="docutils literal notranslate"><span class="pre">to_executorch()</span></code> belongs to
+ExecuTorch, not to Torch-TensorRT: <code class="docutils literal notranslate"><span class="pre">export()</span></code> hands back an
+<code class="docutils literal notranslate"><span class="pre">EdgeProgramManager</span></code> at the Edge boundary and never sees the config the
+program is finalized with.</p>
+<p><code class="docutils literal notranslate"><span class="pre">config</span></code> is your own configuration – every field is preserved, and a
+<code class="docutils literal notranslate"><span class="pre">to_out_var_pass</span></code> you already set runs after the un-staging. Omit it to
+start from ExecuTorch’s defaults. Two fields are not merely carried:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">enable_non_cpu_memory_planning</span></code> is <em>read</em>. Zero-copy needs the caches
+planned in device memory, so <code class="docutils literal notranslate"><span class="pre">False</span></code> – which plans every tensor into
+the one host arena – has the pass refuse each cache it finds rather than
+write a <code class="docutils literal notranslate"><span class="pre">.pte</span></code> whose every <code class="docutils literal notranslate"><span class="pre">execute()</span></code> fails. It is read off the
+config returned here, at the moment the pass runs, so setting the field
+<em>on that object</em> afterwards is honoured: the pass and the finalizer then
+cannot disagree about it. There are two cases the field decides nothing
+in, and that the pass therefore refuses nothing on. One is building a
+<em>new</em> config out of this one with <code class="docutils literal notranslate"><span class="pre">dataclasses.replace</span></code>: the field is a
+bool, copied by value, while the pass is copied by reference and goes on
+reading the config returned here, so call this function again on the
+derived config and the pass it builds reads that one. The other is a
+<code class="docutils literal notranslate"><span class="pre">memory_planning_pass</span></code> of your own that does not already carry an
+attribute of that name – <code class="docutils literal notranslate"><span class="pre">to_executorch</span></code> assigns the flag onto the
+planner rather than passing it, and only onto a planner that has it, so
+for any other the field reaches nothing and where the caches land is that
+planner’s own business. Neither is left to the runtime to discover:
+<code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">check_zero_copy_kv()</span></code> reads the arena memory planning actually chose
+and refuses the program either mistake produces – but only where
+something runs it, which on the two-step path is you. The one placement it
+cannot settle is a method holding no host tensor to give the
+shared arena away and a program that records its arena devices; a planner
+that records nothing is refused rather than passed over, as
+<code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">check_zero_copy_kv()</span></code> describes.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">propagate_device_config.skip_h2d_for_method_inputs</span></code> is <em>refused</em>,
+wherever it is written – in the single <code class="docutils literal notranslate"><span class="pre">PropagateDeviceConfig</span></code> or in a
+per-method dict of them – and on every value <code class="docutils literal notranslate"><span class="pre">PropagateDevicePass</span></code>
+reads as on rather than only on <code class="docutils literal notranslate"><span class="pre">True</span></code>: it tests the field for truth
+without ever resolving it per method, so any non-empty dict is on for
+every method, one of <code class="docutils literal notranslate"><span class="pre">False</span></code> included. It is ExecuTorch’s own un-staging
+of method inputs, and it requires each placeholder it un-stages to have
+exactly one user. A rewired cache always has two – the delegate, and the
+graph output it is its own mutation result for – so
+<code class="docutils literal notranslate"><span class="pre">PropagateDevicePass</span></code> raises on every zero-copy graph. Returning the
+option unchanged would hand back a config that cannot finalize at all;
+this says so here instead, where the caller can act on it.</p></li>
+</ul>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Finalizing a <code class="docutils literal notranslate"><span class="pre">zero_copy_kv=True</span></code> program <em>without</em> this config leaves
+the engine writing a per-call staging copy that is then discarded, so
+the buffer never updates – for a KV cache, wrong output rather than a
+crash. <strong>Nothing stops that on the two-step path.</strong> <code class="docutils literal notranslate"><span class="pre">to_executorch</span></code>
+belongs to ExecuTorch and finalizes whatever config it is handed, so
+pairing the two calls is yours to get right, and so is handing the
+finalized program to <code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">check_zero_copy_kv()</span></code> afterwards – which is
+what catches the placements this config cannot settle.
+<code class="docutils literal notranslate"><span class="pre">torch_tensorrt.save(...,</span> <span class="pre">zero_copy_kv=True)</span></code> owns both ends and does
+both for you.</p>
+<p><code class="docutils literal notranslate"><span class="pre">save(...,</span> <span class="pre">zero_copy_kv=True)</span></code> installs this pass itself, so handing
+it the result of this function as <code class="docutils literal notranslate"><span class="pre">backend_config</span></code> applies the pass
+twice. That is redundant rather than an error – the second run finds
+the buffers already wired straight to their delegates and changes
+nothing – but the two entry points are alternatives: use one or the
+other.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>config</strong> (<em>Optional</em><em>[</em><em>executorch.exir.ExecutorchBackendConfig</em><em>]</em>) – The
+configuration to compose onto. Omit it to start from ExecuTorch’s
+defaults.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A new config, every field of
+the given one preserved, whose <code class="docutils literal notranslate"><span class="pre">to_out_var_pass</span></code> un-stages the aliased
+buffers before running the <code class="docutils literal notranslate"><span class="pre">to_out_var_pass</span></code> that was there.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>executorch.exir.ExecutorchBackendConfig</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If the configuration sets
+    <code class="docutils literal notranslate"><span class="pre">propagate_device_config.skip_h2d_for_method_inputs</span></code>, which cannot
+    be combined with zero-copy KV.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch_tensorrt.executorch.check_zero_copy_kv">
+<span class="sig-prename descclassname"><span class="pre">torch_tensorrt.executorch.</span></span><span class="sig-name descname"><span class="pre">check_zero_copy_kv</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">program</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/executorch/_zero_copy.html#check_zero_copy_kv"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.executorch.check_zero_copy_kv" title="Link to this definition">#</a></dt>
+<dd><p>Raise unless a finalized program really updates its KV buffers in place.</p>
+<p><code class="docutils literal notranslate"><span class="pre">program</span></code> is what <code class="docutils literal notranslate"><span class="pre">to_executorch()</span></code> returns. Both halves of zero-copy do
+nothing quietly when they find nothing to do: <code class="docutils literal notranslate"><span class="pre">zero_copy_kv=True</span></code> warns and
+carries on when the model holds no aliased buffer mutation, and the pass
+<code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">unstage_aliased_buffers_pass()</span></code> builds, handed a program with nothing
+marked, un-stages nothing and returns. Neither of those is wrong output – nothing
+removed a copy-back, so the <code class="docutils literal notranslate"><span class="pre">.pte</span></code> stages its cache and updates it like any
+other – but the optimization the caller asked for is silently not there, and
+a caller who reads the successful <code class="docutils literal notranslate"><span class="pre">save</span></code> as proof it is gets neither an
+error nor the speedup. The wrong-output case is the one below: a rewiring
+that did happen and then lost its mark.</p>
+<p>Six shapes are refused: a marked buffer that is not a direct argument of a
+TensorRT delegate carrying the zero-copy compile spec, a stamped delegate
+that takes fewer marked buffers than its own spec says it elided aliased
+outputs – including one in a method with no marked buffer at all, which is
+the lost-mark case – a marked buffer that reaches such a delegate directly
+but is planned in a host arena, one whose placement the program records
+nowhere, one planned in a device arena the program records for another GPU,
+and a program carrying neither a marked buffer nor a stamped delegate in any
+of its methods. The first three are
+what finalizing without <code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">zero_copy_backend_config()</span></code> leaves behind –
+all but the lost-mark case folded into the second, which no finalization
+choice produces. That config’s pass gets to all three earlier, off the
+configuration and the graph: it removes the staging copy the first two come
+from, and refuses outright when there is none to remove or when the
+configuration plans nothing onto a device. What it cannot see is the arena
+planning then chose, which is what this reads.</p>
+<p>The spec is what narrows the delegates that count. The mark is put on a
+buffer because one TensorRT engine writes it in place, and only a delegate
+whose own engine elided an aliased output is stamped, so another backend’s
+delegate taking the buffer says nothing about whether the engine did, and
+neither does an unrelated TensorRT engine that happens to read it. Either
+would stand in for the delegate whose write was elided while that one still
+reads a staging copy whose contents are discarded. Being stamped is not
+enough on its own either: in a method that lowers to two of them, one
+stamped delegate holding both caches leaves every marked buffer reaching
+<em>some</em> stamped delegate while the other’s write is still thrown away. So
+each stamped delegate is also counted against its own spec, the same
+cross-check <code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">_unstage_aliased_buffers()</span></code> makes, against the same spec and
+with the same fallback: a spec that names none – listing none, or not
+decoding – cannot say how many to expect, so it demands at least one. What
+that count cannot separate is an exact swap – two stamped delegates each
+taking one marked buffer, each the other’s. The mark records only that some
+engine writes the buffer in place, never which one, and the spec lists
+engine output binding names rather than buffers, so there is nothing left to
+match on; that pass has the same blind spot for the same reason.</p>
+<p>Placement is read from where memory planning actually put the buffer – the
+<code class="docutils literal notranslate"><span class="pre">mem_id</span></code> on its <code class="docutils literal notranslate"><span class="pre">TensorSpec</span></code> – rather than from the spec’s own device,
+which does not settle it: <code class="docutils literal notranslate"><span class="pre">PropagateDevicePass</span></code> writes CUDA onto the spec
+of a buffer that reaches a CUDA delegate directly, and
+<code class="docutils literal notranslate"><span class="pre">enable_non_cpu_memory_planning=False</span></code> then plans that same buffer into the
+one host arena, which is the shape whose every <code class="docutils literal notranslate"><span class="pre">execute()</span></code> fails on the
+runtime’s alias-target guard. Two independent grounds answer whether that
+<code class="docutils literal notranslate"><span class="pre">mem_id</span></code> names a host arena. An arena that also holds one of the program’s
+host tensors is one whatever the program records (see
+<code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">_host_planned_arenas()</span></code>); failing that, an arena missing from the CUDA
+ones the program <em>does</em> record in <code class="docutils literal notranslate"><span class="pre">non_const_buffer_device</span></code> is one too.</p>
+<p>A placement the program does not record at all is a refusal of its own
+rather than either of those, because it is not an accusation about the
+planner’s choice – a buffer with no <code class="docutils literal notranslate"><span class="pre">mem_id</span></code> was not planned, and a
+program with no <code class="docutils literal notranslate"><span class="pre">non_const_buffer_device</span></code> entries says nothing about any
+of its arenas. It is refused because of what the runtime makes of it:
+<code class="docutils literal notranslate"><span class="pre">MethodMeta::memory_planned_buffer_device</span></code> answers <code class="docutils literal notranslate"><span class="pre">CPU</span></code> for an arena
+the <code class="docutils literal notranslate"><span class="pre">.pte</span></code> records nothing for, so a runner that honours it –
+<code class="docutils literal notranslate"><span class="pre">examples/executorch_reference_runner</span></code> does – backs that arena with host
+memory and the engine then fails the alias-target guard on every call. Only
+<code class="docutils literal notranslate"><span class="pre">apply_algo</span></code> writes that record, so a caller-supplied
+<code class="docutils literal notranslate"><span class="pre">memory_planning_pass</span></code> that does not go through it leaves a <code class="docutils literal notranslate"><span class="pre">.pte</span></code> in
+exactly that state whatever it planned; a planner for a zero-copy cache has
+to leave the record behind, which means going through <code class="docutils literal notranslate"><span class="pre">apply_algo</span></code> with
+<code class="docutils literal notranslate"><span class="pre">enable_non_cpu_memory_planning=True</span></code>. That parameter defaults to
+<code class="docutils literal notranslate"><span class="pre">False</span></code>, and with it off <code class="docutils literal notranslate"><span class="pre">apply_algo</span></code> plans every spec into one CPU
+bucket and writes no record either.</p>
+<p>Where the record does name a GPU it is read as one: an arena recorded for
+<code class="docutils literal notranslate"><span class="pre">cuda:1</span></code> holding a cache whose own spec asks for <code class="docutils literal notranslate"><span class="pre">cuda:0</span></code> is an address
+on the wrong device, which fails the same way a host one does, so the index
+is compared and not only the type. An unrecorded index on either side says
+nothing and is accepted, since the arena’s device type is already settled by
+then.</p>
+<p>Every method is read, not only <code class="docutils literal notranslate"><span class="pre">forward</span></code>. <code class="docutils literal notranslate"><span class="pre">export()</span></code> rewires each method
+on its own, so a check that stopped at <code class="docutils literal notranslate"><span class="pre">forward</span></code> would pass a program whose
+decode had degenerated to staged – and on the prefill/decode pair the user
+guide’s zero-copy example exports it would not get that far, since a
+multi-method program need not have a <code class="docutils literal notranslate"><span class="pre">forward</span></code> at all. Within a method the
+marks and the stamped delegates are enumerated independently and a method is
+passed over only when it carries neither, because the disagreement between
+those two records is the whole subject: starting from the marks and looking
+the delegates up leaves anything recorded only on the delegate side outside
+the walk. The last refusal is about the program rather than about one method,
+matching the warning <code class="docutils literal notranslate"><span class="pre">export()</span></code> emits: a method with no aliased buffer
+mutation of its own is not an error, so a model that rewires only its decode
+step is accepted.</p>
+<p>This reads the graph and the finalized specs, so it says what the program
+does rather than what the passes recorded. It still says nothing about
+whether the engine’s write itself is correct.</p>
+<p><code class="docutils literal notranslate"><span class="pre">save(...,</span> <span class="pre">zero_copy_kv=True)</span></code> runs this for you, before it writes the
+file. The two-step path does not, and this is the limitation of that path:
+<code class="docutils literal notranslate"><span class="pre">export(...,</span> <span class="pre">zero_copy_kv=True)</span></code> hands back an ExecuTorch
+<code class="docutils literal notranslate"><span class="pre">EdgeProgramManager</span></code>, whose <code class="docutils literal notranslate"><span class="pre">to_executorch</span></code> is ExecuTorch’s own and
+finalizes whatever config it is given. So finalizing a zero-copy export
+yourself owes two calls, and nothing enforces either – pass
+<code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">zero_copy_backend_config()</span></code> as the config, and hand the program that
+comes back to this before writing the <code class="docutils literal notranslate"><span class="pre">.pte</span></code>. Skipping the config is the
+consequential one: it writes a <code class="docutils literal notranslate"><span class="pre">.pte</span></code> whose caches never update, which is
+what the first three refusals above are.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>program</strong> (<em>executorch.exir.ExecutorchProgramManager</em>) – The finalized program
+<code class="docutils literal notranslate"><span class="pre">to_executorch()</span></code> returned. Every method it holds is read.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>a program that passes is left exactly as it was.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><em>None</em></p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>RuntimeError</strong> – If the program does not update its KV buffers in place,
+    naming the buffers or delegates and the method each is in.</p>
+</dd>
+</dl>
 </dd></dl>
 
 </section>
@@ -768,6 +1030,8 @@ backend parses that blob directly without the legacy Torch-TensorRT C++ runtime.
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#functions">Functions</a><ul class="visible nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#torch_tensorrt.executorch.export"><code class="docutils literal notranslate"><span class="pre">export()</span></code></a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#torch_tensorrt.executorch.get_edge_compile_config"><code class="docutils literal notranslate"><span class="pre">get_edge_compile_config()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#torch_tensorrt.executorch.zero_copy_backend_config"><code class="docutils literal notranslate"><span class="pre">zero_copy_backend_config()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#torch_tensorrt.executorch.check_zero_copy_kv"><code class="docutils literal notranslate"><span class="pre">check_zero_copy_kv()</span></code></a></li>
 </ul>
 </li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#classes">Classes</a><ul class="visible nav section-nav flex-column">

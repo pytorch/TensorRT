@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=0866734c"></script>
+    <script src="../../../_static/documentation_options.js?v=a71228c4"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -868,6 +868,41 @@ document.write(`
         <span class="n">_assign_attr</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">gm</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">_AttrKind</span><span class="o">.</span><span class="n">BUFFER</span><span class="p">)</span>
 
 
+<span class="k">def</span><span class="w"> </span><span class="nf">_order_placeholders_first</span><span class="p">(</span><span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Hoist every placeholder to the front of the node list, keeping their</span>
+<span class="sd">    relative order.</span>
+
+<span class="sd">    ``make_constraints()`` indexes ``flat_dynamic_shapes`` by *node* position while</span>
+<span class="sd">    walking ``enumerate(gm.graph.nodes)``, so it silently requires placeholders to lead</span>
+<span class="sd">    the graph. For ``nn.Linear(10, 5)`` with one dynamic input::</span>
+
+<span class="sd">        converted (placeholders lead)     fully fallen back to PyTorch</span>
+<span class="sd">        [0] placeholder    x              [0] get_attr       linear_weight</span>
+<span class="sd">        [1] get_attr       engine_0       [1] get_attr       linear_bias</span>
+<span class="sd">        [2] call_function  ...            [2] placeholder    x</span>
+<span class="sd">        [3] output                        [3] call_function  linear</span>
+<span class="sd">                                          [4] output</span>
+
+<span class="sd">    Unlifting puts the parameters ahead of the user input, so on the right the lone</span>
+<span class="sd">    input sits at node index 2 and the lookup becomes ``flat_dynamic_shapes[2]`` on a</span>
+<span class="sd">    one-element list: ``save()`` dies with a bare ``IndexError`` while its own length</span>
+<span class="sd">    check passes. Placeholders take no arguments, so hoisting cannot break topological</span>
+<span class="sd">    order, and preserving their relative order leaves the forward signature,</span>
+<span class="sd">    ``input_nodes``, ``in_spec`` and InputSpec ordering unchanged.</span>
+<span class="sd">    """</span>
+    <span class="n">nodes</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">)</span>
+    <span class="n">placeholders</span> <span class="o">=</span> <span class="p">[</span><span class="n">node</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">nodes</span> <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"placeholder"</span><span class="p">]</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">placeholders</span> <span class="ow">or</span> <span class="n">nodes</span><span class="p">[:</span> <span class="nb">len</span><span class="p">(</span><span class="n">placeholders</span><span class="p">)]</span> <span class="o">==</span> <span class="n">placeholders</span><span class="p">:</span>
+        <span class="k">return</span>
+
+    <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="nb">reversed</span><span class="p">(</span><span class="n">placeholders</span><span class="p">):</span>
+        <span class="n">first</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="nb">iter</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">node</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">first</span><span class="p">:</span>
+            <span class="n">first</span><span class="o">.</span><span class="n">prepend</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
+
+    <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">lint</span><span class="p">()</span>
+
+
 <span class="k">def</span><span class="w"> </span><span class="nf">create_trt_exp_program</span><span class="p">(</span>
     <span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
@@ -1006,6 +1041,10 @@ document.write(`
             <span class="p">),</span>
         <span class="p">)</span>
     <span class="p">]</span>
+
+    <span class="c1"># make_constraints() needs the placeholders to lead the graph. Keep this call</span>
+    <span class="c1"># after the copy-back block, because that block can put a get_attr ahead of them.</span>
+    <span class="n">_order_placeholders_first</span><span class="p">(</span><span class="n">gm</span><span class="p">)</span>
 
     <span class="c1"># Compute range_constraints from the placeholder SymInt shapes before lift(),</span>
     <span class="c1"># while the graph still has only user-input placeholders (num_lifted=0).</span>
@@ -1378,11 +1417,14 @@ document.write(`
         <span class="p">)</span>
     <span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">scalar_tensor_meta</span><span class="p">(</span><span class="n">dtype</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">scalar_tensor_meta</span><span class="p">(</span>
+        <span class="n">dtype</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">,</span> <span class="n">rank</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+        <span class="n">shape</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span><span class="p">,)</span> <span class="o">*</span> <span class="n">rank</span>
         <span class="k">if</span> <span class="n">fake_mode</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">((),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s2">"meta"</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s2">"meta"</span><span class="p">)</span>
         <span class="k">with</span> <span class="n">fake_mode</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">((),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
 
     <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">named_children</span><span class="p">():</span>
         <span class="k">if</span> <span class="s2">"_run_on_acc"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">name</span><span class="p">:</span>
@@ -1390,11 +1432,10 @@ document.write(`
         <span class="c1"># Get the TRT submodule</span>
         <span class="n">trt_module</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
 
-        <span class="c1"># Ensure the trt module node in the main graph (gm) has inputs</span>
+        <span class="c1"># Constant-only TRT partitions can have zero runtime inputs.</span>
         <span class="n">trt_module_node</span> <span class="o">=</span> <span class="p">[</span><span class="n">node</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span> <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="n">name</span><span class="p">]</span>
         <span class="k">assert</span> <span class="n">trt_module_node</span>
         <span class="n">trt_module_node</span> <span class="o">=</span> <span class="n">trt_module_node</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-        <span class="k">assert</span> <span class="n">trt_module_node</span><span class="o">.</span><span class="n">args</span>
 
         <span class="k">if</span> <span class="s2">"val"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">trt_module_node</span><span class="o">.</span><span class="n">meta</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
@@ -1434,9 +1475,22 @@ document.write(`
                         <span class="s2">"device"</span><span class="p">:</span> <span class="n">trt_module</span><span class="o">.</span><span class="n">target_device</span><span class="p">,</span>
                     <span class="p">},</span>
                 <span class="p">)</span>
+                <span class="c1"># Set meta on the scalar_tensor node itself before wrapping it. The</span>
+                <span class="c1"># non-retracing export path builds an ExportedProgram straight from this</span>
+                <span class="c1"># graph and its verifier requires a val on every node, so a node left</span>
+                <span class="c1"># without one fails verification.</span>
                 <span class="n">scalar_input</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">]</span> <span class="o">=</span> <span class="n">scalar_tensor_meta</span><span class="p">(</span>
                     <span class="n">info</span><span class="p">[</span><span class="s2">"dtype"</span><span class="p">],</span> <span class="n">trt_module</span><span class="o">.</span><span class="n">target_device</span>
                 <span class="p">)</span>
+                <span class="c1"># scalar_tensor is rank 0; lift it to the declared binding rank, as the</span>
+                <span class="c1"># runtime does from the same record.</span>
+                <span class="k">for</span> <span class="n">rank</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"binding_rank"</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+                    <span class="n">scalar_input</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">call_function</span><span class="p">(</span>
+                        <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">aten</span><span class="o">.</span><span class="n">unsqueeze</span><span class="o">.</span><span class="n">default</span><span class="p">,</span> <span class="p">(</span><span class="n">scalar_input</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+                    <span class="p">)</span>
+                    <span class="n">scalar_input</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">]</span> <span class="o">=</span> <span class="n">scalar_tensor_meta</span><span class="p">(</span>
+                        <span class="n">info</span><span class="p">[</span><span class="s2">"dtype"</span><span class="p">],</span> <span class="n">trt_module</span><span class="o">.</span><span class="n">target_device</span><span class="p">,</span> <span class="n">rank</span>
+                    <span class="p">)</span>
                 <span class="n">engine_inputs</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">scalar_input</span>
 
             <span class="k">if</span> <span class="n">cross_compile_module</span><span class="p">:</span>

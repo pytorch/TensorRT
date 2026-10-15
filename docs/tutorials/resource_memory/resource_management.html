@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=0866734c"></script>
+    <script src="../../_static/documentation_options.js?v=a71228c4"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -471,6 +471,8 @@ document.write(`
 <li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/nvrtc_aot_plugin.html">Example: Custom Kernels with NVRTC in TensorRT AOT Plugins</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/cuda_kernel_op.html">Example: Auto-derived CUDA Kernel Plugins via cuda_kernel_op</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/ptx_op.html">Example: Pre-compiled PTX Kernels via ptx_op</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/triton_op.html">Example: Triton Kernel AOT Plugins via triton_op</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/cutile_op.html">Example: cuTile Kernel AOT Plugins via cutile_op</a></li>
 </ul>
 </details></li>
 </ul>
@@ -618,13 +620,14 @@ This can exceed system limits when compiling large models.</p>
 </ul>
 <p><strong>Ways to lower CPU memory usage:</strong></p>
 <ol class="arabic">
-<li><p><strong>Enable memory trimming</strong></p>
-<p>Set the following environment variable:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">TORCHTRT_ENABLE_BUILDER_MALLOC_TRIM</span><span class="o">=</span><span class="m">1</span>
+<li><p><strong>Keep memory trimming enabled</strong></p>
+<p>On Linux, Torch-TensorRT returns the memory the TensorRT builder frees to the
+operating system after each engine build (glibc <code class="docutils literal notranslate"><span class="pre">malloc_trim</span></code>). Without it the
+process keeps on the order of gigabytes of freed builder memory for the rest of its
+life. Trimming is on by default; to turn it off, set:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">TORCHTRT_ENABLE_BUILDER_MALLOC_TRIM</span><span class="o">=</span><span class="m">0</span>
 </pre></div>
 </div>
-<p>This reduces approximately <strong>2x</strong> of redundant model copies, limiting
-total CPU memory usage to up to <strong>3x</strong> the model size.</p>
 </li>
 <li><p><strong>Disable CPU offloading</strong></p>
 <p>In compilation settings, set:</p>

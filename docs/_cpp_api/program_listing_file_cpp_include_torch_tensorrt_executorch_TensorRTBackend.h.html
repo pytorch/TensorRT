@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=0866734c"></script>
+    <script src="../_static/documentation_options.js?v=a71228c4"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -539,8 +539,15 @@ document.write(`
 <span class="w">  </span><span class="n">nvinfer1</span><span class="o">::</span><span class="n">Dims</span><span class="w"> </span><span class="n">max</span><span class="p">{};</span>
 <span class="p">};</span>
 
+<span class="k">class</span><span class="w"> </span><span class="nc">ExecutionGraph</span><span class="p">;</span>
+
 <span class="k">struct</span><span class="w"> </span><span class="nc">EngineHandle</span><span class="w"> </span><span class="p">{</span>
-<span class="w">  </span><span class="n">TRTUniquePtr</span><span class="o">&lt;</span><span class="n">nvinfer1</span><span class="o">::</span><span class="n">ICudaEngine</span><span class="o">&gt;</span><span class="w"> </span><span class="n">engine</span><span class="p">;</span>
+<span class="w">  </span><span class="n">EngineHandle</span><span class="p">();</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">unique_ptr</span><span class="o">&lt;</span><span class="n">ExecutionGraph</span><span class="o">&gt;</span><span class="w"> </span><span class="n">execution_graph</span><span class="p">;</span>
+<span class="w">  </span><span class="c1">// Shared with every other handle loaded with kSharedEnginesKey on from the same engine bytes, for</span>
+<span class="w">  </span><span class="c1">// the same device and weight streaming request, so the weights are on the device once. The context</span>
+<span class="w">  </span><span class="c1">// and everything below it stay this handle's own.</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">nvinfer1</span><span class="o">::</span><span class="n">ICudaEngine</span><span class="o">&gt;</span><span class="w"> </span><span class="n">engine</span><span class="p">;</span>
 <span class="w">  </span><span class="n">TRTUniquePtr</span><span class="o">&lt;</span><span class="n">nvinfer1</span><span class="o">::</span><span class="n">IExecutionContext</span><span class="o">&gt;</span><span class="w"> </span><span class="n">exec_ctx</span><span class="p">;</span>
 <span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;</span><span class="w"> </span><span class="n">input_binding_names</span><span class="p">;</span>
 <span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;</span><span class="w"> </span><span class="n">output_binding_names</span><span class="p">;</span>
@@ -553,11 +560,15 @@ document.write(`
 <span class="w">  </span><span class="kt">size_t</span><span class="w"> </span><span class="n">num_outputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
 <span class="w">  </span><span class="c1">// Per output binding [0..num_outputs): index into input_binding_names of the</span>
 <span class="w">  </span><span class="c1">// input it aliases (in-place KV-cache / user alias), or -1 for a normal output.</span>
-<span class="w">  </span><span class="c1">// Built at init from the blob's aliased_io. The KV buffers are threaded by</span>
-<span class="w">  </span><span class="c1">// ExecuTorch as caller-owned mutable-buffer delegate args (input AND aliased</span>
-<span class="w">  </span><span class="c1">// output): execute() binds each aliased TRT output binding to its aliased</span>
-<span class="w">  </span><span class="c1">// input's caller-provided pointer (in-place) and reflects the result into the</span>
-<span class="w">  </span><span class="c1">// delegate output EValue, which ExecuTorch's write-back copy_ then reads.</span>
+<span class="w">  </span><span class="c1">// Built at init from the blob's aliased_io. Either way execute() binds the</span>
+<span class="w">  </span><span class="c1">// aliased TRT output binding to its aliased input's caller-provided pointer,</span>
+<span class="w">  </span><span class="c1">// so the engine's write lands in the caller's buffer; what differs is how the</span>
+<span class="w">  </span><span class="c1">// .pte carries the buffer. Threaded: the buffer is both a delegate input arg</span>
+<span class="w">  </span><span class="c1">// and a delegate output arg (the caller-owned mutable buffer's mutation slot),</span>
+<span class="w">  </span><span class="c1">// and execute() reflects the result into that output EValue for ExecuTorch's</span>
+<span class="w">  </span><span class="c1">// write-back copy_ to read. Elided -- zero-copy KV -- the buffer is an input</span>
+<span class="w">  </span><span class="c1">// arg only, the delegate has no output for it, and execute() skips the</span>
+<span class="w">  </span><span class="c1">// reflect: the in-place write already is the update.</span>
 <span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">output_aliased_input_idx</span><span class="p">;</span>
 <span class="w">  </span><span class="c1">// Per input binding [0..num_inputs): true if any output aliases this input, so</span>
 <span class="w">  </span><span class="c1">// its in-place (KV/user) update must land in the caller-owned storage. Built at</span>
@@ -570,10 +581,58 @@ document.write(`
 <span class="w">  </span><span class="c1">// question the uses of this flag ask. A discrete card answers no: it can reach pageable memory, but</span>
 <span class="w">  </span><span class="c1">// only by faulting pages in one at a time, so it takes the staged-copy path instead.</span>
 <span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">pageable_host_access</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+<span class="w">  </span><span class="c1">// Whether exec_ctx was created kUSER_MANAGED, because</span>
+<span class="w">  </span><span class="c1">// kSharedActivationScratchKey was on at this handle's load. Such a context takes</span>
+<span class="w">  </span><span class="c1">// its activation scratch from the shared per-device pool on every call, unless</span>
+<span class="w">  </span><span class="c1">// claims_pooled_scratch below is false, in which case the engine needs none and</span>
+<span class="w">  </span><span class="c1">// never claims from the pool at all.</span>
+<span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">shared_scratch</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+<span class="w">  </span><span class="c1">// Whether this handle takes its activation scratch from the pool. Set at init</span>
+<span class="w">  </span><span class="c1">// only where shared_scratch above is on, and then only where the engine reports</span>
+<span class="w">  </span><span class="c1">// needing activation scratch under some shape; a handle loaded with the option</span>
+<span class="w">  </span><span class="c1">// off keeps this false and says nothing about what its engine needs, because it</span>
+<span class="w">  </span><span class="c1">// has its own kSTATIC scratch either way. It is a predicate and not a size</span>
+<span class="w">  </span><span class="c1">// because the size is never the right amount to install: enqueueV3 refuses a</span>
+<span class="w">  </span><span class="c1">// kUSER_MANAGED context with no device memory once the engine needs any, however</span>
+<span class="w">  </span><span class="c1">// little the shapes bound to a given call need, so execute() must hand such a</span>
+<span class="w">  </span><span class="c1">// call some buffer -- but the engine's own figure covers every shape in the</span>
+<span class="w">  </span><span class="c1">// profile, and installing it would size the pool for the largest of them.</span>
+<span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">claims_pooled_scratch</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
 <span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">mutex</span><span class="w"> </span><span class="n">mu</span><span class="p">;</span>
 
 <span class="w">  </span><span class="o">~</span><span class="n">EngineHandle</span><span class="p">();</span>
 <span class="p">};</span>
+
+<span class="c1">// Runtime backend option that backs execution-context activation scratch with a</span>
+<span class="c1">// shared per-device pool instead of giving every context its own. Boolean,</span>
+<span class="c1">// default false. Read by TensorRTBackend::set_option below, and delivered as</span>
+<span class="c1">//   executorch::runtime::set_option("TensorRTBackend", options.view())</span>
+<span class="c1">// A context's allocation strategy is fixed when the context is created, so a</span>
+<span class="c1">// later call governs only the methods loaded after it, and a pooled context and</span>
+<span class="c1">// a private-scratch one coexist in one process.</span>
+<span class="kr">inline</span><span class="w"> </span><span class="k">constexpr</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="n">kSharedActivationScratchKey</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"use_shared_activation_scratch"</span><span class="p">;</span>
+
+<span class="c1">// Load-time backend option that shares one deserialized engine when the engine bytes have the same</span>
+<span class="c1">// std::hash and size, for the same device and weight streaming request. The bytes are not compared,</span>
+<span class="c1">// and the hash is not collision resistant: every program in the process must be trusted.</span>
+<span class="c1">// Boolean, default true. It is a property of one load: init reads it from that load's runtime</span>
+<span class="c1">// specs, passed to Module::load in a LoadBackendOptionsMap like the weight streaming budget, and a</span>
+<span class="c1">// load with it false neither uses nor publishes a shared engine. Each handle still creates its own</span>
+<span class="c1">// execution context, so handles of a shared engine can run at the same time, unless both were loaded</span>
+<span class="c1">// with kSharedActivationScratchKey on and the engine needs activation scratch.</span>
+<span class="kr">inline</span><span class="w"> </span><span class="k">constexpr</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="n">kSharedEnginesKey</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"use_shared_engines"</span><span class="p">;</span>
+
+<span class="c1">// Records each eligible engine as a CUDA graph and replays it. Read when an engine loads, from the</span>
+<span class="c1">// load option of this name, a boolean passed to Module::load, which overrides everything else.</span>
+<span class="c1">// Otherwise an explicit process option of false refuses recording. Then the program's compile spec,</span>
+<span class="c1">// b"1" or b"0", overrides the process default, which is false unless set. Any other compile spec</span>
+<span class="c1">// value, or the key twice, fails the load. Engines with aliased outputs, GPUs without stream-ordered</span>
+<span class="c1">// memory, and drivers older than CUDA 12.5 keep ordinary enqueueV3. An engine on the shared activation</span>
+<span class="c1">// scratch pool drops its recorded graph whenever the pool hands it a different buffer, and pays the</span>
+<span class="c1">// same stable I/O buffers and copies as any other replaying engine. Caller streams in the current</span>
+<span class="c1">// ordinary context can replay, as can a call with no caller stream. Green context and other context</span>
+<span class="c1">// streams take the plain path, and the graph is kept unless the scratch buffer or the shapes changed.</span>
+<span class="kr">inline</span><span class="w"> </span><span class="k">constexpr</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="n">kCudaGraphsKey</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"use_cuda_graphs"</span><span class="p">;</span>
 
 <span class="k">class</span><span class="w"> </span><span class="nc">TensorRTBackend</span><span class="w"> </span><span class="k">final</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="o">::</span><span class="n">executorch</span><span class="o">::</span><span class="n">runtime</span><span class="o">::</span><span class="n">BackendInterface</span><span class="w"> </span><span class="p">{</span>
 <span class="w"> </span><span class="k">public</span><span class="o">:</span>
@@ -590,12 +649,50 @@ document.write(`
 <span class="w">  </span><span class="c1">// Every buffer passed in must stay alive and unchanged until this returns. Freeing one while the</span>
 <span class="w">  </span><span class="c1">// call runs is not detectable here or anywhere below, and returns a plausible wrong answer rather</span>
 <span class="w">  </span><span class="c1">// than an error.</span>
+<span class="w">  </span><span class="c1">//</span>
+<span class="w">  </span><span class="c1">// With the shared activation scratch pool (kSharedActivationScratchKey) one buffer per device</span>
+<span class="w">  </span><span class="c1">// backs every context created while the option was on. What a caller has to know:</span>
+<span class="w">  </span><span class="c1">//   - Calls on two such handles on one device are serialized at submission. The backend does</span>
+<span class="w">  </span><span class="c1">//     that itself, with a per-device lock held across the enqueue. A handle loaded with the</span>
+<span class="w">  </span><span class="c1">//     option off keeps its own scratch, and so does one whose engine needs no activation</span>
+<span class="w">  </span><span class="c1">//     scratch under any shape; neither is affected.</span>
+<span class="w">  </span><span class="c1">//   - A call can wait on the host for pooled work submitted earlier on that device, and a call</span>
+<span class="w">  </span><span class="c1">//     that grows the pool can wait for an unbounded amount of it. If the caller parks work that</span>
+<span class="w">  </span><span class="c1">//     only the caller will release once execute() returns, the call does not return. Do not hold</span>
+<span class="w">  </span><span class="c1">//     a pooled call behind something it has to come back to release.</span>
+<span class="w">  </span><span class="c1">//   - Capturing a CUDA graph around this delegate is not supported, with the option on or off.</span>
+<span class="w">  </span><span class="c1">//     A handle that claims pooled scratch refuses a capturing selected stream with</span>
+<span class="w">  </span><span class="c1">//     Error::NotSupported. Other streams are not checked. Do not overlap execution with a</span>
+<span class="w">  </span><span class="c1">//     Global capture on any thread or a ThreadLocal capture on the calling thread, even with</span>
+<span class="w">  </span><span class="c1">//     the option off or with an engine that needs no scratch: the call can invalidate it.</span>
+<span class="w">  </span><span class="c1">//   - cudaDeviceReset() invalidates the pool without emptying it, and the next call on that</span>
+<span class="w">  </span><span class="c1">//     device uses what it destroyed. There is no guard: do not reset a device this backend has</span>
+<span class="w">  </span><span class="c1">//     run a pooled engine on.</span>
+<span class="w">  </span><span class="c1">//   - Pool failures share error codes with other failures in execute(). Error::NotSupported</span>
+<span class="w">  </span><span class="c1">//     can also mean an output resize was refused. Error::Internal can mean handoff event</span>
+<span class="w">  </span><span class="c1">//     creation, cudaFree(nullptr), or the final stream synchronization failed. The CUDA call</span>
+<span class="w">  </span><span class="c1">//     can fail because of a capture or an earlier device fault. Check the error log for the cause.</span>
+<span class="w">  </span><span class="c1">//</span>
+<span class="w">  </span><span class="c1">// The mechanism behind all of that, the measurements, and which calls grow the pool are in the</span>
+<span class="w">  </span><span class="c1">// backend README rather than here.</span>
 <span class="w">  </span><span class="o">::</span><span class="n">executorch</span><span class="o">::</span><span class="n">runtime</span><span class="o">::</span><span class="n">Error</span><span class="w"> </span><span class="nf">execute</span><span class="p">(</span>
 <span class="w">      </span><span class="o">::</span><span class="n">executorch</span><span class="o">::</span><span class="n">runtime</span><span class="o">::</span><span class="n">BackendExecutionContext</span><span class="o">&amp;</span><span class="w"> </span><span class="n">context</span><span class="p">,</span>
 <span class="w">      </span><span class="o">::</span><span class="n">executorch</span><span class="o">::</span><span class="n">runtime</span><span class="o">::</span><span class="n">DelegateHandle</span><span class="o">*</span><span class="w"> </span><span class="n">handle</span><span class="p">,</span>
 <span class="w">      </span><span class="o">::</span><span class="n">executorch</span><span class="o">::</span><span class="n">runtime</span><span class="o">::</span><span class="n">Span</span><span class="o">&lt;::</span><span class="n">executorch</span><span class="o">::</span><span class="n">runtime</span><span class="o">::</span><span class="n">EValue</span><span class="o">*&gt;</span><span class="w"> </span><span class="n">args</span><span class="p">)</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="k">override</span><span class="p">;</span>
 
+<span class="w">  </span><span class="c1">// Applies the runtime backend options a caller passes to</span>
+<span class="w">  </span><span class="c1">// executorch::runtime::set_option("TensorRTBackend", ...). The keys read are</span>
+<span class="w">  </span><span class="c1">// kSharedActivationScratchKey and kCudaGraphsKey, both booleans. A kCudaGraphsKey load option wins</span>
+<span class="w">  </span><span class="c1">// over this one. An explicit false refuses a saved true. kSharedEnginesKey is load-only and rejected here.</span>
+<span class="w">  </span><span class="o">::</span><span class="n">executorch</span><span class="o">::</span><span class="n">runtime</span><span class="o">::</span><span class="n">Error</span><span class="w"> </span><span class="nf">set_option</span><span class="p">(</span>
+<span class="w">      </span><span class="n">ET_UNUSED</span><span class="w"> </span><span class="o">::</span><span class="n">executorch</span><span class="o">::</span><span class="n">runtime</span><span class="o">::</span><span class="n">BackendOptionContext</span><span class="o">&amp;</span><span class="w"> </span><span class="n">context</span><span class="p">,</span>
+<span class="w">      </span><span class="k">const</span><span class="w"> </span><span class="o">::</span><span class="n">executorch</span><span class="o">::</span><span class="n">runtime</span><span class="o">::</span><span class="n">Span</span><span class="o">&lt;::</span><span class="n">executorch</span><span class="o">::</span><span class="n">runtime</span><span class="o">::</span><span class="n">BackendOption</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">backend_options</span><span class="p">)</span><span class="w"> </span><span class="k">override</span><span class="p">;</span>
+
 <span class="w">  </span><span class="kt">void</span><span class="w"> </span><span class="nf">destroy</span><span class="p">(</span><span class="o">::</span><span class="n">executorch</span><span class="o">::</span><span class="n">runtime</span><span class="o">::</span><span class="n">DelegateHandle</span><span class="o">*</span><span class="w"> </span><span class="n">handle</span><span class="p">)</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="k">override</span><span class="p">;</span>
+
+<span class="w"> </span><span class="k">private</span><span class="o">:</span>
+<span class="w">  </span><span class="k">static</span><span class="w"> </span><span class="n">nvinfer1</span><span class="o">::</span><span class="n">IRuntime</span><span class="o">*</span><span class="w"> </span><span class="n">shared_runtime</span><span class="p">();</span>
+<span class="w">  </span><span class="k">friend</span><span class="w"> </span><span class="n">nvinfer1</span><span class="o">::</span><span class="n">IRuntime</span><span class="o">*</span><span class="w"> </span><span class="nf">shared_runtime_for_testing</span><span class="p">();</span>
 <span class="p">};</span>
 
 <span class="p">}</span><span class="w"> </span><span class="c1">// namespace executorch_backend</span>

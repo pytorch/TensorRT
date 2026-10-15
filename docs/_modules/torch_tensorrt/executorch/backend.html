@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=0866734c"></script>
+    <script src="../../../_static/documentation_options.js?v=a71228c4"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -482,8 +482,10 @@ document.write(`
 
 <span class="c1"># ExecuTorch TensorRT backend: serialize engines to a libtorch-free runtime blob.</span>
 
+<span class="kn">import</span><span class="w"> </span><span class="nn">copy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">operator</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">final</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Container</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">final</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch.fx</span>
@@ -513,6 +515,19 @@ document.write(`
 <span class="p">)</span>
 
 <span class="n">_BINDING_DELIM</span> <span class="o">=</span> <span class="s2">"%"</span>
+
+<span class="c1"># CompileSpec key naming the aliased outputs a delegate deliberately does not</span>
+<span class="c1"># carry. Its value is the JSON list of those engine output binding names (see</span>
+<span class="c1"># _serialize_elided_output_names), NOT a bare flag: only the aliased outputs</span>
+<span class="c1"># backed by a registered buffer are elided, so the backend must exempt exactly</span>
+<span class="c1"># those and still reject a delegate that dropped any other binding. export()</span>
+<span class="c1"># appends a method-wide instance to signal the opt-in; TensorRTPartitioner strips</span>
+<span class="c1"># that one and re-derives the per-engine value it puts on each delegate's</span>
+<span class="c1"># DelegationSpec, the only channel that reaches preprocess (see</span>
+<span class="c1"># TensorRTPartitioner._partition_elided_output_names). Without it a delegate</span>
+<span class="c1"># short of its aliased outputs is a bug, not a zero-copy program, and stays an</span>
+<span class="c1"># error.</span>
+<span class="n">ZERO_COPY_KV_COMPILE_SPEC_KEY</span> <span class="o">=</span> <span class="s2">"zero_copy_kv"</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_schema_name</span><span class="p">(</span><span class="n">target</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
@@ -756,7 +771,10 @@ document.write(`
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_validate_output_binding_order</span><span class="p">(</span>
-    <span class="n">edge_program</span><span class="p">:</span> <span class="n">ExportedProgram</span><span class="p">,</span> <span class="n">engine_node</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">output_names</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+    <span class="n">edge_program</span><span class="p">:</span> <span class="n">ExportedProgram</span><span class="p">,</span>
+    <span class="n">engine_node</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="n">output_names</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+    <span class="n">elidable_output_names</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Container</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Check the delegate's outputs are the engine's output bindings, in order.</span>
 
@@ -768,19 +786,70 @@ document.write(`
 <span class="sd">    delegate -- would swap the names silently. Inputs cannot rely on position at</span>
 <span class="sd">    all and recover their order by node identity in</span>
 <span class="sd">    ``_reorder_input_names_for_executorch``.</span>
+
+<span class="sd">    ``elidable_output_names`` names the bindings the delegate is *allowed* to</span>
+<span class="sd">    have dropped, which zero-copy KV sets to exactly the aliased outputs export</span>
+<span class="sd">    rewired to write in place: the engine's in-place write through the aliased</span>
+<span class="sd">    input already is the buffer update, so no argument is passed for them. Pass</span>
+<span class="sd">    ``None`` (the default) when elision was not asked for, and the delegate must</span>
+<span class="sd">    carry every binding. This check does not require that set to cover the</span>
+<span class="sd">    engine's whole ``aliased_io``; ``preprocess`` requires a non-empty one to,</span>
+<span class="sd">    because the runtime can only take all of an engine's aliased outputs as</span>
+<span class="sd">    elided or none of them.</span>
+
+<span class="sd">    A delegate that dropped its aliased outputs because nothing declared them as</span>
+<span class="sd">    mutations looks exactly like a zero-copy one, and the runtime reads elision off</span>
+<span class="sd">    a single argument count, so it cannot tell them apart either. That is also why</span>
+<span class="sd">    a partial drop stays an error: the count cannot express which bindings went.</span>
 <span class="sd">    """</span>
+    <span class="n">elidable_names</span> <span class="o">=</span> <span class="n">elidable_output_names</span> <span class="k">if</span> <span class="n">elidable_output_names</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">()</span>
+    <span class="n">all_indices</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">output_names</span><span class="p">)))</span>
+    <span class="n">unaliased_indices</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">all_indices</span> <span class="k">if</span> <span class="n">output_names</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">elidable_names</span>
+    <span class="p">]</span>
+
     <span class="n">output_node</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span>
         <span class="n">node</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">edge_program</span><span class="o">.</span><span class="n">graph_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span> <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"output"</span>
     <span class="p">)</span>
     <span class="n">out_args</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">output_node</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">out_args</span><span class="p">:</span>
+        <span class="c1"># Naming every binding elidable empties unaliased_indices too, so the</span>
+        <span class="c1"># comparison below would match. That is the zero-output delegate</span>
+        <span class="c1"># rewire_aliased_mutations_to_buffers raises about -- nothing reads it,</span>
+        <span class="c1"># so a later graph-wide dead-code elimination can erase the computation.</span>
+        <span class="c1"># The rewiring's guard runs before partitioning; this is the only one</span>
+        <span class="c1"># left after lowering. The check is unconditional because a delegate with</span>
+        <span class="c1"># no outputs is wrong however it got that way; only the remedy below is</span>
+        <span class="c1"># about zero-copy.</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"TensorRT ExecuTorch backend: the delegate has no outputs at all, "</span>
+            <span class="sa">f</span><span class="s2">"but the engine declares </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">output_names</span><span class="p">)</span><span class="si">}</span><span class="s2"> output binding(s). A "</span>
+            <span class="s2">"delegate nothing reads is a pure node a later dead-code elimination "</span>
+            <span class="s2">"can erase, taking the engine with it."</span>
+            <span class="o">+</span> <span class="p">(</span>
+                <span class="s2">" Every one of this engine's outputs was declared elidable, so "</span>
+                <span class="s2">"nothing was left to thread out; export this method without "</span>
+                <span class="s2">"zero_copy_kv."</span>
+                <span class="k">if</span> <span class="n">elidable_output_names</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">unaliased_indices</span>
+                <span class="k">else</span> <span class="s2">""</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
     <span class="c1"># A single-output engine is returned directly rather than through a getitem,</span>
-    <span class="c1"># and one binding has no order to get wrong.</span>
+    <span class="c1"># and one binding has no order to get wrong. The same holds under elision</span>
+    <span class="c1"># when exactly one binding is left unaliased.</span>
     <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">out_args</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">out_args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="n">engine_node</span><span class="p">:</span>
-        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">output_names</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">all_indices</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">1</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">unaliased_indices</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">remaining</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="sa">f</span><span class="s2">", </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">unaliased_indices</span><span class="p">)</span><span class="si">}</span><span class="s2"> of them after eliding the in-place "</span>
+                <span class="s2">"outputs"</span>
+                <span class="k">if</span> <span class="n">unaliased_indices</span> <span class="o">!=</span> <span class="n">all_indices</span>
+                <span class="k">else</span> <span class="s2">""</span>
+            <span class="p">)</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
                 <span class="s2">"TensorRT ExecuTorch backend: the delegate returns the engine node "</span>
                 <span class="sa">f</span><span class="s2">"directly but the engine declares </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">output_names</span><span class="p">)</span><span class="si">}</span><span class="s2"> output "</span>
-                <span class="s2">"bindings; only a single-output engine can be returned unwrapped."</span>
+                <span class="sa">f</span><span class="s2">"bindings</span><span class="si">{</span><span class="n">remaining</span><span class="si">}</span><span class="s2">; only a single-output engine can be returned "</span>
+                <span class="s2">"unwrapped."</span>
             <span class="p">)</span>
         <span class="k">return</span>
     <span class="n">indices</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
@@ -797,13 +866,98 @@ document.write(`
                 <span class="s2">"node; cannot establish a reliable output binding order."</span>
             <span class="p">)</span>
         <span class="n">indices</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
-    <span class="k">if</span> <span class="n">indices</span> <span class="o">!=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">output_names</span><span class="p">))):</span>
+    <span class="k">if</span> <span class="n">indices</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="n">all_indices</span><span class="p">,</span> <span class="n">unaliased_indices</span><span class="p">):</span>
+        <span class="n">expected</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">all_indices</span><span class="si">}</span><span class="s2">, or </span><span class="si">{</span><span class="n">unaliased_indices</span><span class="si">}</span><span class="s2"> with the in-place outputs elided"</span>
+            <span class="k">if</span> <span class="n">unaliased_indices</span> <span class="o">!=</span> <span class="n">all_indices</span>
+            <span class="k">else</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">all_indices</span><span class="si">}</span><span class="s2">"</span>
+        <span class="p">)</span>
+        <span class="c1"># Outputs are missing and nothing exempted them. That is what an export</span>
+        <span class="c1"># asking for zero_copy_kv looks like when the aliased-buffer mark did not</span>
+        <span class="c1"># reach the partitioner, so no delegate was stamped and none is exempt --</span>
+        <span class="c1"># a failure mode with no other symptom, hence naming it here.</span>
+        <span class="n">unexempted_drop</span> <span class="o">=</span> <span class="n">elidable_output_names</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">indices</span><span class="p">)</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span>
+            <span class="n">all_indices</span>
+        <span class="p">)</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
             <span class="s2">"TensorRT ExecuTorch backend: delegate outputs map to engine output "</span>
-            <span class="sa">f</span><span class="s2">"indices </span><span class="si">{</span><span class="n">indices</span><span class="si">}</span><span class="s2">, expected </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">output_names</span><span class="p">)))</span><span class="si">}</span><span class="s2"> -- the "</span>
-            <span class="s2">"runtime binds output i to output_binding_names[i], so a permuted or "</span>
-            <span class="s2">"incomplete output list would bind the wrong tensors."</span>
+            <span class="sa">f</span><span class="s2">"indices </span><span class="si">{</span><span class="n">indices</span><span class="si">}</span><span class="s2">, expected </span><span class="si">{</span><span class="n">expected</span><span class="si">}</span><span class="s2"> -- the runtime binds each "</span>
+            <span class="s2">"output it is given in binding order, so a permuted, incomplete, or "</span>
+            <span class="s2">"partially elided output list would bind the wrong tensors."</span>
+            <span class="o">+</span> <span class="p">(</span>
+                <span class="s2">" No output was declared elidable for this delegate, so if the "</span>
+                <span class="s2">"export asked for zero_copy_kv the aliased-buffer mark did not "</span>
+                <span class="s2">"survive lowering."</span>
+                <span class="k">if</span> <span class="n">unexempted_drop</span>
+                <span class="k">else</span> <span class="s2">""</span>
+            <span class="p">)</span>
         <span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_serialize_elided_output_names</span><span class="p">(</span><span class="n">names</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Encode the elided aliased-output binding names for the compile spec.</span>
+
+<span class="sd">    JSON, not the ``%`` / ``@`` delimiters that separate ``engine_info``'s</span>
+<span class="sd">    binding-name and aliased_io fields, so a binding name containing one of those</span>
+<span class="sd">    cannot corrupt the record.</span>
+<span class="sd">    """</span>
+    <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">names</span><span class="p">)))</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">"utf-8"</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_elided_output_names</span><span class="p">(</span><span class="n">compile_specs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">CompileSpec</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Set</span><span class="p">[</span><span class="nb">str</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">"""The aliased-output binding names export declared elidable, or ``None``.</span>
+
+<span class="sd">    ``None`` when no zero-copy spec is present, which keeps a missing output an</span>
+<span class="sd">    error: only a caller who asked for zero-copy may drop the aliased outputs,</span>
+<span class="sd">    and then only exactly the ones export rewired to write in place.</span>
+
+<span class="sd">    A spec built by hand rather than by ``TensorRTPartitioner`` may carry</span>
+<span class="sd">    anything, so the value is type-checked and the decode is caught, and both</span>
+<span class="sd">    raise naming this key. Without that a bare ``b"1"`` comes out as an</span>
+<span class="sd">    unattributed ``TypeError``, and -- the quieter one -- a JSON *string*</span>
+<span class="sd">    decodes into a set of its own characters, exempting every one-character</span>
+<span class="sd">    binding name and not the real one.</span>
+
+<span class="sd">    ``_zero_copy._delegate_elided_output_names`` reads the same key on the same</span>
+<span class="sd">    spec and takes the same shapes of value. It differs in what it does with the</span>
+<span class="sd">    rest: where this raises, it returns the empty set, because for it an</span>
+<span class="sd">    undecodable spec merely weakens a cross-check while here it leaves the</span>
+<span class="sd">    backend unable to say which outputs may be missing. The one value the two</span>
+<span class="sd">    read differently is bytes that are not valid UTF-8, replaced here and</span>
+<span class="sd">    refused there by ``json.loads``.</span>
+<span class="sd">    """</span>
+    <span class="k">for</span> <span class="n">spec</span> <span class="ow">in</span> <span class="n">compile_specs</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">spec</span><span class="p">,</span> <span class="s2">"key"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="o">!=</span> <span class="n">ZERO_COPY_KV_COMPILE_SPEC_KEY</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="n">spec</span><span class="o">.</span><span class="n">value</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">,</span> <span class="nb">bytearray</span><span class="p">)):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"TensorRT ExecuTorch backend: compile spec "</span>
+                <span class="sa">f</span><span class="s2">"'</span><span class="si">{</span><span class="n">ZERO_COPY_KV_COMPILE_SPEC_KEY</span><span class="si">}</span><span class="s2">' must hold a JSON list of "</span>
+                <span class="sa">f</span><span class="s2">"engine output binding names, not </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">value</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">. It is "</span>
+                <span class="s2">"written by TensorRTPartitioner; a hand-built spec has to match."</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="p">(</span><span class="nb">bytes</span><span class="p">,</span> <span class="nb">bytearray</span><span class="p">)):</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="nb">bytes</span><span class="p">(</span><span class="n">value</span><span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">"utf-8"</span><span class="p">,</span> <span class="s2">"replace"</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">names</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"TensorRT ExecuTorch backend: compile spec "</span>
+                <span class="sa">f</span><span class="s2">"'</span><span class="si">{</span><span class="n">ZERO_COPY_KV_COMPILE_SPEC_KEY</span><span class="si">}</span><span class="s2">' does not decode as JSON "</span>
+                <span class="sa">f</span><span class="s2">"(</span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">). It holds a JSON list of engine output binding names, "</span>
+                <span class="s2">"written by TensorRTPartitioner."</span>
+            <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">e</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">names</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"TensorRT ExecuTorch backend: compile spec "</span>
+                <span class="sa">f</span><span class="s2">"'</span><span class="si">{</span><span class="n">ZERO_COPY_KV_COMPILE_SPEC_KEY</span><span class="si">}</span><span class="s2">' decoded to "</span>
+                <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">names</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">, not a list of engine output binding "</span>
+                <span class="s2">"names. A JSON string would decode into its own characters and "</span>
+                <span class="s2">"exempt every one-character binding name."</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span><span class="nb">str</span><span class="p">(</span><span class="n">name</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">names</span><span class="p">}</span>
+    <span class="k">return</span> <span class="kc">None</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_get_str</span><span class="p">(</span><span class="n">engine_info</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Any</span><span class="p">],</span> <span class="n">index</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">default</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
@@ -828,6 +982,20 @@ document.write(`
 <span class="sd">    backend parses that blob directly without the legacy Torch-TensorRT C++ runtime.</span>
 <span class="sd">    """</span>
 
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">copy_exported_program_for_preprocess</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span> <span class="n">edge_program</span><span class="p">:</span> <span class="n">ExportedProgram</span><span class="p">,</span> <span class="n">compile_specs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">CompileSpec</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ExportedProgram</span><span class="p">:</span>
+        <span class="c1"># The default deep copy also copies the engine tensor, which can be several</span>
+        <span class="c1"># gigabytes. preprocess only reads tensors, so share them and copy the rest.</span>
+        <span class="n">tensor_memo</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="nb">id</span><span class="p">(</span><span class="n">tensor</span><span class="p">):</span> <span class="n">tensor</span>
+            <span class="k">for</span> <span class="n">values</span> <span class="ow">in</span> <span class="p">(</span><span class="n">edge_program</span><span class="o">.</span><span class="n">state_dict</span><span class="p">,</span> <span class="n">edge_program</span><span class="o">.</span><span class="n">constants</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">tensor</span> <span class="ow">in</span> <span class="n">values</span><span class="o">.</span><span class="n">values</span><span class="p">()</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">tensor</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span>
+        <span class="p">}</span>
+        <span class="k">return</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="n">edge_program</span><span class="p">,</span> <span class="n">tensor_memo</span><span class="p">)</span>
+
     <span class="nd">@staticmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">preprocess</span><span class="p">(</span>
         <span class="n">edge_program</span><span class="p">:</span> <span class="n">ExportedProgram</span><span class="p">,</span>
@@ -843,12 +1011,12 @@ document.write(`
             <span class="c1"># the storage element by element in Python, costing about two seconds</span>
             <span class="c1"># per megabyte, and it returns the whole backing allocation rather than</span>
             <span class="c1"># the tensor's own extent, so a view of a larger buffer serializes too</span>
-            <span class="c1"># many bytes. `memoryview` is not redundant here: on a 0-dim uint8</span>
-            <span class="c1"># tensor numpy alone goes through `__index__` and yields that many zero</span>
-            <span class="c1"># bytes instead of the value. `.view(torch.uint8)` keeps `.numpy()` from</span>
+            <span class="c1"># many bytes. A view and not a bytes copy, because serialize_engine</span>
+            <span class="c1"># already copies the engine into the blob once, and an engine can be</span>
+            <span class="c1"># several gigabytes. `.view(torch.uint8)` keeps `.numpy()` from</span>
             <span class="c1"># rejecting a dtype it has no equivalent for.</span>
             <span class="n">engine_bytes</span> <span class="o">=</span> <span class="n">serialized_engine</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
-            <span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="nb">bytes</span><span class="p">(</span><span class="nb">memoryview</span><span class="p">(</span><span class="n">engine_bytes</span><span class="o">.</span><span class="n">numpy</span><span class="p">()))</span>
+            <span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="nb">memoryview</span><span class="p">(</span><span class="n">engine_bytes</span><span class="o">.</span><span class="n">numpy</span><span class="p">())</span>
         <span class="k">elif</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">serialized_engine</span><span class="p">,</span> <span class="p">(</span><span class="nb">bytes</span><span class="p">,</span> <span class="nb">bytearray</span><span class="p">)):</span>
             <span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="nb">bytes</span><span class="p">(</span><span class="n">serialized_engine</span><span class="p">)</span>
         <span class="n">input_names</span> <span class="o">=</span> <span class="n">_reorder_input_names_for_executorch</span><span class="p">(</span>
@@ -859,7 +1027,13 @@ document.write(`
         <span class="n">output_names</span> <span class="o">=</span> <span class="n">_split_binding_names</span><span class="p">(</span>
             <span class="n">_get_str</span><span class="p">(</span><span class="n">engine_info</span><span class="p">,</span> <span class="n">OUTPUT_BINDING_NAMES_IDX</span><span class="p">)</span>
         <span class="p">)</span>
-        <span class="n">_validate_output_binding_order</span><span class="p">(</span><span class="n">edge_program</span><span class="p">,</span> <span class="n">engine_node</span><span class="p">,</span> <span class="n">output_names</span><span class="p">)</span>
+        <span class="n">elidable_output_names</span> <span class="o">=</span> <span class="n">_elided_output_names</span><span class="p">(</span><span class="n">compile_specs</span><span class="p">)</span>
+        <span class="n">_validate_output_binding_order</span><span class="p">(</span>
+            <span class="n">edge_program</span><span class="p">,</span>
+            <span class="n">engine_node</span><span class="p">,</span>
+            <span class="n">output_names</span><span class="p">,</span>
+            <span class="n">elidable_output_names</span><span class="p">,</span>
+        <span class="p">)</span>
         <span class="n">io_bindings</span> <span class="o">=</span> <span class="p">[</span>
             <span class="n">TensorRTIOBinding</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">is_input</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">input_names</span>
         <span class="p">]</span> <span class="o">+</span> <span class="p">[</span><span class="n">TensorRTIOBinding</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">is_input</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">output_names</span><span class="p">]</span>
@@ -868,6 +1042,24 @@ document.write(`
         <span class="c1"># C++ backend binds each aliased output to its aliased input's tensor</span>
         <span class="c1"># (in-place) and reflects the update back into the delegate output.</span>
         <span class="n">aliased_io</span> <span class="o">=</span> <span class="n">deserialize_aliased_io</span><span class="p">(</span><span class="n">_get_str</span><span class="p">(</span><span class="n">engine_info</span><span class="p">,</span> <span class="n">ALIASED_IO_IDX</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">elidable_output_names</span> <span class="ow">and</span> <span class="nb">set</span><span class="p">(</span><span class="n">elidable_output_names</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">set</span><span class="p">(</span><span class="n">aliased_io</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"TensorRT ExecuTorch backend: engine "</span>
+                <span class="sa">f</span><span class="s2">"'</span><span class="si">{</span><span class="n">engine_node</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">' aliases the outputs </span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">aliased_io</span><span class="p">)</span><span class="si">}</span><span class="s2">, "</span>
+                <span class="sa">f</span><span class="s2">"but only </span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">elidable_output_names</span><span class="p">)</span><span class="si">}</span><span class="s2"> of them are elided -- "</span>
+                <span class="s2">"dropped from the delegate's arguments, because the engine's "</span>
+                <span class="s2">"in-place write through the aliased input already is that "</span>
+                <span class="s2">"output. Partial elision is not expressible by the runtime: it "</span>
+                <span class="s2">"takes the aliased outputs as elided only when the argument "</span>
+                <span class="s2">"count is short by the engine's whole aliased-output count, so a "</span>
+                <span class="s2">"delegate short of only some of them reads as not elided at all "</span>
+                <span class="s2">"and every execute() fails with an argument-count error. An "</span>
+                <span class="s2">"output is elided when export rewired a buffer mutation to write "</span>
+                <span class="s2">"it in place, so this engine mixes such a buffer with an aliased "</span>
+                <span class="s2">"input that is not one -- a plain input, say. Export this method "</span>
+                <span class="s2">"without zero_copy_kv, or keep every aliased input of this engine "</span>
+                <span class="s2">"a mutated buffer."</span>
+            <span class="p">)</span>
 
         <span class="n">metadata</span> <span class="o">=</span> <span class="n">TensorRTBlobMetadata</span><span class="p">(</span>
             <span class="n">io_bindings</span><span class="o">=</span><span class="n">io_bindings</span><span class="p">,</span>
@@ -877,7 +1069,7 @@ document.write(`
             <span class="n">serialized_metadata</span><span class="o">=</span><span class="n">_get_str</span><span class="p">(</span><span class="n">engine_info</span><span class="p">,</span> <span class="n">SERIALIZED_METADATA_IDX</span><span class="p">),</span>
             <span class="n">target_platform</span><span class="o">=</span><span class="n">_get_str</span><span class="p">(</span><span class="n">engine_info</span><span class="p">,</span> <span class="n">TARGET_PLATFORM_IDX</span><span class="p">),</span>
         <span class="p">)</span>
-        <span class="n">blob</span> <span class="o">=</span> <span class="n">serialize_engine</span><span class="p">(</span><span class="nb">bytes</span><span class="p">(</span><span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]),</span> <span class="n">metadata</span><span class="p">)</span>
+        <span class="n">blob</span> <span class="o">=</span> <span class="n">serialize_engine</span><span class="p">(</span><span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">],</span> <span class="n">metadata</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">PreprocessResult</span><span class="p">(</span><span class="n">processed_bytes</span><span class="o">=</span><span class="n">blob</span><span class="p">)</span></div>
 
 </pre></div>

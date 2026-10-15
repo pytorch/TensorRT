@@ -77,3 +77,14 @@ Typedefs
 
 - :ref:`exhale_typedef_TensorRTBackend_8h_1acdb398aaccae05cc399de3a885797c13`
 
+
+Variables
+---------
+
+
+- :ref:`exhale_variable_TensorRTBackend_8h_1a27092406344aaf7c875381e8b55088b0`
+
+- :ref:`exhale_variable_TensorRTBackend_8h_1aaa620d42a4544b852fdf716ec5f90954`
+
+- :ref:`exhale_variable_TensorRTBackend_8h_1a76e2f00695cc5f8173af78f35180e3e9`
+

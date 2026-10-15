@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=0866734c"></script>
+    <script src="../../_static/documentation_options.js?v=a71228c4"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -574,16 +574,19 @@ emits a <code class="docutils literal notranslate"><span class="pre">UserWarning
 <hr class="docutils" />
 <section id="the-three-ways-to-apply-settings">
 <h2>The three ways to apply settings<a class="headerlink" href="#the-three-ways-to-apply-settings" title="Link to this heading">#</a></h2>
-<section id="direct-assignment-permanent">
-<h3>Direct assignment — permanent<a class="headerlink" href="#direct-assignment-permanent" title="Link to this heading">#</a></h3>
+<section id="apply-runtime-settings-permanent-apply">
+<h3><code class="docutils literal notranslate"><span class="pre">apply_runtime_settings(...)</span></code> — permanent apply<a class="headerlink" href="#apply-runtime-settings-permanent-apply" title="Link to this heading">#</a></h3>
+<p>Use for any permanent assignment on in-process compiled models:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.runtime</span><span class="w"> </span><span class="kn">import</span> <span class="n">RuntimeSettings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.runtime</span><span class="w"> </span><span class="kn">import</span> <span class="n">RuntimeSettings</span><span class="p">,</span> <span class="n">apply_runtime_settings</span>
 
 <span class="n">mod</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
-<span class="n">mod</span><span class="o">.</span><span class="n">runtime_settings</span> <span class="o">=</span> <span class="n">RuntimeSettings</span><span class="p">(</span><span class="n">runtime_cache</span><span class="o">=</span><span class="s2">"/var/cache/jit.bin"</span><span class="p">)</span>
+<span class="n">apply_runtime_settings</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="n">RuntimeSettings</span><span class="p">(</span><span class="n">runtime_cache</span><span class="o">=</span><span class="s2">"/var/cache/jit.bin"</span><span class="p">))</span>
 </pre></div>
 </div>
-<p>Use when you want the setting to apply for the module’s lifetime.</p>
+<p><code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">apply_runtime_settings()</span></code> walks all TRT subgraphs under <code class="docutils literal notranslate"><span class="pre">mod</span></code> and
+applies <code class="docutils literal notranslate"><span class="pre">settings</span></code> to each one. It returns the number of engines updated and
+raises <a href="#id1"><span class="problematic" id="id2">:exc:`RuntimeError`</span></a> if no TRT engines are found.</p>
 </section>
 <section id="runtime-config-context-manager-scoped-override">
 <h3><code class="docutils literal notranslate"><span class="pre">runtime_config(...)</span></code> context manager — scoped override<a class="headerlink" href="#runtime-config-context-manager-scoped-override" title="Link to this heading">#</a></h3>
@@ -788,10 +791,10 @@ cache saved to <code class="docutils literal notranslate"><span class="pre">/var
 <section id="advanced-caller-owned-runtimecache">
 <h2>Advanced: caller-owned <code class="docutils literal notranslate"><span class="pre">RuntimeCache</span></code><a class="headerlink" href="#advanced-caller-owned-runtimecache" title="Link to this heading">#</a></h2>
 <p>Construct your own handle if you want full lifetime control:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.runtime</span><span class="w"> </span><span class="kn">import</span> <span class="n">RuntimeCache</span><span class="p">,</span> <span class="n">RuntimeSettings</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.runtime</span><span class="w"> </span><span class="kn">import</span> <span class="n">RuntimeCache</span><span class="p">,</span> <span class="n">RuntimeSettings</span><span class="p">,</span> <span class="n">apply_runtime_settings</span>
 
 <span class="n">handle</span> <span class="o">=</span> <span class="n">RuntimeCache</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="s2">"/var/cache/jit.bin"</span><span class="p">,</span> <span class="n">autosave_on_del</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="n">mod</span><span class="o">.</span><span class="n">runtime_settings</span> <span class="o">=</span> <span class="n">RuntimeSettings</span><span class="p">(</span><span class="n">runtime_cache</span><span class="o">=</span><span class="n">handle</span><span class="p">)</span>
+<span class="n">apply_runtime_settings</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="n">RuntimeSettings</span><span class="p">(</span><span class="n">runtime_cache</span><span class="o">=</span><span class="n">handle</span><span class="p">))</span>
 <span class="n">out</span> <span class="o">=</span> <span class="n">mod</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
 <span class="c1"># handle.save() will fire when handle goes out of scope (autosave_on_del=True)</span>
 </pre></div>
@@ -799,11 +802,52 @@ cache saved to <code class="docutils literal notranslate"><span class="pre">/var
 <p>Or with explicit save/load:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">handle</span> <span class="o">=</span> <span class="n">RuntimeCache</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="s2">"/var/cache/jit.bin"</span><span class="p">)</span>  <span class="c1"># autosave_on_del=False default</span>
 <span class="n">handle</span><span class="o">.</span><span class="n">load</span><span class="p">()</span>
-<span class="n">mod</span><span class="o">.</span><span class="n">runtime_settings</span> <span class="o">=</span> <span class="n">RuntimeSettings</span><span class="p">(</span><span class="n">runtime_cache</span><span class="o">=</span><span class="n">handle</span><span class="p">)</span>
+<span class="n">apply_runtime_settings</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="n">RuntimeSettings</span><span class="p">(</span><span class="n">runtime_cache</span><span class="o">=</span><span class="n">handle</span><span class="p">))</span>
 <span class="n">out</span> <span class="o">=</span> <span class="n">mod</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
 <span class="n">handle</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
 </pre></div>
 </div>
+<section id="aot-loaded-artifacts-exportedprogram-graphmodule">
+<h3>AOT-loaded artifacts (<code class="docutils literal notranslate"><span class="pre">ExportedProgram</span></code> / <code class="docutils literal notranslate"><span class="pre">GraphModule</span></code>)<a class="headerlink" href="#aot-loaded-artifacts-exportedprogram-graphmodule" title="Link to this heading">#</a></h3>
+<p>Engines loaded with <code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">torch_tensorrt.load()</span></code> have no
+<code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">TorchTensorRTModule</span></code>, so the context managers cannot restore settings
+on exit and will raise. Use <code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">apply_runtime_settings()</span></code> with a caller-owned
+<code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">RuntimeCache</span></code> instead:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.runtime</span><span class="w"> </span><span class="kn">import</span> <span class="n">RuntimeCache</span><span class="p">,</span> <span class="n">RuntimeSettings</span><span class="p">,</span> <span class="n">apply_runtime_settings</span>
+
+<span class="n">ep</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">"model.ep"</span><span class="p">)</span>
+<span class="n">gm</span> <span class="o">=</span> <span class="n">ep</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
+
+<span class="n">cache</span> <span class="o">=</span> <span class="n">RuntimeCache</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="s2">"/var/cache/jit.bin"</span><span class="p">)</span>
+<span class="n">cache</span><span class="o">.</span><span class="n">load</span><span class="p">()</span>  <span class="c1"># caller's responsibility — no module to auto-warm the cache</span>
+
+<span class="n">apply_runtime_settings</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">RuntimeSettings</span><span class="p">(</span><span class="n">runtime_cache</span><span class="o">=</span><span class="n">cache</span><span class="p">))</span>
+<span class="n">out</span> <span class="o">=</span> <span class="n">gm</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+<span class="n">cache</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">settings.runtime_cache</span></code> must be <code class="docutils literal notranslate"><span class="pre">None</span></code> or a <code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">RuntimeCache</span></code> you own
+for module-less engines — a path string raises <a href="#id3"><span class="problematic" id="id4">:exc:`TypeError`</span></a> because there
+is no module to build and save the handle.</p>
+<p><code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">apply_runtime_settings()</span></code> also accepts the <code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">torch.export.ExportedProgram</span></code>
+directly, which is equivalent to passing <code class="docutils literal notranslate"><span class="pre">ep.module()</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">apply_runtime_settings</span><span class="p">(</span><span class="n">ep</span><span class="p">,</span> <span class="n">RuntimeSettings</span><span class="p">(</span><span class="n">runtime_cache</span><span class="o">=</span><span class="n">cache</span><span class="p">))</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>TorchScript artifacts are not supported. When <code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">torch_tensorrt.load()</span></code>
+returns a <code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">torch.jit.ScriptModule</span></code>, <code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">apply_runtime_settings()</span></code>,
+<code class="docutils literal notranslate"><span class="pre">runtime_config(...)</span></code> and <code class="docutils literal notranslate"><span class="pre">runtime_cache(...)</span></code> raise <a href="#id5"><span class="problematic" id="id6">:exc:`TypeError`</span></a>.
+Save the compiled model with <code class="docutils literal notranslate"><span class="pre">output_format=&quot;exported_program&quot;</span></code> instead.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Runtime settings are never serialized.  They do not survive
+<code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">torch_tensorrt.save()</span></code>; re-apply after each <code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">torch_tensorrt.load()</span></code>.</p>
+</div>
+</section>
 </section>
 <hr class="docutils" />
 <section id="best-practices">
@@ -813,14 +857,14 @@ cache saved to <code class="docutils literal notranslate"><span class="pre">/var
 <p><code class="docutils literal notranslate"><span class="pre">IExecutionContext</span></code> is created lazily on first execute. Apply settings
 before that and you get <strong>one</strong> context create:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">mod</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
-<span class="n">mod</span><span class="o">.</span><span class="n">runtime_settings</span> <span class="o">=</span> <span class="n">RuntimeSettings</span><span class="p">(</span><span class="n">cuda_graph_strategy</span><span class="o">=</span><span class="s2">"whole_graph_capture"</span><span class="p">)</span>
+<span class="n">apply_runtime_settings</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="n">RuntimeSettings</span><span class="p">(</span><span class="n">cuda_graph_strategy</span><span class="o">=</span><span class="s2">"whole_graph_capture"</span><span class="p">))</span>
 <span class="n">out</span> <span class="o">=</span> <span class="n">mod</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>  <span class="c1"># single createExecutionContext call here</span>
 </pre></div>
 </div>
 <p>Apply settings <em>after</em> first execute and you get <strong>two</strong>:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">mod</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
 <span class="n">out</span> <span class="o">=</span> <span class="n">mod</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>  <span class="c1"># context created with defaults</span>
-<span class="n">mod</span><span class="o">.</span><span class="n">runtime_settings</span> <span class="o">=</span> <span class="n">RuntimeSettings</span><span class="p">(</span><span class="n">cuda_graph_strategy</span><span class="o">=</span><span class="s2">"whole_graph_capture"</span><span class="p">)</span>
+<span class="n">apply_runtime_settings</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="n">RuntimeSettings</span><span class="p">(</span><span class="n">cuda_graph_strategy</span><span class="o">=</span><span class="s2">"whole_graph_capture"</span><span class="p">))</span>
 <span class="n">out</span> <span class="o">=</span> <span class="n">mod</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>  <span class="c1"># context invalidated + recreated</span>
 </pre></div>
 </div>
@@ -830,8 +874,8 @@ set, so this matters for setup latency.</p>
 <section id="nccl-engines-pay-the-extra-create">
 <h3>NCCL engines pay the extra create<a class="headerlink" href="#nccl-engines-pay-the-extra-create" title="Link to this heading">#</a></h3>
 <p>NCCL-collective engines eagerly materialize the context at setup (cross-rank
-barrier ordering). Any subsequent <code class="docutils literal notranslate"><span class="pre">mod.runtime_settings</span> <span class="pre">=</span> <span class="pre">...</span></code> triggers a
-second create. This is a documented trade-off — apply settings before any
+barrier ordering). Any subsequent <code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">apply_runtime_settings()</span></code> call triggers
+a second create. This is a documented trade-off — apply settings before any
 inference if you can, but the eager bind is non-negotiable for NCCL safety.</p>
 </section>
 <section id="default-runtime-cache-is-shared-per-user-concurrent-processes-can-lose-kernels">
@@ -847,10 +891,10 @@ by a filelock against corruption, but <strong>not</strong> against lost-update r
 <p>For hyperparameter sweeps, or any multi-process workload where lost kernels
 matter:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Option 1: per-worker path</span>
-<span class="n">mod</span><span class="o">.</span><span class="n">runtime_settings</span> <span class="o">=</span> <span class="n">RuntimeSettings</span><span class="p">(</span><span class="n">runtime_cache</span><span class="o">=</span><span class="sa">f</span><span class="s2">"/var/cache/jit-worker-</span><span class="si">{</span><span class="n">worker_id</span><span class="si">}</span><span class="s2">.bin"</span><span class="p">)</span>
+<span class="n">apply_runtime_settings</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="n">RuntimeSettings</span><span class="p">(</span><span class="n">runtime_cache</span><span class="o">=</span><span class="sa">f</span><span class="s2">"/var/cache/jit-worker-</span><span class="si">{</span><span class="n">worker_id</span><span class="si">}</span><span class="s2">.bin"</span><span class="p">))</span>
 
 <span class="c1"># Option 2: opt out</span>
-<span class="n">mod</span><span class="o">.</span><span class="n">runtime_settings</span> <span class="o">=</span> <span class="n">RuntimeSettings</span><span class="p">(</span><span class="n">runtime_cache</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+<span class="n">apply_runtime_settings</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="n">RuntimeSettings</span><span class="p">(</span><span class="n">runtime_cache</span><span class="o">=</span><span class="kc">None</span><span class="p">))</span>
 </pre></div>
 </div>
 </section>
@@ -869,19 +913,13 @@ re-attached (different <code class="docutils literal notranslate"><span class="p
 overwrites <code class="docutils literal notranslate"><span class="pre">/p</span></code> with the now-stale <code class="docutils literal notranslate"><span class="pre">rc1</span></code> state. <strong>Last writer wins;
 mid-block kernels are silently lost.</strong></p>
 </section>
-<section id="setter-is-per-torchtensorrtmodule">
-<h3>Setter is per-<code class="docutils literal notranslate"><span class="pre">TorchTensorRTModule</span></code><a class="headerlink" href="#setter-is-per-torchtensorrtmodule" title="Link to this heading">#</a></h3>
-<p><code class="docutils literal notranslate"><span class="pre">mod.runtime_settings</span> <span class="pre">=</span> <span class="pre">rs</span></code> only affects <code class="docutils literal notranslate"><span class="pre">self</span></code>. If you compile a model
-with multiple TRT subgraphs, walk the submodules:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._TorchTensorRTModule</span><span class="w"> </span><span class="kn">import</span> <span class="n">TorchTensorRTModule</span>
-
-<span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">sub</span> <span class="ow">in</span> <span class="n">compiled</span><span class="o">.</span><span class="n">named_modules</span><span class="p">():</span>
-    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">sub</span><span class="p">,</span> <span class="n">TorchTensorRTModule</span><span class="p">):</span>
-        <span class="n">sub</span><span class="o">.</span><span class="n">runtime_settings</span> <span class="o">=</span> <span class="n">RuntimeSettings</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
-</pre></div>
-</div>
-<p><code class="docutils literal notranslate"><span class="pre">runtime_config(...)</span></code> and <code class="docutils literal notranslate"><span class="pre">runtime_cache(...)</span></code> do this walk automatically
-— that is the easier API for compound models.</p>
+<section id="apply-runtime-settings-reaches-all-subgraphs-automatically">
+<h3><code class="docutils literal notranslate"><span class="pre">apply_runtime_settings</span></code> reaches all subgraphs automatically<a class="headerlink" href="#apply-runtime-settings-reaches-all-subgraphs-automatically" title="Link to this heading">#</a></h3>
+<p>A compiled model with multiple TRT subgraphs has one
+<code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">TorchTensorRTModule</span></code> per subgraph. Calling
+<code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">apply_runtime_settings()</span></code> on the top-level module (or an
+<code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">torch.export.ExportedProgram</span></code>) walks all of them in one call — you do
+not need to iterate submodules manually. The context managers do the same walk.</p>
 </section>
 <section id="non-tensorrt-rtx-builds-emit-a-warning-do-nothing">
 <h3>Non-TensorRT-RTX builds emit a warning, do nothing<a class="headerlink" href="#non-tensorrt-rtx-builds-emit-a-warning-do-nothing" title="Link to this heading">#</a></h3>
@@ -906,8 +944,8 @@ cross-RTX/non-RTX code, you can suppress the warning with
 </tr>
 </thead>
 <tbody>
-<tr class="row-even"><td><p>Set a runtime knob permanently on one module</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">mod.runtime_settings</span> <span class="pre">=</span> <span class="pre">RuntimeSettings(...)</span></code></p></td>
+<tr class="row-even"><td><p>Set a runtime knob permanently (compiled or AOT-loaded)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">apply_runtime_settings(mod_or_ep,</span> <span class="pre">RuntimeSettings(...))</span></code></p></td>
 </tr>
 <tr class="row-odd"><td><p>Temporary override for one call site</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">with</span> <span class="pre">runtime_config(mod,</span> <span class="pre">**overrides):</span></code></p></td>
@@ -986,7 +1024,7 @@ cross-RTX/non-RTX code, you can suppress the warning with
   <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#the-three-ways-to-apply-settings">The three ways to apply settings</a><ul class="visible nav section-nav flex-column">
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#direct-assignment-permanent">Direct assignment — permanent</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#apply-runtime-settings-permanent-apply"><code class="docutils literal notranslate"><span class="pre">apply_runtime_settings(...)</span></code> — permanent apply</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#runtime-config-context-manager-scoped-override"><code class="docutils literal notranslate"><span class="pre">runtime_config(...)</span></code> context manager — scoped override</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#runtime-cache-context-manager-shared-cache-io"><code class="docutils literal notranslate"><span class="pre">runtime_cache(...)</span></code> context manager — shared cache + IO</a><ul class="nav section-nav flex-column">
 <li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#stream-backed-runtime-cache">Stream-backed <code class="docutils literal notranslate"><span class="pre">runtime_cache</span></code></a></li>
@@ -1001,13 +1039,16 @@ cross-RTX/non-RTX code, you can suppress the warning with
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#putting-it-all-together">Putting it all together</a></li>
 </ul>
 </li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#advanced-caller-owned-runtimecache">Advanced: caller-owned <code class="docutils literal notranslate"><span class="pre">RuntimeCache</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#advanced-caller-owned-runtimecache">Advanced: caller-owned <code class="docutils literal notranslate"><span class="pre">RuntimeCache</span></code></a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#aot-loaded-artifacts-exportedprogram-graphmodule">AOT-loaded artifacts (<code class="docutils literal notranslate"><span class="pre">ExportedProgram</span></code> / <code class="docutils literal notranslate"><span class="pre">GraphModule</span></code>)</a></li>
+</ul>
+</li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#best-practices">Best practices</a><ul class="visible nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#apply-settings-before-first-execute">Apply settings <em>before</em> first execute</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nccl-engines-pay-the-extra-create">NCCL engines pay the extra create</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#default-runtime-cache-is-shared-per-user-concurrent-processes-can-lose-kernels">Default <code class="docutils literal notranslate"><span class="pre">runtime_cache</span></code> is shared per-user — concurrent processes can lose kernels</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#don-t-nest-runtime-cache-cms-with-the-same-path">Don’t nest <code class="docutils literal notranslate"><span class="pre">runtime_cache(...)</span></code> CMs with the same path</a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#setter-is-per-torchtensorrtmodule">Setter is per-<code class="docutils literal notranslate"><span class="pre">TorchTensorRTModule</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#apply-runtime-settings-reaches-all-subgraphs-automatically"><code class="docutils literal notranslate"><span class="pre">apply_runtime_settings</span></code> reaches all subgraphs automatically</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#non-tensorrt-rtx-builds-emit-a-warning-do-nothing">Non-TensorRT-RTX builds emit a warning, do nothing</a></li>
 </ul>
 </li>
