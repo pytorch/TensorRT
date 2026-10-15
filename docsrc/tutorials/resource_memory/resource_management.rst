@@ -161,7 +161,7 @@ Compiling from Memory-Mapped Weights
 ------------------------------------
 
 To compile, a model's weights normally have to be loaded into host memory first, all of them, before
-the first engine is built. ``torch_tensorrt.dynamo.map_weights`` instead points the model's weights at
+the first engine is built. ``torch_tensorrt.dynamo.tools.map_weights`` instead points the model's weights at
 zero-copy views of a safetensors file:
 
 - ``torch.export`` reads only shapes, so a weight's pages become resident only when TensorRT reads them,
@@ -173,7 +173,7 @@ zero-copy views of a safetensors file:
 
     import torch
     import torch_tensorrt
-    from torch_tensorrt.dynamo import map_weights, save_weights_for_mapping
+    from torch_tensorrt.dynamo.tools import map_weights, save_weights_for_mapping
 
     # Once, wherever the model loads: write its weights in the dtypes it runs in.
     save_weights_for_mapping(model, "weights.safetensors")

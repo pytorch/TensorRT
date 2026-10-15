@@ -29,16 +29,23 @@ Functions
 
 .. autofunction:: refit_module_weights
 
+Classes
+--------
+
+.. autoclass:: CompilationSettings
+
+Tools
+-----
+
+Weight mapping: compile from a safetensors checkpoint's weights in place (see the resource management guide).
+
+.. currentmodule:: torch_tensorrt.dynamo.tools
+
 .. autofunction:: map_weights
 
 .. autofunction:: save_weights_for_mapping
 
 .. autofunction:: release_mapped_storage
-
-Classes
---------
-
-.. autoclass:: CompilationSettings
 
 .. autoclass:: MappedWeights
     :members: close

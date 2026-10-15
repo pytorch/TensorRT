@@ -9,14 +9,14 @@ import struct
 import pytest
 import torch
 import torch_tensorrt
-from torch_tensorrt.dynamo import (
-    _weight_mapping,
-    _weight_release,
+from torch_tensorrt.dynamo import _weight_release
+from torch_tensorrt.dynamo._weight_release import release_storage
+from torch_tensorrt.dynamo.tools import (
     map_weights,
     release_mapped_storage,
     save_weights_for_mapping,
+    weight_mapping,
 )
-from torch_tensorrt.dynamo._weight_release import release_storage
 
 
 class _Tied(torch.nn.Module):
@@ -226,7 +226,7 @@ def test_unclosed_mappings_are_freed_with_their_views(tmp_path):
     _reference(tmp_path / "w.safetensors")
     gc.collect()
     release_mapped_storage(torch.ones(1).untyped_storage())  # prunes dead entries
-    before = len(_weight_mapping._live_mappings)
+    before = len(weight_mapping._live_mappings)
     for _ in range(3):
         with torch.device("meta"):
             model = _Tied()
@@ -234,7 +234,7 @@ def test_unclosed_mappings_are_freed_with_their_views(tmp_path):
         del model
     gc.collect()
     release_mapped_storage(torch.ones(1).untyped_storage())  # prunes dead entries
-    assert len(_weight_mapping._live_mappings) == before
+    assert len(weight_mapping._live_mappings) == before
 
 
 def test_release_storage_drops_pages_of_mapped_weights(tmp_path):

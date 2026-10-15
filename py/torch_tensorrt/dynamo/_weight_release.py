@@ -17,7 +17,7 @@ from typing import Dict, Iterable
 
 import torch
 from torch.utils._python_dispatch import is_traceable_wrapper_subclass
-from torch_tensorrt.dynamo._weight_mapping import release_mapped_storage
+from torch_tensorrt.dynamo.tools.weight_mapping import release_mapped_storage
 
 logger = logging.getLogger(__name__)
 

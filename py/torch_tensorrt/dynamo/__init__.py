@@ -22,11 +22,5 @@ if version.parse(sanitized_torch_version()) >= version.parse("2.1.dev"):
     from ._settings import CompilationSettings
     from ._SourceIR import SourceIR
     from ._tracer import trace
-    from ._weight_mapping import (
-        MappedWeights,
-        map_weights,
-        release_mapped_storage,
-        save_weights_for_mapping,
-    )
     from .debug._Debugger import Debugger
     from .tuning import get_all_build_routes, is_global_perf_tuning_available
