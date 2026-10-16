@@ -535,8 +535,7 @@ def div(
     lhs_val: Union[TRTTensor, int, float],
     rhs_val: Union[TRTTensor, int, float],
 ) -> TRTTensor:
-    if isinstance(lhs_val, TRTTensor) and isinstance(rhs_val, TRTTensor):
-        lhs_val, rhs_val = cast_int_int_div_trt_tensor(ctx, lhs_val, rhs_val, name)
+    lhs_val, rhs_val = cast_int_int_div_trt_tensor(ctx, lhs_val, rhs_val, name)
 
     return convert_binary_elementwise(
         ctx, target, source_ir, name, trt.ElementWiseOperation.DIV, lhs_val, rhs_val
