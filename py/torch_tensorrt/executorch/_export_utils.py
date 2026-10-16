@@ -534,3 +534,33 @@ def replace_execute_engine(
     graph_module.graph.lint()
     graph_module.recompile()
     return exported_program
+
+
+def operators_without_kernels(executorch_program: Any) -> list[str]:
+    """Operators a finalized program calls that the ExecuTorch runtime here cannot run.
+
+    These are the operators left outside the TensorRT delegates. Only the runtime
+    installed in this environment can be asked, and a runtime built with other kernel
+    libraries may register more, so this is advice rather than a verdict. Returns an
+    empty list when there is no runtime here to ask.
+    """
+    try:
+        from executorch.extension.pybindings.portable_lib import _get_operator_names
+
+        registered = set(_get_operator_names())
+        plans = executorch_program.executorch_program.execution_plan
+    except Exception:
+        # Broad by design: the check is advisory. An environment without a loadable
+        # ExecuTorch runtime, or a program that does not expose its plans, must still
+        # save.
+        logger.debug(
+            "Could not check the program's operators against the ExecuTorch runtime.",
+            exc_info=True,
+        )
+        return []
+    used = {
+        f"{operator.name}.{operator.overload}" if operator.overload else operator.name
+        for plan in plans
+        for operator in plan.operators
+    }
+    return sorted(used - registered)
