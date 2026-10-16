@@ -33,6 +33,9 @@ struct TensorRTBlobHeader {
   std::vector<AliasedBinding> aliased_io;
   bool hardware_compatible = false;
   int device_id = 0;
+  // Named-data key of an engine kept in an ExecuTorch data file (.ptd) rather than in the blob.
+  // Empty when the engine follows the metadata; set, the blob carries no engine bytes.
+  std::string engine_key;
 
   static const void* engine_data(const void* blob, const TensorRTBlobHeader& h);
   static bool parse(const void* data, std::size_t size, TensorRTBlobHeader& out);

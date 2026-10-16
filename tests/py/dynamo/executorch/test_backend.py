@@ -2,8 +2,11 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import ast
+import gc
+import hashlib
 import operator
 import struct
+import tempfile
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -12,6 +15,7 @@ import pytest
 executorch = pytest.importorskip("executorch.exir")
 
 import torch  # noqa: E402
+from executorch.exir._serialize._cord import FileBackedData  # noqa: E402
 from executorch.exir.backend.compile_spec_schema import CompileSpec  # noqa: E402
 from torch.export.graph_signature import InputKind  # noqa: E402
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (  # noqa: E402
@@ -251,7 +255,6 @@ def test_preprocess_hands_the_engine_to_the_blob_without_copying_it(monkeypatch)
     # the engine tensor into bytes first would hold one more copy at the same time,
     # and an engine can be several gigabytes.
     import numpy as np
-
     from torch_tensorrt.executorch import backend as backend_module
 
     engine_tensor = _engine_tensor(b"engine-bytes")
@@ -854,3 +857,109 @@ def test_elided_output_names_reads_the_list_the_partitioner_writes():
 
     assert _elided_output_names(specs) == {"kv0"}
     assert _elided_output_names([]) is None
+
+
+def _external_engine_spec(tag=b"engines"):
+    from torch_tensorrt.executorch.backend import EXTERNAL_ENGINE_DATA_COMPILE_SPEC_KEY
+
+    return CompileSpec(EXTERNAL_ENGINE_DATA_COMPILE_SPEC_KEY, tag)
+
+
+def _simple_engine_program(payload):
+    engine_info = [""] * SERIALIZATION_LEN
+    engine_info[ENGINE_IDX] = _engine_tensor(payload)
+    engine_info[DEVICE_IDX] = "0%8%0%0%GPU"
+    engine_info[INPUT_BINDING_NAMES_IDX] = "x"
+    engine_info[OUTPUT_BINDING_NAMES_IDX] = "y"
+    return _build_edge_program(engine_info)
+
+
+@pytest.mark.unit
+def test_preprocess_moves_the_engine_to_the_named_data_file():
+    payload = b"engine-bytes"
+    embedded = TensorRTBackend.preprocess(_simple_engine_program(payload), [])
+    result = TensorRTBackend.preprocess(
+        _simple_engine_program(payload), [_external_engine_spec()]
+    )
+
+    engine, metadata = deserialize_engine(result.processed_bytes)
+    assert engine == b""
+    store = result.data_store_output
+    assert not store.pte_data
+    assert list(store.external_data) == ["engines"]
+    entry = store.external_data["engines"][metadata.engine_key]
+    buffer = store.buffers[entry.buffer_index]
+    # File-backed, so the engine is not held in memory a second time until the .ptd is written.
+    assert isinstance(buffer, FileBackedData)
+    # The same bytes the embedded blob carries, not a re-serialized engine.
+    assert buffer.to_bytes() == deserialize_engine(embedded.processed_bytes)[0]
+    assert buffer.sha256() == hashlib.sha256(buffer.to_bytes()).digest()
+    assert entry.alignment % 16 == 0
+    _, embedded_metadata = deserialize_engine(embedded.processed_bytes)
+    embedded_metadata.engine_key = metadata.engine_key
+    assert metadata == embedded_metadata
+
+
+@pytest.mark.unit
+def test_preprocess_keys_the_engine_by_its_content():
+    keys = [
+        deserialize_engine(
+            TensorRTBackend.preprocess(
+                _simple_engine_program(payload), [_external_engine_spec()]
+            ).processed_bytes
+        )[1].engine_key
+        for payload in (b"engine-a", b"engine-a", b"engine-b")
+    ]
+    assert keys[0] == keys[1] != keys[2]
+    assert keys[0] == "tensorrt_engine_" + hashlib.sha256(b"engine-a").hexdigest()
+
+
+@pytest.mark.unit
+def test_preprocess_removes_the_engine_file_with_the_named_data(monkeypatch, tmp_path):
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
+    result = TensorRTBackend.preprocess(
+        _simple_engine_program(b"engine-bytes"), [_external_engine_spec()]
+    )
+    assert len(list(tmp_path.glob("tensorrt_engine_*"))) == 1
+    del result
+    gc.collect()
+    assert not list(tmp_path.glob("tensorrt_engine_*"))
+
+
+@pytest.mark.unit
+def test_preprocess_removes_the_engine_file_when_staging_fails(monkeypatch, tmp_path):
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
+
+    def fail(*args, **kwargs):
+        raise OSError("disk full")
+
+    monkeypatch.setattr("torch_tensorrt.executorch.backend.FileBackedData", fail)
+    with pytest.raises(OSError, match="disk full"):
+        TensorRTBackend.preprocess(
+            _simple_engine_program(b"engine-bytes"), [_external_engine_spec()]
+        )
+    assert not list(tmp_path.glob("tensorrt_engine_*"))
+
+
+@pytest.mark.unit
+def test_preprocess_without_the_spec_embeds_the_engine_and_writes_no_key():
+    result = TensorRTBackend.preprocess(_simple_engine_program(b"engine-bytes"), [])
+    assert result.data_store_output is None
+    assert b"engine_key" not in result.processed_bytes
+    assert deserialize_engine(result.processed_bytes)[0] == b"engine-bytes"
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "specs, message",
+    [
+        ([_external_engine_spec(), _external_engine_spec()], "at most once"),
+        ([_external_engine_spec(b"")], "must be a non-empty file name"),
+        ([_external_engine_spec(b"../outside")], "without a directory"),
+        ([_external_engine_spec(5)], "not int"),
+        ([_external_engine_spec(b"\xff\xfe")], "not valid UTF-8"),
+    ],
+)
+def test_preprocess_rejects_a_malformed_external_engine_spec(specs, message):
+    with pytest.raises(ValueError, match=message):
+        TensorRTBackend.preprocess(_simple_engine_program(b"engine-bytes"), specs)

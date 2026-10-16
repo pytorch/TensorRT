@@ -191,7 +191,8 @@ TEST(ExecuTorchTensorRTBlobHeader, RejectsAnEngineOffsetPastEndOfBlob) {
   auto blob = make_blob(VALID_METADATA);
   const auto past_end = static_cast<uint32_t>(align_up(blob.size() + ENGINE_ALIGNMENT, ENGINE_ALIGNMENT));
   write_field(blob, ENGINE_OFFSET_FIELD_OFFSET, past_end);
-  write_field(blob, ENGINE_SIZE_FIELD_OFFSET, uint64_t{0});
+  // Not zero, so the rule that a keyless blob carries engine bytes cannot be what refuses it.
+  write_field(blob, ENGINE_SIZE_FIELD_OFFSET, uint64_t{4});
 
   TensorRTBlobHeader header;
   EXPECT_FALSE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
@@ -491,7 +492,8 @@ TEST(ExecuTorchTensorRTBlobHeader, RejectsEngineOffsetPastEndOfBlob) {
   auto blob = make_blob(R"({"io_bindings":[{"name":"x","is_input":true}]})");
   const auto past_end = static_cast<uint32_t>(align_up(blob.size() + ENGINE_ALIGNMENT, ENGINE_ALIGNMENT));
   write_field(blob, ENGINE_OFFSET_FIELD_OFFSET, past_end);
-  write_field(blob, ENGINE_SIZE_FIELD_OFFSET, uint64_t{0});
+  // Not zero, so the rule that a keyless blob carries engine bytes cannot be what refuses it.
+  write_field(blob, ENGINE_SIZE_FIELD_OFFSET, uint64_t{4});
 
   TensorRTBlobHeader header;
   EXPECT_FALSE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
@@ -755,6 +757,73 @@ TEST(ExecuTorchTensorRTBlobHeader, RejectsUnknownFutureMagic) {
   const std::string metadata = R"({"io_bindings":[{"name":"x","is_input":true}]})";
   const auto blob = make_blob(metadata, 4, kFutureMagic);
 
+  TensorRTBlobHeader header;
+  EXPECT_FALSE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
+}
+
+TEST(ExecuTorchTensorRTBlobHeader, ReadsTheKeyOfAnEngineKeptInADataFile) {
+  // The writer's key order, with the key last, and no engine bytes after the metadata.
+  const std::string metadata = R"({"io_bindings":[{"name":"x","is_input":true}],"aliased_io":[],)"
+                               R"("hardware_compatible":false,"device_id":0,"serialized_metadata":"",)"
+                               R"("target_platform":"","engine_key":"tensorrt_engine_0123abcd"})";
+  const auto blob = make_blob(metadata, 0);
+
+  TensorRTBlobHeader header;
+  ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
+  EXPECT_EQ(header.engine_key, "tensorrt_engine_0123abcd");
+  EXPECT_EQ(header.engine_size, 0u);
+}
+
+TEST(ExecuTorchTensorRTBlobHeader, LeavesTheKeyEmptyForAnEngineInTheBlob) {
+  TensorRTBlobHeader header;
+  header.engine_key = "left over from an earlier parse";
+  const auto blob = make_blob(VALID_METADATA);
+  ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
+  EXPECT_TRUE(header.engine_key.empty());
+}
+
+TEST(ExecuTorchTensorRTBlobHeader, RejectsAnEngineKeyThatIsEmptyOrNotAString) {
+  // Either would read as an engine in the blob. The blob carries engine bytes, so only the key
+  // check can refuse it.
+  for (const char* value : {R"("")", "7", "null"}) {
+    const std::string metadata =
+        std::string(R"({"io_bindings":[{"name":"x","is_input":true}],"engine_key":)") + value + "}";
+    const auto blob = make_blob(metadata, 4);
+    TensorRTBlobHeader header;
+    EXPECT_FALSE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header)) << value;
+  }
+}
+
+TEST(ExecuTorchTensorRTBlobHeader, RejectsTextAfterTheEngineKey) {
+  for (const char* tail : {R"("k"x})", R"("k" x})", R"("k" "x"})"}) {
+    const std::string metadata = std::string(R"({"io_bindings":[{"name":"x","is_input":true}],"engine_key":)") + tail;
+    const auto blob = make_blob(metadata, 0);
+    TensorRTBlobHeader header;
+    EXPECT_FALSE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header)) << tail;
+  }
+  const auto spaced = make_blob(R"({"io_bindings":[{"name":"x","is_input":true}],"engine_key":"k" })", 0);
+  TensorRTBlobHeader header;
+  ASSERT_TRUE(TensorRTBlobHeader::parse(spaced.data(), spaced.size(), header));
+  EXPECT_EQ(header.engine_key, "k");
+}
+
+TEST(ExecuTorchTensorRTBlobHeader, InputNamedEngineKeyIsNotReadAsOne) {
+  const auto blob = make_blob(R"({"io_bindings":[{"name":"engine_key","is_input":true}]})");
+  TensorRTBlobHeader header;
+  ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
+  EXPECT_TRUE(header.engine_key.empty());
+}
+
+TEST(ExecuTorchTensorRTBlobHeader, RejectsAnEngineKeyAlongsideEngineBytes) {
+  // Either one could be the engine to load, so the blob is ambiguous.
+  const std::string metadata = R"({"io_bindings":[{"name":"x","is_input":true}],"engine_key":"tensorrt_engine_k"})";
+  const auto blob = make_blob(metadata, 4);
+  TensorRTBlobHeader header;
+  EXPECT_FALSE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
+}
+
+TEST(ExecuTorchTensorRTBlobHeader, RejectsABlobWithNeitherEngineBytesNorAnEngineKey) {
+  const auto blob = make_blob(VALID_METADATA, 0);
   TensorRTBlobHeader header;
   EXPECT_FALSE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
 }

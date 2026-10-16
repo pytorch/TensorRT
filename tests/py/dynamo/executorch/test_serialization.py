@@ -2,9 +2,11 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import json
+import struct
 
 import pytest
 from torch_tensorrt.executorch.serialization import (
+    HEADER_FORMAT,
     HEADER_SIZE,
     TENSORRT_MAGIC,
     TENSORRT_MAGIC_ALIASED_IO,
@@ -159,6 +161,10 @@ def test_to_json_writes_every_scalar_after_both_arrays():
     )
     for key in ('"hardware_compatible"', '"device_id"'):
         assert text.index(key) > arrays_end, f"{key} is written before an array"
+    keyed = TensorRTBlobMetadata.from_json(metadata.to_json())
+    keyed.engine_key = "tensorrt_engine_abc"
+    keyed_text = keyed.to_json().decode("utf-8")
+    assert keyed_text.index('"engine_key"') > arrays_end
 
     # Read back through the writer's own reader as well, so the ordering
     # assertion is made about a payload that is otherwise correct.
@@ -167,3 +173,64 @@ def test_to_json_writes_every_scalar_after_both_arrays():
     assert restored.device_id == 6
     assert restored.aliased_io == {"out_k": ("in_k", "kv_cache_update")}
     assert [b.name for b in restored.io_bindings] == ["in_k", "out_k"]
+
+
+@pytest.mark.unit
+def test_engine_key_round_trips_and_is_absent_when_unset():
+    metadata = TensorRTBlobMetadata(
+        io_bindings=[
+            TensorRTIOBinding(name="x"),
+            TensorRTIOBinding(name="y", is_input=False),
+        ]
+    )
+    assert "engine_key" not in json.loads(metadata.to_json())
+
+    metadata.engine_key = "tensorrt_engine_abc"
+    engine, restored = deserialize_engine(serialize_engine(b"", metadata))
+    assert engine == b""
+    assert restored.engine_key == "tensorrt_engine_abc"
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "engine, key",
+    [(b"engine-bytes", "tensorrt_engine_abc"), (b"", ""), (b"", 7), (b"", True)],
+)
+def test_serialize_engine_refuses_both_or_neither_engine_bytes_and_key(engine, key):
+    with pytest.raises(ValueError, match="exactly one"):
+        serialize_engine(engine, TensorRTBlobMetadata(engine_key=key))
+
+
+@pytest.mark.unit
+def test_deserialize_engine_refuses_both_or_neither_engine_bytes_and_key():
+    inline = serialize_engine(b"engine-bytes", TensorRTBlobMetadata())
+    neither = inline[:16] + struct.pack("<Q", 0) + inline[24:]
+    keyed = serialize_engine(
+        b"", TensorRTBlobMetadata(engine_key="tensorrt_engine_abc")
+    )
+    both = keyed[:16] + struct.pack("<Q", 4) + keyed[24:] + b"eng!"
+    for blob in (neither, both):
+        with pytest.raises(ValueError, match="exactly one"):
+            deserialize_engine(blob)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("key, engine", [("", b"eng!"), (None, b"eng!"), (7, b"")])
+def test_deserialize_engine_refuses_a_key_that_is_not_a_non_empty_string(key, engine):
+    # The C++ parser refuses these too.
+    metadata = json.loads(TensorRTBlobMetadata().to_json())
+    metadata["engine_key"] = key
+    metadata_json = json.dumps(metadata).encode()
+    engine_offset = (HEADER_SIZE + len(metadata_json) + 15) & ~15
+    header = struct.pack(
+        HEADER_FORMAT,
+        TENSORRT_MAGIC,
+        HEADER_SIZE,
+        len(metadata_json),
+        engine_offset,
+        len(engine),
+        bytes(8),
+    )
+    padding = bytes(engine_offset - HEADER_SIZE - len(metadata_json))
+    with pytest.raises(ValueError, match="non-empty string"):
+        deserialize_engine(header + metadata_json + padding + engine)

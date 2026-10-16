@@ -176,6 +176,15 @@ bool parse_int_after_key(const std::string& json, std::size_t search_from, const
   return true;
 }
 
+bool parse_string_after_key(const std::string& json, std::size_t key_pos, const char* key, std::string& value) {
+  const std::size_t colon = json.find(':', key_pos + std::strlen(key));
+  if (colon == std::string::npos) {
+    return false;
+  }
+  const std::size_t end = parse_string(json, skip_ws(json, colon + 1), value);
+  return end != std::string::npos && ends_value(json, skip_ws(json, end));
+}
+
 // A key of the outermost object, so a tensor named after a key is not mistaken for it.
 std::size_t find_top_level_key(const std::string& json, const char* key) {
   const std::size_t key_len = std::strlen(key);
@@ -221,6 +230,7 @@ bool parse_metadata_json(const std::string& json, bool expects_aliased_io, Tenso
   out.aliased_io.clear();
   out.hardware_compatible = false;
   out.device_id = 0;
+  out.engine_key.clear();
 
   const std::size_t bindings_pos = find_top_level_key(json, "\"io_bindings\"");
   if (bindings_pos == std::string::npos) {
@@ -476,8 +486,15 @@ bool parse_metadata_json(const std::string& json, bool expects_aliased_io, Tenso
   }
   const std::size_t hw_key = find_top_level_key(json, "\"hardware_compatible\"");
   const std::size_t device_key = find_top_level_key(json, "\"device_id\"");
-  return parse_bool_after_key(json, hw_key, "\"hardware_compatible\"", out.hardware_compatible) &&
-      parse_int_after_key(json, device_key, "\"device_id\"", out.device_id);
+  if (!parse_bool_after_key(json, hw_key, "\"hardware_compatible\"", out.hardware_compatible) ||
+      !parse_int_after_key(json, device_key, "\"device_id\"", out.device_id)) {
+    return false;
+  }
+  // Optional: absent in a blob that carries its engine. Present, it must be a non-empty string,
+  // since an empty key would read as "engine in the blob".
+  const std::size_t engine_key_pos = find_top_level_key(json, "\"engine_key\"");
+  return engine_key_pos == std::string::npos ||
+      (parse_string_after_key(json, engine_key_pos, "\"engine_key\"", out.engine_key) && !out.engine_key.empty());
 }
 
 } // namespace
@@ -532,7 +549,8 @@ bool TensorRTBlobHeader::parse(const void* data, std::size_t size, TensorRTBlobH
   }
 
   std::string json(reinterpret_cast<const char*>(bytes + out.metadata_offset), out.metadata_size);
-  return parse_metadata_json(json, aliased_io_magic, out);
+  // Exactly one engine source: with both, either could be the one to load; with neither, there is nothing to load.
+  return parse_metadata_json(json, aliased_io_magic, out) && out.engine_key.empty() == (out.engine_size != 0);
 }
 
 } // namespace executorch_backend
