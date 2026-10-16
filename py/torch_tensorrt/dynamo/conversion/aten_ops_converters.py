@@ -39,6 +39,8 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     dynamo_tensorrt_converter,
     has_static_shapes_in_args,
     node_has_dynamic_shapes,
+    node_has_uint8_tensors,
+    produces_floating_output,
 )
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     args_bounds_check,
@@ -655,7 +657,9 @@ def aten_ops_sigmoid(
         0: (TRTTensor,),
     }
 )
-@dynamo_tensorrt_converter(torch.ops.aten.sym_size.int, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.sym_size.int, supports_dynamic_shapes=True, supports_uint8=True
+)
 def aten_ops_symsize_int(
     ctx: ConversionContext,
     target: Target,
@@ -2219,11 +2223,13 @@ def to_copy_dtype_validator(
         not is_only_operator_on_placeholder(node, settings)
     ),
     supports_dynamic_shapes=True,
+    supports_uint8=True,
 )
 @dynamo_tensorrt_converter(
     torch.ops.aten._to_copy.default,
     capability_validator=to_copy_dtype_validator(placeholder_only=False),
     supports_dynamic_shapes=True,
+    supports_uint8=True,
 )
 def aten_ops_clone_copy_dtype(
     ctx: ConversionContext,
@@ -2329,11 +2335,13 @@ def _to_copy_placeholder_validator(
     torch.ops.aten.clone.default,
     capability_validator=_clone_placeholder_validator,
     supports_dynamic_shapes=True,
+    supports_uint8=True,
 )
 @dynamo_tensorrt_converter(
     torch.ops.aten._to_copy.default,
     capability_validator=_to_copy_placeholder_validator,
     supports_dynamic_shapes=True,
+    supports_uint8=True,
 )
 def aten_ops_clone_copy_placeholder(
     ctx: ConversionContext,
@@ -2661,6 +2669,7 @@ def log1p_validator(node: Node, settings: Optional[CompilationSettings] = None) 
     torch.ops.aten.log1p.default,
     capability_validator=log1p_validator,
     supports_dynamic_shapes=True,
+    supports_uint8=True,
 )
 def aten_ops_log1p(
     ctx: ConversionContext,
@@ -3096,9 +3105,27 @@ def aten_ops_isnan(
     )
 
 
+def uint8_operands_with_floating_result(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    """Arithmetic casts its operands to the result type before computing, so a uint8
+    operand is fine when that type is floating. A uint8 result would need uint8 math."""
+    return not node_has_uint8_tensors(node) or produces_floating_output(node)
+
+
 @dynamo_tensorrt_converter(operator.add, supports_dynamic_shapes=True)
-@dynamo_tensorrt_converter(torch.ops.aten.add.Tensor, supports_dynamic_shapes=True)
-@dynamo_tensorrt_converter(torch.ops.aten.add.Scalar, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.add.Tensor,
+    capability_validator=uint8_operands_with_floating_result,
+    supports_dynamic_shapes=True,
+    supports_uint8=True,
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.add.Scalar,
+    capability_validator=uint8_operands_with_floating_result,
+    supports_dynamic_shapes=True,
+    supports_uint8=True,
+)
 def aten_ops_add(
     ctx: ConversionContext,
     target: Target,
@@ -3130,8 +3157,18 @@ def aten_ops_add(
 
 
 @dynamo_tensorrt_converter(operator.mul, supports_dynamic_shapes=True)
-@dynamo_tensorrt_converter(torch.ops.aten.mul.Tensor, supports_dynamic_shapes=True)
-@dynamo_tensorrt_converter(torch.ops.aten.mul.Scalar, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.mul.Tensor,
+    capability_validator=uint8_operands_with_floating_result,
+    supports_dynamic_shapes=True,
+    supports_uint8=True,
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.mul.Scalar,
+    capability_validator=uint8_operands_with_floating_result,
+    supports_dynamic_shapes=True,
+    supports_uint8=True,
+)
 def aten_ops_mul(
     ctx: ConversionContext,
     target: Target,
@@ -3187,8 +3224,18 @@ def aten_ops_minimum(
 
 
 @dynamo_tensorrt_converter(operator.sub, supports_dynamic_shapes=True)
-@dynamo_tensorrt_converter(torch.ops.aten.sub.Tensor, supports_dynamic_shapes=True)
-@dynamo_tensorrt_converter(torch.ops.aten.sub.Scalar, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.sub.Tensor,
+    capability_validator=uint8_operands_with_floating_result,
+    supports_dynamic_shapes=True,
+    supports_uint8=True,
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.sub.Scalar,
+    capability_validator=uint8_operands_with_floating_result,
+    supports_dynamic_shapes=True,
+    supports_uint8=True,
+)
 def aten_ops_sub(
     ctx: ConversionContext,
     target: Target,
@@ -3220,9 +3267,19 @@ def aten_ops_sub(
 
 
 @dynamo_tensorrt_converter(operator.truediv, supports_dynamic_shapes=True)
-@dynamo_tensorrt_converter(torch.ops.aten.div.Tensor, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.div.Tensor,
+    capability_validator=uint8_operands_with_floating_result,
+    supports_dynamic_shapes=True,
+    supports_uint8=True,
+)
 @dynamo_tensorrt_converter(torch.ops.aten.div.Tensor_mode, supports_dynamic_shapes=True)
-@dynamo_tensorrt_converter(torch.ops.aten.div.Scalar, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.div.Scalar,
+    capability_validator=uint8_operands_with_floating_result,
+    supports_dynamic_shapes=True,
+    supports_uint8=True,
+)
 @dynamo_tensorrt_converter(torch.ops.aten.div.Scalar_mode, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.prims.div.default, supports_dynamic_shapes=True)
 def aten_ops_div(
