@@ -128,6 +128,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         symbolic_shape_expressions: Optional[Dict[str, List[Dict[str, Any]]]] = None,
         aliased_io: Optional[Dict[str, Tuple[str, str]]] = None,
         num_user_outputs: Optional[int] = None,
+        serialized_engine_path: Optional[str] = None,
     ):
         """Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs
         a PyTorch ``torch.nn.Module`` around it. Uses the Torch-TensorRT runtime extension to run the engines
@@ -173,6 +174,9 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             settings: Compilation/runtime settings (device, lazy init, cross-compile, etc.).
             requires_output_allocator: Engine needs TRT dynamic output allocation.
             symbolic_shape_expressions: Optional symbolic shape metadata from compile.
+            serialized_engine_path: A file holding the serialized engine, used instead of
+                ``serialized_engine`` (``engine_output_dir``). The engine is read from it when
+                first used, so the module holds no engine until then.
         """
         super().__init__()
 
@@ -186,7 +190,10 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.hardware_compatible = settings.hardware_compatible
         self.settings = copy.deepcopy(settings)
         self.serialized_engine = serialized_engine
+        self.serialized_engine_path = serialized_engine_path
         self.engine: Optional[Any] = None
+        # Applied when the engine is set up, for a module whose engine is still on disk.
+        self._output_tensors_unowned = False
         self.requires_output_allocator = requires_output_allocator
         self.dynamically_allocate_resources = settings.dynamically_allocate_resources
 
@@ -237,7 +244,15 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             return torch.device(f"cuda:{self.settings.device.gpu_id}")
         return torch.device(f"cuda:{torch.cuda.current_device()}")
 
-    def _pack_engine_info(self) -> List[str | bytes]:
+    def _engine_bytes(self) -> bytes:
+        """The serialized engine, from memory or from ``serialized_engine_path``."""
+        if self.serialized_engine is not None:
+            return self.serialized_engine
+        assert self.serialized_engine_path is not None
+        with open(self.serialized_engine_path, "rb") as f:
+            return f.read()
+
+    def _pack_engine_info(self, include_engine: bool = True) -> List[str | bytes]:
         target_device = (
             self.settings.device
             if self.settings.device is not None
@@ -247,11 +262,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             "settings": self.settings,
             "inout_symexprs": self.symbolic_shape_expressions,
             "num_user_outputs": self.num_user_outputs,
-            "output_tensors_are_unowned": (
-                False
-                if self.engine is None
-                else self.engine.are_output_tensors_unowned()
-            ),
+            "output_tensors_are_unowned": self.are_output_tensors_unowned(),
         }
         engine_info: List[str | bytes] = [""] * SERIALIZATION_LEN
         engine_info[ABI_TARGET_IDX] = (
@@ -267,8 +278,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             if ENABLED_FEATURES.torch_tensorrt_runtime
             else serialize_device_info(target_device)
         )
-        assert self.serialized_engine is not None
-        engine_info[ENGINE_IDX] = self.serialized_engine
+        engine_info[ENGINE_IDX] = self._engine_bytes() if include_engine else b""
         engine_info[INPUT_BINDING_NAMES_IDX] = serialize_binding_names(
             self.input_binding_names
         )
@@ -304,6 +314,8 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         Used by every engine-accessing method except the hot ``forward`` path,
         which intentionally skips the check to avoid per-call overhead.
         """
+        if self.engine is None and self.serialized_engine_path is not None:
+            self.setup_engine()
         if self.engine is None:
             raise RuntimeError("Engine has not been setup yet.")
         return self.engine
@@ -453,6 +465,8 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             )
         else:
             self.engine = torch.classes.tensorrt.Engine(self._pack_engine_info())
+        if self._output_tensors_unowned:
+            self.engine.set_output_tensors_as_unowned(True)
 
         # Re-apply via the setter: resolves any path-string runtime_cache,
         # dispatches to the engine, and writes back the resolved form.
@@ -512,7 +526,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                 self.input_binding_names,
                 self.output_binding_names,
             )
-        elif self.serialized_engine:
+        elif self.serialized_engine or self.serialized_engine_path:
             engine_info = self._pack_engine_info()
             engine_bytes = engine_info[ENGINE_IDX]
             assert isinstance(engine_bytes, bytes)
@@ -680,6 +694,8 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
     def __setstate__(self, state: dict[str, Any]) -> None:
         state.setdefault("_runtime_settings", RuntimeSettings(runtime_cache=None))
         state.setdefault("_implicit_cache_handle", None)
+        state.setdefault("serialized_engine_path", None)
+        state.setdefault("_output_tensors_unowned", False)
         set_state = getattr(super(), "__setstate__", None)
         if set_state is not None:
             set_state(state)
@@ -702,9 +718,9 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
     def forward(self, *inputs: Any) -> Any:
         """Run the TensorRT engine on GPU tensors (non-tensor args are cast to CUDA tensors).
 
-        Note: callers are responsible for ensuring the engine has been set up;
-        the hot path intentionally omits a ``self.engine is None`` guard so
-        that a properly-bound module avoids the per-call attribute check.
+        Note: callers are responsible for ensuring the engine has been set up,
+        except for an engine still on disk (``engine_output_dir``), which is
+        loaded on the first call.
         """
         target = self.target_device
         binding_names = self.input_binding_names
@@ -746,8 +762,11 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                     scalar_tensor = scalar_tensor.unsqueeze(0)
                 input_tensors.append(scalar_tensor.cuda())
 
+        engine = self.engine
+        if engine is None and self.serialized_engine_path is not None:
+            engine = self.get_engine()  # first call: the engine is still on disk
         outputs: List[Any] = torch.ops.tensorrt.execute_engine(
-            list(input_tensors), self.engine
+            list(input_tensors), engine
         )
 
         # The interpreter may have appended extra "side-effect" outputs to
@@ -794,10 +813,14 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.profiling_enabled = True
 
     def set_output_tensors_as_unowned(self, enabled: bool) -> None:
-        self.get_engine().set_output_tensors_as_unowned(enabled)
+        self._output_tensors_unowned = enabled
+        if self.engine is not None:
+            self.engine.set_output_tensors_as_unowned(enabled)
 
     def are_output_tensors_unowned(self) -> bool:
-        return bool(self.get_engine().are_output_tensors_unowned())
+        if self.engine is None:
+            return self._output_tensors_unowned
+        return bool(self.engine.are_output_tensors_unowned())
 
     def disable_profiling(self) -> None:
         """Disable engine profiling and clear the profiling flag on this module."""

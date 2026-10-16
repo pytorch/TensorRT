@@ -5,8 +5,11 @@ from __future__ import annotations
 
 import io
 import logging
+import os
+import tempfile
 from typing import Any, Dict, List, NamedTuple, Optional, Sequence, Tuple
 
+import tensorrt as trt
 import torch
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
@@ -27,8 +30,6 @@ from torch_tensorrt.dynamo.utils import (
     release_host_and_device_memory,
 )
 from torch_tensorrt.logging import TRT_LOGGER
-
-import tensorrt as trt
 
 logger = logging.getLogger(__name__)
 
@@ -443,8 +444,24 @@ def convert_module(
                 "For TRT-LLM fallback, set TRTLLM_PLUGINS_PATH or USE_TRTLLM_PLUGINS=1."
             )
 
+    serialized_engine: Optional[bytes] = serialized_interpreter_result.serialized_engine
+    serialized_engine_path = None
+    if settings.engine_output_dir:
+        # Keep the engine on disk, not on the GPU or the host, until it is used or saved.
+        os.makedirs(settings.engine_output_dir, exist_ok=True)
+        fd, serialized_engine_path = tempfile.mkstemp(
+            suffix=".engine",
+            prefix=f"{name or 'engine'}_",
+            dir=settings.engine_output_dir,
+        )
+        with os.fdopen(fd, "wb") as f:
+            f.write(serialized_interpreter_result.serialized_engine)
+        serialized_engine = None
+        logger.info(f"Wrote the engine for {name} to {serialized_engine_path}")
+
     return TorchTensorRTModule(
-        serialized_engine=serialized_interpreter_result.serialized_engine,
+        serialized_engine=serialized_engine,
+        serialized_engine_path=serialized_engine_path,
         input_binding_names=list(serialized_interpreter_result.input_names),
         output_binding_names=list(serialized_interpreter_result.output_names),
         name=name,
