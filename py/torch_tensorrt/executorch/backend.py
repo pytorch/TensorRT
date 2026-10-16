@@ -6,6 +6,7 @@
 import copy
 import hashlib
 import json
+import logging
 import operator
 from typing import Any, Container, Iterable, List, Optional, Set, final
 
@@ -31,13 +32,37 @@ from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
     TARGET_PLATFORM_IDX,
     deserialize_aliased_io,
 )
+from torch_tensorrt.executorch._export_utils import ENGINE_BYTES_ATTR
 from torch_tensorrt.executorch.serialization import (
     TensorRTBlobMetadata,
     TensorRTIOBinding,
     serialize_engine,
 )
 
+logger = logging.getLogger(__name__)
+
 _BINDING_DELIM = "%"
+
+_warned_engine_copy = False
+
+
+def _warn_engine_copy() -> None:
+    """Warn once that preprocess copies an engine instead of reusing the export's bytes.
+
+    The export stages each engine as a tensor that remembers its ``bytes``
+    (``engine_bytes_tensor``); a ``detach()`` or ``state_dict()`` along the way drops
+    that, and the copy here is then a second host copy of the engine during the save.
+    """
+    global _warned_engine_copy
+    if not _warned_engine_copy:
+        _warned_engine_copy = True
+        logger.warning(
+            "TensorRTBackend.preprocess: an engine tensor no longer carries the bytes it "
+            "was staged from (%s), so the engine is copied once more and the save holds an "
+            "extra host copy of it.",
+            ENGINE_BYTES_ATTR,
+        )
+
 
 # CompileSpec key naming the aliased outputs a delegate deliberately does not
 # carry. Its value is the JSON list of those engine output binding names (see
@@ -267,7 +292,7 @@ def _reorder_input_names_for_executorch(
     tagged into a delegate its spec becomes ``BUFFER_MUTATION``, the delegate's
     outputs are permuted, and they would need the same node-identity reordering as
     the inputs below. ``_validate_output_binding_order`` checks that correspondence
-    on every preprocess, so it would fail loudly rather than mis-bind.
+    on every preprocess, so it would fail loudly rather than bind wrongly.
     """
     input_nodes = list(engine_node.args[0])
     if len(input_nodes) != len(input_names):
@@ -530,9 +555,10 @@ class TensorRTBackend(BackendDetails):  # type: ignore[misc]
         # ExecuTorch writes named data only from `bytes`, and an engine can be several
         # gigabytes, so reuse the `bytes` the export staged the engine from
         # (engine_bytes_tensor) and copy only a tensor that did not come from one.
-        engine_bytes = getattr(serialized_engine, "_trt_engine_bytes", None)
+        engine_bytes = getattr(serialized_engine, ENGINE_BYTES_ATTR, None)
         if not isinstance(engine_bytes, bytes):
             if isinstance(serialized_engine, torch.Tensor):
+                _warn_engine_copy()
                 # `bytes(storage)` looks equivalent but iterates element by element in
                 # Python, about two seconds per megabyte, and returns the whole backing
                 # allocation rather than the tensor's own extent. `.view(torch.uint8)`
