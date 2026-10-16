@@ -110,12 +110,16 @@ Memory Errors During Compilation
 
 **Process killed (OOM) on CPU**
 
-    Compilation peaks at about 1× the model size in CPU memory, plus about 2 GB for
-    TensorRT's builder, or about 2× with ``offload_module_to_cpu=True``.
+    Compilation typically peaks at about 1× the model size in CPU memory, plus about
+    2 GB for TensorRT's builder, or about 2× with ``offload_module_to_cpu=True``. In
+    some cases TensorRT's engine build itself still reaches 2–3× the model size, for
+    example when a large model is built as a single engine.
 
     * Make sure ``TORCHTRT_ENABLE_BUILDER_MALLOC_TRIM`` is not set to ``0``; trimming
       the builder's freed memory is on by default on Linux.
     * Disable ``offload_module_to_cpu`` (``False``) to drop another 1× copy.
+    * Enable resource partitioning (``enable_resource_partitioning=True``) so each
+      engine build holds only part of the model; see :ref:`resource_management`.
 
 ----
 

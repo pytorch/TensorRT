@@ -27,7 +27,7 @@ from torch_tensorrt.dynamo.utils import (
 )
 from torch_tensorrt.logging import TRT_LOGGER
 
-import tensorrt as trt
+import tensorrt as trt  # isort: skip  # imported after torch_tensorrt for RTX alias
 
 logger = logging.getLogger(__name__)
 
@@ -189,7 +189,8 @@ def pull_cached_engine(
             if hasattr(trt.SerializationFlag, "INCLUDE_REFIT"):
                 serialization_config.set_flag(trt.SerializationFlag.INCLUDE_REFIT)
             serialized_engine = engine.serialize_with_config(serialization_config)
-            del engine
+            # The serialization config keeps its engine alive, so free both.
+            del engine, serialization_config
 
         return SerializedInterpreterResult(
             serialized_engine=serialized_engine,
