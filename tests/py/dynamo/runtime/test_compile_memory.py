@@ -16,7 +16,7 @@ from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 from torch_tensorrt.logging import TRT_LOGGER
 
-import tensorrt as trt
+import tensorrt as trt  # isort: skip  # imported after torch_tensorrt for RTX alias
 
 
 def _proc_status(field: str) -> int:
