@@ -426,7 +426,8 @@ def refit_module_weights(
         serialized_engine = engine.serialize_with_config(serialization_config)
         # Only the plan is needed from here on. Free the refitted copy before the
         # runtime engine is rebuilt from it, so the weights are not on the device twice.
-        del engine
+        # The serialization config keeps its engine alive, so it has to go too.
+        del engine, serialization_config
 
         if isinstance(compiled_submodule, TorchTensorRTModule):
             if isinstance(compiled_submodule.engine, TRTEngine):
