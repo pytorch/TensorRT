@@ -663,6 +663,31 @@ def test_install_channel_guard_rejects_unsupported_nightly_recipes(
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize(
+    ("path", "command", "allowed"),
+    [
+        ("docsrc/install.rst", 'pip install "torch-tensorrt[executorch]"', True),
+        ("README.md", 'pip install "torch-tensorrt[executorch]"', False),
+        ("docsrc/install.rst", 'pip install --pre "torch-tensorrt[executorch]"', False),
+    ],
+)
+def test_only_user_docs_may_print_the_release_install(
+    tmp_path, monkeypatch, path, command, allowed
+):
+    recipe = tmp_path / path
+    recipe.parent.mkdir(parents=True, exist_ok=True)
+    recipe.write_text(f".. code-block:: bash\n\n    {command}\n")
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "add", path], check=True)
+    monkeypatch.setattr(sys.modules[__name__], "REPO_ROOT", tmp_path)
+    if allowed:
+        test_every_printed_install_instruction_names_the_nightly_channel()
+    else:
+        with pytest.raises(AssertionError, match="names no nightly channel"):
+            test_every_printed_install_instruction_names_the_nightly_channel()
+
+
+@pytest.mark.unit
 @pytest.mark.parametrize("variable", [False, True])
 def test_install_channel_check_detects_removed_suffix_fix(
     tmp_path, monkeypatch, variable
@@ -1439,6 +1464,7 @@ def _install_invocation_window(block: str, match_offset: int) -> str:
 def test_every_printed_install_instruction_names_the_nightly_channel():
     """Supported shell install examples must name the pinned runtime's nightly channel.
 
+    Release installs in the user docs (docsrc/) are exempt: they describe what ships.
     Inspect each command's arguments, including continued lines, in tracked source files.
     This is not a general shell or embedded-language parser.
     """
@@ -1589,6 +1615,12 @@ def test_every_printed_install_instruction_names_the_nightly_channel():
                     )
                     continue
             if not channel:
+                # The user docs describe the release, which installs from PyPI or a stable CUDA
+                # channel without --pre. A nightly instruction there is still checked in full.
+                if name.startswith("docsrc/") and not re.search(
+                    r"(?:^|\s)--pre(?:\s|$)", block
+                ):
+                    continue
                 missing.append(f"{name}:{line} names no nightly channel")
                 continue
             # Literal channels must be supported; variable row exports are checked separately.

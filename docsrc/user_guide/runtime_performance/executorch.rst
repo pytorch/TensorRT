@@ -21,29 +21,29 @@ program, so the whole model stays on the GPU.
 
 .. note::
 
-    The ExecuTorch delegate is Linux only, on x86_64 and aarch64, and it requires CUDA 13.
-    Ordinary Torch-TensorRT builds keep their separate CUDA 12 support.
+    The ExecuTorch delegate runs on Linux, x86_64 and aarch64, and on Windows x86_64. It
+    requires CUDA 13. Ordinary Torch-TensorRT builds keep their separate CUDA 12 support.
 
 ----
 
 Installation
 -------------
 
-This guide follows the ``main`` branch, so it installs nightly builds. Name the delegate
-package beside the ``executorch`` extra:
+Install Torch-TensorRT with the ``executorch`` extra, and name the delegate package beside
+it:
 
 .. code-block:: bash
 
-    pip install --pre --upgrade "torch-tensorrt[executorch]" torch-tensorrt-executorch-runtime \
-      --index-url https://download.pytorch.org/whl/nightly/cu132 \
-      --extra-index-url https://pypi.org/simple
+    pip install "torch-tensorrt[executorch]" torch-tensorrt-executorch-runtime
 
-* ``--pre`` is required. Without it pip takes the stable release instead.
-* ``--upgrade`` is required if a nightly is already installed, or pip keeps the old one and
-  tells you nothing.
-* PyPI stays in the list because TensorRT is not published on the nightly channel.
-* Swap ``cu132`` for ``cu134`` on CUDA 13.4. Keep PyTorch, ExecuTorch and Torch-TensorRT
-  on the same channel.
+To pin a CUDA version, point pip at the matching PyTorch channel and keep the packages on
+it. Swap ``cu132`` for ``cu134`` on CUDA 13.4:
+
+.. code-block:: bash
+
+    pip install "torch-tensorrt[executorch]" torch-tensorrt-executorch-runtime \
+      --index-url https://download.pytorch.org/whl/cu132 \
+      --extra-index-url https://pypi.org/simple
 
 What the command installs
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -57,6 +57,23 @@ What the command installs
 
 Use a fresh virtual environment. To export a coalesced program you also need a CUDA toolkit,
 because ExecuTorch's CUDA backend compiles the leftover operators with ``nvcc``.
+
+Nightly builds
+^^^^^^^^^^^^^^^
+
+To pick up a change before it ships, or to report a problem against ``main``:
+
+.. code-block:: bash
+
+    pip install --pre --upgrade "torch-tensorrt[executorch]" torch-tensorrt-executorch-runtime \
+      --index-url https://download.pytorch.org/whl/nightly/cu132 \
+      --extra-index-url https://pypi.org/simple
+
+* ``--pre`` is required. Without it pip takes the stable release instead.
+* ``--upgrade`` is required if a nightly is already installed, or pip keeps the old one and
+  tells you nothing.
+* PyPI stays in the list because TensorRT is not published on the nightly channel.
+* Keep PyTorch, ExecuTorch and Torch-TensorRT on the same channel.
 
 ----
 
@@ -497,8 +514,8 @@ Comparison: .pte vs .pt2
      - ExecuTorch CUDA backend, or CPU fallback
      - Compiled by AOTInductor
    * - Platform
-     - Linux, CUDA 13
-     - Linux
+     - Linux + Windows x86_64, CUDA 13
+     - Linux + Windows
 
 ----
 
