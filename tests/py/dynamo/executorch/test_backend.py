@@ -3,9 +3,9 @@
 
 import ast
 import operator
-import struct
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -28,9 +28,8 @@ from torch_tensorrt.executorch.backend import (  # noqa: E402
     _get_engine_info_from_edge_program,
 )
 from torch_tensorrt.executorch.serialization import (  # noqa: E402
-    HEADER_FORMAT,
-    HEADER_SIZE,
     TENSORRT_MAGIC,
+    TENSORRT_MAGIC_NAMED_ENGINE,
     deserialize_engine,
 )
 
@@ -131,6 +130,14 @@ def _engine_tensor(payload: bytes) -> torch.Tensor:
     return torch.frombuffer(bytearray(payload), dtype=torch.uint8)
 
 
+def _named_engine(result: Any) -> bytes:
+    """The engine a preprocess result stores as named data; its blob holds none."""
+    blob_engine, metadata = deserialize_engine(result.processed_bytes)
+    assert blob_engine == b""
+    store = result.data_store_output
+    return store.buffers[store.pte_data[metadata.engine_key].buffer_index]
+
+
 @pytest.mark.unit
 def test_no_op_placeholder_schema_matches_serialized_engine_layout():
     meta_ops_path = (
@@ -190,9 +197,9 @@ def test_preprocess_serializes_engine_blob():
     result = TensorRTBackend.preprocess(edge_program, [])
 
     assert isinstance(result.processed_bytes, bytes)
-    assert result.processed_bytes[:4] == TENSORRT_MAGIC
-    engine, metadata = deserialize_engine(result.processed_bytes)
-    assert engine == b"engine-bytes"
+    assert result.processed_bytes[:4] == TENSORRT_MAGIC_NAMED_ENGINE
+    assert _named_engine(result) == b"engine-bytes"
+    _, metadata = deserialize_engine(result.processed_bytes)
     assert metadata.device_id == 2
     assert [binding.name for binding in metadata.io_bindings] == ["x", "y"]
     assert [binding.is_input for binding in metadata.io_bindings] == [True, False]
@@ -202,9 +209,6 @@ def test_preprocess_serializes_engine_blob():
 def test_preprocess_serializes_only_the_engine_tensors_extent():
     # A tensor that views part of a larger buffer. Serializing the whole storage
     # instead of the tensor's own extent pads the engine with the trailing bytes.
-    # The recorded engine size is what exposes it: deserialize_engine trims the
-    # blob back to that size, so an over-long engine still round-trips and only
-    # the size gives it away.
     payload = b"engine-bytes"
     backing = torch.frombuffer(bytearray(payload + b"TRAILING"), dtype=torch.uint8)
     engine_info = [""] * SERIALIZATION_LEN
@@ -216,12 +220,7 @@ def test_preprocess_serializes_only_the_engine_tensors_extent():
 
     result = TensorRTBackend.preprocess(edge_program, [])
 
-    _, _, _, _, engine_size, _ = struct.unpack(
-        HEADER_FORMAT, result.processed_bytes[:HEADER_SIZE]
-    )
-    assert engine_size == len(payload)
-    engine, _ = deserialize_engine(result.processed_bytes)
-    assert engine == payload
+    assert _named_engine(result) == payload
 
 
 @pytest.mark.unit
@@ -246,36 +245,44 @@ def test_preprocess_copy_shares_tensors_and_copies_the_graph():
 
 
 @pytest.mark.unit
-def test_preprocess_hands_the_engine_to_the_blob_without_copying_it(monkeypatch):
-    # The blob concatenation is the one copy of the engine preprocess needs. Turning
-    # the engine tensor into bytes first would hold one more copy at the same time,
-    # and an engine can be several gigabytes.
-    import numpy as np
+def test_preprocess_hands_the_staged_engine_bytes_to_named_data_without_copying():
+    # An engine can be several gigabytes. The export stages it as a view of the
+    # module's own bytes, and the .pte is written from named data by reference, so
+    # the same object must come out the other end -- any copy is a whole engine more.
+    from torch_tensorrt.executorch._export_utils import engine_bytes_tensor
 
-    from torch_tensorrt.executorch import backend as backend_module
-
-    engine_tensor = _engine_tensor(b"engine-bytes")
+    payload = b"engine-bytes"
     engine_info = [""] * SERIALIZATION_LEN
-    engine_info[ENGINE_IDX] = engine_tensor
+    engine_info[ENGINE_IDX] = engine_bytes_tensor(payload)
     engine_info[DEVICE_IDX] = "0%8%0%0%GPU"
     engine_info[INPUT_BINDING_NAMES_IDX] = "x"
     engine_info[OUTPUT_BINDING_NAMES_IDX] = "y"
     edge_program = _build_edge_program(engine_info)
 
-    received = []
-    real_serialize_engine = backend_module.serialize_engine
-
-    def recording_serialize_engine(engine_bytes, metadata):
-        received.append(engine_bytes)
-        return real_serialize_engine(engine_bytes, metadata)
-
-    monkeypatch.setattr(backend_module, "serialize_engine", recording_serialize_engine)
     result = TensorRTBackend.preprocess(edge_program, [])
 
-    assert len(received) == 1
-    assert np.shares_memory(np.asarray(received[0]), engine_tensor.numpy())
-    engine, _ = deserialize_engine(result.processed_bytes)
-    assert engine == b"engine-bytes"
+    assert _named_engine(result) is payload
+
+
+@pytest.mark.unit
+def test_preprocess_warns_once_when_it_has_to_copy_an_engine(monkeypatch, caplog):
+    # A tensor that lost the staged bytes (a detach() or state_dict() drops the
+    # attribute) still saves, but costs a second host copy of the engine: say so once.
+    import logging
+
+    from torch_tensorrt.executorch import backend as backend_module
+
+    monkeypatch.setattr(backend_module, "_warned_engine_copy", False)
+    engine_info = [""] * SERIALIZATION_LEN
+    engine_info[ENGINE_IDX] = _engine_tensor(b"engine-bytes")
+    engine_info[DEVICE_IDX] = "0%8%0%0%GPU"
+    engine_info[INPUT_BINDING_NAMES_IDX] = "x"
+    engine_info[OUTPUT_BINDING_NAMES_IDX] = "y"
+    with caplog.at_level(logging.WARNING, logger=backend_module.__name__):
+        for _ in range(2):
+            result = TensorRTBackend.preprocess(_build_edge_program(engine_info), [])
+    assert _named_engine(result) == b"engine-bytes"
+    assert caplog.text.count("no longer carries the bytes") == 1
 
 
 @pytest.mark.unit
@@ -382,7 +389,7 @@ def test_preprocess_rejects_non_placeholder_engine_input():
     # Defensive invariant: every engine input must be a delegate runtime
     # placeholder (activation input); weights are baked into the engine blob.
     # If an engine input is not a placeholder, its runtime arg slot is unknown,
-    # so refuse rather than emit a mis-ordered binding.
+    # so refuse rather than emit a binding in the wrong order.
     engine_info = [""] * SERIALIZATION_LEN
     engine_info[ENGINE_IDX] = _engine_tensor(b"engine-bytes")
     engine_info[INPUT_BINDING_NAMES_IDX] = "a%b"
