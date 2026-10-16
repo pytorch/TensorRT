@@ -29,6 +29,7 @@ from torch_tensorrt.executorch.backend import (  # noqa: E402
 )
 from torch_tensorrt.executorch.serialization import (  # noqa: E402
     TENSORRT_MAGIC,
+    TENSORRT_MAGIC_NAMED_ENGINE,
     deserialize_engine,
 )
 
@@ -196,7 +197,7 @@ def test_preprocess_serializes_engine_blob():
     result = TensorRTBackend.preprocess(edge_program, [])
 
     assert isinstance(result.processed_bytes, bytes)
-    assert result.processed_bytes[:4] == TENSORRT_MAGIC
+    assert result.processed_bytes[:4] == TENSORRT_MAGIC_NAMED_ENGINE
     assert _named_engine(result) == b"engine-bytes"
     _, metadata = deserialize_engine(result.processed_bytes)
     assert metadata.device_id == 2
@@ -261,6 +262,27 @@ def test_preprocess_hands_the_staged_engine_bytes_to_named_data_without_copying(
     result = TensorRTBackend.preprocess(edge_program, [])
 
     assert _named_engine(result) is payload
+
+
+@pytest.mark.unit
+def test_preprocess_warns_once_when_it_has_to_copy_an_engine(monkeypatch, caplog):
+    # A tensor that lost the staged bytes (a detach() or state_dict() drops the
+    # attribute) still saves, but costs a second host copy of the engine: say so once.
+    import logging
+
+    from torch_tensorrt.executorch import backend as backend_module
+
+    monkeypatch.setattr(backend_module, "_warned_engine_copy", False)
+    engine_info = [""] * SERIALIZATION_LEN
+    engine_info[ENGINE_IDX] = _engine_tensor(b"engine-bytes")
+    engine_info[DEVICE_IDX] = "0%8%0%0%GPU"
+    engine_info[INPUT_BINDING_NAMES_IDX] = "x"
+    engine_info[OUTPUT_BINDING_NAMES_IDX] = "y"
+    with caplog.at_level(logging.WARNING, logger=backend_module.__name__):
+        for _ in range(2):
+            result = TensorRTBackend.preprocess(_build_edge_program(engine_info), [])
+    assert _named_engine(result) == b"engine-bytes"
+    assert caplog.text.count("no longer carries the bytes") == 1
 
 
 @pytest.mark.unit
@@ -367,7 +389,7 @@ def test_preprocess_rejects_non_placeholder_engine_input():
     # Defensive invariant: every engine input must be a delegate runtime
     # placeholder (activation input); weights are baked into the engine blob.
     # If an engine input is not a placeholder, its runtime arg slot is unknown,
-    # so refuse rather than emit a mis-ordered binding.
+    # so refuse rather than emit a binding in the wrong order.
     engine_info = [""] * SERIALIZATION_LEN
     engine_info[ENGINE_IDX] = _engine_tensor(b"engine-bytes")
     engine_info[INPUT_BINDING_NAMES_IDX] = "a%b"
