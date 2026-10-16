@@ -1,0 +1,1179 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>torch_tensorrt.runtime._runtime_config &#8212; Torch-TensorRT</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../../../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=72e443bf" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery.css?v=61a4c737" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery-dataframe.css?v=e5fbc548" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/collapsible-lists/css/tree_view.css?v=a885cde7" />
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/katex@0.10.0-beta/dist/katex.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/css/custom.css?v=0cb2b9ef" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../../../_static/documentation_options.js?v=a71228c4"></script>
+    <script src="../../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
+    <script src="../../../_static/collapsible-lists/js/apply-collapsible-lists.js?v=660e4f45"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_modules/torch_tensorrt/runtime/_runtime_config';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://raw.githubusercontent.com/pytorch/TensorRT/refs/heads/main/docs/versions.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = 'main';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner = false;
+        </script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Torch-TensorRT</p>
+  
+</a></div>
+    
+      <div class="navbar-item">
+<script>
+document.write(`
+  <div class="version-switcher__container dropdown">
+    <button id="pst-version-switcher-button-2"
+      type="button"
+      class="version-switcher__button btn btn-sm dropdown-toggle"
+      data-bs-toggle="dropdown"
+      aria-haspopup="listbox"
+      aria-controls="pst-version-switcher-list-2"
+      aria-label="Version switcher list"
+    >
+      Choose version  <!-- this text may get changed later by javascript -->
+      <span class="caret"></span>
+    </button>
+    <div id="pst-version-switcher-list-2"
+      class="version-switcher__menu dropdown-menu list-group-flush py-0"
+      role="listbox" aria-labelledby="pst-version-switcher-button-2">
+      <!-- dropdown will be populated by javascript on page load -->
+    </div>
+  </div>
+`);
+</script></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../tutorials/advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../tutorials/model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+        
+      
+      <div class="bd-sidebar-primary bd-sidebar hide-on-wide">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../tutorials/advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../tutorials/model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../../index.html" class="nav-link">Module code</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page">torch_tensor...</li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <h1>Source code for torch_tensorrt.runtime._runtime_config</h1><div class="highlight"><pre>
+<span></span><span class="c1"># SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION &amp; AFFILIATES. All rights reserved.</span>
+<span class="c1"># SPDX-License-Identifier: BSD-3-Clause</span>
+
+<span class="sd">"""Runtime settings + the TRTRuntimeConfig shim + the ``runtime_config`` CM.</span>
+
+<span class="sd">This module groups three closely related concepts together:</span>
+
+<span class="sd">* :class:`RuntimeSettings` -- the user-facing, frozen dataclass of runtime-only</span>
+<span class="sd">  knobs sampled at IExecutionContext creation (cuda_graph_strategy,</span>
+<span class="sd">  dynamic_shapes_kernel_specialization_strategy, runtime_cache).</span>
+<span class="sd">* :class:`TRTRuntimeConfig` -- the engine-internal shim that owns a</span>
+<span class="sd">  :class:`RuntimeSettings` and the live ``trt.IRuntimeConfig`` derived from</span>
+<span class="sd">  it. All ``ENABLED_FEATURES.tensorrt_rtx`` branching lives inside; callers in</span>
+<span class="sd">  ``_TRTEngine`` and ``_TorchTensorRTModule`` stay uniform. Mirrors the C++</span>
+<span class="sd">  ``torch_tensorrt::core::runtime::TRTRuntimeConfig`` struct.</span>
+<span class="sd">* :func:`runtime_config` -- the runtime-mode context manager that toggles</span>
+<span class="sd">  settings on every TRT submodule under a target for the duration of a</span>
+<span class="sd">  ``with`` block.</span>
+<span class="sd">* :func:`apply_runtime_settings` -- permanent apply to every TRT engine under a</span>
+<span class="sd">  target, including engines loaded without a :class:`TorchTensorRTModule`.</span>
+
+<span class="sd">Two ways to use ``RuntimeSettings``:</span>
+
+<span class="sd">1. **Runtime context manager** -- toggle settings inside a ``with`` block.</span>
+<span class="sd">2. **Permanent apply** -- call :func:`apply_runtime_settings` on any compiled</span>
+<span class="sd">   module, :class:`ExportedProgram`, or AOT-loaded ``GraphModule``.</span>
+
+<span class="sd">``RuntimeSettings`` is intentionally NOT part of ``CompilationSettings`` and is</span>
+<span class="sd">NOT serialized into the engine tuple. It's purely an in-memory initialization</span>
+<span class="sd">parameter / runtime override state.</span>
+<span class="sd">"""</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">dataclasses</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">TYPE_CHECKING</span><span class="p">,</span>
+    <span class="n">Any</span><span class="p">,</span>
+    <span class="n">Dict</span><span class="p">,</span>
+    <span class="n">Iterable</span><span class="p">,</span>
+    <span class="n">Optional</span><span class="p">,</span>
+    <span class="n">Sequence</span><span class="p">,</span>
+    <span class="n">Set</span><span class="p">,</span>
+    <span class="n">Tuple</span><span class="p">,</span>
+    <span class="n">Union</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._features</span><span class="w"> </span><span class="kn">import</span> <span class="n">ENABLED_FEATURES</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._defaults</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">CUDA_GRAPH_STRATEGY</span><span class="p">,</span>
+    <span class="n">DYNAMIC_SHAPES_KERNEL_SPECIALIZATION_STRATEGY</span><span class="p">,</span>
+    <span class="n">RUNTIME_CACHE_PATH</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.runtime._runtime_cache</span><span class="w"> </span><span class="kn">import</span> <span class="n">RuntimeCache</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="c1"># Validation maps for the dataclass post-init. The TRT enum mappings live</span>
+<span class="c1"># inside ``TRTRuntimeConfig._apply_settings`` so non-RTX imports don't trip</span>
+<span class="c1"># over RTX-only enum symbols at module load time.</span>
+<span class="n">_DYNAMIC_SHAPES_KERNEL_STRATEGY_MAP</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"lazy"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="s2">"eager"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="s2">"none"</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+<span class="p">}</span>
+<span class="n">_CUDA_GRAPH_STRATEGY_MAP</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"disabled"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="s2">"whole_graph_capture"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+<span class="p">}</span>
+<span class="n">_TORCHBIND_ENGINE_FQN</span> <span class="o">=</span> <span class="s2">"__torch__.torch.classes.tensorrt.Engine"</span>
+
+
+<span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">RuntimeSettings</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Per-engine runtime-only knobs sampled at IExecutionContext creation.</span>
+
+<span class="sd">    Fields:</span>
+<span class="sd">        dynamic_shapes_kernel_specialization_strategy: ``"lazy" | "eager" | "none"``.</span>
+<span class="sd">            TRT-RTX-only; no-op on standard TensorRT.</span>
+<span class="sd">        cuda_graph_strategy: ``"disabled" | "whole_graph_capture"``. TRT-RTX-only.</span>
+<span class="sd">        runtime_cache: ``None``, a disk path string, or a</span>
+<span class="sd">            :class:`RuntimeCache`. ``None`` ⇒ no cache attached. A string is</span>
+<span class="sd">            resolved by :class:`TorchTensorRTModule`, which builds the</span>
+<span class="sd">            engine-implicit :class:`RuntimeCache`, owns it, and saves it on</span>
+<span class="sd">            ``__del__``; engines themselves only ever receive ``None`` or a</span>
+<span class="sd">            handle. A handle is the shared-cache form, typically obtained from</span>
+<span class="sd">            :func:`torch_tensorrt.runtime.runtime_cache` -- multiple engines</span>
+<span class="sd">            attaching the same handle share one ``IRuntimeCache``.</span>
+<span class="sd">            For engines without a :class:`TorchTensorRTModule` (e.g. loaded</span>
+<span class="sd">            via :func:`torch_tensorrt.load`), only ``None`` or a</span>
+<span class="sd">            :class:`RuntimeCache` is accepted; a path string raises</span>
+<span class="sd">            ``TypeError`` at the :func:`apply_runtime_settings` call site.</span>
+
+<span class="sd">    Equality compares all fields; for ``runtime_cache``, handle equality is</span>
+<span class="sd">    by identity (same handle ⇒ same cache).</span>
+
+<span class="sd">    Note on the default disk path: the default ``runtime_cache`` points at a</span>
+<span class="sd">    per-user temp file (see ``torch_tensorrt.dynamo._defaults.RUNTIME_CACHE_PATH``).</span>
+<span class="sd">    Concurrent processes for the same user share that file via filelock --</span>
+<span class="sd">    that prevents corruption, but **not** lost-update races (process A's</span>
+<span class="sd">    save can clobber kernels process B just generated). For</span>
+<span class="sd">    multi-process / CI / hyperparameter-sweep workloads where lost kernels</span>
+<span class="sd">    materially slow you down, either give each worker its own</span>
+<span class="sd">    ``runtime_cache="..."`` path or pass ``runtime_cache=None`` to opt out.</span>
+<span class="sd">    """</span>
+
+    <span class="n">dynamic_shapes_kernel_specialization_strategy</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">DYNAMIC_SHAPES_KERNEL_SPECIALIZATION_STRATEGY</span>
+    <span class="p">)</span>
+    <span class="n">cuda_graph_strategy</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">CUDA_GRAPH_STRATEGY</span>
+    <span class="n">runtime_cache</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="s2">"RuntimeCache"</span><span class="p">]]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span>  <span class="c1"># noqa: F821</span>
+        <span class="n">default_factory</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">RUNTIME_CACHE_PATH</span>
+    <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">dynamic_shapes_kernel_specialization_strategy</span>
+            <span class="ow">not</span> <span class="ow">in</span> <span class="n">_DYNAMIC_SHAPES_KERNEL_STRATEGY_MAP</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"Invalid dynamic_shapes_kernel_specialization_strategy: "</span>
+                <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">dynamic_shapes_kernel_specialization_strategy</span><span class="si">!r}</span><span class="s2">. "</span>
+                <span class="sa">f</span><span class="s2">"Expected one of </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="n">_DYNAMIC_SHAPES_KERNEL_STRATEGY_MAP</span><span class="p">)</span><span class="si">}</span><span class="s2">."</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">cuda_graph_strategy</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_CUDA_GRAPH_STRATEGY_MAP</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"Invalid cuda_graph_strategy: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">cuda_graph_strategy</span><span class="si">!r}</span><span class="s2">. "</span>
+                <span class="sa">f</span><span class="s2">"Expected one of </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="n">_CUDA_GRAPH_STRATEGY_MAP</span><span class="p">)</span><span class="si">}</span><span class="s2">."</span>
+            <span class="p">)</span>
+        <span class="c1"># RuntimeSettings only takes effect on TRT-RTX builds. Warn on every</span>
+        <span class="c1"># construction on regular TRT so users don't silently expect cache /</span>
+        <span class="c1"># strategy plumbing to do anything. Callers that want once-per-process</span>
+        <span class="c1"># behavior can filter via ``warnings.simplefilter("once", UserWarning)``.</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">tensorrt_rtx</span><span class="p">:</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                <span class="s2">"RuntimeSettings is only honored on TRT-RTX builds; "</span>
+                <span class="s2">"constructing it on regular TensorRT has no effect."</span><span class="p">,</span>
+                <span class="ne">UserWarning</span><span class="p">,</span>
+                <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+            <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">merge</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">overrides</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"RuntimeSettings"</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Return a new ``RuntimeSettings`` with ``overrides`` applied on top of self."""</span>
+        <span class="n">unknown</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">overrides</span><span class="p">)</span> <span class="o">-</span> <span class="p">{</span><span class="n">f</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">dataclasses</span><span class="o">.</span><span class="n">fields</span><span class="p">(</span><span class="bp">self</span><span class="p">)}</span>
+        <span class="k">if</span> <span class="n">unknown</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"Unknown RuntimeSettings field(s): </span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">unknown</span><span class="p">)</span><span class="si">}</span><span class="s2">. "</span>
+                <span class="sa">f</span><span class="s2">"Valid fields: </span><span class="si">{</span><span class="p">[</span><span class="n">f</span><span class="o">.</span><span class="n">name</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">f</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="n">dataclasses</span><span class="o">.</span><span class="n">fields</span><span class="p">(</span><span class="bp">self</span><span class="p">)]</span><span class="si">}</span><span class="s2">."</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="n">dataclasses</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">overrides</span><span class="p">)</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">TRTRuntimeConfig</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Owns ``RuntimeSettings`` + the live ``trt.IRuntimeConfig`` for one engine.</span>
+
+<span class="sd">    All TRT-RTX feature-flag branching lives in this class -- callers in</span>
+<span class="sd">    ``_TRTEngine`` and ``_TorchTensorRTModule`` stay uniform. Mirrors the C++</span>
+<span class="sd">    ``TRTRuntimeConfig`` struct.</span>
+
+<span class="sd">    On non-RTX builds, ``self._live`` stays ``None`` and the strategy /</span>
+<span class="sd">    runtime-cache plumbing is short-circuited; ``create_execution_context``</span>
+<span class="sd">    picks the legacy ``cuda_engine.create_execution_context(strategy)``</span>
+<span class="sd">    overload.</span>
+<span class="sd">    """</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">settings</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">RuntimeSettings</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="p">:</span> <span class="n">RuntimeSettings</span> <span class="o">=</span> <span class="n">settings</span> <span class="ow">or</span> <span class="n">RuntimeSettings</span><span class="p">(</span>
+            <span class="n">runtime_cache</span><span class="o">=</span><span class="kc">None</span>
+        <span class="p">)</span>
+        <span class="c1"># Live trt.IRuntimeConfig (RTX) or None (non-RTX / pre-init).</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_live</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">settings</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RuntimeSettings</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""The current ``RuntimeSettings``. Mutate only via :meth:`set_settings`."""</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_settings</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new</span><span class="p">:</span> <span class="n">RuntimeSettings</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Apply ``new`` settings. Returns True iff the value actually changed.</span>
+
+<span class="sd">        On change, invalidates the live ``IRuntimeConfig`` and signals callers</span>
+<span class="sd">        to recreate the ``IExecutionContext``. Disk persistence of any prior</span>
+<span class="sd">        implicit cache handle is the module's responsibility (see</span>
+<span class="sd">        ``TorchTensorRTModule._set_managed_handle``); this method is a</span>
+<span class="sd">        pure-execution swap.</span>
+<span class="sd">        """</span>
+        <span class="k">if</span> <span class="n">new</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">new</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
+        <span class="k">return</span> <span class="kc">True</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">ensure_initialized</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cuda_engine</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Lazy-create the live ``trt.IRuntimeConfig`` and apply settings.</span>
+
+<span class="sd">        No-op on non-TRT-RTX builds, where there is no ``IRuntimeConfig`` to</span>
+<span class="sd">        configure.</span>
+<span class="sd">        """</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">tensorrt_rtx</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_live</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_live</span> <span class="o">=</span> <span class="n">cuda_engine</span><span class="o">.</span><span class="n">create_runtime_config</span><span class="p">()</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_apply_settings</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="c1"># Reset the live config so a later ensure_initialized rebuilds it</span>
+            <span class="c1"># instead of short-circuiting on the guard above.</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_live</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">raise</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">reset</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Drop the live ``IRuntimeConfig``; the next ``ensure_initialized`` rebuilds."""</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_live</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">create_execution_context</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">cuda_engine</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">allocation_strategy</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Lazy-init + create a fresh ``IExecutionContext``.</span>
+
+<span class="sd">        Picks the right ``cuda_engine.create_execution_context`` overload</span>
+<span class="sd">        (``IRuntimeConfig`` vs ``ExecutionContextAllocationStrategy``) so</span>
+<span class="sd">        callers stay free of any ``ENABLED_FEATURES.tensorrt_rtx`` branching.</span>
+<span class="sd">        """</span>
+        <span class="k">if</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">tensorrt_rtx</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">ensure_initialized</span><span class="p">(</span><span class="n">cuda_engine</span><span class="p">)</span>
+            <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_live</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_live</span><span class="o">.</span><span class="n">set_execution_context_allocation_strategy</span><span class="p">(</span><span class="n">allocation_strategy</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">cuda_engine</span><span class="o">.</span><span class="n">create_execution_context</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_live</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">cuda_engine</span><span class="o">.</span><span class="n">create_execution_context</span><span class="p">(</span><span class="n">allocation_strategy</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">uses_internal_capture</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cudagraphs_enabled</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Returns True if TRT-RTX owns capture/replay for the current settings.</span>
+
+<span class="sd">        Caller should then bypass its own ``torch.cuda.CUDAGraph`` capture</span>
+<span class="sd">        around ``execute_async_v3``. Always False on non-RTX builds.</span>
+<span class="sd">        """</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">tensorrt_rtx</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">cuda_graph_strategy</span> <span class="o">!=</span> <span class="s2">"disabled"</span> <span class="ow">or</span> <span class="n">cudagraphs_enabled</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_monolithic_capturable</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">has_dynamic_inputs</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+        <span class="n">context</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">stream</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Returns True iff this engine can be safely wrapped by an outer monolithic capture.</span>
+
+<span class="sd">        Mirrors C++ ``TRTRuntimeConfig::is_monolithic_capturable``. Non-RTX</span>
+<span class="sd">        builds always return True.</span>
+<span class="sd">        """</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">tensorrt_rtx</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">context</span><span class="o">.</span><span class="n">is_stream_capturable</span><span class="p">(</span><span class="n">stream</span><span class="o">.</span><span class="n">cuda_stream</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">False</span>
+        <span class="c1"># "lazy" kernel specialization swaps specialized kernels mid-run when an</span>
+        <span class="c1"># input has a dynamic dimension; for static-shape engines the kernels</span>
+        <span class="c1"># are fixed at setup and the captured graph stays valid.</span>
+        <span class="k">return</span> <span class="ow">not</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">dynamic_shapes_kernel_specialization_strategy</span> <span class="o">==</span> <span class="s2">"lazy"</span>
+            <span class="ow">and</span> <span class="n">has_dynamic_inputs</span>
+        <span class="p">)</span>
+
+    <span class="c1"># ------------------------------------------------------------------</span>
+    <span class="c1"># Internal: apply self._settings to self._live</span>
+    <span class="c1"># ------------------------------------------------------------------</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_apply_settings</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Apply ``self._settings`` to the live ``trt.IRuntimeConfig``.</span>
+
+<span class="sd">        Resolves ``runtime_cache``, which must be ``None`` or a</span>
+<span class="sd">        :class:`RuntimeCache` -- something that *owns* what it points at. A</span>
+<span class="sd">        ``RuntimeCache``'s ``ensure_cache`` materializes the inner</span>
+<span class="sd">        ``IRuntimeCache`` on first use and drains any pending warm bytes loaded</span>
+<span class="sd">        into the handle's pending buffer at construction time (by</span>
+<span class="sd">        ``_TorchTensorRTModule._resolve_runtime_cache`` for engine-implicit</span>
+<span class="sd">        handles, or by the ``runtime_cache`` CM for shared ones).</span>
+
+<span class="sd">        Path strings are resolved upstream by ``TorchTensorRTModule`` and are</span>
+<span class="sd">        rejected here: a string owns nothing, so honoring one would mean</span>
+<span class="sd">        building a handle this method does not outlive, handing its</span>
+<span class="sd">        ``IRuntimeCache`` to ``_live``, and letting it be collected on return.</span>
+<span class="sd">        """</span>
+        <span class="c1"># Deferred imports: trt is import-aliased to tensorrt_rtx on RTX builds,</span>
+        <span class="c1"># and _runtime_cache imports this module's RuntimeSettings.</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">tensorrt</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">trt</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.runtime._runtime_cache</span><span class="w"> </span><span class="kn">import</span> <span class="n">RuntimeCache</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_live</span><span class="o">.</span><span class="n">dynamic_shapes_kernel_specialization_strategy</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_to_trt_ds_strategy</span><span class="p">(</span><span class="n">trt</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">"Dynamic shapes kernel specialization strategy: "</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">dynamic_shapes_kernel_specialization_strategy</span><span class="si">}</span><span class="s2">"</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_live</span><span class="o">.</span><span class="n">cuda_graph_strategy</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_to_trt_cg_strategy</span><span class="p">(</span><span class="n">trt</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">"CUDA graph strategy: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">cuda_graph_strategy</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+
+        <span class="n">rc</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">runtime_cache</span>
+        <span class="k">if</span> <span class="n">rc</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">"Runtime cache disabled (no RuntimeCache provided)."</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">rc</span><span class="p">,</span> <span class="n">RuntimeCache</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_live</span><span class="o">.</span><span class="n">set_runtime_cache</span><span class="p">(</span><span class="n">rc</span><span class="o">.</span><span class="n">ensure_cache</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_live</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"runtime_cache must be None or a RuntimeCache by the time it "</span>
+                <span class="sa">f</span><span class="s2">"reaches TRTRuntimeConfig; got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">rc</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">. Path "</span>
+                <span class="sa">f</span><span class="s2">"strings are resolved by TorchTensorRTModule -- an engine "</span>
+                <span class="sa">f</span><span class="s2">"used without one must be given a RuntimeCache explicitly."</span>
+            <span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"TensorRT-RTX runtime config configured"</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_to_trt_ds_strategy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">trt</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">"lazy"</span><span class="p">:</span> <span class="n">trt</span><span class="o">.</span><span class="n">DynamicShapesKernelSpecializationStrategy</span><span class="o">.</span><span class="n">LAZY</span><span class="p">,</span>
+            <span class="s2">"eager"</span><span class="p">:</span> <span class="n">trt</span><span class="o">.</span><span class="n">DynamicShapesKernelSpecializationStrategy</span><span class="o">.</span><span class="n">EAGER</span><span class="p">,</span>
+            <span class="s2">"none"</span><span class="p">:</span> <span class="n">trt</span><span class="o">.</span><span class="n">DynamicShapesKernelSpecializationStrategy</span><span class="o">.</span><span class="n">NONE</span><span class="p">,</span>
+        <span class="p">}[</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">dynamic_shapes_kernel_specialization_strategy</span><span class="p">]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_to_trt_cg_strategy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">trt</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">"disabled"</span><span class="p">:</span> <span class="n">trt</span><span class="o">.</span><span class="n">CudaGraphStrategy</span><span class="o">.</span><span class="n">DISABLED</span><span class="p">,</span>
+            <span class="s2">"whole_graph_capture"</span><span class="p">:</span> <span class="n">trt</span><span class="o">.</span><span class="n">CudaGraphStrategy</span><span class="o">.</span><span class="n">WHOLE_GRAPH_CAPTURE</span><span class="p">,</span>
+        <span class="p">}[</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">cuda_graph_strategy</span><span class="p">]</span>
+
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1"># runtime_config(...) CM and factory</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">_RuntimeConfigContextManager</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Pool CM that applies ``RuntimeSettings`` overrides to every TRT submodule.</span>
+
+<span class="sd">    Walks ``named_modules()`` once on enter, snapshots prior settings per</span>
+<span class="sd">    engine, sets ``mod.runtime_settings = merged`` per engine. Restores on</span>
+<span class="sd">    exit using the same snapshot dict.</span>
+
+<span class="sd">    Yields the target (or tuple of targets) so users can write</span>
+<span class="sd">    ``with runtime_config(model, ...) as m: m(*inputs)``.</span>
+<span class="sd">    """</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">target_or_targets</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="s2">"torch.nn.Module"</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">[</span><span class="s2">"torch.nn.Module"</span><span class="p">]],</span>
+        <span class="o">**</span><span class="n">overrides</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># Validate keys against RuntimeSettings field names (typo =&gt; raise here,</span>
+        <span class="c1"># not silently no-op later).</span>
+        <span class="n">valid_fields</span> <span class="o">=</span> <span class="p">{</span><span class="n">f</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">dataclasses</span><span class="o">.</span><span class="n">fields</span><span class="p">(</span><span class="n">RuntimeSettings</span><span class="p">)}</span>
+        <span class="n">unknown</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">overrides</span><span class="p">)</span> <span class="o">-</span> <span class="n">valid_fields</span>
+        <span class="k">if</span> <span class="n">unknown</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"Unknown RuntimeSettings field(s): </span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">unknown</span><span class="p">)</span><span class="si">}</span><span class="s2">. "</span>
+                <span class="sa">f</span><span class="s2">"Valid fields: </span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">valid_fields</span><span class="p">)</span><span class="si">}</span><span class="s2">."</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">target_or_targets</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_targets</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">target_or_targets</span><span class="p">,)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_yield_tuple</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_targets</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">target_or_targets</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_yield_tuple</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_overrides</span> <span class="o">=</span> <span class="n">overrides</span>
+        <span class="c1"># Engine ↔ prior RuntimeSettings snapshot; populated on enter.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_saved</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">RuntimeSettings</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="s2">"torch.nn.Module"</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="s2">"torch.nn.Module"</span><span class="p">,</span> <span class="o">...</span><span class="p">]]:</span>
+        <span class="c1"># Drain the traversal before mutating; raise on unsupported engines</span>
+        <span class="c1"># before any settings are changed.</span>
+        <span class="n">engines</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">_iter_trt_engines</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_targets</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">owner</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">for</span> <span class="n">owner</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">engines</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+                <span class="s2">"runtime_config() encountered module-less TRT engine(s) that it "</span>
+                <span class="s2">"cannot snapshot and restore on exit. "</span>
+                <span class="s2">"Use apply_runtime_settings() for engines loaded without a "</span>
+                <span class="s2">"TorchTensorRTModule (e.g. via torch_tensorrt.load())."</span>
+            <span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">owner</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">engines</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">owner</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_saved</span><span class="p">:</span>
+                <span class="c1"># The same TRTModule appears under multiple targets in the</span>
+                <span class="c1"># list (or the tree contains a cycle). Don't snapshot twice.</span>
+                <span class="k">continue</span>
+            <span class="n">current</span> <span class="o">=</span> <span class="n">owner</span><span class="o">.</span><span class="n">runtime_settings</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_saved</span><span class="p">[</span><span class="n">owner</span><span class="p">]</span> <span class="o">=</span> <span class="n">current</span>
+            <span class="n">merged</span> <span class="o">=</span> <span class="n">current</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">_overrides</span><span class="p">)</span>
+            <span class="n">owner</span><span class="o">.</span><span class="n">runtime_settings</span> <span class="o">=</span> <span class="n">merged</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_targets</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_yield_tuple</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">_targets</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">mod</span><span class="p">,</span> <span class="n">prior</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_saved</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">mod</span><span class="o">.</span><span class="n">runtime_settings</span> <span class="o">=</span> <span class="n">prior</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">runtime_config</span><span class="p">(</span>
+    <span class="n">target_or_targets</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="s2">"torch.nn.Module"</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">[</span><span class="s2">"torch.nn.Module"</span><span class="p">]],</span>
+    <span class="o">**</span><span class="n">overrides</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">_RuntimeConfigContextManager</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Context manager that applies ``RuntimeSettings`` overrides to all TRT</span>
+<span class="sd">    engines under ``target_or_targets`` for the duration of the ``with`` block.</span>
+
+<span class="sd">    Accepts the same kwargs as :class:`RuntimeSettings` fields. The pool</span>
+<span class="sd">    semantics collapse N knob changes into one ``update_runtime_settings`` call</span>
+<span class="sd">    per engine, which means exactly two ``IExecutionContext`` recreates per</span>
+<span class="sd">    engine (one on enter, one on exit) regardless of how many overrides are</span>
+<span class="sd">    passed.</span>
+
+<span class="sd">    Yields the target module (single form) or a tuple of targets (list form),</span>
+<span class="sd">    by-reference -- same object the caller passed in.</span>
+<span class="sd">    """</span>
+    <span class="k">return</span> <span class="n">_RuntimeConfigContextManager</span><span class="p">(</span><span class="n">target_or_targets</span><span class="p">,</span> <span class="o">**</span><span class="n">overrides</span><span class="p">)</span>
+
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1"># Sugar wrappers for the two strategy knobs</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">set_dynamic_shapes_kernel_strategy</span><span class="p">(</span>
+    <span class="n">target_or_targets</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="s2">"torch.nn.Module"</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">[</span><span class="s2">"torch.nn.Module"</span><span class="p">]],</span>
+    <span class="n">strategy</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">_RuntimeConfigContextManager</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Context manager that sets the dynamic-shapes kernel specialization</span>
+<span class="sd">    strategy on all TRT engines under ``target_or_targets``.</span>
+
+<span class="sd">    Accepts ``"lazy"``, ``"eager"``, or ``"none"``. Delegates to</span>
+<span class="sd">    :func:`runtime_config`.</span>
+<span class="sd">    """</span>
+    <span class="k">return</span> <span class="n">runtime_config</span><span class="p">(</span>
+        <span class="n">target_or_targets</span><span class="p">,</span> <span class="n">dynamic_shapes_kernel_specialization_strategy</span><span class="o">=</span><span class="n">strategy</span>
+    <span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_send_settings_to_engine</span><span class="p">(</span><span class="n">engine</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">rs</span><span class="p">:</span> <span class="n">RuntimeSettings</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Push ``rs`` to whichever TRT engine flavor is attached.</span>
+
+<span class="sd">    Dispatches on engine flavor: Python ``TRTEngine`` uses the native</span>
+<span class="sd">    ``update_runtime_settings`` method; torchbind engines expect int-valued</span>
+<span class="sd">    strategies and a torchbind handle rather than the Python facade.</span>
+<span class="sd">    """</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._TRTEngine</span><span class="w"> </span><span class="kn">import</span> <span class="n">TRTEngine</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.runtime._runtime_cache</span><span class="w"> </span><span class="kn">import</span> <span class="n">_to_torchbind_handle</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="n">TRTEngine</span><span class="p">):</span>
+        <span class="n">engine</span><span class="o">.</span><span class="n">update_runtime_settings</span><span class="p">(</span><span class="n">rs</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">engine</span><span class="o">.</span><span class="n">update_runtime_settings</span><span class="p">(</span>
+            <span class="n">_DYNAMIC_SHAPES_KERNEL_STRATEGY_MAP</span><span class="p">[</span>
+                <span class="n">rs</span><span class="o">.</span><span class="n">dynamic_shapes_kernel_specialization_strategy</span>
+            <span class="p">],</span>
+            <span class="n">_CUDA_GRAPH_STRATEGY_MAP</span><span class="p">[</span><span class="n">rs</span><span class="o">.</span><span class="n">cuda_graph_strategy</span><span class="p">],</span>
+            <span class="n">_to_torchbind_handle</span><span class="p">(</span><span class="n">rs</span><span class="o">.</span><span class="n">runtime_cache</span><span class="p">),</span>
+        <span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_is_trt_engine</span><span class="p">(</span><span class="n">obj</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""True iff ``obj`` is a TRT engine on either runtime.</span>
+
+<span class="sd">    ``isinstance(obj, torch.classes.tensorrt.Engine)`` is unusable -- it raises</span>
+<span class="sd">    ``TypeError`` on cpp rt and ``RuntimeError`` on python-only rt.  Compare</span>
+<span class="sd">    ``_type().qualified_name()`` on the torchbind flavor, guarded against the</span>
+<span class="sd">    ``AttributeError`` the Python engine raises on that method.</span>
+<span class="sd">    """</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._TRTEngine</span><span class="w"> </span><span class="kn">import</span> <span class="n">TRTEngine</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">TRTEngine</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">True</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">ScriptObject</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">bool</span><span class="p">(</span><span class="n">obj</span><span class="o">.</span><span class="n">_type</span><span class="p">()</span><span class="o">.</span><span class="n">qualified_name</span><span class="p">()</span> <span class="o">==</span> <span class="n">_TORCHBIND_ENGINE_FQN</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+            <span class="k">pass</span>
+    <span class="k">return</span> <span class="kc">False</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_iter_trt_engines</span><span class="p">(</span>
+    <span class="n">target_or_targets</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Yield ``(owner_or_None, engine)`` for every TRT engine reachable from ``target_or_targets``.</span>
+
+<span class="sd">    ``owner_or_None`` is the :class:`TorchTensorRTModule` that holds the</span>
+<span class="sd">    engine, or ``None`` for a bare engine constant (e.g. in an AOT-loaded</span>
+<span class="sd">    ``GraphModule``).</span>
+
+<span class="sd">    Accepts an ``nn.Module``, a ``torch.export.ExportedProgram``, or a</span>
+<span class="sd">    sequence of those.  Results are deduped by ``id(engine)``.  A</span>
+<span class="sd">    ``torch.jit.ScriptModule`` target raises :exc:`TypeError`.</span>
+<span class="sd">    """</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._TorchTensorRTModule</span><span class="w"> </span><span class="kn">import</span> <span class="n">TorchTensorRTModule</span>
+
+    <span class="n">seen</span><span class="p">:</span> <span class="n">Set</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_visit_ep</span><span class="p">(</span><span class="n">ep</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">obj</span> <span class="ow">in</span> <span class="n">ep</span><span class="o">.</span><span class="n">constants</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">_is_trt_engine</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">id</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">seen</span><span class="p">:</span>
+                <span class="n">seen</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="nb">id</span><span class="p">(</span><span class="n">obj</span><span class="p">))</span>
+                <span class="k">yield</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="n">obj</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_visit_module</span><span class="p">(</span><span class="n">root</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">mod</span> <span class="ow">in</span> <span class="n">root</span><span class="o">.</span><span class="n">named_modules</span><span class="p">():</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="n">TorchTensorRTModule</span><span class="p">)</span> <span class="ow">and</span> <span class="n">mod</span><span class="o">.</span><span class="n">engine</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">if</span> <span class="nb">id</span><span class="p">(</span><span class="n">mod</span><span class="o">.</span><span class="n">engine</span><span class="p">)</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">seen</span><span class="p">:</span>
+                    <span class="n">seen</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="nb">id</span><span class="p">(</span><span class="n">mod</span><span class="o">.</span><span class="n">engine</span><span class="p">))</span>
+                    <span class="k">yield</span> <span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="n">mod</span><span class="o">.</span><span class="n">engine</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">mod</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"get_attr"</span><span class="p">:</span>
+                        <span class="n">parts</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">"."</span><span class="p">)</span>
+                        <span class="n">obj</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="n">mod</span>
+                        <span class="k">try</span><span class="p">:</span>
+                            <span class="k">for</span> <span class="n">part</span> <span class="ow">in</span> <span class="n">parts</span><span class="p">:</span>
+                                <span class="n">obj</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">part</span><span class="p">)</span>
+                        <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+                            <span class="k">continue</span>
+                        <span class="k">if</span> <span class="n">_is_trt_engine</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">id</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">seen</span><span class="p">:</span>
+                            <span class="n">seen</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="nb">id</span><span class="p">(</span><span class="n">obj</span><span class="p">))</span>
+                            <span class="k">yield</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="n">obj</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_visit_one</span><span class="p">(</span><span class="n">t</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">ExportedProgram</span><span class="p">):</span>
+            <span class="k">yield from</span> <span class="n">_visit_ep</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">ScriptModule</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"_iter_trt_engines(): TorchScript modules are not supported; "</span>
+                <span class="sa">f</span><span class="s2">"got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">t</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">. Save the compiled model with "</span>
+                <span class="s1">'output_format="exported_program" and pass the '</span>
+                <span class="s2">"torch_tensorrt.load() result or its .module()."</span>
+            <span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+            <span class="k">yield from</span> <span class="n">_visit_module</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"_iter_trt_engines(): each target must be an nn.Module or "</span>
+                <span class="sa">f</span><span class="s2">"ExportedProgram; got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">t</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">. "</span>
+                <span class="s2">"For a torch_tensorrt.load() result, pass the ExportedProgram "</span>
+                <span class="s2">"directly or call .module() on it."</span>
+            <span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">target_or_targets</span><span class="p">,</span> <span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">ExportedProgram</span><span class="p">)):</span>
+        <span class="k">yield from</span> <span class="n">_visit_one</span><span class="p">(</span><span class="n">target_or_targets</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">target_or_targets</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">target_or_targets</span><span class="p">:</span>
+            <span class="k">yield from</span> <span class="n">_visit_one</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"_iter_trt_engines(): target must be an nn.Module, an "</span>
+            <span class="sa">f</span><span class="s2">"ExportedProgram, or a sequence of those; got "</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">target_or_targets</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">."</span>
+        <span class="p">)</span>
+
+
+<div class="viewcode-block" id="apply_runtime_settings">
+<a class="viewcode-back" href="../../../py_api/runtime.html#torch_tensorrt.runtime.apply_runtime_settings">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">apply_runtime_settings</span><span class="p">(</span>
+    <span class="n">target_or_targets</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="n">settings</span><span class="p">:</span> <span class="s2">"RuntimeSettings"</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Apply ``settings`` permanently to every TRT engine reachable from ``target_or_targets``.</span>
+
+<span class="sd">    Returns the number of engines updated.  Raises :exc:`RuntimeError` if no</span>
+<span class="sd">    TRT engines are found (the shape of the silent-no-op bug this function</span>
+<span class="sd">    removes) and :exc:`TypeError` if ``settings.runtime_cache`` is a path</span>
+<span class="sd">    string and any reachable engine has no :class:`TorchTensorRTModule` to own</span>
+<span class="sd">    the resulting handle.</span>
+
+<span class="sd">    Accepted targets:</span>
+
+<span class="sd">    * :class:`torch.nn.Module` -- compiled result of</span>
+<span class="sd">      :func:`torch_tensorrt.compile`.</span>
+<span class="sd">    * :class:`torch.export.ExportedProgram` -- loaded result of</span>
+<span class="sd">      :func:`torch_tensorrt.load`.</span>
+<span class="sd">    * A sequence (list / tuple) of the above.</span>
+
+<span class="sd">    A :class:`torch.jit.ScriptModule` (a TorchScript artifact loaded by</span>
+<span class="sd">    :func:`torch_tensorrt.load`) is not supported and raises :exc:`TypeError`.</span>
+
+<span class="sd">    **Ownership rule for module-less engines** (e.g. an AOT-loaded artifact):</span>
+<span class="sd">    ``settings.runtime_cache`` must be ``None`` or a :class:`RuntimeCache` you</span>
+<span class="sd">    own.  A path string is accepted only where a :class:`TorchTensorRTModule`</span>
+<span class="sd">    can own the result and save it on ``__del__``.  If you pass</span>
+<span class="sd">    ``RuntimeSettings()`` (whose default ``runtime_cache`` is a path string),</span>
+<span class="sd">    you will get a :exc:`TypeError`.  Pass</span>
+<span class="sd">    ``RuntimeSettings(runtime_cache=None)`` or supply a</span>
+<span class="sd">    :class:`RuntimeCache` explicitly.</span>
+
+<span class="sd">    **Warm-load is also the caller's responsibility.**  When a</span>
+<span class="sd">    :class:`TorchTensorRTModule` is present it calls :meth:`RuntimeCache.load`</span>
+<span class="sd">    automatically (via ``_resolve_runtime_cache``), so cached kernels are</span>
+<span class="sd">    available from the first execute without any caller action.  For module-less</span>
+<span class="sd">    engines there is no equivalent hook — the caller must call</span>
+<span class="sd">    :meth:`RuntimeCache.load` (or :meth:`RuntimeCache.load_from_stream`) before</span>
+<span class="sd">    passing the handle to :func:`apply_runtime_settings`, or the engine will</span>
+<span class="sd">    start with an empty cache regardless of what is on disk.</span>
+
+<span class="sd">    Settings are never serialized; they do not survive</span>
+<span class="sd">    :func:`torch_tensorrt.save`.  Re-apply after each :func:`torch_tensorrt.load`.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">settings</span><span class="p">,</span> <span class="n">RuntimeSettings</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"apply_runtime_settings(): 'settings' must be a RuntimeSettings; "</span>
+            <span class="sa">f</span><span class="s2">"got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">settings</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">."</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Drain traversal before mutating (validate-then-apply).</span>
+    <span class="n">engines</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">_iter_trt_engines</span><span class="p">(</span><span class="n">target_or_targets</span><span class="p">))</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">engines</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+            <span class="s2">"apply_runtime_settings(): no TRT engines found under the target(s). "</span>
+            <span class="s2">"If the model fell back entirely to PyTorch (no TRT subgraphs were "</span>
+            <span class="s2">"compiled), no engines exist to configure."</span>
+        <span class="p">)</span>
+
+    <span class="c1"># A path string needs a module to own the resulting RuntimeCache and save</span>
+    <span class="c1"># it on __del__.  Module-less engines have no such owner.</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">runtime_cache</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">module_less_count</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="mi">1</span> <span class="k">for</span> <span class="n">owner</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">engines</span> <span class="k">if</span> <span class="n">owner</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">module_less_count</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"apply_runtime_settings(): settings.runtime_cache is a path "</span>
+                <span class="sa">f</span><span class="s2">"string (</span><span class="si">{</span><span class="n">settings</span><span class="o">.</span><span class="n">runtime_cache</span><span class="si">!r}</span><span class="s2">), but </span><span class="si">{</span><span class="n">module_less_count</span><span class="si">}</span><span class="s2"> "</span>
+                <span class="s2">"engine(s) in the target have no TorchTensorRTModule to own the "</span>
+                <span class="s2">"resulting RuntimeCache and persist it on __del__. "</span>
+                <span class="s2">"Pass runtime_cache=None (no JIT cache) or a RuntimeCache "</span>
+                <span class="s2">"you own and save explicitly."</span>
+            <span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">owner</span><span class="p">,</span> <span class="n">engine</span> <span class="ow">in</span> <span class="n">engines</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">owner</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">owner</span><span class="o">.</span><span class="n">runtime_settings</span> <span class="o">=</span> <span class="n">settings</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">_send_settings_to_engine</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="n">engines</span><span class="p">)</span></div>
+
+</pre></div>
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2024, NVIDIA Corporation.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>

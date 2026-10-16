@@ -364,6 +364,15 @@ _L2: list[Suite] = [
         platforms=("linux-x86_64",),
     ),
     Suite(
+        "executorch-windows",
+        tier="l2",
+        lanes=("full", "nightly"),
+        paths=("executorch/test_windows_runtime.py",),
+        jobs="1",
+        variants=("standard",),
+        platforms=("windows",),
+    ),
+    Suite(
         # Standard: automatic plugins and the in-place regression tests.
         # RTX: the whole automatic_plugin
         # directory, except the Linux-only FlashInfer test below.
@@ -465,7 +474,7 @@ _L2: list[Suite] = [
         env={"USE_HOST_DEPS": "1", "CI_BUILD": "1", "USE_TRTLLM_PLUGINS": "1"},
         # The --multirank follow-ups need 2 GPUs, so this suite cannot run on
         # the default single-GPU validation_runner.
-        runner="linux.g4dn.12xlarge.nvidia.gpu",
+        runner="mt-l-x86iavx512-45-172-t4-4",
         # TensorRT-RTX has no TensorRT-LLM plugin path, so multi-device runs
         # entirely on the native TRT DistCollective API. Drop test_nccl_ops.py
         # (every test in it is gated on ENABLED_FEATURES.trtllm_for_nccl and
@@ -480,7 +489,7 @@ _L2: list[Suite] = [
                 # Multi-GPU box: the --multirank follow-ups need 2 devices.
                 # g5 is A10G (SM 8.6) rather than g4dn's T4 (SM 7.5), since the
                 # TensorRT docs describe DistCollective as needing Ampere+.
-                "runner": "linux.g5.12xlarge.nvidia.gpu",
+                "runner": "mt-l-x86aavx2-45-167-a10g-4",
             }
         },
         follow=(

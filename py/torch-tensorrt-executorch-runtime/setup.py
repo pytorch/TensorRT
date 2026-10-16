@@ -37,6 +37,9 @@ CUDA_RUNTIME_DISTRIBUTION = "nvidia-cuda-runtime"
 # ships this exact filename: a consumer looking for a delegate beside ExecuTorch's own
 # libexecutorch_backend_cuda.so finds the same shape here.
 DELEGATE_LIBRARY = "libexecutorch_backend_tensorrt.so"
+if sys.platform == "win32":
+    DELEGATE_LIBRARY = "executorch_backend_tensorrt.dll"
+DELEGATE_IMPORT_LIBRARY = "executorch_backend_tensorrt.lib"
 # Checked in rather than generated: it has no build-time inputs. Only the companion version file is
 # written at build time, because the version is not known until then.
 _CMAKE_CONFIG_SOURCE = HERE / "cmake" / "executorch_backend_tensorrt-config.cmake"
@@ -172,15 +175,18 @@ class BazelBuild(build_py):
 
     def _generated_output_mapping(self) -> dict[str, str]:
         package = "torch_tensorrt_executorch_runtime"
+        filenames = [
+            f"lib/{DELEGATE_LIBRARY}",
+            "lib/cmake/executorch_backend_tensorrt/executorch_backend_tensorrt-config.cmake",
+            "lib/cmake/executorch_backend_tensorrt/executorch_backend_tensorrt-config-version.cmake",
+        ]
+        if sys.platform == "win32":
+            filenames.append(f"lib/{DELEGATE_IMPORT_LIBRARY}")
         return {
             str(pathlib.Path(self.build_lib) / package / filename): str(
                 pathlib.Path(self.get_package_dir(package)) / filename
             )
-            for filename in (
-                f"lib/{DELEGATE_LIBRARY}",
-                "lib/cmake/executorch_backend_tensorrt/executorch_backend_tensorrt-config.cmake",
-                "lib/cmake/executorch_backend_tensorrt/executorch_backend_tensorrt-config-version.cmake",
-            )
+            for filename in filenames
         }
 
     def get_outputs(self, include_bytecode: bool = True) -> list[str]:
@@ -216,8 +222,13 @@ class BazelBuild(build_py):
     def _build(self) -> None:
         super().run()
 
-        if sys.platform != "linux":
-            raise RuntimeError("The ExecuTorch TensorRT delegate supports Linux only")
+        if sys.platform not in {"linux", "win32"}:
+            raise RuntimeError(
+                "The ExecuTorch TensorRT delegate supports Linux and Windows"
+            )
+        if sys.platform == "win32":
+            self._build_windows()
+            return
 
         bazel = shutil.which("bazelisk") or shutil.which("bazel")
         if bazel is None:
@@ -275,6 +286,66 @@ class BazelBuild(build_py):
         if not built.is_file():
             raise RuntimeError(f"Bazel did not produce {built}")
 
+        self._install_delegate(built)
+
+    def _build_windows(self) -> None:
+        if platform.machine().lower() not in {"amd64", "x86_64"}:
+            raise RuntimeError(
+                "The Windows ExecuTorch TensorRT delegate requires x86-64"
+            )
+        cmake = shutil.which("cmake")
+        compiler = shutil.which("clang-cl")
+        if compiler is None and (vc := os.getenv("BAZEL_VC")):
+            candidate = pathlib.Path(vc) / "Tools/Llvm/x64/bin/clang-cl.exe"
+            if candidate.is_file():
+                compiler = str(candidate)
+        if cmake is None or compiler is None or shutil.which("ninja") is None:
+            raise RuntimeError(
+                "Install CMake >=3.28, Ninja, and Visual Studio Clang tools, and build "
+                "from a Visual Studio x64 developer environment"
+            )
+        build_dir = pathlib.Path(self.build_lib).resolve().parent / "delegate-native"
+        install_dir = build_dir / "install"
+        build_type = (
+            "Debug"
+            if os.getenv("TORCH_TENSORRT_EXECUTORCH_DEBUG", "").lower()
+            in ("1", "true", "yes", "on")
+            else "Release"
+        )
+        command = [
+            cmake,
+            "-S",
+            str(HERE / "native"),
+            "-B",
+            str(build_dir),
+            "-G",
+            "Ninja",
+            f"-DCMAKE_CXX_COMPILER={compiler}",
+            f"-DCMAKE_BUILD_TYPE={build_type}",
+            f"-DCMAKE_INSTALL_PREFIX={install_dir.as_posix()}",
+            f"-DTORCH_TENSORRT_SOURCE_DIR={REPO_ROOT.as_posix()}",
+            f"-DCMAKE_PREFIX_PATH={pathlib.Path(executorch_cmake_prefix_path()).as_posix()}",
+        ]
+        # The main build already fetched the TensorRT SDK. Its import libraries
+        # and headers are needed here; the installed TensorRT wheel supplies DLLs.
+        if root := os.getenv("TensorRT_ROOT") or os.getenv("TENSORRT_ROOT"):
+            command.append(f"-DTensorRT_ROOT={pathlib.Path(root).as_posix()}")
+        if cuda := os.getenv("CUDA_HOME") or os.getenv("CUDA_PATH"):
+            command.append(f"-DCUDAToolkit_ROOT={pathlib.Path(cuda).as_posix()}")
+        subprocess.run(command, cwd=REPO_ROOT, check=True)
+        subprocess.run([cmake, "--build", str(build_dir), "--parallel"], check=True)
+        subprocess.run([cmake, "--install", str(build_dir)], check=True)
+        self._install_delegate(
+            install_dir / "lib" / DELEGATE_LIBRARY,
+            install_dir / "lib" / DELEGATE_IMPORT_LIBRARY,
+        )
+
+    def _install_delegate(
+        self, built: pathlib.Path, import_library: pathlib.Path | None = None
+    ) -> None:
+        for artifact in (built, import_library):
+            if artifact is not None and not artifact.is_file():
+                raise RuntimeError(f"Native build did not produce {artifact}")
         package = "torch_tensorrt_executorch_runtime"
         # Editable build_lib is temporary; generated package data must survive its removal.
         package_root = (
@@ -300,17 +371,23 @@ class BazelBuild(build_py):
             # released main wheel imports by name. Removing it from the build output published a
             # wheel without it, so that import failed for anyone pairing an older main wheel with
             # this companion.
-            for stale in package_root.glob("*.so*"):
-                if stale.is_file():
-                    stale.unlink()
-        for stale in output.parent.glob("*.so*"):
-            stale.unlink()
+            for pattern in ("*.so*", "*.dll", "*.lib"):
+                for stale in package_root.glob(pattern):
+                    if stale.is_file():
+                        stale.unlink()
+        for pattern in ("*.so*", "*.dll", "*.lib"):
+            for stale in output.parent.glob(pattern):
+                stale.unlink()
         # The build system leaves its output read only, and copy2 carries the mode across, so a
         # second build in the same tree used to fail with a permission error on its own previous
         # output. Removing the destination first covers that, and the copy is made writable so
         # anything downstream that rewrites it in place, such as the run path repair, still can.
         shutil.copy2(built, output)
         output.chmod(output.stat().st_mode | stat.S_IWUSR)
+        if import_library is not None:
+            destination = output.parent / DELEGATE_IMPORT_LIBRARY
+            shutil.copy2(import_library, destination)
+            destination.chmod(destination.stat().st_mode | stat.S_IWUSR)
         self._install_cmake_package(output.parent.parent)
 
     def _install_cmake_package(self, package_dir: pathlib.Path) -> None:
@@ -413,7 +490,14 @@ class PlatformDistribution(Distribution):
 require_supported_cuda()
 executorch_version = installed_version("executorch")
 tensorrt_version = installed_version(TENSORRT_DISTRIBUTION)
-cuda_runtime_version = installed_version(CUDA_RUNTIME_DISTRIBUTION)
+cuda_requirements = []
+# NVIDIA's CUDA runtime pip wheels are Linux-only. Windows uses the CUDA
+# Toolkit installation whose bin directory the loader registers at import.
+if sys.platform != "win32":
+    cuda_runtime_version = installed_version(CUDA_RUNTIME_DISTRIBUTION)
+    cuda_requirements = [
+        f"{CUDA_RUNTIME_DISTRIBUTION}=={public_version(cuda_runtime_version)}"
+    ]
 setup(
     name="torch-tensorrt-executorch-runtime",
     version=get_runtime_version(),
@@ -423,6 +507,7 @@ setup(
     package_data={
         "torch_tensorrt_executorch_runtime": [
             f"lib/{DELEGATE_LIBRARY}",
+            *([f"lib/{DELEGATE_IMPORT_LIBRARY}"] if sys.platform == "win32" else []),
             "lib/cmake/executorch_backend_tensorrt/*.cmake",
         ]
     },
@@ -448,7 +533,7 @@ setup(
         "torch",
         f"executorch=={executorch_version}",
         f"{TENSORRT_DISTRIBUTION}=={public_version(tensorrt_version)}",
-        f"{CUDA_RUNTIME_DISTRIBUTION}=={public_version(cuda_runtime_version)}",
+        *cuda_requirements,
     ],
     zip_safe=False,
 )

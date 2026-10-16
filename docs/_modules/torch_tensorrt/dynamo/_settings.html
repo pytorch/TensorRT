@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=0866734c"></script>
+    <script src="../../../_static/documentation_options.js?v=a71228c4"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -486,6 +486,10 @@ document.write(`
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._Device</span><span class="w"> </span><span class="kn">import</span> <span class="n">Device</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._enums</span><span class="w"> </span><span class="kn">import</span> <span class="n">EngineCapability</span><span class="p">,</span> <span class="n">dtype</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._defaults</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">ACCURACY_ALGORITHM</span><span class="p">,</span>
+    <span class="n">ACCURACY_ATOL</span><span class="p">,</span>
+    <span class="n">ACCURACY_RTOL</span><span class="p">,</span>
+    <span class="n">ACCURACY_THRESHOLD</span><span class="p">,</span>
     <span class="n">ASSUME_DYNAMIC_SHAPE_SUPPORT</span><span class="p">,</span>
     <span class="n">ATTN_BIAS_IS_CAUSAL</span><span class="p">,</span>
     <span class="n">AUTOCAST_CALIBRATION_DATALOADER</span><span class="p">,</span>
@@ -494,6 +498,7 @@ document.write(`
     <span class="n">AUTOCAST_LOW_PRECISION_TYPE</span><span class="p">,</span>
     <span class="n">AUTOCAST_MAX_DEPTH_OF_REDUCTION</span><span class="p">,</span>
     <span class="n">AUTOCAST_MAX_OUTPUT_THRESHOLD</span><span class="p">,</span>
+    <span class="n">BUILD_ROUTE</span><span class="p">,</span>
     <span class="n">CACHE_BUILT_ENGINES</span><span class="p">,</span>
     <span class="n">CPU_MEMORY_BUDGET</span><span class="p">,</span>
     <span class="n">DECOMPOSE_ATTENTION</span><span class="p">,</span>
@@ -530,6 +535,13 @@ document.write(`
     <span class="n">TILING_OPTIMIZATION_LEVEL</span><span class="p">,</span>
     <span class="n">TIMING_CACHE_PATH</span><span class="p">,</span>
     <span class="n">TRUNCATE_DOUBLE</span><span class="p">,</span>
+    <span class="n">TUNE_BUILD_ROUTE_FILE</span><span class="p">,</span>
+    <span class="n">TUNE_BUILD_ROUTES</span><span class="p">,</span>
+    <span class="n">TUNING_CACHE_FILE</span><span class="p">,</span>
+    <span class="n">TUNING_CONTINUE</span><span class="p">,</span>
+    <span class="n">TUNING_DRY_RUN</span><span class="p">,</span>
+    <span class="n">TUNING_SEARCH</span><span class="p">,</span>
+    <span class="n">TUNING_TIMEOUT_S</span><span class="p">,</span>
     <span class="n">USE_COMPLEX_DECOMPOSITION</span><span class="p">,</span>
     <span class="n">USE_DISTRIBUTED_MODE_TRACE</span><span class="p">,</span>
     <span class="n">USE_FAST_PARTITIONER</span><span class="p">,</span>
@@ -566,6 +578,7 @@ document.write(`
 <span class="sd">        workspace_size (int): Workspace TRT is allowed to use for the module (0 is default)</span>
 <span class="sd">        min_block_size (int): Minimum number of operators per TRT-Engine Block</span>
 <span class="sd">        torch_executed_ops (Collection[Target]): Collection of operations to run in Torch, regardless of converter coverage</span>
+<span class="sd">        torch_executed_modules (Collection[str]): Collection of modules to run in Torch</span>
 <span class="sd">        pass_through_build_failures (bool): Whether to fail on TRT engine build errors (True) or not (False)</span>
 <span class="sd">        max_aux_streams (Optional[int]): Maximum number of allowed auxiliary TRT streams for each engine</span>
 <span class="sd">        version_compatible (bool): Provide version forward-compatibility for engine plan files</span>
@@ -624,14 +637,28 @@ document.write(`
 <span class="sd">            Torch-TensorRT rules to disable. Rules are registered by lowering</span>
 <span class="sd">            implementations and enabled by default; compilation users do not</span>
 <span class="sd">            need to register them. Disabling a rule makes its matching nodes</span>
-<span class="sd">            foldable. Default is empty.</span>
+<span class="sd">            foldable. Supported IDs: ``"attention_mask_arange"``.</span>
+<span class="sd">            Default is empty.</span>
 <span class="sd">        attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.</span>
 <span class="sd">        fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.</span>
+<span class="sd">        build_route (Optional[str]): TensorRT Global Performance Tuning build route string (space-separated "-knob=value" tokens). None uses the default route. This feature requires TensorRT with Global Performance Tuning enabled; currently unavailable on TensorRT-RTX / Windows.</span>
+<span class="sd">        tune_build_routes (Optional[str]): Build-route expression for an autotuning sweep that runs each candidate in a spawned child process (e.g. "-slice_fusion=[on|off] -kgen:codegen:cuda_tile=[0|1|2|3]"). None disables tuning.</span>
+<span class="sd">        tune_build_route_file (Optional[str]): Path to a file with one route token per line (same as "tune_build_routes"). Mutually exclusive with "tune_build_routes".</span>
+<span class="sd">        tuning_search (str): Search algorithm: "fast", "full", or "mixed". Default is "fast". "fast" runs a baseline with all knobs at default, then varies one knob at a time. "full" runs a full grid search. "mixed" runs "fast" first, and then "full" only on knobs that improved performance.</span>
+<span class="sd">        tuning_timeout_s (int): Time budget for the entire tuning process. The current iteration finishes before the loop stops. Use -1 (default) to disable the timeout. Helpful for capping large "full" sweeps.</span>
+<span class="sd">        tuning_cache_file (Optional[str]): JSONL path for tuning results / resume.</span>
+<span class="sd">        tuning_continue (bool): Resume an interrupted sweep from "tuning_cache_file". When it is True, "tuning_cache_file" must be provided; "tune_build_routes", "tune_build_route_file", and "tuning_dry_run" must not be provided.</span>
+<span class="sd">        tuning_dry_run (bool): Enumerate candidate routes without building engines.</span>
+<span class="sd">        accuracy_threshold (Optional[float]): Max allowed accuracy loss between the engine outputs and eager Torch reference outputs; routes with accuracy loss above this threshold are excluded from best-engine selection. "None" skips accuracy checks.</span>
+<span class="sd">        accuracy_algorithm (str): Loss metric: "l0", "l1", "l2", "lInf", or "cos" (lower is better).</span>
+<span class="sd">        accuracy_atol (float): Absolute tolerance for "accuracy_algorithm="l0"".</span>
+<span class="sd">        accuracy_rtol (float): Relative tolerance for "accuracy_algorithm="l0"".</span>
 <span class="sd">    """</span>
 
     <span class="n">workspace_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">WORKSPACE_SIZE</span>
     <span class="n">min_block_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">MIN_BLOCK_SIZE</span>
     <span class="n">torch_executed_ops</span><span class="p">:</span> <span class="n">Collection</span><span class="p">[</span><span class="n">Target</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">set</span><span class="p">)</span>
+    <span class="n">torch_executed_modules</span><span class="p">:</span> <span class="n">Collection</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">set</span><span class="p">)</span>
     <span class="n">pass_through_build_failures</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">PASS_THROUGH_BUILD_FAILURES</span>
     <span class="n">max_aux_streams</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="n">MAX_AUX_STREAMS</span>
     <span class="n">version_compatible</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">VERSION_COMPATIBLE</span>
@@ -693,6 +720,18 @@ document.write(`
     <span class="p">)</span>
     <span class="n">attn_bias_is_causal</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">ATTN_BIAS_IS_CAUSAL</span>
     <span class="n">fallback_data_dependent_ops</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">FALLBACK_DATA_DEPENDENT_OPS</span>
+    <span class="n">build_route</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">BUILD_ROUTE</span>
+    <span class="n">tune_build_routes</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">TUNE_BUILD_ROUTES</span>
+    <span class="n">tune_build_route_file</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">TUNE_BUILD_ROUTE_FILE</span>
+    <span class="n">tuning_search</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">TUNING_SEARCH</span>
+    <span class="n">tuning_timeout_s</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">TUNING_TIMEOUT_S</span>
+    <span class="n">tuning_cache_file</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">TUNING_CACHE_FILE</span>
+    <span class="n">tuning_continue</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">TUNING_CONTINUE</span>
+    <span class="n">tuning_dry_run</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">TUNING_DRY_RUN</span>
+    <span class="n">accuracy_threshold</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="n">ACCURACY_THRESHOLD</span>
+    <span class="n">accuracy_algorithm</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">ACCURACY_ALGORITHM</span>
+    <span class="n">accuracy_atol</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">ACCURACY_ATOL</span>
+    <span class="n">accuracy_rtol</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">ACCURACY_RTOL</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">disabled_constant_fold_exclusions</span> <span class="o">=</span> <span class="p">(</span>
@@ -729,6 +768,18 @@ document.write(`
             <span class="p">)</span>
         <span class="p">)</span>
         <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"fallback_data_dependent_ops"</span><span class="p">,</span> <span class="n">FALLBACK_DATA_DEPENDENT_OPS</span><span class="p">)</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"build_route"</span><span class="p">,</span> <span class="n">BUILD_ROUTE</span><span class="p">)</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"tune_build_routes"</span><span class="p">,</span> <span class="n">TUNE_BUILD_ROUTES</span><span class="p">)</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"tune_build_route_file"</span><span class="p">,</span> <span class="n">TUNE_BUILD_ROUTE_FILE</span><span class="p">)</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"tuning_search"</span><span class="p">,</span> <span class="n">TUNING_SEARCH</span><span class="p">)</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"tuning_timeout_s"</span><span class="p">,</span> <span class="n">TUNING_TIMEOUT_S</span><span class="p">)</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"tuning_cache_file"</span><span class="p">,</span> <span class="n">TUNING_CACHE_FILE</span><span class="p">)</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"tuning_continue"</span><span class="p">,</span> <span class="n">TUNING_CONTINUE</span><span class="p">)</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"tuning_dry_run"</span><span class="p">,</span> <span class="n">TUNING_DRY_RUN</span><span class="p">)</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"accuracy_threshold"</span><span class="p">,</span> <span class="n">ACCURACY_THRESHOLD</span><span class="p">)</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"accuracy_algorithm"</span><span class="p">,</span> <span class="n">ACCURACY_ALGORITHM</span><span class="p">)</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"accuracy_atol"</span><span class="p">,</span> <span class="n">ACCURACY_ATOL</span><span class="p">)</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"accuracy_rtol"</span><span class="p">,</span> <span class="n">ACCURACY_RTOL</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">state</span><span class="p">)</span></div>
 
 
@@ -758,6 +809,7 @@ document.write(`
     <span class="s2">"decompose_attention"</span><span class="p">,</span>
     <span class="s2">"disabled_constant_fold_exclusions"</span><span class="p">,</span>
     <span class="s2">"attn_bias_is_causal"</span><span class="p">,</span>
+    <span class="s2">"build_route"</span><span class="p">,</span>
 <span class="p">}</span>
 
 

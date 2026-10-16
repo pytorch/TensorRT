@@ -590,10 +590,11 @@ def export(
         further transformation, or ``to_executorch()``.
     """
     from torch_tensorrt._features import ENABLED_FEATURES
+    from torch_tensorrt._utils import is_platform_supported_for_executorch
 
-    if platform.system() != "Linux":
+    if not is_platform_supported_for_executorch():
         raise ValueError(
-            f"The executorch format is only supported on Linux, {platform.system()} "
+            f"The executorch format supports Linux and Windows x86-64, {platform.system()} "
             "is not a supported platform for this format"
         )
     if inputs is not None and arg_inputs is not None:

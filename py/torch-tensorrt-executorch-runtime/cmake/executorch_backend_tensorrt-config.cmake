@@ -58,14 +58,28 @@ include(FindPackageHandleStandardArgs)
 # missing one.
 get_filename_component(_executorch_backend_tensorrt_root "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
 unset(EXECUTORCH_BACKEND_TENSORRT_BACKEND_LIBRARY)
-if(EXISTS "${_executorch_backend_tensorrt_root}/lib/libexecutorch_backend_tensorrt.so")
+if(WIN32)
+  set(_executorch_backend_tensorrt_filename "executorch_backend_tensorrt.dll")
+else()
+  set(_executorch_backend_tensorrt_filename "libexecutorch_backend_tensorrt.so")
+endif()
+if(EXISTS "${_executorch_backend_tensorrt_root}/lib/${_executorch_backend_tensorrt_filename}")
   set(EXECUTORCH_BACKEND_TENSORRT_BACKEND_LIBRARY
-    "${_executorch_backend_tensorrt_root}/lib/libexecutorch_backend_tensorrt.so")
+    "${_executorch_backend_tensorrt_root}/lib/${_executorch_backend_tensorrt_filename}")
+endif()
+set(_executorch_backend_tensorrt_required_vars EXECUTORCH_BACKEND_TENSORRT_BACKEND_LIBRARY)
+if(WIN32)
+  unset(EXECUTORCH_BACKEND_TENSORRT_IMPORT_LIBRARY)
+  if(EXISTS "${_executorch_backend_tensorrt_root}/lib/executorch_backend_tensorrt.lib")
+    set(EXECUTORCH_BACKEND_TENSORRT_IMPORT_LIBRARY
+      "${_executorch_backend_tensorrt_root}/lib/executorch_backend_tensorrt.lib")
+  endif()
+  list(APPEND _executorch_backend_tensorrt_required_vars EXECUTORCH_BACKEND_TENSORRT_IMPORT_LIBRARY)
 endif()
 
 find_package_handle_standard_args(
   executorch_backend_tensorrt
-  REQUIRED_VARS EXECUTORCH_BACKEND_TENSORRT_BACKEND_LIBRARY
+  REQUIRED_VARS ${_executorch_backend_tensorrt_required_vars}
 )
 
 if(NOT executorch_backend_tensorrt_FOUND)
@@ -118,6 +132,13 @@ set_target_properties(
     IMPORTED_LOCATION "${EXECUTORCH_BACKEND_TENSORRT_BACKEND_LIBRARY}"
     INTERFACE_COMPILE_FEATURES cxx_std_17
 )
+if(WIN32)
+  set_target_properties(executorch::backend_tensorrt PROPERTIES
+    IMPORTED_IMPLIB "${EXECUTORCH_BACKEND_TENSORRT_IMPORT_LIBRARY}"
+    INTERFACE_COMPILE_FEATURES cxx_std_20)
+  set_property(TARGET executorch::backend_tensorrt APPEND PROPERTY
+    INTERFACE_LINK_OPTIONS "LINKER:/INCLUDE:torch_tensorrt_owns_executorch_registration")
+endif()
 
 # Retain the static registration even when the consumer references no delegate symbol.
 # Scope --no-as-needed to this library so unrelated dependencies can still be dropped.
