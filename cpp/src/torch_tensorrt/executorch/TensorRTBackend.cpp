@@ -1759,10 +1759,34 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   if (profile_err != Error::Ok) {
     return profile_err;
   }
+  // A new thread has no current context, and the device guard sets one only when it switches devices.
+  // cudaFree(nullptr) sets the primary context only if none is current, so it keeps one the caller set.
+  const auto make_context_current = [&engine]() -> Error {
+    const cudaError_t err = cudaFree(nullptr);
+    if (err == cudaSuccess) {
+      return Error::Ok;
+    }
+    ET_LOG(
+        Error,
+        "TensorRTBackend::execute: cudaFree(nullptr) on device %d failed: %s",
+        engine->device_id,
+        cudaGetErrorString(err));
+    // The error is this call's, so it is cleared rather than left for the caller's next CUDA call to
+    // report. A sticky fault survives the clear.
+    cudaGetLastError();
+    return Error::Internal;
+  };
+
   if (profile != engine->profiles.active) {
-    // The switch enqueues copies of the new profile's weights/scratch, and TensorRT
-    // forbids reconfiguring or destroying a context while they run. The binding loop
-    // below can still fail and return, so arm the drain before the switch is submitted.
+    // On every stream, TensorRT fails the switch with no current context.
+    const Error context_err = make_context_current();
+    if (context_err != Error::Ok) {
+      return context_err;
+    }
+    // The switch enqueues work on the stream, and TensorRT forbids reconfiguring or
+    // destroying a context while it runs. The binding loop below can still fail and
+    // return, so arm the drain before the switch is submitted. It writes none of a
+    // user-managed context's scratch, which is why it can precede the pool claim.
     drain_on_early_return.arm();
     if (!ctx->setOptimizationProfileAsync(profile, stream)) {
       ET_LOG(Error, "TensorRTBackend::execute: setOptimizationProfileAsync(%d) failed", profile);
@@ -2054,23 +2078,14 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   }
 
   // TensorRT's enqueue can look up a default stream's context through the driver, and graph replay compares the
-  // stream's context with the current one, and both fail while no context is current. A new thread has none, and
-  // the device guard sets one only when it switches devices.
-  // cudaFree(nullptr) sets the primary context only if none is current, so it keeps one the caller set. Outside
-  // cudaStreamCaptureModeRelaxed a capture cannot take it, so it runs after the pooled capture refusal and the
-  // argument checks. Any earlier, it would fail first under a capture, hiding their error and invalidating the capture.
+  // stream's context with the current one, and both fail while no context is current. Outside
+  // cudaStreamCaptureModeRelaxed a capture cannot take make_context_current, so it runs after the pooled capture
+  // refusal and the argument checks. Any earlier, it would fail first under a capture, hiding their error and
+  // invalidating the capture.
   if (engine->execution_graph || stream == nullptr || stream == cudaStreamLegacy || stream == cudaStreamPerThread) {
-    cuda_err = cudaFree(nullptr);
-    if (cuda_err != cudaSuccess) {
-      ET_LOG(
-          Error,
-          "TensorRTBackend::execute: cudaFree(nullptr) on device %d failed: %s",
-          engine->device_id,
-          cudaGetErrorString(cuda_err));
-      // The error is this call's, so it is cleared rather than left for the caller's next CUDA call to
-      // report. A sticky fault survives the clear.
-      cudaGetLastError();
-      return Error::Internal;
+    const Error context_err = make_context_current();
+    if (context_err != Error::Ok) {
+      return context_err;
     }
   }
 

@@ -13,6 +13,7 @@ test_suite(
         ":test_executorch_binding_names",
         ":test_executorch_blob_header",
         ":test_executorch_weight_streaming_budget",
+        ":test_optimization_profile_backend",
         ":test_optimization_profile_selection",
         ":test_shared_engines",
         ":test_shared_scratch_backend",
@@ -104,12 +105,42 @@ cc_test(
     }),
 )
 
+cc_test(
+    name = "test_optimization_profile_backend",
+    srcs = ["test_optimization_profile_backend.cpp"],
+    target_compatible_with = select({
+        "//cpp:linux_x86_64": [],
+        "//cpp:sbsa": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "//cpp:tensorrt_executorch_backend",
+        "//cpp:tensorrt_executorch_engine_handle_test_access",
+        "@executorch//:executorch_core",
+        "@executorch//:executorch_headers",
+        "@executorch//:extension_cuda",
+        "@googletest//:gtest_main",
+    ] + select({
+        "//cpp:linux_x86_64": [
+            "@cuda//:cudart",
+            "@tensorrt//:nvinfer",
+        ],
+        "//cpp:sbsa": [
+            "@cuda//:cudart",
+            "@tensorrt_sbsa//:nvinfer",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
 # Asserts against the profile-selection policy only, so unlike the runtime tests
 # it needs neither a GPU nor a TensorRT engine. It does need TensorRT headers,
 # hence the same platform gate the backend carries.
 cc_test(
     name = "test_optimization_profile_selection",
     srcs = ["test_optimization_profile_selection.cpp"],
+    # Turns an out-of-bounds read in the policy into an abort instead of a pass.
+    copts = ["-D_GLIBCXX_ASSERTIONS"],
     target_compatible_with = select({
         "//cpp:linux_x86_64": [],
         "//cpp:sbsa": [],

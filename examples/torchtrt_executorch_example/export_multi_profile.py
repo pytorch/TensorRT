@@ -33,17 +33,15 @@ few million parameters, so the whole export takes about a minute and needs no
 download or Hugging Face account. Only the shapes matter for demonstrating
 optimization profiles, and the weights never leave the engine.
 
-Pass ``--weights google/gemma-3-1b-it`` for the real 1B model. That is the
-configuration the latency numbers in the runner README were measured on, and it
-takes considerably longer: the ``.pte`` serialization step costs roughly 3.6
+Pass ``--weights google/gemma-3-1b-it`` for the real 1B model, which is what
+the runner's benchmark is meant for. It takes considerably longer: the ``.pte`` serialization step costs roughly 3.6
 seconds per megabyte of engine, so its ~2 GB engine is a couple of hours.
 
 .. note::
 
    ``google/gemma-3-1b-it`` is **gated**: accept its license on the Hugging Face
    Hub and authenticate (``hf auth login`` or the ``HF_TOKEN`` environment
-   variable) first, or point ``--weights`` at an ungated mirror of the same
-   architecture. A CUDA GPU is required either way.
+   variable) first. A CUDA GPU is required either way.
 
 Prerequisites
 -------------
@@ -205,7 +203,7 @@ except Exception as e:
         print("Skipping example: a CUDA GPU is required.")
         sys.exit(0)
     print("With --weights, accept the model license and authenticate")
-    print("(hf auth login / HF_TOKEN), or use an ungated mirror.")
+    print("(hf auth login / HF_TOKEN).")
     sys.exit(1)
 
 
