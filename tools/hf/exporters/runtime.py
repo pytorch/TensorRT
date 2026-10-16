@@ -4,7 +4,8 @@ from collections.abc import Mapping
 from typing import Any
 
 import torch.nn as nn
-from torch_tensorrt.hf.exporters.spec import EdgeSpec
+
+from .spec import EdgeSpec
 
 
 class EdgeRuntimeModule(nn.Module):  # type: ignore[misc]

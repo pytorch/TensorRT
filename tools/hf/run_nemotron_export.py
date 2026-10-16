@@ -8,24 +8,15 @@ pads to max_seq_len. apply_mamba_stub() must run before from_pretrained.
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
-_REPO_ROOT = Path(__file__).resolve().parents[2]  # TensorRT/
-_TRT_PY = _REPO_ROOT / "py"
-
-import torch  # noqa: E402
-import torch_tensorrt  # noqa: E402
-
-_src_pkg = str(_TRT_PY / "torch_tensorrt")
-if _src_pkg not in list(torch_tensorrt.__path__):
-    torch_tensorrt.__path__.append(_src_pkg)
-
-from torch_tensorrt.hf.exporters import EdgeConfig, EdgeExporter
-from torch_tensorrt.hf.exporters.models.nemotron.mamba_stub import (
-    apply as apply_mamba_stub,
-)
-from torch_tensorrt.hf.exporters.plugin.plugin_utils import load_plugins_for_trt
-from torch_tensorrt.hf.exporters.utils import configure_thor_pytorch
+import torch
+import torch_tensorrt
+from exporters import EdgeConfig, EdgeExporter
+from exporters.measure import print_bench
+from exporters.models.nemotron.mamba_stub import apply as apply_mamba_stub
+from exporters.plugin.plugin_utils import load_plugins_for_trt
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
@@ -60,7 +51,6 @@ def main() -> None:
     parser.add_argument("--max-seq-len", type=int, default=128)
     args = parser.parse_args()
 
-    configure_thor_pytorch()
     load_plugins_for_trt()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -94,6 +84,7 @@ def main() -> None:
 
     logits = out[0] if isinstance(out, (tuple, list)) else out
     print("logits", tuple(logits.shape), "mean", float(logits.float().mean()))
+    print_bench(exporter.bench)
 
 
 if __name__ == "__main__":

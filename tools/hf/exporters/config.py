@@ -7,7 +7,7 @@ from typing import Any
 
 @dataclass
 class EdgeConfig:
-    """Knobs for :class:`~torch_tensorrt.hf.exporters.EdgeExporter`.
+    """Knobs for :class:`~exporters.EdgeExporter`.
 
     ``strict`` / ``dynamic`` / ``dynamic_shapes`` match HuggingFace
     ``DynamoConfig`` so this can subclass it later without an API break.
