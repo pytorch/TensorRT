@@ -324,18 +324,9 @@ Python runtime. Everything below is the ExecuTorch delegate, so the numbers are
 not comparable with that example's or with the two-engine table in the
 [tutorial](../../docsrc/tutorials/runtime_opt/multi_optimization_profiles.rst):
 different runtime, and there a separately compiled single-profile engine
-provides the baseline rather than a second profile of this one.
-
-```
-Per-call latency (ms), batch=1
-call                        active profile        ms
-----------------------------------------------------
-decode (seq=1)                     prefill     6.415
-decode (seq=1)                      decode     4.981
-prefill (seq=128)                  prefill     8.438
-
-Giving decode its own profile: 1.29x faster per token (+1.434 ms)
-```
+provides the baseline rather than a second profile of this one. It prints the
+per-call latency of decode on each profile and of prefill, then how much faster
+decode is on its own profile.
 
 The profile is pinned around each timing loop rather than per call, so profile
 switches stay out of the measurement. Prefill appears once because the decode
@@ -357,18 +348,10 @@ cmake --build build-executorch-reference-runner --target example_executorch_mult
   --model_path=model_gemma3_multi_profile.pte
 ```
 
-On the real `google/gemma-3-1b-it` (exported with `--weights
-google/gemma-3-1b-it`) on an idle A40, decode is **1.29x faster** on its own
-profile (6.42 ms down to 4.97 ms per token) while a switch costs ~3.6 ms,
-charged to whichever call switches. That breaks even after about five decode
-steps. End to end, one prefill plus 16 decode steps drops from 112.0 ms to
-96.2 ms (14.1% faster), and a 64-step round from 420.6 ms to 336.2 ms (20.1%).
-
-Both numbers shrink with the model. The mini Gemma-3 exported by default is
-small enough that decode gains only 0.02 ms (1.12x) against a 0.48 ms switch, so
-it takes ~46 decode steps to break even and a 16-step round is actually 4-5%
-slower with switching. Use it to exercise the API, and `--weights` to see what
-the feature is worth.
+A switch is charged to whichever call makes it, so switching pays off only once
+the per-token decode gain, summed over a round's decode steps, exceeds the
+switch cost. The mini Gemma-3 exported by default exercises the API; export with
+`--weights google/gemma-3-1b-it` to see what the feature is worth.
 
 When comparing wall-clock rounds, keep blocks long (`--block_rounds=8`). With
 short blocks the prefill-only configuration inherits the decode profile from the

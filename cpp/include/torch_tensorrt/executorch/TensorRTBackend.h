@@ -213,6 +213,10 @@ class TensorRTBackend final : public ::executorch::runtime::BackendInterface {
  * where the engine, its lock, and the execution stream are already available,
  * and switches there. Without a guard every delegate runs profile 0.
  *
+ * The torch-tensorrt-executorch-runtime wheel ships no headers and, on Windows,
+ * does not export this class, so selecting a profile needs the source tree or the
+ * release tarball.
+ *
  * Composes with executorch::extension::cuda::CallerStreamGuard, which is
  * orthogonal: the stream guard says where the GPU work runs, this one says which
  * profile it runs under. A switch is issued on whichever stream execute()

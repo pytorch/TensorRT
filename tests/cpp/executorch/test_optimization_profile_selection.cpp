@@ -9,15 +9,10 @@
  * profile bounds table, so it runs here without a GPU, a TensorRT engine, or an
  * ExecuTorch method.
  *
- * Applying the decision is not covered here or anywhere else yet, because all of
- * it needs a live engine: setOptimizationProfileAsync, writing profiles.active
- * back, the ordering that puts the switch before setInputShape, and draining
- * the switch on an early return. The one automated live-engine job,
- * .github/scripts/verify-executorch-reference-runner.sh, exports a
- * single-profile static model and installs no guard, so it never switches.
- * example_executorch_multi_profile_runner does exercise all of it and returns
- * nonzero on failure, so pointing that job at a multi-profile .pte is the cheap
- * way to close the gap.
+ * Applying the decision needs a live engine, so it is covered elsewhere:
+ * test_optimization_profile_backend.cpp runs the guard through execute() on a
+ * two-profile engine, and test_execution_graph.cpp checks that a switch drops a
+ * recorded CUDA graph.
  */
 
 #include "torch_tensorrt/executorch/OptimizationProfileSelection.h"
@@ -298,11 +293,12 @@ TEST(ExecuTorchOptimizationProfileSelection, ProfileWithFewerBoundsThanInputsDoe
   EXPECT_EQ(selected, 1);
 }
 
-// The last two guards, exercised directly because select_profile cannot reach
-// them: it range-checks a pinned index before profile_fits sees it, and it never
-// builds a bounds row itself. profile_fits is installed all the same, so both
-// are reachable by a caller we do not control -- and deleting either one leaves
-// every select_profile test above still passing.
+// The last two guards, exercised directly. select_profile range-checks a pinned
+// index, but reaches the index guard through an out-of-range table.active (see
+// AutoRescansPastAnActiveIndexTheTableDoesNotHave), and it never builds a bounds
+// row itself. profile_fits is installed, so a caller we do not control reaches
+// both. Without a guard these tests read out of bounds, which the target's
+// _GLIBCXX_ASSERTIONS turns into an abort rather than a lucky pass.
 TEST(ExecuTorchOptimizationProfileSelection, ProfileFitsRejectsAnIndexOutsideTheTable) {
   const ProfileTable table = decode_and_prefill();
 
@@ -315,12 +311,16 @@ TEST(ExecuTorchOptimizationProfileSelection, ProfileWhoseBoundsCarryAnExtraExten
   table.bounds = {
       {bounds({1, 1, 4}, {1, 2048, 4})}, // profile 0: both bounds rank 3
       {bounds({1, 1}, {1, 2048, 4})}, // profile 1: max alone rank 3
+      {bounds({1}, {1, 2048})}, // profile 2: min alone of another rank
   };
 
   // The extra extent is nonzero on purpose. At zero the range comparison would
   // reject a rank-2 input on its own and the rank check could go missing unseen.
+  // Profile 2's missing min extent reads as zero, which every input clears, so
+  // only the min half of the rank check rejects it.
   EXPECT_FALSE(profile_fits(table, 0, prefill_input()));
   EXPECT_FALSE(profile_fits(table, 1, prefill_input()));
+  EXPECT_FALSE(profile_fits(table, 2, prefill_input()));
 }
 
 TEST(ExecuTorchOptimizationProfileSelection, AnIndexOutsideInt32IsRejectedRatherThanWrapped) {
@@ -331,6 +331,7 @@ TEST(ExecuTorchOptimizationProfileSelection, AnIndexOutsideInt32IsRejectedRather
   EXPECT_EQ(to_profile_index(int64_t{4294967297}), -1);
   EXPECT_EQ(to_profile_index(int64_t{std::numeric_limits<int32_t>::min()} - 1), -1);
   EXPECT_EQ(to_profile_index(uint64_t{std::numeric_limits<uint32_t>::max()}), -1);
+  EXPECT_EQ(to_profile_index(size_t{1} << 32), -1);
   EXPECT_EQ(to_profile_index(std::numeric_limits<int32_t>::max()), std::numeric_limits<int32_t>::max());
 
   ProfileTable table;
@@ -339,6 +340,7 @@ TEST(ExecuTorchOptimizationProfileSelection, AnIndexOutsideInt32IsRejectedRather
   EXPECT_EQ(
       select_profile(table, ProfileRequest::kPinned, to_profile_index(int64_t{1} << 32), {dims({1})}, selected),
       ProfileSelection::kRequestedProfileUnavailable);
+  EXPECT_EQ(selected, -7) << "a failed selection must leave selected untouched";
 }
 
 } // namespace

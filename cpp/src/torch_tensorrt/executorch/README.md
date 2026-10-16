@@ -396,6 +396,51 @@ Turn it off when two loads of one program must not share an engine, for example 
 their memory, or when the loads run under different CUDA driver contexts on one device, which
 sharing does not tell apart.
 
+## Optimization profiles
+
+An engine exported with several optimization profiles, for example one for single-token decode
+and one for prefill, runs one profile at a time. A C++ host chooses it per thread with
+`OptimizationProfileGuard` from `torch_tensorrt/executorch/TensorRTBackend.h`, scoped around the
+call:
+
+```cpp
+#include <torch_tensorrt/executorch/TensorRTBackend.h>
+
+using torch_tensorrt::executorch_backend::OptimizationProfileGuard;
+
+constexpr int32_t kDecodeProfile = 0; // indices follow the export-time profile order
+constexpr int32_t kPrefillProfile = 1;
+
+{
+  OptimizationProfileGuard guard(kPrefillProfile);
+  module.forward(prefill_inputs);
+}
+{
+  auto guard = OptimizationProfileGuard::automatic();
+  module.forward(inputs);
+}
+```
+
+- Without a guard every engine runs profile 0. An input outside its range fails with
+  `Error::InvalidArgument`, and when the engine has more profiles the message says how many and
+  points at the guard.
+- A pinned index runs that profile, and only the shapes it covers. An index the engine lacks fails
+  the call. An engine with a single profile ignores a nonnegative pin, runs profile 0 and logs that
+  once, so a pin meant for another engine in the same method does not fail it. A negative index
+  always fails.
+- `automatic()` keeps the current profile while the inputs fit it, and otherwise takes the lowest
+  index that fits. Where ranges overlap the choice depends on earlier calls, so pin when it matters.
+- The request belongs to the thread that made it, and a nested guard restores the enclosing one
+  when it ends. Every TensorRT delegate in the method reads the same index and resolves it against
+  its own profile list, so pin by index only when the engines were built from one list.
+- Each handle keeps its own active profile, so handles of a shared engine switch independently. A
+  switch is issued on the call's stream, before the pooled scratch is claimed, and a switch drops
+  the handle's recorded CUDA graph (see [CUDA graph replay](#cuda-graph-replay)).
+- Profile selection needs the header. The `torch-tensorrt-executorch-runtime` wheel ships none,
+  and on Windows its DLL does not export the guard, so an app that links the delegate from the
+  wheel always runs profile 0. Build against the source tree or the release tarball, which carries
+  the headers under `include/torch_tensorrt/executorch/`. Python has no way to choose a profile.
+
 ## CUDA graph replay
 
 CUDA graph replay is off by default. When it is on, the delegate records an
@@ -475,15 +520,15 @@ set_option("TensorRTBackend", options.view());
 ### When recording is unsafe
 
 Recording can recur throughout an engine's lifetime. Every input shape change
-starts another warmup and recording cycle. A growth of the shared activation
+and every optimization profile switch starts another warmup and recording cycle. A growth of the shared activation
 scratch pool also drops the recorded graph: when any engine on a device needs
 more than the pool holds, every engine on that device's pool records again. That
 can happen long after warm-up, for example when a dynamic engine sees a larger
 shape, so warming up every shape does not end the risk for those engines.
 A failed recording is retried on the next call, up to three failures for that
-set of shapes. A shape change resets that budget and a pool growth does not, so
-an engine that used up its three failures stays on the ordinary path until its
-shapes change. Loading everything before the first replay does not end the risk.
+set of shapes. A shape change or a profile switch resets that budget and a pool
+growth does not, so an engine that used up its three failures stays on the
+ordinary path until its shapes or its profile change. Loading everything before the first replay does not end the risk.
 
 A lock shared across this backend prevents recording from overlapping its own
 engine and execution context creation and destruction. Loading or destroying a
@@ -524,7 +569,11 @@ scratch, and make 8 copies per round.
 The first call with a set of input shapes runs on the stable buffers with an
 ordinary launch, the second records the graph on a private stream and launches
 it on the caller's stream, and later calls replay. A shape change starts this
-again. So does a new activation scratch buffer: an engine on the shared
+again, and so does an optimization profile switch at the same shapes, because a
+graph replays the kernels of the profile it was recorded under. A handle keeps
+one graph, so a loop that switches profile on every call, such as alternating
+prefill and decode on one handle, records on every switch and never replays.
+A new activation scratch buffer also starts recording again: an engine on the shared
 activation scratch pool records against the buffer the pool hands it, and when a
 larger request from any engine moves the pool to a new buffer, the engine's next
 call drops the old graph. Recording then starts again on a later call, unless
@@ -539,16 +588,17 @@ Engines with aliased outputs, GPUs without support for stream ordered memory,
 and drivers older than CUDA 12.5 keep the ordinary path. Each reason is logged
 once at load or first call. A call on a green context stream or a stream from
 another context also takes the ordinary path, and the recorded graph is kept for
-the next compatible call unless the scratch buffer or the shapes changed. Taking
+the next compatible call unless the scratch buffer, the shapes, or the profile
+changed. Taking
 the ordinary path does not guarantee that a stream from another context works
 with the engine; the call can still fail.
 
 If allocating a graph buffer fails, the engine uses the ordinary path until an
-input shape changes. Host staging allocations can still fail with
+input shape or the profile changes. Host staging allocations can still fail with
 `Error::MemoryAllocationFailed`; retained graph buffers are not reclaimed to
 retry them. A failed recording is retried on the next call, and after three
 failures for one set of shapes the engine logs an error and uses the ordinary
-path until a shape changes.
+path until a shape or the profile changes.
 
 ## Shared activation scratch
 
