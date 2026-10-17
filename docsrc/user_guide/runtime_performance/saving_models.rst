@@ -225,6 +225,12 @@ see :ref:`aot_inductor`.
 c) ExecuTorch (.pte)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+.. seealso::
+
+    :ref:`executorch_deployment` is the end to end guide: install the stack, run the
+    saved program from Python and from C++, and tune the runtime. This section covers
+    the saving step itself.
+
 The ``executorch`` output format lowers the compiled module to an ExecuTorch
 ``.pte`` program, delegating the TensorRT engines to the Torch-TensorRT ExecuTorch
 backend. This CUDA integration links CUDA 13 libraries, so it supports Linux with
