@@ -700,6 +700,10 @@ def _launch_metadata_bool(metadata: Any, field: str, kernel_name: str) -> bool:
     return value
 
 
+# CUDA's per-block dynamic shared memory limit without an explicit opt-in.
+_AOT_MAX_DYNAMIC_SHARED_MEM = 48 * 1024
+
+
 def _validate_launch_metadata(compiled: Any) -> Tuple[str, int, int]:
     """Refuse Triton launch features the QDP AOT path cannot reproduce.
 
@@ -805,6 +809,14 @@ def _validate_launch_metadata(compiled: Any) -> Tuple[str, int, int]:
         raise RuntimeError(
             f"Triton kernel '{kernel_name}' reports invalid shared memory size "
             f"{shared_mem}."
+        )
+    if shared_mem > _AOT_MAX_DYNAMIC_SHARED_MEM:
+        raise RuntimeError(
+            f"Triton kernel '{kernel_name}' needs {shared_mem} bytes of shared "
+            f"memory, more than the {_AOT_MAX_DYNAMIC_SHARED_MEM} bytes a kernel "
+            "may use without opting in (cudaFuncAttributeMaxDynamicSharedMemorySize). "
+            "TensorRT's AOT plugin launch does not opt in, so the engine would "
+            "fail at enqueue. Reduce num_stages or the block sizes."
         )
     return kernel_name, compiled_warps, shared_mem
 
