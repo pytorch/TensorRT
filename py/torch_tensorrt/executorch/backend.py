@@ -4,8 +4,11 @@
 # ExecuTorch TensorRT backend: serialize engines to a libtorch-free runtime blob.
 
 import copy
+import ctypes
 import json
+import mmap
 import operator
+import sys
 from typing import Any, Container, Iterable, List, Optional, Set, final
 
 import torch
@@ -265,7 +268,7 @@ def _reorder_input_names_for_executorch(
     tagged into a delegate its spec becomes ``BUFFER_MUTATION``, the delegate's
     outputs are permuted, and they would need the same node-identity reordering as
     the inputs below. ``_validate_output_binding_order`` checks that correspondence
-    on every preprocess, so it would fail loudly rather than mis-bind.
+    on every preprocess, so it would fail loudly rather than bind wrongly.
     """
     input_nodes = list(engine_node.args[0])
     if len(input_nodes) != len(input_names):
@@ -481,6 +484,33 @@ def _elided_output_names(compile_specs: List[CompileSpec]) -> Optional[Set[str]]
     return None
 
 
+def _drop_engine_file_pages(engine: torch.Tensor) -> None:
+    """Drop the resident pages of an engine read from its file (``engine_output_dir``) once it is in the blob.
+
+    The exporter maps such an engine privately and never writes to it, so its pages are clean and are
+    re-read from the file if touched again. Only a range ``/proc/self/maps`` shows inside a mapping of an
+    ``.engine`` file is dropped: on any other memory, ``MADV_DONTNEED`` would discard the data.
+    """
+    if not sys.platform.startswith("linux") or not engine.numel():
+        return
+    start = engine.data_ptr()
+    end = start + engine.numel() * engine.element_size()
+    with open("/proc/self/maps") as maps:
+        for line in maps:
+            fields = line.split()
+            lo, hi = (int(bound, 16) for bound in fields[0].split("-"))
+            if lo <= start and end <= hi:
+                if len(fields) >= 6 and fields[-1].endswith(".engine"):
+                    page = mmap.PAGESIZE
+                    aligned = start // page * page
+                    ctypes.CDLL(None).madvise(
+                        ctypes.c_void_p(aligned),
+                        ctypes.c_size_t(end - aligned),
+                        ctypes.c_int(mmap.MADV_DONTNEED),
+                    )
+                return
+
+
 def _get_str(engine_info: List[Any], index: int, default: str = "") -> str:
     if index < 0 or index >= len(engine_info):
         return default
@@ -589,4 +619,6 @@ class TensorRTBackend(BackendDetails):  # type: ignore[misc]
             target_platform=_get_str(engine_info, TARGET_PLATFORM_IDX),
         )
         blob = serialize_engine(engine_info[ENGINE_IDX], metadata)
+        if isinstance(serialized_engine, torch.Tensor):
+            _drop_engine_file_pages(serialized_engine)
         return PreprocessResult(processed_bytes=blob)
