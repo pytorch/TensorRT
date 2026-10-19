@@ -17,6 +17,7 @@ from torch_tensorrt.dynamo.conversion.impl import (
     full,
     grid,
     index_copy,
+    kv_cache_update,
     linalg,
     linear,
     matmul,
