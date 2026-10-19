@@ -111,9 +111,12 @@ Optimization Tuning
        Disable only when you need strict IEEE FP32 semantics.
    * - ``attn_bias_is_causal``
      - ``True``
-     - Whether the attn_bias in efficient SDPA is causal. Default is True. This can 
-       accelerate models from HF because attn_bias is always a causal mask in HF. 
-       If you want to use non-causal attn_bias, you can set this to False.
+     - Replace the attn_bias of a square efficient-SDPA call with TensorRT's faster
+       causal attention when the bias is a causal mask. A mask computed in the graph
+       is checked and kept unless it is causal; one that depends on runtime inputs (a
+       padding mask, positions passed in) cannot be checked, is assumed causal, and is
+       reported in a warning. Set to ``False`` if such masks may not be causal (sliding
+       window, padding, bidirectional).
 
 ----
 
