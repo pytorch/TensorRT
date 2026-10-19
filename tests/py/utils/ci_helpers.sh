@@ -99,6 +99,7 @@ trt_tier_l0_core() {
         trt_pytest -ra $(_trt_nproc) --junitxml="$(_trt_xml l0_dynamo_core_partitioning_tests_results)" partitioning/test_000_* "$@"
       fi
       trt_pytest -ra $(_trt_nproc) --junitxml="$(_trt_xml l0_dynamo_core_lowering_tests_results)" lowering/ "$@"
+      trt_pytest -ra $(_trt_nproc 4) --junitxml="$(_trt_xml l0_dynamo_core_regions_tests_results)" regions/ "$@"
       [ "${USE_TRT_RTX:-false}" = "true" ] || trt_pytest -ra $(_trt_nproc) --junitxml="$(_trt_xml l0_dynamo_hlo_tests_results)" hlo/ "$@" )
 }
 
