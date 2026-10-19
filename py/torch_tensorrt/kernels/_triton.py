@@ -593,6 +593,30 @@ def _triton_import() -> Any:
     return triton
 
 
+def _pointer_alignment_attrs(
+    kernel: Any, signature: Dict[str, str]
+) -> Dict[Tuple[int, ...], List[List[Any]]]:
+    """Specialize every pointer parameter as 16-byte aligned.
+
+    Triton's JIT applies this specialization (``tt.divisibility=16``) to any
+    tensor whose ``data_ptr()`` is 16-byte aligned, and it is what lets the
+    compiler emit vectorized global loads and stores. An AOT compile has no
+    tensors to inspect, so without it every pointer is treated as possibly
+    unaligned and memory-bound kernels fall back to byte- or half-word-wide
+    accesses -- an uint8-unpacking GEMV ran ~1.5x slower inside the engine than
+    under the JIT.
+
+    The assumption is TensorRT's contract, not a guess: tensor addresses passed
+    to ``IExecutionContext::setTensorAddress`` must be at least 256-byte
+    aligned, and TensorRT allocates the engine's internal tensors itself.
+    """
+    return {
+        (kernel.arg_names.index(name),): [["tt.divisibility", 16]]
+        for name, ty in signature.items()
+        if ty.startswith("*")
+    }
+
+
 def _compile_within_driver_isa(
     triton: Any,
     kernel: Any,
@@ -618,6 +642,7 @@ def _compile_within_driver_isa(
             fn=kernel,
             signature=dict(signature),
             constexprs=dict(constexprs),
+            attrs=_pointer_alignment_attrs(kernel, signature),
         )
         opts = dict(options)
         if ptx_version is not None:

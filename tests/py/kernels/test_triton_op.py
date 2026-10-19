@@ -385,10 +385,14 @@ def test_untested_pointer_dtype_rejected():
 
 # FAKE_PTX declares .version 9.3 and 5 entry params for this 3-param signature.
 CAPPING_SIG = {"a": "*fp32", "b": "i32", "c": "*fp32"}
+CAPPING_KERNEL = _FakeKernel(CAPPING_SIG)
 
 
-def _stub_triton(monkeypatch, requested, omitted_metadata=(), **extra_metadata):
-    """Replace triton.compile with a stub recording each requested ptx_version."""
+def _stub_triton(
+    monkeypatch, requested, omitted_metadata=(), sources=None, **extra_metadata
+):
+    """Replace triton.compile with a stub recording each requested ptx_version
+    (and, if ``sources`` is given, the ``ASTSource`` keyword arguments)."""
     from torch_tensorrt.kernels import _triton
 
     metadata = {
@@ -428,7 +432,11 @@ def _stub_triton(monkeypatch, requested, omitted_metadata=(), **extra_metadata):
         )
 
         class compiler:
-            ASTSource = staticmethod(lambda **kw: object())
+            @staticmethod
+            def ASTSource(**kw):
+                if sources is not None:
+                    sources.append(kw)
+                return object()
 
         @staticmethod
         def compile(src, options=None, target=None):
@@ -472,7 +480,7 @@ def test_ptx_isa_capped_to_driver(monkeypatch, driver_max, default_isa, expected
     requested = []
     compiled_results = _stub_triton(monkeypatch, requested)
 
-    artifact = _triton.compile_triton_to_ptx(object(), CAPPING_SIG, {})
+    artifact = _triton.compile_triton_to_ptx(CAPPING_KERNEL, CAPPING_SIG, {})
 
     assert requested == expected
     assert artifact.ptx == compiled_results[-1].asm["ptx"].encode("utf-8")
@@ -503,7 +511,7 @@ def test_unsupported_launch_metadata(monkeypatch, metadata, match):
     monkeypatch.setattr(_triton, "_triton_default_ptx_version", lambda: None)
     _stub_triton(monkeypatch, [], **metadata)
     with pytest.raises(RuntimeError, match=match):
-        _triton.compile_triton_to_ptx(object(), CAPPING_SIG, {})
+        _triton.compile_triton_to_ptx(CAPPING_KERNEL, CAPPING_SIG, {})
 
 
 def test_missing_launch_metadata_fails_closed(monkeypatch):
@@ -512,7 +520,38 @@ def test_missing_launch_metadata_fails_closed(monkeypatch):
     monkeypatch.setattr(_triton, "_driver_max_ptx_version", lambda: None)
     _stub_triton(monkeypatch, [], omitted_metadata=("global_scratch_size",))
     with pytest.raises(RuntimeError, match="missing.*global_scratch_size"):
-        _triton.compile_triton_to_ptx(object(), CAPPING_SIG, {})
+        _triton.compile_triton_to_ptx(CAPPING_KERNEL, CAPPING_SIG, {})
+
+
+def test_pointer_args_specialized_as_aligned(monkeypatch):
+    """Every pointer (and only pointers) is compiled as 16-byte aligned,
+    keyed by its position in the kernel's full parameter list."""
+    from torch_tensorrt.kernels import _triton
+
+    monkeypatch.setattr(_triton, "_driver_max_ptx_version", lambda: None)
+    sources = []
+    _stub_triton(monkeypatch, [], sources=sources)
+    kernel = _FakeKernel(["a", "BLOCK", "b", "c"], constexpr_names=["BLOCK"])
+    _triton.compile_triton_to_ptx(kernel, CAPPING_SIG, {"BLOCK": 128})
+    (source,) = sources
+    assert source["attrs"] == {
+        (0,): [["tt.divisibility", 16]],
+        (3,): [["tt.divisibility", 16]],
+    }
+
+
+@skip_no_cuda
+@skip_no_triton
+def test_aot_ptx_uses_vector_loads():
+    """Aligned pointers let a contiguous copy load 128 bits per thread, as the
+    JIT does for aligned tensors; unaligned ones would load 32 bits."""
+    from torch_tensorrt.kernels import _triton
+
+    artifact = _triton.compile_triton_to_ptx(
+        _ttk_copy, {"src": "*fp32", "dst": "*fp32"}, {"BLOCK": 1024}, num_warps=4
+    )
+    ptx = artifact.ptx.decode("utf-8")
+    assert "ld.global.v4" in ptx
 
 
 @skip_no_qdp
@@ -630,6 +669,12 @@ try:
         off = pid * BLOCK + tl.arange(0, BLOCK)
         mask = off < n
         tl.store(y_ptr + off, tl.load(x_ptr + off, mask=mask) + 1, mask=mask)
+
+    @triton.jit
+    def _ttk_copy(src, dst, BLOCK: tl.constexpr):
+        # Unmasked, so only pointer alignment decides the access width.
+        offset = tl.program_id(0) * BLOCK + tl.arange(0, BLOCK)
+        tl.store(dst + offset, tl.load(src + offset))
 
 except ImportError:
     triton = None
