@@ -7,6 +7,7 @@ import logging
 from typing import Dict, Optional, Sequence, Tuple, Union
 
 import tensorrt as trt
+import torch
 from torch.fx.node import Argument, Node, Target
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.dynamo._settings import CompilationSettings
@@ -19,7 +20,13 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
 from torch_tensorrt.dynamo.conversion.aten_ops_converters import (
     turing_rejects_forward_convolution,
 )
-from torch_tensorrt.dynamo.conversion.converter_utils import args_bounds_check
+from torch_tensorrt.dynamo.conversion.converter_utils import (
+    args_bounds_check,
+    enforce_tensor_types,
+)
+from torch_tensorrt.dynamo.lowering._kv_cache_update import (
+    tensorrt_kv_cache_update_op,
+)
 from torch_tensorrt.dynamo.lowering.passes.fuse_distributed_ops import (
     tensorrt_fused_nccl_all_gather_op,
     tensorrt_fused_nccl_all_reduce_op,
@@ -88,6 +95,82 @@ def conv_asym_pad(
         groups=groups,
         pre_padding=pre_padding,
         post_padding=post_padding,
+    )
+
+
+def _kv_cache_update_shapes_supported(
+    node: Node, cache: Optional[Argument] = None
+) -> bool:
+    """Static shapes, a 4-D cache, and an update no longer than the cache. The op's
+    fake kernel has already checked the rest when the graph was traced: matching
+    batch / head / head_dim sizes and dtypes, and ``write_indices`` of shape
+    ``[b]``. ``cache`` overrides the node read as the cache."""
+    args = list(node.args[:3])
+    if len(args) != 3:
+        return False
+    if cache is not None:
+        args[0] = cache
+    shapes = []
+    for arg in args:
+        val = arg.meta.get("val") if isinstance(arg, Node) else None
+        if not isinstance(val, torch.Tensor):
+            return False
+        shapes.append(tuple(val.shape))
+    if not all(isinstance(size, int) for shape in shapes for size in shape):
+        return False
+    cache_shape, update_shape = shapes[0], shapes[1]
+    return (
+        len(cache_shape) == 4
+        and len(update_shape) == 4
+        and update_shape[2] <= cache_shape[2]
+    )
+
+
+def kv_cache_update_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    """Writes the converter cannot lower (dynamic shapes) run in PyTorch."""
+    return _kv_cache_update_shapes_supported(node)
+
+
+def kv_cache_update_will_alias(
+    node: Node, *, input_node: Optional[Node] = None
+) -> bool:
+    """Whether the converter will emit an ``IKVCacheUpdateLayer`` for this write:
+    it converts, its cache is a network input, and ``lift_mutated_buffers`` did not
+    file it copy-back.
+
+    ``input_node`` overrides the node taken as the cache. The pre-conversion
+    classifier in ``lowering/_buffer_lifting.py`` passes the node lowering will leave
+    behind, which is not always ``node.args[0]``.
+    """
+    if node.meta.get("_trt_no_kv_alias"):
+        return False
+    cache = node.args[0] if input_node is None else input_node
+    if not (isinstance(cache, Node) and cache.op == "placeholder"):
+        return False
+    return _kv_cache_update_shapes_supported(node, cache)
+
+
+@dynamo_tensorrt_converter(
+    tensorrt_kv_cache_update_op,
+    capability_validator=kv_cache_update_validator,
+    supports_dynamic_shapes=False,
+)
+@enforce_tensor_types({0: (trt.ITensor,), 1: (trt.ITensor,), 2: (trt.ITensor,)})
+def tensorrt_kv_cache_update(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[trt.ITensor, Sequence[trt.ITensor]]:
+    """KV-cache write with a position per batch row: an ``IKVCacheUpdateLayer``
+    when the cache is a network input, else a scatter."""
+    del kwargs
+    cache, update, write_indices = args[:3]
+    return impl.kv_cache_update.kv_cache_update(
+        ctx, target, SourceIR.ATEN, name, cache, update, write_indices
     )
 
 
