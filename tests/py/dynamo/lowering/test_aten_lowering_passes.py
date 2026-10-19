@@ -484,5 +484,157 @@ class TestRewriteEfficientAttention(TestCase):
         torch.testing.assert_close(pytorch_out, trt_out, rtol=1e-2, atol=1e-2)
 
 
+class MaskedAttention(torch.nn.Module):
+    """Self-attention whose mask ``mask_fn(positions)`` is built in the graph."""
+
+    def __init__(self, mask_fn):
+        super().__init__()
+        self.mask_fn = mask_fn
+
+    def forward(self, q, k, v):
+        pos = torch.arange(q.shape[-2], device=q.device)
+        return torch.nn.functional.scaled_dot_product_attention(
+            q, k, v, attn_mask=self.mask_fn(pos)
+        )
+
+
+def _causal(p):
+    return p[None, :] <= p[:, None]
+
+
+def _sliding_window(window):
+    return lambda p: _causal(p) & (p[None, :] > p[:, None] - window)
+
+
+class TestForceCausalChecksTheMask(TestCase):
+    """``force_causal_efficient_attention`` replaces a mask with is_causal=True
+    only if the mask is causal: one it can compute at compile time is checked,
+    and one that depends on runtime inputs is assumed causal, with a warning."""
+
+    def _lower(self, model, args, dynamic_shapes=None, **settings):
+        from torch_tensorrt.dynamo._settings import CompilationSettings
+        from torch_tensorrt.dynamo.lowering.passes.force_causal_efficient_attention import (
+            force_causal_efficient_attention,
+        )
+
+        # The default decompositions turn SDPA with a mask into efficient attention.
+        ep = torch.export.export(
+            model, args, dynamic_shapes=dynamic_shapes
+        ).run_decompositions()
+        gm = force_causal_efficient_attention(
+            ep.module(), CompilationSettings(**settings)
+        )
+        (node,) = [
+            n
+            for n in gm.graph.nodes
+            if n.target
+            == torch.ops.aten._scaled_dot_product_efficient_attention.default
+        ]
+        return node.args[3] is None and node.args[6] is True
+
+    @staticmethod
+    def _qkv(seq_len=16):
+        return tuple(torch.randn(1, 4, seq_len, 16, device="cuda") for _ in range(3))
+
+    def _assert_no_warning(self, fn):
+        logger = (
+            "torch_tensorrt.dynamo.lowering.passes.force_causal_efficient_attention"
+        )
+        with self.assertNoLogs(logger, level="WARNING"):
+            return fn()
+
+    def test_causal_mask_is_replaced(self):
+        forced = self._assert_no_warning(
+            lambda: self._lower(MaskedAttention(_causal), self._qkv())
+        )
+        self.assertTrue(forced)
+
+    def test_sliding_window_is_kept(self):
+        self.assertFalse(self._lower(MaskedAttention(_sliding_window(4)), self._qkv()))
+
+    def test_prefix_lm_mask_is_kept(self):
+        prefix = lambda p: _causal(p) | (p[None, :] < 4)  # noqa: E731
+        self.assertFalse(self._lower(MaskedAttention(prefix), self._qkv()))
+
+    def test_additive_bias_is_kept(self):
+        alibi = lambda p: torch.where(  # noqa: E731
+            _causal(p), -0.5 * (p[:, None] - p[None, :]).float(), float("-inf")
+        )
+        self.assertFalse(self._lower(MaskedAttention(alibi), self._qkv()))
+
+    def test_without_the_setting_nothing_is_replaced(self):
+        self.assertFalse(
+            self._lower(
+                MaskedAttention(_causal), self._qkv(), attn_bias_is_causal=False
+            )
+        )
+
+    def test_mask_from_an_input_is_assumed_causal_with_a_warning(self):
+        class M(torch.nn.Module):
+            def forward(self, q, k, v, mask):
+                return torch.nn.functional.scaled_dot_product_attention(
+                    q, k, v, attn_mask=mask
+                )
+
+        mask = torch.ones(16, 16, dtype=torch.bool, device="cuda").tril()
+        logger = (
+            "torch_tensorrt.dynamo.lowering.passes.force_causal_efficient_attention"
+        )
+        with self.assertLogs(logger, level="WARNING") as logs:
+            forced = self._lower(M(), self._qkv() + (mask,))
+        self.assertTrue(forced)
+        self.assertIn("attn_bias_is_causal=False", "\n".join(logs.output))
+
+    def test_window_with_an_input_padding_mask_is_kept(self):
+        """The input-dependent part is unknown, but the window alone already
+        masks out causal positions."""
+
+        class M(torch.nn.Module):
+            def forward(self, q, k, v, keep):
+                pos = torch.arange(q.shape[-2], device=q.device)
+                mask = _sliding_window(4)(pos) & keep[None, :]
+                return torch.nn.functional.scaled_dot_product_attention(
+                    q, k, v, attn_mask=mask
+                )
+
+        keep = torch.ones(16, dtype=torch.bool, device="cuda")
+        self.assertFalse(self._lower(M(), self._qkv() + (keep,)))
+
+    def test_window_wider_than_the_example_is_checked_at_the_longest_length(self):
+        """At the example length (4) the window of 8 looks causal; at the
+        longest length compiled for (32) it is not."""
+        t = torch.export.Dim("t", min=2, max=32)
+        self.assertFalse(
+            self._lower(
+                MaskedAttention(_sliding_window(8)),
+                self._qkv(4),
+                dynamic_shapes=({2: t}, {2: t}, {2: t}),
+            )
+        )
+
+    def test_causal_mask_with_a_dynamic_length_is_replaced(self):
+        t = torch.export.Dim("t", min=2, max=32)
+        forced = self._assert_no_warning(
+            lambda: self._lower(
+                MaskedAttention(_causal),
+                self._qkv(4),
+                dynamic_shapes=({2: t}, {2: t}, {2: t}),
+            )
+        )
+        self.assertTrue(forced)
+
+    def test_sliding_window_compiles_to_the_eager_result(self):
+        """End to end with the default settings (the bug: the window was dropped)."""
+        model = MaskedAttention(_sliding_window(4)).cuda()
+        args = self._qkv()
+        ep = torch.export.export(model, args).run_decompositions()
+        trt_module = torch_tensorrt.dynamo.compile(
+            ep, list(args), min_block_size=1, decompose_attention=False
+        )
+        torch.testing.assert_close(
+            trt_module(*args), model(*args), rtol=1e-2, atol=1e-2
+        )
+
+
 if __name__ == "__main__":
     run_tests()
