@@ -678,9 +678,12 @@ def test_fp8_mha_softmax_quantizer_annotation(ir):
     )
 
     def _build_sdpa_input_quant_graph(
-        exponent_bits: int, quantize_v: bool = True
+        exponent_bits: int, quantize_v: bool = True, between=None
     ) -> fx.GraphModule:
-        """Build FX graph where Q, K, V flow into SDPA through quantize_op nodes."""
+        """Build FX graph where Q, K, V flow into SDPA through quantize_op nodes.
+
+        ``between(graph, node)`` optionally inserts ops between each quantize_op and SDPA.
+        """
         graph = fx.Graph()
         q = graph.placeholder("q")
         k = graph.placeholder("k")
@@ -702,6 +705,8 @@ def test_fp8_mha_softmax_quantizer_annotation(ir):
             if quantize_v
             else v
         )
+        if between is not None:
+            q_q, k_q, v_q = (between(graph, n) for n in (q_q, k_q, v_q))
         out = graph.call_function(
             torch.ops.aten.scaled_dot_product_attention.default, args=(q_q, k_q, v_q)
         )
@@ -740,6 +745,39 @@ def test_fp8_mha_softmax_quantizer_annotation(ir):
         "_fp8_softmax_scale" not in n.meta for n in sdpa_partial
     ), "annotate_fp8_sdpa incorrectly annotated SDPA when V input is not FP8"
 
+    # Shape-only ops between quantize_op and SDPA (e.g. HF's repeat_kv for GQA, or a transpose)
+    # must be looked through: per-tensor quantization commutes with them.
+    def _repeat_kv_like(graph, node):
+        n = graph.call_function(torch.ops.aten.unsqueeze.default, args=(node, 2))
+        n = graph.call_function(
+            torch.ops.aten.expand.default, args=(n, [1, 2, 4, 32, 64])
+        )
+        # Torch-TensorRT lowers view/reshape to _reshape_copy before this pass runs.
+        n = graph.call_function(
+            torch.ops.aten._reshape_copy.default, args=(n, [1, 8, 32, 64])
+        )
+        return graph.call_function(torch.ops.aten.transpose.int, args=(n, 1, 2))
+
+    gm_layout = _build_sdpa_input_quant_graph(exponent_bits=4, between=_repeat_kv_like)
+    annotate_fp8_sdpa(gm_layout, settings)
+    sdpa_layout = [n for n in gm_layout.graph.nodes if n.target in _SDPA_TARGETS]
+    assert all(
+        "_fp8_softmax_scale" in n.meta for n in sdpa_layout
+    ), "annotate_fp8_sdpa must look through view/expand/reshape/transpose"
+
+    # ...but not through ops that change values.
+    def _casts(graph, node):
+        return graph.call_function(
+            torch.ops.aten._to_copy.default, args=(node,), kwargs={"dtype": torch.float32}
+        )
+
+    gm_cast = _build_sdpa_input_quant_graph(exponent_bits=4, between=_casts)
+    annotate_fp8_sdpa(gm_cast, settings)
+    sdpa_cast = [n for n in gm_cast.graph.nodes if n.target in _SDPA_TARGETS]
+    assert all(
+        "_fp8_softmax_scale" not in n.meta for n in sdpa_cast
+    ), "annotate_fp8_sdpa must not look through value-changing ops"
+
 
 @unittest.skipIf(
     torch.cuda.get_device_capability() < (8, 9),
@@ -747,7 +785,8 @@ def test_fp8_mha_softmax_quantizer_annotation(ir):
 )
 @pytest.mark.trt_api
 @pytest.mark.unit
-def test_fp8_mha_fused_kernel(ir):
+@pytest.mark.parametrize("repeat_kv", [False, True], ids=["mha", "gqa_repeat_kv"])
+def test_fp8_mha_fused_kernel(ir, repeat_kv):
     """Regression test for #4200: FP8 MHA with FP8 Q/K/V inputs must produce a
     fused ``_gemm_mha_v2`` MHA kernel with normalization_quantize_to_type set.
 
@@ -770,6 +809,11 @@ def test_fp8_mha_fused_kernel(ir):
 
     D=64 meets TRT's head_dim >= 32 requirement for the
     normalization_quantize FP8 kernel.
+
+    With ``repeat_kv`` the K/V quantizers see ``num_kv_heads`` heads and HF's ``repeat_kv``
+    (unsqueeze -> expand -> reshape) runs between them and SDPA, which is how ModelOpt's
+    attention wrapper composes with grouped-query attention in HF models. The fusion must
+    still trigger.
     """
     import json
 
@@ -777,6 +821,7 @@ def test_fp8_mha_fused_kernel(ir):
     import torch_tensorrt
 
     B, H, S, D = 1, 2, 32, 64
+    KV_H = 1 if repeat_kv else H
     torch.manual_seed(0)
 
     class FP8MHAModel(torch.nn.Module):
@@ -793,14 +838,24 @@ def test_fp8_mha_fused_kernel(ir):
             q_fp8 = torch.ops.tensorrt.quantize_op(q, self.amax_q, 8, 4, False, False)
             k_fp8 = torch.ops.tensorrt.quantize_op(k, self.amax_k, 8, 4, False, False)
             v_fp8 = torch.ops.tensorrt.quantize_op(v, self.amax_v, 8, 4, False, False)
+            if repeat_kv:
+                k_fp8 = _repeat_kv(k_fp8, H // KV_H)
+                v_fp8 = _repeat_kv(v_fp8, H // KV_H)
             return torch.nn.functional.scaled_dot_product_attention(q_fp8, k_fp8, v_fp8)
 
+    def _repeat_kv(x, n_rep):  # transformers' repeat_kv
+        b, kv_heads, slen, d = x.shape
+        x = x[:, :, None, :, :].expand(b, kv_heads, n_rep, slen, d)
+        return x.reshape(b, kv_heads * n_rep, slen, d)
+
     q = torch.randn(B, H, S, D, dtype=torch.float16).cuda()
-    k = torch.randn(B, H, S, D, dtype=torch.float16).cuda()
-    v = torch.randn(B, H, S, D, dtype=torch.float16).cuda()
+    k = torch.randn(B, KV_H, S, D, dtype=torch.float16).cuda()
+    v = torch.randn(B, KV_H, S, D, dtype=torch.float16).cuda()
 
     model = FP8MHAModel().eval().cuda()
-    ref_out = torch.nn.functional.scaled_dot_product_attention(q, k, v)
+    ref_out = torch.nn.functional.scaled_dot_product_attention(
+        q, _repeat_kv(k, H // KV_H), _repeat_kv(v, H // KV_H)
+    )
 
     exp_program = torch.export.export(model, (q, k, v), strict=False)
     serialized_engine = (
