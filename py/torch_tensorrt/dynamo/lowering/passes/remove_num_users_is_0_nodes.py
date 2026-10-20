@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import logging
+import operator
 
 import torch
 from torch_tensorrt.dynamo._settings import CompilationSettings
@@ -15,6 +16,7 @@ logger = logging.getLogger(__name__)
 def apply_remove_num_users_is_0_nodes(gm: torch.fx.GraphModule) -> bool:
     """Remove unused ops in-place. Returns True if the graph changed."""
     from torch_tensorrt.dynamo.conversion.plugins._auto_functionalized_converter import (
+        _WRAPPER_TARGETS,
         _is_matching_writeback,
     )
 
@@ -33,6 +35,17 @@ def apply_remove_num_users_is_0_nodes(gm: torch.fx.GraphModule) -> bool:
             # the model returns None. Other unused writes (e.g. to buffers
             # baked into a standalone engine) retain the existing removal.
             and not _is_matching_writeback(node)
+            # The write-back of an in-place update of a user input (e.g. a cache).
+            # A functionalized plugin's write-back is decided above: the plugin
+            # already wrote its input in place.
+            and not (
+                node.target == torch.ops.aten.copy_.default
+                and node.args[0].op == "placeholder"
+                and not (
+                    node.args[1].target is operator.getitem
+                    and node.args[1].args[0].target in _WRAPPER_TARGETS
+                )
+            )
         ):
             gm.graph.erase_node(node)
             erased += 1
