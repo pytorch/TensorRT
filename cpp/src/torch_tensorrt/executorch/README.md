@@ -430,7 +430,6 @@ torch_tensorrt.save(
     trt_module,
     "model.pte",
     output_format="executorch",
-    arg_inputs=inputs,
     use_cuda_graphs=True,
 )
 ```

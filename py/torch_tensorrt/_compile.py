@@ -739,7 +739,7 @@ def save(
     inputs: Optional[Sequence[torch.Tensor | Input]] = None,
     arg_inputs: Optional[Sequence[torch.Tensor | Input]] = None,
     kwarg_inputs: Optional[Dict[str, Any]] = None,
-    retrace: bool = True,
+    retrace: Optional[bool] = None,
     use_legacy_exporter: Optional[bool] = None,
     pickle_protocol: int = 2,
     dynamic_shapes: Optional[Dict[str, Any]] = None,
@@ -755,7 +755,10 @@ def save(
         arg_inputs (Tuple[Union[torch.Tensor, torch_tensorrt.Input], ...]): Same as inputs. Alias for better understanding with kwarg_inputs.
         kwarg_inputs (dict[str, Union[torch.Tensor, torch_tensorrt.Input]]): Optional, kwarg inputs to the module forward function.
         output_format (str): Format to save the model. Options include exported_program | torchscript | aot_inductor | executorch.
-        retrace (bool): When the module type is a fx.GraphModule, this option re-exports the graph using torch.export.export(strict=False) to save it.
+        retrace (Optional[bool]): When the module type is a fx.GraphModule, this option re-exports the graph using torch.export.export(strict=False) to save it.
+
+                Defaults to True, except for ``output_format="executorch"``, where it defaults to False:
+                the compiled graph is lowered as it is, so no example inputs are needed.
 
                 For TRT-compiled modules with dynamic shapes, both retrace=True and retrace=False are supported:
 
@@ -879,6 +882,10 @@ def save(
     """
     if isinstance(module, CudaGraphsTorchTensorRTModule):
         module = module.compiled_module
+    if retrace is None:
+        # Match torch_tensorrt.executorch.export, which lowers a compiled GraphModule as it
+        # is, so writing a .pte needs no example inputs.
+        retrace = output_format != "executorch"
     module_type = _parse_module_type(module)
     accepted_formats = {"exported_program", "torchscript", "aot_inductor", "executorch"}
     if arg_inputs is not None and not all(
