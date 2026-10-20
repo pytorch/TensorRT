@@ -109,12 +109,16 @@ def _process_sdpa_node(
 
         modified_input_args = (query, key, value, attn_mask, dropout_p, is_causal)
         with gm.graph.inserting_after(node):
+            kwargs = {"scale": node.kwargs.get("scale", None)}
+            # Grouped-query attention: keep the flag so the K/V heads stay un-expanded (the TRT
+            # converter infers the group size from the head counts; the flag is needed when the
+            # node falls back to PyTorch).
+            if node.kwargs.get("enable_gqa", False):
+                kwargs["enable_gqa"] = True
             new_node = gm.graph.call_function(
                 torch.nn.functional.scaled_dot_product_attention,
                 args=modified_input_args,
-                kwargs={
-                    "scale": node.kwargs.get("scale", None),
-                },
+                kwargs=kwargs,
             )
             new_node.meta = copy.copy(node.meta)
             new_node.meta["trt_sliding_window_size"] = sliding_window_size

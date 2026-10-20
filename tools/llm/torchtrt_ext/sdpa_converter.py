@@ -137,6 +137,21 @@ def tril(
     return mask
 
 
+def _dim(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    tensor: TRTTensor,
+    index: int,
+) -> Union[int, TRTTensor]:
+    """Size of ``tensor`` along ``index``: a python int when static, else a shape tensor."""
+    size = tensor.shape[index]
+    if size >= 0:
+        return size
+    return impl.shape.shape(ctx, target, source_ir, name, tensor, index)
+
+
 @torch_tensorrt.dynamo.conversion.dynamo_tensorrt_converter(
     torch.nn.functional.scaled_dot_product_attention,
     enabled=True,
@@ -171,6 +186,46 @@ def scaled_dot_product_attention(
     sliding_window_size = kwargs.get("trt_sliding_window_size", None)
 
     query_dtype = query.dtype
+
+    # Grouped-query attention: query has ``groups`` times more heads than key/value. Instead of
+    # expanding K/V (which would also force the KV cache to be stored expanded), the query heads
+    # that share a KV head are folded into the row dimension:
+    #   [B, Hq, L, D] -> [B, Hkv, groups * L, D]
+    # Row ``g * L + l`` of KV head ``j`` is query head ``j * groups + g`` at position ``l`` (the
+    # same head -> KV head mapping as ``repeat_kv``). The causal bias is tiled ``groups`` times.
+    num_q_heads, num_kv_heads = query.shape[1], key.shape[1]
+    groups = 1
+    if num_q_heads != num_kv_heads:
+        if (
+            num_q_heads < 0
+            or num_kv_heads <= 0
+            or num_q_heads % num_kv_heads != 0
+            or value.shape[1] != num_kv_heads
+        ):
+            raise ValueError(
+                f"Unsupported GQA head counts: query={num_q_heads}, key={key.shape[1]}, "
+                f"value={value.shape[1]} (heads must be static and query heads a multiple of kv heads)"
+            )
+        groups = num_q_heads // num_kv_heads
+    q_batch = _dim(ctx, target, source_ir, name + "_q_batch", query, 0)
+    q_len = _dim(ctx, target, source_ir, name + "_q_len", query, 2)
+    head_dim = query.shape[-1]
+    if groups > 1:
+        folded_rows = (
+            q_len * groups
+            if isinstance(q_len, int)
+            else impl.elementwise.mul(
+                ctx, target, source_ir, name + "_folded_rows", q_len, groups
+            )
+        )
+        query = impl.shuffle.reshape(
+            ctx,
+            target,
+            source_ir,
+            name + "_fold_q",
+            query,
+            [q_batch, num_kv_heads, folded_rows, head_dim],
+        )
 
     if scale is None:
         scale = query.shape[-1]
@@ -222,17 +277,16 @@ def scaled_dot_product_attention(
             ctx, mm, query_dtype, name + "_mm_cast_to_fp16", target, source_ir
         )
 
-    L, S = query.shape[-2], key.shape[-2]
-    if L >= 0 and S >= 0:
+    L, S = q_len, key.shape[-2]
+    if isinstance(L, int) and S >= 0:
         # static shape
         attn_bias = np.zeros((L, S), dtype=dtype._from(query_dtype).to(np.dtype))
         temp_mask = np.logical_not(np.tril(np.ones((L, S), dtype=np.bool_), k=0))
         attn_bias = np.ma.array(attn_bias, mask=temp_mask).filled(float("-inf"))
+        attn_bias = np.tile(attn_bias, (groups, 1))
         attn_bias = get_trt_tensor(ctx, attn_bias, name + "_attn_bias")
     else:
         # if any of the L or S is dynamic shape
-        if L < 0:
-            L = impl.shape.shape(ctx, target, source_ir, name + "_shape_0", query, 2)
         if S < 0:
             S = impl.shape.shape(ctx, target, source_ir, name + "_shape_1", key, 2)
 
@@ -268,6 +322,15 @@ def scaled_dot_product_attention(
         attn_bias = impl.unary.log(
             ctx, target, source_ir, name + "_log", one_minus_temp_mask
         )
+        if groups > 1:
+            attn_bias = impl.cat.cat(
+                ctx,
+                target,
+                source_ir,
+                name + "_tile_bias",
+                [attn_bias] * groups,
+                dim=0,
+            )
 
     scaled_add_attn_bias = impl.elementwise.add(
         ctx, target, source_ir, name + "_attn_bias_add", mm, attn_bias
@@ -293,6 +356,16 @@ def scaled_dot_product_attention(
     if use_fp32_acc:
         out = cast_trt_tensor(
             ctx, out, query_dtype, name + "_out_cast_to_fp16", target, source_ir
+        )
+
+    if groups > 1:
+        out = impl.shuffle.reshape(
+            ctx,
+            target,
+            source_ir,
+            name + "_unfold_out",
+            out,
+            [q_batch, num_q_heads, q_len, head_dim],
         )
 
     return out
