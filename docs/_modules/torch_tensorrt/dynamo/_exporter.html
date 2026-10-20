@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=b05cd5df"></script>
+    <script src="../../../_static/documentation_options.js?v=29ff6be7"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -502,6 +502,10 @@ document.write(`
 <span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch.fx.graph</span><span class="w"> </span><span class="kn">import</span> <span class="n">_PyTreeCodeGen</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._features</span><span class="w"> </span><span class="kn">import</span> <span class="n">ENABLED_FEATURES</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._serialized_engine_layout</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">create_cpp_engine</span><span class="p">,</span>
+    <span class="n">plan_buffer</span><span class="p">,</span>
+<span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._TorchTensorRTModule</span><span class="w"> </span><span class="kn">import</span> <span class="n">ENGINE_IDX</span><span class="p">,</span> <span class="n">NAME_IDX</span>
 
 <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
@@ -1496,7 +1500,9 @@ document.write(`
             <span class="k">if</span> <span class="n">cross_compile_module</span><span class="p">:</span>
                 <span class="n">engine_info</span> <span class="o">=</span> <span class="n">trt_module</span><span class="o">.</span><span class="n">_pack_engine_info</span><span class="p">()</span>
                 <span class="n">engine_bytes</span> <span class="o">=</span> <span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span>
-                <span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64encode</span><span class="p">(</span><span class="n">engine_bytes</span><span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">"utf-8"</span><span class="p">)</span>
+                <span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64encode</span><span class="p">(</span>
+                    <span class="n">plan_buffer</span><span class="p">(</span><span class="n">engine_bytes</span><span class="p">)</span>
+                <span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">"utf-8"</span><span class="p">)</span>
                 <span class="n">trt_node</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">call_function</span><span class="p">(</span>
                     <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">no_op_placeholder_for_execute_engine</span><span class="o">.</span><span class="n">default</span><span class="p">,</span>
                     <span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">engine_inputs</span><span class="p">),</span> <span class="o">*</span><span class="n">engine_info</span><span class="p">),</span>
@@ -1706,7 +1712,7 @@ document.write(`
                 <span class="n">engine_bytes</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">"utf-8"</span><span class="p">)</span>
             <span class="p">)</span>
             <span class="k">if</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torch_tensorrt_runtime</span><span class="p">:</span>
-                <span class="n">trt_engine</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">classes</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">Engine</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">packed_engine_info</span><span class="p">))</span>
+                <span class="n">trt_engine</span> <span class="o">=</span> <span class="n">create_cpp_engine</span><span class="p">(</span><span class="n">packed_engine_info</span><span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._TRTEngine</span><span class="w"> </span><span class="kn">import</span> <span class="n">TRTEngine</span>
 
