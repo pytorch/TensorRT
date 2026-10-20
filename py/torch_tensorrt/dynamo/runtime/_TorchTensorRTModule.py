@@ -33,6 +33,7 @@ from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
     SERIALIZED_METADATA_IDX,
     TARGET_PLATFORM_IDX,
     SerializedTensorRTEngineFmt,
+    create_cpp_engine,
     serialize_binding_names,
     serialize_device_info,
 )
@@ -452,7 +453,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                 profile_execution=self.profiling_enabled,
             )
         else:
-            self.engine = torch.classes.tensorrt.Engine(self._pack_engine_info())
+            self.engine = create_cpp_engine(self._pack_engine_info())
 
         # Re-apply via the setter: resolves any path-string runtime_cache,
         # dispatches to the engine, and writes back the resolved form.
@@ -574,7 +575,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
 
                 self.engine = TRTEngine(serialized_engine_info)
             else:
-                self.engine = torch.classes.tensorrt.Engine(serialized_engine_info)
+                self.engine = create_cpp_engine(serialized_engine_info)
 
             self.engine.set_output_tensors_as_unowned(
                 metadata["output_tensors_are_unowned"]
