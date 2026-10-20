@@ -741,7 +741,7 @@ def save(
     kwarg_inputs: Optional[Dict[str, Any]] = None,
     retrace: bool = True,
     use_legacy_exporter: Optional[bool] = None,
-    pickle_protocol: int = 2,
+    pickle_protocol: int = 4,
     dynamic_shapes: Optional[Dict[str, Any]] = None,
     use_cuda_graphs: bool | None = None,
     **kwargs: Any,
@@ -779,7 +779,7 @@ def save(
                 Set to ``False`` to force ``torch.export.export`` on the inlined graph; this requires
                 example inputs and a live CUDA device.
 
-        pickle_protocol (int): The pickle protocol to use to save the model. Default is 2. Increase this to 4 or higher for large models
+        pickle_protocol (int): The pickle protocol to use to save the model. Default is 4, the lowest protocol that can serialize an engine larger than 4 GiB (protocols 2 and 3 fail with ``OverflowError: serializing a string larger than 4 GiB``).
         dynamic_shapes (Optional[Union[dict[str, Any], tuple[Any, ...]]]): Dynamic shape specifications for re-exporting the model.
 
                 **Method 1: Explicit dynamic_shapes (torch.export style)**
