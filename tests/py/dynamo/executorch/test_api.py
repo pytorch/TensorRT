@@ -3054,6 +3054,47 @@ def test_public_save_forwards_lowering_kwargs_graphmodule_no_retrace(
 
 
 @pytest.mark.unit
+@_needs_torch_tensorrt
+def test_public_save_graphmodule_to_executorch_skips_retrace_by_default(
+    monkeypatch, tmp_path
+):
+    pytest.importorskip("executorch.exir")
+    import torch_tensorrt
+    import torch_tensorrt.dynamo._exporter as _exporter
+
+    calls = _stub_save_as_executorch(monkeypatch)
+    stub_ep = torch.export.export(_AddOne(), (torch.randn(2, 2),))
+    exporter_calls = []
+
+    def _fake_export(*args, **kwargs):
+        exporter_calls.append(kwargs)
+        return stub_ep
+
+    monkeypatch.setattr(_exporter, "export", _fake_export)
+
+    # Neither retrace nor inputs: a retrace would refuse to run without inputs.
+    gm = torch.export.export(_AddOne(), (torch.randn(2, 2),)).module()
+    torch_tensorrt.save(gm, str(tmp_path / "gm.pte"), output_format="executorch")
+
+    assert len(exporter_calls) == 1
+    assert exporter_calls[0]["use_legacy_exporter"] is True
+    assert len(calls) == 1
+    assert calls[0]["module"] is stub_ep
+
+
+@pytest.mark.unit
+@_needs_torch_tensorrt
+def test_public_save_graphmodule_to_exported_program_still_retraces_by_default(
+    tmp_path,
+):
+    import torch_tensorrt
+
+    gm = torch.export.export(_AddOne(), (torch.randn(2, 2),)).module()
+    with pytest.raises(ValueError, match="retrace is True"):
+        torch_tensorrt.save(gm, str(tmp_path / "gm.ep"))
+
+
+@pytest.mark.unit
 def test_save_executorch_real_etrecord_is_inspector_consumable(tmp_path):
     """A real lowering with generate_etrecord=True writes a sidecar that ExecuTorch's
     devtools can parse back into an Inspector-consumable ETRecord."""
