@@ -58,6 +58,7 @@ from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
     create_cpp_engine,
     deserialize_binding_names,
     parse_device_info,
+    plan_buffer,
 )
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 from torch_tensorrt.logging import TRT_LOGGER
@@ -456,9 +457,18 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         self.version = str(self.serialized_info[ABI_TARGET_IDX])
         self.name = str(self.serialized_info[NAME_IDX]).replace(".", "_")
         self.serialized_device_info = str(self.serialized_info[DEVICE_IDX])
-        self.serialized_engine = self.serialized_info[ENGINE_IDX]
-        if not isinstance(self.serialized_engine, (bytes, bytearray)):
-            raise TypeError("Expected serialized engine as bytes")
+        plan = self.serialized_info[ENGINE_IDX]
+        if not isinstance(plan, (bytes, bytearray)):
+            # e.g. a view of a C++ engine's plan from TorchTensorRTModule._pack_engine_info.
+            # This engine keeps its plan, so it keeps it as bytes.
+            try:
+                plan = bytes(memoryview(plan_buffer(plan)))
+            except TypeError:
+                raise TypeError(
+                    "Expected the serialized engine as bytes or a buffer"
+                ) from None
+            self.serialized_info[ENGINE_IDX] = plan
+        self.serialized_engine = plan
 
         self.in_binding_names = deserialize_binding_names(
             str(self.serialized_info[INPUT_BINDING_NAMES_IDX])
