@@ -80,11 +80,9 @@ To pick up a change before it ships, or to report a problem against ``main``:
 Compile and Save
 -----------------
 
-The usual ``ir="dynamo"`` path, with two extra arguments to ``torch_tensorrt.save``:
-
-* ``output_format="executorch"`` selects the ``.pte`` writer.
-* ``retrace=False`` keeps the compiled graph as it is. Re-exporting would drop the TensorRT
-  engines before ExecuTorch's partitioner sees them.
+The usual ``ir="dynamo"`` path, with one extra argument to ``torch_tensorrt.save``:
+``output_format="executorch"`` selects the ``.pte`` writer. For this format ``save`` keeps
+the compiled graph as it is rather than re-exporting it, so it needs no example inputs.
 
 .. code-block:: python
 
@@ -101,13 +99,7 @@ The usual ``ir="dynamo"`` path, with two extra arguments to ``torch_tensorrt.sav
         min_block_size=1,
     )
 
-    torch_tensorrt.save(
-        trt_gm,
-        "model.pte",
-        output_format="executorch",
-        arg_inputs=example_inputs,
-        retrace=False,
-    )
+    torch_tensorrt.save(trt_gm, "model.pte", output_format="executorch")
 
 :ref:`executorch_save` covers the rest: dynamic shapes, several methods in one file, a
 zero-copy KV cache, and the two-step ``torch_tensorrt.executorch.export()`` path for
@@ -129,8 +121,6 @@ CUDA backend compiles them instead, so nothing leaves the GPU:
         trt_gm,
         "coalesced.pte",
         output_format="executorch",
-        arg_inputs=example_inputs,
-        retrace=False,
         partitioners=[
             CudaPartitioner([CudaBackend.generate_method_name_compile_spec("forward")])
         ],
@@ -164,8 +154,6 @@ copies are pure overhead:
         trt_gm,
         "device_resident.pte",
         output_format="executorch",
-        arg_inputs=example_inputs,
-        retrace=False,
         backend_config=ExecutorchBackendConfig(
             propagate_device_config=PropagateDeviceConfig(
                 skip_h2d_for_method_inputs=True,
@@ -397,8 +385,6 @@ launch many short kernels, where CPU launch work dominates each call.
         trt_gm,
         "model.pte",
         output_format="executorch",
-        arg_inputs=example_inputs,
-        retrace=False,
         use_cuda_graphs=True,
     )
 
