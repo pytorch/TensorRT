@@ -26,6 +26,10 @@ from torch.export.exported_program import (
 )
 from torch.fx.graph import _PyTreeCodeGen
 from torch_tensorrt._features import ENABLED_FEATURES
+from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
+    create_cpp_engine,
+    plan_buffer,
+)
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import ENGINE_IDX, NAME_IDX
 
 logger = logging.getLogger(__name__)
@@ -1017,7 +1021,9 @@ def inline_trt_modules(
             if cross_compile_module:
                 engine_info = trt_module._pack_engine_info()
                 engine_bytes = engine_info[ENGINE_IDX]
-                engine_info[ENGINE_IDX] = base64.b64encode(engine_bytes).decode("utf-8")
+                engine_info[ENGINE_IDX] = base64.b64encode(
+                    plan_buffer(engine_bytes)
+                ).decode("utf-8")
                 trt_node = gm.graph.call_function(
                     torch.ops.tensorrt.no_op_placeholder_for_execute_engine.default,
                     (tuple(engine_inputs), *engine_info),
@@ -1227,7 +1233,7 @@ def replace_execute_engine_no_op_node(
                 engine_bytes.encode("utf-8")
             )
             if ENABLED_FEATURES.torch_tensorrt_runtime:
-                trt_engine = torch.classes.tensorrt.Engine(tuple(packed_engine_info))
+                trt_engine = create_cpp_engine(packed_engine_info)
             else:
                 from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
 

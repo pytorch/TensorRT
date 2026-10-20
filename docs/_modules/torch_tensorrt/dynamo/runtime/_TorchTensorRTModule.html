@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../../_static/documentation_options.js?v=b05cd5df"></script>
+    <script src="../../../../_static/documentation_options.js?v=29ff6be7"></script>
     <script src="../../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -509,6 +509,8 @@ document.write(`
     <span class="n">SERIALIZED_METADATA_IDX</span><span class="p">,</span>
     <span class="n">TARGET_PLATFORM_IDX</span><span class="p">,</span>
     <span class="n">SerializedTensorRTEngineFmt</span><span class="p">,</span>
+    <span class="n">create_cpp_engine</span><span class="p">,</span>
+    <span class="n">plan_buffer</span><span class="p">,</span>
     <span class="n">serialize_binding_names</span><span class="p">,</span>
     <span class="n">serialize_device_info</span><span class="p">,</span>
 <span class="p">)</span>
@@ -665,6 +667,12 @@ document.write(`
         <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">hardware_compatible</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">hardware_compatible</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">settings</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="n">settings</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">serialized_engine</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="p">(</span>
+            <span class="n">settings</span><span class="o">.</span><span class="n">lazy_engine_init</span> <span class="ow">or</span> <span class="n">settings</span><span class="o">.</span><span class="n">enable_cross_compile_for_windows</span>
+        <span class="p">):</span>
+            <span class="c1"># Held until the engine is set up, and the module may be pickled or deep</span>
+            <span class="c1"># copied before then, which TensorRT's buffer type does not support.</span>
+            <span class="n">serialized_engine</span> <span class="o">=</span> <span class="nb">bytes</span><span class="p">(</span><span class="n">plan_buffer</span><span class="p">(</span><span class="n">serialized_engine</span><span class="p">))</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">serialized_engine</span> <span class="o">=</span> <span class="n">serialized_engine</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">requires_output_allocator</span> <span class="o">=</span> <span class="n">requires_output_allocator</span>
@@ -718,7 +726,32 @@ document.write(`
             <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="sa">f</span><span class="s2">"cuda:</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">gpu_id</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="sa">f</span><span class="s2">"cuda:</span><span class="si">{</span><span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">current_device</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">_pack_engine_info</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span> <span class="o">|</span> <span class="nb">bytes</span><span class="p">]:</span>
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">serialized_engine</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bytes</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""The serialized TensorRT engine.</span>
+
+<span class="sd">        Once the C++ runtime holds the engine, the module stops keeping a host copy of</span>
+<span class="sd">        the plan, which is as large as the weights. Reading this property then</span>
+<span class="sd">        serializes the engine again, so each read costs a full copy.</span>
+<span class="sd">        """</span>
+        <span class="n">plan</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_plan_buffer</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">plan</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">plan</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">plan</span>
+        <span class="k">return</span> <span class="nb">bytes</span><span class="p">(</span><span class="n">plan_buffer</span><span class="p">(</span><span class="n">plan</span><span class="p">))</span>
+
+    <span class="nd">@serialized_engine</span><span class="o">.</span><span class="n">setter</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">serialized_engine</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">serialized_engine</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_serialized_engine</span> <span class="o">=</span> <span class="n">serialized_engine</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_plan_buffer</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""The plan without copying it: the retained buffer, else a view of a fresh serialization."""</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_serialized_engine</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_serialized_engine</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torch_tensorrt_runtime</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">serialized_engine_tensor</span><span class="p">()</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_pack_engine_info</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Any</span><span class="p">]:</span>
         <span class="n">target_device</span> <span class="o">=</span> <span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">device</span>
             <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">device</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
@@ -734,7 +767,7 @@ document.write(`
                 <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">are_output_tensors_unowned</span><span class="p">()</span>
             <span class="p">),</span>
         <span class="p">}</span>
-        <span class="n">engine_info</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span> <span class="o">|</span> <span class="nb">bytes</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="s2">""</span><span class="p">]</span> <span class="o">*</span> <span class="n">SERIALIZATION_LEN</span>
+        <span class="n">engine_info</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="s2">""</span><span class="p">]</span> <span class="o">*</span> <span class="n">SERIALIZATION_LEN</span>
         <span class="n">engine_info</span><span class="p">[</span><span class="n">ABI_TARGET_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
             <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">ABI_VERSION</span><span class="p">()</span>
             <span class="k">if</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torch_tensorrt_runtime</span>
@@ -748,8 +781,9 @@ document.write(`
             <span class="k">if</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torch_tensorrt_runtime</span>
             <span class="k">else</span> <span class="n">serialize_device_info</span><span class="p">(</span><span class="n">target_device</span><span class="p">)</span>
         <span class="p">)</span>
-        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">serialized_engine</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-        <span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">serialized_engine</span>
+        <span class="n">plan</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_plan_buffer</span><span class="p">()</span>
+        <span class="k">assert</span> <span class="n">plan</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="n">plan</span>
         <span class="n">engine_info</span><span class="p">[</span><span class="n">INPUT_BINDING_NAMES_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="n">serialize_binding_names</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">input_binding_names</span>
         <span class="p">)</span>
@@ -933,12 +967,18 @@ document.write(`
         <span class="k">if</span> <span class="ow">not</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torch_tensorrt_runtime</span><span class="p">:</span>
             <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._TRTEngine</span><span class="w"> </span><span class="kn">import</span> <span class="n">TRTEngine</span>
 
+            <span class="c1"># The Python runtime takes the plan as bytes and keeps it.</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_serialized_engine</span><span class="p">,</span> <span class="p">(</span><span class="nb">bytes</span><span class="p">,</span> <span class="nb">bytearray</span><span class="p">)):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_serialized_engine</span> <span class="o">=</span> <span class="nb">bytes</span><span class="p">(</span><span class="n">plan_buffer</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_serialized_engine</span><span class="p">))</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">=</span> <span class="n">TRTEngine</span><span class="p">(</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">_pack_engine_info</span><span class="p">(),</span>
                 <span class="n">profile_execution</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">profiling_enabled</span><span class="p">,</span>
             <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">classes</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">Engine</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_pack_engine_info</span><span class="p">())</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">=</span> <span class="n">create_cpp_engine</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_pack_engine_info</span><span class="p">())</span>
+            <span class="c1"># The engine re-serializes on demand (see ``_plan_buffer``), so a host copy</span>
+            <span class="c1"># of the plan, as large as the weights, need not live as long as the module.</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_serialized_engine</span> <span class="o">=</span> <span class="kc">None</span>
 
         <span class="c1"># Re-apply via the setter: resolves any path-string runtime_cache,</span>
         <span class="c1"># dispatches to the engine, and writes back the resolved form.</span>
@@ -990,22 +1030,11 @@ document.write(`
 <div class="viewcode-block" id="TorchTensorRTModule.get_extra_state">
 <a class="viewcode-back" href="../../../../py_api/runtime.html#torch_tensorrt.runtime.TorchTensorRTModule.get_extra_state">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_extra_state</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SerializedTorchTensorRTModuleFmt</span><span class="p">:</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_serialized_engine</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">engine_info</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pack_engine_info</span><span class="p">()</span>
-            <span class="n">engine_bytes</span> <span class="o">=</span> <span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span>
-            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">engine_bytes</span><span class="p">,</span> <span class="p">(</span><span class="nb">bytes</span><span class="p">,</span> <span class="nb">bytearray</span><span class="p">))</span>
-            <span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64encode</span><span class="p">(</span><span class="n">engine_bytes</span><span class="p">)</span>
-            <span class="k">return</span> <span class="p">(</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
-                <span class="n">engine_info</span><span class="p">,</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">input_binding_names</span><span class="p">,</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">output_binding_names</span><span class="p">,</span>
+            <span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64encode</span><span class="p">(</span>
+                <span class="n">plan_buffer</span><span class="p">(</span><span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">])</span>
             <span class="p">)</span>
-        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">serialized_engine</span><span class="p">:</span>
-            <span class="n">engine_info</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pack_engine_info</span><span class="p">()</span>
-            <span class="n">engine_bytes</span> <span class="o">=</span> <span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span>
-            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">engine_bytes</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">)</span>
-            <span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64encode</span><span class="p">(</span><span class="n">engine_bytes</span><span class="p">)</span>
             <span class="k">return</span> <span class="p">(</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
                 <span class="n">engine_info</span><span class="p">,</span>
@@ -1066,7 +1095,7 @@ document.write(`
 
                 <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">=</span> <span class="n">TRTEngine</span><span class="p">(</span><span class="n">serialized_engine_info</span><span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">classes</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">Engine</span><span class="p">(</span><span class="n">serialized_engine_info</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">=</span> <span class="n">create_cpp_engine</span><span class="p">(</span><span class="n">serialized_engine_info</span><span class="p">)</span>
 
             <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">set_output_tensors_as_unowned</span><span class="p">(</span>
                 <span class="n">metadata</span><span class="p">[</span><span class="s2">"output_tensors_are_unowned"</span><span class="p">]</span>
@@ -1180,6 +1209,9 @@ document.write(`
         <span class="k">return</span> <span class="n">state</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">__setstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="s2">"serialized_engine"</span> <span class="ow">in</span> <span class="n">state</span><span class="p">:</span>
+            <span class="n">state</span><span class="p">[</span><span class="s2">"_serialized_engine"</span><span class="p">]</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">"serialized_engine"</span><span class="p">)</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"_serialized_engine"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
         <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"_runtime_settings"</span><span class="p">,</span> <span class="n">RuntimeSettings</span><span class="p">(</span><span class="n">runtime_cache</span><span class="o">=</span><span class="kc">None</span><span class="p">))</span>
         <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"_implicit_cache_handle"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
         <span class="n">set_state</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="nb">super</span><span class="p">(),</span> <span class="s2">"__setstate__"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>

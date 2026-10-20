@@ -55,8 +55,10 @@ from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
     SERIALIZED_METADATA_IDX,
     TARGET_PLATFORM_IDX,
     SerializedTensorRTEngineFmt,
+    create_cpp_engine,
     deserialize_binding_names,
     parse_device_info,
+    plan_buffer,
 )
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 from torch_tensorrt.logging import TRT_LOGGER
@@ -208,7 +210,7 @@ def _reconstruct_trt_engine(serialized_info: List[Any]) -> Any:
         serialized_info[ENGINE_IDX] = base64.b64decode(engine_field)
 
     if torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime:
-        return torch.classes.tensorrt.Engine(tuple(serialized_info))
+        return create_cpp_engine(serialized_info)
 
     return TRTEngine(serialized_info)
 
@@ -225,7 +227,9 @@ class EngineSerializer(OpaqueBase):  # type: ignore[misc]
         or a Python ``TRTEngine``, so a single saved artifact works on both.
         """
         state = list(self.serialized_info)
-        state[ENGINE_IDX] = base64.b64encode(state[ENGINE_IDX]).decode("utf-8")
+        state[ENGINE_IDX] = base64.b64encode(cast(bytes, state[ENGINE_IDX])).decode(
+            "utf-8"
+        )
         return (_reconstruct_trt_engine, (state,))
 
 
@@ -381,7 +385,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         """
         serialized_info = list(self.serialized_info)
         serialized_info[ENGINE_IDX] = base64.b64encode(
-            serialized_info[ENGINE_IDX]
+            cast(bytes, serialized_info[ENGINE_IDX])
         ).decode("utf-8")
         return (serialized_info, "TRTEngine")
 
@@ -453,9 +457,18 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         self.version = str(self.serialized_info[ABI_TARGET_IDX])
         self.name = str(self.serialized_info[NAME_IDX]).replace(".", "_")
         self.serialized_device_info = str(self.serialized_info[DEVICE_IDX])
-        self.serialized_engine = self.serialized_info[ENGINE_IDX]
-        if not isinstance(self.serialized_engine, (bytes, bytearray)):
-            raise TypeError("Expected serialized engine as bytes")
+        plan = self.serialized_info[ENGINE_IDX]
+        if not isinstance(plan, (bytes, bytearray)):
+            # e.g. a view of a C++ engine's plan from TorchTensorRTModule._pack_engine_info.
+            # This engine keeps its plan, so it keeps it as bytes.
+            try:
+                plan = bytes(memoryview(plan_buffer(plan)))
+            except TypeError:
+                raise TypeError(
+                    "Expected the serialized engine as bytes or a buffer"
+                ) from None
+            self.serialized_info[ENGINE_IDX] = plan
+        self.serialized_engine = plan
 
         self.in_binding_names = deserialize_binding_names(
             str(self.serialized_info[INPUT_BINDING_NAMES_IDX])

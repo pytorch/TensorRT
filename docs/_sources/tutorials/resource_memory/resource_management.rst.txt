@@ -15,11 +15,30 @@ to reduce both CPU and GPU memory consumption.
 Memory Usage Control
 --------------------
 
+Peak memory during compilation, as multiples of the model's weight size, measured on a
+3 GiB fp16 model. The GPU column includes the model's own copy. TensorRT's builder also
+needs about 2 GB of host working memory that does not grow with the model.
+
+.. list-table::
+   :header-rows: 1
+
+   * - Setting
+     - Peak CPU memory
+     - Peak GPU memory
+   * - Default
+     - ~1x
+     - ~2x
+   * - ``offload_module_to_cpu=True``
+     - ~2x
+     - ~1x
+
+Once compilation finishes, the compiled module holds only the TensorRT engine, about 1x
+the weight size on the GPU. Delete the original PyTorch model if you no longer need it.
+Models whose lowering creates new weight tensors (for example by folding transposes or
+casts of weights) need more.
+
 CPU Memory
 ^^^^^^^^^^
-
-By default, Torch-TensorRT may consume up to **5x** the model size in CPU memory.  
-This can exceed system limits when compiling large models.
 
 **Common symptoms of high CPU memory usage:**
 
@@ -47,13 +66,11 @@ This can exceed system limits when compiling large models.
 
       offload_module_to_cpu = False
 
-   This removes another **1x** model copy, reducing peak CPU memory
-   usage to about **2x** the model size.
+   The weights then stay on the GPU instead of moving to the CPU. TensorRT still builds
+   from a host copy of them, but that copy is freed as soon as the engine is built.
 
 GPU Memory
 ^^^^^^^^^^
-
-By default, Torch-TensorRT may consume up to **2x** the model size in GPU memory.
 
 **Common symptoms of high GPU memory usage:**
 
@@ -70,9 +87,20 @@ By default, Torch-TensorRT may consume up to **2x** the model size in GPU memory
 
       offload_module_to_cpu = True
 
-   This shifts one model copy from GPU to CPU memory.
-   As a result, peak GPU memory usage decreases to about **1x**
-   the model size, while one more copy of the model will occupy the CPU memory so CPU memory usage increases by roughly **1x**.
+   This moves the model's weights to CPU memory before the engine builds, a block at a
+   time, and TensorRT reads them there in place. Peak GPU memory drops to about the size
+   of the engine (**1x**), while CPU memory holds the weights for the rest of
+   compilation (about **2x** at peak, while the engine is handed to the runtime).
+
+Unified Memory Systems
+^^^^^^^^^^^^^^^^^^^^^^
+
+On systems where the CPU and GPU share physical memory, such as Jetson or DGX Spark,
+CPU and GPU allocations come out of the same pool, so budget for their sum. Counting
+the model itself, compilation peaks at about **3.8x** the weight size with default
+settings and about **3.2x** with ``offload_module_to_cpu=True``. Moving the weights to
+the CPU frees no memory on these systems, but TensorRT then builds from them directly
+instead of from a second copy.
 
 ----
 
