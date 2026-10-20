@@ -159,6 +159,20 @@ def _add_graph_input(
     return in_node
 
 
+def set_output_spec(gm: GraphModule, out_spec: Any) -> None:
+    """Make ``gm`` return outputs structured as ``out_spec`` (e.g. after appending KV-cache outputs).
+
+    ``GraphModule.recompile()`` re-derives ``gm._out_spec`` from the graph's pytree codegen, so
+    assigning the attribute alone is silently undone by any later recompile (Torch-TensorRT
+    recompiles after the lowering passes). The codegen's ``pytree_info`` is the source of truth.
+    """
+    gm._out_spec = out_spec
+    codegen = gm.graph._codegen
+    info = getattr(codegen, "pytree_info", None)
+    if info is not None:
+        codegen.pytree_info = info._replace(out_spec=out_spec)
+
+
 def is_op(node: Node, ops: Union[OpOverloadPacket, Iterable[OpOverloadPacket]]) -> bool:
     """Check if the node is a call to one of the ops."""
     if node.op != "call_function":

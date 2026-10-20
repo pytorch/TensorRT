@@ -6,7 +6,12 @@ from typing import List, Tuple
 
 import torch
 import torch.utils._pytree as pytree
-from cache_utils import _add_graph_input, create_random_output_tensors, get_kv_nodes
+from cache_utils import (
+    _add_graph_input,
+    create_random_output_tensors,
+    get_kv_nodes,
+    set_output_spec,
+)
 from torch.fx import Node
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes._aten_lowering_pass import (
@@ -302,7 +307,7 @@ def insert_static_cache_v2(
     new_output_tensors = create_random_output_tensors(logits_keys_values)
 
     new_out_spec = pytree.tree_flatten(new_output_tensors)[1]
-    gm._out_spec = new_out_spec
+    set_output_spec(gm, new_out_spec)
 
     logger.debug("After inserting KV cache into the graph: " + str(gm.graph))
     return gm
