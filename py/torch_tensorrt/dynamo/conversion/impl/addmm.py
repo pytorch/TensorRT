@@ -10,6 +10,7 @@ from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
+from torch_tensorrt.dynamo.conversion.converter_utils import broadcast, get_trt_tensor
 
 
 def addmm(
@@ -34,4 +35,8 @@ def addmm(
             ctx, target, SourceIR.ATEN, f"{name}_mul_beta", input, beta
         )
 
+    # Rank-align the bias instead of broadcasting it to mm's shape, as linear does
+    # (#4393): a materialized bias breaks TensorRT's fused QKV projections.
+    input = get_trt_tensor(ctx, input, f"{name}_input")
+    mm, input = broadcast(ctx, mm, input, f"{name}_mm", f"{name}_input_broadcast")
     return impl.elementwise.add(ctx, target, source_ir, f"{name}_add", input, mm)

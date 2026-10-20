@@ -67,6 +67,24 @@ class TestAddmmConverter(DispatchTestCase):
             inputs,
         )
 
+    def test_addmm_bias_then_qkv_heads(self):
+        # GPT-2's Conv1D QKV projection split into heads: with the bias broadcast to
+        # the matmul's full shape, TensorRT failed to build the fused projection.
+        class QKV(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.w = nn.Parameter(torch.randn(64, 192) * 0.1)
+                self.b = nn.Parameter(torch.randn(192) * 0.1)
+
+            def forward(self, x):
+                y = torch.ops.aten.addmm.default(self.b, x.view(-1, 64), self.w)
+                return tuple(
+                    t.view(1, 7, 2, 32).permute(0, 2, 1, 3)
+                    for t in y.view(1, 7, 192).split(64, dim=2)
+                )
+
+        self.run_test(QKV(), [torch.randn(1, 7, 64)])
+
 
 if __name__ == "__main__":
     run_tests()
