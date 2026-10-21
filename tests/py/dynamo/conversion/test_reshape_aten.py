@@ -40,6 +40,21 @@ class TestReshapeConverter(DispatchTestCase):
             inputs,
         )
 
+    def test_reshape_to_empty_dim(self):
+        # MLA attention with qk_rope_head_dim=0 (e.g. GLM-5) views its empty rotary
+        # part of the keys as [batch, 1, seq, 0] before concatenating it
+        class Reshape(torch.nn.Module):
+            def forward(self, x):
+                k_pass, k_rot = x[..., :8].reshape(2, 1, 4, 8), x[..., 8:]
+                return torch.cat([k_pass, k_rot.reshape(2, 1, 4, 0)], dim=-1)
+
+        self.run_test(
+            Reshape(),
+            [torch.randn(2, 4, 8)],
+            use_dynamo_tracer=True,
+            enable_passes=True,
+        )
+
     @parameterized.expand(
         [
             ((-1,),),
