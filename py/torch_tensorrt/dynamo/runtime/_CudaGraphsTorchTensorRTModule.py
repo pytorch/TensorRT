@@ -349,22 +349,18 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                 if self._input_buffers[i] is inputs[i]
             }
 
-            if isinstance(self._output_buffers, (list, tuple)):
-                output_buffers = self._output_buffers
-            else:
-                output_buffers = [self._output_buffers]
-            # An output in an input updated in place is the caller's tensor already
-            outputs = [
-                (
-                    output
-                    if output.untyped_storage().data_ptr() in in_place
-                    else output.clone()
-                )
-                for output in output_buffers
-            ]
-            if len(outputs) == 1:
-                return outputs[0]
-            return outputs
+            # Copy the outputs out of the static buffers, keeping the module's output
+            # structure (e.g. a Hugging Face ModelOutput or nested tuples). An output
+            # in an input updated in place is the caller's tensor already
+            return tree_map(
+                lambda t: (
+                    t.clone()
+                    if isinstance(t, torch.Tensor)
+                    and t.untyped_storage().data_ptr() not in in_place
+                    else t
+                ),
+                self._output_buffers,
+            )
         else:
             self._reset_captured_graph()
             return self.compiled_module(*args, **kwargs)
