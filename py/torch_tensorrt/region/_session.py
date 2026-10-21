@@ -5,9 +5,12 @@ from __future__ import annotations
 
 from contextvars import ContextVar, Token
 from types import TracebackType
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from ._errors import RegionCaptureError
+
+if TYPE_CHECKING:
+    from ._plugin import PluginSpec
 
 _CURRENT_SESSION: ContextVar[Optional[RegionCompilationSession]] = ContextVar(
     "torch_tensorrt_region_session", default=None
@@ -25,6 +28,7 @@ class RegionCompilationSession:
     def __init__(self, *, strict: bool) -> None:
         self.strict = strict
         self.capture_error: Optional[str] = None
+        self.plugins: dict[int, PluginSpec] = {}
         self._context_token: Optional[Token[Optional[RegionCompilationSession]]] = None
 
     def __enter__(self) -> RegionCompilationSession:

@@ -1,13 +1,14 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES.
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Compile-local records and invariants for explicit PyTorch regions."""
+"""Compile-local records and invariants for explicit execution regions."""
 
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Optional, Sequence, Union
 
 import torch
 
+from torch_tensorrt.region._constants import SUPPORTED_BACKENDS
 from torch_tensorrt.region._errors import RegionError
 
 REGION_META_KEY = "torch_tensorrt_region"
@@ -25,13 +26,25 @@ class RegionRecord:
     route: str = "torch"
     owner: Optional[str] = None
     reference: Optional[torch.fx.GraphModule] = field(default=None, repr=False)
+    backend: str = "eager"
+    plugin_key: int = -1
+    plugin_op: Any = field(default=None, repr=False)
     _reference_graph: Optional[str] = field(init=False, default=None, repr=False)
 
     def __post_init__(self) -> None:
+        if self.route not in ("torch", "plugin"):
+            raise RegionError(f"Unsupported region route {self.route!r}")
+        if self.backend not in SUPPORTED_BACKENDS:
+            raise RegionError(f"Unsupported region backend {self.backend!r}")
         # The reference is an immutable capture snapshot. Format it once, rather
         # than again after every lowering pass and partitioning stage.
-        if self.reference is not None:
+        if self.route == "torch" and self.reference is not None:
             self._reference_graph = str(self.reference.graph)
+
+    @property
+    def capture_signature(self) -> tuple[str, str, str, int]:
+        """Identity and execution policy that lowering must preserve."""
+        return self.id, self.backend, self.route, self.plugin_key
 
 
 def get_region_records(gm: torch.nn.Module) -> list[RegionRecord]:
@@ -74,8 +87,11 @@ def validate_region_settings(settings: Any, records: Sequence[RegionRecord]) -> 
     if not records:
         return
     conflicts = []
+    if getattr(settings, "require_full_compilation", False) and any(
+        record.route == "torch" for record in records
+    ):
+        conflicts.append("require_full_compilation=True")
     for name in (
-        "require_full_compilation",
         "offload_module_to_cpu",
         "enable_autocast",
         "enable_resource_partitioning",
@@ -90,7 +106,7 @@ def validate_region_settings(settings: Any, records: Sequence[RegionRecord]) -> 
         conflicts.append("immutable_weights=False")
     if conflicts:
         raise RegionError(
-            f"execute_in_torch region {records[0].id!r} is incompatible with "
+            f"Region {records[0].id!r} is incompatible with "
             + ", ".join(conflicts)
             + ". The experimental region path requires these features disabled "
             "and immutable_weights=True."
@@ -98,7 +114,10 @@ def validate_region_settings(settings: Any, records: Sequence[RegionRecord]) -> 
 
 
 def audit_region_placement(
-    gm: torch.fx.GraphModule, records: Sequence[RegionRecord]
+    gm: torch.fx.GraphModule,
+    records: Sequence[RegionRecord],
+    *,
+    require_plugins_in_trt: bool = False,
 ) -> None:
     """Verify actual call ownership, including nested fallback partitions."""
     if not records:
@@ -115,14 +134,41 @@ def audit_region_placement(
             if node.op == "placeholder":
                 continue
             annotation = node.meta.get(REGION_META_KEY)
+            # The global partitioner also copies a single-output producer's
+            # metadata onto the enclosing partition call. A plugin executes
+            # inside that child; count its actual operator (or built engine
+            # ownership) below, rather than treating the wrapper as the op.
+            if (
+                annotation is not None
+                and annotation.get("route") == "plugin"
+                and node.op == "call_module"
+            ):
+                annotation = None
             if annotation is not None:
+                region_id = annotation.get("id")
+                record = expected.get(region_id)
+                if record is None:
+                    raise RegionError(f"Unexpected region {region_id!r}")
+                if record.route == "plugin":
+                    if (
+                        annotation.get("route") != "plugin"
+                        or node.op != "call_function"
+                        or node.target != record.plugin_op
+                    ):
+                        raise RegionError(
+                            f"Plugin region {region_id!r} lost its kernel"
+                        )
+                    if require_plugins_in_trt and not accelerated:
+                        raise RegionError(
+                            f"fuse_in_plugin region {region_id!r} must run in a TensorRT "
+                            "plugin; check converter support, excluded ops and min_block_size"
+                        )
+                    occurrences[region_id].append(path or "<root>")
+                    continue
                 if not is_torch_region_node(module, node):
                     raise RegionError(
                         f"Region leaf {node.name!r} lost its child, target or route"
                     )
-                region_id = annotation["id"]
-                if region_id not in expected:
-                    raise RegionError(f"Unexpected region {region_id!r}")
                 if accelerated:
                     raise RegionError(
                         f"execute_in_torch region {region_id!r} entered a TensorRT partition"
@@ -131,7 +177,11 @@ def audit_region_placement(
                 placeholders = [n for n in child.graph.nodes if n.op == "placeholder"]
                 if len(placeholders) != len(node.args) or node.kwargs:
                     raise RegionError(f"Region {region_id!r} input boundary changed")
-                record = expected[region_id]
+                if (
+                    record.backend not in SUPPORTED_BACKENDS
+                    or annotation.get("backend", "eager") != record.backend
+                ):
+                    raise RegionError(f"Region {region_id!r} backend changed")
                 if (
                     record._reference_graph is not None
                     and str(child.graph) != record._reference_graph
@@ -141,6 +191,21 @@ def audit_region_placement(
                 continue
             if node.op == "call_module":
                 child = module.get_submodule(str(node.target))
+                plugin_ids = getattr(child, "_torch_tensorrt_plugin_regions", ())
+                if plugin_ids:
+                    from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
+
+                    if not isinstance(child, TorchTensorRTModule):
+                        raise RegionError(
+                            "Plugin regions must belong to a TensorRT engine"
+                        )
+                    for region_id in plugin_ids:
+                        if (
+                            region_id not in expected
+                            or expected[region_id].route != "plugin"
+                        ):
+                            raise RegionError(f"Unexpected plugin region {region_id!r}")
+                        occurrences[region_id].append(str(node.target))
                 if isinstance(child, torch.fx.GraphModule):
                     child_path = f"{path}.{node.target}" if path else str(node.target)
                     visit(
@@ -153,6 +218,6 @@ def audit_region_placement(
     for region_id, owners in occurrences.items():
         if len(owners) != 1:
             raise RegionError(
-                f"Region {region_id!r} must have exactly one PyTorch call; found {len(owners)}"
+                f"Region {region_id!r} must have exactly one call; found {len(owners)}"
             )
         expected[region_id].owner = owners[0]

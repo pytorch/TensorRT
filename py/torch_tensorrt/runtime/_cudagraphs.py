@@ -2,9 +2,12 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import logging
+import operator
+import sys
 from typing import Any, Optional, Union
 
 import torch
+
 import torch_tensorrt
 from torch_tensorrt.dynamo.runtime._CudaGraphsTorchTensorRTModule import (
     CudaGraphsTorchTensorRTModule,
@@ -79,29 +82,46 @@ class _CudagraphsContextManager(object):
         self._inner_cm: Any = None
         self.cudagraphs_module: Optional[CudaGraphsTorchTensorRTModule] = None
         self.old_module = None
+        self._active = False
 
     def __enter__(self) -> Union[torch.nn.Module, torch.fx.GraphModule]:
-        # Apply the RTX cuda-graph strategy BEFORE the wrapper's ``warm_up``
-        # materializes the engine's ``IExecutionContext``. Open the
-        # ``runtime_config`` CM here so the strategy is live for the next
-        # ``get_cuda_graph_module`` call.
-        if self._cuda_graph_strategy is not None:
-            from torch_tensorrt.runtime._runtime_config import runtime_config
+        if self._active:
+            raise RuntimeError("A CUDA graph context cannot re-enter itself")
+        self._active = True
+        # Snapshot on entry: this context may have been constructed before a
+        # surrounding CUDA-graph context was entered.
+        self.old_mode = _PY_RT_CUDAGRAPHS
+        try:
+            # Apply the RTX strategy before warmup materializes the engine's
+            # execution context, and undo it if wrapper construction fails.
+            if self._cuda_graph_strategy is not None:
+                from torch_tensorrt.runtime._runtime_config import runtime_config
 
-            self._inner_cm = runtime_config(
-                self.compiled_module,
-                cuda_graph_strategy=self._cuda_graph_strategy,
+                inner_cm = runtime_config(
+                    self.compiled_module,
+                    cuda_graph_strategy=self._cuda_graph_strategy,
+                )
+                inner_cm.__enter__()
+                self._inner_cm = inner_cm
+
+            mutable = isinstance(
+                self.compiled_module, torch_tensorrt.MutableTorchTensorRTModule
             )
-            self._inner_cm.__enter__()
-
-        if isinstance(self.compiled_module, torch_tensorrt.MutableTorchTensorRTModule):
-            self.old_module = self.compiled_module.gm
-            self.compiled_module.gm = get_cuda_graph_module(self.compiled_module.gm)
-            return self.compiled_module
-        else:
-            return get_cuda_graph_module(self.compiled_module)
+            if mutable:
+                self.old_module = self.compiled_module.gm
+                wrapped = get_cuda_graph_module(self.old_module)
+                self.compiled_module.gm = wrapped
+            else:
+                wrapped = get_cuda_graph_module(self.compiled_module)
+            if isinstance(wrapped, CudaGraphsTorchTensorRTModule):
+                self.cudagraphs_module = wrapped
+            return self.compiled_module if mutable else wrapped
+        except BaseException:
+            self.__exit__(*sys.exc_info())
+            raise
 
     def __exit__(self, *args: Any) -> None:
+        self._active = False
         # Restore the exact integer mode (0=STANDARD, 1=SUBGRAPH, 2=WHOLE_GRAPH).
         # Calling set_cudagraphs_mode(bool) would coerce 2 → 1 and can't restore
         # WHOLE_GRAPH_CUDAGRAPHS, so we write the global and C++ op directly.
@@ -109,16 +129,20 @@ class _CudagraphsContextManager(object):
         _PY_RT_CUDAGRAPHS = self.old_mode
         if torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime:
             torch.ops.tensorrt.set_cudagraphs_mode(self.old_mode)
-        # __del__ is not entirely predictable, so we reset cudagraph here
-        if self.cudagraphs_module:
-            self.cudagraphs_module._reset_captured_graph()
-        if self.old_module:  # MutableTorchTRTModule
-            self.compiled_module.gm = self.old_module
-        # Restore prior strategy state on the engines (after the wrapper is
-        # gone). Reverse order would leave the wrapper attached to engines
-        # whose settings have already been restored.
-        if self._inner_cm is not None:
-            self._inner_cm.__exit__(*args)
+        try:
+            # __del__ is not predictable, so release the captured graph here.
+            if self.cudagraphs_module is not None:
+                self.cudagraphs_module._reset_captured_graph()
+                self.cudagraphs_module = None
+        finally:
+            if self.old_module is not None:  # MutableTorchTRTModule
+                self.compiled_module.gm = self.old_module
+                self.old_module = None
+            # Restore strategy after detaching the wrapper, even if graph
+            # cleanup failed. A failed __enter__ also follows this path.
+            if self._inner_cm is not None:
+                inner_cm, self._inner_cm = self._inner_cm, None
+                inner_cm.__exit__(*args)
 
 
 def get_cuda_graph_module(
@@ -140,6 +164,21 @@ def get_cuda_graph_module(
         if "_run_on_acc" in name:
             num_trt_module += 1
         elif "_run_on_gpu" in name:
+            num_torch_module += 1
+
+    # The global partitioner leaves PyTorch work in the parent graph rather
+    # than naming a fallback child _run_on_gpu. Explicit regions also retain
+    # their own child names, including when the whole model stays in PyTorch.
+    if isinstance(compiled_module, torch.fx.GraphModule):
+        from torch_tensorrt.dynamo.regions import get_region_records
+
+        if any(
+            record.route == "torch" for record in get_region_records(compiled_module)
+        ) or any(
+            node.op in ("call_function", "call_method")
+            and node.target is not operator.getitem
+            for node in compiled_module.graph.nodes
+        ):
             num_torch_module += 1
 
     if num_torch_module > 0:

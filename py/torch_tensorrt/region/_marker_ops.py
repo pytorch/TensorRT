@@ -13,11 +13,15 @@ from typing import Optional
 import torch
 
 _LIBRARY = torch.library.Library("torch_tensorrt_region", "DEF")
-_LIBRARY.define("begin(str name) -> Tensor")
+_LIBRARY.define(
+    'begin(str name, str backend="eager", str route="torch", int plugin=-1) -> Tensor'
+)
 _LIBRARY.define("end(Tensor sentinel) -> ()")
 
 
-def _begin(name: str) -> torch.Tensor:
+def _begin(
+    name: str, backend: str = "eager", route: str = "torch", plugin: int = -1
+) -> torch.Tensor:
     # No tensor arguments means CPU-only dispatch is insufficient. A Composite
     # implementation also prevents dependence on the model's current CUDA device.
     return torch.empty((), dtype=torch.uint8, device="cpu")

@@ -7,6 +7,7 @@ dynamic shapes, weight streaming, debugging, complex numerics, and more.
 .. toctree::
    :maxdepth: 2
 
+   execute_in_torch
    huggingface/index
    extensibility/index
    resource_memory/index

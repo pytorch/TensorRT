@@ -14,7 +14,7 @@ import torch_tensorrt
 from torch_tensorrt import region
 from torch_tensorrt.dynamo.regions import (
     get_region_records,
-    materialize_torch_regions,
+    materialize_regions,
     normalize_region_scopes,
 )
 from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
@@ -46,7 +46,7 @@ def test_region_capture():
         exported = torch.export.export(model, (x,), strict=True)  # Record operations.
         exported = normalize_region_scopes(exported)  # Extract the marked region.
         exported = exported.run_decompositions()  # Lower operations.
-        graph_model = materialize_torch_regions(exported.module())  # Child call.
+        graph_model = materialize_regions(exported.module())  # Child call.
 
     records = get_region_records(graph_model)
     assert len(records) == 1

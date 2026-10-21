@@ -909,16 +909,22 @@ def save(
     if isinstance(module, torch.fx.GraphModule):
         from torch_tensorrt.dynamo.regions import RegionError, get_region_records
 
-        if get_region_records(module) and (
-            output_format != "exported_program"
-            or retrace
-            or use_legacy_exporter is False
-        ):
-            raise RegionError(
-                "Saving execute_in_torch regions currently requires "
-                "output_format='exported_program', retrace=False, "
-                "use_legacy_exporter=True"
+        if get_region_records(module):
+            from torch_tensorrt.dynamo._exporter import (
+                _validate_region_serialization,
             )
+
+            _validate_region_serialization(module)
+            if (
+                output_format != "exported_program"
+                or retrace
+                or use_legacy_exporter is False
+            ):
+                raise RegionError(
+                    "Saving annotated regions currently requires "
+                    "output_format='exported_program', retrace=False, "
+                    "use_legacy_exporter=True"
+                )
     module_type = _parse_module_type(module)
     accepted_formats = {"exported_program", "torchscript", "aot_inductor", "executorch"}
     if arg_inputs is not None and not all(

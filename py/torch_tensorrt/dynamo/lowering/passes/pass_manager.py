@@ -148,18 +148,20 @@ class DynamoPassManager(PassManager):  # type: ignore[misc]
         self.validate()
         out = gm
         records = get_region_records(gm)
-        captured_ids = (
-            [] if records else [record.id for record in region_hop_records(gm)]
+        captured_regions = (
+            []
+            if records
+            else [record.capture_signature for record in region_hop_records(gm)]
         )
         for _pass in self.passes:
             out = _pass(out, settings)
             # Only the pre-decomposition parent carries region HOPs. Ordinary
             # graphs and materialized PyTorch children need no per-pass HOP scan.
-            if captured_ids and captured_ids != [
-                record.id for record in region_hop_records(out)
+            if captured_regions and captured_regions != [
+                record.capture_signature for record in region_hop_records(out)
             ]:
                 raise RegionError(
-                    f"Lowering pass {_pass.__name__!r} changed or lost a region boundary"
+                    f"Lowering pass {_pass.__name__!r} changed or lost a region boundary or backend"
                 )
             if records:
                 try:

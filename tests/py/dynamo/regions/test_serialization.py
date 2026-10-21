@@ -17,7 +17,7 @@ from torch_tensorrt.dynamo.regions import (
     attach_region_records,
     audit_region_placement,
     get_region_records,
-    materialize_torch_regions,
+    materialize_regions,
     normalize_region_scopes,
 )
 from torch_tensorrt.dynamo.regions._types import REGION_META_KEY
@@ -42,7 +42,7 @@ def _captured_module(model, x):
     with RegionCompilationSession(strict=True):
         ep = torch.export.export(model, (x,), strict=True)
         ep = normalize_region_scopes(ep)
-        gm = materialize_torch_regions(ep.run_decompositions().module())
+        gm = materialize_regions(ep.run_decompositions().module())
     return erase_export_guards(gm)
 
 

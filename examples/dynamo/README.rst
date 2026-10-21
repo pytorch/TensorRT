@@ -38,3 +38,5 @@ Model Zoo
 * :ref:`debugger_example`: Debugging Torch-TensorRT Compilation
 * :ref:`torch_export_3d_rope`: Compiling a 3D RoPE video-transformer block with complex numerics support
 * :ref:`engine_converter_binding_names`: Naming input / output bindings when emitting a raw serialized TRT engine
+* :ref:`execute_in_torch_example`: Run annotated operations with PyTorch eager or Inductor while keeping surrounding operations in TensorRT
+* :ref:`fuse_in_plugin_example`: Use ``fuse_in_plugin`` to register a supplied Triton kernel automatically inside TensorRT

@@ -8,10 +8,11 @@ from torch_tensorrt.region._errors import RegionError
 from ._capture import (
     assert_no_unresolved_regions,
     is_region_hop,
-    materialize_torch_regions,
+    materialize_regions,
     normalize_region_scopes,
     region_hop_records,
 )
+from ._runtime import configure_region_backends
 from ._types import (
     RegionRecord,
     attach_region_records,
@@ -27,10 +28,11 @@ __all__ = [
     "assert_no_unresolved_regions",
     "attach_region_records",
     "audit_region_placement",
+    "configure_region_backends",
     "get_region_records",
     "is_region_hop",
     "is_torch_region_node",
-    "materialize_torch_regions",
+    "materialize_regions",
     "normalize_region_scopes",
     "region_hop_records",
     "validate_region_settings",

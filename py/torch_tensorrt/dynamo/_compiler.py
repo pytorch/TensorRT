@@ -861,7 +861,8 @@ def compile(
     exported_program = pre_export_lowering(exported_program, settings)
     from torch_tensorrt.dynamo.regions import (
         RegionError,
-        materialize_torch_regions,
+        configure_region_backends,
+        materialize_regions,
         region_hop_records,
         validate_region_settings,
     )
@@ -880,9 +881,16 @@ def compile(
     )
 
     decomposed_regions = region_hop_records(exported_program.graph_module)
-    if [r.id for r in captured_regions] != [r.id for r in decomposed_regions]:
-        raise RegionError("Decomposition changed or lost an execute_in_torch boundary")
-    gm = materialize_torch_regions(exported_program.module())
+    if [r.capture_signature for r in captured_regions] != [
+        r.capture_signature for r in decomposed_regions
+    ]:
+        raise RegionError(
+            "Decomposition changed or lost a region boundary or execution policy"
+        )
+    from torch_tensorrt.dynamo.regions._validation import validate_region_mutations
+
+    validate_region_mutations(exported_program)
+    gm = materialize_regions(exported_program.module())
     try:
         validate_region_settings(settings, captured_regions)
     except RegionError as error:
@@ -981,6 +989,8 @@ def compile(
     # mutation the caller cannot act on, so the compiled module keeps the arity of
     # the model it was compiled from.
     hide_copyback_outputs(trt_gm, len(_copyback_mutation_buffers))
+    if not settings.dryrun:
+        configure_region_backends(trt_gm)
     return trt_gm
 
 
@@ -1335,6 +1345,7 @@ def compile_module(
         is_torch_region_node,
         validate_region_settings,
     )
+    from torch_tensorrt.dynamo.regions._types import REGION_META_KEY
 
     assert_no_unresolved_regions(gm)
     dryrun_tracker = DryRunTracker()
@@ -1440,7 +1451,9 @@ def compile_module(
         if settings.offload_module_to_cpu:
             pin_torch_executed_state(gm, to_torch_device(settings.device))
         if region_records:
-            audit_region_placement(gm, region_records)
+            audit_region_placement(
+                gm, region_records, require_plugins_in_trt=not settings.dryrun
+            )
         return gm
     else:
         logger.debug(
@@ -1469,6 +1482,7 @@ def compile_module(
         settings.require_full_compilation
         and num_supported_ops == total_ops
         and not settings.enable_resource_partitioning
+        and not region_records
     ):
         logger.info(
             "require_full_compilation + full operator support: "
@@ -1564,7 +1578,11 @@ def compile_module(
 
     if region_records:
         attach_region_records(partitioned_module, region_records)
-        audit_region_placement(partitioned_module, region_records)
+        audit_region_placement(
+            partitioned_module,
+            region_records,
+            require_plugins_in_trt=not settings.dryrun,
+        )
 
     dryrun_tracker.unsupported_ops = supported_ops.fallback_operators
 
@@ -1736,6 +1754,14 @@ def compile_module(
             )
 
             trt_modules[name] = trt_module
+            plugin_ids = tuple(
+                node.meta[REGION_META_KEY]["id"]
+                for node in submodule.graph.nodes
+                if node.op == "call_function"
+                and node.meta.get(REGION_META_KEY, {}).get("route") == "plugin"
+            )
+            if plugin_ids:
+                trt_module._torch_tensorrt_plugin_regions = plugin_ids
 
             if _debugger_config:
                 if _debugger_config.save_engine_profile:
@@ -1788,7 +1814,11 @@ def compile_module(
     _insert_complex_io_adapters(partitioned_module, gm, settings)
 
     if region_records:
-        audit_region_placement(partitioned_module, region_records)
+        audit_region_placement(
+            partitioned_module,
+            region_records,
+            require_plugins_in_trt=not settings.dryrun,
+        )
 
     # Only set output tensors as unowned if not in dryrun mode (TRT modules exist)
     if not settings.dryrun:

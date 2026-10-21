@@ -7,9 +7,10 @@ import logging
 from typing import Any, List, Optional, Sequence, Tuple
 
 import torch
-import torch_tensorrt
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.utils._pytree import tree_flatten, tree_map, tree_unflatten
+
+import torch_tensorrt
 from torch_tensorrt.dynamo import partitioning
 
 logger = logging.getLogger(__name__)
@@ -52,7 +53,7 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
     Args:
         compiled_module: Complied fx graphModule that will be wrapped
     Returns:
-        Output tensor or tensor list
+        Model outputs with their original container structure
     """
 
     def __init__(
@@ -65,13 +66,19 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.is_weight_streaming_set = False
 
         self._input_buffers: List[torch.Tensor] = []
-        self._output_buffers: List[torch.Tensor] = []
+        self._output_buffers: Any = None
         self.cudagraph: Optional[torch.cuda.CUDAGraph] = None
         self.use_output_allocator_outputs = False
         self.shape_key: Optional[str] = None
         self._caller_stream: Optional[torch.cuda.Stream] = None
         self._engine_stream: Optional[torch.cuda.Stream] = None
         self._owned_pool_stream: Optional[torch.cuda.Stream] = None
+        from torch_tensorrt.dynamo.regions import get_region_records
+
+        self._has_torch_regions = any(
+            record.route == "torch" for record in get_region_records(compiled_module)
+        )
+        self._capture_context: Optional[Tuple[Any, ...]] = None
         # Bind to the device of the wrapped module's first CUDA parameter so
         # multi-GPU deployments cache the right default stream.
         target = next(
@@ -84,7 +91,11 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             else torch.device("cuda", torch.cuda.current_device())
         )
         self._default_stream = torch.cuda.default_stream(self._target_device)
-        self.warm_up()
+        # Torch regions can initialize kernels or compile lazily for their
+        # execution context. Warm them with the real inputs/context/stream
+        # immediately before capture, avoiding duplicate constructor warmup.
+        if not self._has_torch_regions:
+            self.warm_up()
 
     def warm_up(self) -> None:
         """
@@ -178,9 +189,25 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                     "(using outer monolithic capture instead)"
                 )
 
-    def forward(
-        self, *args: Any, **kwargs: Any
-    ) -> torch.Tensor | Tuple[torch.Tensor, ...]:
+    def _warm_up_regions(self, args: Any, kwargs: Any) -> None:
+        """Initialize Torch kernels and compiled backends before capture."""
+        if not self._has_torch_regions:
+            return
+        if torch.cuda.is_current_stream_capturing():
+            raise RuntimeError(
+                "PyTorch regions must warm up before CUDA graph capture; "
+                "enable_cudagraphs cannot be entered inside another capture."
+            )
+        # A previous capture may have used different grad/inference/autocast
+        # settings, inputs or stream. Eager kernels need initialization for the
+        # new context too, and Dynamo must finish any new compilation outside
+        # cuda.graph to avoid invalidating capture.
+        for _ in range(3):
+            self.compiled_module(*args, **kwargs)
+        assert self._engine_stream is not None
+        self._engine_stream.synchronize()
+
+    def forward(self, *args: Any, **kwargs: Any) -> Any:
         inputs, _ = tree_flatten((args, kwargs))
         cudagraphs_enabled = torch_tensorrt.runtime.get_whole_cudagraphs_mode()
         if cudagraphs_enabled:
@@ -205,8 +232,22 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                 self._engine_stream = self._caller_stream
             stream_changed = self._engine_stream != previous_engine_stream
 
+            capture_context = (
+                torch.is_grad_enabled(),
+                torch.is_inference_mode_enabled(),
+                torch.is_autocast_enabled("cuda"),
+                torch.get_autocast_dtype("cuda"),
+            )
+            context_changed = (
+                self._has_torch_regions and capture_context != self._capture_context
+            )
+
             need_cudagraphs_record = (
-                shape_changed or self.is_weight_streaming_set or stream_changed
+                self.cudagraph is None
+                or shape_changed
+                or self.is_weight_streaming_set
+                or stream_changed
+                or context_changed
             )
             if need_cudagraphs_record:
                 self._reset_captured_graph()
@@ -263,23 +304,27 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
 
             with torch.cuda.stream(self._engine_stream):
                 if need_cudagraphs_record:
+                    self._warm_up_regions(args, kwargs)
                     self._check_monolithic_capturability(self._engine_stream)
-                    self.cudagraph = torch.cuda.CUDAGraph()
-                    with torch.cuda.graph(self.cudagraph, stream=self._engine_stream):
+                    captured_graph = torch.cuda.CUDAGraph()
+                    with torch.cuda.graph(captured_graph, stream=self._engine_stream):
                         self._output_buffers = self.compiled_module(*args, **kwargs)
+                    self.cudagraph = captured_graph
+                    self._capture_context = capture_context
 
                 self.cudagraph.replay()  # type: ignore
             if caller_on_default:
                 self._caller_stream.wait_stream(self._engine_stream)
 
-            if isinstance(self._output_buffers, (list, tuple)):
-                output_buffers = self._output_buffers
-            else:
-                output_buffers = [self._output_buffers]
-            outputs = [output.clone() for output in output_buffers]
-            if len(outputs) == 1:
-                return outputs[0]
-            return outputs
+            # Replay updates captured tensors in place. Return independent
+            # tensor values while preserving the model's output pytree and
+            # non-Tensor constants, including one-element containers.
+            return tree_map(
+                lambda value: (
+                    value.clone() if isinstance(value, torch.Tensor) else value
+                ),
+                self._output_buffers,
+            )
         else:
             self._reset_captured_graph()
             return self.compiled_module(*args, **kwargs)

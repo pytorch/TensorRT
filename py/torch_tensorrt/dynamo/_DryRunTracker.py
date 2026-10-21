@@ -305,8 +305,10 @@ def parse_non_trt_nodes(graph_module: torch.fx.GraphModule) -> List[str]:
     for node in graph_module.graph.nodes:
         if is_torch_region_node(graph_module, node):
             region_id = node.meta["torch_tensorrt_region"]["id"]
+            backend = node.meta["torch_tensorrt_region"].get("backend", "eager")
             to_run_in_torch.append(
                 f"Region: {region_id}, explicit execute_in_torch region, "
+                f"backend: {backend}, "
                 f"with layer location: {get_node_name(node)}"
             )
             continue

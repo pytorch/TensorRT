@@ -33,10 +33,44 @@ from torch_tensorrt.dynamo.regions import (
     is_torch_region_node,
 )
 from torch_tensorrt.dynamo.regions._types import RECORDS_META_KEY, REGION_META_KEY
-from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import ENGINE_IDX, NAME_IDX
+from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
+    ENGINE_IDX,
+    NAME_IDX,
+    TorchTensorRTModule,
+)
 from torch_tensorrt.region._errors import RegionError
 
 logger = logging.getLogger(__name__)
+
+
+def _validate_region_serialization(gm: torch.fx.GraphModule) -> None:
+    """Reject region execution contracts that the artifact cannot preserve."""
+    records = get_region_records(gm)
+    plugin_records = [record for record in records if record.route == "plugin"]
+    if plugin_records:
+        built_plugins = {
+            region_id
+            for module in gm.modules()
+            if isinstance(module, TorchTensorRTModule)
+            for region_id in getattr(module, "_torch_tensorrt_plugin_regions", ())
+        }
+        for record in plugin_records:
+            if record.id not in built_plugins:
+                raise RegionError(
+                    f"Saving fuse_in_plugin region {record.id!r} requires a built "
+                    "TensorRT engine. Dry-run or unresolved plugin regions cannot "
+                    "be saved because their process-local operator registration "
+                    "is not part of the artifact. Compile with dryrun=False first."
+                )
+    for record in records:
+        backend = getattr(record, "backend", "eager")
+        if backend != "eager":
+            raise RegionError(
+                f"Saving execute_in_torch region {record.id!r} with "
+                f"backend={backend!r} is not supported: the exporter cannot "
+                "preserve its execution backend. Compile with backend='eager' "
+                "to save an ExportedProgram."
+            )
 
 
 def _resolve_lifted_custom_obj(
@@ -86,9 +120,10 @@ def export(
         inputs (torch.Tensor): Torch input tensors
         cross_compile_module (bool): Flag to indicated whether it is cross_compilation enabled or not
     """
+    _validate_region_serialization(gm)
     if get_region_records(gm) and (not use_legacy_exporter or cross_compile_module):
         raise RegionError(
-            "execute_in_torch serialization requires the legacy exported_program "
+            "Annotated region serialization requires the legacy exported_program "
             "path: retrace=False, use_legacy_exporter=True, without cross-compilation"
         )
     patched_module = transform(
@@ -132,19 +167,31 @@ def transform(
 
     Returns an inlined torch.fx.GraphModule
     """
+    # GraphModule deepcopy drops compiled dispatchers, and flattening erases
+    # their region boundaries. Reject unsupported backends before either step.
+    _validate_region_serialization(gm)
     # Work on a clone so export cannot change the compiled graph or its records.
     # GraphModule deepcopy drops arbitrary attributes; retain the region identity
     # so inline_torch_region_modules can audit the clone before flattening it.
     region_children = {}
     if get_region_records(gm):
         region_children = {
-            name: child._torch_tensorrt_region_id
+            name: {
+                attr: getattr(child, attr)
+                for attr in (
+                    "_torch_tensorrt_region_id",
+                    "_torch_tensorrt_plugin_regions",
+                )
+                if hasattr(child, attr)
+            }
             for name, child in gm.named_modules()
             if hasattr(child, "_torch_tensorrt_region_id")
+            or hasattr(child, "_torch_tensorrt_plugin_regions")
         }
     gm = copy.deepcopy(gm)
-    for name, region_id in region_children.items():
-        gm.get_submodule(name)._torch_tensorrt_region_id = region_id
+    for name, attributes in region_children.items():
+        for attr, value in attributes.items():
+            setattr(gm.get_submodule(name), attr, value)
 
     # A region may be a direct child or nested inside an ordinary fallback
     # partition. Expand it before that partition is copied into the parent.
@@ -353,6 +400,7 @@ def inline_torch_region_modules(gm: torch.fx.GraphModule) -> torch.fx.GraphModul
     records = get_region_records(gm)
     if not records:
         return gm
+    _validate_region_serialization(gm)
     audit_region_placement(gm, records)
     # Fallback inlining later promotes attributes into the top-level namespace.
     # Allocate state names uniquely across the entire module tree to avoid an
