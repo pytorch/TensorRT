@@ -1408,6 +1408,21 @@ class TestLowering(TestCase):
             f"Scatter_add TRT outputs don't match with the original model.",
         )
 
+    @parameterized.expand([("sum",), ("prod",), ("mean",), ("amax",), ("amin",)])
+    def test_scatter_reduce_exclude_self(self, reduce):
+        # Positions that receive values reduce over src only; the rest keep self
+        from torch_tensorrt.dynamo.lowering._decompositions import (
+            scatter_reduce_decomposition,
+        )
+
+        input = torch.randn(3, 5)
+        index = torch.tensor([[0, 1, 2, 0], [1, 2, 1, 1]])
+        src = torch.randn(2, 4)
+        torch.testing.assert_close(
+            scatter_reduce_decomposition(input, 1, index, src, reduce, False),
+            torch.scatter_reduce(input, 1, index, src, reduce, include_self=False),
+        )
+
     @parameterized.expand(
         [
             ############################sum###########################
