@@ -5,6 +5,7 @@
 
 import torch
 import torch.nn as nn
+import torch_tensorrt
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt.dynamo.conversion.aten_ops_converters import (
     to_copy_dtype_validator,
@@ -107,6 +108,22 @@ class TestToCopyConverter(DispatchTestCase):
             ToCopyReturns(),
             inputs,
         )
+
+    def test_to_copy_returned_with_its_input(self):
+        # A same-dtype copy converts to its input's tensor; the engine must
+        # still return one tensor per graph output.
+        class ToCopyAndInput(nn.Module):
+            def forward(self, x):
+                y = x + 1
+                z = torch.ops.aten._to_copy.default(y, dtype=torch.float)
+                return y, z, y * 2
+
+        model = ToCopyAndInput().eval().cuda()
+        inputs = (torch.rand((2, 3), device="cuda"),)
+        trt_mod = torch_tensorrt.dynamo.compile(
+            torch.export.export(model, inputs), arg_inputs=inputs, min_block_size=1
+        )
+        torch.testing.assert_close(trt_mod(*inputs), model(*inputs))
 
     def test_to_copy_validator_rejects_device_transfer(self):
         class DeviceAndDtypeCopy(nn.Module):

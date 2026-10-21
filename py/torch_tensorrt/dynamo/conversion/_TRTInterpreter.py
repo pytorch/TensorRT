@@ -964,9 +964,9 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         marked_outputs_ids = []
         for i, output in enumerate(outputs):
             # In some cases, the same output tensor may be marked multiple times, such as _to_copy,
-            # so we skip marking if the output is already marked
+            # so we mark a copy to keep one engine binding per graph output
             if id(output) in marked_outputs_ids:
-                continue
+                output = self.ctx.net.add_identity(output).get_output(0)
             marked_outputs_ids.append(id(output))
             if i < num_declared_outputs:
                 self._num_user_outputs += 1
