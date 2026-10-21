@@ -429,6 +429,16 @@ jobs:
           else
             export PYTORCH_VERSION="$(${CONDA_RUN} pip show torch | grep ^Version: | sed 's/Version:  *//')"
           fi
+      # Named before either wheel is built: the main wheel's executorch extra requires exactly this
+      # companion, and the companion build below takes its version from the same variable.
+      - name: Name the ExecuTorch runtime companion
+        if: ${{ inputs.build-executorch-runtime && inputs.architecture == 'x64' && !inputs.cross-compile && !inputs.python-only && !inputs.use-rtx && !inputs.is-release-tarball }}
+        working-directory: ${{ inputs.repository }}
+        run: |
+          set -euo pipefail
+          source "${BUILD_ENV_FILE}"
+          version="$(${CONDA_RUN} python packaging/executorch_runtime_version.py ${{ inputs.is-release-wheel }})"
+          echo "TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION=${version}" >> "${GITHUB_ENV}"
       - name: Build the wheel (python-build-package) X64
         if: ${{ inputs.build-platform == 'python-build-package' && inputs.architecture == 'x64' && inputs.cross-compile == false }}
         working-directory: ${{ inputs.repository }}
@@ -481,7 +491,7 @@ jobs:
             ${CONDA_RUN} ${ENV_SCRIPT} python setup.py bdist_wheel ${BUILD_PARAMS}
           fi
       - name: Build the ExecuTorch runtime wheel
-        if: ${{ inputs.build-executorch-runtime && inputs.architecture == 'x64' && !inputs.cross-compile && !inputs.python-only && !inputs.use-rtx && !inputs.is-release-tarball }}
+        if: ${{ env.TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION != '' }}
         working-directory: ${{ inputs.repository }}
         run: |
           set -euxo pipefail
@@ -498,19 +508,6 @@ jobs:
           export TensorRT_ROOT="$(${CONDA_RUN} python -c 'import pathlib, sys; roots = [p.parent.parent for p in pathlib.Path(sys.argv[1], "external").glob("**/include/NvInfer.h") if (p.parent.parent / "lib/nvinfer_11.lib").is_file()]; sys.exit("TensorRT SDK not found in Bazel external dependencies") if len(roots) != 1 else print(roots[0])' "${bazel_output}")"
           # Install only the dependency group selected by the main wheel, preserving Torch.
           ${CONDA_RUN} python packaging/install_executorch_tensorrt.py
-          main_version="$(sed 's/a0$//' version.txt)"
-          runtime_version="$(<py/torch-tensorrt-executorch-runtime/version.txt)"
-          if [[ "${BUILD_VERSION}" != "${main_version}"* ]]; then
-            echo "Unexpected torch-tensorrt build version: ${BUILD_VERSION}" >&2; exit 1
-          fi
-          if [[ ${{ inputs.is-release-wheel }} == true ]]; then
-            companion_suffix="${BUILD_VERSION#"${main_version}"}"
-            companion_suffix="${companion_suffix%+*}"
-          else
-            companion_suffix="${BUILD_VERSION#"${main_version}"}"
-            companion_suffix="${companion_suffix%+*}+${CU_VERSION}"
-          fi
-          export TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION="${runtime_version}${companion_suffix}"
           # clang-cl needs the same Visual Studio environment as ExecuTorch's own CUDA build.
           ${CONDA_RUN} packaging/vc_env_helper.bat python -m pip wheel \
             --no-build-isolation --no-deps --wheel-dir dist py/torch-tensorrt-executorch-runtime

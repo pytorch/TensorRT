@@ -226,13 +226,22 @@ EXECUTORCH_REQUIREMENT = (
     "(platform_system == 'Linux' or "
     "(platform_system == 'Windows' and platform_machine == 'AMD64'))"
 )
-# Install the native companion separately from the matching build artifacts. Its
-# exact ABI dependencies can lag the source pins while a new nightly is building,
-# so resolving it here would prevent locking or installing the current project.
 EXTRAS_REQUIRE = {
     "executorch": [EXECUTORCH_REQUIREMENT],
     "all": [EXECUTORCH_REQUIREMENT],
 }
+# A published wheel's extras also require the exact companion its build job produced. The workflow
+# names it in this variable before building either wheel, and the companion build reads the same
+# value. Source builds leave it out, so the lock keeps following the source pins.
+EXECUTORCH_RUNTIME_VERSION = (
+    os.environ.get("TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION", "") if RELEASE else ""
+)
+if EXECUTORCH_RUNTIME_VERSION:
+    for _extra in ("executorch", "all"):
+        EXTRAS_REQUIRE[_extra].append(
+            f"torch-tensorrt-executorch-runtime=={EXECUTORCH_RUNTIME_VERSION}; "
+            + EXECUTORCH_REQUIREMENT.partition(";")[2].strip()
+        )
 
 if "--ci" in sys.argv:
     sys.argv.remove("--ci")
@@ -391,6 +400,9 @@ def gen_version_file():
         f.write('__tensorrt_version__ = "' + __tensorrt_version__ + '"\n')
         f.write('__tensorrt_rtx_version__ = "' + __tensorrt_rtx_version__ + '"\n')
         f.write('__tensorrt_llm_version__ = "' + __tensorrt_llm_version__ + '"\n')
+        f.write(
+            '__executorch_runtime_version__ = "' + EXECUTORCH_RUNTIME_VERSION + '"\n'
+        )
 
 
 def copy_libtorchtrt(multilinux=False, rt_only=False):

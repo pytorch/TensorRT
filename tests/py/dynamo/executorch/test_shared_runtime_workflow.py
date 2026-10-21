@@ -258,26 +258,40 @@ def test_shared_build_provisions_tensorrt_metadata(tmp_path, arch, cuda, release
     shutil.copy2(
         ROOT / "packaging/executorch_pin.txt", packaging / "executorch_pin.txt"
     )
-    step = next(
-        s
-        for s in _workflow("build_linux.yml")["jobs"]["build"]["steps"]
-        if s.get("id") == "executorch-runtime"
+    shutil.copy2(
+        ROOT / "packaging/executorch_runtime_version.py",
+        packaging / "executorch_runtime_version.py",
     )
-    script = step["run"].replace("${{ inputs.is-release-wheel }}", str(release).lower())
+    steps = _workflow("build_linux.yml")["jobs"]["build"]["steps"]
+    env = {
+        "PATH": f"{bin_dir}:{os.environ['PATH']}",
+        "PYTHONPATH": str(site),
+        "BUILD_ENV_FILE": str(tmp_path / "build-env"),
+        "BUILD_VERSION": version if release else f"{version}.dev20260911",
+        "CU_VERSION": cuda,
+        "ARCH": arch,
+        "EVENTS": str(tmp_path / "events"),
+        "BUILT_VERSION": str(tmp_path / "built-version"),
+        "GITHUB_ENV": str(tmp_path / "github-env"),
+    }
+    # The step that names the companion runs first and hands the version over through GITHUB_ENV,
+    # as GitHub Actions does between steps.
+    naming = next(
+        s for s in steps if s.get("name") == "Name the ExecuTorch runtime companion"
+    )
     result = _run(
-        script,
+        naming["run"].replace("${{ inputs.is-release-wheel }}", str(release).lower()),
         tmp_path,
-        {
-            "PATH": f"{bin_dir}:{os.environ['PATH']}",
-            "PYTHONPATH": str(site),
-            "BUILD_ENV_FILE": str(tmp_path / "build-env"),
-            "BUILD_VERSION": version if release else f"{version}.dev20260911",
-            "CU_VERSION": cuda,
-            "ARCH": arch,
-            "EVENTS": str(tmp_path / "events"),
-            "BUILT_VERSION": str(tmp_path / "built-version"),
-        },
+        env,
     )
+    assert result.returncode == 0, result.stdout + result.stderr
+    env.update(
+        line.split("=", 1)
+        for line in (tmp_path / "github-env").read_text().splitlines()
+    )
+    step = next(s for s in steps if s.get("id") == "executorch-runtime")
+    script = step["run"].replace("${{ inputs.is-release-wheel }}", str(release).lower())
+    result = _run(script, tmp_path, env)
     assert result.returncode == 0, result.stdout + result.stderr
     events = [
         json.loads(line) for line in (tmp_path / "events").read_text().splitlines()
@@ -394,6 +408,8 @@ def _assert_device_commands(tmp_path, workflow, failure=""):
         "    elif args[:2] == ['-m', 'venv']:\n"
         "        p = Path(args[2]) / 'bin/python'; p.parent.mkdir(parents=True); p.symlink_to(os.environ['DISPATCH'])\n"
         "    elif args[:4] == ['-u', '-X', 'faulthandler', '-c']: pass\n"
+        # The extra check reads installed metadata from a script on stdin.
+        "    elif args == ['-']: sys.stdin.read()\n"
         # The step that builds the module consumer asks python where the two packages put their
         # CMake files. Answer with a directory that exists, so the configure step it feeds is
         # given something plausible rather than an empty string.
@@ -457,6 +473,12 @@ def _assert_device_commands(tmp_path, workflow, failure=""):
         event for event in events if event[:4] == ["python", "-m", "pip", "install"]
     )
     _assert_test_wheel_dependency(setup)
+    # The published extra is checked against the wheels just built: its metadata, then a resolve
+    # pinned to the built version so a fallback to an older torch-tensorrt cannot pass.
+    assert ["python", "-"] in events
+    resolve = [e for e in events if "--dry-run" in e]
+    assert len(resolve) == 1, resolve
+    assert resolve[0][-1] == f"torch-tensorrt[executorch]=={runner}", resolve
     examples = [
         event[1:]
         for event in events
