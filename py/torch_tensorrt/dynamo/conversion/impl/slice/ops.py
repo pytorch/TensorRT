@@ -759,10 +759,12 @@ def as_strided(
     size: Sequence[int],
     stride: Sequence[int],
     storage_offset: Optional[int],
+    input_stride: Optional[Sequence[int]] = None,
+    input_offset: int = 0,
 ) -> TRTTensor:
     # Ensure storage_offset is an integer before passing to nested
     if storage_offset is None:
-        storage_offset = 0
+        storage_offset = input_offset
 
     flatten_shape = flatten_dims(input, 0, -1)
     flatten_output = impl.shuffle.reshape(
@@ -788,6 +790,18 @@ def as_strided(
     nested(len(size), size, stride, storage_offset, 0)
 
     indices = np.array(indices, dtype=np.int32)
+    if input_stride is not None:
+        # The indices are positions in the input's PyTorch memory, where its elements sit at input_offset +
+        # sum(i * input_stride); TensorRT holds the input contiguously, so look up the element at each position
+        positions = (
+            input_offset
+            + np.tensordot(input_stride, np.indices(tuple(input.shape)), 1).ravel()
+        )
+        element = np.full(max(positions.max(), indices.max()) + 1, -1, dtype=np.int32)
+        element[positions] = np.arange(positions.size)
+        indices = element[indices]
+        if -1 in indices:
+            raise RuntimeError(f"{name}: as_strided reads memory outside its input")
 
     indices_tensor = get_trt_tensor(ctx, indices, f"{name}_indices")
 
