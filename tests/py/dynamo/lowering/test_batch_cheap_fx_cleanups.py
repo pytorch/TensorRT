@@ -153,6 +153,19 @@ class TestBatchCheapFxCleanups(TestCase):
         x = torch.arange(4.0)
         torch.testing.assert_close(gm(x), x)
 
+    def test_input_write_back_is_kept(self) -> None:
+        # n.add_(1) leaves copy_(n, add) behind: no users, but it updates the input
+        graph = torch.fx.Graph()
+        n = graph.placeholder("n")
+        add = graph.call_function(torch.ops.aten.add.Tensor, args=(n, 1))
+        graph.call_function(torch.ops.aten.copy_.default, args=(n, add))
+        graph.output(n)
+        gm = batch_cheap_fx_cleanups(torch.fx.GraphModule({}, graph), _settings())
+
+        n = torch.zeros(4)
+        gm(n)
+        torch.testing.assert_close(n, torch.ones(4))
+
     def test_defer_skips_dce_until_flush(self) -> None:
         gm = _dead_add_graph()
         set_defer_graph_cleanup(True)
