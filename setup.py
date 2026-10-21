@@ -400,6 +400,9 @@ def gen_version_file():
         f.write('__tensorrt_version__ = "' + __tensorrt_version__ + '"\n')
         f.write('__tensorrt_rtx_version__ = "' + __tensorrt_rtx_version__ + '"\n')
         f.write('__tensorrt_llm_version__ = "' + __tensorrt_llm_version__ + '"\n')
+        f.write(
+            '__executorch_runtime_version__ = "' + EXECUTORCH_RUNTIME_VERSION + '"\n'
+        )
 
 
 def copy_libtorchtrt(multilinux=False, rt_only=False):

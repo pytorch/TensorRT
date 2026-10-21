@@ -1120,6 +1120,93 @@ def test_the_executorch_install_message_names_the_torch_channel() -> None:
         )
 
 
+def _load_runtime_install_command(monkeypatch, recorded, cuda="13.2"):
+    """Run the real helper against a build that recorded the given companion version."""
+    tree = ast.parse((REPO_ROOT / "py/torch_tensorrt/_utils.py").read_text("utf-8"))
+    function = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef)
+        and node.name == "executorch_runtime_install_command"
+    )
+    channel, command = _load_utils_channel_helpers(cuda)
+    version = types.ModuleType("torch_tensorrt._version")
+    if recorded is not None:
+        version.__executorch_runtime_version__ = recorded
+    package = types.ModuleType("torch_tensorrt")
+    package._version = version
+    monkeypatch.setitem(sys.modules, "torch_tensorrt", package)
+    monkeypatch.setitem(sys.modules, "torch_tensorrt._version", version)
+    namespace = {
+        "executorch_install_channel": channel,
+        "executorch_install_command": command,
+    }
+    exec(compile(ast.Module([function], []), "<utils-extract>", "exec"), namespace)
+    return namespace["executorch_runtime_install_command"]()
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "recorded, expected",
+    [
+        (
+            "0.3.0.dev20261019+cu132",
+            'pip install "torch-tensorrt-executorch-runtime==0.3.0.dev20261019+cu132" '
+            "--extra-index-url https://download.pytorch.org/whl/nightly/cu132",
+        ),
+        (
+            "0.3.0+cu134",
+            'pip install "torch-tensorrt-executorch-runtime==0.3.0+cu134" '
+            "--extra-index-url https://download.pytorch.org/whl/cu134",
+        ),
+        (
+            "0.3.0",
+            'pip install "torch-tensorrt-executorch-runtime==0.3.0" '
+            "--extra-index-url https://download.pytorch.org/whl/cu132",
+        ),
+    ],
+)
+def test_a_missing_delegate_names_the_exact_companion(monkeypatch, recorded, expected):
+    """The advice names the companion this wheel was built with and the index carrying it."""
+    assert _load_runtime_install_command(monkeypatch, recorded) == expected
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("recorded", ["", None])
+def test_a_build_without_a_companion_says_it_has_none(monkeypatch, recorded):
+    """RTX, Python-only, JetPack and source builds, and a version file from before the field."""
+    message = _load_runtime_install_command(monkeypatch, recorded)
+    assert "has no matching delegate" in message, message
+    assert "pip install" not in message, message
+
+
+@pytest.mark.unit
+def test_the_build_records_the_companion_it_requires(tmp_path) -> None:
+    """The version file carries the same companion the extras require, for the error above."""
+    tree = ast.parse((REPO_ROOT / "setup.py").read_text(encoding="utf-8"))
+    function = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "gen_version_file"
+    )
+    (tmp_path / "torch_tensorrt").mkdir()
+    namespace = {
+        "os": os,
+        "IS_WINDOWS": True,
+        "dir_path": str(tmp_path),
+        "__version__": "2.16.0.dev20261019+cu132",
+        "__cuda_version__": "13.2",
+        "__tensorrt_version__": "11.4.0",
+        "__tensorrt_rtx_version__": "1.7.1",
+        "__tensorrt_llm_version__": "0.17.0",
+        "EXECUTORCH_RUNTIME_VERSION": "0.3.0.dev20261019+cu132",
+    }
+    exec(compile(ast.Module([function], []), "setup.py", "exec"), namespace)
+    namespace["gen_version_file"]()
+    recorded = runpy.run_path(str(tmp_path / "torch_tensorrt/_version.py"))
+    assert recorded["__executorch_runtime_version__"] == "0.3.0.dev20261019+cu132"
+
+
 @pytest.mark.parametrize("cuda", ["13.0", "13.2", None])
 @pytest.mark.parametrize("entrypoint", ["lazy", "save", "_save_as_executorch"])
 @pytest.mark.unit
