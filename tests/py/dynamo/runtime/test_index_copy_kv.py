@@ -40,7 +40,7 @@ def _compile(model, args):
     )
 
 
-def _compile_dynamic_write(model, cache, start, update, min_len=2, max_len=8):
+def _compile_dynamic_write(model, cache, start, update, min_len=2, max_len=8, **kw):
     """Compile ``model(cache, start, update)`` with the write length dynamic.
 
     ``Dim(min=1)`` is recorded as min=2 (PyTorch 0/1 specialization), so the
@@ -69,6 +69,7 @@ def _compile_dynamic_write(model, cache, start, update, min_len=2, max_len=8):
         enabled_precisions={torch.float32},
         min_block_size=1,
         use_python_runtime=False,
+        **kw,
     )
 
 
@@ -144,6 +145,35 @@ class TestIndexCopyKVFastPath(TestCase):
             self.assertTrue(
                 torch.allclose(out_val, eager), f"mismatch writing {run_len} positions"
             )
+
+    def test_positions_from_another_engine_aliased(self):
+        """The positions can be computed outside the write's engine (in Qwen3-MoE's
+        decode graph the MoE routing stays in PyTorch and splits the graph). The
+        converter's subgraph then shows the index only as an input."""
+
+        class M(torch.nn.Module):
+            def forward(self, cache, start, update):
+                index = torch.arange(update.shape[2], device=cache.device) + start
+                return torch.ops.aten.index_copy.default(cache, 2, index, update)
+
+        cache = torch.zeros(1, 4, 16, 8, device="cuda")
+        start = torch.tensor(3, dtype=torch.int64, device="cuda")
+        update = torch.randn(1, 4, 4, 8, device="cuda")
+        compiled = _compile_dynamic_write(
+            M().cuda(),
+            cache,
+            start,
+            update,
+            torch_executed_ops={
+                torch.ops.aten.arange.default,
+                torch.ops.aten.arange.start_step,
+            },
+        )
+        self.assertEqual(len(_aliased_io(compiled)), 1)
+
+        out = compiled(cache.clone(), start, update)
+        out_val = out[0] if isinstance(out, tuple) else out
+        self.assertTrue(torch.allclose(out_val, M()(cache.clone(), start, update)))
 
     def test_static_multi_position_write_on_lifted_buffer_aliased(self):
         """A prefill-shaped write whose length is known at compile time.
@@ -368,6 +398,26 @@ class TestIndexCopyFallback(TestCase):
             out_val = out[0] if isinstance(out, tuple) else out
             eager = torch.ops.aten.index_copy.default(cache.clone(), 2, index, u)
             self.assertTrue(torch.allclose(out_val, eager), f"len {run_len}")
+
+    def test_dynamic_half_precision_write_uses_fallback(self):
+        """TensorRT can fail to build half-precision networks that chain
+        dynamic-length writes (Qwen3 in fp16, Qwen2.5 in bf16), so a
+        half-precision write of runtime length stays off the fast path."""
+
+        class M(torch.nn.Module):
+            def forward(self, cache, start, update):
+                index = torch.arange(update.shape[2], device=cache.device) + start
+                return torch.ops.aten.index_copy.default(cache, 2, index, update)
+
+        cache = torch.zeros(1, 4, 16, 8, dtype=torch.float16, device="cuda")
+        start = torch.tensor(3, dtype=torch.int64, device="cuda")
+        update = torch.randn(1, 4, 4, 8, dtype=torch.float16, device="cuda")
+        compiled = _compile_dynamic_write(M().cuda(), cache, start, update)
+        self.assertEqual(_aliased_io(compiled), {})
+
+        out = compiled(cache.clone(), start, update)
+        out_val = out[0] if isinstance(out, tuple) else out
+        self.assertTrue(torch.allclose(out_val, M()(cache.clone(), start, update)))
 
     def test_rank_3_input_uses_fallback(self):
         class M(torch.nn.Module):
