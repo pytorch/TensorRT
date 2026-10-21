@@ -263,6 +263,31 @@ class TestCudagraphsCPP(TestCase):
 
         torch._dynamo.reset()
 
+    def test_cudagraphs_whole_graph_nested_outputs_cpp(self):
+        # A graph break puts the whole module under one CUDA graph. Its outputs must
+        # keep their structure, as an exported Hugging Face model's ModelOutput does
+        class SampleModel(torch.nn.Module):
+            def forward(self, x):
+                y = torch.relu((x + 2) * 0.5)
+                return {"y": y, "pair": (y + 1, y - 1)}
+
+        model = SampleModel().eval().cuda()
+        x = torch.randn(*INPUT_SIZE).cuda()
+        optimized_model = torch_tensorrt.dynamo.compile(
+            torch.export.export(model, (x,)),
+            arg_inputs=(x,),
+            min_block_size=1,
+            torch_executed_ops={"torch.ops.aten.mul.Tensor"},
+        )
+        with torch_tensorrt.runtime.enable_cudagraphs(
+            optimized_model
+        ) as cudagraphs_module:
+            for _ in range(TRIALS):
+                x = torch.randn(*INPUT_SIZE).cuda()
+                torch.testing.assert_close(cudagraphs_module(x), model(x))
+
+        torch._dynamo.reset()
+
     def test_cudagraphs_whole_graph_input_updated_in_place_cpp(self):
         # The op without a converter puts the module under one CUDA graph. Its write
         # to the cache must land in the caller's tensor at every replay
