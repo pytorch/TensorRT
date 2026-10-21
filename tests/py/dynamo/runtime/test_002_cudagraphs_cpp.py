@@ -15,6 +15,32 @@ INPUT_SIZE = (3, 16, 16)
 TRIALS = 5
 
 
+class _TensorDict(dict):
+    # Registered as transformers' exporter registers its cache classes: the tensors
+    # are the leaves and anything else goes into the context
+    pass
+
+
+def _flatten_tensor_dict(d):
+    tensors = {k: v for k, v in d.items() if isinstance(v, torch.Tensor)}
+    others = {k: v for k, v in d.items() if k not in tensors}
+    return list(tensors.values()), (list(tensors), others)
+
+
+def _flatten_tensor_dict_with_keys(d):
+    values, context = _flatten_tensor_dict(d)
+    keyed = [(torch.utils._pytree.MappingKey(k), v) for k, v in zip(context[0], values)]
+    return keyed, context
+
+
+torch.utils._pytree.register_pytree_node(
+    _TensorDict,
+    _flatten_tensor_dict,
+    lambda values, context: _TensorDict(zip(context[0], values), **context[1]),
+    flatten_with_keys_fn=_flatten_tensor_dict_with_keys,
+)
+
+
 @torch.library.custom_op(
     "torchtrt_cudagraphs_test::accumulate_", mutates_args=("cache",)
 )
@@ -285,6 +311,34 @@ class TestCudagraphsCPP(TestCase):
             for _ in range(TRIALS):
                 x = torch.randn(*INPUT_SIZE).cuda()
                 torch.testing.assert_close(cudagraphs_module(x), model(x))
+
+        torch._dynamo.reset()
+
+    def test_cudagraphs_whole_graph_custom_pytree_input_cpp(self):
+        # Warm-up rebuilds the inputs from the input spec, which here includes a
+        # container whose pytree leaves can only be tensors
+        class SampleModel(torch.nn.Module):
+            def forward(self, x, cache):
+                return torch.relu((x + cache["key"]) * 0.5) + cache["value"]
+
+        def make_inputs():
+            k, v = torch.randn(*INPUT_SIZE).cuda(), torch.randn(*INPUT_SIZE).cuda()
+            return torch.randn(*INPUT_SIZE).cuda(), _TensorDict(key=k, value=v)
+
+        model = SampleModel().eval().cuda()
+        inputs = make_inputs()
+        optimized_model = torch_tensorrt.dynamo.compile(
+            torch.export.export(model, inputs),
+            arg_inputs=inputs,
+            min_block_size=1,
+            torch_executed_ops={"torch.ops.aten.mul.Tensor"},
+        )
+        with torch_tensorrt.runtime.enable_cudagraphs(
+            optimized_model
+        ) as cudagraphs_module:
+            for _ in range(TRIALS):
+                inputs = make_inputs()
+                torch.testing.assert_close(cudagraphs_module(*inputs), model(*inputs))
 
         torch._dynamo.reset()
 
