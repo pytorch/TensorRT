@@ -8,8 +8,9 @@ from typing import Any, List, Optional, Sequence, Set, Tuple
 
 import torch
 import torch_tensorrt
+from torch.fx._pytree import tree_flatten_spec
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
-from torch.utils._pytree import tree_flatten, tree_map, tree_unflatten
+from torch.utils._pytree import tree_map, tree_unflatten
 from torch_tensorrt.dynamo import partitioning
 
 logger = logging.getLogger(__name__)
@@ -236,7 +237,9 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
     def forward(
         self, *args: Any, **kwargs: Any
     ) -> torch.Tensor | Tuple[torch.Tensor, ...]:
-        inputs, _ = tree_flatten((args, kwargs))
+        # Flatten by the input spec, as the compiled module does: keyword arguments
+        # given in another order than at export must still fill the same inputs
+        inputs = tree_flatten_spec((args, kwargs), self.compiled_module._in_spec)
         cudagraphs_enabled = torch_tensorrt.runtime.get_whole_cudagraphs_mode()
         if cudagraphs_enabled:
             shape_changed = self.validate_input_shapes(inputs)
