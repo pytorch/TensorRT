@@ -148,7 +148,6 @@ torch_enabled_decompositions: Set[Union[OpOverload, OpOverloadPacket]] = {
     aten.tril.default,
     aten.triu.default,
     aten.unbind,
-    aten.unfold,
     aten.unfold_backward,
     aten.unfold_copy,
     aten._unsafe_index,
