@@ -364,3 +364,27 @@ def test_fake_flat_args_raises_on_symbolic_tensor_meta_without_val():
 
     with pytest.raises(RuntimeError, match="symbolic dimension"):
         cda._fake_flat_args(gm)
+
+
+def test_dynamic_dims_stay_dynamic():
+    """Rotary angles from arange(seq) must not freeze seq at its traced value."""
+    from torch_tensorrt.dynamo._settings import CompilationSettings
+    from torch_tensorrt.dynamo.lowering import get_decompositions
+
+    class M(torch.nn.Module):
+        def forward(self, x):
+            angles = torch.outer(torch.arange(x.shape[1]).float(), torch.ones(4))
+            z = torch.view_as_complex(x.reshape(x.shape[0], x.shape[1], 4, 2))
+            return torch.view_as_real(z * torch.polar(torch.ones_like(angles), angles))
+
+    model = M().eval()
+    seq = torch.export.Dim("seq", min=2, max=16)
+    gm = (
+        torch.export.export(model, (torch.randn(2, 6, 8),), dynamic_shapes=({1: seq},))
+        .run_decompositions(get_decompositions())
+        .module()
+    )
+    out = cda.complex_decomposition_adapter(gm, CompilationSettings())
+
+    x = torch.randn(2, 5, 8)
+    torch.testing.assert_close(out(x), model(x))

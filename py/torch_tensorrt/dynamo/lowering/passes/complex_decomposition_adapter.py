@@ -31,6 +31,7 @@ from typing import Any
 import torch
 from torch._export.utils import _detect_fake_mode_from_gm
 from torch.fx import GraphModule
+from torch.fx.experimental.symbolic_shapes import free_symbols
 from torch_tensorrt._features import has_complex_decomposition
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes.constant_folding import constant_fold
@@ -95,6 +96,11 @@ def complex_decomposition_adapter(
     )
 
     flat_args = _fake_flat_args(gm)
+    if any(free_symbols(arg) for arg in flat_args):
+        # Upstream retraces with make_fx in real mode, where an op building a
+        # tensor of symbolic size (arange(seq) for rotary positions) needs a
+        # concrete value: the exported program's dynamic dims get specialized.
+        return complex_graph_detection(gm, settings)
     logger.debug("complex_decomposition_adapter: retracing under ComplexTensor")
     try:
         # NOTE: returns a new module -- assign to a fresh name so that on
