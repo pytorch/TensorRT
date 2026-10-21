@@ -387,11 +387,12 @@ TRTEngine::TRTEngine(
 }
 
 TRTEngine::~TRTEngine() {
+  // Release the captured graph and context before the TensorRT objects below, which unload the kernels it runs.
+  invalidate_exec_ctx();
   // Disk persistence for runtime caches is owned by the Python side
   // (`RuntimeCacheHandle.save()` invoked from the runtime_cache CM or the engine
   // wrapper). The C++ side just lets refcounts drop.
   trt_engine_profiler.reset();
-  exec_ctx_.reset();
   cuda_engine.reset();
   if (empty_tensor_placeholder) {
     cudaFree(empty_tensor_placeholder);
@@ -521,8 +522,6 @@ bool TRTEngine::set_device_memory_budget(int64_t budget) {
     bind_nccl_comm();
   }
 #endif
-  // Indicates to reevaluate the runtime settings
-  runtime_states.context_changed = true;
 
   return result;
 }
@@ -1038,10 +1037,6 @@ bool TRTEngine::runtime_settings(RuntimeSettings new_settings) {
   // the next ``execute_engine`` must re-bind via ``bind_nccl_comm()``.
   nccl_initialized = false;
 #endif
-  // Existing recreate sites set runtime_states.context_changed for cudagraph
-  // re-record; do the same here so a settings flip inside an active CM forces
-  // the next enqueue to re-record any captured graph.
-  runtime_states.context_changed = true;
   return true;
 }
 
@@ -1053,6 +1048,9 @@ nvinfer1::IExecutionContext* TRTEngine::exec_ctx() {
 }
 
 void TRTEngine::invalidate_exec_ctx() noexcept {
+  // A captured graph replays this context's kernels and memory, so the graph must not outlive the context.
+  reset_captured_graph();
+  runtime_states.context_changed = true;
   exec_ctx_.reset();
 }
 
