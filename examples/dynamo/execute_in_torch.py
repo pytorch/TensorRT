@@ -41,7 +41,7 @@ class Model(torch.nn.Module):
 
     def forward(self, x, bias, scale):
         x = x + 1.0
-        with torch_tensorrt.region.execute_in_torch(backend=self.backend):
+        with torch_tensorrt.region_annotations.execute_in_torch(backend=self.backend):
             x = x + bias
             x = torch.relu(x)
             x = x * scale

@@ -92,7 +92,7 @@ def test_dryrun_plugin_save_rejected_before_file_or_graph_changes(
     tmp_path, monkeypatch, plugin_example
 ):
     from torch_tensorrt.dynamo import _exporter
-    from torch_tensorrt.region import RegionError
+    from torch_tensorrt.region_annotations import RegionError
 
     inputs = [torch.randn(2, 8, device="cuda") for _ in range(3)]
     compiled = torch_tensorrt.compile(

@@ -197,7 +197,7 @@ def pre_export_lowering(
         f"Invoking DynamoPassManager and applying lowering passes: {ATEN_PRE_LOWERING_PASSES}"
     )
 
-    from torch_tensorrt.dynamo.regions import (
+    from torch_tensorrt.dynamo.region_compilation import (
         RegionError,
         is_region_hop,
         normalize_region_scopes,
@@ -205,8 +205,7 @@ def pre_export_lowering(
         validate_region_settings,
     )
 
-    # Consume effectful capture markers before any decomposition, calibration,
-    # or user lowering pass can erase or move the annotated operations.
+    # Extract regions before other passes can move or erase their operations.
     ep = normalize_region_scopes(ep)
     records = region_hop_records(ep.graph_module)
     try:
@@ -225,8 +224,7 @@ def pre_export_lowering(
             [torch.ops.higher_order.wrap_with_autocast, operator.getitem],
         )
     gm = ep.graph_module
-    # Regions remain structured through decomposition. Only the pre-export
-    # passes run inside the child; post-lowering sees an opaque PyTorch leaf.
+    # Pre-export passes may enter region bodies; post-lowering treats them as leaves.
     for node in gm.graph.nodes:
         if is_region_hop(node):
             body_target = str(node.args[0].target)

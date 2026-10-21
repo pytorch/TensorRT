@@ -8,8 +8,8 @@ from typing import Any, Mapping, Optional, Sequence, Union
 
 import torch
 
-from torch_tensorrt.region._constants import SUPPORTED_BACKENDS
-from torch_tensorrt.region._errors import RegionError
+from torch_tensorrt.region_annotations._constants import SUPPORTED_BACKENDS
+from torch_tensorrt.region_annotations._errors import RegionError
 
 REGION_META_KEY = "torch_tensorrt_region"
 RECORDS_META_KEY = "torch_tensorrt_regions"
@@ -25,21 +25,16 @@ class RegionRecord:
     output_names: tuple[str, ...] = ()
     route: str = "torch"
     owner: Optional[str] = None
-    reference: Optional[torch.fx.GraphModule] = field(default=None, repr=False)
+    reference_graph: Optional[str] = field(default=None, repr=False)
     backend: str = "eager"
     plugin_key: int = -1
     plugin_op: Any = field(default=None, repr=False)
-    _reference_graph: Optional[str] = field(init=False, default=None, repr=False)
 
     def __post_init__(self) -> None:
         if self.route not in ("torch", "plugin"):
             raise RegionError(f"Unsupported region route {self.route!r}")
         if self.backend not in SUPPORTED_BACKENDS:
             raise RegionError(f"Unsupported region backend {self.backend!r}")
-        # The reference is an immutable capture snapshot. Format it once, rather
-        # than again after every lowering pass and partitioning stage.
-        if self.route == "torch" and self.reference is not None:
-            self._reference_graph = str(self.reference.graph)
 
     @property
     def capture_signature(self) -> tuple[str, str, str, int]:
@@ -129,15 +124,11 @@ def audit_region_placement(
 
     def visit(module: torch.fx.GraphModule, path: str, accelerated: bool) -> None:
         for node in module.graph.nodes:
-            # Splitters copy a producer's metadata onto partition inputs. A
-            # placeholder carries provenance, not another region invocation.
+            # Partition inputs inherit metadata but do not invoke the region.
             if node.op == "placeholder":
                 continue
             annotation = node.meta.get(REGION_META_KEY)
-            # The global partitioner also copies a single-output producer's
-            # metadata onto the enclosing partition call. A plugin executes
-            # inside that child; count its actual operator (or built engine
-            # ownership) below, rather than treating the wrapper as the op.
+            # Count the plugin inside its partition, not the copied wrapper metadata.
             if (
                 annotation is not None
                 and annotation.get("route") == "plugin"
@@ -183,14 +174,15 @@ def audit_region_placement(
                 ):
                     raise RegionError(f"Region {region_id!r} backend changed")
                 if (
-                    record._reference_graph is not None
-                    and str(child.graph) != record._reference_graph
+                    record.reference_graph is not None
+                    and str(child.graph) != record.reference_graph
                 ):
                     raise RegionError(f"Region {region_id!r} reference body changed")
                 occurrences[region_id].append(path or "<root>")
                 continue
             if node.op == "call_module":
                 child = module.get_submodule(str(node.target))
+                child_path = f"{path}.{node.target}" if path else str(node.target)
                 plugin_ids = getattr(child, "_torch_tensorrt_plugin_regions", ())
                 if plugin_ids:
                     from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
@@ -205,9 +197,8 @@ def audit_region_placement(
                             or expected[region_id].route != "plugin"
                         ):
                             raise RegionError(f"Unexpected plugin region {region_id!r}")
-                        occurrences[region_id].append(str(node.target))
+                        occurrences[region_id].append(child_path)
                 if isinstance(child, torch.fx.GraphModule):
-                    child_path = f"{path}.{node.target}" if path else str(node.target)
                     visit(
                         child,
                         child_path,

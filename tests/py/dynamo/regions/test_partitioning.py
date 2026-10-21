@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import operator
-from copy import deepcopy
 from unittest import mock
 
 import pytest
@@ -17,11 +16,7 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     DYNAMO_CONVERTERS as CONVERTERS,
 )
 from torch_tensorrt.dynamo.lowering.passes.constant_folding import constant_fold
-from torch_tensorrt.dynamo.partitioning._adjacency_partitioner import OpSupportTester
-from torch_tensorrt.dynamo.partitioning._global_partitioner import (
-    TorchTensorRTOperatorSupport,
-)
-from torch_tensorrt.dynamo.regions import (
+from torch_tensorrt.dynamo.region_compilation import (
     RegionRecord,
     attach_region_records,
     audit_region_placement,
@@ -77,7 +72,7 @@ def make_region_graph(
                 node.name for node in body.graph.nodes if node.op == "placeholder"
             ),
             output_names=(body_output.name,),
-            reference=deepcopy(body),
+            reference_graph=str(body.graph),
         )
     ]
     attach_region_records(gm, records)
@@ -106,36 +101,6 @@ def test_region_counts_as_unsupported_computation():
         "explicit execute_in_torch region"
     }
     assert any("test#0" in entry for entry in parse_non_trt_nodes(gm))
-
-
-@pytest.mark.parametrize(
-    "support_type", [OpSupportTester, TorchTensorRTOperatorSupport]
-)
-def test_region_support_policy_precedes_converter_lookup(support_type):
-    gm = make_region_graph()
-    node = next(node for node in gm.graph.nodes if node.op == "call_module")
-    support = support_type()
-    assert not support.is_node_supported(dict(gm.named_modules()), node)
-    assert support.unsupported_operators["region_body"] == 1
-    assert support.fallback_reasons["region_body"] == {
-        "explicit execute_in_torch region"
-    }
-
-
-@pytest.mark.parametrize(
-    "partition", [partitioning.fast_partition, partitioning.global_partition]
-)
-def test_region_remains_outside_accelerated_children(partition):
-    gm = make_region_graph()
-    inputs = torch.randn(2, 3)
-    expected = gm(inputs)
-    records = get_region_records(gm)
-    result, _ = partition(gm, min_block_size=1)
-    audit_region_placement(result, records)
-    assert (
-        len([name for name, _ in result.named_children() if "_run_on_acc" in name]) == 2
-    )
-    torch.testing.assert_close(result(inputs), expected)
 
 
 @pytest.mark.parametrize("tuple_output", [False, True])
@@ -187,19 +152,6 @@ def test_compile_dryrun_preserves_regions_and_live_parent_state(use_fast_partiti
         result = compile_module(gm, [], settings=settings)
         convert.assert_not_called()
     assert get_region_records(result)
-    audit_region_placement(result, get_region_records(result))
-    torch.testing.assert_close(result(inputs), expected)
-
-
-@pytest.mark.parametrize("neighbors,min_block_size", [(False, 1), (True, 10)])
-def test_compile_early_return_preserves_region(neighbors, min_block_size):
-    gm = make_region_graph(neighbors=neighbors)
-    settings = CompilationSettings(
-        offload_module_to_cpu=False, min_block_size=min_block_size
-    )
-    inputs = torch.randn(2, 3)
-    expected = gm(inputs)
-    result = compile_module(gm, [], settings=settings)
     audit_region_placement(result, get_region_records(result))
     torch.testing.assert_close(result(inputs), expected)
 

@@ -9,11 +9,7 @@ from ._types import REGION_META_KEY, audit_region_placement, get_region_records
 
 
 def configure_region_backends(gm: torch.fx.GraphModule) -> None:
-    """Keep FX leaves intact while configuring their lazy runtime compilation.
-
-    Call only on the finished runtime module, never during lowering, partitioning,
-    or dry-run analysis. Intermediate passes must use the ordinary FX bodies.
-    """
+    """Enable lazy compilation on the finished runtime graph, after all rewriting."""
     records = get_region_records(gm)
     if not records:
         return
@@ -37,10 +33,7 @@ def configure_region_backends(gm: torch.fx.GraphModule) -> None:
                     and child._compiled_call_impl is not None
                 ):
                     continue
-                # Module.compile retains the GraphModule and reference graph.
-                # Inductor compiles lazily on first real execution. fullgraph
-                # makes graph breaks/compiler failures visible to the caller.
-                # Disable its CUDA graphs to avoid nested runtime captures.
+                # Keep the FX body; compile lazily without nesting CUDA captures.
                 child.compile(
                     backend=backend,
                     fullgraph=True,

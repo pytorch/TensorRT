@@ -88,12 +88,10 @@ class _CudagraphsContextManager(object):
         if self._active:
             raise RuntimeError("A CUDA graph context cannot re-enter itself")
         self._active = True
-        # Snapshot on entry: this context may have been constructed before a
-        # surrounding CUDA-graph context was entered.
+        # Snapshot on entry so preconstructed nested contexts restore correctly.
         self.old_mode = _PY_RT_CUDAGRAPHS
         try:
-            # Apply the RTX strategy before warmup materializes the engine's
-            # execution context, and undo it if wrapper construction fails.
+            # Apply the RTX strategy before warmup creates execution contexts.
             if self._cuda_graph_strategy is not None:
                 from torch_tensorrt.runtime._runtime_config import runtime_config
 
@@ -138,8 +136,7 @@ class _CudagraphsContextManager(object):
             if self.old_module is not None:  # MutableTorchTRTModule
                 self.compiled_module.gm = self.old_module
                 self.old_module = None
-            # Restore strategy after detaching the wrapper, even if graph
-            # cleanup failed. A failed __enter__ also follows this path.
+            # Restore strategy even after failed entry or graph cleanup.
             if self._inner_cm is not None:
                 inner_cm, self._inner_cm = self._inner_cm, None
                 inner_cm.__exit__(*args)
@@ -166,11 +163,9 @@ def get_cuda_graph_module(
         elif "_run_on_gpu" in name:
             num_torch_module += 1
 
-    # The global partitioner leaves PyTorch work in the parent graph rather
-    # than naming a fallback child _run_on_gpu. Explicit regions also retain
-    # their own child names, including when the whole model stays in PyTorch.
+    # Global partitioning and explicit regions need not create _run_on_gpu children.
     if isinstance(compiled_module, torch.fx.GraphModule):
-        from torch_tensorrt.dynamo.regions import get_region_records
+        from torch_tensorrt.dynamo.region_compilation import get_region_records
 
         if any(
             record.route == "torch" for record in get_region_records(compiled_module)

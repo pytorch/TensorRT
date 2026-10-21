@@ -9,12 +9,15 @@ import copy
 import logging
 import uuid
 from dataclasses import dataclass, replace
-from typing import Any, Callable
+from functools import partial
+from typing import TYPE_CHECKING, Any, Callable
 
 import torch
 
-from torch_tensorrt.region._errors import RegionError
-from torch_tensorrt.region._plugin import PluginSpec
+from torch_tensorrt.region_annotations._errors import RegionError
+
+if TYPE_CHECKING:
+    from torch_tensorrt.kernels import KernelSpec
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -110,11 +113,7 @@ def _make_callbacks(
         return outputs[0] if len(outputs) == 1 else tuple(outputs)
 
     def meta_fn(*inputs: torch.Tensor) -> Any:
-        # QDP's descriptor generator calls fake kernels with fresh symbolic
-        # input dimensions. Executing the captured, specialized body here could
-        # fail at a reshape or matrix multiply, or accidentally introduce guards.
-        # This plugin describes one static specialization; conversion and eager
-        # execution check that actual inputs match that specialization instead.
+        # QDP probes symbolic inputs; return this specialization's static outputs.
         return pack(
             [
                 torch.empty(spec.shape, dtype=spec.dtype, device=inputs[0].device)
@@ -176,19 +175,20 @@ def _make_callbacks(
 
 
 def _triton_signature(
-    spec: PluginSpec,
+    registration: partial[None],
     input_specs: list[_TensorBoundary],
     output_specs: list[_TensorBoundary],
     region_id: str,
 ) -> dict[str, str]:
     from torch_tensorrt.kernels import _triton
 
-    constexprs = spec.constexprs or {}
-    if spec.signature is not None:
-        signature = dict(spec.signature)
+    options = registration.keywords
+    constexprs = options["constexprs"]
+    if options.get("signature") is not None:
+        signature = dict(options["signature"])
     else:
         runtime_names = [
-            name for name in spec.kernel.arg_names if name not in constexprs
+            name for name in options["kernel"].arg_names if name not in constexprs
         ]
         num_extras = len(runtime_names) - len(input_specs) - len(output_specs)
         if num_extras < 0:
@@ -210,14 +210,8 @@ def _triton_signature(
         signature = dict(
             zip(runtime_names, input_types + ["i32"] * num_extras + output_types)
         )
-    layout = _triton.validate_triton_config(
-        region_id,
-        spec.kernel,
-        signature,
-        constexprs,
-        (len(input_specs), len(output_specs)),
-        spec.extra_args_fn,
-    )
+    # Launch validation belongs to triton_op; only compare captured dtypes here.
+    layout = _triton.analyze_signature(signature, (len(input_specs), len(output_specs)))
     for kind, params, boundaries in (
         ("input", layout.inputs, input_specs),
         ("output", layout.outputs, output_specs),
@@ -232,16 +226,12 @@ def _triton_signature(
 
 
 def register_region_plugin(
-    child: torch.fx.GraphModule, spec: PluginSpec, *, region_id: str
+    child: torch.fx.GraphModule,
+    registration: KernelSpec | partial[None],
+    *,
+    region_id: str,
 ) -> torch._ops.OpOverload:
-    """Register one static region specialization and return its Torch operator.
-
-    The caller owns capture validation, graph replacement, and the mandatory
-    TensorRT placement audit. The eagerly executable body is a reference for
-    tracing and correctness checks; accepting a final PyTorch fallback would
-    silently skip the user-supplied kernel and must be rejected by that caller.
-    A single output uses a Tensor schema; multiple outputs use a flat tuple.
-    """
+    """Register a static specialization; the caller must enforce TRT placement."""
     from torch_tensorrt import kernels
     from torch_tensorrt.kernels._dsl import InputDecl, KernelSpec
 
@@ -267,8 +257,8 @@ def register_region_plugin(
         capability_validator=validator,
     )
     with torch.cuda.device(input_specs[0].device):
-        if isinstance(spec.kernel, KernelSpec):
-            declared_inputs = spec.kernel.inputs
+        if isinstance(registration, KernelSpec):
+            declared_inputs = registration.inputs
             if declared_inputs is None:
                 declared_inputs = [
                     InputDecl(f"arg{i}", boundary.dtype)
@@ -283,22 +273,20 @@ def register_region_plugin(
                     f"Plugin region {region_id!r} KernelSpec.inputs must describe "
                     "the captured Tensor live-ins in first-use order"
                 )
-            if spec.kernel.outputs is not None and len(spec.kernel.outputs) != len(
+            if registration.outputs is not None and len(registration.outputs) != len(
                 output_specs
             ):
                 raise RegionError(
                     f"Plugin region {region_id!r} KernelSpec.outputs has the wrong arity"
                 )
-            if spec.kernel.geometry is None:
+            if registration.geometry is None:
                 raise RegionError(
                     f"Plugin region {region_id!r} requires KernelSpec.geometry"
                 )
             from torch_tensorrt.kernels import _common, _derive
 
-            cuda_spec = replace(spec.kernel, inputs=declared_inputs)
-            # The captured tensors define the compiled pointer ABI. Checking
-            # FX metadata alone cannot protect against different engine binding
-            # dtypes; use the same final AOT guard as the Triton frontend.
+            cuda_spec = replace(registration, inputs=declared_inputs)
+            # Guard the final engine pointer dtypes, as the Triton frontend does.
             kernels.cuda_kernel_op(
                 op_name,
                 cuda_spec,
@@ -311,16 +299,12 @@ def register_region_plugin(
                 **common,
             )
         else:
-            signature = _triton_signature(spec, input_specs, output_specs, region_id)
-            kernels.triton_op(
+            signature = _triton_signature(
+                registration, input_specs, output_specs, region_id
+            )
+            registration(
                 op_name,
-                spec.kernel,
                 signature=signature,
-                constexprs=spec.constexprs or {},
-                grid=spec.grid,
-                extra_args_fn=spec.extra_args_fn,
-                num_warps=spec.num_warps,
-                num_stages=spec.num_stages,
                 **common,
             )
     return getattr(getattr(torch.ops, namespace), name).default

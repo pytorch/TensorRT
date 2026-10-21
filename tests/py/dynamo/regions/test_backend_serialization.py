@@ -9,21 +9,17 @@ import pytest
 import torch
 
 import torch_tensorrt
-from torch_tensorrt import region
-from torch_tensorrt.dynamo._exporter import (
-    export,
-    inline_torch_region_modules,
-    transform,
-)
+from torch_tensorrt import region_annotations
+from torch_tensorrt.dynamo._exporter import export, transform
 from torch_tensorrt.dynamo.lowering._buffer_lifting import erase_export_guards
-from torch_tensorrt.dynamo.regions import (
+from torch_tensorrt.dynamo.region_compilation import (
     attach_region_records,
     audit_region_placement,
     get_region_records,
     materialize_regions,
     normalize_region_scopes,
 )
-from torch_tensorrt.region._session import RegionCompilationSession
+from torch_tensorrt.region_annotations._session import RegionCompilationSession
 
 pytestmark = pytest.mark.unit
 
@@ -34,7 +30,7 @@ class _InductorRegion(torch.nn.Module):
         self.register_buffer("bias", torch.ones(3))
 
     def forward(self, x):
-        with region.execute_in_torch(name="activation", backend="inductor"):
+        with region_annotations.execute_in_torch(name="activation", backend="inductor"):
             y = torch.relu(x + self.bias)
         return y * 2
 
@@ -89,7 +85,7 @@ def test_save_rejects_inductor_before_writing_or_mutating(source, tmp_path, nest
         if existing:
             destination.write_bytes(b"existing artifact")
         with pytest.raises(
-            region.RegionError, match="backend='inductor'.*cannot preserve"
+            region_annotations.RegionError, match="backend='inductor'.*cannot preserve"
         ):
             torch_tensorrt.save(
                 gm,
@@ -108,7 +104,7 @@ def test_save_rejects_inductor_before_writing_or_mutating(source, tmp_path, nest
         torch.testing.assert_close(gm(x), expected)
 
 
-@pytest.mark.parametrize("entrypoint", [export, transform, inline_torch_region_modules])
+@pytest.mark.parametrize("entrypoint", [export, transform])
 def test_export_helpers_reject_inductor_before_cloning_or_mutating(source, entrypoint):
     gm, x = source
     before = _snapshot(gm)
@@ -118,7 +114,7 @@ def test_export_helpers_reject_inductor_before_cloning_or_mutating(source, entry
         side_effect=AssertionError("Inductor region was cloned before rejection"),
     ):
         with pytest.raises(
-            region.RegionError, match="backend='inductor'.*cannot preserve"
+            region_annotations.RegionError, match="backend='inductor'.*cannot preserve"
         ):
             entrypoint(gm)
     assert _snapshot(gm) == before

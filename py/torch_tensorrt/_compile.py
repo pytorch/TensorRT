@@ -343,10 +343,9 @@ def compile(
             kwarg_inputs, disable_memory_format_check=True
         )
 
-        from torch_tensorrt.region._session import RegionCompilationSession
+        from torch_tensorrt.region_annotations._session import RegionCompilationSession
 
-        # Scope capture belongs to this trace, not to global Dynamo state. In
-        # eager execution and unrelated exports the public annotation is a no-op.
+        # Enable annotations only for this compilation's trace.
         with RegionCompilationSession(strict=kwargs.get("strict", False)):
             if module_type == _ModuleType.ep:
                 exp_program = module
@@ -357,8 +356,10 @@ def compile(
                     kwarg_inputs=torchtrt_kwarg_inputs,
                     **kwargs,
                 )
-                from torch_tensorrt.dynamo.regions._capture import _marker_kind
-                from torch_tensorrt.region._errors import RegionCaptureError
+                from torch_tensorrt.dynamo.region_compilation._capture import (
+                    _marker_kind,
+                )
+                from torch_tensorrt.region_annotations._errors import RegionCaptureError
 
                 if any(_marker_kind(n) for n in exp_program.graph.nodes) and any(
                     child.training for child in module.modules()
@@ -458,8 +459,8 @@ def cross_compile_for_windows(
         kwarg_inputs, disable_memory_format_check=True
     )
 
-    from torch_tensorrt.dynamo.regions._capture import reject_region_capture
-    from torch_tensorrt.region._session import RegionCompilationSession
+    from torch_tensorrt.dynamo.region_compilation._capture import reject_region_capture
+    from torch_tensorrt.region_annotations._session import RegionCompilationSession
 
     with RegionCompilationSession(strict=kwargs.get("strict", False)):
         exp_program = dynamo_trace(
@@ -593,8 +594,10 @@ def convert_method_to_trt_engine(
             kwarg_inputs, disable_memory_format_check=True
         )
 
-        from torch_tensorrt.dynamo.regions._capture import reject_region_capture
-        from torch_tensorrt.region._session import RegionCompilationSession
+        from torch_tensorrt.dynamo.region_compilation._capture import (
+            reject_region_capture,
+        )
+        from torch_tensorrt.region_annotations._session import RegionCompilationSession
 
         with RegionCompilationSession(strict=kwargs.get("strict", False)):
             exp_program = dynamo_trace(
@@ -907,7 +910,10 @@ def save(
     if isinstance(module, CudaGraphsTorchTensorRTModule):
         module = module.compiled_module
     if isinstance(module, torch.fx.GraphModule):
-        from torch_tensorrt.dynamo.regions import RegionError, get_region_records
+        from torch_tensorrt.dynamo.region_compilation import (
+            RegionError,
+            get_region_records,
+        )
 
         if get_region_records(module):
             from torch_tensorrt.dynamo._exporter import (

@@ -3,15 +3,20 @@
 
 """Exercise automatic region registration through the public compile API."""
 
+from dataclasses import replace
+from threading import Lock
 from types import SimpleNamespace
 
 import pytest
 import torch
 
 import torch_tensorrt
-from torch_tensorrt import kernels, region
-from torch_tensorrt.dynamo.regions import get_region_records
-from torch_tensorrt.region import RegionCaptureError, RegionError
+from torch_tensorrt import kernels, region_annotations
+from torch_tensorrt.dynamo.region_compilation import (
+    audit_region_placement,
+    get_region_records,
+)
+from torch_tensorrt.region_annotations import RegionCaptureError, RegionError
 
 triton = pytest.importorskip("triton")
 tl = pytest.importorskip("triton.language")
@@ -71,7 +76,7 @@ def _extras(inputs, outputs):
 
 class Unary(torch.nn.Module):
     def forward(self, x):
-        with region.fuse_in_plugin(
+        with region_annotations.fuse_in_plugin(
             kernel=lambda: _unary_kernel,
             name="activation",
             constexprs={"BLOCK": BLOCK},
@@ -105,8 +110,7 @@ def _assert_plugin_ownership(compiled, count):
     ]
     assert sorted(engine_ids) == sorted(record.id for record in records)
     assert all(record.owner.startswith("_run_on_acc") for record in records)
-    # The annotated reference body must be replaced, including a body whose
-    # operators would normally all have native TensorRT converters.
+    # No plugin call may remain outside an engine.
     for module in compiled.modules():
         if isinstance(module, torch.fx.GraphModule):
             assert not any(
@@ -126,7 +130,7 @@ def test_unowned_context_does_not_resolve_or_register_a_kernel(monkeypatch):
 
     class Eager(torch.nn.Module):
         def forward(self, x):
-            with region.fuse_in_plugin(kernel=unexpected):
+            with region_annotations.fuse_in_plugin(kernel=unexpected):
                 result = x.sin() + 1
             return result
 
@@ -155,17 +159,21 @@ def test_triton_region_is_one_plugin_in_a_real_engine(use_fast_partitioner):
         other = torch.randn_like(x)
         torch.testing.assert_close(compiled(other), model(other))
 
-        # The automatic eager implementation is the captured reference and is
-        # valid only for the specialization used to derive the plugin contract.
+        # Eager dispatch must respect the captured shape and dtype.
         op = records[0].plugin_op
         torch.testing.assert_close(op(x), model(x))
         with pytest.raises(RegionError, match="captured static shapes"):
             op(torch.randn(4, 129, device="cuda"))
         with pytest.raises(RegionError, match="captured static shapes"):
             op(x.to(torch.float16))
-        with torch._subclasses.fake_tensor.FakeTensorMode():
-            fake = op(torch.empty(5, 5, device="cuda"))
-            assert tuple(fake.shape) == (3, 129)
+
+        engine = compiled.get_submodule(records[0].owner)
+        graph = torch.fx.Graph()
+        graph.output(graph.call_module("nested", (graph.placeholder("x"),)))
+        wrapper = torch.fx.GraphModule({"nested": compiled}, graph)
+        nested_record = replace(records[0], owner=None)
+        audit_region_placement(wrapper, [nested_record], require_plugins_in_trt=True)
+        assert wrapper.get_submodule(nested_record.owner) is engine
 
 
 @requires_cuda_qdp
@@ -180,8 +188,7 @@ def test_plugin_specializations_keep_shapes_and_storage_offsets_independent():
             op = _assert_plugin_ownership(compiled, 1)[0].plugin_op
             retained.append((compiled, op, x))
 
-        # Registering the second shape must leave the first operator's eager
-        # reference and fake contract intact, including offset input bindings.
+        # New registrations must preserve earlier shape and offset bindings.
         for index, (compiled, op, x) in enumerate(retained):
             torch.testing.assert_close(compiled(x), model(x))
             torch.testing.assert_close(op(x), model(x))
@@ -204,10 +211,8 @@ def test_plugin_inputs_follow_first_use_not_exported_placeholder_order(with_para
             )
 
         def forward(self, x, y):
-            # Export puts user input x before y and lifted parameters before
-            # both. The kernel ABI must instead begin with y, which this body
-            # uses first. Subtraction exposes swaps that addition would hide.
-            with region.fuse_in_plugin(
+            # First use puts y first; subtraction exposes reversed bindings.
+            with region_annotations.fuse_in_plugin(
                 kernel=lambda: _subtract_kernel,
                 constexprs={"BLOCK": BLOCK},
                 grid=_grid,
@@ -233,7 +238,7 @@ def test_plugin_inputs_follow_first_use_not_exported_placeholder_order(with_para
 def test_multioutput_plugin_derives_different_output_shapes(use_fast_partitioner):
     class MultiOutput(torch.nn.Module):
         def forward(self, x):
-            with region.fuse_in_plugin(
+            with region_annotations.fuse_in_plugin(
                 kernel=lambda: _row_kernel,
                 constexprs={"BLOCK": BLOCK},
                 grid=lambda inputs, outputs: (inputs[0].shape_expr[0],),
@@ -243,8 +248,7 @@ def test_multioutput_plugin_derives_different_output_shapes(use_fast_partitioner
             ):
                 activated = torch.relu(x + 0.25)
                 reduced = torch.sum(x, dim=-1)
-            # Kernel outputs follow production order inside the region, even
-            # when the model exposes those tensors in a different order.
+            # The kernel follows production order, independent of return order.
             return reduced, activated
 
     x = torch.randn(3, 17, device="cuda")
@@ -282,12 +286,11 @@ def test_cuda_kernel_spec_infers_inputs_and_outputs():
     class CudaRegion(torch.nn.Module):
         def __init__(self):
             super().__init__()
-            # Creating this factory before capture also supports local kernels
-            # and launch descriptors without placing them in Dynamo's graph.
+            # Local kernel descriptors stay outside Dynamo's graph.
             self.kernel_factory = lambda: spec
 
         def forward(self, x):
-            with region.fuse_in_plugin(kernel=self.kernel_factory):
+            with region_annotations.fuse_in_plugin(kernel=self.kernel_factory):
                 y = torch.relu(x + 0.25)
             return y
 
@@ -304,16 +307,30 @@ def test_cuda_region_checks_engine_pointer_dtypes_before_launch(monkeypatch):
     import tensorrt as trt
     from torch.fx.experimental.proxy_tensor import make_fx
 
-    from torch_tensorrt.dynamo.regions._plugins import register_region_plugin
+    from torch_tensorrt.dynamo.region_compilation._plugins import register_region_plugin
     from torch_tensorrt.kernels import _derive, _register
-    from torch_tensorrt.region._plugin import PluginSpec
+    from torch_tensorrt.region_annotations._plugin import prepare_plugin
 
-    def launch(*args):
-        raise RuntimeError("launch callback reached")
+    class Launch:
+        def __init__(self):
+            self.lock = Lock()
 
-    spec = PluginSpec(
-        kernels.KernelSpec("unused source", "kernel", geometry=kernels.Custom(launch))
+        def __call__(self, *args):
+            raise RuntimeError("launch callback reached")
+
+    launch = Launch()
+    spec = kernels.KernelSpec(
+        "unused source",
+        "kernel",
+        extras=[],
+        include_paths=[],
+        geometry=kernels.Custom(launch),
     )
+    captured_spec = prepare_plugin(spec)
+    spec.extras.append(kernels.Numel("arg0"))
+    spec.include_paths.append("changed_after_capture")
+    assert not captured_spec.extras and not captured_spec.include_paths
+    assert captured_spec.geometry.fn is launch
     with torch._subclasses.fake_tensor.FakeTensorMode():
         child = make_fx(lambda x: (x + 1,))(torch.empty(8, device="cuda"))
     captured = {}
@@ -334,7 +351,7 @@ def test_cuda_region_checks_engine_pointer_dtypes_before_launch(monkeypatch):
     monkeypatch.setattr(
         _register, "register_precompiled_qdp_plugin", capture_registration
     )
-    register_region_plugin(child, spec, region_id="pointer-dtype")
+    register_region_plugin(child, captured_spec, region_id="pointer-dtype")
     actual = SimpleNamespace(dtype=trt.float32)
     wrong = SimpleNamespace(dtype=trt.float16)
     for inputs, outputs in (([wrong], [actual]), ([actual], [wrong])):
@@ -354,9 +371,9 @@ def test_repeated_plugin_scopes_with_parameter_and_torch_region_recompile():
             )
 
         def forward(self, x):
-            with region.execute_in_torch(name="torch"):
+            with region_annotations.execute_in_torch(name="torch"):
                 x = torch.sin(x)
-            with region.fuse_in_plugin(
+            with region_annotations.fuse_in_plugin(
                 kernel=lambda: _bias_kernel,
                 name="repeated",
                 constexprs={"BLOCK": BLOCK},
@@ -364,7 +381,7 @@ def test_repeated_plugin_scopes_with_parameter_and_torch_region_recompile():
                 extra_args_fn=_extras,
             ):
                 x = torch.relu(x + self.bias)
-            with region.fuse_in_plugin(
+            with region_annotations.fuse_in_plugin(
                 kernel=lambda: _bias_kernel,
                 name="repeated",
                 constexprs={"BLOCK": BLOCK},
@@ -381,7 +398,6 @@ def test_repeated_plugin_scopes_with_parameter_and_torch_region_recompile():
         for _ in range(2):
             compiled = _compile(model, [x])
             records = _assert_plugin_ownership(compiled, 2)
-            assert [record.plugin_key for record in records] == [0, 1]
             assert len({record.id for record in records}) == 2
             assert all(len(record.input_names) == 2 for record in records)
             assert not previous_ops.intersection(record.plugin_op for record in records)
@@ -401,17 +417,16 @@ def test_repeated_plugin_scopes_with_parameter_and_torch_region_recompile():
 def test_plugin_value_reused_after_torch_region_has_one_owner(use_fast_partitioner):
     class Reused(torch.nn.Module):
         def forward(self, x):
-            with region.fuse_in_plugin(
+            with region_annotations.fuse_in_plugin(
                 kernel=lambda: _unary_kernel,
                 constexprs={"BLOCK": BLOCK},
                 grid=_grid,
                 extra_args_fn=_extras,
             ):
                 y = torch.relu(x + 0.25)
-            with region.execute_in_torch():
+            with region_annotations.execute_in_torch():
                 z = torch.sigmoid(y)
-            # The later engine takes y as an input as well. Its placeholder
-            # inherits provenance, but must not become another plugin owner.
+            # Reusing y in another engine must not duplicate plugin ownership.
             return y + z
 
     x = torch.randn(3, 17, device="cuda")
@@ -430,7 +445,7 @@ def test_constant_input_plugin_remains_an_engine_layer():
             self.register_buffer("weight", torch.randn(3, 17, device="cuda"))
 
         def forward(self, x):
-            with region.fuse_in_plugin(
+            with region_annotations.fuse_in_plugin(
                 kernel=lambda: _unary_kernel,
                 constexprs={"BLOCK": BLOCK},
                 grid=_grid,
@@ -452,7 +467,7 @@ def test_constant_input_plugin_remains_an_engine_layer():
 def test_dead_plugin_scope_does_not_register_a_kernel(monkeypatch):
     class Dead(torch.nn.Module):
         def forward(self, x):
-            with region.fuse_in_plugin(
+            with region_annotations.fuse_in_plugin(
                 kernel=lambda: _unary_kernel,
                 constexprs={"BLOCK": BLOCK},
                 grid=_grid,
@@ -483,8 +498,11 @@ def test_plugin_region_rejects_final_pytorch_fallback():
 def test_lowering_cannot_change_plugin_policy(field, value):
     from torch_tensorrt.dynamo._settings import CompilationSettings
     from torch_tensorrt.dynamo.lowering.passes.pass_manager import DynamoPassManager
-    from torch_tensorrt.dynamo.regions import is_region_hop, normalize_region_scopes
-    from torch_tensorrt.region._session import RegionCompilationSession
+    from torch_tensorrt.dynamo.region_compilation import (
+        is_region_hop,
+        normalize_region_scopes,
+    )
+    from torch_tensorrt.region_annotations._session import RegionCompilationSession
 
     with RegionCompilationSession(strict=True):
         exported = normalize_region_scopes(
@@ -511,7 +529,7 @@ def test_plugin_region_rejects_unsupported_tensor_boundaries(kind):
                 x = x.transpose(0, 1)
             elif kind == "cpu":
                 x = x.cpu()
-            with region.fuse_in_plugin(
+            with region_annotations.fuse_in_plugin(
                 kernel=lambda: _unary_kernel,
                 constexprs={"BLOCK": BLOCK},
                 grid=_grid,
@@ -544,7 +562,7 @@ def test_plugin_region_rejects_dynamic_shapes():
 def test_plugin_region_rejects_invalid_launch_contract(invalid):
     class InvalidLaunch(torch.nn.Module):
         def forward(self, x):
-            with region.fuse_in_plugin(
+            with region_annotations.fuse_in_plugin(
                 kernel=lambda: _unary_kernel,
                 signature=(
                     {"x": "*fp16", "n": "i32", "y": "*fp32"}

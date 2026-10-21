@@ -859,7 +859,7 @@ def compile(
 
     logger.info("Compilation Settings: %s\n", settings)
     exported_program = pre_export_lowering(exported_program, settings)
-    from torch_tensorrt.dynamo.regions import (
+    from torch_tensorrt.dynamo.region_compilation import (
         RegionError,
         configure_region_backends,
         materialize_regions,
@@ -887,7 +887,9 @@ def compile(
         raise RegionError(
             "Decomposition changed or lost a region boundary or execution policy"
         )
-    from torch_tensorrt.dynamo.regions._validation import validate_region_mutations
+    from torch_tensorrt.dynamo.region_compilation._validation import (
+        validate_region_mutations,
+    )
 
     validate_region_mutations(exported_program)
     gm = materialize_regions(exported_program.module())
@@ -1336,7 +1338,7 @@ def compile_module(
     Returns:
         Compiled FX GraphModule
     """
-    from torch_tensorrt.dynamo.regions import (
+    from torch_tensorrt.dynamo.region_compilation import (
         RegionError,
         assert_no_unresolved_regions,
         attach_region_records,
@@ -1345,14 +1347,13 @@ def compile_module(
         is_torch_region_node,
         validate_region_settings,
     )
-    from torch_tensorrt.dynamo.regions._types import REGION_META_KEY
+    from torch_tensorrt.dynamo.region_compilation._types import REGION_META_KEY
 
     assert_no_unresolved_regions(gm)
     dryrun_tracker = DryRunTracker()
     region_records = get_region_records(gm)
     if region_records:
-        # Check explicit placement before support-count early returns and the
-        # full-compilation shortcut, which deliberately bypasses partitioning.
+        # Audit before early returns or shortcuts can bypass partitioning.
         audit_region_placement(gm, region_records)
         try:
             validate_region_settings(settings, region_records)
@@ -1633,8 +1634,7 @@ def compile_module(
     # Iterate over all components that can be accelerated
     # Generate the corresponding TRT Module for those
 
-    # Release frozen parameters copied into accelerated children, while retaining
-    # parent state still feeding PyTorch calls (in particular on the global path).
+    # Release copied engine weights, but keep state used by parent PyTorch calls.
     live_parent_attrs = {
         str(node.target).partition(".")[0]
         for node in partitioned_module.graph.nodes
@@ -1658,8 +1658,7 @@ def compile_module(
         if (
             settings.use_fast_partitioner and "_run_on_acc" not in name
         ) or name in torch_region_children:
-            # Global partitioning leaves the region call in the parent, where
-            # it has already been reported as one explicit PyTorch region.
+            # The global partitioner's parent already reports its region calls.
             if name not in torch_region_children:
                 dryrun_tracker.to_run_in_torch.extend(parse_non_trt_nodes(submodule))
             logger.debug(

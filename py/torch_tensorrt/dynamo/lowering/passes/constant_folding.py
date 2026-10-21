@@ -177,19 +177,16 @@ class _TorchTensorRTConstantFolder(ConstantFolder):  # type: ignore[misc]
             pass
 
     def run_node(self, node: torch.fx.Node) -> Any:
-        from torch_tensorrt.dynamo.regions._types import REGION_META_KEY
+        from torch_tensorrt.dynamo.region_compilation._types import REGION_META_KEY
 
-        # Upstream checks is_impure only after evaluating Tensor-valued nodes.
-        # Region children can return tuples: propagating that concrete tuple
-        # would let getitem fold its outputs and dead-code elimination erase the
-        # entire region. Stop before execution, for every output structure.
+        # Skip before evaluation: upstream's impurity check misses tuple outputs.
         if REGION_META_KEY in node.meta and node.op != "placeholder":
             return self.unknown_value
         return super().run_node(node)
 
     # TODO: Update this function when quantization is added
     def is_impure(self, node: torch.fx.node.Node) -> bool:
-        from torch_tensorrt.dynamo.regions._types import REGION_META_KEY
+        from torch_tensorrt.dynamo.region_compilation._types import REGION_META_KEY
 
         # Folding an observable view loses its relation to the original storage.
         # Keep the view so the reset pass can clone a fresh allocation once and
@@ -197,8 +194,7 @@ class _TorchTensorRTConstantFolder(ConstantFolder):  # type: ignore[misc]
         if _aliases_input(node) and _storage_escapes(node):
             return True
 
-        # Placement is an explicit semantic requirement, not an optional folding
-        # exclusion. Constant-input regions must retain their requested runtime.
+        # Constant-input regions must still execute on their requested backend.
         if REGION_META_KEY in node.meta and node.op != "placeholder":
             return True
         if node.target in self.quantization_ops:

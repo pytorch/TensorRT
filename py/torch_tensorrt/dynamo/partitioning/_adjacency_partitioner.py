@@ -68,7 +68,7 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
     def is_node_supported(
         self, submodules: Dict[str, torch.nn.Module], node: torch.fx.Node
     ) -> bool:
-        from torch_tensorrt.dynamo.regions import is_torch_region_node
+        from torch_tensorrt.dynamo.region_compilation import is_torch_region_node
 
         node_name = ConverterRegistry.qualified_name_or_str(node.target)
 
@@ -257,7 +257,7 @@ class TRTPartitioner(_SplitterBase):  # type: ignore
         self.assume_full_support = assume_full_support
 
         if self.assume_full_support:
-            from torch_tensorrt.dynamo.regions import is_torch_region_node
+            from torch_tensorrt.dynamo.region_compilation import is_torch_region_node
 
             if any(is_torch_region_node(module, node) for node in module.graph.nodes):
                 raise ValueError(

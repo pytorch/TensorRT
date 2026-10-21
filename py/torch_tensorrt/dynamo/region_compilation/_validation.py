@@ -6,19 +6,13 @@
 import torch
 from torch.export.graph_signature import OutputKind
 
-from torch_tensorrt.region._errors import RegionCaptureError
+from torch_tensorrt.region_annotations._errors import RegionCaptureError
 
 from ._capture import region_hop_records
 
 
 def validate_region_mutations(exported_program: torch.export.ExportedProgram) -> None:
-    """Reject observable mutations after decomposition, before unlift/lowering.
-
-    Functionalization records writes to user inputs and model buffers in the
-    export signature, including writes outside an annotated scope. Temporary
-    tensor updates do not appear there. Region-free graphs retain their normal
-    mutation support.
-    """
+    """Reject input/buffer writes anywhere in a model containing live regions."""
     if not region_hop_records(exported_program.graph_module):
         return
     mutations: list[str] = []

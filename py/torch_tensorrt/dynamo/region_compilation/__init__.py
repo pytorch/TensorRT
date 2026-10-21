@@ -3,7 +3,7 @@
 
 """Experimental explicit-region compiler support."""
 
-from torch_tensorrt.region._errors import RegionError
+from torch_tensorrt.region_annotations._errors import RegionError
 
 from ._capture import (
     assert_no_unresolved_regions,

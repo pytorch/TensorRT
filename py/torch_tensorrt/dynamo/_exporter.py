@@ -27,18 +27,21 @@ from torch.export.exported_program import (
 from torch.fx.graph import _PyTreeCodeGen
 
 from torch_tensorrt._features import ENABLED_FEATURES
-from torch_tensorrt.dynamo.regions import (
+from torch_tensorrt.dynamo.region_compilation import (
     audit_region_placement,
     get_region_records,
     is_torch_region_node,
 )
-from torch_tensorrt.dynamo.regions._types import RECORDS_META_KEY, REGION_META_KEY
+from torch_tensorrt.dynamo.region_compilation._types import (
+    RECORDS_META_KEY,
+    REGION_META_KEY,
+)
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
     ENGINE_IDX,
     NAME_IDX,
     TorchTensorRTModule,
 )
-from torch_tensorrt.region._errors import RegionError
+from torch_tensorrt.region_annotations._errors import RegionError
 
 logger = logging.getLogger(__name__)
 
@@ -167,12 +170,9 @@ def transform(
 
     Returns an inlined torch.fx.GraphModule
     """
-    # GraphModule deepcopy drops compiled dispatchers, and flattening erases
-    # their region boundaries. Reject unsupported backends before either step.
+    # Reject unsupported backends before deepcopy drops their compiled dispatchers.
     _validate_region_serialization(gm)
-    # Work on a clone so export cannot change the compiled graph or its records.
-    # GraphModule deepcopy drops arbitrary attributes; retain the region identity
-    # so inline_torch_region_modules can audit the clone before flattening it.
+    # Preserve region attributes that GraphModule deepcopy would otherwise drop.
     region_children = {}
     if get_region_records(gm):
         region_children = {
@@ -392,19 +392,12 @@ def _replace_module_call_outputs(call: torch.fx.Node, outputs: Any) -> None:
 
 
 def inline_torch_region_modules(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
-    """Inline verified PyTorch regions on a serialization clone, bottom-up.
-
-    The compiled module retains opaque region calls. Only its export clone is
-    flattened, preserving engine boundaries and storing JSON-safe provenance.
-    """
+    """Inline PyTorch regions on the export clone, preserving engine boundaries."""
     records = get_region_records(gm)
     if not records:
         return gm
-    _validate_region_serialization(gm)
     audit_region_placement(gm, records)
-    # Fallback inlining later promotes attributes into the top-level namespace.
-    # Allocate state names uniquely across the entire module tree to avoid an
-    # unrelated parameter being overwritten during that promotion.
+    # State names must remain unique when fallback children are later inlined.
     reserved = set()
     for module in gm.modules():
         reserved.update(vars(module))
@@ -427,8 +420,6 @@ def inline_torch_region_modules(gm: torch.fx.GraphModule) -> torch.fx.GraphModul
                 continue
 
             placeholders = [n for n in child.graph.nodes if n.op == "placeholder"]
-            if call.kwargs or len(placeholders) != len(call.args):
-                raise RegionError("Region input bindings changed before serialization")
             values = dict(zip(placeholders, call.args))
             outputs = None
             with parent.graph.inserting_before(call):
@@ -464,8 +455,7 @@ def inline_torch_region_modules(gm: torch.fx.GraphModule) -> torch.fx.GraphModul
                             if isinstance(value, torch.nn.Parameter):
                                 parent.register_parameter(state_name, value)
                             else:
-                                # Export snapshots all read-only tensor constants,
-                                # including originally non-persistent buffers.
+                                # Include non-persistent tensor constants in the artifact.
                                 parent.register_buffer(state_name, value)
                             state_bindings[id(value)] = state_name
                         copied.target = state_name

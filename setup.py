@@ -638,13 +638,13 @@ dynamo_packages = [
     "torch_tensorrt.dynamo.lowering.passes",
     "torch_tensorrt.dynamo.lowering.constant_fold_exclusions",
     "torch_tensorrt.dynamo.partitioning",
-    "torch_tensorrt.dynamo.regions",
+    "torch_tensorrt.dynamo.region_compilation",
     "torch_tensorrt.dynamo.runtime",
     "torch_tensorrt.dynamo.runtime.meta_ops",
     "torch_tensorrt.dynamo.tools",
     "torch_tensorrt.dynamo.tuning",
     "torch_tensorrt.executorch",
-    "torch_tensorrt.region",
+    "torch_tensorrt.region_annotations",
     "torch_tensorrt.runtime",
 ]
 

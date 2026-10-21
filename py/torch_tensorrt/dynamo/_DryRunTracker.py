@@ -299,7 +299,7 @@ def parse_non_trt_nodes(graph_module: torch.fx.GraphModule) -> List[str]:
 
     Returns a string representation of the nodes
     """
-    from torch_tensorrt.dynamo.regions import is_torch_region_node
+    from torch_tensorrt.dynamo.region_compilation import is_torch_region_node
 
     to_run_in_torch = []
     for node in graph_module.graph.nodes:

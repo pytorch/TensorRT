@@ -9,10 +9,10 @@ import io
 import pytest
 import torch
 
-from torch_tensorrt import region
+from torch_tensorrt import region_annotations
 from torch_tensorrt.dynamo._exporter import export, transform
 from torch_tensorrt.dynamo.lowering._buffer_lifting import erase_export_guards
-from torch_tensorrt.dynamo.regions import (
+from torch_tensorrt.dynamo.region_compilation import (
     RegionRecord,
     attach_region_records,
     audit_region_placement,
@@ -20,8 +20,8 @@ from torch_tensorrt.dynamo.regions import (
     materialize_regions,
     normalize_region_scopes,
 )
-from torch_tensorrt.dynamo.regions._types import REGION_META_KEY
-from torch_tensorrt.region._session import RegionCompilationSession
+from torch_tensorrt.dynamo.region_compilation._types import REGION_META_KEY
+from torch_tensorrt.region_annotations._session import RegionCompilationSession
 
 
 class _TwoOutputs(torch.nn.Module):
@@ -32,7 +32,7 @@ class _TwoOutputs(torch.nn.Module):
 
     def forward(self, x):
         h = x + 1
-        with region.execute_in_torch(name="branches"):
+        with region_annotations.execute_in_torch(name="branches"):
             y = torch.relu(h @ self.weight)
             z = torch.sigmoid(h + self.bias)
         return y + x, z
@@ -138,8 +138,7 @@ def test_region_child_constants_do_not_overwrite_sibling_or_parent_state():
         records.append(RegionRecord(region_id, "", "region_body"))
     graph.output(tuple(calls))
     source = torch.fx.GraphModule(root, graph)
-    # GraphModule only retains referenced attributes; retain this adversarial
-    # name explicitly to test collision handling during state promotion.
+    # Retain an unused name to test collisions during state promotion.
     source.register_buffer("_ttrt_region_export_state_0", torch.tensor(99.0))
     attach_region_records(source, records)
     inputs = torch.tensor([1.0, 3.0])
@@ -165,7 +164,7 @@ def test_region_child_constants_do_not_overwrite_sibling_or_parent_state():
 def test_exporter_rejects_unqualified_region_paths(options):
     x = torch.randn(2, 3)
     source = _captured_module(_TwoOutputs().eval(), x)
-    with pytest.raises(region.RegionError, match="legacy exported_program"):
+    with pytest.raises(region_annotations.RegionError, match="legacy exported_program"):
         export(source, arg_inputs=(x,), **options)
 
 
@@ -202,7 +201,7 @@ def test_export_audits_region_clone_without_modifying_source(corruption, message
         if isinstance(module, torch.fx.GraphModule)
     }
     owners = [record.owner for record in get_region_records(source)]
-    with pytest.raises(region.RegionError, match=message):
+    with pytest.raises(region_annotations.RegionError, match=message):
         export(source, use_legacy_exporter=True)
 
     assert graphs == {

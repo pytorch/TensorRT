@@ -3,8 +3,8 @@
 Region annotations: PyTorch and custom kernels
 ==============================================
 
-``torch_tensorrt.region.execute_in_torch()`` marks a group of tensor operations
-that should stay together in PyTorch while eligible surrounding operations
+``torch_tensorrt.region_annotations.execute_in_torch()`` marks a group of tensor
+operations that should stay together in PyTorch while eligible surrounding operations
 compile to TensorRT. This experimental API is useful when you want to control
 placement for a particular part of a model, even if its operations have TensorRT
 converters. CUDA tensors remain on CUDA inside the region.
@@ -12,8 +12,8 @@ converters. CUDA tensors remain on CUDA inside the region.
 The optional ``backend`` selects how the region executes: ``"eager"`` runs its
 captured PyTorch operations normally, and ``"inductor"`` uses PyTorch Inductor.
 The default is ``"eager"``. Both choices keep the region outside TensorRT.
-``torch_tensorrt.region.fuse_in_plugin()`` instead replaces a region with a
-supplied custom kernel inside TensorRT, registering its plugin automatically.
+``torch_tensorrt.region_annotations.fuse_in_plugin()`` instead replaces a region
+with a supplied custom kernel inside TensorRT, registering its plugin automatically.
 
 This tutorial requires a CUDA device and a Torch-TensorRT installation targeting
 PyTorch 2.16 development builds. Capture currently uses private PyTorch APIs;
@@ -51,7 +51,7 @@ in PyTorch. Addition and multiplication remain eligible for TensorRT.
     class Model(torch.nn.Module):
         def forward(self, x):
             x = x + 1
-            with torch_tensorrt.region.execute_in_torch(name="activation"):
+            with torch_tensorrt.region_annotations.execute_in_torch(name="activation"):
                 x = torch.relu(x)
             return x * 2
 
@@ -112,7 +112,7 @@ For example, this region contains addition, ReLU, and multiplication:
     class InductorModel(torch.nn.Module):
         def forward(self, x, bias, scale):
             x = x + 1.0
-            with torch_tensorrt.region.execute_in_torch(backend="inductor"):
+            with torch_tensorrt.region_annotations.execute_in_torch(backend="inductor"):
                 x = x + bias
                 x = torch.relu(x)
                 x = x * scale
@@ -178,7 +178,7 @@ annotated computation. For the Triton kernel and launch callbacks defined in
 
 .. code-block:: python
 
-    with torch_tensorrt.region.fuse_in_plugin(
+    with torch_tensorrt.region_annotations.fuse_in_plugin(
         kernel=lambda: bias_relu_scale_kernel,
         constexprs={"BLOCK": BLOCK},
         grid=launch_grid,
@@ -246,7 +246,7 @@ A scope applies only to the operations captured inside it. For example, if
 
         def forward(self, x):
             x = self.block(x)
-            with torch_tensorrt.region.execute_in_torch():
+            with torch_tensorrt.region_annotations.execute_in_torch():
                 x = self.block(x)
             return self.block(x)
 
@@ -328,7 +328,7 @@ Inspect placement and measure performance
 ---------------------------------------------
 
 For compiler development, inspect ``compiled.graph`` and the internal manifest
-returned by ``torch_tensorrt.dynamo.regions.get_region_records(compiled)``.
+returned by ``torch_tensorrt.dynamo.region_compilation.get_region_records(compiled)``.
 For ``execute_in_torch``, capture extracts each region into a child FX graph,
 keeps it through decomposition, and makes it an opaque PyTorch call for
 partitioning. Audits check that graph rewrites preserve the child and keep it

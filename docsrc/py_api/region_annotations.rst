@@ -1,9 +1,9 @@
-.. _torch_tensorrt_region_py:
+.. _torch_tensorrt_region_annotations_py:
 
-torch_tensorrt.region
-=====================
+torch_tensorrt.region_annotations
+================================
 
-.. currentmodule:: torch_tensorrt.region
+.. currentmodule:: torch_tensorrt.region_annotations
 
 These experimental context managers choose how a selected group of model
 operations executes. Use direct ``torch_tensorrt.compile(..., ir="dynamo",

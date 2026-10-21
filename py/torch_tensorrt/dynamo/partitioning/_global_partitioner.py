@@ -315,7 +315,7 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
     def is_node_supported(
         self, submodules: Mapping[str, torch.nn.Module], node: torch.fx.Node
     ) -> bool:
-        from torch_tensorrt.dynamo.regions import is_torch_region_node
+        from torch_tensorrt.dynamo.region_compilation import is_torch_region_node
 
         node_name = ConverterRegistry.qualified_name_or_str(node.target)
 

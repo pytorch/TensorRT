@@ -511,7 +511,7 @@ def get_graph_converter_support_overview(
     """As get_graph_converter_support, but also returns the operator support object,
     which holds *which* operators are unsupported rather than just how many
     """
-    from torch_tensorrt.dynamo.regions import is_torch_region_node
+    from torch_tensorrt.dynamo.region_compilation import is_torch_region_node
 
     from ._global_partitioner import TorchTensorRTOperatorSupport
 

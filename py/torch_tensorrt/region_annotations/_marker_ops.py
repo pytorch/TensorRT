@@ -1,12 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES.
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Temporary scope markers, consumed before ordinary graph lowering.
-
-This module is imported by the owned compilation session before tracing. The
-private effect/annotation interfaces are required only when a region is used.
-Their absence must not prevent compilation of an unannotated model.
-"""
+"""Temporary scope markers, registered by the compilation session before tracing."""
 
 from typing import Optional
 
@@ -22,8 +17,7 @@ _LIBRARY.define("end(Tensor sentinel) -> ()")
 def _begin(
     name: str, backend: str = "eager", route: str = "torch", plugin: int = -1
 ) -> torch.Tensor:
-    # No tensor arguments means CPU-only dispatch is insufficient. A Composite
-    # implementation also prevents dependence on the model's current CUDA device.
+    # Composite dispatch handles this tensor-free call on any current device.
     return torch.empty((), dtype=torch.uint8, device="cpu")
 
 

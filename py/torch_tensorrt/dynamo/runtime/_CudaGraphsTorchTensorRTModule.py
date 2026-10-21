@@ -69,11 +69,11 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self._output_buffers: Any = None
         self.cudagraph: Optional[torch.cuda.CUDAGraph] = None
         self.use_output_allocator_outputs = False
-        self.shape_key: Optional[str] = None
+        self.shape_key: Optional[Tuple[Any, ...]] = None
         self._caller_stream: Optional[torch.cuda.Stream] = None
         self._engine_stream: Optional[torch.cuda.Stream] = None
         self._owned_pool_stream: Optional[torch.cuda.Stream] = None
-        from torch_tensorrt.dynamo.regions import get_region_records
+        from torch_tensorrt.dynamo.region_compilation import get_region_records
 
         self._has_torch_regions = any(
             record.route == "torch" for record in get_region_records(compiled_module)
@@ -91,9 +91,7 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             else torch.device("cuda", torch.cuda.current_device())
         )
         self._default_stream = torch.cuda.default_stream(self._target_device)
-        # Torch regions can initialize kernels or compile lazily for their
-        # execution context. Warm them with the real inputs/context/stream
-        # immediately before capture, avoiding duplicate constructor warmup.
+        # Region backends need real inputs and the caller's context for warmup.
         if not self._has_torch_regions:
             self.warm_up()
 
@@ -114,17 +112,13 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                 torch.cuda.current_stream().wait_stream(s)
 
     def validate_input_shapes(self, inputs: Sequence[torch.Tensor]) -> bool:
-        """
-        Validates the input shapes of the forward function has changed
-        And infer output shapes if dynamic input shape has changed.
-        """
-        # Representation of input shapes to a given model
-        # Shapes are concatenated as so:
-        # x: (3, 4), y: (4, 5) --> Key: (3,4)(4,5)
-        new_shape_key = "".join(str(tuple(t.shape)).replace(" ", "") for t in inputs)
+        """Invalidate capture when inputs need different buffers or kernels."""
+        new_shape_key = tuple((tuple(t.shape), t.dtype, t.device) for t in inputs)
 
         if new_shape_key != self.shape_key:
-            logger.debug(f"Input shape changed {self.shape_key} -> {new_shape_key}")
+            logger.debug(
+                "Input metadata changed %s -> %s", self.shape_key, new_shape_key
+            )
             self.shape_key = new_shape_key
             return True
 
@@ -198,10 +192,7 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                 "PyTorch regions must warm up before CUDA graph capture; "
                 "enable_cudagraphs cannot be entered inside another capture."
             )
-        # A previous capture may have used different grad/inference/autocast
-        # settings, inputs or stream. Eager kernels need initialization for the
-        # new context too, and Dynamo must finish any new compilation outside
-        # cuda.graph to avoid invalidating capture.
+        # Finish kernel initialization and lazy compilation outside CUDA capture.
         for _ in range(3):
             self.compiled_module(*args, **kwargs)
         assert self._engine_stream is not None
@@ -316,9 +307,7 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             if caller_on_default:
                 self._caller_stream.wait_stream(self._engine_stream)
 
-            # Replay updates captured tensors in place. Return independent
-            # tensor values while preserving the model's output pytree and
-            # non-Tensor constants, including one-element containers.
+            # Copy captured tensors while preserving the model's output structure.
             return tree_map(
                 lambda value: (
                     value.clone() if isinstance(value, torch.Tensor) else value

@@ -11,7 +11,7 @@ from typing import Any, Optional
 import torch
 from torch.fx.passes.utils.fuser_utils import erase_nodes, fuse_as_graphmodule
 
-from torch_tensorrt.region._constants import (
+from torch_tensorrt.region_annotations._constants import (
     BACKEND_KEY,
     NAME_KEY,
     PLUGIN_KEY,
@@ -19,7 +19,7 @@ from torch_tensorrt.region._constants import (
     SUPPORTED_BACKENDS,
     TOKEN_KEY,
 )
-from torch_tensorrt.region._errors import RegionCaptureError, RegionError
+from torch_tensorrt.region_annotations._errors import RegionCaptureError, RegionError
 
 from ._types import (
     HOP_SCHEMA_KEY,
@@ -27,7 +27,6 @@ from ._types import (
     RegionRecord,
     attach_region_records,
     audit_region_placement,
-    validate_region_settings,
 )
 
 logger = logging.getLogger(__name__)
@@ -151,10 +150,7 @@ def _functionalize_tensor_constructor_detaches(members: list[torch.fx.Node]) -> 
             and source.target == torch.ops.aten.lift_fresh_copy.default
             and set(source.users) == {node}
         ):
-            # Strict export implements torch.tensor literals with a fresh copy
-            # followed by detach_. No other user can observe this fresh tensor's
-            # metadata mutation, so an ordinary detach has the same semantics.
-            # Input/state detaches and all other mutations remain unsupported.
+            # A tensor literal's fresh, single-use copy can detach out of place.
             node.target = torch.ops.aten.detach.default
             changed = True
     return changed
@@ -171,9 +167,7 @@ def _reject_complex_regions(gm: torch.fx.GraphModule) -> None:
                 isinstance(value, torch.Tensor) and value.is_complex()
                 for value in torch.utils._pytree.tree_leaves(node.meta.get("val"))
             ):
-                # Both complex lowering paths transform the whole graph. Even
-                # complex work outside an otherwise real-valued region can
-                # change its boundary representation or inline its child.
+                # Whole-graph complex lowering cannot preserve region boundaries.
                 raise RegionCaptureError(
                     "Region capture currently does not support complex tensors "
                     "in a model containing nonempty regions; complex lowering "
@@ -182,7 +176,7 @@ def _reject_complex_regions(gm: torch.fx.GraphModule) -> None:
 
 
 def normalize_region_scopes(
-    ep: torch.export.ExportedProgram, settings: Any = None
+    ep: torch.export.ExportedProgram,
 ) -> torch.export.ExportedProgram:
     """Validate exact membership and replace scopes with durable HOP children."""
     gm = ep.graph_module
@@ -234,24 +228,14 @@ def normalize_region_scopes(
             if active is None or node.args != (active,):
                 raise RegionCaptureError("Unmatched or crossed region markers")
             token = custom.get(TOKEN_KEY)
-            name = active.args[0]
-            backend = (
-                active.args[1]
-                if len(active.args) > 1
-                else active.kwargs.get("backend", "eager")
-            )
+            boundary = dict(zip(("name", "backend", "route", "plugin"), active.args))
+            boundary.update(active.kwargs)
+            name = boundary["name"]
+            backend = boundary.get("backend", "eager")
             if backend not in SUPPORTED_BACKENDS:
                 raise RegionCaptureError(f"Unsupported region backend {backend!r}")
-            route = (
-                active.args[2]
-                if len(active.args) > 2
-                else active.kwargs.get("route", "torch")
-            )
-            plugin = (
-                active.args[3]
-                if len(active.args) > 3
-                else active.kwargs.get("plugin", -1)
-            )
+            route = boundary.get("route", "torch")
+            plugin = boundary.get("plugin", -1)
             if route not in ("torch", "plugin") or (route == "plugin" and plugin < 0):
                 raise RegionCaptureError("Invalid region plugin boundary")
             if not isinstance(token, int) or token in tokens:
@@ -317,9 +301,7 @@ def normalize_region_scopes(
                 f"Cannot extract region {region_id}: {error}"
             ) from error
         if route == "plugin":
-            # FX may sort an all-placeholder boundary by model argument order
-            # (including lifted parameters). Kernel pointers have a positional
-            # ABI: consistently use first encounter in the captured region.
+            # Kernel arguments follow first use in the region, not model argument order.
             ordered_inputs = tuple(
                 dict.fromkeys(
                     arg
@@ -342,12 +324,7 @@ def normalize_region_scopes(
         if functionalized_constructor:
             from torch.fx.passes.fake_tensor_prop import FakeTensorProp
 
-            # Export's tensor-literal metadata can alias the lifted constant even
-            # though lift_fresh_copy allocates fresh storage. Recompute metadata
-            # for this pure child so boundary checks see the true relationships
-            # of views derived from the constructor. Keep the refreshed values
-            # local: partially updating parent metadata would break its alias
-            # relationships with later scopes until decomposition recomputes it.
+            # Refresh stale literal aliases locally; decomposition updates the parent.
             fake_mode = torch._export.utils._detect_fake_mode_from_gm(child)
             output_metadata = FakeTensorProp(child, fake_mode).propagate(
                 *(node.meta["val"] for node in inputs)
@@ -384,8 +361,7 @@ def normalize_region_scopes(
         gm.add_submodule(child_name, child)
         with gm.graph.inserting_before(begin):
             body = gm.graph.get_attr(child_name)
-        # All live-ins have been produced by the last member. Validated extraction
-        # guarantees no external consumer has to run before this replacement.
+        # Insert after all live-ins are available, before any external consumer.
         with gm.graph.inserting_before(end):
             hop = gm.graph.call_function(
                 hints_wrapper,
@@ -417,11 +393,7 @@ def normalize_region_scopes(
     gm.graph.lint()
     gm.recompile()
     ep.validate()
-    if settings is not None:
-        validate_region_settings(settings, region_hop_records(gm))
-    # Export can copy a scope's annotations onto lifted constant placeholders,
-    # which remain in the parent after both live and dead scopes are extracted.
-    # Remove that transient provenance too, while retaining unrelated metadata.
+    # Lifted constant placeholders can also inherit the scope's transient tags.
     for node in gm.graph.nodes:
         node.meta = _without_capture_tags(node.meta)
     return ep
@@ -442,12 +414,10 @@ def materialize_regions(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
         child_name = f"_ttrt_torch_region_{len(records)}"
         while hasattr(gm, child_name):
             child_name += "_"
-        # The reference remains independent of subsequent parent rewriting.
-        reference = copy.deepcopy(child)
         route = hints.get("route", "torch")
         plugin_op = None
         if route == "plugin":
-            from torch_tensorrt.region._session import current_session
+            from torch_tensorrt.region_annotations._session import current_session
 
             from ._plugins import register_region_plugin
 
@@ -458,7 +428,7 @@ def materialize_regions(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
                     "fuse_in_plugin requires its owning compilation session"
                 )
             plugin_op = register_region_plugin(
-                reference, session.plugins[key], region_id=hints["region_id"]
+                child, session.plugins[key], region_id=hints["region_id"]
             )
         if route == "torch":
             child._torch_tensorrt_region_id = hints["region_id"]
@@ -505,7 +475,7 @@ def materialize_regions(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
                     n.name for n in child.graph.nodes if n.op == "placeholder"
                 ),
                 output_names=tuple(n.name for n in output.all_input_nodes),
-                reference=reference,
+                reference_graph=str(child.graph) if route == "torch" else None,
                 backend=hints.get("backend", "eager"),
                 route=route,
                 plugin_key=hints.get("plugin_key", -1),

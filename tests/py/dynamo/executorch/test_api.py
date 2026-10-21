@@ -350,8 +350,8 @@ def test_python_only_wheel_packages_the_executorch_export_ops(fx_frontend):
     selected = {Path(path).resolve() for path in command.get_source_files()}
     required = {
         _REPO_ROOT / "py/torch_tensorrt/dynamo/runtime/meta_ops/register_meta_ops.py",
-        _REPO_ROOT / "py/torch_tensorrt/region/__init__.py",
-        _REPO_ROOT / "py/torch_tensorrt/dynamo/regions/__init__.py",
+        _REPO_ROOT / "py/torch_tensorrt/region_annotations/__init__.py",
+        _REPO_ROOT / "py/torch_tensorrt/dynamo/region_compilation/__init__.py",
     }
     assert required <= selected, f"Python-only wheel omits {required - selected}"
 

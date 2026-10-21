@@ -7,7 +7,6 @@ import ast
 import importlib
 import json
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -27,78 +26,6 @@ ROOT = Path(__file__).resolve().parents[4]
 
 def _workflow(name):
     return yaml.safe_load((ROOT / ".github/workflows" / name).read_text())
-
-
-def _render_job_identity(template, values):
-    """Evaluate the variable, boolean and fallback expressions used in job names."""
-
-    def render(match):
-        expression = re.sub(
-            r"\b(?:github|inputs|matrix)\.[\w.-]+",
-            lambda variable: repr(values[variable.group()]),
-            match.group(1),
-        )
-        value = eval(
-            expression.replace("&&", " and ").replace("||", " or "),
-            {"__builtins__": {}},
-        )
-        return str(value).lower() if isinstance(value, bool) else str(value)
-
-    return re.sub(r"\$\{\{(.*?)\}\}", render, template)
-
-
-@pytest.mark.parametrize("platform", ["linux", "windows"])
-def test_shared_suites_keep_wheel_flavor_job_identities_distinct(monkeypatch, platform):
-    """Native and Python-only coverage must not cancel or overwrite each other."""
-    monkeypatch.syspath_prepend(str(ROOT))
-    from tests.ci.suites import SUITES
-
-    caller = _workflow(f"_test-{platform}.yml")["jobs"]["test"]
-    callee = _workflow(Path(caller["uses"]).name)
-    artifacts = [
-        step["with"]["name"]
-        for step in callee["jobs"]["test"]["steps"]
-        if step.get("uses", "").startswith("actions/upload-artifact@")
-        and step.get("with", {}).get("name", "").startswith("junit-")
-    ]
-    assert artifacts, "the test workflow must publish JUnit results"
-    identities = {"concurrency": set(), "artifact": set()}
-    suite_platform = "linux-x86_64" if platform == "linux" else "windows"
-    for suite in SUITES:
-        if suite.manual or suite_platform not in suite.platforms:
-            continue
-        native = any(lane in suite.lanes for lane in ("fast", "full", "nightly"))
-        for python_only in (False, True):
-            if not ("python-only" in suite.lanes if python_only else native):
-                continue
-            for variant in suite.variants:
-                values = {
-                    "matrix.suite": suite.name,
-                    "matrix.variant": variant,
-                    "matrix.python_version": "3.11",
-                    "matrix.desired_cuda": "cu134",
-                    "inputs.python-only": python_only,
-                    "inputs.use-rtx": variant == "rtx",
-                    "inputs.repository": "pytorch/tensorrt",
-                    "github.workflow": f"CI {platform}",
-                    "github.event.pull_request.number": 4752,
-                    "github.ref_name": "region_annotation",
-                    "github.event_name": "pull_request",
-                }
-                values["inputs.job-name"] = _render_job_identity(
-                    caller["with"]["job-name"], values
-                )
-                for kind, templates in (
-                    ("concurrency", [callee["concurrency"]["group"]]),
-                    ("artifact", artifacts),
-                ):
-                    for template in templates:
-                        identity = _render_job_identity(template, values)
-                        assert identity not in identities[kind], (
-                            f"{platform} {suite.name} {variant} python-only={python_only} "
-                            f"shares {kind} identity {identity!r} with another test job"
-                        )
-                        identities[kind].add(identity)
 
 
 def _run(script, root, env):

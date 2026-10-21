@@ -12,14 +12,19 @@ from torch._dynamo.testing import CompileCounterWithBackend
 from torch.utils._triton import has_triton
 
 import torch_tensorrt
-from torch_tensorrt import region
-from torch_tensorrt.dynamo.regions import normalize_region_scopes
-from torch_tensorrt.dynamo.regions._types import RegionRecord, attach_region_records
-from torch_tensorrt.dynamo.regions._validation import validate_region_mutations
+from torch_tensorrt import region_annotations
+from torch_tensorrt.dynamo.region_compilation import normalize_region_scopes
+from torch_tensorrt.dynamo.region_compilation._types import (
+    RegionRecord,
+    attach_region_records,
+)
+from torch_tensorrt.dynamo.region_compilation._validation import (
+    validate_region_mutations,
+)
 from torch_tensorrt.dynamo.runtime._CudaGraphsTorchTensorRTModule import (
     CudaGraphsTorchTensorRTModule,
 )
-from torch_tensorrt.region._session import RegionCompilationSession
+from torch_tensorrt.region_annotations._session import RegionCompilationSession
 from torch_tensorrt.runtime import _cudagraphs
 
 
@@ -51,11 +56,11 @@ class MutationModel(torch.nn.Module):
         if self.placement == "before":
             mutated.add_(1)
         if self.annotation == "live":
-            with region.execute_in_torch(backend=self.backend):
+            with region_annotations.execute_in_torch(backend=self.backend):
                 result = torch.relu(x + mutated)
         else:
             if self.annotation == "empty":
-                with region.execute_in_torch():
+                with region_annotations.execute_in_torch():
                     pass
             result = torch.relu(x + mutated)
         if self.placement == "after":
@@ -101,7 +106,7 @@ def test_public_compile_rejects_mutation_before_buffer_lifting(
 
     monkeypatch.setattr(_compiler, "lift_mutated_buffers", unexpected_lifting)
     model = MutationModel(target, placement, backend=backend).cuda().eval()
-    with pytest.raises(region.RegionError, match=f"mutation of {target}"):
+    with pytest.raises(region_annotations.RegionError, match=f"mutation of {target}"):
         torch_tensorrt.compile(
             model,
             inputs=[torch.randn(2, 8, device="cuda")],
@@ -170,8 +175,7 @@ def test_failed_cudagraph_entry_restores_mode_and_runtime_override(monkeypatch):
     monkeypatch.setattr(_cudagraphs, "CudaGraphsTorchTensorRTModule", failed_wrapper)
     compiled = torch.fx.symbolic_trace(torch.nn.ReLU())
     previous_mode = _cudagraphs._PY_RT_CUDAGRAPHS
-    # Exercise the same internal context with a strategy override on both
-    # regular TensorRT and RTX builds; no engine or CUDA device is needed.
+    # Test the strategy override without requiring an engine or CUDA.
     context = _cudagraphs._CudagraphsContextManager(
         compiled, cuda_graph_strategy="whole_graph_capture"
     )
@@ -223,15 +227,15 @@ def test_cudagraph_context_rejects_nested_self_entry_and_allows_reuse(monkeypatc
 
 class InductorRegion(torch.nn.Module):
     def forward(self, x):
-        with region.execute_in_torch(backend="inductor"):
+        with region_annotations.execute_in_torch(backend="inductor"):
             return torch.relu(x + 0.25) * 2
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required")
-def test_eager_region_cudagraph_recaptures_and_warms_up_autocast():
+def test_eager_region_cudagraph_recaptures_for_autocast_and_dtype():
     class Matmul(torch.nn.Module):
         def forward(self, x, y):
-            with region.execute_in_torch():
+            with region_annotations.execute_in_torch():
                 return x @ y
 
     x, y = (torch.randn(8, 8, device="cuda") for _ in range(2))
@@ -263,19 +267,22 @@ def test_eager_region_cudagraph_recaptures_and_warms_up_autocast():
         ):
             assert not executions
             previous_graph = None
-            for autocast in (False, True, False):
+            for dtype, autocast in (
+                (torch.float32, False),
+                (torch.float32, True),
+                (torch.float32, False),
+                (torch.float64, False),
+            ):
+                value, weight = x.to(dtype), y.to(dtype)
                 with torch.autocast("cuda", enabled=autocast, dtype=torch.float16):
                     start = len(executions)
-                    result = wrapped(x, y)
-                    torch.testing.assert_close(result, model(x, y))
-                    assert result.dtype == (
-                        torch.float16 if autocast else torch.float32
-                    )
+                    result = wrapped(value, weight)
+                    torch.testing.assert_close(result, model(value, weight))
+                    assert result.dtype == (torch.float16 if autocast else dtype)
                     assert wrapped.cudagraph is not previous_graph
                     previous_graph = wrapped.cudagraph
                     calls = executions[start:]
-                    # Kernel initialization runs on the chosen capture stream
-                    # in the new autocast context, before the captured call.
+                    # Warmup must use the capture stream and autocast context.
                     assert len(calls) > 1 and calls[-1][0]
                     assert not any(capturing for capturing, _, _ in calls[:-1])
                     assert all(enabled == autocast for _, enabled, _ in calls)
@@ -284,7 +291,9 @@ def test_eager_region_cudagraph_recaptures_and_warms_up_autocast():
                         for _, _, stream in calls
                     )
                     count = len(executions)
-                    torch.testing.assert_close(wrapped(x + 1, y), model(x + 1, y))
+                    torch.testing.assert_close(
+                        wrapped(value + 1, weight), model(value + 1, weight)
+                    )
                     assert wrapped.cudagraph is previous_graph
                     assert len(executions) == count
     finally:
@@ -328,8 +337,7 @@ def test_inductor_cudagraph_warms_up_actual_context_and_stream(
             min_block_size=1,
             use_fast_partitioner=use_fast_partitioner,
         )
-        # Context entry must remain lazy. Real calls exercise different Dynamo
-        # specializations and must compile BEFORE stream capture.
+        # Compile lazily in the caller's context, before stream capture.
         with torch_tensorrt.runtime.enable_cudagraphs(compiled) as wrapped:
             assert isinstance(wrapped, CudaGraphsTorchTensorRTModule)
             assert counter.frame_count == 0
@@ -349,6 +357,12 @@ def test_inductor_cudagraph_warms_up_actual_context_and_stream(
                     torch.testing.assert_close(wrapped(x + 2), model(x + 2))
                     assert wrapped.cudagraph is not graph
                 caller.wait_stream(stream)
+                torch.testing.assert_close(wrapped(x + 3), model(x + 3))
+                graph = wrapped.cudagraph
+                result = wrapped(x.double())
+                torch.testing.assert_close(result, model(x.double()))
+                assert result.dtype == torch.float64
+                assert wrapped.cudagraph is not graph
         assert wrapped.cudagraph is None
         assert compiler_capture_states and not any(compiler_capture_states)
         assert counter.frame_count >= 2
@@ -361,7 +375,7 @@ def test_inductor_cudagraph_warms_up_actual_context_and_stream(
 def test_region_cudagraph_preserves_output_pytree_and_previous_results(nested):
     class StructuredOutputs(torch.nn.Module):
         def forward(self, x):
-            with region.execute_in_torch():
+            with region_annotations.execute_in_torch():
                 activated = torch.relu(x)
                 gated = torch.sigmoid(x)
             if nested:

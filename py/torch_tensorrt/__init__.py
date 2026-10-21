@@ -89,7 +89,7 @@ from torch_tensorrt._enums import (  # noqa: F401
     dtype,
     memory_format,
 )
-from torch_tensorrt._Input import Input  # noqa: F401
+from torch_tensorrt._Input import Input as Input  # noqa: F401
 from torch_tensorrt.runtime import *  # noqa: F403
 
 if ENABLED_FEATURES.torchscript_frontend:
@@ -99,7 +99,7 @@ if ENABLED_FEATURES.fx_frontend:
     from torch_tensorrt import fx
 
 if ENABLED_FEATURES.dynamo_frontend:
-    from torch_tensorrt import dynamo, region  # noqa: F401
+    from torch_tensorrt import dynamo, region_annotations  # noqa: F401
     from torch_tensorrt.dynamo import backend  # noqa: F401
 
 if ENABLED_FEATURES.qdp_plugin:

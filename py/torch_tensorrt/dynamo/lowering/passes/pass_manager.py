@@ -137,7 +137,7 @@ class DynamoPassManager(PassManager):  # type: ignore[misc]
             ), f"{name} is not a valid pass! Passes: {pass_names_str}"
 
     def __call__(self, gm: Any, settings: CompilationSettings) -> Any:
-        from torch_tensorrt.dynamo.regions import (
+        from torch_tensorrt.dynamo.region_compilation import (
             RegionError,
             attach_region_records,
             audit_region_placement,
@@ -155,8 +155,7 @@ class DynamoPassManager(PassManager):  # type: ignore[misc]
         )
         for _pass in self.passes:
             out = _pass(out, settings)
-            # Only the pre-decomposition parent carries region HOPs. Ordinary
-            # graphs and materialized PyTorch children need no per-pass HOP scan.
+            # HOP checks apply only before regions become ordinary module calls.
             if captured_regions and captured_regions != [
                 record.capture_signature for record in region_hop_records(out)
             ]:

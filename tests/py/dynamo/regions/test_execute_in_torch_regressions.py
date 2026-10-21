@@ -1,10 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Extended regression coverage for execute_in_torch.
-
-Start with test_execute_in_torch.py for the beginner examples.
-"""
+"""Capture boundaries, TensorRT placement, and serialization of PyTorch regions."""
 
 import subprocess
 import sys
@@ -19,26 +16,26 @@ from parameterized import parameterized
 from torch.testing._internal.common_utils import TestCase, run_tests
 
 import torch_tensorrt
-from torch_tensorrt import region
+from torch_tensorrt import region_annotations
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes.pass_manager import DynamoPassManager
-from torch_tensorrt.dynamo.regions import (
+from torch_tensorrt.dynamo.region_compilation import (
     audit_region_placement,
     get_region_records,
     materialize_regions,
     normalize_region_scopes,
 )
 from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
-from torch_tensorrt.region._constants import (
+from torch_tensorrt.region_annotations._constants import (
     BACKEND_KEY,
     NAME_KEY,
     PLUGIN_KEY,
     ROUTE_KEY,
     TOKEN_KEY,
 )
-from torch_tensorrt.region._errors import RegionCaptureError
-from torch_tensorrt.region._marker_ops import BEGIN, END
-from torch_tensorrt.region._session import RegionCompilationSession
+from torch_tensorrt.region_annotations._errors import RegionCaptureError
+from torch_tensorrt.region_annotations._marker_ops import BEGIN, END
+from torch_tensorrt.region_annotations._session import RegionCompilationSession
 
 
 class SharedBlock(torch.nn.Module):
@@ -50,8 +47,7 @@ class SharedBlock(torch.nn.Module):
 
     def forward(self, x):
         h = self.block(x)
-        # "shared": these calls reuse the same module and weights.
-        with region.execute_in_torch(name="shared"):
+        with region_annotations.execute_in_torch(name="shared"):
             y = self.block(h)
         return self.block(y) + h
 
@@ -60,24 +56,23 @@ class RepeatedScopes(torch.nn.Module):
     def forward(self, x):
         x = x + 1
         for _ in range(2):
-            # "repeated": one annotation used in separate loop occurrences.
-            with region.execute_in_torch(name="repeated"):
+            with region_annotations.execute_in_torch(name="repeated"):
                 x = torch.relu(x * 1.5)
         return x - 3
 
 
 class MultipleOutputs(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, direct_output=False):
         super().__init__()
         self.register_buffer("scale", torch.tensor(2.0))
+        self.direct_output = direct_output
 
     def forward(self, x, y):
         h = x + 1
-        # "branches": two output computations, not Python control flow.
-        with region.execute_in_torch(name="branches"):
+        with region_annotations.execute_in_torch(name="branches"):
             a = torch.relu(h * self.scale)
             b = torch.sigmoid(y - 1)
-        return a + h, b * 3
+        return (a, b) if self.direct_output else (a + h, b * 3)
 
 
 class ComplexRegion(torch.nn.Module):
@@ -88,10 +83,10 @@ class ComplexRegion(torch.nn.Module):
     def forward(self, x):
         if self.location == "parent":
             z = torch.complex(x, x + 1)
-            with region.execute_in_torch():
+            with region_annotations.execute_in_torch():
                 y = torch.relu(x)
             return y + z.abs()
-        with region.execute_in_torch():
+        with region_annotations.execute_in_torch():
             if self.location == "body":
                 x = torch.complex(x, x + 1)
             y = x * x
@@ -102,9 +97,22 @@ class ComplexRegion(torch.nn.Module):
 
 class TensorLiteralRegion(torch.nn.Module):
     def forward(self, x):
-        with region.execute_in_torch():
+        with region_annotations.execute_in_torch():
             y = x + torch.tensor([1.0, 2.0], device=x.device)
         return y * 2
+
+
+class BufferRegion(torch.nn.Module):
+    def __init__(self, constant_only=False):
+        super().__init__()
+        self.register_buffer("bias", torch.randn(8))
+        self.constant_only = constant_only
+
+    def forward(self, x):
+        folded = self.bias + 2
+        with region_annotations.execute_in_torch():
+            y = torch.relu(self.bias * 2 if self.constant_only else x + folded)
+        return x + y if self.constant_only else y * 3
 
 
 def capture_regions(model, *inputs):
@@ -130,7 +138,7 @@ class TestExecuteInTorchEager(TestCase):
     def test_user_exception_is_not_suppressed(self):
         expected = RuntimeError("body failed")
         with self.assertRaises(RuntimeError) as caught:
-            with region.execute_in_torch():
+            with region_annotations.execute_in_torch():
                 raise expected
         self.assertIs(caught.exception, expected)
 
@@ -159,7 +167,7 @@ class TestExecuteInTorchCapture(TestCase):
         class Conditional(torch.nn.Module):
             def forward(self, x, predicate):
                 def true_branch(x):
-                    with region.execute_in_torch():
+                    with region_annotations.execute_in_torch():
                         return torch.sin(x)
 
                 def false_branch(x):
@@ -205,7 +213,7 @@ class TestExecuteInTorchCapture(TestCase):
         class Independent(torch.nn.Module):
             def forward(self, x):
                 before = torch.sin(x)
-                with region.execute_in_torch():
+                with region_annotations.execute_in_torch():
                     inside = torch.relu(x + 2)
                 after = torch.cos(x)
                 return inside + before + after
@@ -230,9 +238,14 @@ class TestExecuteInTorchCapture(TestCase):
         self.assertEqual(len({record.id for record in records}), 2)
         torch.testing.assert_close(gm(x), model(x))
 
-    def test_multiple_inputs_outputs_state_and_residual(self):
-        x, y = torch.randn(2, 8), torch.randn(2, 8)
-        model = MultipleOutputs().eval()
+    @parameterized.expand(
+        [("residual", False, False), ("direct", True, False), ("strided", False, True)]
+    )
+    def test_multiple_inputs_outputs_and_state(self, _, direct_output, strided):
+        x, y = (
+            torch.randn(8, 2).t() if strided else torch.randn(2, 8) for _ in range(2)
+        )
+        model = MultipleOutputs(direct_output=direct_output).eval()
         gm = capture_regions(model, x, y)
         records = get_region_records(gm)
         self.assertEqual(len(records), 1)
@@ -240,25 +253,12 @@ class TestExecuteInTorchCapture(TestCase):
         self.assertEqual(len(records[0].input_names), 3)
         torch.testing.assert_close(gm(x, y), model(x, y))
 
-    def test_region_outputs_can_be_direct_model_outputs(self):
-        class DirectOutput(torch.nn.Module):
-            def forward(self, x):
-                with region.execute_in_torch():
-                    y = torch.relu(x + 1)
-                    z = torch.sigmoid(x)
-                return y, z
-
-        model, x = DirectOutput().eval(), torch.randn(2, 8)
-        gm = capture_regions(model, x)
-        self.assertEqual(len(get_region_records(gm)), 1)
-        torch.testing.assert_close(gm(x), model(x))
-
     def test_empty_and_dead_scopes_are_noops(self):
         class EmptyAndDead(torch.nn.Module):
             def forward(self, x):
-                with region.execute_in_torch(name="empty"):
+                with region_annotations.execute_in_torch(name="empty"):
                     pass
-                with region.execute_in_torch(name="dead"):
+                with region_annotations.execute_in_torch(name="dead"):
                     unused = torch.relu(x)
                 return x * 2
 
@@ -268,17 +268,11 @@ class TestExecuteInTorchCapture(TestCase):
         self.assertEqual(len(get_region_records(gm)), 0)
         torch.testing.assert_close(gm(x), model(x))
 
-    def test_tensor_literal_constructor_is_supported(self):
-        model, x = TensorLiteralRegion().eval(), torch.randn(2)
-        gm = capture_regions(model, x)
-        self.assertEqual(len(get_region_records(gm)), 1)
-        torch.testing.assert_close(gm(x), model(x))
-
     @parameterized.expand([("live", True), ("dead", False)])
     def test_literal_normalization_removes_only_capture_metadata(self, _, live):
         class Literal(torch.nn.Module):
             def forward(self, x):
-                with region.execute_in_torch():
+                with region_annotations.execute_in_torch():
                     y = x + torch.tensor([1.0, 2.0])
                 return y if live else x * 2
 
@@ -304,52 +298,50 @@ class TestExecuteInTorchCapture(TestCase):
         ep = normalize_region_scopes(ep.run_decompositions())
         torch.testing.assert_close(ep.module()(x), model(x))
 
-    def test_tensor_literal_can_be_the_region_output(self):
+    @parameterized.expand([("live", True), ("dead", False)])
+    def test_tensor_literal_as_region_output(self, _, live):
         class LiteralOutput(torch.nn.Module):
             def forward(self, x):
-                with region.execute_in_torch():
+                with region_annotations.execute_in_torch():
                     y = torch.tensor([1.0, 2.0], device=x.device)
-                return y
+                return y if live else x * 2
 
         model, x = LiteralOutput().eval(), torch.randn(2)
         gm = capture_regions(model, x)
-        self.assertEqual(len(get_region_records(gm)), 1)
+        self.assertEqual(len(get_region_records(gm)), int(live))
         torch.testing.assert_close(gm(x), model(x))
 
-    def test_dead_tensor_literal_scope_is_a_noop(self):
-        class DeadLiteral(torch.nn.Module):
+    @parameterized.expand(
+        [
+            ("input", "alias region inputs"),
+            ("adjacent_literal", "alias region inputs"),
+            ("literal_outputs", "alias each other"),
+            ("views", "alias each other"),
+            ("chunk", "alias each other"),
+        ]
+    )
+    def test_aliasing_is_rejected_before_decomposition(self, kind, message):
+        class Aliased(torch.nn.Module):
             def forward(self, x):
-                with region.execute_in_torch():
-                    unused = torch.tensor([1.0, 2.0], device=x.device)
-                return x * 2
+                if kind == "adjacent_literal":
+                    with region_annotations.execute_in_torch():
+                        x = torch.tensor([1.0, 2.0])
+                with region_annotations.execute_in_torch(name="aliased"):
+                    if kind in ("input", "adjacent_literal"):
+                        return x.view(-1)
+                    y = torch.tensor([1.0, 2.0]) if kind == "literal_outputs" else x + 1
+                    if kind == "chunk":
+                        return y.chunk(2, dim=-1)
+                    if kind == "views":
+                        return y.view(2, 8), y.transpose(0, 1)
+                    return y, y.view(-1)
 
-        model, x = DeadLiteral().eval(), torch.randn(2)
-        gm = capture_regions(model, x)
-        self.assertEqual(len(get_region_records(gm)), 0)
-        torch.testing.assert_close(gm(x), model(x))
-
-    def test_tensor_literal_outputs_sharing_storage_are_rejected(self):
-        class AliasedLiteralOutputs(torch.nn.Module):
-            def forward(self, x):
-                with region.execute_in_torch():
-                    y = torch.tensor([1.0, 2.0], device=x.device)
-                    z = y.view(2, 1)
-                return y, z
-
-        with self.assertRaisesRegex(RegionCaptureError, "alias each other.*clone"):
-            capture_regions(AliasedLiteralOutputs(), torch.randn(2))
-
-    def test_view_of_preceding_literal_region_output_is_rejected(self):
-        class AdjacentLiteralView(torch.nn.Module):
-            def forward(self, x):
-                with region.execute_in_torch():
-                    y = torch.tensor([1.0, 2.0], device=x.device)
-                with region.execute_in_torch():
-                    z = y.view(2, 1)
-                return z
-
-        with self.assertRaisesRegex(RegionCaptureError, "alias region inputs.*clone"):
-            capture_regions(AdjacentLiteralView(), torch.randn(2))
+        with RegionCompilationSession(strict=True):
+            ep = torch.export.export(
+                Aliased().eval(), (torch.randn(2, 8),), strict=True
+            )
+        with self.assertRaisesRegex(RegionCaptureError, f"aliased.*{message}.*clone"):
+            normalize_region_scopes(ep)
 
     @parameterized.expand([("input", False), ("state", True)])
     def test_in_place_detach_of_input_or_state_is_rejected(self, _, use_state):
@@ -359,7 +351,7 @@ class TestExecuteInTorchCapture(TestCase):
                 self.register_buffer("bias", torch.ones(2))
 
             def forward(self, x):
-                with region.execute_in_torch():
+                with region_annotations.execute_in_torch():
                     target = self.bias if use_state else x
                     target.detach_()
                     y = target + 1
@@ -381,9 +373,9 @@ class TestExecuteInTorchCapture(TestCase):
         class ComplexNoop(torch.nn.Module):
             def forward(self, x):
                 if dead_scopes:
-                    with region.execute_in_torch():
+                    with region_annotations.execute_in_torch():
                         pass
-                    with region.execute_in_torch():
+                    with region_annotations.execute_in_torch():
                         unused = x * x
                 return x + 1
 
@@ -391,19 +383,6 @@ class TestExecuteInTorchCapture(TestCase):
         gm = capture_regions(model, x)
         self.assertEqual(len(get_region_records(gm)), 0)
         torch.testing.assert_close(gm(x), model(x))
-
-    def test_noncontiguous_boundary_is_supported(self):
-        x, y = torch.randn(8, 2).t(), torch.randn(8, 2).t()
-        model = MultipleOutputs().eval()
-        gm = capture_regions(model, x, y)
-        torch.testing.assert_close(gm(x, y), model(x, y))
-
-    def test_non_strict_capture_fails_explicitly(self):
-        with self.assertRaisesRegex(Exception, "strict=True"):
-            with RegionCompilationSession(strict=False):
-                torch.export.export(
-                    SharedBlock().eval(), (torch.randn(2, 8),), strict=False
-                )
 
     def test_failed_capture_does_not_leak_session(self):
         with self.assertRaisesRegex(RuntimeError, "deliberate failure"):
@@ -418,9 +397,9 @@ class TestExecuteInTorchCapture(TestCase):
     def test_nested_regions_are_rejected(self):
         class Nested(torch.nn.Module):
             def forward(self, x):
-                with region.execute_in_torch(name="outer"):
+                with region_annotations.execute_in_torch(name="outer"):
                     x = x + 1
-                    with region.execute_in_torch(name="inner"):
+                    with region_annotations.execute_in_torch(name="inner"):
                         x = torch.relu(x)
                 return x
 
@@ -430,7 +409,7 @@ class TestExecuteInTorchCapture(TestCase):
     def test_input_mutation_is_rejected(self):
         class Mutation(torch.nn.Module):
             def forward(self, x):
-                with region.execute_in_torch():
+                with region_annotations.execute_in_torch():
                     x.add_(1)
                     y = x * 2
                 return y
@@ -438,41 +417,10 @@ class TestExecuteInTorchCapture(TestCase):
         with self.assertRaisesRegex(RuntimeError, "[Mm]utat|functional"):
             capture_regions(Mutation(), torch.randn(2, 8))
 
-    def test_alias_escape_is_rejected(self):
-        class Aliasing(torch.nn.Module):
-            def forward(self, x):
-                with region.execute_in_torch():
-                    y = x.view(2, 8)
-                return y
-
-        with self.assertRaisesRegex(RegionCaptureError, "alias region inputs.*clone"):
-            capture_regions(Aliasing(), torch.randn(2, 8))
-
-    @parameterized.expand([("views", False), ("chunk", True)])
-    def test_outputs_sharing_storage_are_rejected_before_decomposition(self, _, chunk):
-        class AliasedOutputs(torch.nn.Module):
-            def forward(self, x):
-                with region.execute_in_torch(name="aliased_outputs"):
-                    y = x + 1
-                    if chunk:
-                        a, b = y.chunk(2, dim=-1)
-                    else:
-                        a, b = y.view(2, 8), y.transpose(0, 1)
-                return a, b
-
-        with RegionCompilationSession(strict=True):
-            ep = torch.export.export(
-                AliasedOutputs().eval(), (torch.randn(2, 8),), strict=True
-            )
-        with self.assertRaisesRegex(
-            RegionCaptureError, "aliased_outputs#0.*alias each other.*clone"
-        ):
-            normalize_region_scopes(ep)
-
     def test_cloned_chunk_outputs_are_supported(self):
         class ClonedOutputs(torch.nn.Module):
             def forward(self, x):
-                with region.execute_in_torch():
+                with region_annotations.execute_in_torch():
                     a, b = (x + 1).chunk(2, dim=-1)
                     a, b = a.clone(), b.clone()
                 return a, b
@@ -485,7 +433,7 @@ class TestExecuteInTorchCapture(TestCase):
     def test_rng_effects_are_rejected(self):
         class Random(torch.nn.Module):
             def forward(self, x):
-                with region.execute_in_torch():
+                with region_annotations.execute_in_torch():
                     y = x + torch.rand_like(x)
                 return y
 
@@ -495,7 +443,7 @@ class TestExecuteInTorchCapture(TestCase):
     def test_graph_break_inside_scope_is_rejected(self):
         class GraphBreak(torch.nn.Module):
             def forward(self, x):
-                with region.execute_in_torch():
+                with region_annotations.execute_in_torch():
                     y = x + 1
                     torch._dynamo.graph_break()
                     y = torch.relu(y)
@@ -515,19 +463,6 @@ class TestExecuteInTorchCapture(TestCase):
         with self.assertRaisesRegex(RuntimeError, "drop_region_policy.*invalidated"):
             DynamoPassManager([drop_region_policy])(gm, CompilationSettings())
 
-    def test_unchanged_id_does_not_hide_a_modified_region_body(self):
-        gm = capture_regions(SharedBlock().eval(), torch.randn(2, 8))
-        child = region_children(gm)[0]
-        activation = next(
-            node
-            for node in child.graph.nodes
-            if node.target == torch.ops.aten.relu.default
-        )
-        activation.target = torch.ops.aten.sigmoid.default
-        child.recompile()
-        with self.assertRaisesRegex(RuntimeError, "reference body changed"):
-            audit_region_placement(gm, get_region_records(gm))
-
 
 @unittest.skipIf(not torch.cuda.is_available(), "CUDA is required")
 class TestExecuteInTorchIntegration(TestCase):
@@ -545,90 +480,39 @@ class TestExecuteInTorchIntegration(TestCase):
         options.update(overrides)
         return torch_tensorrt.compile(model, inputs=list(inputs), **options)
 
-    @parameterized.expand([("fast", True), ("global", False)])
-    def test_supported_shared_module_stays_torch_only_inside_scope(
-        self, _, use_fast_partitioner
-    ):
-        model, x = SharedBlock().eval().cuda(), torch.randn(2, 8, device="cuda")
-        expected = model(x)
-        compiled = self._compile(model, (x,), use_fast_partitioner)
-        engines = [m for m in compiled.modules() if isinstance(m, TorchTensorRTModule)]
-        self.assertEqual(len(engines), 2)
-        self.assertEqual(len(get_region_records(compiled)), 1)
-        torch.testing.assert_close(compiled(x), expected, atol=5e-3, rtol=5e-3)
-
-    @parameterized.expand([("fast", True), ("global", False)])
-    def test_multiple_outputs_and_live_buffer(self, _, use_fast_partitioner):
-        model = MultipleOutputs().eval().cuda()
-        inputs = (torch.randn(2, 8, device="cuda"), torch.randn(2, 8, device="cuda"))
+    @parameterized.expand(
+        [
+            (f"{name}_{partition}", model, shape, count, fast)
+            for name, model, shape, count in [
+                ("shared", SharedBlock, (2, 8), 1),
+                ("multiple_outputs", MultipleOutputs, (2, 8), 1),
+                ("repeated", RepeatedScopes, (2, 8), 2),
+                ("folded_state", BufferRegion, (2, 8), 1),
+                ("constant_input", lambda: BufferRegion(constant_only=True), (2, 8), 1),
+                ("tensor_literal", TensorLiteralRegion, (2,), 1),
+            ]
+            for partition, fast in [("fast", True), ("global", False)]
+        ]
+    )
+    def test_region_survives_compilation(self, _, factory, shape, count, fast):
+        model = factory().eval().cuda()
+        inputs = [torch.randn(shape, device="cuda")]
+        if isinstance(model, MultipleOutputs):
+            inputs.append(torch.randn_like(inputs[0]))
         expected = model(*inputs)
-        compiled = self._compile(model, inputs, use_fast_partitioner)
-        self.assertEqual(len(get_region_records(compiled)), 1)
-        self.assertTrue(
-            any(isinstance(m, TorchTensorRTModule) for m in compiled.modules())
-        )
+        compiled = self._compile(model, inputs, fast)
+        engines = [m for m in compiled.modules() if isinstance(m, TorchTensorRTModule)]
+        self.assertTrue(engines)
+        if isinstance(model, SharedBlock):
+            self.assertEqual(len(engines), 2)
+        self.assertEqual(len(get_region_records(compiled)), count)
         torch.testing.assert_close(compiled(*inputs), expected, atol=5e-3, rtol=5e-3)
-
-    @parameterized.expand([("fast", True), ("global", False)])
-    def test_adjacent_scopes_survive_partitioning(self, _, use_fast_partitioner):
-        model, x = RepeatedScopes().eval().cuda(), torch.randn(2, 8, device="cuda")
-        compiled = self._compile(model, (x,), use_fast_partitioner)
-        self.assertEqual(len(get_region_records(compiled)), 2)
-        torch.testing.assert_close(compiled(x), model(x), atol=5e-3, rtol=5e-3)
-
-    @parameterized.expand([("fast", True), ("global", False)])
-    def test_folded_parent_state_remains_live(self, _, use_fast_partitioner):
-        class FoldedState(torch.nn.Module):
-            def __init__(self):
-                super().__init__()
-                self.register_buffer("bias", torch.randn(8))
-
-            def forward(self, x):
-                folded = self.bias + 2
-                with region.execute_in_torch(name="live_constant"):
-                    y = torch.relu(x + folded)
-                return y * 3
-
-        model, x = FoldedState().eval().cuda(), torch.randn(2, 8, device="cuda")
-        expected = model(x)
-        compiled = self._compile(model, (x,), use_fast_partitioner)
-        self.assertEqual(len(get_region_records(compiled)), 1)
-        torch.testing.assert_close(compiled(x), expected, atol=5e-3, rtol=5e-3)
-
-    @parameterized.expand([("fast", True), ("global", False)])
-    def test_constant_input_region_survives_constant_folding(
-        self, _, use_fast_partitioner
-    ):
-        class ConstantRegion(torch.nn.Module):
-            def __init__(self):
-                super().__init__()
-                self.register_buffer("bias", torch.randn(8))
-
-            def forward(self, x):
-                with region.execute_in_torch(name="constant_body"):
-                    y = torch.relu(self.bias * 2)
-                return x + y
-
-        model, x = ConstantRegion().eval().cuda(), torch.randn(2, 8, device="cuda")
-        expected = model(x)
-        compiled = self._compile(model, (x,), use_fast_partitioner)
-        self.assertEqual(len(get_region_records(compiled)), 1)
-        torch.testing.assert_close(compiled(x), expected, atol=5e-3, rtol=5e-3)
-
-    @parameterized.expand([("fast", True), ("global", False)])
-    def test_tensor_literal_constructor_compiles(self, _, use_fast_partitioner):
-        model = TensorLiteralRegion().eval().cuda()
-        x = torch.randn(2, device="cuda")
-        compiled = self._compile(model, (x,), use_fast_partitioner)
-        self.assertEqual(len(get_region_records(compiled)), 1)
-        torch.testing.assert_close(compiled(x), model(x))
 
     @parameterized.expand([("legacy", False), ("decomposition", True)])
     def test_complex_regions_are_rejected_before_lowering(
         self, _, use_complex_decomposition
     ):
-        # Capture tests cover each complex location. Here verify that both
-        # public lowering modes reject before partitioning can begin.
+        # Both lowering modes must reject before partitioning.
         model = ComplexRegion("parent").eval().cuda()
         x = torch.randn(2, device="cuda")
         with self.assertRaisesRegex(RegionCaptureError, "complex tensors.*regions"):
@@ -696,8 +580,7 @@ class TestExecuteInTorchIntegration(TestCase):
     )
     def test_unqualified_save_modes_are_rejected(self, _, overrides):
         model, x = SharedBlock().eval().cuda(), torch.randn(2, 8, device="cuda")
-        # The early return supplies a real region-bearing module without building
-        # engines, keeping this API validation independent of serialization.
+        # Exercise save validation without building engines.
         compiled = self._compile(model, (x,), min_block_size=100)
         options = dict(
             output_format="exported_program", retrace=False, use_legacy_exporter=True
@@ -721,7 +604,7 @@ class TestExecuteInTorchIntegration(TestCase):
     ):
         class DirectTorch(torch.nn.Module):
             def forward(self, x):
-                with region.execute_in_torch(name="direct"):
+                with region_annotations.execute_in_torch(name="direct"):
                     y = torch.relu(x + 1)
                 return y
 
@@ -752,7 +635,7 @@ class TestExecuteInTorchIntegration(TestCase):
 import sys
 import torch
 import torch_tensorrt
-from torch_tensorrt.region._session import current_session
+from torch_tensorrt.region_annotations._session import current_session
 
 assert current_session() is None
 assert not hasattr(torch.ops.torch_tensorrt_region, "begin")

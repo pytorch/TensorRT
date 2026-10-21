@@ -4,13 +4,14 @@
 from __future__ import annotations
 
 from contextvars import ContextVar, Token
+from functools import partial
 from types import TracebackType
 from typing import TYPE_CHECKING, Optional
 
 from ._errors import RegionCaptureError
 
 if TYPE_CHECKING:
-    from ._plugin import PluginSpec
+    from torch_tensorrt.kernels import KernelSpec
 
 _CURRENT_SESSION: ContextVar[Optional[RegionCompilationSession]] = ContextVar(
     "torch_tensorrt_region_session", default=None
@@ -18,17 +19,12 @@ _CURRENT_SESSION: ContextVar[Optional[RegionCompilationSession]] = ContextVar(
 
 
 class RegionCompilationSession:
-    """Enable region capture only for an owned trace/compilation attempt.
-
-    The compiler enters this context before export and keeps it until compilation
-    ends. Marker registration happens outside tracing; ordinary eager imports do
-    not register operators. Tokens and occurrence IDs are never allocated here.
-    """
+    """Own marker registration and kernel definitions from export to compilation."""
 
     def __init__(self, *, strict: bool) -> None:
         self.strict = strict
         self.capture_error: Optional[str] = None
-        self.plugins: dict[int, PluginSpec] = {}
+        self.plugins: dict[int, KernelSpec | partial[None]] = {}
         self._context_token: Optional[Token[Optional[RegionCompilationSession]]] = None
 
     def __enter__(self) -> RegionCompilationSession:
@@ -54,10 +50,6 @@ class RegionCompilationSession:
             raise RegionCaptureError("A region compilation session was not entered")
         _CURRENT_SESSION.reset(token)
         self._context_token = None
-
-    @staticmethod
-    def current() -> Optional[RegionCompilationSession]:
-        return _CURRENT_SESSION.get()
 
 
 def current_session() -> Optional[RegionCompilationSession]:
