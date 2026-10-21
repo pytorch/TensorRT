@@ -12,6 +12,7 @@ from typing import Any, Container, Iterable, List, Optional, Set, final
 
 import torch
 import torch.fx
+from executorch.exir._serialize._cord import FileBackedData
 from executorch.exir._serialize._named_data_store import NamedDataStore
 from executorch.exir.backend.backend_details import (
     BackendDetails,
@@ -32,7 +33,7 @@ from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
     TARGET_PLATFORM_IDX,
     deserialize_aliased_io,
 )
-from torch_tensorrt.executorch._export_utils import ENGINE_BYTES_ATTR
+from torch_tensorrt.executorch._export_utils import ENGINE_BYTES_ATTR, engine_file_of
 from torch_tensorrt.executorch.serialization import (
     TensorRTBlobMetadata,
     TensorRTIOBinding,
@@ -555,8 +556,11 @@ class TensorRTBackend(BackendDetails):  # type: ignore[misc]
         # ExecuTorch writes named data only from `bytes`, and an engine can be several
         # gigabytes, so reuse the `bytes` the export staged the engine from
         # (engine_bytes_tensor) and copy only a tensor that did not come from one.
+        # An engine still in its file (engine_output_dir) is streamed from the file into
+        # the .pte, never read into memory.
+        engine_file = engine_file_of(serialized_engine)
         engine_bytes = getattr(serialized_engine, ENGINE_BYTES_ATTR, None)
-        if not isinstance(engine_bytes, bytes):
+        if engine_file is None and not isinstance(engine_bytes, bytes):
             if isinstance(serialized_engine, torch.Tensor):
                 _warn_engine_copy()
                 # `bytes(storage)` looks equivalent but iterates element by element in
@@ -614,6 +618,14 @@ class TensorRTBackend(BackendDetails):  # type: ignore[misc]
                 "a mutated buffer."
             )
 
+        engine_data: Any
+        if engine_file is not None:
+            engine_data = FileBackedData(engine_file)
+            engine_data_sha256 = engine_data.sha256()
+        else:
+            assert isinstance(engine_bytes, bytes)
+            engine_data = engine_bytes
+            engine_data_sha256 = hashlib.sha256(engine_bytes).digest()
         metadata = TensorRTBlobMetadata(
             io_bindings=io_bindings,
             aliased_io=aliased_io,
@@ -623,12 +635,12 @@ class TensorRTBackend(BackendDetails):  # type: ignore[misc]
             target_platform=_get_str(engine_info, TARGET_PLATFORM_IDX),
             # Content-keyed, so identical engines in different methods share one
             # entry and different engines can never collide on a key.
-            engine_key="tensorrt_engine_" + hashlib.sha256(engine_bytes).hexdigest(),
+            engine_key="tensorrt_engine_" + engine_data_sha256.hex(),
         )
         # The engine goes to named data by reference and is streamed into the .pte,
         # so the delegate blob holds only the header and metadata.
         named_data = NamedDataStore()
-        named_data.add_named_data(metadata.engine_key, engine_bytes, alignment=16)
+        named_data.add_named_data(metadata.engine_key, engine_data, alignment=16)
         return PreprocessResult(
             processed_bytes=serialize_engine(b"", metadata),
             data_store_output=named_data.get_named_data_store_output(),

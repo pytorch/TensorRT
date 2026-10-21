@@ -294,8 +294,13 @@ Memory and Resource Management
        slightly more engines. See :ref:`partitioning` for details.
    * - ``cpu_memory_budget``
      - ``None``
-     - Byte budget per TRT engine during build, used by resource partitioning. ``None``
-       uses available system memory (reported by ``psutil``).
+     - Host memory budget in bytes for the build, used by resource partitioning: each
+       engine gets ``(cpu_memory_budget - process RSS) / 4``. ``None`` uses available
+       system memory / 4 (reported by ``psutil``).
+   * - ``resource_partition_engine_cap``
+     - ``None``
+     - Target weight bytes per engine for resource partitioning. When set, it is used
+       instead of the RSS-derived budget, so the split is the same on every run.
    * - ``offload_module_to_cpu``
      - ``False``
      - Move the model weights to CPU RAM before compilation to reduce GPU memory

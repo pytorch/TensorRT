@@ -37,7 +37,12 @@ Given an original `torch.fx.GraphModule` and a capability-partitioned
    - Continue until the left subgraph fits the budget
    - Repeat the process for the right subgraph until all subgraphs fit the budget.
 
-5) Finalize
+5) Recompute input-only nodes
+   - Weightless nodes computed from the graph inputs alone (attention masks, rotary tables) were moved
+     into the first subgraph by the splitting; each later subgraph that reads one gets its own copy of
+     the chain instead of taking it as an input.
+
+6) Finalize
    - After splitting, assert all fusion groups reside in a single subgraph.
    - Tag nodes and produce a `GraphModule` where each subgraph becomes either a
      TRT engine (accelerated) or runs in Torch (non-accelerated).
@@ -49,6 +54,7 @@ Notes
 """
 
 import logging
+import operator
 from typing import Dict, List, Optional, Set, Tuple
 
 import psutil
@@ -64,6 +70,12 @@ logger = logging.getLogger(__name__)
 
 MAX_NUM_OF_ENGINES = 50
 ENGINE_COMPILATION_MEMORY_USAGE_MULTIPLIER = 4
+# Constants a recomputed input-only node may read: mask fill values and rotary tables, not weights.
+RECOMPUTE_MAX_CONSTANT_BYTES = 64 << 10
+# Constant folding turns the fixed part of an attention mask into one constant (968x968 bools for pi0.5).
+RECOMPUTE_MAX_FOLDED_BYTES = 4 << 20
+# A value up to this size crosses between engines as it is; only larger ones are recomputed from it.
+RECOMPUTE_MIN_OUTPUT_BYTES = 64 << 10
 
 
 class ResourcePartitioner(_SplitterBase):  # type: ignore
@@ -73,7 +85,7 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
     - an original `torch.fx.GraphModule` (`module`)
     - a capability-partitioned `GraphModule` (`partitioned_module`) containing
       submodules that delineate accelerated vs non-accelerated regions
-    - a CPU memory budget in bytes (`cpu_memory_budget`)
+    - a CPU memory budget in bytes (`cpu_memory_budget`), or a fixed per-engine size (`engine_cap`)
 
     It maps nodes from `module` into subgraphs according to `partitioned_module`
     and then splits oversized accelerated subgraphs so that each resulting TRT
@@ -86,18 +98,26 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
         module: torch.fx.GraphModule,
         cpu_memory_budget: Optional[int],
         submodule_name: str,
+        engine_cap: Optional[int] = None,
     ):
 
         assert isinstance(module, torch.fx.GraphModule)
 
         self.module = module
-        used_rss: int = psutil.Process().memory_info().rss
-        self.remaining_memory_budget = (
-            cpu_memory_budget - used_rss
-            if cpu_memory_budget is not None
-            else psutil.virtual_memory().available
-        )
-        self.not_set_limit = cpu_memory_budget is None
+        self.engine_cap = engine_cap
+        if engine_cap is not None:
+            # A fixed per-engine size: the split no longer depends on the process's resident memory.
+            self.remaining_memory_budget = (
+                engine_cap * ENGINE_COMPILATION_MEMORY_USAGE_MULTIPLIER
+            )
+        else:
+            used_rss: int = psutil.Process().memory_info().rss
+            self.remaining_memory_budget = (
+                cpu_memory_budget - used_rss
+                if cpu_memory_budget is not None
+                else psutil.virtual_memory().available
+            )
+        self.not_set_limit = cpu_memory_budget is None and engine_cap is None
         self.resource_split_count = 0
         self.submodule_name = submodule_name
         self.deps = self.find_deps()
@@ -129,6 +149,7 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
         subgraphs = self.break_subgraphs(
             subgraphs, subgraph_size_budget=self.calculate_size_budget()
         )
+        subgraphs = self.recompute_input_only_nodes(subgraphs)
 
         if len(subgraphs) == 1:
             return self.module
@@ -191,8 +212,8 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
     ) -> int:
         """Compute the per-engine size budget in bytes.
 
-        Uses explicit `cpu_memory_budget` minus used RSS
-        divided by a safety multiplier.
+        Uses explicit `cpu_memory_budget` minus used RSS (or available memory without a budget)
+        divided by a safety multiplier; with `engine_cap` set, this is the cap.
 
         Args:
             engine_compilation_memory_usage_multiplier: Safety divisor applied to
@@ -236,6 +257,12 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
             if self.not_set_limit:
                 raise ValueError(
                     "The system memory is too constrained to compile the model without severe perf degradation. Consider setting offload_module_to_cpu=False to save more CPU memory."
+                )
+            elif self.engine_cap is not None:
+                raise ValueError(
+                    f"resource_partition_engine_cap ({self.engine_cap / 2**20:.2f} MiB) would split the model "
+                    + f"({sum(sizes) / 2**20:.2f} MiB) into more than {MAX_NUM_OF_ENGINES} engines. "
+                    + "Consider setting resource_partition_engine_cap to a larger value."
                 )
             else:
                 raise ValueError(
@@ -333,7 +360,8 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
            There are two rules to check:
             1. The subgraphs should be ordered in a way that is safely to partition.
                This is checked by validate_and_correct_subgraphs. Check that function for more details.
-            2. The subgraphs should not break any fusion groups.
+            2. The subgraphs should not break any fusion groups, nor separate a multi-output
+               node from the getitem nodes that unpack its tuple.
         - Move `step_size` nodes from the right to the left subgraph.
         - Run validation/correction to ensure a legal partitioning placement.
         - Get all leaf nodes in the left subgraph and check whether any of them are in a fusion group.
@@ -374,7 +402,8 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
         Given the current split boundary (captured by `leaf_nodes` of the left
         subgraph), check all recorded fusion groups. If any fused node remains
         on the right while its peer is on the left, pull the node and all of its
-        producer chain into the left subgraph to keep fusions intact.
+        producer chain into the left subgraph to keep fusions intact. A leaf's
+        getitem users are treated the same way: a tuple cannot be an engine output.
 
         Returns:
             bool: True if any fusion was migrated (i.e., a split would have
@@ -400,7 +429,8 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
 
         fusion_broken = False
         for leaf in leaf_nodes:
-            for node in self.fusion_patterns.get(leaf, []):
+            getitems = [u for u in leaf.users if u.target is operator.getitem]
+            for node in [*self.fusion_patterns.get(leaf, []), *getitems]:
                 if (
                     node not in nodes_in_first_subgraph
                     and node in nodes_in_second_subgraph
@@ -465,6 +495,99 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
             sizes.append(size)
         return sizes
 
+    def recompute_input_only_nodes(self, subgraphs: List[Subgraph]) -> List[Subgraph]:
+        """Recompute, in each subgraph, the weightless nodes it reads that depend only on graph inputs.
+
+        `validate_and_correct_subgraphs` moves every node whose inputs are ready into the earliest
+        subgraph, so values computed from the graph inputs alone (an attention mask, rotary cos/sin)
+        all land in the first engine and reach every later engine as inputs. Besides the extra
+        engine I/O, TensorRT's fused attention on sm_110 (11.0 to 11.4) cannot build a layer fed
+        that way: its kernel needs 0x39174 bytes of shared memory, 0x38c00 max. Each subgraph
+        that reads such a value gets its own copy of the chain instead.
+
+        Only large values are recomputed, from the small ones they are built from: a value of at most
+        `RECOMPUTE_MIN_OUTPUT_BYTES` (a padding mask, position ids, prompt tokens) crosses engines as it
+        is, and so does any node that reads a graph input directly, which keeps each input a single
+        reader, as GPU-resident ExecuTorch programs (`skip_h2d_for_method_inputs`) require. A whole
+        chain recomputed into an attention engine lets TensorRT fuse it into the attention kernel,
+        which fails the same way.
+        """
+        params = self.module.state_dict(keep_vars=True)
+        cheap: Dict[torch.fx.Node, bool] = {}
+
+        def is_cheap(node: torch.fx.Node) -> bool:
+            if node not in cheap:
+                if node.op == "placeholder":
+                    cheap[node] = True
+                elif node.op == "get_attr":
+                    weight = params.get(node.target)
+                    limit = (
+                        RECOMPUTE_MAX_FOLDED_BYTES
+                        if str(node.target).startswith("_frozen_param")
+                        else RECOMPUTE_MAX_CONSTANT_BYTES
+                    )
+                    cheap[node] = (
+                        weight is None
+                        or weight.numel() * weight.element_size() <= limit
+                    )
+                else:
+                    cheap[node] = (
+                        node.op == "call_function"
+                        and torch.Tag.nondeterministic_seeded
+                        not in getattr(node.target, "tags", ())
+                        and all(is_cheap(i) for i in node._input_nodes)
+                    )
+            return cheap[node]
+
+        def crosses(node: torch.fx.Node) -> bool:
+            """Whether the node's value goes to later subgraphs as it is rather than being recomputed."""
+            if any(i.op == "placeholder" for i in node._input_nodes):
+                return True
+            value = node.meta.get("val")
+            return (
+                isinstance(value, torch.Tensor)
+                and value.numel() * value.element_size() <= RECOMPUTE_MIN_OUTPUT_BYTES
+            )
+
+        graph = self.module.graph
+        where = {n: i for i, s in enumerate(subgraphs) for n in s.nodes}
+        order = {
+            n: k for k, n in enumerate(graph.nodes)
+        }  # subgraph lists aren't in graph order
+        recomputed = 0
+        for j, subgraph in enumerate(subgraphs):
+            copies: Dict[torch.fx.Node, torch.fx.Node] = {}
+
+            def copy(node: torch.fx.Node, before: torch.fx.Node) -> torch.fx.Node:
+                if (
+                    node.op in ("placeholder", "get_attr")
+                    or where.get(node) == j
+                    or crosses(node)
+                ):
+                    return node
+                if node not in copies:
+                    args = {i: copy(i, before) for i in node._input_nodes}
+                    with graph.inserting_before(before):
+                        copies[node] = graph.node_copy(node, lambda i: args[i])
+                    subgraph.nodes.insert(subgraph.nodes.index(before), copies[node])
+                return copies[node]
+
+            for user in sorted(subgraph.nodes, key=order.__getitem__):
+                for node in list(user._input_nodes):
+                    if where.get(node, j) < j and is_cheap(node) and not crosses(node):
+                        user.replace_input_with(node, copy(node, user))
+                        recomputed += 1
+        for subgraph in subgraphs:  # the originals nothing reads any more
+            for node in reversed(list(subgraph.nodes)):
+                if not node.users and node.op == "call_function" and cheap.get(node):
+                    subgraph.nodes.remove(node)
+                    graph.erase_node(node)
+        if recomputed:
+            logger.info(
+                f"Recomputed {recomputed} input-only inputs in the subgraphs that read them."
+            )
+        return [s for s in subgraphs if s.nodes]
+
     def validate_and_correct_subgraphs(
         self, subgraphs: List[Subgraph]
     ) -> List[Subgraph]:
@@ -521,7 +644,8 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
 
 def resource_partition(
     gm: torch.fx.GraphModule,
-    cpu_memory_budget: int,
+    cpu_memory_budget: Optional[int],
+    engine_cap: Optional[int] = None,
 ) -> torch.fx.GraphModule:
     """Resource-aware partitioning entry point.
 
@@ -535,7 +659,10 @@ def resource_partition(
         partitioned_module: Capability-partitioned `GraphModule` indicating
             accelerated vs non-accelerated regions.
         cpu_memory_budget: CPU memory budget in bytes for engine compilation.
-            Use -1 to base the budget on currently available system memory.
+            Use None to base the budget on currently available system memory.
+        engine_cap: The weight bytes per engine to split to. When set, it is used
+            instead of ``cpu_memory_budget`` minus the process's resident memory, so
+            the split does not depend on what the process happens to hold.
 
     Returns:
         torch.fx.GraphModule: Final graph with resource-constrained subgraphs.
@@ -553,6 +680,7 @@ def resource_partition(
             submodule,
             submodule_name=name,
             cpu_memory_budget=cpu_memory_budget,
+            engine_cap=engine_cap,
         )
 
         partitioned_graph = partitioner.partition_graph()

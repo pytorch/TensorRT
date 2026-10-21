@@ -30,6 +30,11 @@ from torch_tensorrt.dynamo._DryRunTracker import (
 )
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache, DiskEngineCache
 from torch_tensorrt.dynamo._exporter import replace_execute_engine_no_op_node
+from torch_tensorrt.dynamo._weight_release import (
+    WeightReleaser,
+    parameter_storages,
+    weight_storages,
+)
 from torch_tensorrt.dynamo.conversion import (
     CompilationSettings,
     UnsupportedOperatorException,
@@ -71,6 +76,7 @@ from torch_tensorrt.dynamo.utils import (
     parse_graph_io,
     pin_torch_executed_state,
     prepare_inputs,
+    release_host_and_device_memory,
     to_torch_device,
     to_torch_tensorrt_device,
     validate_optimization_profiles,
@@ -129,6 +135,9 @@ def cross_compile_for_windows(
     use_distributed_mode_trace: bool = _defaults.USE_DISTRIBUTED_MODE_TRACE,
     enable_resource_partitioning: bool = _defaults.ENABLE_RESOURCE_PARTITIONING,
     cpu_memory_budget: Optional[int] = _defaults.CPU_MEMORY_BUDGET,
+    resource_partition_engine_cap: Optional[
+        int
+    ] = _defaults.RESOURCE_PARTITION_ENGINE_CAP,
     dynamically_allocate_resources: bool = _defaults.DYNAMICALLY_ALLOCATE_RESOURCES,
     decompose_attention: bool = _defaults.DECOMPOSE_ATTENTION,
     disabled_constant_fold_exclusions: Collection[
@@ -214,6 +223,7 @@ def cross_compile_for_windows(
         use_distributed_mode_trace (bool):  Using aot_autograd to trace the graph. This is enabled when DTensors or distributed tensors are present in distributed model
         enable_resource_partitioning (bool): Enable resource-aware partitioning. This is useful when the model is large and the CPU memory is limited.
         cpu_memory_budget (Optional[int]): The maximum amount of CPU memory to use for the compilation. If the compilation requires more memory than this budget, the compilation will fail.
+        resource_partition_engine_cap (Optional[int]): With resource partitioning, the weight bytes per TensorRT engine the partitioner splits to, used instead of the budget derived from ``cpu_memory_budget`` and the process's resident memory, so the same model and cap always give the same split. ``cpu_memory_budget`` is then not needed.
         dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.
         decompose_attention (bool): Whether to decompose attention layers into smaller operations
             instead of using the attention converters. When combined with ``use_fp32_acc=True``,
@@ -381,6 +391,7 @@ def cross_compile_for_windows(
         "use_distributed_mode_trace": use_distributed_mode_trace,
         "enable_resource_partitioning": enable_resource_partitioning,
         "cpu_memory_budget": cpu_memory_budget,
+        "resource_partition_engine_cap": resource_partition_engine_cap,
         "dynamically_allocate_resources": dynamically_allocate_resources,
         "decompose_attention": decompose_attention,
         "disabled_constant_fold_exclusions": disabled_constant_fold_exclusions,
@@ -513,8 +524,13 @@ def compile(
         torch.utils.data.DataLoader
     ] = _defaults.AUTOCAST_CALIBRATION_DATALOADER,
     cpu_memory_budget: Optional[int] = _defaults.CPU_MEMORY_BUDGET,
+    resource_partition_engine_cap: Optional[
+        int
+    ] = _defaults.RESOURCE_PARTITION_ENGINE_CAP,
     enable_resource_partitioning: bool = _defaults.ENABLE_RESOURCE_PARTITIONING,
     dynamically_allocate_resources: bool = _defaults.DYNAMICALLY_ALLOCATE_RESOURCES,
+    release_weights_after_build: bool = _defaults.RELEASE_WEIGHTS_AFTER_BUILD,
+    engine_output_dir: Optional[str] = _defaults.ENGINE_OUTPUT_DIR,
     decompose_attention: bool = _defaults.DECOMPOSE_ATTENTION,
     disabled_constant_fold_exclusions: Collection[
         str
@@ -622,7 +638,17 @@ def compile(
         autocast_calibration_dataloader (Optional[torch.utils.data.DataLoader]): The dataloader to use for autocast calibration. Default is None.
         enable_resource_partitioning (bool): Enable resource-aware partitioning. This is useful when the model is large and the CPU memory is limited.
         cpu_memory_budget (Optional[int]): The maximum amount of CPU memory to use for the compilation. If the compilation requires more memory than this budget, the compilation will fail.
+        resource_partition_engine_cap (Optional[int]): With resource partitioning, the weight bytes per TensorRT engine the partitioner splits to, used instead of the budget derived from ``cpu_memory_budget`` and the process's resident memory, so the same model and cap always give the same split. ``cpu_memory_budget`` is then not needed.
         dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.
+        release_weights_after_build (bool): Release the memory of each model weight once the last TensorRT engine that reads it is built,
+            and of weights no partition reads before the first build, so compilation holds only the weights still to be built. The source
+            module shares that memory and must not be used afterwards, even if compilation fails. Weights read by subgraphs that run in
+            PyTorch are kept. Applies to ``torch_tensorrt.dynamo.compile``; no effect under ``torch.compile``, and not supported by
+            ``MutableTorchTensorRTModule``.
+        engine_output_dir (Optional[str]): Write each TensorRT engine to a file in this directory as soon as it is built, and keep it there
+            instead of in memory, so engines don't accumulate on the GPU or the host during compilation. A module loads its engine from the file
+            when first used; ``torch_tensorrt.save(..., output_format="executorch", retrace=False)`` copies it into the ``.pte`` from the file.
+            The files must outlive the compiled module.
         decompose_attention (bool): Whether to decompose attention layers into smaller operations
             instead of using the attention converters. When combined with ``use_fp32_acc=True``,
             decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only
@@ -835,7 +861,10 @@ def compile(
         "autocast_calibration_dataloader": autocast_calibration_dataloader,
         "enable_resource_partitioning": enable_resource_partitioning,
         "cpu_memory_budget": cpu_memory_budget,
+        "resource_partition_engine_cap": resource_partition_engine_cap,
         "dynamically_allocate_resources": dynamically_allocate_resources,
+        "release_weights_after_build": release_weights_after_build,
+        "engine_output_dir": engine_output_dir,
         "decompose_attention": decompose_attention,
         "disabled_constant_fold_exclusions": disabled_constant_fold_exclusions,
         "attn_bias_is_causal": attn_bias_is_causal,
@@ -1282,6 +1311,14 @@ def _build_user_symbol_bounds(
     return user_symbol_bounds
 
 
+def _warn_if_refit_source_released(settings: CompilationSettings) -> None:
+    if settings.strip_engine_weights and not settings.immutable_weights:
+        logger.warning(
+            "release_weights_after_build releases the source weights; engines built with "
+            "strip_engine_weights must be refit from a freshly loaded checkpoint."
+        )
+
+
 @fn_supports_debugger  # type: ignore[misc]
 def compile_module(
     gm: torch.fx.GraphModule,
@@ -1412,6 +1449,14 @@ def compile_module(
             "Some nodes do not have metadata (shape and dtype information). This could lead to problems sometimes if the graph has PyTorch and TensorRT segments."
         )
 
+    if (
+        settings.resource_partition_engine_cap is not None
+        and not settings.enable_resource_partitioning
+    ):
+        logger.warning(
+            "resource_partition_engine_cap has no effect without enable_resource_partitioning=True."
+        )
+
     # Every computational op is TRT-legal: skip AccNodesFinder / tag / split and
     # convert the lowered graph as a single engine. Mixed graphs still partition.
     if (
@@ -1435,13 +1480,25 @@ def compile_module(
             gm,
             user_symbol_bounds=user_symbol_bounds,
         )
-        return convert_module(
+        single_releaser = None
+        single_weights: Dict[int, torch.UntypedStorage] = {}
+        if settings.release_weights_after_build:
+            _warn_if_refit_source_released(settings)
+            single_releaser = WeightReleaser([gm])
+            single_releaser.release_unread(parameter_storages(gm))
+            single_weights = weight_storages(gm)
+        single_module = convert_module(
             gm,
             convert_inputs,
             settings=settings,
             name="_run_on_acc_0",
             engine_cache=engine_cache,
         )
+        if single_releaser is not None and single_releaser.built(
+            single_weights, "_run_on_acc_0"
+        ):
+            release_host_and_device_memory()
+        return single_module
 
     # Store the original input spec for later use
     original_in_spec = getattr(gm, "_in_spec", None)
@@ -1505,10 +1562,19 @@ def compile_module(
             require_full_compilation=enforce_full_compilation,
         )
 
+    if (
+        settings.enable_resource_partitioning
+        and settings.resource_partition_engine_cap is not None
+        and settings.cpu_memory_budget is not None
+    ):
+        logger.warning(
+            "resource_partition_engine_cap is set, so cpu_memory_budget is not used for the split."
+        )
     if settings.enable_resource_partitioning:
         partitioned_module = resource_partition(
             partitioned_module,
             cpu_memory_budget=settings.cpu_memory_budget,
+            engine_cap=settings.resource_partition_engine_cap,
         )
 
     dryrun_tracker.unsupported_ops = supported_ops.fallback_operators
@@ -1559,6 +1625,22 @@ def compile_module(
     trt_modules = {}
     # Iterate over all components that can be accelerated
     # Generate the corresponding TRT Module for those
+
+    weight_releaser = None
+    if settings.release_weights_after_build and not settings.dryrun:
+        _warn_if_refit_source_released(settings)
+        # The partitioned module's own graph runs in PyTorch: it counts as a reader that is never built.
+        weight_releaser = WeightReleaser(
+            [partitioned_module]
+            + [
+                sub
+                for _, sub in partitioned_module.named_children()
+                if isinstance(sub, torch.fx.GraphModule)
+            ]
+        )
+        # The lowered module still holds weights no partition reads (for example a model head the
+        # traced function never calls); nothing needs them once partitioning is done.
+        weight_releaser.release_unread(parameter_storages(gm))
 
     # Here we delete the frozen parameters from the graph module. Note this does not affect the submodules. We are going to delete the frozen parameters from the submodules in the convert_module function.
     # This is done to release CPU memory.
@@ -1657,6 +1739,10 @@ def compile_module(
         torch.cuda.empty_cache()
         # Create TRT engines from submodule
         if not settings.dryrun:
+            # Collected before conversion, which deletes the submodule's frozen parameters.
+            submodule_weights = (
+                weight_storages(submodule) if weight_releaser is not None else {}
+            )
             trt_module = convert_module(
                 submodule,
                 submodule_inputs,
@@ -1666,6 +1752,10 @@ def compile_module(
             )
 
             trt_modules[name] = trt_module
+            if weight_releaser is not None and weight_releaser.built(
+                submodule_weights, name
+            ):
+                release_host_and_device_memory()
 
             if _debugger_config:
                 if _debugger_config.save_engine_profile:
@@ -1709,7 +1799,11 @@ def compile_module(
     # Replace all FX Modules with TRT Modules
     for name, trt_module in trt_modules.items():
         setattr(partitioned_module, name, trt_module)
-        if settings.lazy_engine_init and not settings.enable_cross_compile_for_windows:
+        if (
+            settings.lazy_engine_init
+            and not settings.enable_cross_compile_for_windows
+            and not settings.engine_output_dir
+        ):
             trt_module = getattr(partitioned_module, name)
             trt_module.setup_engine()
 

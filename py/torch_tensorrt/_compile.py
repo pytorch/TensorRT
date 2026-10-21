@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import collections.abc
+import gc
 import importlib
 import inspect
 import logging
@@ -22,7 +23,6 @@ from typing import (
     Set,
     Tuple,
     Union,
-    cast,
 )
 
 import torch
@@ -575,14 +575,11 @@ def convert_method_to_trt_engine(
             module, torchtrt_arg_inputs, kwarg_inputs=torchtrt_kwarg_inputs, **kwargs
         )
 
-        return cast(
-            bytes,
-            dynamo_convert_exported_program_to_serialized_trt_engine(
-                exp_program,
-                arg_inputs=tuple(normalized_arg_inputs),
-                kwarg_inputs=torchtrt_kwarg_inputs,
-                **kwargs,
-            ),
+        return dynamo_convert_exported_program_to_serialized_trt_engine(
+            exp_program,
+            arg_inputs=tuple(normalized_arg_inputs),
+            kwarg_inputs=torchtrt_kwarg_inputs,
+            **kwargs,
         )
     elif target_ir == _IRType.torch_compile:
         raise RuntimeError(
@@ -1267,6 +1264,7 @@ def save(
                     kwarg_inputs=kwarg_tensors,
                     dynamic_shapes=dynamic_shapes,
                     use_legacy_exporter=_use_legacy,
+                    engines_from_files=output_format == "executorch",
                 )
 
                 from torch_tensorrt.dynamo._exporter import (
@@ -1374,6 +1372,7 @@ def save(
                         kwarg_inputs=kwarg_tensors,
                         dynamic_shapes=dynamic_shapes,
                         use_legacy_exporter=_use_legacy,
+                        engines_from_files=output_format == "executorch",
                     )
                 else:
                     # Regular GraphModule or no dynamic shapes - retrace normally
@@ -1569,6 +1568,27 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
         # persist the ETRecord as "<pte_base>_etrecord.bin" next to the .pte.
         etrecord_path = os.path.splitext(file_path)[0] + "_etrecord.bin"
         executorch_program.get_etrecord().save(etrecord_path)
+    del edge_program, executorch_program
+    _release_lowering_caches()
+
+
+def _release_lowering_caches() -> None:
+    """Drop the process-wide cache entries that point at the lowered program once it is written.
+
+    to_backend's graph check memoizes ``is_same_node`` on FX nodes, and FakeTensorMode's
+    dispatch cache keys entries on the ``executorch_call_delegate`` arguments. Both keep
+    the lowered modules, and with them every serialized engine, alive after save()
+    returns, so each saved program stays resident until the process exits. Clearing
+    them frees nothing still in use; they refill on demand. The program is a web of
+    reference cycles (graph and nodes), so it is collected here rather than at some
+    later automatic collection, which can land in the middle of the next save.
+    """
+    from executorch.exir.backend.utils import is_same_node
+    from torch._subclasses.fake_tensor import FakeTensorMode
+
+    is_same_node.cache_clear()
+    FakeTensorMode.cache_clear()
+    gc.collect()
 
 
 def _normalize_engine_constants_to_python(exp_program: "ExportedProgram") -> None:

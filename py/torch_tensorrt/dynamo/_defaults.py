@@ -53,6 +53,7 @@ TIMING_CACHE_PATH = os.path.join(
     tempfile.gettempdir(), "torch_tensorrt_engine_cache", "timing_cache.bin"
 )
 LAZY_ENGINE_INIT = False
+ENGINE_OUTPUT_DIR = None
 CACHE_BUILT_ENGINES = False
 REUSE_CACHED_ENGINES = False
 ENGINE_CACHE_DIR = os.path.join(tempfile.gettempdir(), "torch_tensorrt_engine_cache")
@@ -78,7 +79,9 @@ AUTOCAST_MAX_DEPTH_OF_REDUCTION = None
 AUTOCAST_CALIBRATION_DATALOADER = None
 ENABLE_RESOURCE_PARTITIONING = False
 CPU_MEMORY_BUDGET = None
+RESOURCE_PARTITION_ENGINE_CAP = None
 DYNAMICALLY_ALLOCATE_RESOURCES = False
+RELEASE_WEIGHTS_AFTER_BUILD = False
 DECOMPOSE_ATTENTION = False
 DISABLED_CONSTANT_FOLD_EXCLUSIONS = frozenset[str]()
 ATTN_BIAS_IS_CAUSAL = True

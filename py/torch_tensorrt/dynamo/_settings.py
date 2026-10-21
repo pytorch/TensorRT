@@ -39,6 +39,7 @@ from torch_tensorrt.dynamo._defaults import (
     ENABLE_RESOURCE_PARTITIONING,
     ENABLE_WEIGHT_STREAMING,
     ENGINE_CAPABILITY,
+    ENGINE_OUTPUT_DIR,
     FALLBACK_DATA_DEPENDENT_OPS,
     HARDWARE_COMPATIBLE,
     IMMUTABLE_WEIGHTS,
@@ -51,7 +52,9 @@ from torch_tensorrt.dynamo._defaults import (
     OPTIMIZATION_LEVEL,
     PASS_THROUGH_BUILD_FAILURES,
     REFIT_IDENTICAL_ENGINE_WEIGHTS,
+    RELEASE_WEIGHTS_AFTER_BUILD,
     REQUIRE_FULL_COMPILATION,
+    RESOURCE_PARTITION_ENGINE_CAP,
     REUSE_CACHED_ENGINES,
     SPARSE_WEIGHTS,
     STRIP_ENGINE_WEIGHTS,
@@ -127,6 +130,11 @@ class CompilationSettings:
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
         target_compute_capabilities (Optional[List[Tuple[int, int]]]): Compute capabilities to build for, e.g. ``[(7, 5)]`` for Turing. Defaults to ``None``. The compilation then targets the current device, from ``torch.cuda.get_device_capability()``. TensorRT-RTX only -- raises on standard TensorRT. Drives both engine targeting and op partitioning: a compiled artifact carries a single partitioning, so an op unsupported on any listed target falls back to PyTorch for all of them.
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation. Not used for TensorRT-RTX (no autotuning).
+        engine_output_dir (Optional[str]): Write each TensorRT engine to a file in this directory as soon as
+            it is built, and keep it there instead of in memory: no engine is loaded on the GPU or held on the
+            host during compilation. A module loads its engine from the file when first used, and
+            ``torch_tensorrt.save(..., output_format="executorch")`` copies it into the ``.pte`` from the
+            file. The files must outlive the compiled module. Default is None (engines in memory).
         cache_built_engines (bool): Whether to save the compiled TRT engines to storage
         reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
         use_fp32_acc (bool): Enable FP32 accumulation for FP16 matmul layers while retaining FP16
@@ -149,8 +157,19 @@ class CompilationSettings:
         autocast_max_output_threshold (float): Maximum absolute value for node outputs, nodes with outputs greater than this value will remain in FP32. Default is 512.
         autocast_max_depth_of_reduction (Optional[int]): Maximum depth of reduction allowed in low precision. Nodes with higher reduction depths will remain in FP32. This helps prevent excessive accuracy loss in operations particularly sensitive to reduced precision, as higher-depth reductions may amplify computation errors in low precision formats. If not provided, infinity will be used. Default is None.
         autocast_calibration_dataloader (Optional[torch.utils.data.DataLoader]): The dataloader to use for autocast calibration. Default is None.
+        resource_partition_engine_cap (Optional[int]): With resource partitioning, the weight bytes per TensorRT engine
+            the partitioner splits to. Used instead of the budget derived from ``cpu_memory_budget`` and the process's
+            resident memory, so the same model and cap always give the same split. Default is None.
         offload_module_to_cpu (bool): Offload the model to CPU to reduce memory footprint during compilation
         dynamically_allocate_resources (bool): Dynamically allocate resources for TensorRT engines
+        release_weights_after_build (bool): Release the memory of each model weight once the last
+            TensorRT engine that reads it is built, and of weights no partition reads before the first
+            build, so compilation holds only the weights still to be built. The model's tensors share
+            that memory, so the source module (and an ``ExportedProgram`` exported from it) must not be
+            used after compilation, even if compilation fails. Weights read by subgraphs that run in
+            PyTorch are kept. Applies to ``torch_tensorrt.dynamo.compile``; no effect under
+            ``torch.compile`` (parameters arrive as graph inputs), and not supported by
+            ``MutableTorchTensorRTModule``. Default is False.
         decompose_attention (bool): Whether to decompose attention layers into smaller operations
             instead of using the attention converters. When combined with ``use_fp32_acc=True``,
             decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only
@@ -205,6 +224,7 @@ class CompilationSettings:
     hardware_compatible: bool = HARDWARE_COMPATIBLE
     timing_cache_path: str = TIMING_CACHE_PATH
     lazy_engine_init: bool = LAZY_ENGINE_INIT
+    engine_output_dir: Optional[str] = ENGINE_OUTPUT_DIR
     cache_built_engines: bool = CACHE_BUILT_ENGINES
     reuse_cached_engines: bool = REUSE_CACHED_ENGINES
     use_fp32_acc: bool = USE_FP32_ACC
@@ -235,7 +255,9 @@ class CompilationSettings:
     )
     enable_resource_partitioning: bool = ENABLE_RESOURCE_PARTITIONING
     cpu_memory_budget: Optional[int] = CPU_MEMORY_BUDGET
+    resource_partition_engine_cap: Optional[int] = RESOURCE_PARTITION_ENGINE_CAP
     dynamically_allocate_resources: bool = DYNAMICALLY_ALLOCATE_RESOURCES
+    release_weights_after_build: bool = RELEASE_WEIGHTS_AFTER_BUILD
     decompose_attention: bool = DECOMPOSE_ATTENTION
     disabled_constant_fold_exclusions: Collection[str] = (
         DISABLED_CONSTANT_FOLD_EXCLUSIONS
@@ -261,6 +283,14 @@ class CompilationSettings:
                 self.disabled_constant_fold_exclusions
             )
         )
+        if (
+            self.resource_partition_engine_cap is not None
+            and self.resource_partition_engine_cap <= 0
+        ):
+            raise ValueError(
+                "resource_partition_engine_cap must be a positive number of bytes, "
+                f"got {self.resource_partition_engine_cap}"
+            )
         if self.target_compute_capabilities:
             from torch_tensorrt._features import ENABLED_FEATURES
 
@@ -290,6 +320,7 @@ class CompilationSettings:
             )
         )
         state.setdefault("fallback_data_dependent_ops", FALLBACK_DATA_DEPENDENT_OPS)
+        state.setdefault("release_weights_after_build", RELEASE_WEIGHTS_AFTER_BUILD)
         state.setdefault("build_route", BUILD_ROUTE)
         state.setdefault("tune_build_routes", TUNE_BUILD_ROUTES)
         state.setdefault("tune_build_route_file", TUNE_BUILD_ROUTE_FILE)
@@ -302,6 +333,8 @@ class CompilationSettings:
         state.setdefault("accuracy_algorithm", ACCURACY_ALGORITHM)
         state.setdefault("accuracy_atol", ACCURACY_ATOL)
         state.setdefault("accuracy_rtol", ACCURACY_RTOL)
+        state.setdefault("resource_partition_engine_cap", RESOURCE_PARTITION_ENGINE_CAP)
+        state.setdefault("engine_output_dir", ENGINE_OUTPUT_DIR)
         self.__dict__.update(state)
 
 
