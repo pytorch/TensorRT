@@ -2245,6 +2245,9 @@ def aten_ops_as_strided(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    # The strides address the input's PyTorch memory, which differs from TensorRT's contiguous copy for views
+    val = ctx.current_node.args[0].meta.get("val")
+    view = val is not None and not (val.is_contiguous() and val.storage_offset() == 0)
     return impl.slice.as_strided(
         ctx,
         target,
@@ -2254,6 +2257,8 @@ def aten_ops_as_strided(
         size=args[1],
         stride=args[2],
         storage_offset=args_bounds_check(args, 3, None),
+        input_stride=val.stride() if view else None,
+        input_offset=val.storage_offset() if view else 0,
     )
 
 
