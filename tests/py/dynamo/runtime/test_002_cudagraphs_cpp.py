@@ -15,6 +15,18 @@ INPUT_SIZE = (3, 16, 16)
 TRIALS = 5
 
 
+@torch.library.custom_op(
+    "torchtrt_cudagraphs_test::accumulate_", mutates_args=("cache",)
+)
+def _accumulate_(cache: torch.Tensor, x: torch.Tensor) -> None:
+    cache.add_(x)
+
+
+@_accumulate_.register_fake
+def _(cache, x):
+    return None
+
+
 @unittest.skipIf(
     not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "Torch-TensorRT runtime is not available",
@@ -220,6 +232,36 @@ class TestCudagraphsCPP(TestCase):
                 DECIMALS_OF_AGREEMENT,
                 msg=f"CUDA Graph Python TRT outputs don't match with the original model. (trial: {i})",
             )
+
+        torch._dynamo.reset()
+
+    def test_cudagraphs_whole_graph_input_updated_in_place_cpp(self):
+        # The op without a converter puts the module under one CUDA graph. Its write
+        # to the cache must land in the caller's tensor at every replay
+        class SampleModel(torch.nn.Module):
+            def forward(self, x, cache):
+                torch.ops.torchtrt_cudagraphs_test.accumulate_(cache, x)
+                return torch.relu(cache * 0.5)
+
+        model = SampleModel().eval().cuda()
+        x = torch.randn(*INPUT_SIZE).cuda()
+        optimized_model = torch_tensorrt.dynamo.compile(
+            torch.export.export(model, (x, torch.zeros(*INPUT_SIZE).cuda())),
+            arg_inputs=(x, torch.zeros(*INPUT_SIZE).cuda()),
+            min_block_size=1,
+        )
+        cache, expected = (
+            torch.zeros(*INPUT_SIZE).cuda(),
+            torch.zeros(*INPUT_SIZE).cuda(),
+        )
+        with torch_tensorrt.runtime.enable_cudagraphs(
+            optimized_model
+        ) as cudagraphs_module:
+            for _ in range(TRIALS):
+                x = torch.randn(*INPUT_SIZE).cuda()
+                out = cudagraphs_module(x, cache)
+                torch.testing.assert_close(out, model(x, expected))
+                torch.testing.assert_close(cache, expected)
 
         torch._dynamo.reset()
 
