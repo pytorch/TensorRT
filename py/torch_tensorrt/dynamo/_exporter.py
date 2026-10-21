@@ -619,9 +619,15 @@ def create_trt_exp_program(
                 if node.op != "placeholder" or "val" not in node.meta:
                     continue
                 val = node.meta["val"]
-                if not isinstance(val, torch.Tensor):
+                # Scalar SymInt inputs (e.g. the unbacked start/end indices of a static KV
+                # cache) carry their own symbols; tensor inputs carry them in their shape.
+                if isinstance(val, torch.SymInt):
+                    dims = [val]
+                elif isinstance(val, torch.Tensor):
+                    dims = list(val.shape)
+                else:
                     continue
-                for d in val.shape:
+                for d in dims:
                     if isinstance(d, torch.SymInt):
                         for sym in d.node.expr.free_symbols:
                             if (
