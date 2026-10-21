@@ -4683,12 +4683,10 @@ def grouped_mm_validator(
     shapes = []
     for arg in node.args[:2]:
         val = arg.meta.get("val")
-        if val is None:
+        # int() on a SymInt does not raise: it specializes the dimension
+        if val is None or not all(isinstance(d, int) for d in val.shape):
             return False
-        try:
-            shapes.append(tuple(int(d) for d in val.shape))
-        except (TypeError, ValueError):  # SymInt
-            return False
+        shapes.append(tuple(val.shape))
     # Only the (rows, K) x (experts, K, N) form.
     return len(shapes[0]) == 2 and len(shapes[1]) == 3
 

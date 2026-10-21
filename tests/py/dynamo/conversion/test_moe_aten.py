@@ -69,6 +69,33 @@ class TestGroupedMMConverter(DispatchTestCase):
             use_dynamo_tracer=True,
         )
 
+    def test_grouped_mm_validator_keeps_dynamic_rows(self):
+        # Checking a dynamic-rows grouped_mm must not specialize the rows
+        # (e.g. the token count of a decode graph's MoE layer)
+        from torch_tensorrt.dynamo.conversion.aten_ops_converters import (
+            grouped_mm_validator,
+        )
+
+        class GroupedMM(nn.Module):
+            def forward(self, x, w, offs):
+                return torch.ops.aten._grouped_mm.default(x, w, offs)
+
+        x = torch.randn(16, 32, dtype=torch.bfloat16)
+        w = torch.randn(4, 32, 24, dtype=torch.bfloat16)
+        offs = torch.tensor([4, 8, 12, 16], dtype=torch.int32)
+        rows = torch.export.Dim("rows", min=2, max=64)
+        ep = torch.export.export(
+            GroupedMM(), (x, w, offs), dynamic_shapes=({0: rows}, None, None)
+        )
+        node = next(
+            n for n in ep.graph.nodes if n.target == torch.ops.aten._grouped_mm.default
+        )
+        grouped_mm_validator(node)
+
+        sym = node.args[0].meta["val"].shape[0].node
+        value_range = sym.shape_env.var_to_range[sym.expr]
+        self.assertLess(value_range.lower, value_range.upper)
+
 
 if __name__ == "__main__":
     run_tests()
