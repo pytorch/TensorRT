@@ -32,6 +32,7 @@ import torch
 from torch._subclasses.fake_tensor import FakeScriptObject, FakeTensor
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.utils._sympy.numbers import int_oo
+from torch.utils._sympy.value_ranges import ValueRanges, bound_sympy
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
@@ -505,7 +506,16 @@ def extract_var_range_info(
     # In the case of expr which has symbolic computation, bound_sympy evaluates them.
     # https://pytorch.org/docs/stable/generated/torch.fx.experimental.symbolic_shapes.ShapeEnv.html#torch.fx.experimental.symbolic_shapes.ShapeEnv.bound_sympy
     # expr.xreplace replaces the symbolic variables with their current values and computes the expression.
-    var_range = shape_env.var_to_range.get(expr, None) or shape_env.bound_sympy(expr)
+    # Torchdynamo 0/1 specialization traces a dim that may be 1 with lower bound 2;
+    # widen each symbol back to 1 so exprs derived from it (eg: 2*s0) admit it too.
+    var_range = bound_sympy(
+        expr,
+        {
+            s: ValueRanges(1, r.upper) if r.lower == 2 else r
+            for s, r in shape_env.var_to_range.items()
+            if s in expr.free_symbols
+        },
+    )
     # PyTorch commit adb73cc: var_to_val->backed_var_to_val, unbacked_var_to_val->real_tensor_prop_unbacked_vals
     var_to_val_map = getattr(shape_env, "backed_var_to_val", None) or getattr(
         shape_env, "var_to_val", None
@@ -546,9 +556,6 @@ def extract_var_range_info(
     max_val = _bound_to_int_or_none(var_range.upper)
     # Unbounded lower shouldn't happen for tensor dims; fall back to 1.
     min_val = min_val_opt if min_val_opt is not None else 1
-
-    # Torchdynamo 0/1 specialization outlier
-    min_val = 1 if min_val == 2 else min_val
 
     # Apply user bounds whenever present. ``_build_user_symbol_bounds`` already
     # rejects user ranges that exceed the exporter, so the only cases reaching
