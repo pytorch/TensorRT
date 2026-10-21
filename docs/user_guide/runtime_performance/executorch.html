@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=29ff6be7"></script>
+    <script src="../../_static/documentation_options.js?v=d075c98e"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -606,12 +606,9 @@ tells you nothing.</p></li>
 <hr class="docutils" />
 <section id="compile-and-save">
 <h2>Compile and Save<a class="headerlink" href="#compile-and-save" title="Link to this heading">#</a></h2>
-<p>The usual <code class="docutils literal notranslate"><span class="pre">ir=&quot;dynamo&quot;</span></code> path, with two extra arguments to <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.save</span></code>:</p>
-<ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">output_format=&quot;executorch&quot;</span></code> selects the <code class="docutils literal notranslate"><span class="pre">.pte</span></code> writer.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">retrace=False</span></code> keeps the compiled graph as it is. Re-exporting would drop the TensorRT
-engines before ExecuTorch’s partitioner sees them.</p></li>
-</ul>
+<p>The usual <code class="docutils literal notranslate"><span class="pre">ir=&quot;dynamo&quot;</span></code> path, with one extra argument to <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.save</span></code>:
+<code class="docutils literal notranslate"><span class="pre">output_format=&quot;executorch&quot;</span></code> selects the <code class="docutils literal notranslate"><span class="pre">.pte</span></code> writer. For this format <code class="docutils literal notranslate"><span class="pre">save</span></code> keeps
+the compiled graph as it is rather than re-exporting it, so it needs no example inputs.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
 
@@ -625,13 +622,7 @@ engines before ExecuTorch’s partitioner sees them.</p></li>
     <span class="n">min_block_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
 <span class="p">)</span>
 
-<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span>
-    <span class="n">trt_gm</span><span class="p">,</span>
-    <span class="s2">"model.pte"</span><span class="p">,</span>
-    <span class="n">output_format</span><span class="o">=</span><span class="s2">"executorch"</span><span class="p">,</span>
-    <span class="n">arg_inputs</span><span class="o">=</span><span class="n">example_inputs</span><span class="p">,</span>
-    <span class="n">retrace</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-<span class="p">)</span>
+<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="s2">"model.pte"</span><span class="p">,</span> <span class="n">output_format</span><span class="o">=</span><span class="s2">"executorch"</span><span class="p">)</span>
 </pre></div>
 </div>
 <p><a class="reference internal" href="saving_models.html#executorch-save"><span class="std std-ref">c) ExecuTorch (.pte)</span></a> covers the rest: dynamic shapes, several methods in one file, a
@@ -649,8 +640,6 @@ CUDA backend compiles them instead, so nothing leaves the GPU:</p>
     <span class="n">trt_gm</span><span class="p">,</span>
     <span class="s2">"coalesced.pte"</span><span class="p">,</span>
     <span class="n">output_format</span><span class="o">=</span><span class="s2">"executorch"</span><span class="p">,</span>
-    <span class="n">arg_inputs</span><span class="o">=</span><span class="n">example_inputs</span><span class="p">,</span>
-    <span class="n">retrace</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
     <span class="n">partitioners</span><span class="o">=</span><span class="p">[</span>
         <span class="n">CudaPartitioner</span><span class="p">([</span><span class="n">CudaBackend</span><span class="o">.</span><span class="n">generate_method_name_compile_spec</span><span class="p">(</span><span class="s2">"forward"</span><span class="p">)])</span>
     <span class="p">],</span>
@@ -681,8 +670,6 @@ copies are pure overhead:</p>
     <span class="n">trt_gm</span><span class="p">,</span>
     <span class="s2">"device_resident.pte"</span><span class="p">,</span>
     <span class="n">output_format</span><span class="o">=</span><span class="s2">"executorch"</span><span class="p">,</span>
-    <span class="n">arg_inputs</span><span class="o">=</span><span class="n">example_inputs</span><span class="p">,</span>
-    <span class="n">retrace</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
     <span class="n">backend_config</span><span class="o">=</span><span class="n">ExecutorchBackendConfig</span><span class="p">(</span>
         <span class="n">propagate_device_config</span><span class="o">=</span><span class="n">PropagateDeviceConfig</span><span class="p">(</span>
             <span class="n">skip_h2d_for_method_inputs</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
@@ -884,8 +871,6 @@ launch many short kernels, where CPU launch work dominates each call.</p>
     <span class="n">trt_gm</span><span class="p">,</span>
     <span class="s2">"model.pte"</span><span class="p">,</span>
     <span class="n">output_format</span><span class="o">=</span><span class="s2">"executorch"</span><span class="p">,</span>
-    <span class="n">arg_inputs</span><span class="o">=</span><span class="n">example_inputs</span><span class="p">,</span>
-    <span class="n">retrace</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
     <span class="n">use_cuda_graphs</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span>
 </pre></div>
