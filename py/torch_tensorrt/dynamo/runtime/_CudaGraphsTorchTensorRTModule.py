@@ -21,7 +21,7 @@ def _unflatten_inputs(
     compiled_module: torch.fx.GraphModule,
 ) -> Tuple[Any, Any]:
     """
-    Process inputs using tree_unflatten and tree_map to reconstructe inputs
+    Create the input tensors and use tree_unflatten to reconstruct inputs
 
     Args:
         flattened_inputs: Flattened input tensors to process
@@ -37,14 +37,12 @@ def _unflatten_inputs(
         else:
             raise RuntimeError("Input is not a torch_tensorrt.Input")
 
+    # Create the tensors before unflattening: a custom pytree node (e.g. a Hugging
+    # Face cache) may only keep tensors as leaves, as in the exported program
+    tensors = [convert_input_to_cuda_tensor(i) for i in flattened_inputs]
     # Reconstruct the (args, kwargs) structure that was flattened during export
-    pytree_inputs = tree_unflatten(flattened_inputs, compiled_module._in_spec)
-    # Apply the tensor creation to the reconstructed structure
-    processed_inputs = tree_map(convert_input_to_cuda_tensor, pytree_inputs)
-
-    # Since inputs were originally flattened from (args, kwargs),
-    # processed_inputs is now that same tuple structure
-    return processed_inputs[0], processed_inputs[1]
+    args, kwargs = tree_unflatten(tensors, compiled_module._in_spec)
+    return args, kwargs
 
 
 def _inputs_updated_in_place(compiled_module: torch.fx.GraphModule) -> Set[int]:
