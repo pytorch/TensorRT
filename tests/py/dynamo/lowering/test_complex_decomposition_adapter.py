@@ -197,6 +197,30 @@ def test_interior_complex_region_leaves_nothing_trt_cannot_convert():
     torch.testing.assert_close(out(x), expected)
 
 
+def test_interior_complex_region_keeps_exported_signature():
+    """The retrace returns a module taking positional flat args; the exported
+    program's codegen must survive so the module still takes its inputs by
+    name (e.g. Llama 4's complex rotary embedding, called with input_ids=...)."""
+    from torch_tensorrt.dynamo._settings import CompilationSettings
+    from torch_tensorrt.dynamo.lowering import get_decompositions
+
+    class M(torch.nn.Module):
+        def forward(self, x):
+            z = torch.view_as_complex(x.reshape(1, 2, 1, 1, 2))
+            return torch.view_as_real(z * z)
+
+    model = M().eval()
+    x = torch.randn(1, 2, 1, 2)
+    gm = (
+        torch.export.export(model, (x,))
+        .run_decompositions(get_decompositions())
+        .module()
+    )
+    out = cda.complex_decomposition_adapter(gm, CompilationSettings())
+
+    torch.testing.assert_close(out(x=x), model(x))
+
+
 # ---------------------------------------------------------------------------
 # feature gate / fallback
 # ---------------------------------------------------------------------------

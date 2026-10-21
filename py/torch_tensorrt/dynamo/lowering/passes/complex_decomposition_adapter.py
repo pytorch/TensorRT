@@ -82,6 +82,7 @@ def complex_decomposition_adapter(
     # the unflatten step is silently skipped and callers get a raw tuple.
     original_in_spec = getattr(gm, "_in_spec", None)
     original_out_spec = getattr(gm, "_out_spec", None)
+    original_codegen = gm.graph._codegen
     if not complex_input_names and not complex_output_indices:
         # No complex I/O and no interior complex work -> nothing to do.  (Interior-
         # only complex still shows up via inputs/outputs of the complex region, so
@@ -142,6 +143,14 @@ def complex_decomposition_adapter(
         gm._in_spec = original_in_spec
     if original_out_spec is not None:
         gm._out_spec = original_out_spec
+    # The retrace's plain codegen takes positional flat args and returns the
+    # user's output structure; restore the exported program's pytree codegen
+    # (keyword inputs), which expects the graph to return flat leaves
+    if isinstance(original_codegen, torch.fx.graph._PyTreeCodeGen):
+        output = gm.graph.output_node()
+        output.args = (tuple(torch.utils._pytree.tree_leaves(output.args[0])),)
+        gm.graph._codegen = original_codegen
+        gm.recompile()
     return gm
 
 
