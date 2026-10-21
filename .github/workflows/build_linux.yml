@@ -337,6 +337,17 @@ jobs:
           key: trt-bazel-${{ inputs.architecture }}-${{ matrix.desired_cuda }}-rtx${{ inputs.use-rtx }}-${{ hashFiles('**/MODULE.bazel', '**/WORKSPACE', '**/.bazelrc', '**/dev_dep_versions.yml') }}
           restore-keys: |
             trt-bazel-${{ inputs.architecture }}-${{ matrix.desired_cuda }}-rtx${{ inputs.use-rtx }}-
+      # Named before either wheel is built: the main wheel's executorch extra requires exactly this
+      # companion, and the companion build below takes its version from the same variable.
+      - name: Name the ExecuTorch runtime companion
+        if: ${{ inputs.build-executorch-runtime }}
+        working-directory: ${{ inputs.repository }}
+        shell: bash -l {0}
+        run: |
+          set -euo pipefail
+          source "${BUILD_ENV_FILE}"
+          version="$(${CONDA_RUN} python packaging/executorch_runtime_version.py ${{ inputs.is-release-wheel }})"
+          echo "TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION=${version}" >> "${GITHUB_ENV}"
       - name: Build the wheel (python-build-package)
         if: ${{ inputs.build-platform == 'python-build-package' }}
         working-directory: ${{ inputs.repository }}
@@ -403,7 +414,7 @@ jobs:
       # upload follow the exact same path as torch-tensorrt itself.
       - name: Build the ExecuTorch runtime wheel
         id: executorch-runtime
-        if: ${{ inputs.build-executorch-runtime }}
+        if: ${{ env.TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION != '' }}
         working-directory: ${{ inputs.repository }}
         shell: bash -l {0}
         run: |
@@ -448,21 +459,7 @@ jobs:
           ${CONDA_RUN} python -m pip install pyyaml patchelf "wheel>=0.40" \
             --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" \
             -r packaging/executorch_pin.txt
-          # Give the companion wheel the same channel/date and CUDA local-version
-          # suffix as torch-tensorrt, while retaining its independent base version.
-          main_version="$(sed 's/a0$//' version.txt)"
-          runtime_version="$(<py/torch-tensorrt-executorch-runtime/version.txt)"
-          if [[ "${BUILD_VERSION}" != "${main_version}"* ]]; then
-            echo "Unexpected torch-tensorrt build version: ${BUILD_VERSION}" >&2
-            exit 1
-          fi
-          if [[ ${{ inputs.is-release-wheel }} == true ]]; then
-            BUILD_VERSION="${BUILD_VERSION%+*}"
-          elif [[ "${BUILD_VERSION}" != *"+${CU_VERSION}" ]]; then
-            BUILD_VERSION="${BUILD_VERSION}+${CU_VERSION}"
-          fi
-          export TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION="${runtime_version}${BUILD_VERSION#"${main_version}"}"
-          echo "TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION=${TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION}"
+          echo "TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION=${TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION:?}"
           ${CONDA_RUN} python -m pip wheel --no-build-isolation --no-deps --wheel-dir dist \
             py/torch-tensorrt-executorch-runtime
       - name: Repair Manylinux_2_28 Wheel
