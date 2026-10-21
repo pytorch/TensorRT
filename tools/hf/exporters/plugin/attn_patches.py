@@ -2,8 +2,8 @@
 
 Same contract as ``transformers.exporters.utils.register_patch``: one factory per
 backend, listed against every attention class that shares that layout. Patches are
-installed only while ``apply_patches`` is active (or left installed on dryrun so
-``execute_engine`` still hits the plugin).
+installed only while ``apply_patches`` is active so ``torch.export`` sees
+plugin I/O. Eager inference uses the original HuggingFace forward.
 
 Language dispatch: Edge prefill calls ``self_attn(..., rope_rotary_cos_sin=...)``.
 The PI05 action expert is often the same class (GemmaAttention / PiGemmaModel)
@@ -224,14 +224,33 @@ def _patch_vision_attention(original: Callable) -> Callable:
     "transformers.models.qwen3.modeling_qwen3.Qwen3Attention.forward",
 )
 def _patch_language_attention(original: Callable) -> Callable:
-    def forward(self, hidden_states, *args, **kwargs):
-        rope_rotary_cos_sin = kwargs.get("rope_rotary_cos_sin")
-        if rope_rotary_cos_sin is None:
-            return original(self, hidden_states, *args, **kwargs)
+    """Same I/O as ``PluginAttention.forward``.
 
-        past_key_value = kwargs.get("past_key_value")
-        ctx_len = kwargs.get("ctx_len")
-        kvcache_start_index = kwargs.get("kvcache_start_index")
+    ``rope_rotary_cos_sin`` is a real parameter (not ``kwargs.get``) so
+    ``torch.export`` specializes the plugin branch. The HF expert path is
+    ``rope_rotary_cos_sin is None``.
+    """
+
+    def forward(
+        self,
+        hidden_states,
+        rope_rotary_cos_sin=None,
+        attention_mask=None,
+        position_ids=None,
+        past_key_value=None,
+        ctx_len=None,
+        kvcache_start_index=None,
+        **kwargs,
+    ):
+        if rope_rotary_cos_sin is None:
+            return original(
+                self,
+                hidden_states,
+                attention_mask=attention_mask,
+                position_ids=position_ids,
+                **kwargs,
+            )
+
         if rope_rotary_cos_sin.dtype != torch.float32:
             raise ValueError("rope_rotary_cos_sin must be FP32")
         if past_key_value is None:

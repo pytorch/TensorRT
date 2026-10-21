@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
+import sys
 from typing import Any
 
 import torch
 
-_ENGINE_META: dict[str, dict[str, Any]] = {}
-_COMPILED_MODULES: dict[str, torch.nn.Module] = {}
+# One process-wide table so pytest dual-imports of this module still share
+# execute_engine state with record_engine.
+_REGISTRY: dict[str, Any] = sys.modules.setdefault(
+    "_edge_llm_engine_registry",
+    {"meta": {}, "modules": {}},
+)
+_ENGINE_META: dict[str, dict[str, Any]] = _REGISTRY["meta"]
+_COMPILED_MODULES: dict[str, torch.nn.Module] = _REGISTRY["modules"]
 
 
 def record_engine(
