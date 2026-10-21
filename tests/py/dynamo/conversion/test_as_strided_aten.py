@@ -87,6 +87,25 @@ class TestAsStridedConverter(DispatchTestCase):
             inputs,
         )
 
+    @parameterized.expand(
+        [
+            ("sliced", lambda x: x[:, 2:].unfold(1, 3, 2)),
+            ("transposed", lambda x: x.transpose(1, 2).unfold(-1, 4, 2)),
+        ]
+    )
+    def test_as_strided_view_input(self, _, view):
+        # unfold decomposes to as_strided with strides into the view's base memory
+        class TestModule(torch.nn.Module):
+            def forward(self, x):
+                return view(x)
+
+        self.run_test(
+            TestModule(),
+            [torch.randn(2, 20, 3)],
+            use_dynamo_tracer=True,
+            enable_passes=True,
+        )
+
 
 if __name__ == "__main__":
     run_tests()
