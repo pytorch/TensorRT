@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=818a17f6"></script>
+    <script src="../../../_static/documentation_options.js?v=d075c98e"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -1060,8 +1060,8 @@ document.write(`
     <span class="c1">#      gm.meta["inline_constraints"] to be a dict; TRT graph modules don't</span>
     <span class="c1">#      set it so we default it to {} if absent.</span>
     <span class="c1">#   2. No dynamic_shapes (or no example inputs): harvest every SymInt free</span>
-    <span class="c1">#      symbol from placeholder meta["val"] shapes and look up its bound</span>
-    <span class="c1">#      directly in the shape_env.  This is the retrace=False path where the</span>
+    <span class="c1">#      symbol from tensor shapes and scalar placeholder values, then look up</span>
+    <span class="c1">#      its bound directly in the shape_env.  This is the retrace=False path where the</span>
     <span class="c1">#      caller didn't supply inputs.</span>
     <span class="n">fake_mode</span> <span class="o">=</span> <span class="n">detect_fake_mode</span><span class="p">(</span>
         <span class="nb">tuple</span><span class="p">(</span>
@@ -1092,15 +1092,21 @@ document.write(`
                 <span class="n">num_lifted_inputs</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
             <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="c1"># Path 2: harvest bounds from shape_env for any SymInt dims present.</span>
+            <span class="c1"># Path 2: preserve tensor dimensions and scalar inputs such as KV</span>
+            <span class="c1"># cache start/end indices. Deserialization needs bounds for both.</span>
             <span class="n">shape_env</span> <span class="o">=</span> <span class="n">fake_mode</span><span class="o">.</span><span class="n">shape_env</span>
             <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">:</span>
                 <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">!=</span> <span class="s2">"placeholder"</span> <span class="ow">or</span> <span class="s2">"val"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">meta</span><span class="p">:</span>
                     <span class="k">continue</span>
                 <span class="n">val</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"val"</span><span class="p">]</span>
-                <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
+                <span class="n">symbolic_values</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
+                    <span class="n">symbolic_values</span> <span class="o">=</span> <span class="n">val</span><span class="o">.</span><span class="n">shape</span>
+                <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">SymInt</span><span class="p">):</span>
+                    <span class="n">symbolic_values</span> <span class="o">=</span> <span class="p">(</span><span class="n">val</span><span class="p">,)</span>
+                <span class="k">else</span><span class="p">:</span>
                     <span class="k">continue</span>
-                <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">val</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">symbolic_values</span><span class="p">:</span>
                     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">SymInt</span><span class="p">):</span>
                         <span class="k">for</span> <span class="n">sym</span> <span class="ow">in</span> <span class="n">d</span><span class="o">.</span><span class="n">node</span><span class="o">.</span><span class="n">expr</span><span class="o">.</span><span class="n">free_symbols</span><span class="p">:</span>
                             <span class="k">if</span> <span class="p">(</span>
