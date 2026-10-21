@@ -44,6 +44,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     args_bounds_check,
     enforce_tensor_types,
     get_positive_dim,
+    get_trt_tensor,
     is_only_operator_on_placeholder,
 )
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
@@ -5196,6 +5197,14 @@ def scaled_dot_product_attention_validator(
 
     enable_gqa = node.kwargs.get("enable_gqa", False)
 
+    # TensorRT's fp16 IAttention can compute constant keys or values wrongly (e.g.
+    # when an add consumes its output); input-independent attention is folded instead
+    qkv_constant = [arg.op == "get_attr" for arg in node.args[:3]]
+    mask_constant = not isinstance(attn_mask, Node) or attn_mask.op == "get_attr"
+    if any(qkv_constant) and not (all(qkv_constant) and mask_constant):
+        _LOGGER.debug("Attention over a mix of constant and computed inputs.")
+        return False
+
     query_shape, key_shape, value_shape = None, None, None
     if "val" in node.args[0].meta:
         query_shape = node.args[0].meta["val"].size()
@@ -5267,6 +5276,10 @@ def aten_ops_scaled_dot_product_attention(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     # scaled_dot_product_attention(Tensor query, Tensor key, Tensor value, Tensor? attn_mask=None, float dropout_p=0.0, bool is_causal=False, *, float? scale=None, bool enable_gqa=False) -> Tensor
+    if not any(isinstance(arg, TRTTensor) for arg in args):
+        # Input-independent (e.g. over DETR's learned queries), but constant folding
+        # skips SDPA, which is tagged nondeterministic_seeded for its dropout
+        return get_trt_tensor(ctx, target(*args, **kwargs), name)
     return impl.attention.scaled_dot_product_attention(
         ctx,
         target,
@@ -5388,6 +5401,10 @@ def scaled_dot_product_efficient_attention_validator(
 
     if args_bounds_check(node.args, 4, False):
         _LOGGER.debug("compute_log_sumexp is not yet supported.")
+        return False
+
+    if any(arg.op == "get_attr" for arg in node.args[:3]):
+        _LOGGER.debug("Attention over constant inputs.")  # see the SDPA validator
         return False
 
     query_shape, key_shape, value_shape = None, None, None
