@@ -726,6 +726,12 @@ def test_the_kept_entry_points_actually_warn_and_forward(monkeypatch) -> None:
     ]:
         monkeypatch.delitem(sys.modules, name)
     delegate = importlib.import_module("torch_tensorrt_executorch_runtime")
+    # Recorded, so teardown removes this unregistered copy rather than leaving it for a later test
+    # in the same process to import in place of the real package.
+    for name in [
+        n for n in sys.modules if n.startswith("torch_tensorrt_executorch_runtime")
+    ]:
+        monkeypatch.setitem(sys.modules, name, sys.modules.pop(name))
 
     registered = []
     monkeypatch.setattr(delegate, "register", lambda: registered.append("register"))
@@ -746,6 +752,23 @@ def test_the_kept_entry_points_actually_warn_and_forward(monkeypatch) -> None:
         assert any(
             issubclass(w.category, DeprecationWarning) for w in caught
         ), f"{shim} raised no DeprecationWarning: {[w.category for w in caught]}"
+
+
+def test_the_shim_test_leaves_no_delegate_module_behind():
+    # A module left in sys.modules is what a later test in the same process would import in place
+    # of the real package, so run the test above in its own pytest process and check after.
+    script = (
+        "import sys, pytest\n"
+        "sys.modules.pop('torch_tensorrt_executorch_runtime', None)\n"
+        "rc = pytest.main(['-q', '-p', 'no:cacheprovider', '--noconftest', '-o', 'addopts=', "
+        f"{__file__!r} + '::test_the_kept_entry_points_actually_warn_and_forward'])\n"
+        "if rc != 0 or 'torch_tensorrt_executorch_runtime' in sys.modules:\n"
+        "    sys.exit(1)\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", script], capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 @pytest.mark.unit
