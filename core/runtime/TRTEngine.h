@@ -475,8 +475,10 @@ struct TRTEngine : torch::CustomClassHolder {
   // factory throws if creation fails).
   nvinfer1::IExecutionContext* exec_ctx();
 
-  // Drop the live execution context without recreating. The next ``exec_ctx()``
-  // call rebuilds from the current ``runtime_cfg`` settings.
+  // Drop the live execution context, and this engine's own CUDA graph captured
+  // on it, without recreating. The next ``exec_ctx()`` call rebuilds from the
+  // current ``runtime_cfg`` settings. If CUDA graphs mode is on, the next
+  // execution records a new graph.
   void invalidate_exec_ctx() noexcept;
 
   // True iff the execution context has been materialized. Probes WITHOUT
