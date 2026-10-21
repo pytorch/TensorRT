@@ -12,7 +12,8 @@
 // between two caller streams, the growth a larger engine forces on a pool a
 // smaller one already allocated, two of the three things that make the per-shape
 // query answer zero -- the third, a failed query, cannot be induced from inside
-// this process -- and two threads submitting against one pooled buffer at once.
+// this process, and one of the two, an empty batch, answers zero only on some
+// GPUs -- and two threads submitting against one pooled buffer at once.
 // It also covers the one place this branch could have moved the option-off path
 // without meaning to, and where it says it did not: the error returns of an
 // unpooled call.
@@ -30,9 +31,10 @@
 // reason is printed at the end of the suite.
 //
 // That variable covers the missing device and nothing else. Cases also skip for a
-// second reason: the device would not fill, its memory would not stay still, or it
-// has no stream-ordered allocator. None of those is a state a test can insist on
-// while sharing the device with other processes. Those skips stand whether the
+// second reason: its memory would not stay still, it has no stream-ordered
+// allocator, it reads host memory directly so execute() stages nothing, or it
+// answers a real size for an empty batch. None of those is a state a test can
+// insist on. Those skips stand whether the
 // variable is set or not, so a green required-CUDA run says every case ran, not
 // that every case covered what it is named for. No count is given here, because a
 // skip written in a fixture helper belongs to every case that calls it and moves
@@ -43,15 +45,9 @@
 // passes --test_summary=detailed, which names every skipped case in Bazel's own
 // summary.
 //
-// SHARED-DEVICE WARNING: the three cases that need the device full take it to
-// essentially zero free bytes for as long as they hold their DeviceMemoryHog --
-// measured, 16 MiB free of 81151 MiB, with a neighbour process getting
-// out-of-memory on 256 MiB allocations throughout the window. That is the only way
-// to reach the pool's allocation-failure path from inside this process: nothing in
-// the delegate takes an allocator a test could substitute, and the other early
-// returns on that path need TensorRT or CUDA to fail a call that is correct as
-// made. Bazel's exclusive tag keeps other actions in the same build off this
-// device; it cannot keep anything else off it.
+// The three cases that need a device allocation to fail inject the failure through
+// a cudaMalloc wrapper (see FailedDeviceAllocations) rather than filling the
+// device, so they take no memory from anything else on the machine.
 //
 // The CI invocation in .github/workflows/executorch-test-linux.yml passes that
 // variable, and the job it sits in asks for a GPU runner and starts its container
@@ -134,10 +130,11 @@ constexpr int kBigRows = 4096;
 constexpr int kBigCols = 4096;
 
 // A dynamic-batch engine whose profile admits an empty batch. Binding one is a
-// valid call that needs no activation scratch, from an engine that needs some,
-// which is one of the three things a zero from updateDeviceMemorySizeForShapes
-// can mean. The dimensions are small because no test compares this engine's
-// memory against a figure; only whether each answer it gives is zero matters.
+// valid call that, on some GPUs, needs no activation scratch, from an engine that
+// needs some, which is one of the three things a zero from
+// updateDeviceMemorySizeForShapes can mean. The dimensions are small because no
+// test compares this engine's memory against a figure; only whether each answer
+// it gives is zero matters.
 constexpr int kDynRows = 64;
 constexpr int kDynCols = 64;
 constexpr int kDynMaxBatch = 128;
@@ -340,8 +337,9 @@ std::vector<std::uint8_t> build_dynamic_batch_engine_blob() {
 
 // The activation scratch one context of `blob`'s engine needs for the given
 // shape, read the way execute() reads it. Zero if the engine could not be
-// measured, which is also what an empty batch answers, so a caller reading a zero
-// as meaningful has to rule the failure out by some other measurement.
+// measured, which is also what an empty batch answers on some GPUs, so a caller
+// reading a zero as meaningful has to rule the failure out by some other
+// measurement.
 std::size_t measure_engine_scratch(
     const std::vector<std::uint8_t>& blob,
     int rows = kRows,
@@ -494,9 +492,9 @@ class LoadedEngine {
 
   // The same run with the output bound to caller-owned host memory as well, which
   // execute() also stages through a device buffer of its own -- and allocates that
-  // buffer on the first call that needs it -- which, with the device full, is the
-  // only failure this suite can force after the input's staging copy has been
-  // queued. Both pointers must hold bytes() bytes.
+  // buffer on the first call that needs it -- which is the only failure this
+  // suite can force after the input's staging copy has been queued. Both
+  // pointers must hold bytes() bytes.
   Error run_from_host_input_to_host_output(cudaStream_t stream, void* host_in, void* host_out) {
     return run_with_input(stream, host_in, /*scope_a_caller_stream=*/true, host_out);
   }
@@ -589,53 +587,30 @@ bool device_bytes_in_use(std::size_t& out) {
   return true;
 }
 
-// Takes device memory until an allocation of the size a caller names can no longer
-// succeed, and gives it all back when it goes out of scope. The only way to reach
-// an allocation failure inside execute() -- the pool's, or a staging buffer's --
-// from inside the process, and the reason it is held for as short a window as
-// possible: while it is up, every other process on this device is out of memory
-// too.
-class DeviceMemoryHog {
- public:
-  DeviceMemoryHog() = default;
-  DeviceMemoryHog(const DeviceMemoryHog&) = delete;
-  DeviceMemoryHog& operator=(const DeviceMemoryHog&) = delete;
+// Linked in with -Wl,--wrap=cudaMalloc, so every cudaMalloc the delegate makes
+// comes through __wrap_cudaMalloc at the end of this file, which reads this
+// threshold. While a FailedDeviceAllocations is alive, any request of at
+// least its size fails the way a device with less than that free fails it, which
+// is how the allocation-failure paths in execute() are reached. Filling the real
+// device to get there starves every other process on it, and on a Jetson, where
+// device memory is system memory, it takes the whole machine down.
+std::atomic<std::size_t> fail_cuda_malloc_from{0};
 
-  ~DeviceMemoryHog() {
+class FailedDeviceAllocations {
+ public:
+  explicit FailedDeviceAllocations(std::size_t bytes) {
+    fail_cuda_malloc_from.store(bytes);
+  }
+  FailedDeviceAllocations(const FailedDeviceAllocations&) = delete;
+  FailedDeviceAllocations& operator=(const FailedDeviceAllocations&) = delete;
+
+  ~FailedDeviceAllocations() {
     release();
   }
 
-  // Chunked from large to small, so a device with tens of gigabytes free is filled
-  // in a few dozen allocations rather than thousands.
-  bool leave_less_free_than(std::size_t bytes) {
-    for (std::size_t chunk = std::size_t{1} << 30; chunk >= (std::size_t{1} << 20); chunk /= 4) {
-      while (free_bytes_above(bytes)) {
-        void* block = nullptr;
-        if (cudaMalloc(&block, chunk) != cudaSuccess) {
-          cudaGetLastError();
-          break;
-        }
-        blocks_.push_back(block);
-      }
-    }
-    return !free_bytes_above(bytes);
-  }
-
   void release() {
-    for (void* block : blocks_) {
-      cudaFree(block);
-    }
-    blocks_.clear();
+    fail_cuda_malloc_from.store(0);
   }
-
- private:
-  static bool free_bytes_above(std::size_t bytes) {
-    std::size_t free_bytes = 0;
-    std::size_t total_bytes = 0;
-    return cudaMemGetInfo(&free_bytes, &total_bytes) == cudaSuccess && free_bytes > bytes;
-  }
-
-  std::vector<void*> blocks_;
 };
 
 // Opens a live kUSER_MANAGED context over `blob`'s engine with one shape bound,
@@ -864,12 +839,13 @@ class SharedScratchBackendTest : public ::testing::Test {
   void run_a_growth_beside_parked_work(bool synchronized_path);
 
   // A case can also skip for a reason the device being present says nothing about
-  // -- the device would not fill, its memory would not stay still, it has no
-  // stream-ordered allocator. Those skips are the difference between a green
-  // target and a run that covered what the cases are named for, and with
-  // --test_output=errors a passing target prints not one of them. So they are
-  // collected here and printed at the end whether or not the CUDA requirement is
-  // armed, which is the case the missing-device banner cannot cover.
+  // -- its memory would not stay still, it has no stream-ordered allocator, it
+  // reads host memory directly, it answers a real size for an empty batch.
+  // Those skips are the difference between a green target and a run that
+  // covered what the cases are named for, and with --test_output=errors a
+  // passing target prints not one of them. So they are collected here and
+  // printed at the end whether or not the CUDA requirement is armed, which is
+  // the case the missing-device banner cannot cover.
   void record_a_second_reason_skip() {
     if (this_case_skipped_for_no_device_ || !::testing::Test::IsSkipped()) {
       return;
@@ -911,7 +887,7 @@ class SharedScratchBackendTest : public ::testing::Test {
     std::fprintf(
         stderr,
         "[  SKIPPED ] %zu of %d cases in this file ran on a device but did not cover what they are named for, so this "
-        "target passing does not say the pool's growth, allocation-failure and queued-free paths were exercised:\n",
+        "target passing does not say the paths they name were exercised:\n",
         second_reason_skips_.size(),
         suite == nullptr ? static_cast<int>(second_reason_skips_.size()) : suite->total_test_count());
     for (const auto& skip : second_reason_skips_) {
@@ -1467,12 +1443,13 @@ TEST_F(SharedScratchBackendTest, AnEngineNeedingNoActivationScratchRunsWithThePo
 // An empty input to an engine that does need activation scratch
 // ---------------------------------------------------------------------------
 
-// An empty batch inside the profile is a valid call, and the per-shape query
-// answers it with the same zero it gives for a failed query, from an engine whose
-// own requirement is not zero. The three assertions at the top are what make this
-// the empty-input case rather than either of the others: an engine that needs
-// nothing would fail the second, and a measurement that could not read the engine
-// at all would fail the third.
+// An empty batch inside the profile is a valid call, and on some GPUs the
+// per-shape query answers it with the same zero it gives for a failed query, from
+// an engine whose own requirement is not zero. Other GPUs answer a real size for
+// it, so no call there reaches the zero this case is about and it skips.
+// The two assertions at the top are what make this the empty-input case rather
+// than either of the others: an engine that needs nothing would fail the first,
+// and a measurement that could not read the engine at all would fail the second.
 //
 // What the empty call must not do is size the pool for itself. The engine's own
 // profile-wide requirement, `dynamic_engine_bytes_`, is the figure a zero invites
@@ -1484,9 +1461,10 @@ TEST_F(SharedScratchBackendTest, AnEngineNeedingNoActivationScratchRunsWithThePo
 // for. The capacity is read directly rather than inferred from device-wide
 // memory, which cannot resolve the difference reliably.
 TEST_F(SharedScratchBackendTest, AnEmptyInputRunsWithThePoolEnabled) {
-  ASSERT_EQ(empty_batch_scratch_bytes_, 0u)
-      << "an empty batch reports " << empty_batch_scratch_bytes_
-      << " bytes of activation scratch, so this test no longer covers a call whose per-shape query answers zero";
+  if (empty_batch_scratch_bytes_ != 0) {
+    GTEST_SKIP() << "an empty batch asks " << empty_batch_scratch_bytes_
+                 << " bytes of activation scratch on this GPU, so no call here reaches the per-shape zero";
+  }
   ASSERT_GT(dynamic_engine_bytes_, 0)
       << "the dynamic fixture engine reports no activation scratch of its own, so the zero above is the "
          "scratch-free case rather than the empty-input one";
@@ -1567,10 +1545,11 @@ TEST_F(SharedScratchBackendTest, AnEmptyInputRunsWithThePoolEnabled) {
 }
 
 // The install is what separates the two causes of a zero from the per-shape
-// query. Both reach execute() as a zero and neither is asked to size the pool, so
-// both can be handed a buffer as small as one byte; only one of them is safe with
-// it. Where the bound shapes genuinely need nothing the engine expects nothing
-// and the one-byte buffer is accepted. Where the query failed the engine expects what it
+// query. Where an empty batch answers zero, both reach execute() as a zero and
+// neither is asked to size the pool, so both can be handed a buffer as small as one
+// byte; only one of them is safe with it. Where the bound shapes genuinely need
+// nothing the engine expects nothing and the one-byte buffer is accepted, which the
+// case after this one pins. Where the query failed the engine expects what it
 // always did, TensorRT refuses the install through a call that returns void, and
 // the context keeps the buffer it was last given -- which a growth may already
 // have freed, and enqueueV3 then reports success while the engine reads and
@@ -1599,16 +1578,25 @@ TEST_F(SharedScratchBackendTest, AnUndersizedScratchInstallIsSeenAsRefused) {
       << " bytes and the backend read the install as accepted, so the enqueue would run on the buffer installed "
          "before it";
 
-  // The safe cause, which has to keep working: an empty batch expects nothing, so
-  // the one-byte buffer is accepted and no refusal may be invented for it.
+  EXPECT_EQ(cudaFree(enough), cudaSuccess);
+  EXPECT_EQ(cudaFree(one_byte), cudaSuccess);
+}
+
+// The safe cause, which has to keep working: an empty batch expects nothing, so
+// the one-byte buffer is accepted and no refusal may be invented for it.
+TEST_F(SharedScratchBackendTest, AOneByteScratchInstallForAnEmptyBatchIsAccepted) {
   LiveContext empty_batch;
   ASSERT_TRUE(open_user_managed_context(dynamic_blob(), kDynRows, kDynCols, 0, empty_batch));
-  ASSERT_EQ(empty_batch.ctx->updateDeviceMemorySizeForShapes(), 0u)
-      << "an empty batch does not answer zero for this engine, so this half covers nothing";
+  const std::size_t empty_need = empty_batch.ctx->updateDeviceMemorySizeForShapes();
+  if (empty_need != 0) {
+    GTEST_SKIP() << "an empty batch asks " << empty_need
+                 << " bytes of activation scratch on this GPU, so execute() never hands it the one-byte buffer";
+  }
+
+  void* one_byte = nullptr;
+  ASSERT_EQ(cudaMalloc(&one_byte, 1), cudaSuccess);
   EXPECT_TRUE(install_pooled_scratch(*empty_batch.ctx, one_byte, 1, 0))
       << "the one-byte buffer an empty call is handed was reported as refused, which would fail a call that is safe";
-
-  EXPECT_EQ(cudaFree(enough), cudaSuccess);
   EXPECT_EQ(cudaFree(one_byte), cudaSuccess);
 }
 
@@ -1729,8 +1717,8 @@ TEST_F(SharedScratchBackendTest, ExecuteInstallsPooledScratchThroughTheCheckedHe
 // Only one of them can be reached from inside the process. A refused install needs
 // the pool to hold less than the context expects, which it never does; a failed
 // enqueue and a failed completion record need TensorRT or CUDA to fail a call that
-// is correct as made. The pool's own allocation can be made to fail by taking the
-// device's memory first, and it returns through the same destructor as the others.
+// is correct as made. The pool's own allocation can be made to fail through the
+// cudaMalloc wrapper, and it returns through the same destructor as the others.
 //
 // What it reaches is the lock the destructor drops, not the buffer it disposes
 // of: an allocation that failed retired nothing, so this case leaves the
@@ -1759,28 +1747,16 @@ TEST_F(SharedScratchBackendTest, AFailedPooledAllocationLeavesTheDeviceLockFreeA
   Error failed_run = Error::Ok;
   cudaError_t pending_after_the_failure = cudaSuccess;
   {
-    DeviceMemoryHog hog;
-    if (!hog.leave_less_free_than(scratch_bytes_)) {
-      ASSERT_EQ(cudaStreamDestroy(stream), cudaSuccess);
-      GTEST_SKIP() << "could not take the device below the " << scratch_bytes_
-                   << " bytes this engine's scratch needs, so its allocation would have succeeded";
-    }
-    // The hog clears the last failed allocation of its own, and nothing else has
-    // made a CUDA call since, so whatever is pending after the run below was left
-    // by the run.
+    FailedDeviceAllocations no_room_for_the_scratch(scratch_bytes_);
+    // Arming the failure makes no CUDA call, so the check below sees a clean state
+    // and whatever is pending after the run was left by the run.
     ASSERT_EQ(cudaGetLastError(), cudaSuccess) << "something before the call under test left a CUDA error pending";
     failed_run = pooled.run(stream);
     pending_after_the_failure = cudaPeekAtLastError();
   }
 
-  if (failed_run == Error::Ok) {
-    ASSERT_EQ(cudaStreamSynchronize(stream), cudaSuccess);
-    ASSERT_EQ(cudaStreamDestroy(stream), cudaSuccess);
-    GTEST_SKIP() << "the pooled allocation succeeded with the device full, so this run did not take the path under "
-                    "test";
-  }
   ASSERT_EQ(failed_run, Error::MemoryAllocationFailed)
-      << "the run failed somewhere other than the pool's allocation, so it says nothing about that path";
+      << "the run did not fail at the pool's allocation, so it says nothing about that path";
 
   SharedScratchDevice& dev = scratch_pool().get(device_id);
   const bool lock_free = dev.mu.try_lock();
@@ -1801,8 +1777,8 @@ TEST_F(SharedScratchBackendTest, AFailedPooledAllocationLeavesTheDeviceLockFreeA
          "caller makes collects the pool's error as its own";
   cudaGetLastError();
 
-  // And the slot is still usable, not merely unlocked: with the memory back, the
-  // next call allocates and runs.
+  // And the slot is still usable, not merely unlocked: with allocations working
+  // again, the next call allocates and runs.
   ASSERT_TRUE(pooled.fill_output(kSentinel));
   EXPECT_EQ(pooled.run(stream), Error::Ok) << "the pool was left unusable by a call whose allocation failed";
   ASSERT_EQ(cudaStreamSynchronize(stream), cudaSuccess);
@@ -2558,6 +2534,11 @@ TEST_F(SharedScratchBackendTest, AFailedPooledCallDrainsTheHostInputCopyItQueued
   ASSERT_EQ(pooled.load(blob(), 41), Error::Ok);
   ASSERT_TRUE(pooled.handle()->shared_scratch);
   const int device_id = pooled.handle()->device_id;
+  if (pooled.handle()->pageable_host_access) {
+    ASSERT_EQ(cudaStreamDestroy(stream), cudaSuccess);
+    GTEST_SKIP() << "device " << device_id << " reads host memory directly, so execute() stages no input and queues "
+                 << "no copy for a failing call to drain";
+  }
 
   // Pinned: cudaMemcpyAsync from pageable memory does not return until the
   // driver has taken the bytes, so a later write cannot reach the device and
@@ -2568,9 +2549,9 @@ TEST_F(SharedScratchBackendTest, AFailedPooledCallDrainsTheHostInputCopyItQueued
     host_in[i] = pattern(i, 41);
   }
 
-  // One good run first, so the failing one reaches the copy: the staging buffer
-  // is allocated on the call that first needs it, and with the device full that
-  // allocation would fail ahead of everything this case is about.
+  // One good run first, so the failing one reaches the copy whatever the staging
+  // size: the staging buffer is allocated on the call that first needs it, and the
+  // wrapper refuses any request at least as large as the scratch.
   ASSERT_EQ(pooled.run_from_host_input(stream, host_in), Error::Ok);
   ASSERT_EQ(cudaStreamSynchronize(stream), cudaSuccess);
   void* const staging = pooled.staging_buffer_for_input_0();
@@ -2588,13 +2569,7 @@ TEST_F(SharedScratchBackendTest, AFailedPooledCallDrainsTheHostInputCopyItQueued
   ASSERT_TRUE(reset_shared_scratch_pool_for_testing());
   ASSERT_EQ(shared_scratch_capacity_for_testing(device_id), 0u);
 
-  DeviceMemoryHog hog;
-  if (!hog.leave_less_free_than(scratch_bytes_)) {
-    ASSERT_EQ(cudaFreeHost(host_in), cudaSuccess);
-    ASSERT_EQ(cudaStreamDestroy(stream), cudaSuccess);
-    GTEST_SKIP() << "could not take the device below the " << scratch_bytes_
-                 << " bytes this engine's scratch needs, so its allocation would have succeeded";
-  }
+  FailedDeviceAllocations no_room_for_the_scratch(scratch_bytes_);
 
   StreamGate gate;
   ASSERT_EQ(cudaLaunchHostFunc(stream, hold_stream, &gate), cudaSuccess);
@@ -2630,8 +2605,7 @@ TEST_F(SharedScratchBackendTest, AFailedPooledCallDrainsTheHostInputCopyItQueued
   const bool returned_with_the_copy_still_queued = call_returned.load();
   gate_release.release();
   caller.join();
-  // After the gate, because a free is device-wide and would otherwise block on it.
-  hog.release();
+  no_room_for_the_scratch.release();
   ASSERT_EQ(cudaStreamSynchronize(stream), cudaSuccess);
 
   std::vector<float> staged(pooled.elems(), 0.0f);
@@ -2641,12 +2615,8 @@ TEST_F(SharedScratchBackendTest, AFailedPooledCallDrainsTheHostInputCopyItQueued
 
   ASSERT_FALSE(gate.forced_open.load())
       << "the watchdog had to open the gate, so the timings below were not measured under the conditions they describe";
-  if (failed_run == Error::Ok) {
-    GTEST_SKIP() << "the pooled allocation succeeded with the device full, so this run did not fail where the case "
-                    "needs it to";
-  }
   ASSERT_EQ(failed_run, Error::MemoryAllocationFailed)
-      << "the run failed somewhere other than the pool's allocation, so it says nothing about that early return";
+      << "the run did not fail at the pool's allocation, so it says nothing about that early return";
 
   EXPECT_FALSE(returned_with_the_copy_still_queued)
       << "the failing call returned while the copy reading the caller's host input was still queued behind a parked "
@@ -2688,6 +2658,11 @@ TEST_F(SharedScratchBackendTest, AFailedUnpooledCallDrainsTheHostInputCopyItQueu
   ASSERT_EQ(unpooled.load(blob(), 43), Error::Ok);
   ASSERT_FALSE(unpooled.handle()->shared_scratch)
       << "the engine took the pooled path, so this case says nothing about the option-off one";
+  if (unpooled.handle()->pageable_host_access) {
+    ASSERT_EQ(cudaStreamDestroy(stream), cudaSuccess);
+    GTEST_SKIP() << "device " << unpooled.handle()->device_id << " reads host memory directly, so execute() stages "
+                 << "no input and queues no copy for a failing call to drain";
+  }
 
   // Pinned, for the same reason as the case above: a copy from pageable memory
   // waits for the parked stream itself, so the call would block whatever the
@@ -2700,22 +2675,16 @@ TEST_F(SharedScratchBackendTest, AFailedUnpooledCallDrainsTheHostInputCopyItQueu
   std::vector<float> host_out(unpooled.elems(), 0.0f);
 
   // One good run first, so the failing one reaches the copy rather than failing
-  // on the input's own staging allocation with the device full. Its output stays
-  // device-resident, so the output staging buffer is still unallocated -- which is
-  // what the failing run below fails on.
+  // on the input's own staging allocation. Its output stays device-resident, so
+  // the output staging buffer is still unallocated -- which is what the failing
+  // run below fails on.
   ASSERT_EQ(unpooled.run_from_host_input(stream, host_in), Error::Ok);
   ASSERT_EQ(cudaStreamSynchronize(stream), cudaSuccess);
   ASSERT_NE(unpooled.staging_buffer_for_input_0(), nullptr)
       << "the run bound the caller's host memory directly, so nothing was staged and there is no asynchronous copy to "
          "leave running";
 
-  DeviceMemoryHog hog;
-  if (!hog.leave_less_free_than(unpooled.bytes())) {
-    ASSERT_EQ(cudaFreeHost(host_in), cudaSuccess);
-    ASSERT_EQ(cudaStreamDestroy(stream), cudaSuccess);
-    GTEST_SKIP() << "could not take the device below the " << unpooled.bytes()
-                 << " bytes this call's output staging needs, so its allocation would have succeeded";
-  }
+  FailedDeviceAllocations no_room_for_the_output_staging(unpooled.bytes());
 
   StreamGate gate;
   ASSERT_EQ(cudaLaunchHostFunc(stream, hold_stream, &gate), cudaSuccess);
@@ -2739,8 +2708,7 @@ TEST_F(SharedScratchBackendTest, AFailedUnpooledCallDrainsTheHostInputCopyItQueu
 
   gate_release.release();
   caller.join();
-  // After the gate, because a free is device-wide and would otherwise block on it.
-  hog.release();
+  no_room_for_the_output_staging.release();
   ASSERT_EQ(cudaStreamSynchronize(stream), cudaSuccess);
   ASSERT_EQ(cudaFreeHost(host_in), cudaSuccess);
   ASSERT_EQ(cudaStreamDestroy(stream), cudaSuccess);
@@ -2748,13 +2716,9 @@ TEST_F(SharedScratchBackendTest, AFailedUnpooledCallDrainsTheHostInputCopyItQueu
   ASSERT_FALSE(gate.forced_open.load())
       << "the watchdog had to open the gate rather than this case, so what is asserted below was not observed under "
          "the conditions it describes";
-  if (failed_run == Error::Ok) {
-    GTEST_SKIP() << "the output staging allocation succeeded with the device full, so this run did not fail where the "
-                    "case needs it to";
-  }
   ASSERT_EQ(failed_run, Error::MemoryAllocationFailed)
-      << "the run failed somewhere other than the output staging allocation, so it says nothing about the error "
-         "returns between a staged input's copy and the synchronize on the success path";
+      << "the run did not fail at the output staging allocation, so it says nothing about the error returns between "
+         "a staged input's copy and the synchronize on the success path";
 
   EXPECT_FALSE(returned_while_the_stream_was_parked)
       << "a failing call left the host input copy it queued still running: that copy reads the caller's own memory, "
@@ -3120,3 +3084,16 @@ TEST_F(SharedScratchBackendTest, LoadingAnEngineReservesNothingFromTheStreamOrde
 } // namespace
 } // namespace executorch_backend
 } // namespace torch_tensorrt
+
+extern "C" cudaError_t __real_cudaMalloc(void** pointer, std::size_t bytes);
+
+// See fail_cuda_malloc_from and FailedDeviceAllocations.
+extern "C" cudaError_t __wrap_cudaMalloc(void** pointer, std::size_t bytes) {
+  const std::size_t fail_from = torch_tensorrt::executorch_backend::fail_cuda_malloc_from.load();
+  if (fail_from != 0 && bytes >= fail_from) {
+    // A request CUDA refuses outright, so the failure leaves the same pending
+    // error a real out-of-memory does, without touching any memory.
+    return __real_cudaMalloc(pointer, static_cast<std::size_t>(1) << 62);
+  }
+  return __real_cudaMalloc(pointer, bytes);
+}

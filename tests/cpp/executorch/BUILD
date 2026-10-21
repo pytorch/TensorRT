@@ -159,6 +159,10 @@ cc_test(
     name = "test_shared_scratch_backend",
     timeout = "long",
     srcs = ["test_shared_scratch_backend.cpp"],
+    # Injects allocation failures without taking real device memory.
+    linkopts = ["-Wl,--wrap=cudaMalloc"],
+    # The wrapper needs the backend's CUDA reference at this executable's link.
+    linkstatic = True,
     tags = ["exclusive"],
     target_compatible_with = select({
         "//cpp:linux_x86_64": [],
