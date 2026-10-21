@@ -11,6 +11,7 @@ import importlib.abc
 import json
 import os
 import re
+import runpy
 import shlex
 import subprocess
 import sys
@@ -396,12 +397,11 @@ def test_runtime_callers_use_the_shared_pinned_build(caller, job):
     shared = yaml.safe_load(
         (REPO_ROOT / ".github/workflows/build_linux.yml").read_text()
     )
-    step = next(
-        s
-        for s in shared["jobs"]["build"]["steps"]
-        if s.get("name") == "Build the ExecuTorch runtime wheel"
-    )
-    assert step["if"].startswith("${{ inputs.build-executorch-runtime")
+    steps = {s.get("name"): s for s in shared["jobs"]["build"]["steps"]}
+    step = steps["Build the ExecuTorch runtime wheel"]
+    naming = steps["Name the ExecuTorch runtime companion"]
+    assert naming["if"].startswith("${{ inputs.build-executorch-runtime")
+    assert step["if"] == "${{ env.TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION != '' }}"
     # The version arrives through the requirement file, so the pin moves without touching this
     # workflow. Everything else about the install is still asserted here.
     assert "-r packaging/executorch_pin.txt" in step["run"]
@@ -566,6 +566,143 @@ def test_derived_requirements_match_the_pin(monkeypatch) -> None:
     expected = 'import yaml; print(yaml.safe_load(open("dev_dep_versions.yml"))["__executorch_version__"])'
     assert command[:2] == ["python3", "-c"] and len(command) == 3
     assert ast.dump(ast.parse(command[2])) == ast.dump(ast.parse(expected)), command
+
+
+def _companion_version(build_version: str, cuda: str, release_wheel: bool) -> str:
+    """Run the one rule both build workflows use to version the companion."""
+    script = runpy.run_path(str(REPO_ROOT / "packaging/executorch_runtime_version.py"))
+    return script["companion_version"](build_version, cuda, release_wheel)
+
+
+def _published_extras(monkeypatch, companion, release: bool = True) -> dict:
+    """Run setup.py's companion requirement block with the companion the workflow named."""
+    tree = ast.parse((REPO_ROOT / "setup.py").read_text(encoding="utf-8"))
+    blocks = [
+        node
+        for node in tree.body
+        if isinstance(node, (ast.Assign, ast.If))
+        and "EXECUTORCH_RUNTIME_VERSION"
+        in {n.id for n in ast.walk(node) if isinstance(n, ast.Name)}
+    ]
+    assert len(blocks) == 2, "setup.py no longer names the companion in one place"
+    if companion is None:
+        monkeypatch.delenv("TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION", raising=False)
+    else:
+        monkeypatch.setenv("TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION", companion)
+    requirement = _setup_py_requirement(_versions()["__executorch_version__"])
+    namespace: dict = {
+        "os": os,
+        "RELEASE": release,
+        "EXECUTORCH_REQUIREMENT": requirement,
+        "EXTRAS_REQUIRE": {"executorch": [requirement], "all": [requirement]},
+    }
+    exec(compile(ast.Module(blocks, []), "setup.py", "exec"), namespace)
+    return namespace["EXTRAS_REQUIRE"]
+
+
+def _companion_requirements(extras: dict) -> list:
+    return [
+        Requirement(r)
+        for name in ("executorch", "all")
+        for r in extras[name]
+        if r.startswith("torch-tensorrt-executorch-runtime")
+    ]
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "build_version, cuda, release_wheel, expected",
+    [
+        ("2.16.0.dev20261019+cu132", "cu132", False, ".dev20261019+cu132"),
+        ("2.16.0.dev20261019+cu134", "cu134", False, ".dev20261019+cu134"),
+        ("2.16.0+cu132", "cu132", False, "+cu132"),
+        ("2.16.0+cu132", "cu132", True, ""),
+    ],
+)
+def test_published_extras_require_the_companion_built_beside_them(
+    monkeypatch, build_version, cuda, release_wheel, expected
+):
+    """A published wheel requires exactly the companion its own job built, CUDA label included.
+
+    Without the label a cu134 wheel accepts a cu132 companion, so upgrading from the cu132 index
+    to the cu134 one keeps the old companion and the ExecuTorch and CUDA runtime it pins.
+    """
+    main = (REPO_ROOT / "version.txt").read_text().strip().removesuffix("a0")
+    build_version = build_version.replace("2.16.0", main)
+    base = (
+        (REPO_ROOT / "py/torch-tensorrt-executorch-runtime/version.txt")
+        .read_text()
+        .strip()
+    )
+    companion = _companion_version(build_version, cuda, release_wheel)
+    assert companion == f"{base}{expected}"
+    marker = Requirement(
+        _setup_py_requirement(_versions()["__executorch_version__"])
+    ).marker
+    requirements = _companion_requirements(_published_extras(monkeypatch, companion))
+    assert len(requirements) == 2, requirements
+    for requirement in requirements:
+        assert str(requirement.specifier) == f"=={companion}"
+        assert str(requirement.marker) == str(marker)
+        if not release_wheel:
+            other = "cu134" if cuda == "cu132" else "cu132"
+            assert not requirement.specifier.contains(
+                companion.replace(cuda, other), prereleases=True
+            ), f"{requirement} accepts the {other} companion"
+
+
+@pytest.mark.unit
+def test_source_builds_do_not_require_a_companion(monkeypatch):
+    """The lock and editable installs follow the source pins, so they never name a companion."""
+    extras = _published_extras(monkeypatch, "0.3.0.dev20261019+cu132", release=False)
+    assert not _companion_requirements(extras)
+    # A release build whose job builds no companion (RTX, Python-only) names none either.
+    assert not _companion_requirements(_published_extras(monkeypatch, None))
+
+
+@pytest.mark.unit
+def test_an_unexpected_build_version_is_refused():
+    with pytest.raises(ValueError, match="Unexpected torch-tensorrt build version"):
+        _companion_version("9.9.9.dev20261019+cu132", "cu132", False)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "workflow, main_build",
+    [
+        ("build_linux.yml", "Build the wheel (setup-py)"),
+        ("build_windows.yml", "Build the wheel (setup-py) X64"),
+    ],
+)
+def test_the_companion_and_the_requirement_on_it_share_one_version(
+    workflow, main_build
+):
+    """Each build workflow names the companion once, before the main wheel is built.
+
+    The main wheel's requirement and the companion build both read that one variable, so they
+    cannot name different versions, and only a job that names a companion builds one.
+    """
+    steps = yaml.safe_load((REPO_ROOT / ".github/workflows" / workflow).read_text())[
+        "jobs"
+    ]["build"]["steps"]
+    names = [s.get("name") for s in steps]
+    naming = steps[names.index("Name the ExecuTorch runtime companion")]
+    build = steps[names.index("Build the ExecuTorch runtime wheel")]
+    assert names.index("Name the ExecuTorch runtime companion") < names.index(
+        main_build
+    )
+    assert names.index(main_build) < names.index("Build the ExecuTorch runtime wheel")
+    assert (
+        "python packaging/executorch_runtime_version.py ${{ inputs.is-release-wheel }}"
+        in naming["run"]
+    )
+    assert (
+        'TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION=${version}" >> "${GITHUB_ENV}"'
+        in (naming["run"])
+    )
+    assert build["if"] == "${{ env.TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION != '' }}"
+    assert "export TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION" not in build["run"]
+    assert "version.txt" not in build["run"]
 
 
 _RUNTIME_SETUP_PY = "py/torch-tensorrt-executorch-runtime/setup.py"
@@ -981,6 +1118,93 @@ def test_the_executorch_install_message_names_the_torch_channel() -> None:
             f"{path} has no ExecuTorch install message built with executorch_install_command(); "
             "either a site was removed or this scan no longer recognises it"
         )
+
+
+def _load_runtime_install_command(monkeypatch, recorded, cuda="13.2"):
+    """Run the real helper against a build that recorded the given companion version."""
+    tree = ast.parse((REPO_ROOT / "py/torch_tensorrt/_utils.py").read_text("utf-8"))
+    function = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef)
+        and node.name == "executorch_runtime_install_command"
+    )
+    channel, command = _load_utils_channel_helpers(cuda)
+    version = types.ModuleType("torch_tensorrt._version")
+    if recorded is not None:
+        version.__executorch_runtime_version__ = recorded
+    package = types.ModuleType("torch_tensorrt")
+    package._version = version
+    monkeypatch.setitem(sys.modules, "torch_tensorrt", package)
+    monkeypatch.setitem(sys.modules, "torch_tensorrt._version", version)
+    namespace = {
+        "executorch_install_channel": channel,
+        "executorch_install_command": command,
+    }
+    exec(compile(ast.Module([function], []), "<utils-extract>", "exec"), namespace)
+    return namespace["executorch_runtime_install_command"]()
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "recorded, expected",
+    [
+        (
+            "0.3.0.dev20261019+cu132",
+            'pip install "torch-tensorrt-executorch-runtime==0.3.0.dev20261019+cu132" '
+            "--extra-index-url https://download.pytorch.org/whl/nightly/cu132",
+        ),
+        (
+            "0.3.0+cu134",
+            'pip install "torch-tensorrt-executorch-runtime==0.3.0+cu134" '
+            "--extra-index-url https://download.pytorch.org/whl/cu134",
+        ),
+        (
+            "0.3.0",
+            'pip install "torch-tensorrt-executorch-runtime==0.3.0" '
+            "--extra-index-url https://download.pytorch.org/whl/cu132",
+        ),
+    ],
+)
+def test_a_missing_delegate_names_the_exact_companion(monkeypatch, recorded, expected):
+    """The advice names the companion this wheel was built with and the index carrying it."""
+    assert _load_runtime_install_command(monkeypatch, recorded) == expected
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("recorded", ["", None])
+def test_a_build_without_a_companion_says_it_has_none(monkeypatch, recorded):
+    """RTX, Python-only, JetPack and source builds, and a version file from before the field."""
+    message = _load_runtime_install_command(monkeypatch, recorded)
+    assert "has no matching delegate" in message, message
+    assert "pip install" not in message, message
+
+
+@pytest.mark.unit
+def test_the_build_records_the_companion_it_requires(tmp_path) -> None:
+    """The version file carries the same companion the extras require, for the error above."""
+    tree = ast.parse((REPO_ROOT / "setup.py").read_text(encoding="utf-8"))
+    function = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "gen_version_file"
+    )
+    (tmp_path / "torch_tensorrt").mkdir()
+    namespace = {
+        "os": os,
+        "IS_WINDOWS": True,
+        "dir_path": str(tmp_path),
+        "__version__": "2.16.0.dev20261019+cu132",
+        "__cuda_version__": "13.2",
+        "__tensorrt_version__": "11.4.0",
+        "__tensorrt_rtx_version__": "1.7.1",
+        "__tensorrt_llm_version__": "0.17.0",
+        "EXECUTORCH_RUNTIME_VERSION": "0.3.0.dev20261019+cu132",
+    }
+    exec(compile(ast.Module([function], []), "setup.py", "exec"), namespace)
+    namespace["gen_version_file"]()
+    recorded = runpy.run_path(str(tmp_path / "torch_tensorrt/_version.py"))
+    assert recorded["__executorch_runtime_version__"] == "0.3.0.dev20261019+cu132"
 
 
 @pytest.mark.parametrize("cuda", ["13.0", "13.2", None])
