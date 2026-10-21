@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import logging
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 import torch
 import torch.utils._pytree as pytree
@@ -25,6 +25,10 @@ from torch_tensorrt.dynamo.utils import extract_var_range_info
 logger = logging.getLogger(__name__)
 
 SDPA_OP = torch._C._nn.scaled_dot_product_attention
+
+# Length of the static KV cache; None ties it to the largest per-call sequence length. Set before
+# compiling (the lowering pass has no way to receive arguments).
+KV_CACHE_LEN: Optional[int] = None
 
 
 def add_kv_as_outputs(gm, kv_cache_for_graph: List[Tuple[torch.Tensor, torch.Tensor]]):
@@ -60,13 +64,15 @@ def add_kv_as_outputs(gm, kv_cache_for_graph: List[Tuple[torch.Tensor, torch.Ten
     return new_outputs
 
 
-def add_kv_cache_inputs(gm, fixed_kv: bool = True):
+def add_kv_cache_inputs(gm, fixed_kv: bool = True, kv_cache_len: Optional[int] = None):
     """
     Add key-value tensors, index parameters as inputs to the graph.
 
     Args:
         gm: The GraphModule to modify
         fixed_kv: Boolean indicating whether to use static tensors for KV cache. Default is True.
+        kv_cache_len: Length of the static KV cache. Default (None): the maximum of the dynamic
+            sequence-length range, which ties the cache to the largest single call.
 
     Returns:
         A tuple containing:
@@ -87,15 +93,26 @@ def add_kv_cache_inputs(gm, fixed_kv: bool = True):
         static_tensor = torch.randn(key_shape, dtype=tensor.dtype, device=tensor.device)
         return static_tensor
 
-    keys_values = get_kv_nodes(gm)
+    def get_cache_tensor(tensor: torch.Tensor):
+        """Cache for ``tensor`` ([B, H, L, D]): its length is ``kv_cache_len`` (decoupled from the
+        per-call ``L`` range) and a dynamic batch stays dynamic (same symbol as the new keys).
+        """
+        if kv_cache_len is None and not isinstance(tensor.shape[0], torch.SymInt):
+            return get_static_tensor(tensor)
+        seq = kv_cache_len
+        if seq is None:
+            seq = extract_var_range_info(tensor.shape[2])["max"]
+        return tensor.new_empty(
+            (tensor.shape[0], tensor.shape[1], seq, tensor.shape[3])
+        )
 
     kv_inputs = []
-    for idx, key_value in enumerate(keys_values):
+    for key_value in get_kv_nodes(gm):
         k_val = key_value[0].meta["val"]
         v_val = key_value[1].meta["val"]
         if fixed_kv:
-            k_val = get_static_tensor(k_val)
-            v_val = get_static_tensor(v_val)
+            k_val = get_cache_tensor(k_val)
+            v_val = get_cache_tensor(v_val)
 
         # Add new inputs using _add_graph_input
         k_input = _add_graph_input(gm, key_value[0].name + "_k_input", k_val)
@@ -291,7 +308,9 @@ def insert_static_cache_v2(
     """Insert KV cache ops in the graph"""
     """Perform insertion of kv-caches and attention kernel."""
     # Add static key and value as inputs to the graph
-    kv_inputs, start_idx_input, end_idx_input = add_kv_cache_inputs(gm, fixed_kv=True)
+    kv_inputs, start_idx_input, end_idx_input = add_kv_cache_inputs(
+        gm, fixed_kv=True, kv_cache_len=KV_CACHE_LEN
+    )
 
     # Build and update the KV cache using computed KV inputs for current token and
     # incoming keys and values from previous tokens (which were added as inputs)
