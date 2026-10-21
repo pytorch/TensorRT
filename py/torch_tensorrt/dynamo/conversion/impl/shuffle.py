@@ -27,7 +27,7 @@ def reshape(
     name: str,
     input: TRTTensor,
     shape: Sequence[int],
-    zero_is_placeholder: bool = True,
+    zero_is_placeholder: bool = False,  # PyTorch's 0 is an empty dim, not "copy the input's"
 ) -> TRTTensor:
     layer = ctx.net.add_shuffle(input)
     layer.zero_is_placeholder = zero_is_placeholder
