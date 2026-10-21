@@ -65,6 +65,34 @@ class TestCudagraphsCPP(TestCase):
             self.assertTrue(torch.ops.tensorrt.get_cudagraphs_mode())
         self.assertFalse(torch.ops.tensorrt.get_cudagraphs_mode())
 
+    def test_cudagraphs_whole_graph_kwargs_order_cpp(self):
+        # A graph break puts the whole module under one CUDA graph. Keyword arguments
+        # in another order than at export must still reach the right inputs
+        class SampleModel(torch.nn.Module):
+            def forward(self, x, y):
+                return torch.relu((x + 2) * 0.5) - y
+
+        model = SampleModel().eval().cuda()
+        kwargs = {
+            "x": torch.randn(*INPUT_SIZE).cuda(),
+            "y": torch.randn(*INPUT_SIZE).cuda(),
+        }
+        optimized_model = torch_tensorrt.dynamo.compile(
+            torch.export.export(model, (), kwargs),
+            arg_inputs=(),
+            kwarg_inputs=kwargs,
+            min_block_size=1,
+            torch_executed_ops={"torch.ops.aten.mul.Tensor"},
+        )
+        with torch_tensorrt.runtime.enable_cudagraphs(
+            optimized_model
+        ) as cudagraphs_module:
+            for _ in range(TRIALS):
+                x, y = torch.randn(*INPUT_SIZE).cuda(), torch.randn(*INPUT_SIZE).cuda()
+                torch.testing.assert_close(cudagraphs_module(y=y, x=x), model(x=x, y=y))
+
+        torch._dynamo.reset()
+
     def test_cudagraphs_enabled_inference_cpp(self):
         class SampleModel(torch.nn.Module):
             def forward(self, x):
