@@ -281,6 +281,29 @@ class TestSliceConverterDynamicShape(DispatchTestCase):
             use_example_tensors=False,
         )
 
+    def test_slice_negative_start_past_runtime_extent(self):
+        # A sliding-window cache keeps its last window - 1 positions, more than a
+        # short sequence has; the batch is dynamic too
+        class TestModule(torch.nn.Module):
+            def forward(self, input):
+                return torch.ops.aten.slice.Tensor(input, 1, -32, None, 1)
+
+        runtime_input = torch.randn(3, 16)
+        input_specs = [
+            Input(
+                min_shape=(1, 16),
+                opt_shape=(2, 64),
+                max_shape=(4, 128),
+                dtype=torch.float32,
+                torch_tensor=runtime_input,
+            ),
+        ]
+        self.run_test_with_dynamic_shape(
+            TestModule(),
+            input_specs,
+            use_example_tensors=False,
+        )
+
     def test_slice_dynamic_computed_negative_start(self):
         # Regression test for https://github.com/pytorch/TensorRT/issues/4186.
         # Unlike the cases above (a literal negative int start, known at

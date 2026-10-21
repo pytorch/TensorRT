@@ -173,8 +173,21 @@ def slice_op(  # TODO: This should be slice not whatever is in base
         ):
             # special assignments for dynamic cases
             if isinstance(start, int) and start < 0:
-                start_slice = input.shape
-                start_slice[dim] = -1 * start
+                # Count from the end, clamped at 0 like Python: the axis can be
+                # shorter than -start (a sliding window longer than the sequence)
+                dim_size = get_shape(
+                    ctx, target, source_ir, name + "_start_dim_size", input, dim
+                )
+                start_slice[dim] = impl.elementwise.max(
+                    ctx,
+                    target,
+                    source_ir,
+                    name + "_start_from_end",
+                    impl.elementwise.add(
+                        ctx, target, source_ir, name + "_start_plus", dim_size, start
+                    ),
+                    0,
+                )
             if (isinstance(stop, int) and stop < 0) or stop_dynamic_None:
                 stop_slice = [0] * len(input.shape)
                 stop_slice[dim] = -1 * stop
@@ -208,19 +221,6 @@ def slice_op(  # TODO: This should be slice not whatever is in base
                 cast_dtype=trt.int32,
             )
 
-            if isinstance(start, int) and start < 0:
-                shape = get_shape_with_dynamic_shape(
-                    ctx, target, source_ir, name, output_shape, input
-                )
-                start_slice_tensor = convert_binary_elementwise(
-                    ctx,
-                    target,
-                    source_ir,
-                    name + "_sub_start",
-                    trt.ElementWiseOperation.SUB,
-                    shape,
-                    start_slice_tensor,
-                )
             if isinstance(stop, int) and (
                 (stop < 0) or stop_dynamic_None or stop == sys.maxsize
             ):
