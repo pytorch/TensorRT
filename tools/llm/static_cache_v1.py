@@ -290,6 +290,11 @@ def insert_static_cache_v1(
 
     new_out_spec = pytree.tree_flatten(new_output_tensors)[1]
     gm._out_spec = new_out_spec
+    # post_lowering's final recompile resets _out_spec from the pytree codegen
+    if isinstance(gm.graph._codegen, torch.fx.graph._PyTreeCodeGen):
+        gm.graph._codegen.pytree_info = gm.graph._codegen.pytree_info._replace(
+            out_spec=new_out_spec
+        )
     logger.debug("After inserting KV cache into the graph: " + str(gm.graph))
 
     return gm
