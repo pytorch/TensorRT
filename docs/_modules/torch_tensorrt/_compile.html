@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=6f0f7f59"></script>
+    <script src="../../_static/documentation_options.js?v=8a1ce37e"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -1213,6 +1213,7 @@ document.write(`
     <span class="s2">"weight_streaming_budget_per_engine"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
     <span class="s2">"use_cuda_graphs"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
     <span class="s2">"zero_copy_kv"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="s2">"external_engine_data"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">}</span>
 
 
@@ -1325,7 +1326,8 @@ document.write(`
 <span class="sd">        kwargs: Additional format-specific kwargs. ``partitioners=``,</span>
 <span class="sd">                ``compile_specs=``, ``backend_config=``, ``constant_methods=``,</span>
 <span class="sd">                ``transform_passes=``, ``compile_config=``, ``generate_etrecord=``,</span>
-<span class="sd">                ``weight_streaming_budget_per_engine=`` and ``zero_copy_kv=`` are</span>
+<span class="sd">                ``weight_streaming_budget_per_engine=``, ``zero_copy_kv=`` and</span>
+<span class="sd">                ``external_engine_data=`` are</span>
 <span class="sd">                only used with ``output_format="executorch"``; otherwise they are</span>
 <span class="sd">                ignored with a warning. Pass ``compile_specs=[CompileSpec("target_device",</span>
 <span class="sd">                b"cuda:&lt;i&gt;")]`` to override the default target device (``cuda:0``).</span>
@@ -1369,6 +1371,11 @@ document.write(`
 <span class="sd">                :func:`torch_tensorrt.executorch.check_zero_copy_kv` on the</span>
 <span class="sd">                finalized program before writing the file, so a single</span>
 <span class="sd">                ``zero_copy_kv=True`` is enough.</span>
+<span class="sd">                ``external_engine_data=`` (default ``None``) takes a file name without</span>
+<span class="sd">                the ``.ptd`` extension and</span>
+<span class="sd">                writes every TensorRT engine to ``&lt;name&gt;.ptd`` next to the ``.pte``</span>
+<span class="sd">                instead of into it. Pass that file as the program's data file when</span>
+<span class="sd">                loading. See :func:`torch_tensorrt.executorch.export`.</span>
 <span class="sd">    """</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">CudaGraphsTorchTensorRTModule</span><span class="p">):</span>
         <span class="n">module</span> <span class="o">=</span> <span class="n">module</span><span class="o">.</span><span class="n">compiled_module</span>
@@ -1412,6 +1419,7 @@ document.write(`
         <span class="s2">"weight_streaming_budget_per_engine"</span>
     <span class="p">]</span>
     <span class="n">executorch_zero_copy_kv</span> <span class="o">=</span> <span class="n">executorch_options</span><span class="p">[</span><span class="s2">"zero_copy_kv"</span><span class="p">]</span>
+    <span class="n">executorch_external_engine_data</span> <span class="o">=</span> <span class="n">executorch_options</span><span class="p">[</span><span class="s2">"external_engine_data"</span><span class="p">]</span>
 
     <span class="k">if</span> <span class="n">output_format</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">accepted_formats</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
@@ -1435,6 +1443,7 @@ document.write(`
             <span class="p">)</span>
         <span class="c1"># Validate options before input and model-shape checks can obscure type errors.</span>
         <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch.partitioner</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+            <span class="n">normalize_external_engine_data</span><span class="p">,</span>
             <span class="n">normalize_use_cuda_graphs</span><span class="p">,</span>
             <span class="n">normalize_weight_streaming_budget_per_engine</span><span class="p">,</span>
         <span class="p">)</span>
@@ -1443,6 +1452,7 @@ document.write(`
             <span class="n">executorch_weight_streaming_budget_per_engine</span>
         <span class="p">)</span>
         <span class="n">normalize_use_cuda_graphs</span><span class="p">(</span><span class="n">use_cuda_graphs</span><span class="p">)</span>
+        <span class="n">normalize_external_engine_data</span><span class="p">(</span><span class="n">executorch_external_engine_data</span><span class="p">)</span>
         <span class="c1"># For the same reason, the one refusal zero-copy makes on the config</span>
         <span class="c1"># alone. _save_as_executorch reaches it only through</span>
         <span class="c1"># zero_copy_backend_config, which it calls after export() has partitioned</span>
@@ -1606,6 +1616,11 @@ document.write(`
             <span class="s2">"use_cuda_graphs= is only used with output_format='executorch' and will "</span>
             <span class="sa">f</span><span class="s2">"be ignored for output_format='</span><span class="si">{</span><span class="n">output_format</span><span class="si">}</span><span class="s2">'."</span>
         <span class="p">)</span>
+    <span class="k">if</span> <span class="n">executorch_external_engine_data</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">output_format</span> <span class="o">!=</span> <span class="s2">"executorch"</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">"external_engine_data= is only used with output_format='executorch' and "</span>
+            <span class="sa">f</span><span class="s2">"will be ignored for output_format='</span><span class="si">{</span><span class="n">output_format</span><span class="si">}</span><span class="s2">'."</span>
+        <span class="p">)</span>
     <span class="k">if</span> <span class="n">executorch_zero_copy_kv</span> <span class="ow">and</span> <span class="n">output_format</span> <span class="o">!=</span> <span class="s2">"executorch"</span><span class="p">:</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
             <span class="s2">"zero_copy_kv= is only used with output_format='executorch' and will "</span>
@@ -1708,6 +1723,7 @@ document.write(`
                     <span class="n">weight_streaming_budget_per_engine</span><span class="o">=</span><span class="n">executorch_weight_streaming_budget_per_engine</span><span class="p">,</span>
                     <span class="n">use_cuda_graphs</span><span class="o">=</span><span class="n">use_cuda_graphs</span><span class="p">,</span>
                     <span class="n">zero_copy_kv</span><span class="o">=</span><span class="n">executorch_zero_copy_kv</span><span class="p">,</span>
+                    <span class="n">external_engine_data</span><span class="o">=</span><span class="n">executorch_external_engine_data</span><span class="p">,</span>
                 <span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
@@ -1827,6 +1843,7 @@ document.write(`
                         <span class="n">weight_streaming_budget_per_engine</span><span class="o">=</span><span class="n">executorch_weight_streaming_budget_per_engine</span><span class="p">,</span>
                         <span class="n">use_cuda_graphs</span><span class="o">=</span><span class="n">use_cuda_graphs</span><span class="p">,</span>
                         <span class="n">zero_copy_kv</span><span class="o">=</span><span class="n">executorch_zero_copy_kv</span><span class="p">,</span>
+                        <span class="n">external_engine_data</span><span class="o">=</span><span class="n">executorch_external_engine_data</span><span class="p">,</span>
                     <span class="p">)</span>
                 <span class="k">else</span><span class="p">:</span>
                     <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
@@ -1955,6 +1972,7 @@ document.write(`
                         <span class="n">weight_streaming_budget_per_engine</span><span class="o">=</span><span class="n">executorch_weight_streaming_budget_per_engine</span><span class="p">,</span>
                         <span class="n">use_cuda_graphs</span><span class="o">=</span><span class="n">use_cuda_graphs</span><span class="p">,</span>
                         <span class="n">zero_copy_kv</span><span class="o">=</span><span class="n">executorch_zero_copy_kv</span><span class="p">,</span>
+                        <span class="n">external_engine_data</span><span class="o">=</span><span class="n">executorch_external_engine_data</span><span class="p">,</span>
                     <span class="p">)</span>
                 <span class="k">else</span><span class="p">:</span>
                     <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
@@ -1967,20 +1985,21 @@ document.write(`
 <span class="w">    </span><span class="sd">"""Write an ExecuTorch program's external named tensor data (``.ptd``) next to the ``.pte``.</span>
 
 <span class="sd">    The CUDA (AOTInductor) backend emits its weights as external named data</span>
-<span class="sd">    (``save_data_externally``), which ExecuTorch serializes only via</span>
+<span class="sd">    (``save_data_externally``), and so does the TensorRT backend for its engines</span>
+<span class="sd">    when saved with ``external_engine_data=``. ExecuTorch serializes that data only via</span>
 <span class="sd">    ``write_tensor_data_to_file`` -- ``ExecutorchProgram.write_to_file`` does not</span>
-<span class="sd">    persist it. So a partition that carries external weights (e.g. a</span>
-<span class="sd">    ``CudaPartitioner`` delegate) would lose its blob and the ``.pte`` could not</span>
+<span class="sd">    persist it. So a partition that carries external data (e.g. a</span>
+<span class="sd">    ``CudaPartitioner`` delegate) would lose it and the ``.pte`` could not</span>
 <span class="sd">    load. This writes the ``.ptd`` data file(s) into the ``.pte``'s directory when</span>
 <span class="sd">    the program has any; the runtime must then be given those data file(s) (e.g.</span>
-<span class="sd">    via the ExecuTorch ``Module`` data-files argument) to load the weights.</span>
+<span class="sd">    via the ExecuTorch ``Module`` data-files argument) to load the program.</span>
 <span class="sd">    """</span>
     <span class="c1"># Direct attribute access (no getattr default) so a future rename fails loud.</span>
     <span class="k">if</span> <span class="n">executorch_program</span><span class="o">.</span><span class="n">_tensor_data</span><span class="p">:</span>
         <span class="n">out_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">file_path</span><span class="p">))</span>
         <span class="n">executorch_program</span><span class="o">.</span><span class="n">write_tensor_data_to_file</span><span class="p">(</span><span class="n">out_dir</span><span class="p">)</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-            <span class="s2">"Wrote external delegate weights (.ptd) to </span><span class="si">%s</span><span class="s2">; point the runtime's "</span>
+            <span class="s2">"Wrote external delegate data (.ptd) to </span><span class="si">%s</span><span class="s2">; point the runtime's "</span>
             <span class="s2">"data-files at this directory to load them."</span><span class="p">,</span>
             <span class="n">out_dir</span><span class="p">,</span>
         <span class="p">)</span>
@@ -2029,6 +2048,7 @@ document.write(`
         <span class="p">),</span>
         <span class="n">use_cuda_graphs</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"use_cuda_graphs"</span><span class="p">),</span>
         <span class="n">zero_copy_kv</span><span class="o">=</span><span class="n">zero_copy_kv</span><span class="p">,</span>
+        <span class="n">external_engine_data</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"external_engine_data"</span><span class="p">),</span>
     <span class="p">)</span>
     <span class="c1"># Unlike the direct export()+to_executorch() path -- where the two steps</span>
     <span class="c1"># belong to different owners and pairing them is the caller's job -- save()</span>

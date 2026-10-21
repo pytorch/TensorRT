@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=6f0f7f59"></script>
+    <script src="../../../_static/documentation_options.js?v=8a1ce37e"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -556,6 +556,11 @@ document.write(`
 <span class="c1"># error.</span>
 <span class="n">ZERO_COPY_KV_COMPILE_SPEC_KEY</span> <span class="o">=</span> <span class="s2">"zero_copy_kv"</span>
 
+<span class="c1"># CompileSpec key naming the ExecuTorch data file (.ptd) that receives each engine of the</span>
+<span class="c1"># method, so the .pte keeps only the engine's key. The value is the file name without the</span>
+<span class="c1"># .ptd extension. Absent, every engine is stored in the .pte.</span>
+<span class="n">EXTERNAL_ENGINE_DATA_COMPILE_SPEC_KEY</span> <span class="o">=</span> <span class="s2">"external_engine_data"</span>
+
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_schema_name</span><span class="p">(</span><span class="n">target</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Return the qualified op schema name for an OpOverload or EdgeOpOverload."""</span>
@@ -987,6 +992,40 @@ document.write(`
     <span class="k">return</span> <span class="kc">None</span>
 
 
+<span class="k">def</span><span class="w"> </span><span class="nf">_external_engine_tag</span><span class="p">(</span><span class="n">compile_specs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">CompileSpec</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""The .ptd file name, without the extension, that engines go to, or ``None``."""</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch.partitioner</span><span class="w"> </span><span class="kn">import</span> <span class="n">normalize_external_engine_data</span>
+
+    <span class="n">tags</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">spec</span><span class="o">.</span><span class="n">value</span>
+        <span class="k">for</span> <span class="n">spec</span> <span class="ow">in</span> <span class="n">compile_specs</span>
+        <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">spec</span><span class="p">,</span> <span class="s2">"key"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="o">==</span> <span class="n">EXTERNAL_ENGINE_DATA_COMPILE_SPEC_KEY</span>
+    <span class="p">]</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">tags</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">tags</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"TensorRT ExecuTorch backend: compile spec "</span>
+            <span class="sa">f</span><span class="s2">"'</span><span class="si">{</span><span class="n">EXTERNAL_ENGINE_DATA_COMPILE_SPEC_KEY</span><span class="si">}</span><span class="s2">' must appear at most once."</span>
+        <span class="p">)</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="n">tags</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="p">(</span><span class="nb">bytes</span><span class="p">,</span> <span class="nb">bytearray</span><span class="p">)):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"TensorRT ExecuTorch backend: compile spec "</span>
+            <span class="sa">f</span><span class="s2">"'</span><span class="si">{</span><span class="n">EXTERNAL_ENGINE_DATA_COMPILE_SPEC_KEY</span><span class="si">}</span><span class="s2">' must hold the file name as UTF-8 "</span>
+            <span class="sa">f</span><span class="s2">"bytes, not </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">value</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">."</span>
+        <span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">tag</span> <span class="o">=</span> <span class="nb">bytes</span><span class="p">(</span><span class="n">value</span><span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">"utf-8"</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">UnicodeDecodeError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"TensorRT ExecuTorch backend: compile spec "</span>
+            <span class="sa">f</span><span class="s2">"'</span><span class="si">{</span><span class="n">EXTERNAL_ENGINE_DATA_COMPILE_SPEC_KEY</span><span class="si">}</span><span class="s2">' is not valid UTF-8: </span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2">."</span>
+        <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">e</span>
+    <span class="n">normalize_external_engine_data</span><span class="p">(</span><span class="n">tag</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">tag</span>
+
+
 <span class="k">def</span><span class="w"> </span><span class="nf">_get_str</span><span class="p">(</span><span class="n">engine_info</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Any</span><span class="p">],</span> <span class="n">index</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">default</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
     <span class="k">if</span> <span class="n">index</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">index</span> <span class="o">&gt;=</span> <span class="nb">len</span><span class="p">(</span><span class="n">engine_info</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">default</span>
@@ -1005,7 +1044,9 @@ document.write(`
 <span class="w">    </span><span class="sd">"""Backend that serializes TensorRT engines for the native ExecuTorch runtime.</span>
 
 <span class="sd">    The partition contains a single execute_engine node; we extract the engine</span>
-<span class="sd">    and metadata and encode them as a standalone blob. The C++ runtime</span>
+<span class="sd">    and metadata, store the engine as named data (in the .pte, or with</span>
+<span class="sd">    external_engine_data in a .ptd file), and encode its key and the metadata as a</span>
+<span class="sd">    standalone blob. The C++ runtime</span>
 <span class="sd">    backend parses that blob directly without the legacy Torch-TensorRT C++ runtime.</span>
 <span class="sd">    """</span>
 
@@ -1106,10 +1147,16 @@ document.write(`
             <span class="c1"># entry and different engines can never collide on a key.</span>
             <span class="n">engine_key</span><span class="o">=</span><span class="s2">"tensorrt_engine_"</span> <span class="o">+</span> <span class="n">hashlib</span><span class="o">.</span><span class="n">sha256</span><span class="p">(</span><span class="n">engine_bytes</span><span class="p">)</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">(),</span>
         <span class="p">)</span>
-        <span class="c1"># The engine goes to named data by reference and is streamed into the .pte,</span>
-        <span class="c1"># so the delegate blob holds only the header and metadata.</span>
+        <span class="c1"># The engine goes to named data by reference and is streamed into the .pte, or</span>
+        <span class="c1"># into &lt;external_engine_data&gt;.ptd when set, so the delegate blob holds only the</span>
+        <span class="c1"># header and metadata.</span>
         <span class="n">named_data</span> <span class="o">=</span> <span class="n">NamedDataStore</span><span class="p">()</span>
-        <span class="n">named_data</span><span class="o">.</span><span class="n">add_named_data</span><span class="p">(</span><span class="n">metadata</span><span class="o">.</span><span class="n">engine_key</span><span class="p">,</span> <span class="n">engine_bytes</span><span class="p">,</span> <span class="n">alignment</span><span class="o">=</span><span class="mi">16</span><span class="p">)</span>
+        <span class="n">named_data</span><span class="o">.</span><span class="n">add_named_data</span><span class="p">(</span>
+            <span class="n">metadata</span><span class="o">.</span><span class="n">engine_key</span><span class="p">,</span>
+            <span class="n">engine_bytes</span><span class="p">,</span>
+            <span class="n">alignment</span><span class="o">=</span><span class="mi">16</span><span class="p">,</span>
+            <span class="n">external_tag</span><span class="o">=</span><span class="n">_external_engine_tag</span><span class="p">(</span><span class="n">compile_specs</span><span class="p">),</span>
+        <span class="p">)</span>
         <span class="k">return</span> <span class="n">PreprocessResult</span><span class="p">(</span>
             <span class="n">processed_bytes</span><span class="o">=</span><span class="n">serialize_engine</span><span class="p">(</span><span class="sa">b</span><span class="s2">""</span><span class="p">,</span> <span class="n">metadata</span><span class="p">),</span>
             <span class="n">data_store_output</span><span class="o">=</span><span class="n">named_data</span><span class="o">.</span><span class="n">get_named_data_store_output</span><span class="p">(),</span>

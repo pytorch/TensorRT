@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=6f0f7f59"></script>
+    <script src="../../../_static/documentation_options.js?v=8a1ce37e"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -504,6 +504,7 @@ document.write(`
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch.backend</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">ZERO_COPY_KV_COMPILE_SPEC_KEY</span><span class="p">,</span>
     <span class="n">TensorRTBackend</span><span class="p">,</span>
+    <span class="n">_external_engine_tag</span><span class="p">,</span>
     <span class="n">_get_engine_info_for_node</span><span class="p">,</span>
     <span class="n">_get_engine_nodes_in</span><span class="p">,</span>
     <span class="n">_get_str</span><span class="p">,</span>
@@ -586,6 +587,31 @@ document.write(`
             <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">use_cuda_graphs</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">."</span>
         <span class="p">)</span>
     <span class="k">return</span> <span class="sa">b</span><span class="s2">"1"</span> <span class="k">if</span> <span class="n">use_cuda_graphs</span> <span class="k">else</span> <span class="sa">b</span><span class="s2">"0"</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">normalize_external_engine_data</span><span class="p">(</span><span class="n">external_engine_data</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Validate the .ptd file name, given without its extension; None embeds every engine."""</span>
+    <span class="k">if</span> <span class="n">external_engine_data</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">external_engine_data</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+            <span class="s2">"external_engine_data must be a str or None, got "</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">external_engine_data</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">."</span>
+        <span class="p">)</span>
+    <span class="c1"># ExecuTorch writes &lt;name&gt;.ptd beside the .pte, so the name may not leave that directory; on</span>
+    <span class="c1"># Windows "D:engines" is relative to drive D, hence ":". It appends .ptd only when missing, so</span>
+    <span class="c1"># "x.ptd" would share x.ptd with another backend's "x" data and the second write would replace</span>
+    <span class="c1"># the first.</span>
+    <span class="k">if</span> <span class="p">(</span>
+        <span class="n">external_engine_data</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">""</span><span class="p">,</span> <span class="s2">"."</span><span class="p">,</span> <span class="s2">".."</span><span class="p">)</span>
+        <span class="ow">or</span> <span class="nb">any</span><span class="p">(</span><span class="n">c</span> <span class="ow">in</span> <span class="n">external_engine_data</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="s2">"/</span><span class="se">\\</span><span class="s2">:</span><span class="se">\0</span><span class="s2">"</span><span class="p">)</span>
+        <span class="ow">or</span> <span class="n">external_engine_data</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">".ptd"</span><span class="p">)</span>
+    <span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"external_engine_data must be a non-empty file name without a directory, a drive or the "</span>
+            <span class="sa">f</span><span class="s2">".ptd extension, got </span><span class="si">{</span><span class="n">external_engine_data</span><span class="si">!r}</span><span class="s2">."</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="n">external_engine_data</span><span class="o">.</span><span class="n">encode</span><span class="p">()</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_keep_mutated_buffers_above_delegate</span><span class="p">(</span><span class="n">exported_program</span><span class="p">:</span> <span class="n">ExportedProgram</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -686,6 +712,8 @@ document.write(`
                 <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">CUDA_GRAPHS_COMPILE_SPEC_KEY</span><span class="si">}</span><span class="s2"> must appear at most once, with the value "</span>
                 <span class="sa">f</span><span class="s1">'b"0" or b"1", got </span><span class="si">{</span><span class="p">[</span><span class="n">s</span><span class="o">.</span><span class="n">value</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">s</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="n">cuda_graphs</span><span class="p">]</span><span class="si">!r}</span><span class="s1">.'</span>
             <span class="p">)</span>
+        <span class="c1"># export() checks this name too, but a caller can lower with this partitioner directly.</span>
+        <span class="n">_external_engine_tag</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">compile_specs</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">delegation_spec</span> <span class="o">=</span> <span class="n">DelegationSpec</span><span class="p">(</span>
             <span class="n">backend_id</span><span class="o">=</span><span class="n">TensorRTBackend</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
             <span class="n">compile_specs</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">compile_specs</span><span class="p">,</span>
