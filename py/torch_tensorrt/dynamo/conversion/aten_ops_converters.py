@@ -1681,8 +1681,18 @@ def _index_copy_kv_eligible(
     # check as well -- hence isinstance before the comparison, which also keeps
     # a SymInt from turning `== 1` into a guard that specialises the axis.
     if not (isinstance(src_shape[2], int) and src_shape[2] == 1):
-        if not _index_positions_ascend_from_first(index_node):
+        # Partitioning can leave the index's producers in another engine, where the
+        # converter's subgraph no longer shows them: keep the verdict on the node.
+        if _index_positions_ascend_from_first(index_node):
+            node.meta["_kv_positions_ascend"] = True
+        elif not node.meta.get("_kv_positions_ascend"):
             return False
+
+    # TensorRT (11.3, 11.4) can fail to build half-precision networks that chain
+    # dynamic-length writes (one layer's write feeding the next), so those stay
+    # in PyTorch.
+    if not isinstance(src_shape[2], int) and src_val.dtype != torch.float32:
+        return False
 
     return True
 
