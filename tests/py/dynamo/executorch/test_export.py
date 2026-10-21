@@ -54,11 +54,13 @@ COPYBACK_WARNING_ANCHOR = "are declared mutated, so ExecuTorch serializes"
 
 
 class FakeExportedProgram:
-    """A program stand-in carrying the graph module and signature ``export()`` reads.
+    """A program stand-in carrying the graph module, signature and tensors ``export()`` reads.
 
     ``export()`` runs the mutation-declaration pass over every program it is handed, and
-    that pass reads both members. Nothing here is mutated, so the pass finds nothing to
-    declare and hands back the same object.
+    that pass reads the graph module and signature. Nothing here is mutated, so the pass
+    finds nothing to declare and hands back the same object. After lowering it also
+    reads each method's ``state_dict`` and ``constants``, to give the program host
+    copies of any CUDA tensors; these hold none.
     """
 
     def __init__(self):
@@ -66,6 +68,8 @@ class FakeExportedProgram:
         graph.output((graph.placeholder("x"),))
         self.graph_module = torch.fx.GraphModule(torch.nn.Module(), graph)
         self.graph_signature = SimpleNamespace(inputs_to_buffers={}, output_specs=[])
+        self.state_dict = {}
+        self.constants = {}
 
 
 class FakeEdgeProgramManager:
