@@ -135,6 +135,38 @@ where TensorRT cannot take ``erfinv``, the saved program's delegate list reads
     still loads, still reports finding its weights, and returns a wrong answer with no error.
     Give each export its own directory.
 
+.. _executorch_external_engine_data:
+
+Keeping engines in a .ptd file
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+By default every TensorRT engine is stored inside the ``.pte``. Pass ``external_engine_data=``
+with a file name, without the ``.ptd`` extension, and the engines go to ``<name>.ptd`` next to
+the ``.pte`` instead:
+
+.. code-block:: python
+
+    torch_tensorrt.save(
+        trt_gm, "model.pte", output_format="executorch", external_engine_data="model"
+    )
+
+The program then needs that file to load. Pass the file, not its directory:
+
+.. code-block:: python
+
+    program = Runtime.get().load_program(Path("model.pte"), data_path=Path("model.ptd"))
+
+In C++, ``Module module("model.pte", "model.ptd");``. Without the file, the method fails to load
+with ``InvalidExternalData``. The engines are GPU code, so treat the ``.ptd`` as trusted input,
+just like the ``.pte``: nothing checks the engines in it at load.
+
+.. warning::
+
+    The ``.ptd`` name does not depend on the ``.pte`` name, and ``save()`` replaces a file of that
+    name. So two programs saved into one directory with the same ``external_engine_data=`` share
+    one ``.ptd`` that holds only the second program's engines, and the first program then fails
+    to load. Name the file after its program, as above, or give each program its own directory.
+
 Keeping inputs and outputs on the GPU
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
