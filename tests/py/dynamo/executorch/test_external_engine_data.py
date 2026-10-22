@@ -99,12 +99,36 @@ def test_export_leaves_engines_embedded_by_default(program, lowering):
         "a\0b",
         "D:engines",
         "aoti_cuda_blob.ptd",
+        "a b",
+        "a?b",
+        "a*b",
+        "a|b",
+        "a<b",
+        'a"b',
+        "a\nb",
+        "-engines",
+        "engines\u00e9",
+        "x" * 252,
+        "NUL",
+        "con",
+        "Com1",
+        "lpt9.engines",
     ],
 )
 def test_export_rejects_a_name_that_is_not_a_plain_file_name(program, lowering, value):
-    with pytest.raises(ValueError, match="external_engine_data must be"):
+    with pytest.raises(ValueError, match="external_engine_data must"):
         torch_tensorrt.executorch.export(program, external_engine_data=value)
     lowering.assert_not_called()
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "value", ["engines", "my-model_v2.1", "_x", "COM10", "x" * 251]
+)
+def test_export_accepts_a_plain_file_name(program, lowering, value):
+    torch_tensorrt.executorch.export(program, external_engine_data=value)
+    specs = _trt_specs(lowering)["forward"]
+    assert [s.value for s in specs if s.key == _KEY] == [value.encode()]
 
 
 @pytest.mark.unit
@@ -130,7 +154,7 @@ def test_export_rejects_a_name_that_is_not_a_str(program, lowering, value):
 def test_the_partitioner_rejects_a_name_that_is_not_a_plain_file_name(value):
     from torch_tensorrt.executorch.partitioner import TensorRTPartitioner
 
-    with pytest.raises(ValueError, match="external_engine_data must be"):
+    with pytest.raises(ValueError, match="external_engine_data must"):
         TensorRTPartitioner([CompileSpec(_KEY, value.encode())])
 
 
@@ -177,7 +201,7 @@ def test_save_forwards_the_name_to_export(monkeypatch, tmp_path, program, path):
 
 @pytest.mark.unit
 def test_save_checks_the_name_before_the_model_and_input_checks(tmp_path):
-    with pytest.raises(ValueError, match="external_engine_data must be"):
+    with pytest.raises(ValueError, match="external_engine_data must"):
         torch_tensorrt.save(
             torch.fx.symbolic_trace(torch.nn.Identity()),
             str(tmp_path / "model.pte"),
