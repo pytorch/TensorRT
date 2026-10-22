@@ -1515,10 +1515,15 @@ def _write_external_tensor_data(executorch_program: Any, file_path: str) -> None
     if executorch_program._tensor_data:
         out_dir = os.path.dirname(os.path.abspath(file_path))
         executorch_program.write_tensor_data_to_file(out_dir)
+        # write_tensor_data_to_file adds .ptd unless the name already ends with it.
+        paths = [
+            os.path.join(out_dir, name if name.endswith(".ptd") else f"{name}.ptd")
+            for name in executorch_program._tensor_data
+        ]
         logger.info(
-            "Wrote external delegate data (.ptd) to %s; point the runtime's "
-            "data-files at this directory to load them.",
-            out_dir,
+            "Wrote external delegate data to %s. Pass the .ptd file, not its "
+            "directory, as the program's data file when loading it.",
+            ", ".join(paths),
         )
 
 

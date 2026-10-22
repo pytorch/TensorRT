@@ -199,6 +199,19 @@ def test_save_refuses_a_program_path_the_engines_would_overwrite(tmp_path):
 
 
 @pytest.mark.unit
+def test_save_logs_the_data_file_to_load(tmp_path, caplog):
+    from torch_tensorrt._compile import _write_external_tensor_data
+
+    program = SimpleNamespace(
+        _tensor_data={"engines": object()}, write_tensor_data_to_file=MagicMock()
+    )
+    with caplog.at_level(logging.INFO, logger="torch_tensorrt._compile"):
+        _write_external_tensor_data(program, str(tmp_path / "model.pte"))
+    program.write_tensor_data_to_file.assert_called_once_with(str(tmp_path))
+    assert str(tmp_path / "engines.ptd") in caplog.text
+
+
+@pytest.mark.unit
 @pytest.mark.parametrize("value", [None, "engines"])
 def test_save_warns_and_does_not_forward_for_other_formats(
     monkeypatch, tmp_path, program, caplog, value
