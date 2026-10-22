@@ -9,6 +9,7 @@
 // every SharedEnginesTest case skips, and TORCHTRT_EXECUTORCH_REQUIRE_CUDA=1 turns that skip into a
 // failure. If TensorRT cannot build the engines, every fixture case fails. The other suites need no device.
 
+#include "torch_tensorrt/executorch/EngineHandle.h"
 #include "torch_tensorrt/executorch/SharedEngineKey.h"
 #include "torch_tensorrt/executorch/SharedEngineTestHooks.h"
 #include "torch_tensorrt/executorch/TensorRTBackend.h"

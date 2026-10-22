@@ -100,9 +100,13 @@ Without an imported target to carry them, the include directories and the compil
 definitions have to be applied by hand as well, which is what the three variables
 above are for.
 
-There is nothing to include. The delegate has no public header: it registers
+There is nothing to include. The wheel ships no header: the delegate registers
 itself with ExecuTorch's backend registry from a static initializer inside the
 shared library, and everything after that is ExecuTorch's own runtime API. The
+one feature this leaves out is choosing an optimization profile, which needs
+`OptimizationProfileGuard` from `torch_tensorrt/executorch/TensorRTBackend.h`.
+Linked from this wheel, every engine runs its profile 0. Build against the
+source tree or the release tarball to select profiles. The
 CMake target links the library with `--no-as-needed`, because nothing in a
 consumer references a symbol the delegate defines, and the default would drop it
 and leave the backend unregistered.
