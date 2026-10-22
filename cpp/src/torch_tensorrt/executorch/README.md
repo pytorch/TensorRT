@@ -331,17 +331,26 @@ pending CUDA error to classify TensorRT failures.
 
 An engine serialized without its weights, for example compiled with
 `immutable_weights=False, strip_engine_weights=True`, is refused with
-`Error::InvalidProgram`, since this backend cannot refit it. A stripped engine
-with no weights at all loads, since it has nothing to restore. To tell the two
-apart, loading an ordinary engine that has weights asks TensorRT for its stripped
-size, and TensorRT logs one warning per engine that it was not built with
-`kSTRIP_PLAN`. The backend forwards it at Info level, and it is harmless.
+`Error::InvalidProgram`, because this backend cannot refit it. To check, the backend
+asks TensorRT how many weight bytes the plan still holds, and refuses the plan when that
+is less than its total:
+
+- A stripped plan that had nothing to strip still holds all its weights, so it loads.
+- A plan with no weights at all loads.
+- A stripped plan saved again as it is still counts as stripped, so it is refused.
+- A stripped plan saved again without `SerializationFlag::kEXCLUDE_WEIGHTS`, and not
+  refitted first, no longer counts as stripped, so this check does not catch it. Refit a
+  stripped plan before you save it again with its weights.
+
+For an ordinary engine with weights, the question makes TensorRT log a warning that the
+engine was not built with `BuilderFlag::kSTRIP_PLAN`, each time the engine is
+deserialized. The backend forwards it at Info level, and it is harmless.
 
 ## Engines in a .ptd file
 
 A program exported with `external_engine_data=` keeps its engines in a `.ptd` file
 next to the `.pte`. Load it with that file, for example
-`Module module("model.pte", "engines.ptd");`. Without the file, or with one that
+`Module module("model.pte", "model.ptd");`. Without the file, or with one that
 lacks the engine, loading returns `Error::InvalidExternalData`. A program that shares
 `aoti_cuda_blob.ptd` with the CUDA backend can fail first in that backend, with
 `Error::NotFound`.
