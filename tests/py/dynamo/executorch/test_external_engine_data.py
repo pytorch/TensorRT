@@ -187,6 +187,18 @@ def test_save_checks_the_name_before_the_model_and_input_checks(tmp_path):
 
 
 @pytest.mark.unit
+def test_save_refuses_a_program_path_the_engines_would_overwrite(tmp_path):
+    with pytest.raises(ValueError, match="engines would replace the program"):
+        torch_tensorrt.save(
+            torch.fx.symbolic_trace(torch.nn.Identity()),
+            str(tmp_path / "engines.ptd"),
+            output_format="executorch",
+            external_engine_data="engines",
+        )
+    assert not any(tmp_path.iterdir())
+
+
+@pytest.mark.unit
 @pytest.mark.parametrize("value", [None, "engines"])
 def test_save_warns_and_does_not_forward_for_other_formats(
     monkeypatch, tmp_path, program, caplog, value

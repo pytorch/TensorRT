@@ -963,6 +963,14 @@ def save(
         )
         normalize_use_cuda_graphs(use_cuda_graphs)
         normalize_external_engine_data(executorch_external_engine_data)
+        if executorch_external_engine_data is not None and os.path.normcase(
+            os.path.basename(file_path)
+        ) == os.path.normcase(f"{executorch_external_engine_data}.ptd"):
+            raise ValueError(
+                f"file_path {file_path!r} is the file external_engine_data="
+                f"{executorch_external_engine_data!r} writes the engines to, so the "
+                "engines would replace the program. Give the two different names."
+            )
         # For the same reason, the one refusal zero-copy makes on the config
         # alone. _save_as_executorch reaches it only through
         # zero_copy_backend_config, which it calls after export() has partitioned
