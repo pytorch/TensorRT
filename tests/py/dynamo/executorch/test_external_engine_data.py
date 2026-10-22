@@ -85,26 +85,59 @@ def test_export_leaves_engines_embedded_by_default(program, lowering):
     assert not any(s.key == _KEY for s in _trt_specs(lowering)["forward"])
 
 
+_CHARACTERS = "external_engine_data must use only ASCII letters"
+_LENGTH = "external_engine_data must be at most 251 characters"
+_PTD = "external_engine_data must not end with .ptd"
+_DEVICE = "external_engine_data must not be a Windows device name"
+
+
 @pytest.mark.unit
 @pytest.mark.parametrize(
-    "value",
+    "value, message",
     [
-        "",
-        ".",
-        "..",
-        "a/b",
-        "../engines",
-        "/abs",
-        "a\\b",
-        "a\0b",
-        "D:engines",
-        "aoti_cuda_blob.ptd",
+        ("", _CHARACTERS),
+        (".", _CHARACTERS),
+        ("..", _CHARACTERS),
+        ("a/b", _CHARACTERS),
+        ("../engines", _CHARACTERS),
+        ("/abs", _CHARACTERS),
+        ("a\\b", _CHARACTERS),
+        ("a\0b", _CHARACTERS),
+        ("D:engines", _CHARACTERS),
+        ("aoti_cuda_blob.ptd", _PTD),
+        ("a b", _CHARACTERS),
+        ("a+b", _CHARACTERS),
+        ("a?b", _CHARACTERS),
+        ("a*b", _CHARACTERS),
+        ("a|b", _CHARACTERS),
+        ("a<b", _CHARACTERS),
+        ('a"b', _CHARACTERS),
+        ("a\nb", _CHARACTERS),
+        ("-engines", _CHARACTERS),
+        ("engines\u00e9", _CHARACTERS),
+        ("x" * 252, _LENGTH),
+        ("NUL", _DEVICE),
+        ("con", _DEVICE),
+        ("Com1", _DEVICE),
+        ("lpt9.engines", _DEVICE),
     ],
 )
-def test_export_rejects_a_name_that_is_not_a_plain_file_name(program, lowering, value):
-    with pytest.raises(ValueError, match="external_engine_data must be"):
+def test_export_rejects_a_name_that_is_not_a_plain_file_name(
+    program, lowering, value, message
+):
+    with pytest.raises(ValueError, match=message):
         torch_tensorrt.executorch.export(program, external_engine_data=value)
     lowering.assert_not_called()
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "value", ["engines", "my-model_v2.1", "_x", "COM10", "x" * 251]
+)
+def test_export_accepts_a_plain_file_name(program, lowering, value):
+    torch_tensorrt.executorch.export(program, external_engine_data=value)
+    specs = _trt_specs(lowering)["forward"]
+    assert [s.value for s in specs if s.key == _KEY] == [value.encode()]
 
 
 @pytest.mark.unit
@@ -126,11 +159,14 @@ def test_export_rejects_a_name_that_is_not_a_str(program, lowering, value):
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("value", ["../outside", "/abs", "x.ptd"])
-def test_the_partitioner_rejects_a_name_that_is_not_a_plain_file_name(value):
+@pytest.mark.parametrize(
+    "value, message",
+    [("../outside", _CHARACTERS), ("/abs", _CHARACTERS), ("x.ptd", _PTD)],
+)
+def test_the_partitioner_rejects_a_name_that_is_not_a_plain_file_name(value, message):
     from torch_tensorrt.executorch.partitioner import TensorRTPartitioner
 
-    with pytest.raises(ValueError, match="external_engine_data must be"):
+    with pytest.raises(ValueError, match=message):
         TensorRTPartitioner([CompileSpec(_KEY, value.encode())])
 
 
@@ -177,7 +213,7 @@ def test_save_forwards_the_name_to_export(monkeypatch, tmp_path, program, path):
 
 @pytest.mark.unit
 def test_save_checks_the_name_before_the_model_and_input_checks(tmp_path):
-    with pytest.raises(ValueError, match="external_engine_data must be"):
+    with pytest.raises(ValueError, match="external_engine_data must"):
         torch_tensorrt.save(
             torch.fx.symbolic_trace(torch.nn.Identity()),
             str(tmp_path / "model.pte"),
