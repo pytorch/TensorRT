@@ -5,12 +5,13 @@
 
 from ._context import execute_in_torch, fuse_in_plugin
 from ._errors import RegionCaptureError, RegionError
-from ._generation import KernelGenerator
+from ._generation import KernelGenerator, SearchPolicy
 
 __all__ = [
     "execute_in_torch",
     "fuse_in_plugin",
     "KernelGenerator",
+    "SearchPolicy",
     "RegionError",
     "RegionCaptureError",
 ]

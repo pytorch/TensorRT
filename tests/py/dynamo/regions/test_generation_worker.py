@@ -6,6 +6,7 @@
 import json
 import subprocess
 import sys
+from types import SimpleNamespace
 
 import pytest
 import torch
@@ -235,6 +236,130 @@ def test_error_report_retains_cause_and_stage_without_local_paths(tmp_path):
     assert "\x1b" not in report["error"]
 
 
+@pytest.fixture
+def mocked_evaluation(monkeypatch, tmp_path):
+    from torch_tensorrt.dynamo.region_compilation._generation import _backends
+
+    reference = torch.fx.symbolic_trace(torch.nn.ReLU())
+    backend = SimpleNamespace(
+        validate_candidate=lambda candidate, *args: dict(candidate, grid=[2]),
+        make_registration=lambda *args: object(),
+    )
+    monkeypatch.setattr(_backends, "get_backend", lambda name: backend)
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "set_device", lambda device: None)
+    monkeypatch.setattr(torch, "load", lambda *args, **kwargs: reference)
+    monkeypatch.setattr(
+        _worker, "_input_cases", lambda *args, **kwargs: iter([(torch.ones(7),)])
+    )
+    monkeypatch.setattr(_worker, "_build_engine", lambda *args: reference)
+    monkeypatch.setattr(_worker, "_build_reference_engine", lambda *args: reference)
+    monkeypatch.setattr(
+        _worker,
+        "_benchmark",
+        lambda functions, *args: {
+            name: {"median_ms": 1.0, "samples_ms": [1.0, 1.0, 1.0]}
+            for name in functions
+        },
+    )
+    candidate = {
+        "source": "source must not be copied into diagnostics",
+        "kernel_name": "generated",
+        "grid": [1],
+        "block": [32],
+        "shared_mem_bytes": 512,
+    }
+    request = {
+        "backend": "cuda_cpp",
+        "candidate": candidate,
+        "incumbent": candidate,
+        "inputs": [dict(_spec(), device="cuda:0")],
+        "outputs": [_spec()],
+        "reference_path": str(tmp_path / "reference.pt"),
+        "num_tests": 1,
+        "check_nonfinite": False,
+        "benchmark_iters": 1,
+        "objective": "tensorrt",
+    }
+    return request, backend
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+def test_optional_diagnostics_measure_existing_builds_without_inventing_resources(
+    tmp_path, monkeypatch, mocked_evaluation, enabled
+):
+    request, _ = mocked_evaluation
+    if enabled:
+        request["diagnostics"] = True
+    ticks = iter([1.0, 1.25, 2.0, 2.5, 3.0, 4.0] if enabled else [])
+    monkeypatch.setattr(_worker.time, "perf_counter", lambda: next(ticks))
+    result = _worker.evaluate(request, tmp_path)
+    assert result["status"] == "passed"
+    assert result["tests"] == 1
+    if not enabled:
+        assert "diagnostics" not in result
+        return
+    details = result["diagnostics"]
+    for name, elapsed in (("candidate", 250.0), ("incumbent", 500.0)):
+        assert details[name]["compilation_ms"] == elapsed
+        assert details[name]["compilation_status"] == "completed"
+        assert details[name]["launch"]["grid"] == [2]
+        assert details[name]["launch"]["shared_mem_bytes"] == 512
+        assert details[name]["launch_basis"] == "validated_proposal"
+        resources = details[name]["compiler_resources"]
+        assert resources["registers_per_thread"] is None
+        assert resources["shared_memory_bytes"] is None
+        assert "does not expose" in resources["unavailable_reason"]
+        assert "source" not in details[name]["launch"]
+    assert details["baseline"]["compilation_ms"] == 1000.0
+    assert details["baseline"]["compilation_status"] == "completed"
+    json.dumps(result, allow_nan=False)
+
+
+@pytest.mark.parametrize("stage", ["compile", "engine", "correctness", "baseline"])
+def test_failed_evaluation_keeps_measured_compilation_diagnostics(
+    tmp_path, monkeypatch, mocked_evaluation, stage
+):
+    request, backend = mocked_evaluation
+    request["diagnostics"] = True
+    ticks = iter([1.0, 1.25, 2.0, 2.5, 3.0, 4.0])
+    monkeypatch.setattr(_worker.time, "perf_counter", lambda: next(ticks))
+
+    def fail(*args):
+        raise _worker._EvaluationError(stage, "build failed")
+
+    if stage == "compile":
+        backend.make_registration = fail
+    elif stage == "engine":
+        monkeypatch.setattr(_worker, "_build_engine", fail)
+    elif stage == "baseline":
+        monkeypatch.setattr(_worker, "_build_reference_engine", fail)
+    else:
+        monkeypatch.setattr(_worker, "_build_engine", lambda *args: lambda x: x + 1)
+    with pytest.raises(_worker._EvaluationError) as failure:
+        _worker.evaluate(request, tmp_path)
+    report = _worker._error_report(failure.value, tmp_path, "search")
+    assert report["stage"] == stage
+    details = report["diagnostics"]
+    assert details["candidate"]["compilation_ms"] == 250.0
+    if stage in {"compile", "engine"}:
+        assert details["candidate"]["compilation_status"] == "failed"
+        assert details["incumbent"]["compilation_status"] == "not_started"
+        assert details["incumbent"]["compilation_ms"] is None
+    else:
+        assert details["candidate"]["compilation_status"] == "completed"
+        assert details["baseline"]["compilation_status"] == (
+            "failed" if stage == "baseline" else "completed"
+        )
+    json.dumps(report, allow_nan=False)
+
+
+def test_diagnostics_flag_requires_a_boolean(tmp_path):
+    with pytest.raises(_worker._EvaluationError, match="must be a boolean") as failure:
+        _worker.evaluate({"diagnostics": "true"}, tmp_path)
+    assert failure.value.stage == "source"
+
+
 def test_restore_metadata_rebuilds_plugin_boundaries_without_intermediate_values():
     class Reference(torch.nn.Module):
         def forward(self, x, y):
@@ -333,6 +458,7 @@ def generated(arg0, out0, out1, N: tl.constexpr, BLOCK: tl.constexpr):
         "validation_phase": "holdout",
         "objective": objective,
         "benchmark_repeats": 3,
+        "diagnostics": True,
     }
     if correct:
         request["incumbent"] = dict(request["candidate"])
@@ -354,6 +480,11 @@ def generated(arg0, out0, out1, N: tl.constexpr, BLOCK: tl.constexpr):
     )
     assert process.returncode == 0, process.stdout + process.stderr
     report = json.loads(result_path.read_text())
+    details = report["diagnostics"]["candidate"]
+    assert details["compilation_ms"] > 0
+    assert details["compilation_status"] == "completed"
+    assert details["launch"]["grid"] == [4]
+    assert details["compiler_resources"]["registers_per_thread"] is None
     if correct:
         assert report["status"] == "passed", report
         assert report["measurement"] == "cuda_graph"

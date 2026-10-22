@@ -20,6 +20,8 @@ with a matching tileiras compiler. CUDA C++ needs CUDA Python's ``cuda-core`` an
     python examples/dynamo/agentic_region_kernel_generation.py --instructions "Try 256-element tiles."
     python examples/dynamo/agentic_region_kernel_generation.py --instruction-file kernel-guidance.md
     python examples/dynamo/agentic_region_kernel_generation.py --objective tensorrt --min-speedup 1.05
+    python examples/dynamo/agentic_region_kernel_generation.py --batch-size 2 --max-candidates 12 --tuning '{"num_warps":[4,8]}' --finalists 2
+    python examples/dynamo/agentic_region_kernel_generation.py --resume --diagnostics
 
 For Claude, use its normal interactive login, then pass ``--provider claude``.
 ``--model`` optionally selects a model; otherwise the CLI keeps its default.
@@ -30,13 +32,37 @@ The author receives the marked region, packaged backend guidance, any explicit
 user instructions, and measured feedback. It can request bounded pages of
 recorded evidence. Torch-TensorRT compiles proposals into isolated QDP engines,
 checks correctness, and compares interleaved timing samples. The selected
-candidate receives fresh final validation before its plugin is installed.
+candidate receives fresh final validation before its plugin is installed. With
+multiple ``finalists``, a failed final check falls through to the next candidate.
 Inference needs neither an agent nor a Python kernel launcher.
 
 Rerun the same command to reuse a kernel without an agent call when cache
 revalidation passes. Logs identify generated source and the artifact directory
 containing the task, exact instructions, per-attempt feedback, and accepted
 candidate. Changed guidance changes the cache key.
+
+``SearchPolicy`` separates author rounds from actual search evaluations::
+
+    SearchPolicy(
+        batch_size=2,
+        max_candidates=12,
+        max_no_improvement=2,
+        max_variants=4,
+        finalists=2,
+        tuning={"num_warps": (4, 8)},
+        resume=True,
+    )
+
+The tuning domain above is for Triton. The controller evaluates launch variants
+through the same correctness checks as authored candidates. ``--attempts`` caps
+author rounds; ``--max-candidates`` caps search evaluations, including tuning,
+resumed candidates, and diagnostic evaluations. Without an explicit candidate
+cap, the limit is attempts times batch size. Final validation and cache checks
+do not consume candidate slots; final validation reserves time within the
+overall timeout. Resuming loads compatible evidence and
+remeasures retained candidates; each invocation has fresh time and search
+budgets. An accepted cache entry still receives fresh validation before reuse.
+Optional diagnostics report actual compiler and execution facts.
 
 The default ``candidate`` objective ranks correct generated candidates. Choose
 ``eager`` or ``tensorrt`` to require a speedup against that region's PyTorch or
@@ -55,7 +81,11 @@ import torch
 import torch_tensorrt
 from torch_tensorrt.dynamo.region_compilation import get_region_records
 from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
-from torch_tensorrt.region_annotations import KernelGenerator, fuse_in_plugin
+from torch_tensorrt.region_annotations import (
+    KernelGenerator,
+    SearchPolicy,
+    fuse_in_plugin,
+)
 
 
 class Model(torch.nn.Module):
@@ -94,7 +124,20 @@ def main():
         help="Required baseline/candidate latency ratio for eager or tensorrt",
     )
     parser.add_argument(
-        "--attempts", type=int, default=3, help="Maximum candidate proposals per region"
+        "--attempts", type=int, default=3, help="Maximum author rounds per region"
+    )
+    parser.add_argument("--batch-size", type=int, default=1)
+    parser.add_argument("--max-candidates", type=int)
+    parser.add_argument("--max-no-improvement", type=int)
+    parser.add_argument("--max-variants", type=int, default=8)
+    parser.add_argument("--finalists", type=int, default=1)
+    parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--diagnostics", action="store_true")
+    parser.add_argument(
+        "--tuning",
+        type=json.loads,
+        default={},
+        help='JSON knob domains; Triton example: {"num_warps":[4,8]}',
     )
     parser.add_argument(
         "--timeout",
@@ -121,6 +164,16 @@ def main():
         max_attempts=args.attempts,
         timeout_s=args.timeout,
         cache_dir=args.cache_dir,
+        search=SearchPolicy(
+            batch_size=args.batch_size,
+            max_candidates=args.max_candidates,
+            max_no_improvement=args.max_no_improvement,
+            max_variants=args.max_variants,
+            finalists=args.finalists,
+            resume=args.resume,
+            tuning=args.tuning,
+        ),
+        diagnostics=args.diagnostics,
     )
     torch.manual_seed(0)
     inputs = tuple(torch.randn(257, 1025, device="cuda") for _ in range(3))

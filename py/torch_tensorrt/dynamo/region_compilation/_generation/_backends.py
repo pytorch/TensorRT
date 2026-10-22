@@ -14,6 +14,8 @@ from __future__ import annotations
 import copy
 import importlib
 import importlib.metadata
+import itertools
+import keyword
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
@@ -169,13 +171,18 @@ class _BuiltinBackend:
     def validate_candidate(
         self, proposal: dict[str, Any], num_inputs: int, num_outputs: int
     ) -> dict[str, Any]:
+        normalized: dict[str, Any]
         if self.name == "cuda_cpp":
             from ._cuda import validate_cuda_candidate
 
-            return validate_cuda_candidate(proposal, num_inputs, num_outputs)
-        from ._candidate import _validate_dsl_candidate
+            normalized = validate_cuda_candidate(proposal, num_inputs, num_outputs)
+        else:
+            from ._candidate import _validate_dsl_candidate
 
-        return _validate_dsl_candidate(proposal, self.name, num_inputs, num_outputs)
+            normalized = _validate_dsl_candidate(
+                proposal, self.name, num_inputs, num_outputs
+            )
+        return normalized
 
     def make_registration(
         self,
@@ -229,3 +236,137 @@ def get_backend(name: str) -> GenerationBackend:
     ):
         raise ValueError(f"Backend {name!r} does not implement GenerationBackend")
     return cast(GenerationBackend, backend)
+
+
+def _matches_tuning_schema(value: Any, schema: dict[str, Any] | bool) -> bool:
+    """Reject incompatible JSON shapes; full schema validation belongs to the backend.
+
+    Unknown constraints are deliberately ignored. In particular, ``oneOf`` can
+    distinguish overlapping shapes using constraints such as ``pattern`` or
+    ``$ref``, so this preliminary check cannot require an exclusive match.
+    """
+    if isinstance(schema, bool):
+        return schema
+    for operator in ("anyOf", "oneOf"):
+        if operator in schema and not any(
+            _matches_tuning_schema(value, option) for option in schema[operator]
+        ):
+            return False
+    kinds = schema.get("type", [])
+    kinds = [kinds] if isinstance(kinds, str) else kinds
+    matches = {
+        "null": value is None,
+        "boolean": type(value) is bool,
+        "integer": type(value) is int or (type(value) is float and value.is_integer()),
+        "number": type(value) in (int, float),
+        "string": isinstance(value, str),
+        "array": isinstance(value, list),
+        "object": isinstance(value, dict),
+    }
+    if kinds and not any(matches.get(kind, False) for kind in kinds):
+        return False
+    if "enum" in schema and value not in schema["enum"]:
+        return False
+    if type(value) in (int, float):
+        if "minimum" in schema and value < schema["minimum"]:
+            return False
+        if "maximum" in schema and value > schema["maximum"]:
+            return False
+    if isinstance(value, list):
+        if (
+            not schema.get("minItems", 0)
+            <= len(value)
+            <= schema.get("maxItems", len(value))
+        ):
+            return False
+        if isinstance(schema.get("items"), dict) and not all(
+            _matches_tuning_schema(item, schema["items"]) for item in value
+        ):
+            return False
+    return True
+
+
+def validate_tuning_space(
+    backend_name: str, tuning: dict[str, tuple[Any, ...]]
+) -> dict[str, list[Any]]:
+    """Snapshot backend-declared tuning choices without accepting source overrides.
+
+    ``constants.NAME`` changes an existing named compile-time constant. Arbitrary
+    nested paths are not supported. Source/ABI and cross-field launch checks are
+    performed by ``validate_candidate`` on each materialized variant.
+    """
+    from torch_tensorrt.region_annotations._generation import _snapshot_tuning
+
+    choices = _snapshot_tuning(tuning)
+    properties = get_backend(backend_name).proposal_schema.get("properties", {})
+    result = {}
+    for name in sorted(choices):
+        if name in ("source", "kernel_name"):
+            raise ValueError(f"Tuning cannot override {name!r}")
+        if name.startswith("constants."):
+            constant = name.removeprefix("constants.")
+            if (
+                not constant.isidentifier()
+                or keyword.iskeyword(constant)
+                or "__" in constant
+            ):
+                raise ValueError(f"Invalid tuning constant name: {constant!r}")
+            if "constants" in choices:
+                raise ValueError("Tune either constants or constants.NAME, not both")
+            schema = properties.get("constants", {})
+            for key in ("items", "properties", "value"):
+                schema = schema.get(key) if isinstance(schema, dict) else None
+        else:
+            schema = properties.get(name)
+        if not isinstance(schema, (dict, bool)):
+            raise ValueError(f"Backend {backend_name!r} has no tunable field {name!r}")
+        if not all(_matches_tuning_schema(value, schema) for value in choices[name]):
+            raise ValueError(
+                f"Tuning choices for {name!r} do not match the backend schema"
+            )
+        result[name] = list(choices[name])
+    return result
+
+
+def candidate_variants(
+    candidate: dict[str, Any],
+    backend_name: str,
+    tuning: dict[str, Any],
+    limit: int,
+) -> list[dict[str, Any]]:
+    """Enumerate a deterministic bounded product, always applying every knob.
+
+    With a tuning space, every returned proposal has all configured overrides.
+    No Python expressions or launch callbacks are accepted as tuning values.
+    """
+    if type(limit) is not int or not 0 <= limit <= 4096:
+        raise ValueError("Variant limit must be an integer in [0, 4096]")
+    if not isinstance(candidate, dict):
+        raise ValueError("A candidate must be a JSON object")
+    choices = validate_tuning_space(backend_name, tuning)
+    names = list(choices)
+    variants = []
+    for values in itertools.islice(itertools.product(*choices.values()), limit):
+        variant = copy.deepcopy(candidate)
+        for name, value in zip(names, values):
+            if name.startswith("constants."):
+                constant = name.removeprefix("constants.")
+                constants = variant.get("constants")
+                matches = (
+                    [
+                        item
+                        for item in constants
+                        if isinstance(item, dict) and item.get("name") == constant
+                    ]
+                    if isinstance(constants, list)
+                    else []
+                )
+                if len(matches) != 1:
+                    raise ValueError(
+                        f"Candidate must declare exactly one constant {constant!r} to tune"
+                    )
+                matches[0]["value"] = copy.deepcopy(value)
+            else:
+                variant[name] = copy.deepcopy(value)
+        variants.append(variant)
+    return variants

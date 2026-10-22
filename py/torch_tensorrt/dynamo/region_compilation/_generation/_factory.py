@@ -14,9 +14,11 @@ import secrets
 import sys
 import tempfile
 import time
+from dataclasses import asdict
 from functools import partial
+from itertools import zip_longest
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import torch
 from filelock import FileLock, Timeout
@@ -26,18 +28,26 @@ from torch_tensorrt.region_annotations import KernelGenerator, RegionError
 
 from .._plugins import _boundaries
 from . import _providers
-from ._backends import get_backend
+from ._backends import candidate_variants, get_backend, validate_tuning_space
 from ._candidate import make_registration, validate_candidate
-from ._instructions import EvidenceCatalog, load_instructions
+from ._instructions import EvidenceCatalog, load_instructions, validate_instructions
 
 _LOGGER = logging.getLogger(__name__)
-_VERSION = 3
+_VERSION = 4
 
 
 def _digest(value: Any) -> str:
     return hashlib.sha256(
         json.dumps(value, sort_keys=True, allow_nan=False).encode()
     ).hexdigest()
+
+
+def _task_digest(task: dict[str, Any]) -> str:
+    # Scheduling and diagnostics do not change kernel compatibility. Tuning
+    # domains do: a cached candidate must satisfy the current user's constraints.
+    identity = {k: v for k, v in task.items() if k not in ("search", "diagnostics")}
+    identity["tuning"] = task.get("search", {}).get("tuning", {})
+    return _digest(identity)
 
 
 def _write_json(path: Path, value: Any) -> None:
@@ -133,20 +143,20 @@ def _prompt(
     instructions: dict[str, Any],
     evidence: EvidenceCatalog,
     best: dict[str, Any] | None = None,
+    action: str = "author",
 ) -> str:
-    mode = "author"
-    if history:
-        mode = (
-            "optimize" if history[-1]["result"].get("status") == "passed" else "repair"
-        )
     return (
         str(instructions["text"])
-        + "\nRESPONSE PROTOCOL: Return a JSON object with action, candidate, resource, offset. "
-        "For action=propose, candidate follows the supplied backend schema and resource/offset are null. "
-        "For action=read, candidate is null and resource/offset identify a page from the evidence catalog. "
+        + "\nRESPONSE PROTOCOL: Return action, candidate, candidates, resource, offset. "
+        "For action=propose, supply either one candidate or a bounded candidates array, "
+        "following the backend schema; unused fields are null. "
+        "For action=read, resource/offset identify a page from the evidence catalog. "
+        "For action=diagnose, request a measured diagnostic of the current best candidate; "
+        "this requires diagnostics=true and shares the evaluation and context budgets. "
+        "Use action=stop when further authoring is not useful; Python still validates the finalist. "
         "Only catalog resources are readable. The controller runs all compilation and evaluation. "
         "Use feedback to change source or launch settings; unchanged passing candidates reuse their prior evaluation."
-        + f"\nSEARCH STEP: {mode}. Remaining search time: {max(0, int(remaining_s))} seconds."
+        + f"\nSEARCH STEP: {action}. Remaining search time: {max(0, int(remaining_s))} seconds."
         + "\nTASK:\n"
         + json.dumps(task, indent=2)
         + "\nRECENT ATTEMPTS AND BEST CANDIDATE:\n"
@@ -156,17 +166,33 @@ def _prompt(
     )
 
 
-def _response_schema(candidate_schema: dict[str, Any]) -> dict[str, Any]:
+def _response_schema(
+    candidate_schema: dict[str, Any], batch_size: int = 1
+) -> dict[str, Any]:
     return {
         "type": "object",
         "additionalProperties": False,
         "properties": {
-            "action": {"type": "string", "enum": ["propose", "read"]},
+            "action": {
+                "type": "string",
+                "enum": ["propose", "read", "diagnose", "stop"],
+            },
             "candidate": {"anyOf": [candidate_schema, {"type": "null"}]},
+            "candidates": {
+                "anyOf": [
+                    {
+                        "type": "array",
+                        "items": candidate_schema,
+                        "minItems": 1,
+                        "maxItems": batch_size,
+                    },
+                    {"type": "null"},
+                ]
+            },
             "resource": {"type": ["string", "null"]},
             "offset": {"type": ["integer", "null"], "minimum": 0},
         },
-        "required": ["action", "candidate", "resource", "offset"],
+        "required": ["action", "candidate", "candidates", "resource", "offset"],
     }
 
 
@@ -177,7 +203,8 @@ def _author(
     directory: Path,
     deadline: float,
     evidence: EvidenceCatalog,
-) -> dict[str, Any]:
+    diagnose: Callable[[Path, float], dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
     # Reserve time for evaluation, including final validation; evidence reads share
     # this author deadline rather than receiving a fresh timeout on every turn.
     remaining = deadline - time.monotonic()
@@ -196,7 +223,8 @@ def _author(
         turn_prompt = prompt + (
             f"\nAUTHOR BUDGET: {config.max_context_requests - turn} evidence reads "
             f"remaining; {max(0, int(timeout))} seconds. "
-            "When no reads remain, return action=propose."
+            "Reads and diagnostics share this allowance. "
+            "When no reads remain, return action=propose or action=stop."
         )
         (turn_dir / "prompt.txt").write_text(turn_prompt, encoding="utf-8")
         reply = _providers.propose(
@@ -212,21 +240,40 @@ def _author(
         )
         # Imported providers may retain the original direct-candidate interface.
         if "action" not in reply:
-            return reply
+            return [reply]
+        if reply.get("action") == "stop":
+            return []
         if reply.get("action") == "propose":
-            if not isinstance(reply.get("candidate"), dict):
-                raise ValueError("Proposal must contain a candidate object")
-            return dict(reply["candidate"])
-        if reply.get("action") != "read":
+            candidate, candidates = reply.get("candidate"), reply.get("candidates")
+            if candidate is not None and candidates is not None:
+                raise ValueError(
+                    "Proposal must supply candidate or candidates, not both"
+                )
+            batch = [candidate] if candidate is not None else candidates
+            if (
+                not isinstance(batch, list)
+                or not 1 <= len(batch) <= config.search.batch_size
+                or any(not isinstance(item, dict) for item in batch)
+            ):
+                raise ValueError(
+                    "Proposal must contain a bounded batch of candidate objects"
+                )
+            return batch
+        if reply.get("action") not in ("read", "diagnose"):
             raise ValueError("Unknown author response action")
         if turn == config.max_context_requests:
             raise ValueError("Evidence request limit reached; return a candidate")
         try:
-            resource = reply.get("resource")
-            if not isinstance(resource, str):
-                raise ValueError("Evidence resource must be a catalog name")
-            offset = reply.get("offset")
-            page = evidence.read(resource, 0 if offset is None else offset)
+            if reply["action"] == "diagnose":
+                if diagnose is None or not config.diagnostics:
+                    raise ValueError("Diagnostics are not enabled for this search")
+                page = diagnose(turn_dir, author_deadline)
+            else:
+                resource = reply.get("resource")
+                if not isinstance(resource, str):
+                    raise ValueError("Evidence resource must be a catalog name")
+                offset = reply.get("offset")
+                page = evidence.read(resource, 0 if offset is None else offset)
         except (ValueError, KeyError, TypeError) as error:
             page = {"error": str(error)}
         _write_json(turn_dir / "evidence.json", {"request": reply, "result": page})
@@ -267,6 +314,34 @@ def _improves(report: dict[str, Any], best_report: dict[str, Any] | None) -> boo
         measurements.get(arm, {}).get("mad_ms", 0) for arm in ("candidate", "incumbent")
     )
     return bool(incumbent - report["latency_ms"] > noise)
+
+
+def _next_action(
+    history: list[dict[str, Any]],
+    best: dict[str, Any] | None,
+    stale: int,
+    config: KernelGenerator,
+) -> str:
+    """Choose the next experiment from measured outcomes, not agent verdicts."""
+    if (
+        config.search.max_no_improvement is not None
+        and stale >= config.search.max_no_improvement
+    ):
+        return "finalize"
+    if history:
+        report = history[-1]["result"]
+        if report.get("status") == "error":
+            stage = report.get("stage")
+            if stage in ("provider", "baseline", "budget"):
+                return "finalize"
+            if stage in ("source", "compile"):
+                return "repair_compile"
+            if stage == "correctness":
+                return "repair_correctness"
+            return "repair"
+        if stale or best is None:
+            return "rewrite"
+    return "optimize" if best is not None else "author"
 
 
 def _evaluate(
@@ -331,7 +406,11 @@ def generate_registration(
 
 
 def _generate(
-    child: torch.fx.GraphModule, config: KernelGenerator, *, region_id: str
+    child: torch.fx.GraphModule,
+    config: KernelGenerator,
+    *,
+    region_id: str,
+    instruction_bundle: dict[str, Any] | None = None,
 ) -> tuple[KernelSpec | partial[None], Path]:
     """Return a registration and the exact run containing its validation evidence."""
     input_specs, output_specs = _boundaries(child, region_id)
@@ -346,12 +425,18 @@ def _generate(
         raise RegionError("Agent-generated regions require nonempty tensors")
     reference, constants = _reference(child)
     backend = get_backend(config.backend)
-    instructions = load_instructions(
-        config.backend,
-        backend.instruction_resources,
-        config.instructions,
-        config.instruction_files,
+    instructions = (
+        validate_instructions(instruction_bundle, config.backend)
+        if instruction_bundle is not None
+        else load_instructions(
+            config.backend,
+            backend.instruction_resources,
+            config.instructions,
+            config.instruction_files,
+        )
     )
+    search = asdict(config.search)
+    search["tuning"] = validate_tuning_space(config.backend, config.search.tuning)
 
     def describe(spec: Any) -> dict[str, Any]:
         return {
@@ -372,6 +457,19 @@ def _generate(
         "proposal_schema_sha256": _digest(backend.proposal_schema),
         "objective": config.objective,
         "min_speedup": config.min_speedup,
+        "search": search,
+        "diagnostics": config.diagnostics,
+        "analysis": {
+            "operations": [
+                str(node.target)
+                for node in reference.graph.nodes
+                if node.op == "call_function"
+            ],
+            "boundary_bytes": sum(
+                math.prod(spec.shape) * spec.dtype.itemsize
+                for spec in input_specs + output_specs
+            ),
+        },
         "target": _target(input_specs[0].device, config.backend),
         "validation": {
             "num_tests": config.num_tests,
@@ -382,7 +480,7 @@ def _generate(
             "atol": config.atol,
         },
     }
-    key = _digest(task)
+    key = _task_digest(task)
     root = _cache_root(config)
     root.mkdir(parents=True, exist_ok=True)
     cache = root / key
@@ -423,7 +521,10 @@ def _generate_locked(
     run = Path(tempfile.mkdtemp(prefix="run-", dir=cache))
     _write_json(run / "task.json", task)
     _write_json(run / "instructions.json", instructions)
-    schema = _response_schema(get_backend(config.backend).proposal_schema)
+    policy = config.search
+    schema = _response_schema(
+        get_backend(config.backend).proposal_schema, policy.batch_size
+    )
     _write_json(run / "proposal.schema.json", schema)
     reference_path = run / "reference.pt"
     torch.save(reference, reference_path)
@@ -435,6 +536,7 @@ def _generate_locked(
         "inputs": task["inputs"],
         "outputs": task["outputs"],
         "objective": config.objective,
+        "diagnostics": config.diagnostics,
         "validation_seed": secrets.randbits(63),
         **task["validation"],
     }
@@ -450,9 +552,14 @@ def _generate_locked(
     history: list[dict[str, Any]] = []
     best: dict[str, Any] | None = None
     best_report: dict[str, Any] | None = None
-    best_evaluation_path: Path | None = None
-    passing_evaluations: dict[str, tuple[dict[str, Any], Path]] = {}
+    contenders: dict[str, dict[str, Any]] = {}
+    pending: list[dict[str, Any]] = []
+    used = 0
+    stale = 0
+    max_candidates = policy.max_candidates or config.max_attempts * policy.batch_size
     manifest = cache / "accepted.json"
+    checkpoint = cache / "checkpoint.json"
+    task_digest = _task_digest(task)
 
     def evaluate(
         candidate: dict[str, Any],
@@ -460,14 +567,18 @@ def _generate_locked(
         *,
         holdout: bool = False,
         incumbent: dict[str, Any] | None = None,
+        until: float | None = None,
     ) -> dict[str, Any]:
+        nonlocal used
         evaluation_deadline = deadline if holdout else search_deadline
+        if until is not None:
+            evaluation_deadline = min(evaluation_deadline, until)
         remaining = evaluation_deadline - time.monotonic()
-        if remaining <= 0:
+        if remaining <= 0 or (not holdout and used >= max_candidates):
             return {
                 "status": "error",
                 "stage": "budget",
-                "error": "Generation wall-time budget exhausted",
+                "error": "Generation evaluation or wall-time budget exhausted",
             }
         gpu_lock = FileLock(
             str(cache.parent / f"gpu-{input_specs[0].device.index}.lock")
@@ -488,6 +599,8 @@ def _generate_locked(
                     )
                 elif incumbent is not None:
                     request["incumbent"] = incumbent
+                if not holdout:
+                    used += 1
                 return _evaluate(
                     request, directory, min(config.candidate_timeout_s, remaining)
                 )
@@ -502,7 +615,7 @@ def _generate_locked(
         try:
             stored = json.loads(manifest.read_text(encoding="utf-8"))
             candidate = stored["candidate"]
-            if stored["task_sha256"] != _digest(task) or stored[
+            if stored["task_sha256"] != task_digest or stored[
                 "candidate_sha256"
             ] != _digest(candidate):
                 raise ValueError("Cache identity or content digest mismatch")
@@ -523,63 +636,25 @@ def _generate_locked(
         except (OSError, KeyError, ValueError, TypeError) as error:
             _LOGGER.warning("Ignoring invalid agent region cache: %s", error)
 
-    for attempt in range(config.max_attempts):
-        remaining = search_deadline - time.monotonic()
-        if remaining <= 0:
-            break
-        directory = run / f"attempt-{attempt + 1}"
-        directory.mkdir()
-        prompt = _prompt(task, history, remaining, instructions, evidence, best)
-        _LOGGER.info(
-            "Agent region %s: attempt %d/%d with %s (%s)",
-            region_id,
-            attempt + 1,
-            config.max_attempts,
-            config.provider,
-            config.backend,
+    def ranked() -> list[dict[str, Any]]:
+        selected = contenders.get(_digest(best)) if best is not None else None
+        others = sorted(
+            (entry for entry in contenders.values() if entry is not selected),
+            key=lambda entry: entry["report"]["latency_ms"],
         )
-        candidate = None
-        evaluation_path = directory / "feedback.json"
-        provider_failed = False
-        stage = "author"
-        try:
-            proposal = _author(
-                config, prompt, schema, directory, search_deadline, evidence
-            )
-            stage = "source"
-            candidate = validate_candidate(
-                proposal, config.backend, len(input_specs), len(output_specs)
-            )
-            _write_json(directory / "candidate.json", candidate)
-            candidate_digest = _digest(candidate)
-            if candidate_digest in passing_evaluations:
-                previous_report, evaluation_path = passing_evaluations[candidate_digest]
-                report = {**previous_report, "reused_from": str(evaluation_path)}
-            else:
-                report = evaluate(candidate, directory, incumbent=best)
-                if report.get("status") == "passed":
-                    passing_evaluations[candidate_digest] = (report, evaluation_path)
-        except _providers.ProviderError as error:
-            report = {
-                "status": "error",
-                "stage": "provider",
-                "error": str(error)[-3000:],
-            }
-            provider_failed = True
-        except (OSError, ValueError, TypeError, TimeoutError, RuntimeError) as error:
-            report = {"status": "error", "stage": stage, "error": str(error)[-3000:]}
-        report["meets_objective"] = _meets_objective(report, config)
-        _write_json(directory / "feedback.json", report)
-        history.append({"candidate": candidate, "result": report})
-        evidence.add(
-            f"attempt-{attempt + 1}/feedback.json", json.dumps(report, indent=2)
-        )
-        if candidate is not None:
-            evidence.add(
-                f"attempt-{attempt + 1}/candidate.json", json.dumps(candidate, indent=2)
-            )
-            if isinstance(candidate.get("source"), str):
-                evidence.add(f"attempt-{attempt + 1}/source", candidate["source"])
+        return ([selected] if selected is not None else []) + others
+
+    def save_checkpoint() -> None:
+        state = {
+            "task_sha256": task_digest,
+            "run": str(run),
+            "history": _prompt_history(history, best),
+            "finalists": [entry["candidate"] for entry in ranked()[: policy.finalists]],
+            "pending": pending,
+        }
+        _write_json(checkpoint, {"state": state, "sha256": _digest(state)})
+
+    def register_logs(directory: Path) -> None:
         for log in (
             directory / "worker.log",
             directory / "provider.log",
@@ -590,18 +665,245 @@ def _generate_locked(
                     str(log.relative_to(run)),
                     log.read_text(encoding="utf-8", errors="replace"),
                 )
-        if (
-            report["meets_objective"]
-            and "reused_from" not in report
-            and _improves(report, best_report)
-        ):
-            best, best_report, best_evaluation_path = candidate, report, evaluation_path
+
+    def record(
+        candidate: dict[str, Any] | None,
+        report: dict[str, Any],
+        directory: Path,
+        action: str,
+    ) -> bool:
+        nonlocal best, best_report
+        report = dict(report)
+        report["meets_objective"] = _meets_objective(report, config)
+        feedback_path = directory / "feedback.json"
+        _write_json(feedback_path, report)
+        history.append({"candidate": candidate, "result": report, "action": action})
+        prefix = str(directory.relative_to(run))
+        evidence.add(f"{prefix}/feedback.json", json.dumps(report, indent=2))
+        improved = False
+        if candidate is not None:
+            _write_json(directory / "candidate.json", candidate)
+            evidence.add(f"{prefix}/candidate.json", json.dumps(candidate, indent=2))
+            if isinstance(candidate.get("source"), str):
+                evidence.add(f"{prefix}/source", candidate["source"])
+            candidate_digest = _digest(candidate)
+            if report.get("status") == "passed" and "reused_from" not in report:
+                contenders[candidate_digest] = {
+                    "candidate": candidate,
+                    "report": report,
+                    "evaluation_path": str(feedback_path),
+                }
+                if _improves(report, best_report):
+                    best, best_report = candidate, report
+                    improved = True
+        register_logs(directory)
+        _write_json(run / "history.json", history)
         _LOGGER.info("Agent region %s: %s", region_id, report)
-        if provider_failed:
+        return improved
+
+    def run_pending(directories: list[Path], action: str) -> bool:
+        improved = False
+        for directory in directories:
+            if (
+                not pending
+                or used >= max_candidates
+                or time.monotonic() >= search_deadline
+            ):
+                break
+            candidate = pending[0]
+            previous = contenders.get(_digest(candidate))
+            if previous is None:
+                report = evaluate(candidate, directory, incumbent=best)
+            else:
+                report = {
+                    **previous["report"],
+                    "reused_from": previous["evaluation_path"],
+                }
+            improved = record(candidate, report, directory, action) or improved
+            if report.get("stage") == "budget":
+                save_checkpoint()
+                break
+            pending.pop(0)
+            save_checkpoint()
+        return improved
+
+    # A checkpoint carries proposals and historical context, never current proof.
+    # Every retained candidate is validated and measured again in this invocation.
+    if policy.resume and checkpoint.is_file():
+        try:
+            saved = json.loads(checkpoint.read_text(encoding="utf-8"))
+            state = saved["state"]
+            if state["task_sha256"] != task_digest or saved["sha256"] != _digest(state):
+                raise ValueError("Checkpoint identity or content digest mismatch")
+            old_history = state["history"]
+            if not isinstance(old_history, list) or any(
+                not isinstance(entry, dict)
+                or not isinstance(entry.get("result"), dict)
+                or not (
+                    entry.get("candidate") is None
+                    or isinstance(entry["candidate"], dict)
+                )
+                for entry in old_history
+            ):
+                raise ValueError("Invalid checkpoint history")
+            restored = []
+            seen = set()
+            for item in [*state["finalists"][: policy.finalists], *state["pending"]]:
+                candidate = validate_candidate(
+                    item, config.backend, len(input_specs), len(output_specs)
+                )
+                candidate_digest = _digest(candidate)
+                if candidate_digest not in seen:
+                    seen.add(candidate_digest)
+                    restored.append(candidate)
+            history.extend({**entry, "historical": True} for entry in old_history)
+            pending.extend(restored)
+            evidence.add("previous-history.json", json.dumps(history, indent=2))
+            _write_json(
+                run / "resume.json", {"from": state["run"], "candidates": len(pending)}
+            )
+        except (OSError, KeyError, ValueError, TypeError) as error:
+            _LOGGER.warning("Ignoring invalid generation checkpoint: %s", error)
+        directories = []
+        for index in range(len(pending)):
+            directory = run / f"resume-{index + 1}"
+            directory.mkdir()
+            directories.append(directory)
+        save_checkpoint()
+        run_pending(directories, "resume")
+
+    def diagnose(directory: Path, until: float) -> dict[str, Any]:
+        if best is None:
+            raise ValueError("Diagnostics require a current verified candidate")
+        diagnostic_dir = directory / "diagnostics"
+        diagnostic_dir.mkdir()
+        report = evaluate(best, diagnostic_dir, until=until)
+        _write_json(diagnostic_dir / "feedback.json", report)
+        evidence.add(
+            str((diagnostic_dir / "feedback.json").relative_to(run)),
+            json.dumps(report, indent=2),
+        )
+        return report
+
+    stop_reason = "attempt_limit"
+    for attempt in range(config.max_attempts):
+        remaining = search_deadline - time.monotonic()
+        if remaining <= 0 or used >= max_candidates:
+            stop_reason = "budget"
+            break
+        action = _next_action(
+            [entry for entry in history if not entry.get("historical")],
+            best,
+            stale,
+            config,
+        )
+        if action == "finalize":
+            stop_reason = "policy"
+            break
+        directory = run / f"attempt-{attempt + 1}"
+        directory.mkdir()
+        prompt = _prompt(task, history, remaining, instructions, evidence, best, action)
+        _LOGGER.info(
+            "Agent region %s: %s attempt %d/%d with %s (%s)",
+            region_id,
+            action,
+            attempt + 1,
+            config.max_attempts,
+            config.provider,
+            config.backend,
+        )
+        try:
+            proposals = _author(
+                config, prompt, schema, directory, search_deadline, evidence, diagnose
+            )
+        except (OSError, ValueError, TypeError, TimeoutError, RuntimeError) as error:
+            provider_failed = isinstance(error, _providers.ProviderError)
+            record(
+                None,
+                {
+                    "status": "error",
+                    "stage": "provider" if provider_failed else "author",
+                    "error": str(error)[-3000:],
+                },
+                directory,
+                action,
+            )
+            stale += 1
+            save_checkpoint()
+            if provider_failed:
+                stop_reason = "provider"
+                break
+            continue
+        register_logs(directory)
+        if not proposals:
+            stop_reason = "author_stop"
+            save_checkpoint()
             break
 
+        # Round-robin across sources so tuning the first proposal cannot consume
+        # the entire batch before a different implementation receives a trial.
+        groups = []
+        failures = []
+        for proposal in proposals:
+            try:
+                groups.append(
+                    candidate_variants(
+                        proposal,
+                        config.backend,
+                        task["search"]["tuning"],
+                        policy.max_variants,
+                    )
+                )
+            except (ValueError, TypeError) as error:
+                failures.append(str(error))
+        options = [
+            candidate
+            for group in zip_longest(*groups)
+            for candidate in group
+            if candidate is not None
+        ]
+        total = len(options) + len(failures)
+        directories = []
+        for index, option in enumerate([*options, *failures]):
+            candidate_directory = (
+                directory if total == 1 else directory / f"candidate-{index + 1}"
+            )
+            candidate_directory.mkdir(exist_ok=True)
+            try:
+                if isinstance(option, str):
+                    raise ValueError(option)
+                candidate = validate_candidate(
+                    option, config.backend, len(input_specs), len(output_specs)
+                )
+            except (ValueError, TypeError) as error:
+                record(
+                    None,
+                    {"status": "error", "stage": "source", "error": str(error)[-3000:]},
+                    candidate_directory,
+                    action,
+                )
+                continue
+            pending.append(candidate)
+            directories.append(candidate_directory)
+        save_checkpoint()
+        improved = run_pending(directories, "tune" if policy.tuning else action)
+        stale = 0 if improved else stale + 1
+
     _write_json(run / "history.json", history)
-    if best is None:
+    _write_json(
+        run / "search.json",
+        {
+            "stop_reason": stop_reason,
+            "evaluations": used,
+            "max_candidates": max_candidates,
+            "stale_rounds": stale,
+        },
+    )
+    save_checkpoint()
+    choices = [entry for entry in ranked() if entry["report"]["meets_objective"]][
+        : policy.finalists
+    ]
+    if not choices:
         detail = (
             history[-1]["result"].get(
                 "error", "No candidate met the performance objective"
@@ -612,33 +914,57 @@ def _generate_locked(
         raise RegionError(
             f"Agent generated no valid kernel for region {region_id!r}: {detail}. Artifacts: {run}"
         )
-    final_directory = run / "holdout"
-    final_directory.mkdir()
-    final_report = evaluate(best, final_directory, holdout=True)
-    _write_json(final_directory / "feedback.json", final_report)
-    if not _meets_objective(final_report, config):
-        raise RegionError(
-            f"Generated kernel for region {region_id!r} failed final validation: "
-            f"{final_report.get('error', 'Performance objective not met')}. Artifacts: {run}"
+
+    # Keep the selection winner first. Alternatives are independently rechecked,
+    # with a time slice reserved for each, before any cache entry is published.
+    final_report: dict[str, Any] = {}
+    for index, entry in enumerate(choices):
+        final_directory = run / ("holdout" if index == 0 else f"holdout-{index + 1}")
+        final_directory.mkdir()
+        remaining = deadline - time.monotonic()
+        final_report = evaluate(
+            entry["candidate"],
+            final_directory,
+            holdout=True,
+            until=time.monotonic() + max(0, remaining) / (len(choices) - index),
         )
-    accepted = {
-        "task_sha256": _digest(task),
-        "candidate_sha256": _digest(best),
-        "candidate": best,
-        "report": best_report,
-        "validation": final_report,
-        "evaluation_path": str(best_evaluation_path),
-        "provider": config.provider,
-        "model": config.model,
-        "instructions_sha256": instructions["sha256"],
-        "run": str(run),
-    }
-    # Construct the final registration before publishing a successful cache entry.
-    registration = make_registration(
-        best, config.backend, input_specs, output_specs, run
+        _write_json(final_directory / "feedback.json", final_report)
+        if not _meets_objective(final_report, config):
+            contenders.pop(_digest(entry["candidate"]), None)
+            history.append(
+                {
+                    "candidate": entry["candidate"],
+                    "result": final_report,
+                    "action": "holdout",
+                }
+            )
+            _write_json(run / "history.json", history)
+            save_checkpoint()
+            continue
+        # Construct registration before publishing a successful cache entry.
+        registration = make_registration(
+            entry["candidate"], config.backend, input_specs, output_specs, run
+        )
+        accepted = {
+            "task_sha256": task_digest,
+            "candidate_sha256": _digest(entry["candidate"]),
+            "candidate": entry["candidate"],
+            "report": entry["report"],
+            "validation": final_report,
+            "evaluation_path": entry["evaluation_path"],
+            "provider": config.provider,
+            "model": config.model,
+            "instructions_sha256": instructions["sha256"],
+            "run": str(run),
+        }
+        _write_json(run / "accepted.json", accepted)
+        if config.use_cache:
+            _write_json(manifest, accepted)
+        checkpoint.unlink(missing_ok=True)
+        _LOGGER.info("Agent region %s: selected kernel; artifacts: %s", region_id, run)
+        return registration, run
+    _write_json(run / "history.json", history)
+    raise RegionError(
+        f"Generated kernel for region {region_id!r} failed final validation: "
+        f"{final_report.get('error', 'Performance objective not met')}. Artifacts: {run}"
     )
-    _write_json(run / "accepted.json", accepted)
-    if config.use_cache:
-        _write_json(manifest, accepted)
-    _LOGGER.info("Agent region %s: selected kernel; artifacts: %s", region_id, run)
-    return registration, run
