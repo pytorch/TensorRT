@@ -20,10 +20,12 @@
 #   )
 #
 # kernels_optimized supplies the et_copy host/device copy operators.
-# There is nothing to include. The delegate exposes no public header: it
+# There is nothing to include. The wheel ships no header: the delegate
 # registers itself with ExecuTorch's backend registry from a static initializer
 # inside the shared library, and everything a caller does afterwards is
-# ExecuTorch's own Runtime API.
+# ExecuTorch's own Runtime API. Choosing an optimization profile needs
+# OptimizationProfileGuard, which only the source tree and the release tarball
+# carry; linked from this wheel, every engine runs its profile 0.
 #
 # Point CMake at it with either of the two lines below. Which one matters: importing this package loads the delegate,
 # which raises where ExecuTorch is not installed yet, and asking for a path does not need it loaded.
