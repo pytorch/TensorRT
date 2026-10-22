@@ -76,6 +76,31 @@ def executorch_install_command() -> str:
     )
 
 
+def executorch_runtime_install_command() -> str:
+    """Return the install command for the delegate built with this wheel, or why there is none.
+
+    The build records the companion it was published with, which is the exact version this
+    wheel's executorch extra requires, so a hand install can name the same one.
+    """
+    from torch_tensorrt import _version
+
+    version = getattr(_version, "__executorch_runtime_version__", "")
+    if not version:
+        return (
+            "This Torch-TensorRT build has no matching delegate. It ships only with the "
+            "standard Linux and Windows x86-64 CUDA 13 wheels; TensorRT-RTX, Python-only, "
+            "JetPack and source builds do not have one."
+        )
+    channel = version.partition("+")[2] or executorch_install_channel()
+    if channel is None:
+        return executorch_install_command()
+    index = f"nightly/{channel}" if ".dev" in version else channel
+    return (
+        f'pip install "torch-tensorrt-executorch-runtime=={version}" '
+        f"--extra-index-url https://download.pytorch.org/whl/{index}"
+    )
+
+
 def check_cross_compile_trt_win_lib() -> bool:
     # cross compile feature is only available on linux
     # build engine on linux and run on windows

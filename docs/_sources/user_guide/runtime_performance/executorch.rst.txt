@@ -29,31 +29,29 @@ program, so the whole model stays on the GPU.
 Installation
 -------------
 
-Install Torch-TensorRT with the ``executorch`` extra, and name the delegate package beside
-it:
+Install Torch-TensorRT with the ``executorch`` extra from the PyTorch channel for your CUDA
+version. Swap ``cu132`` for ``cu134`` on CUDA 13.4:
 
 .. code-block:: bash
 
-    pip install "torch-tensorrt[executorch]" torch-tensorrt-executorch-runtime
-
-To pin a CUDA version, point pip at the matching PyTorch channel and keep the packages on
-it. Swap ``cu132`` for ``cu134`` on CUDA 13.4:
-
-.. code-block:: bash
-
-    pip install "torch-tensorrt[executorch]" torch-tensorrt-executorch-runtime \
+    pip install "torch-tensorrt[executorch]" \
       --index-url https://download.pytorch.org/whl/cu132 \
       --extra-index-url https://pypi.org/simple
+
+The PyTorch channel is needed because the CUDA build of ExecuTorch is published only there.
 
 What the command installs
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 * ExecuTorch, the CUDA build, from the ``executorch`` extra. That is all you need to export.
 * ``torch-tensorrt-executorch-runtime``, one shared library holding the TensorRT delegate,
-  which you need to run a ``.pte``. The extra does not pull it in, so the command names it.
-  It requires the exact ExecuTorch build it was compiled against, so you get that one
-  rather than the newest. Install a different one by hand and the delegate refuses it at
-  import.
+  which you need to run a ``.pte``. The extra installs the one built together with your
+  Torch-TensorRT wheel, for the same CUDA version. It requires the exact ExecuTorch build
+  it was compiled against, so you get that one rather than the newest.
+
+This works for the standard Linux (x86-64 and aarch64) and Windows x86-64 wheels. On aarch64
+it needs glibc 2.35 or newer, the same as TensorRT itself. The TensorRT-RTX and Python-only
+builds have no delegate.
 
 Use a fresh virtual environment. To export a coalesced program you also need a CUDA toolkit,
 because ExecuTorch's CUDA backend compiles the leftover operators with ``nvcc``.
@@ -65,7 +63,7 @@ To pick up a change before it ships, or to report a problem against ``main``:
 
 .. code-block:: bash
 
-    pip install --pre --upgrade "torch-tensorrt[executorch]" torch-tensorrt-executorch-runtime \
+    pip install --pre --upgrade "torch-tensorrt[executorch]" \
       --index-url https://download.pytorch.org/whl/nightly/cu132 \
       --extra-index-url https://pypi.org/simple
 

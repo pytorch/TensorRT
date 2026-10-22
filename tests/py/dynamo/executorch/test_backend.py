@@ -861,3 +861,70 @@ def test_elided_output_names_reads_the_list_the_partitioner_writes():
 
     assert _elided_output_names(specs) == {"kv0"}
     assert _elided_output_names([]) is None
+
+
+def _external_engine_spec(tag=b"engines"):
+    from torch_tensorrt.executorch.backend import EXTERNAL_ENGINE_DATA_COMPILE_SPEC_KEY
+
+    return CompileSpec(EXTERNAL_ENGINE_DATA_COMPILE_SPEC_KEY, tag)
+
+
+def _simple_engine_program(engine):
+    engine_info = [""] * SERIALIZATION_LEN
+    engine_info[ENGINE_IDX] = engine
+    engine_info[DEVICE_IDX] = "0%8%0%0%GPU"
+    engine_info[INPUT_BINDING_NAMES_IDX] = "x"
+    engine_info[OUTPUT_BINDING_NAMES_IDX] = "y"
+    return _build_edge_program(engine_info)
+
+
+@pytest.mark.unit
+def test_preprocess_moves_the_engine_to_the_named_data_file():
+    from torch_tensorrt.executorch._export_utils import engine_bytes_tensor
+
+    payload = b"engine-bytes"
+    embedded = TensorRTBackend.preprocess(
+        _simple_engine_program(engine_bytes_tensor(payload)), []
+    )
+    result = TensorRTBackend.preprocess(
+        _simple_engine_program(engine_bytes_tensor(payload)),
+        [_external_engine_spec()],
+    )
+
+    # The blob is the same as without the spec: only where the engine is written moves.
+    assert result.processed_bytes == embedded.processed_bytes
+    _, metadata = deserialize_engine(result.processed_bytes)
+    store = result.data_store_output
+    assert not store.pte_data
+    assert list(store.external_data) == ["engines"]
+    entry = store.external_data["engines"][metadata.engine_key]
+    # The staged bytes themselves, not a copy.
+    assert store.buffers[entry.buffer_index] is payload
+    assert entry.alignment % 16 == 0
+
+
+@pytest.mark.unit
+def test_preprocess_without_the_spec_writes_no_external_data():
+    result = TensorRTBackend.preprocess(
+        _simple_engine_program(_engine_tensor(b"engine-bytes")), []
+    )
+    assert not result.data_store_output.external_data
+    assert _named_engine(result) == b"engine-bytes"
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "specs, message",
+    [
+        ([_external_engine_spec(), _external_engine_spec()], "at most once"),
+        ([_external_engine_spec(b"")], "must be a non-empty file name"),
+        ([_external_engine_spec(b"../outside")], "without a directory"),
+        ([_external_engine_spec(5)], "not int"),
+        ([_external_engine_spec(b"\xff\xfe")], "not valid UTF-8"),
+    ],
+)
+def test_preprocess_rejects_a_malformed_external_engine_spec(specs, message):
+    with pytest.raises(ValueError, match=message):
+        TensorRTBackend.preprocess(
+            _simple_engine_program(_engine_tensor(b"engine-bytes")), specs
+        )

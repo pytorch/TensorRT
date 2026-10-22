@@ -2391,8 +2391,9 @@ def test_ci_runtime_check_asserts_the_delegate_loads_and_registers():
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize("companion", ["0.1.0.dev20200103+cu130", "0.1.0"])
 @pytest.mark.parametrize("cuda", [None, "12.6", "12.8", "13.0", "13.2", "14.0"])
-def test_runtime_wheel_pins_its_cuda_13_dependencies(monkeypatch, cuda):
+def test_runtime_wheel_pins_its_cuda_13_dependencies(monkeypatch, cuda, companion):
     """Run setup with simulated installed versions and inspect the metadata it hands setuptools."""
     import runpy
 
@@ -2402,9 +2403,7 @@ def test_runtime_wheel_pins_its_cuda_13_dependencies(monkeypatch, cuda):
     fake_torch.version = types.SimpleNamespace(cuda=cuda)
     fake_torch.__version__ = "2.15.0.dev20200103+cu130"
     monkeypatch.setitem(sys.modules, "torch", fake_torch)
-    monkeypatch.setenv(
-        "TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION", "0.1.0.dev20200103+cu130"
-    )
+    monkeypatch.setenv("TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION", companion)
     # No torch-tensorrt entry: the build no longer asks for its version, and leaving it here would
     # make the query assertion below pass against a build that had started asking again.
     versions = {
@@ -2432,14 +2431,19 @@ def test_runtime_wheel_pins_its_cuda_13_dependencies(monkeypatch, cuda):
     else:
         runpy.run_path(str(_RUNTIME_SETUP_PY))
         assert queries == list(versions)
-        assert metadata["version"] == "0.1.0.dev20200103+cu130"
-        # Only what the delegate links, and ExecuTorch keeps the label because the delegate links one
+        assert metadata["version"] == companion
+        # Only what the delegate links, and ExecuTorch keeps the label (except on PyPI, below) because the delegate links one
         # specific build of it. The inference library and the CUDA runtime have no label to keep.
         # PyTorch and Torch-TensorRT are deliberately absent: neither is linked, requiring the second
         # would make this wheel depend on the project that builds it, and ExecuTorch leaves the choice
         # of PyTorch build to the user rather than pinning one.
+        # A wheel for PyPI has no label, so neither does its ExecuTorch requirement: PyPI's
+        # ExecuTorch has none to match.
+        executorch = versions["executorch"]
+        if "+" not in companion:
+            executorch = executorch.partition("+")[0]
         assert set(metadata["install_requires"]) == {
-            f"executorch=={versions['executorch']}",
+            f"executorch=={executorch}",
             "torch",
             f"tensorrt-cu13=={versions['tensorrt-cu13'].partition('+')[0]}",
             f"nvidia-cuda-runtime=={versions['nvidia-cuda-runtime'].partition('+')[0]}",
@@ -3144,6 +3148,9 @@ def _elf_object(architecture: str) -> bytes:
     [
         ("well_formed", True),
         ("aarch64_tag", True),
+        # A wheel for PyPI has no label, and its ExecuTorch requirement must not have one either.
+        ("pypi_release", True),
+        ("pypi_release_keeps_the_executorch_label", False),
         ("payload_for_the_other_architecture", False),
         ("truncated_payload", False),
         ("unrepaired_tag", False),
@@ -3375,13 +3382,25 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
             r + "+cu130" if r.startswith("tensorrt-cu13==") else r for r in requires
         ]
 
+    wheel_version = "0.1.0+cu132"
+    if case.startswith("pypi_release"):
+        wheel_version = "0.1.0"
+        if case == "pypi_release":
+            requires = [
+                r.partition("+")[0] if r.startswith("executorch==") else r
+                for r in requires
+            ]
+
     object_bytes = _elf_object(elf_machine or arch)
     if case == "truncated_payload":
         # Slicing past the end is not an error and int.from_bytes accepts a short slice, so the
         # machine word read out of nineteen bytes still matched and the object passed.
         object_bytes = object_bytes[:19]
 
-    wheel = tmp_path / f"torch_tensorrt_executorch_runtime-0.1.0-py3-none-{tag}.whl"
+    wheel = (
+        tmp_path
+        / f"torch_tensorrt_executorch_runtime-{wheel_version}-py3-none-{tag}.whl"
+    )
     with WheelFile(wheel, "w") as archive:
         for name in payload:
             archive.writestr(name, object_bytes)
@@ -3396,7 +3415,7 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
                     f"{package}lib/cmake/executorch_backend_tensorrt/{cmake_name}",
                     "# stub\n",
                 )
-        info = "torch_tensorrt_executorch_runtime-0.1.0.dist-info"
+        info = f"torch_tensorrt_executorch_runtime-{wheel_version}.dist-info"
         metadata_tag = "any" if case == "wheel_tag_mismatch" else tag
         archive.writestr(
             f"{info}/WHEEL",
@@ -3405,7 +3424,8 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
         if case != "no_metadata_at_all":
             archive.writestr(
                 f"{info}/METADATA",
-                "Metadata-Version: 2.1\nName: torch-tensorrt-executorch-runtime\nVersion: 0.1.0\n"
+                "Metadata-Version: 2.1\nName: torch-tensorrt-executorch-runtime\n"
+                + f"Version: {wheel_version}\n"
                 + "".join(f"Requires-Dist: {r}\n" for r in requires),
             )
 

@@ -95,7 +95,11 @@ def test_examples_use_the_module_loader(
 
     class _Loader:
         def create_module(self, spec):
-            return types.ModuleType(spec.name)
+            module = types.ModuleType(spec.name)
+            # Recorded, so teardown removes this stand-in rather than leaving it for a later test
+            # in the same process to import in place of the real package.
+            monkeypatch.setitem(sys.modules, spec.name, module)
+            return module
 
         def exec_module(self, module):
             return None
@@ -126,6 +130,23 @@ def test_examples_use_the_module_loader(
     # The example has to import the delegate package, because that import is what registers the
     # backend. Nothing here can run without it in a real process.
     assert imported == ["torch_tensorrt_executorch_runtime"], imported
+
+
+def test_the_example_loader_test_leaves_no_stand_in_behind():
+    # A stand-in left in sys.modules is what a later test in the same process would import in
+    # place of the real package, so run the test above in its own pytest process and check after.
+    script = (
+        "import sys, pytest\n"
+        "sys.modules.pop('torch_tensorrt_executorch_runtime', None)\n"
+        "rc = pytest.main(['-q', '-p', 'no:cacheprovider', '--noconftest', '-o', 'addopts=', "
+        f"{__file__!r} + '::test_examples_use_the_module_loader'])\n"
+        "if rc != 0 or 'torch_tensorrt_executorch_runtime' in sys.modules:\n"
+        "    sys.exit(1)\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", script], capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def load_delegate_module(*, register_on_import: bool = False):

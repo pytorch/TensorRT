@@ -725,6 +725,7 @@ _EXECUTORCH_SAVE_OPTIONS: Dict[str, Any] = {
     "weight_streaming_budget_per_engine": None,
     "use_cuda_graphs": None,
     "zero_copy_kv": False,
+    "external_engine_data": None,
 }
 
 
@@ -835,7 +836,8 @@ def save(
         kwargs: Additional format-specific kwargs. ``partitioners=``,
                 ``compile_specs=``, ``backend_config=``, ``constant_methods=``,
                 ``transform_passes=``, ``compile_config=``, ``generate_etrecord=``,
-                ``weight_streaming_budget_per_engine=`` and ``zero_copy_kv=`` are
+                ``weight_streaming_budget_per_engine=``, ``zero_copy_kv=`` and
+                ``external_engine_data=`` are
                 only used with ``output_format="executorch"``; otherwise they are
                 ignored with a warning. Pass ``compile_specs=[CompileSpec("target_device",
                 b"cuda:<i>")]`` to override the default target device (``cuda:0``).
@@ -879,6 +881,11 @@ def save(
                 :func:`torch_tensorrt.executorch.check_zero_copy_kv` on the
                 finalized program before writing the file, so a single
                 ``zero_copy_kv=True`` is enough.
+                ``external_engine_data=`` (default ``None``) takes a file name without
+                the ``.ptd`` extension and
+                writes every TensorRT engine to ``<name>.ptd`` next to the ``.pte``
+                instead of into it. Pass that file as the program's data file when
+                loading. See :func:`torch_tensorrt.executorch.export`.
     """
     if isinstance(module, CudaGraphsTorchTensorRTModule):
         module = module.compiled_module
@@ -922,6 +929,7 @@ def save(
         "weight_streaming_budget_per_engine"
     ]
     executorch_zero_copy_kv = executorch_options["zero_copy_kv"]
+    executorch_external_engine_data = executorch_options["external_engine_data"]
 
     if output_format not in accepted_formats:
         raise ValueError(
@@ -945,6 +953,7 @@ def save(
             )
         # Validate options before input and model-shape checks can obscure type errors.
         from torch_tensorrt.executorch.partitioner import (
+            normalize_external_engine_data,
             normalize_use_cuda_graphs,
             normalize_weight_streaming_budget_per_engine,
         )
@@ -953,6 +962,7 @@ def save(
             executorch_weight_streaming_budget_per_engine
         )
         normalize_use_cuda_graphs(use_cuda_graphs)
+        normalize_external_engine_data(executorch_external_engine_data)
         # For the same reason, the one refusal zero-copy makes on the config
         # alone. _save_as_executorch reaches it only through
         # zero_copy_backend_config, which it calls after export() has partitioned
@@ -1116,6 +1126,11 @@ def save(
             "use_cuda_graphs= is only used with output_format='executorch' and will "
             f"be ignored for output_format='{output_format}'."
         )
+    if executorch_external_engine_data is not None and output_format != "executorch":
+        logger.warning(
+            "external_engine_data= is only used with output_format='executorch' and "
+            f"will be ignored for output_format='{output_format}'."
+        )
     if executorch_zero_copy_kv and output_format != "executorch":
         logger.warning(
             "zero_copy_kv= is only used with output_format='executorch' and will "
@@ -1218,6 +1233,7 @@ def save(
                     weight_streaming_budget_per_engine=executorch_weight_streaming_budget_per_engine,
                     use_cuda_graphs=use_cuda_graphs,
                     zero_copy_kv=executorch_zero_copy_kv,
+                    external_engine_data=executorch_external_engine_data,
                 )
             else:
                 raise RuntimeError(
@@ -1337,6 +1353,7 @@ def save(
                         weight_streaming_budget_per_engine=executorch_weight_streaming_budget_per_engine,
                         use_cuda_graphs=use_cuda_graphs,
                         zero_copy_kv=executorch_zero_copy_kv,
+                        external_engine_data=executorch_external_engine_data,
                     )
                 else:
                     raise RuntimeError(
@@ -1465,6 +1482,7 @@ def save(
                         weight_streaming_budget_per_engine=executorch_weight_streaming_budget_per_engine,
                         use_cuda_graphs=use_cuda_graphs,
                         zero_copy_kv=executorch_zero_copy_kv,
+                        external_engine_data=executorch_external_engine_data,
                     )
                 else:
                     raise RuntimeError(
@@ -1476,20 +1494,21 @@ def _write_external_tensor_data(executorch_program: Any, file_path: str) -> None
     """Write an ExecuTorch program's external named tensor data (``.ptd``) next to the ``.pte``.
 
     The CUDA (AOTInductor) backend emits its weights as external named data
-    (``save_data_externally``), which ExecuTorch serializes only via
+    (``save_data_externally``), and so does the TensorRT backend for its engines
+    when saved with ``external_engine_data=``. ExecuTorch serializes that data only via
     ``write_tensor_data_to_file`` -- ``ExecutorchProgram.write_to_file`` does not
-    persist it. So a partition that carries external weights (e.g. a
-    ``CudaPartitioner`` delegate) would lose its blob and the ``.pte`` could not
+    persist it. So a partition that carries external data (e.g. a
+    ``CudaPartitioner`` delegate) would lose it and the ``.pte`` could not
     load. This writes the ``.ptd`` data file(s) into the ``.pte``'s directory when
     the program has any; the runtime must then be given those data file(s) (e.g.
-    via the ExecuTorch ``Module`` data-files argument) to load the weights.
+    via the ExecuTorch ``Module`` data-files argument) to load the program.
     """
     # Direct attribute access (no getattr default) so a future rename fails loud.
     if executorch_program._tensor_data:
         out_dir = os.path.dirname(os.path.abspath(file_path))
         executorch_program.write_tensor_data_to_file(out_dir)
         logger.info(
-            "Wrote external delegate weights (.ptd) to %s; point the runtime's "
+            "Wrote external delegate data (.ptd) to %s; point the runtime's "
             "data-files at this directory to load them.",
             out_dir,
         )
@@ -1538,6 +1557,7 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
         ),
         use_cuda_graphs=kwargs.get("use_cuda_graphs"),
         zero_copy_kv=zero_copy_kv,
+        external_engine_data=kwargs.get("external_engine_data"),
     )
     # Unlike the direct export()+to_executorch() path -- where the two steps
     # belong to different owners and pairing them is the caller's job -- save()

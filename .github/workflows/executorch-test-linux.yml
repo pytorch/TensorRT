@@ -110,6 +110,32 @@ jobs:
         # pin-check: range-ok
         "${RUNNER_TEMP}/range-check-venv/bin/python" -m pip install --no-deps --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" -r packaging/executorch_range.txt
 
+        # pip does not fail when an extra cannot be satisfied; it quietly picks an older
+        # torch-tensorrt. So check here that the main wheel's executorch extra requires exactly the
+        # companion built beside it, and that pip resolves that extra for the version just built.
+        python - <<'PY'
+        import importlib.metadata as metadata
+        import sys
+
+        from packaging.requirements import Requirement
+
+        companion = metadata.version("torch-tensorrt-executorch-runtime")
+        pins = [
+            r
+            for r in map(Requirement, metadata.requires("torch-tensorrt") or [])
+            if r.name == "torch-tensorrt-executorch-runtime"
+            and r.marker is not None
+            and r.marker.evaluate({"extra": "executorch"})
+        ]
+        if [str(r.specifier) for r in pins] != [f"=={companion}"]:
+            sys.exit(f"the executorch extra requires {pins}, not the companion built beside it ({companion})")
+        PY
+        built="$(python -c 'import importlib.metadata as m; print(m.version("torch-tensorrt"))')"
+        python -m pip install --pre --dry-run --find-links /opt/torch-tensorrt-builds \
+          --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" \
+          --extra-index-url https://pypi.nvidia.com \
+          "torch-tensorrt[executorch]==${built}"
+
         source tests/py/utils/ci_helpers.sh
         trt_tier_executorch
 

@@ -25,6 +25,7 @@ from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import DEVICE_IDX
 from torch_tensorrt.executorch.backend import (
     ZERO_COPY_KV_COMPILE_SPEC_KEY,
     TensorRTBackend,
+    _external_engine_tag,
     _get_engine_info_for_node,
     _get_engine_nodes_in,
     _get_str,
@@ -107,6 +108,31 @@ def normalize_use_cuda_graphs(use_cuda_graphs: bool | None) -> bytes | None:
             f"{type(use_cuda_graphs).__name__}."
         )
     return b"1" if use_cuda_graphs else b"0"
+
+
+def normalize_external_engine_data(external_engine_data: str | None) -> bytes | None:
+    """Validate the .ptd file name, given without its extension; None embeds every engine."""
+    if external_engine_data is None:
+        return None
+    if not isinstance(external_engine_data, str):
+        raise TypeError(
+            "external_engine_data must be a str or None, got "
+            f"{type(external_engine_data).__name__}."
+        )
+    # ExecuTorch writes <name>.ptd beside the .pte, so the name may not leave that directory; on
+    # Windows "D:engines" is relative to drive D, hence ":". It appends .ptd only when missing, so
+    # "x.ptd" would share x.ptd with another backend's "x" data and the second write would replace
+    # the first.
+    if (
+        external_engine_data in ("", ".", "..")
+        or any(c in external_engine_data for c in "/\\:\0")
+        or external_engine_data.endswith(".ptd")
+    ):
+        raise ValueError(
+            "external_engine_data must be a non-empty file name without a directory, a drive or the "
+            f".ptd extension, got {external_engine_data!r}."
+        )
+    return external_engine_data.encode()
 
 
 def _keep_mutated_buffers_above_delegate(exported_program: ExportedProgram) -> None:
@@ -205,6 +231,8 @@ class TensorRTPartitioner(Partitioner):  # type: ignore[misc]
                 f"{CUDA_GRAPHS_COMPILE_SPEC_KEY} must appear at most once, with the value "
                 f'b"0" or b"1", got {[s.value for s in cuda_graphs]!r}.'
             )
+        # export() checks this name too, but a caller can lower with this partitioner directly.
+        _external_engine_tag(self.compile_specs)
         self.delegation_spec = DelegationSpec(
             backend_id=TensorRTBackend.__name__,
             compile_specs=self.compile_specs,

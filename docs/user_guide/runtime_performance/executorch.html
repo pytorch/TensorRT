@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=d075c98e"></script>
+    <script src="../../_static/documentation_options.js?v=8a1ce37e"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -561,35 +561,33 @@ requires CUDA 13. Ordinary Torch-TensorRT builds keep their separate CUDA 12 sup
 <hr class="docutils" />
 <section id="installation">
 <h2>Installation<a class="headerlink" href="#installation" title="Link to this heading">#</a></h2>
-<p>Install Torch-TensorRT with the <code class="docutils literal notranslate"><span class="pre">executorch</span></code> extra, and name the delegate package beside
-it:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"torch-tensorrt[executorch]"</span><span class="w"> </span>torch-tensorrt-executorch-runtime
-</pre></div>
-</div>
-<p>To pin a CUDA version, point pip at the matching PyTorch channel and keep the packages on
-it. Swap <code class="docutils literal notranslate"><span class="pre">cu132</span></code> for <code class="docutils literal notranslate"><span class="pre">cu134</span></code> on CUDA 13.4:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"torch-tensorrt[executorch]"</span><span class="w"> </span>torch-tensorrt-executorch-runtime<span class="w"> </span><span class="se">\</span>
+<p>Install Torch-TensorRT with the <code class="docutils literal notranslate"><span class="pre">executorch</span></code> extra from the PyTorch channel for your CUDA
+version. Swap <code class="docutils literal notranslate"><span class="pre">cu132</span></code> for <code class="docutils literal notranslate"><span class="pre">cu134</span></code> on CUDA 13.4:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"torch-tensorrt[executorch]"</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--index-url<span class="w"> </span>https://download.pytorch.org/whl/cu132<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--extra-index-url<span class="w"> </span>https://pypi.org/simple
 </pre></div>
 </div>
+<p>The PyTorch channel is needed because the CUDA build of ExecuTorch is published only there.</p>
 <section id="what-the-command-installs">
 <h3>What the command installs<a class="headerlink" href="#what-the-command-installs" title="Link to this heading">#</a></h3>
 <ul class="simple">
 <li><p>ExecuTorch, the CUDA build, from the <code class="docutils literal notranslate"><span class="pre">executorch</span></code> extra. That is all you need to export.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">torch-tensorrt-executorch-runtime</span></code>, one shared library holding the TensorRT delegate,
-which you need to run a <code class="docutils literal notranslate"><span class="pre">.pte</span></code>. The extra does not pull it in, so the command names it.
-It requires the exact ExecuTorch build it was compiled against, so you get that one
-rather than the newest. Install a different one by hand and the delegate refuses it at
-import.</p></li>
+which you need to run a <code class="docutils literal notranslate"><span class="pre">.pte</span></code>. The extra installs the one built together with your
+Torch-TensorRT wheel, for the same CUDA version. It requires the exact ExecuTorch build
+it was compiled against, so you get that one rather than the newest.</p></li>
 </ul>
+<p>This works for the standard Linux (x86-64 and aarch64) and Windows x86-64 wheels. On aarch64
+it needs glibc 2.35 or newer, the same as TensorRT itself. The TensorRT-RTX and Python-only
+builds have no delegate.</p>
 <p>Use a fresh virtual environment. To export a coalesced program you also need a CUDA toolkit,
 because ExecuTorch’s CUDA backend compiles the leftover operators with <code class="docutils literal notranslate"><span class="pre">nvcc</span></code>.</p>
 </section>
 <section id="nightly-builds">
 <h3>Nightly builds<a class="headerlink" href="#nightly-builds" title="Link to this heading">#</a></h3>
 <p>To pick up a change before it ships, or to report a problem against <code class="docutils literal notranslate"><span class="pre">main</span></code>:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>--pre<span class="w"> </span>--upgrade<span class="w"> </span><span class="s2">"torch-tensorrt[executorch]"</span><span class="w"> </span>torch-tensorrt-executorch-runtime<span class="w"> </span><span class="se">\</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>--pre<span class="w"> </span>--upgrade<span class="w"> </span><span class="s2">"torch-tensorrt[executorch]"</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--index-url<span class="w"> </span>https://download.pytorch.org/whl/nightly/cu132<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--extra-index-url<span class="w"> </span>https://pypi.org/simple
 </pre></div>
