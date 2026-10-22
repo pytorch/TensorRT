@@ -417,6 +417,7 @@ def materialize_regions(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
         route = hints.get("route", "torch")
         plugin_op = None
         if route == "plugin":
+            from torch_tensorrt.region_annotations import KernelGenerator
             from torch_tensorrt.region_annotations._session import current_session
 
             from ._plugins import register_region_plugin
@@ -427,8 +428,15 @@ def materialize_regions(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
                 raise RegionError(
                     "fuse_in_plugin requires its owning compilation session"
                 )
+            registration = session.plugins[key]
+            if isinstance(registration, KernelGenerator):
+                from ._generation._factory import generate_registration
+
+                registration = generate_registration(
+                    child, registration, region_id=hints["region_id"]
+                )
             plugin_op = register_region_plugin(
-                child, session.plugins[key], region_id=hints["region_id"]
+                child, registration, region_id=hints["region_id"]
             )
         if route == "torch":
             child._torch_tensorrt_region_id = hints["region_id"]
