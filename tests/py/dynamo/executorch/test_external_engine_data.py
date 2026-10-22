@@ -211,6 +211,37 @@ def test_save_refuses_a_program_path_a_data_file_could_overwrite(
 
 
 @pytest.mark.unit
+def test_save_logs_the_data_file_to_load(tmp_path, caplog):
+    from torch_tensorrt._compile import _write_external_tensor_data
+
+    program = SimpleNamespace(
+        _tensor_data={"engines": object()}, write_tensor_data_to_file=MagicMock()
+    )
+    with caplog.at_level(logging.INFO, logger="torch_tensorrt._compile"):
+        _write_external_tensor_data(program, str(tmp_path / "model.pte"))
+    program.write_tensor_data_to_file.assert_called_once_with(str(tmp_path))
+    assert f"{tmp_path / 'engines.ptd'}. Pass this file, not the directory" in (
+        caplog.text
+    )
+
+
+@pytest.mark.unit
+def test_save_logs_every_data_file_it_wrote(tmp_path, caplog):
+    from torch_tensorrt._compile import _write_external_tensor_data
+
+    program = SimpleNamespace(
+        _tensor_data={"engines": object(), "weights.ptd": object()},
+        write_tensor_data_to_file=MagicMock(),
+    )
+    with caplog.at_level(logging.INFO, logger="torch_tensorrt._compile"):
+        _write_external_tensor_data(program, str(tmp_path / "model.pte"))
+    assert (
+        f"{tmp_path / 'engines.ptd'}, {tmp_path / 'weights.ptd'}. "
+        "Pass these files, not the directory"
+    ) in caplog.text
+
+
+@pytest.mark.unit
 @pytest.mark.parametrize("value", [None, "engines"])
 def test_save_warns_and_does_not_forward_for_other_formats(
     monkeypatch, tmp_path, program, caplog, value
