@@ -885,7 +885,12 @@ def save(
                 the ``.ptd`` extension and
                 writes every TensorRT engine to ``<name>.ptd`` next to the ``.pte``
                 instead of into it. Pass that file as the program's data file when
-                loading. See :func:`torch_tensorrt.executorch.export`.
+                loading. An existing file with that name is replaced, so give each
+                program in a directory its own name, for example
+                ``external_engine_data="model"`` for ``model.pte``. A program that also
+                has a CUDA backend part needs its own directory and
+                ``external_engine_data="aoti_cuda_blob"`` instead. See
+                :func:`torch_tensorrt.executorch.export`.
     """
     if isinstance(module, CudaGraphsTorchTensorRTModule):
         module = module.compiled_module

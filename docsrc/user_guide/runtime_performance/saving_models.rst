@@ -277,7 +277,9 @@ Default: ``save()``
     trt_gm = torch_tensorrt.compile(model, ir="dynamo", arg_inputs=inputs)
     torch_tensorrt.save(trt_gm, "trt.pte", output_format="executorch")
 
-``save`` writes both the ``.pte`` and any external ``.ptd`` tensor-data files.
+``save`` writes both the ``.pte`` and any external ``.ptd`` tensor-data files. To keep the
+TensorRT engines in a ``.ptd`` file instead of the ``.pte``, see
+:ref:`executorch_external_engine_data`.
 
 Advanced: ``export()``
 """"""""""""""""""""""
