@@ -425,6 +425,11 @@ def prepare_inputs(
 
             return torchtrt_inputs_dict
 
+        elif type(inputs) in torch.utils._pytree.SUPPORTED_NODES:
+            # Other registered pytree containers (e.g. HF's StaticCache) are
+            # flattened to their tensors by the exported program's in_spec
+            return inputs
+
         else:
             raise ValueError(
                 f"Invalid input type {type(inputs)} encountered in the dynamo_compile input parsing. "
