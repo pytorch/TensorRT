@@ -867,9 +867,9 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         return layer.get_output(0)
 
     def _scalar_output_positions(self) -> Set[int]:
-        """Positions in the FX output node whose value is a scalar, not a tensor.
+        """Positions in the FX output node whose value is a scalar or a rank-0 tensor.
 
-        These are exactly the positions ``extract_symbolic_shape_expressions``
+        The scalars are exactly the positions ``extract_symbolic_shape_expressions``
         records with ``is_scalar``, so the two stay in step.
         """
         if self._cur_node is None:
@@ -886,7 +886,9 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 if isinstance(fx_output, torch.fx.Node)
                 else fx_output
             )
-            if isinstance(val, (torch.SymInt, torch.SymFloat, int, float, bool)):
+            if isinstance(val, (torch.SymInt, torch.SymFloat, int, float, bool)) or (
+                isinstance(val, torch.Tensor) and val.dim() == 0
+            ):
                 positions.add(i)
         return positions
 
