@@ -183,13 +183,19 @@ class Engine {
     return backend_.execute(context, handle_, {args, 2});
   }
 
-  void stage(int rows, int cols, float seed) {
+  // The fill must finish before execute(): a cudaStreamNonBlocking stream does not wait
+  // for the legacy default stream, so an unfinished cudaMemset can land after the engine writes.
+  // Staging on the caller's stream keeps threads from queuing behind each other's legacy work.
+  void stage(int rows, int cols, float seed, cudaStream_t stream = cudaStreamLegacy) {
     input_host_.resize(static_cast<size_t>(rows) * cols);
     for (size_t i = 0; i < input_host_.size(); ++i) {
       input_host_[i] = seed + static_cast<float>(i % 13) / 8.0f;
     }
-    ASSERT_EQ(cudaMemcpy(input_, input_host_.data(), input_host_.size() * 4, cudaMemcpyHostToDevice), cudaSuccess);
-    ASSERT_EQ(cudaMemset(output_, 0xff, kMaxBytes), cudaSuccess);
+    ASSERT_EQ(
+        cudaMemcpyAsync(input_, input_host_.data(), input_host_.size() * 4, cudaMemcpyHostToDevice, stream),
+        cudaSuccess);
+    ASSERT_EQ(cudaMemsetAsync(output_, 0xff, kMaxBytes, stream), cudaSuccess);
+    ASSERT_EQ(cudaStreamSynchronize(stream), cudaSuccess);
   }
 
   void check(int rows, int cols) {
@@ -203,7 +209,7 @@ class Engine {
 
   // Stages, runs, and checks the result on the calling thread.
   Error run(int rows, int cols, float seed = 0.0f, std::optional<cudaStream_t> stream = std::nullopt) {
-    stage(rows, cols, seed);
+    stage(rows, cols, seed, stream.value_or(cudaStreamLegacy));
     const Error err = execute(rows, cols, stream);
     if (err == Error::Ok) {
       if (stream) {
