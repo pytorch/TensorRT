@@ -8,7 +8,7 @@ Two converters are registered for ``aten.index_copy.default``:
 
 * ``aten_ops_index_copy_kv`` — HIGH priority, validator-gated. Fires for
   the narrow KV-eligible case (4-D static cache, dim=2, source seq dim
-  size 1, batch=1) and emits ``IKVCacheUpdateLayer`` with aliased I/O.
+  size 1, any batch) and emits ``IKVCacheUpdateLayer`` with aliased I/O.
 
 * ``aten_ops_index_copy_fallback`` — STANDARD priority. Fires for
   everything else; produces correct results via the scatter path. No
@@ -45,8 +45,8 @@ def _aliased_io(compiled):
 
 
 class TestIndexCopyKVFastPath(TestCase):
-    """KV-eligible: 4-D static cache, dim=2, batch=1, single-position
-    write. The validator passes and the fast path emits
+    """KV-eligible: 4-D static cache, dim=2, single-position write, any
+    batch. The validator passes and the fast path emits
     ``IKVCacheUpdateLayer`` with aliased output."""
 
     def test_single_position_write_aliased(self):
@@ -73,6 +73,32 @@ class TestIndexCopyKVFastPath(TestCase):
         eager = cache.clone()
         eager_out = torch.ops.aten.index_copy.default(eager, 2, index, update)
         self.assertTrue(torch.allclose(out_val, eager_out))
+
+    def test_batch_gt_one_writes_every_row_in_place(self):
+        """The single position becomes every row's write index."""
+
+        class M(torch.nn.Module):
+            def forward(self, cache, index, update):
+                return torch.ops.aten.index_copy.default(cache, 2, index, update)
+
+        cache = torch.randn(4, 4, 16, 8, device="cuda")
+        index = torch.tensor([3], dtype=torch.int64, device="cuda")
+        update = torch.randn(4, 4, 1, 8, device="cuda")
+
+        compiled = _compile(M().cuda(), (cache.clone(), index, update.clone()))
+
+        aliased = _aliased_io(compiled)
+        self.assertEqual(len(aliased), 1)
+        _, kind = next(iter(aliased.values()))
+        self.assertEqual(kind, "kv_cache_update")
+
+        eager = torch.ops.aten.index_copy.default(cache.clone(), 2, index, update)
+        cache_run = cache.clone()
+        out = compiled(cache_run, index, update)
+        out_val = out[0] if isinstance(out, tuple) else out
+        self.assertTrue(torch.allclose(out_val, eager))
+        # Written in place, through the aliased binding.
+        self.assertTrue(torch.allclose(cache_run, eager))
 
 
 class TestIndexCopyFallback(TestCase):
@@ -112,26 +138,6 @@ class TestIndexCopyFallback(TestCase):
         cache_run = cache.clone()
         out = compiled(cache_run, index, update)
         eager = torch.ops.aten.index_copy.default(cache.clone(), 1, index, update)
-        self.assertTrue(torch.allclose(out, eager))
-
-    def test_batch_gt_one_uses_fallback(self):
-        """Batch > 1 currently routes to fallback (broadcasting writeIndices
-        is a Phase-2 extension)."""
-
-        class M(torch.nn.Module):
-            def forward(self, cache, index, update):
-                return torch.ops.aten.index_copy.default(cache, 2, index, update)
-
-        cache = torch.zeros(4, 4, 16, 8, device="cuda")
-        index = torch.tensor([3], dtype=torch.int64, device="cuda")
-        update = torch.ones(4, 4, 1, 8, device="cuda") * 7.0
-
-        compiled = _compile(M().cuda(), (cache.clone(), index, update.clone()))
-        self.assertEqual(_aliased_io(compiled), {})
-
-        cache_run = cache.clone()
-        out = compiled(cache_run, index, update)
-        eager = torch.ops.aten.index_copy.default(cache.clone(), 2, index, update)
         self.assertTrue(torch.allclose(out, eager))
 
 
