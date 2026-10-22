@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=8a1ce37e"></script>
+    <script src="../_static/documentation_options.js?v=ce438fe8"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -455,8 +455,9 @@ document.write(`
 <li class="toctree-l3"><a class="reference internal" href="namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1Device.html">Struct Device</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1AliasedBinding.html">Struct AliasedBinding</a></li>
-<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle.html">Struct EngineHandle</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1InputProfileBounds.html">Struct InputProfileBounds</a></li>
+<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1OptimizationProfileGuard_1_1AutoTag.html">Struct OptimizationProfileGuard::AutoTag</a></li>
+<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1ProfileTable.html">Struct ProfileTable</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1TensorRTBlobHeader.html">Struct TensorRTBlobHeader</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1TRTDeleter.html">Struct TRTDeleter</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1WsBudget.html">Struct WsBudget</a></li>
@@ -465,13 +466,20 @@ document.write(`
 <li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1torchscript_1_1CompileSpec.html">Struct CompileSpec</a></li>
 <li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1DataType.html">Class DataType</a></li>
 <li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1Device_1_1DeviceType.html">Class Device::DeviceType</a></li>
+<li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1OptimizationProfileGuard.html">Class OptimizationProfileGuard</a></li>
 <li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1TensorRTBackend.html">Class TensorRTBackend</a></li>
 <li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1TRTLogger.html">Class TRTLogger</a></li>
 <li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html">Class TensorFormat</a></li>
 <li class="toctree-l3"><a class="reference internal" href="enum_torch__tensorrt_8h_1a3fbe5d72e4fc624dbd038853079620eb.html">Enum EngineCapability</a></li>
+<li class="toctree-l3"><a class="reference internal" href="enum_OptimizationProfileSelection_8h_1a5e828f9e4f3fea51423b5c701d803840.html">Enum ProfileRequest</a></li>
+<li class="toctree-l3"><a class="reference internal" href="enum_OptimizationProfileSelection_8h_1a327ad4db9a647e041f8c082b069975d8.html">Enum ProfileSelection</a></li>
 <li class="toctree-l3"><a class="reference internal" href="enum_logging_8h_1a130f65408ad8cbaee060f05e8db69558.html">Enum Level</a></li>
 <li class="toctree-l3"><a class="reference internal" href="function_torch__tensorrt_8h_1ad6a4ee8ca6c8f6e5519eb1128ec7f4a1.html">Function torch_tensorrt::dump_build_info</a></li>
+<li class="toctree-l3"><a class="reference internal" href="function_OptimizationProfileSelection_8h_1a415ea7d183f608f93a9447eac6393135.html">Function torch_tensorrt::executorch_backend::dims_fit</a></li>
 <li class="toctree-l3"><a class="reference internal" href="function_WeightStreamingBudget_8h_1ad04b467472f3cbcb8d5d02a35ec73b40.html">Function torch_tensorrt::executorch_backend::parse_weight_streaming_budget</a></li>
+<li class="toctree-l3"><a class="reference internal" href="function_OptimizationProfileSelection_8h_1ab53602e32219b5bee50f56c8ac09d47e.html">Function torch_tensorrt::executorch_backend::profile_fits</a></li>
+<li class="toctree-l3"><a class="reference internal" href="function_OptimizationProfileSelection_8h_1a611c9746189bfa9db2efa54e2718cb92.html">Function torch_tensorrt::executorch_backend::select_profile</a></li>
+<li class="toctree-l3"><a class="reference internal" href="function_OptimizationProfileSelection_8h_1a4f6ab33f9a46a8df5d8e205ebe6cbf3c.html">Template Function torch_tensorrt::executorch_backend::to_profile_index</a></li>
 <li class="toctree-l3"><a class="reference internal" href="function_torch__tensorrt_8h_1ac4ab8313ae72c2c899ea31548b528528.html">Function torch_tensorrt::get_build_info</a></li>
 <li class="toctree-l3"><a class="reference internal" href="function_logging_8h_1a56e110feaaba2c3fd44bd201fd21a76a.html">Function torch_tensorrt::logging::get_is_colored_output_on</a></li>
 <li class="toctree-l3"><a class="reference internal" href="function_logging_8h_1a0593f776f469c20469e2f729fc7861a3.html">Function torch_tensorrt::logging::get_logging_prefix</a></li>
@@ -574,9 +582,10 @@ document.write(`
 <ul class="simple">
 <li><p><a class="reference internal" href="#namespaces" id="id2">Namespaces</a></p></li>
 <li><p><a class="reference internal" href="#classes" id="id3">Classes</a></p></li>
-<li><p><a class="reference internal" href="#functions" id="id4">Functions</a></p></li>
-<li><p><a class="reference internal" href="#typedefs" id="id5">Typedefs</a></p></li>
-<li><p><a class="reference internal" href="#variables" id="id6">Variables</a></p></li>
+<li><p><a class="reference internal" href="#enums" id="id4">Enums</a></p></li>
+<li><p><a class="reference internal" href="#functions" id="id5">Functions</a></p></li>
+<li><p><a class="reference internal" href="#typedefs" id="id6">Typedefs</a></p></li>
+<li><p><a class="reference internal" href="#variables" id="id7">Variables</a></p></li>
 </ul>
 </nav>
 <section id="namespaces">
@@ -589,19 +598,32 @@ document.write(`
 <h2>Classes<a class="headerlink" href="#classes" title="Link to this heading">#</a></h2>
 <ul class="simple">
 <li><p><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1AliasedBinding.html#exhale-struct-structtorch-tensorrt-1-1executorch-backend-1-1aliasedbinding"><span class="std std-ref">Struct AliasedBinding</span></a></p></li>
-<li><p><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle.html#exhale-struct-structtorch-tensorrt-1-1executorch-backend-1-1enginehandle"><span class="std std-ref">Struct EngineHandle</span></a></p></li>
 <li><p><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1InputProfileBounds.html#exhale-struct-structtorch-tensorrt-1-1executorch-backend-1-1inputprofilebounds"><span class="std std-ref">Struct InputProfileBounds</span></a></p></li>
+<li><p><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1OptimizationProfileGuard_1_1AutoTag.html#exhale-struct-structtorch-tensorrt-1-1executorch-backend-1-1optimizationprofileguard-1-1autotag"><span class="std std-ref">Struct OptimizationProfileGuard::AutoTag</span></a></p></li>
+<li><p><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1ProfileTable.html#exhale-struct-structtorch-tensorrt-1-1executorch-backend-1-1profiletable"><span class="std std-ref">Struct ProfileTable</span></a></p></li>
 <li><p><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1TensorRTBlobHeader.html#exhale-struct-structtorch-tensorrt-1-1executorch-backend-1-1tensorrtblobheader"><span class="std std-ref">Struct TensorRTBlobHeader</span></a></p></li>
 <li><p><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1TRTDeleter.html#exhale-struct-structtorch-tensorrt-1-1executorch-backend-1-1trtdeleter"><span class="std std-ref">Struct TRTDeleter</span></a></p></li>
 <li><p><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1WsBudget.html#exhale-struct-structtorch-tensorrt-1-1executorch-backend-1-1wsbudget"><span class="std std-ref">Struct WsBudget</span></a></p></li>
+<li><p><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1OptimizationProfileGuard.html#exhale-class-classtorch-tensorrt-1-1executorch-backend-1-1optimizationprofileguard"><span class="std std-ref">Class OptimizationProfileGuard</span></a></p></li>
 <li><p><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1TensorRTBackend.html#exhale-class-classtorch-tensorrt-1-1executorch-backend-1-1tensorrtbackend"><span class="std std-ref">Class TensorRTBackend</span></a></p></li>
 <li><p><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1TRTLogger.html#exhale-class-classtorch-tensorrt-1-1executorch-backend-1-1trtlogger"><span class="std std-ref">Class TRTLogger</span></a></p></li>
+</ul>
+</section>
+<section id="enums">
+<h2>Enums<a class="headerlink" href="#enums" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="enum_OptimizationProfileSelection_8h_1a5e828f9e4f3fea51423b5c701d803840.html#exhale-enum-optimizationprofileselection-8h-1a5e828f9e4f3fea51423b5c701d803840"><span class="std std-ref">Enum ProfileRequest</span></a></p></li>
+<li><p><a class="reference internal" href="enum_OptimizationProfileSelection_8h_1a327ad4db9a647e041f8c082b069975d8.html#exhale-enum-optimizationprofileselection-8h-1a327ad4db9a647e041f8c082b069975d8"><span class="std std-ref">Enum ProfileSelection</span></a></p></li>
 </ul>
 </section>
 <section id="functions">
 <h2>Functions<a class="headerlink" href="#functions" title="Link to this heading">#</a></h2>
 <ul class="simple">
+<li><p><a class="reference internal" href="function_OptimizationProfileSelection_8h_1a415ea7d183f608f93a9447eac6393135.html#exhale-function-optimizationprofileselection-8h-1a415ea7d183f608f93a9447eac6393135"><span class="std std-ref">Function torch_tensorrt::executorch_backend::dims_fit</span></a></p></li>
 <li><p><a class="reference internal" href="function_WeightStreamingBudget_8h_1ad04b467472f3cbcb8d5d02a35ec73b40.html#exhale-function-weightstreamingbudget-8h-1ad04b467472f3cbcb8d5d02a35ec73b40"><span class="std std-ref">Function torch_tensorrt::executorch_backend::parse_weight_streaming_budget</span></a></p></li>
+<li><p><a class="reference internal" href="function_OptimizationProfileSelection_8h_1ab53602e32219b5bee50f56c8ac09d47e.html#exhale-function-optimizationprofileselection-8h-1ab53602e32219b5bee50f56c8ac09d47e"><span class="std std-ref">Function torch_tensorrt::executorch_backend::profile_fits</span></a></p></li>
+<li><p><a class="reference internal" href="function_OptimizationProfileSelection_8h_1a611c9746189bfa9db2efa54e2718cb92.html#exhale-function-optimizationprofileselection-8h-1a611c9746189bfa9db2efa54e2718cb92"><span class="std std-ref">Function torch_tensorrt::executorch_backend::select_profile</span></a></p></li>
+<li><p><a class="reference internal" href="function_OptimizationProfileSelection_8h_1a4f6ab33f9a46a8df5d8e205ebe6cbf3c.html#exhale-function-optimizationprofileselection-8h-1a4f6ab33f9a46a8df5d8e205ebe6cbf3c"><span class="std std-ref">Template Function torch_tensorrt::executorch_backend::to_profile_index</span></a></p></li>
 </ul>
 </section>
 <section id="typedefs">
@@ -669,6 +691,7 @@ document.write(`
     <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#namespaces">Namespaces</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#classes">Classes</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#enums">Enums</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#functions">Functions</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#typedefs">Typedefs</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#variables">Variables</a></li>

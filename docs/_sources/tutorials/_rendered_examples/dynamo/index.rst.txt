@@ -542,23 +542,6 @@ Model Zoo
 
 .. raw:: html
 
-    <div class="sphx-glr-thumbcontainer" tooltip="cuda_kernel_op compiles your CUDA C++ source internally with NVRTC. When you already have PTX i...">
-
-.. only:: html
-
-  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_ptx_op_thumb.png
-    :alt:
-
-  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_ptx_op.py`
-
-.. raw:: html
-
-      <div class="sphx-glr-thumbnail-title">Pre-compiled PTX kernels via torch_tensorrt.kernels.ptx_op</div>
-    </div>
-
-
-.. raw:: html
-
     <div class="sphx-glr-thumbcontainer" tooltip="Autoregressive LLMs run in two very different shape regimes that share one set of weights (and ...">
 
 .. only:: html
@@ -571,6 +554,23 @@ Model Zoo
 .. raw:: html
 
       <div class="sphx-glr-thumbnail-title">Multiple Optimization Profiles: Prefill vs Decode for Gemma-3</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="cuda_kernel_op compiles your CUDA C++ source internally with NVRTC. When you already have PTX i...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_ptx_op_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_ptx_op.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Pre-compiled PTX kernels via torch_tensorrt.kernels.ptx_op</div>
     </div>
 
 
@@ -832,8 +832,8 @@ Model Zoo
    /tutorials/_rendered_examples/dynamo/save_dynamic_shapes_example
    /tutorials/_rendered_examples/dynamo/aot_plugin
    /tutorials/_rendered_examples/dynamo/global_perf_tuning_attention_example
-   /tutorials/_rendered_examples/dynamo/ptx_op
    /tutorials/_rendered_examples/dynamo/multi_optimization_profiles
+   /tutorials/_rendered_examples/dynamo/ptx_op
    /tutorials/_rendered_examples/dynamo/hierarchical_partitioner_example
    /tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example
    /tutorials/_rendered_examples/dynamo/weight_streaming_example
