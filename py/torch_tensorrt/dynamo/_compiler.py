@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import collections.abc
+import copy
 import logging
 import operator
 import os
@@ -31,6 +32,17 @@ from torch_tensorrt.dynamo._DryRunTracker import (
 )
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache, DiskEngineCache
 from torch_tensorrt.dynamo._exporter import replace_execute_engine_no_op_node
+from torch_tensorrt.dynamo._reporting import (
+    build_engine_with_reporting,
+    current_collector,
+    is_analyzing,
+    partition_analysis,
+    record_partition_inputs,
+    stage_end,
+    stage_start,
+    tag_source_nodes,
+    with_compiler_lock,
+)
 from torch_tensorrt.dynamo.conversion import (
     CompilationSettings,
     UnsupportedOperatorException,
@@ -81,11 +93,13 @@ from torch_tensorrt.dynamo.utils import (
     to_torch_tensorrt_device,
     validate_optimization_profiles,
 )
+from torch_tensorrt.reporting import Stage
 
 logger = logging.getLogger(__name__)
 
 
 @needs_cross_compile  # type: ignore[misc]
+@with_compiler_lock
 def cross_compile_for_windows(
     exported_program: ExportedProgram,
     inputs: Optional[Sequence[Sequence[Any]]] = None,
@@ -426,6 +440,7 @@ def cross_compile_for_windows(
 
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
+    stage_start(Stage.LOWERING)
     exported_program = pre_export_lowering(exported_program, settings)
     exported_program = exported_program.run_decompositions(
         filter_decomposition_table(
@@ -447,6 +462,7 @@ def cross_compile_for_windows(
     # module parameters to still be on GPU, so we must not deallocate before this call.
     unlowered_gm = gm
     gm = post_lowering(gm, settings)
+    stage_end(Stage.LOWERING)
     logger.debug(f"CPU memory usage after post_lowering: {get_cpu_memory_usage()} MB")
     logger.debug("Lowered Input graph: " + str(gm.graph))
 
@@ -460,7 +476,7 @@ def cross_compile_for_windows(
             "The PyTorch model was moved to the CPU to allocate all GPU memory to TensorRT. To retain the model on the GPU, set offload_module_to_cpu=False"
         )
         logger.debug(f"CPU memory usage after CPU offload: {get_cpu_memory_usage()} MB")
-    else:
+    elif not is_analyzing():
         remaining_memory, total_memory = torch.cuda.mem_get_info()
         if remaining_memory < total_memory // 2:
             logger.warning(
@@ -476,6 +492,7 @@ def cross_compile_for_windows(
     return trt_gm
 
 
+@with_compiler_lock
 def compile(
     exported_program: ExportedProgram,
     inputs: Optional[Sequence[Sequence[Any]]] = None,
@@ -900,6 +917,7 @@ def compile(
     settings = CompilationSettings(**compilation_options)
 
     logger.info("Compilation Settings: %s\n", settings)
+    stage_start(Stage.LOWERING)
     exported_program = pre_export_lowering(exported_program, settings)
     exported_program = exported_program.run_decompositions(
         filter_decomposition_table(
@@ -945,6 +963,7 @@ def compile(
     # module parameters to still be on GPU, so we must not deallocate before this call.
     unlowered_gm = gm
     gm = post_lowering(gm, settings)
+    stage_end(Stage.LOWERING)
     logger.debug(f"CPU memory usage after post_lowering: {get_cpu_memory_usage()} MB")
     logger.debug("Lowered Input graph: " + str(gm.graph))
 
@@ -964,7 +983,7 @@ def compile(
             "The PyTorch model was moved to the CPU to allocate all GPU memory to TensorRT. To retain the model on the GPU, set offload_module_to_cpu=False"
         )
         logger.debug(f"CPU memory usage after CPU offload: {get_cpu_memory_usage()} MB")
-    else:
+    elif not is_analyzing():
         remaining_memory, total_memory = torch.cuda.mem_get_info()
         if remaining_memory < total_memory // 2:
             logger.warning(
@@ -1343,6 +1362,7 @@ def _build_user_symbol_bounds(
 
 
 @fn_supports_debugger  # type: ignore[misc]
+@with_compiler_lock
 def compile_module(
     gm: torch.fx.GraphModule,
     sample_arg_inputs: Sequence[Input],
@@ -1371,6 +1391,9 @@ def compile_module(
             "The model may be in training mode, which may affect the performance of the compiled model!"
         )
     dryrun_tracker = DryRunTracker()
+    stage_start(Stage.PARTITIONING)
+    if current_collector() is not None or settings.dryrun:
+        tag_source_nodes(gm)
     if sample_kwarg_inputs is None:
         sample_kwarg_inputs = {}
 
@@ -1406,6 +1429,8 @@ def compile_module(
     dryrun_tracker.total_ops_in_graph = total_ops
     dryrun_tracker.supported_ops_in_graph = num_supported_ops
     dryrun_tracker.compilation_settings = settings
+    # Capability-based fusion rewrites gm.graph in place. Reports count the
+    # lowered source graph, never newly-created call_module wrapper nodes.
 
     if settings.dryrun and settings.min_block_size > 1:
         logger.info(
@@ -1415,7 +1440,9 @@ def compile_module(
 
     # If the number of supported operations is 0 or less than the block size, skip the subgraph
     if num_supported_ops == 0 or (
-        num_supported_ops < settings.min_block_size and not settings.dryrun
+        num_supported_ops < settings.min_block_size
+        and (not settings.dryrun or is_analyzing())
+        and not (settings.require_full_compilation and num_supported_ops == total_ops)
     ):
         # Only refuse when an operator genuinely has no converter. A graph whose every
         # operator converts is fully supported however few of them there are, and all
@@ -1443,9 +1470,14 @@ def compile_module(
         # fallback_operators counts every refused operator, including ones with side
         # effects that unsupported_operators leaves out, and never a buffer or a parameter.
         dryrun_tracker.unsupported_ops = op_support.fallback_operators
+        dryrun_tracker.analysis_report = partition_analysis(
+            gm, gm, op_support, settings, skipped=True
+        )
         dryrun_tracker.to_run_in_torch.extend(parse_non_trt_nodes(gm))
         parse_graph_io(gm, dryrun_tracker)
-        dryrun_stats_display(dryrun_tracker, settings.dryrun)
+        dryrun_stats_display(
+            dryrun_tracker, False if is_analyzing() else settings.dryrun
+        )
         # compile() offloaded gm before this call. No operation converted, so all of gm
         # runs in PyTorch, and its state must go back to the device.
         if settings.offload_module_to_cpu:
@@ -1494,7 +1526,25 @@ def compile_module(
             "require_full_compilation + full operator support: "
             "skipping partitioner, converting whole graph"
         )
+        dryrun_tracker.analysis_report = partition_analysis(
+            gm, gm, op_support, settings, whole_graph=True
+        )
         if settings.dryrun:
+            convert_inputs = partitioning.construct_submodule_inputs(
+                gm,
+                user_symbol_bounds=user_symbol_bounds,
+            )
+            record_partition_inputs("_run_on_acc_0", convert_inputs)
+            dryrun_tracker.tensorrt_graph_count = 1
+            subgraph_data = PerSubgraphData(
+                subgraph_name="_run_on_acc_0", subgraph_op_count=total_ops
+            )
+            parse_graph_io(gm, subgraph_data)
+            dryrun_tracker.per_subgraph_data.append(subgraph_data)
+            parse_graph_io(gm, dryrun_tracker)
+            dryrun_stats_display(
+                dryrun_tracker, False if is_analyzing() else settings.dryrun
+            )
             return gm
         gm = erase_export_guards(gm)
         # Do not delete `_frozen_param*` here. Stock compile_module only drops
@@ -1507,7 +1557,9 @@ def compile_module(
             user_symbol_bounds=user_symbol_bounds,
             example_tensors=False,
         )
-        trt_module = convert_module(
+        record_partition_inputs("_run_on_acc_0", convert_inputs)
+        trt_module = build_engine_with_reporting(
+            convert_module,
             gm,
             convert_inputs,
             settings=settings,
@@ -1540,6 +1592,13 @@ def compile_module(
         if out_spec is not None:
             target_module._out_spec = out_spec
 
+    # Snapshot only for requested reports. Legacy compilation must not retain
+    # a second module's references to weights across engine builds.
+    analysis_source = (
+        torch.fx.GraphModule(gm, copy.deepcopy(gm.graph))
+        if current_collector() is not None or settings.dryrun
+        else None
+    )
     # Partition module into components that can be TRT-accelerated
     fast_partitioner_failed = False
     # A dry run needs the PyTorch partitions to report unsupported operators.
@@ -1585,6 +1644,12 @@ def compile_module(
             partitioned_module,
             cpu_memory_budget=settings.cpu_memory_budget,
         )
+
+    if analysis_source is not None:
+        dryrun_tracker.analysis_report = partition_analysis(
+            analysis_source, partitioned_module, op_support, settings
+        )
+    del analysis_source
 
     dryrun_tracker.unsupported_ops = supported_ops.fallback_operators
 
@@ -1636,14 +1701,15 @@ def compile_module(
     # Generate the corresponding TRT Module for those
 
     # Here we delete the frozen parameters from the graph module. Note this does not affect the submodules. We are going to delete the frozen parameters from the submodules in the convert_module function.
-    # This is done to release CPU memory. The global partitioner leaves PyTorch nodes in this graph, so keep
-    # the ones they still read.
-    still_read = {
-        n.target for n in partitioned_module.graph.nodes if n.op == "get_attr"
-    }
-    for attr in dir(gm):
-        if attr.startswith("_frozen_param") and attr not in still_read:
-            delattr(gm, attr)
+    # This is done to release CPU memory. The global partitioner leaves PyTorch
+    # nodes in this graph, so keep the frozen parameters they still read.
+    if not is_analyzing():
+        still_read = {
+            n.target for n in partitioned_module.graph.nodes if n.op == "get_attr"
+        }
+        for attr in dir(gm):
+            if attr.startswith("_frozen_param") and attr not in still_read:
+                delattr(gm, attr)
 
     for name, _ in partitioned_module.named_children():
         submodule = getattr(partitioned_module, name)
@@ -1710,6 +1776,7 @@ def compile_module(
             user_symbol_bounds=user_symbol_bounds,
             example_tensors=False,
         )
+        record_partition_inputs(name, submodule_inputs)
 
         assert submodule_inputs is not None
 
@@ -1734,10 +1801,12 @@ def compile_module(
         parse_graph_io(submodule, subgraph_data)
         dryrun_tracker.tensorrt_graph_count += 1
         dryrun_tracker.per_subgraph_data.append(subgraph_data)
-        torch.cuda.empty_cache()
+        if not is_analyzing():
+            torch.cuda.empty_cache()
         # Create TRT engines from submodule
         if not settings.dryrun:
-            trt_module = convert_module(
+            trt_module = build_engine_with_reporting(
+                convert_module,
                 submodule,
                 submodule_inputs,
                 settings=settings,
@@ -1833,7 +1902,7 @@ def compile_module(
     if fast_partitioner_failed:
         settings.use_fast_partitioner = True
 
-    dryrun_stats_display(dryrun_tracker, settings.dryrun)
+    dryrun_stats_display(dryrun_tracker, False if is_analyzing() else settings.dryrun)
 
     restore_reshape(partitioned_module)
     return partitioned_module
@@ -2014,6 +2083,7 @@ def _resolve_pytree_binding_names(
     return list(leaves)
 
 
+@with_compiler_lock
 def convert_exported_program_to_serialized_trt_engine(
     exported_program: ExportedProgram,
     inputs: Optional[Sequence[Sequence[Any]]] = None,
