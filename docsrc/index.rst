@@ -32,6 +32,7 @@ Additional resources:
    :caption: User Guide
 
    user_guide/index
+   user_guide/agent_workflows/index
 
 .. toctree::
    :hidden:

@@ -1,0 +1,403 @@
+{
+  "$defs": {
+    "ArtifactEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "path": {
+          "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.{1,2}(?:/|$))[^/]+(?:/[^/]+)*$",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "size_bytes": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "path",
+        "sha256",
+        "size_bytes"
+      ],
+      "type": "object"
+    },
+    "ArtifactManifest": {
+      "additionalProperties": false,
+      "properties": {
+        "absent_stage_reasons": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "created_at": {
+          "format": "date-time",
+          "pattern": "Z$",
+          "type": "string"
+        },
+        "diagnostics": {
+          "items": {
+            "$ref": "#/$defs/Diagnostic"
+          },
+          "type": "array"
+        },
+        "entries": {
+          "items": {
+            "$ref": "#/$defs/ArtifactEntry"
+          },
+          "type": "array"
+        },
+        "environment": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EnvironmentReport"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "failure": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Failure"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "job_id": {
+          "type": "string"
+        },
+        "lineage": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "report_type": {
+          "const": "artifact_manifest"
+        },
+        "request_fingerprint": {
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "0.1"
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "running",
+            "succeeded",
+            "failed",
+            "cancelled",
+            "skipped"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "report_type",
+        "schema_version"
+      ],
+      "type": "object"
+    },
+    "Diagnostic": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "node_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "severity": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "type": "object"
+    },
+    "EnvironmentReport": {
+      "additionalProperties": false,
+      "properties": {
+        "created_at": {
+          "format": "date-time",
+          "pattern": "Z$",
+          "type": "string"
+        },
+        "cuda_available": {
+          "type": "boolean"
+        },
+        "cuda_driver_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cuda_runtime_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "diagnostics": {
+          "items": {
+            "$ref": "#/$defs/Diagnostic"
+          },
+          "type": "array"
+        },
+        "failure": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Failure"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "features": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "gpus": {
+          "items": {
+            "$ref": "#/$defs/GPUInfo"
+          },
+          "type": "array"
+        },
+        "job_id": {
+          "type": "string"
+        },
+        "nvidia_driver_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "platform": {
+          "type": "string"
+        },
+        "python_version": {
+          "type": "string"
+        },
+        "report_type": {
+          "const": "environment"
+        },
+        "schema_version": {
+          "const": "0.1"
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "running",
+            "succeeded",
+            "failed",
+            "cancelled",
+            "skipped"
+          ],
+          "type": "string"
+        },
+        "tensorrt_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "torch_cuda_build_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "torch_tensorrt_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "torch_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "unavailable": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        }
+      },
+      "required": [
+        "report_type",
+        "schema_version"
+      ],
+      "type": "object"
+    },
+    "Failure": {
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "enum": [
+            "invalid_input",
+            "unsupported_operator",
+            "unsupported_environment",
+            "builder_error",
+            "out_of_memory",
+            "timeout",
+            "cancelled",
+            "worker_crash",
+            "serialization_error",
+            "artifact_error",
+            "validation_error",
+            "benchmark_error",
+            "internal_error"
+          ],
+          "type": "string"
+        },
+        "exception_type": {
+          "type": "string"
+        },
+        "message": {
+          "maxLength": 2048,
+          "type": "string"
+        },
+        "retry_after_change": {
+          "type": "boolean"
+        },
+        "retry_unchanged": {
+          "type": "boolean"
+        },
+        "stage": {
+          "enum": [
+            "environment",
+            "capture",
+            "analysis",
+            "compilation",
+            "lowering",
+            "partitioning",
+            "conversion",
+            "build",
+            "serialization",
+            "save",
+            "validation",
+            "benchmark",
+            "finalization"
+          ],
+          "type": "string"
+        },
+        "suggested_actions": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "category",
+        "message",
+        "stage"
+      ],
+      "type": "object"
+    },
+    "GPUInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "compute_capability": {
+          "type": "string"
+        },
+        "index": {
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "total_memory_bytes": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "uuid": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [],
+      "type": "object"
+    }
+  },
+  "$ref": "#/$defs/ArtifactManifest",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}
