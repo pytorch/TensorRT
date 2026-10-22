@@ -135,6 +135,7 @@ def cross_compile_for_windows(
         str
     ] = _defaults.DISABLED_CONSTANT_FOLD_EXCLUSIONS,
     attn_bias_is_causal: bool = _defaults.ATTN_BIAS_IS_CAUSAL,
+    fold_shared_kv_attention: bool = _defaults.FOLD_SHARED_KV_ATTENTION,
     fallback_data_dependent_ops: bool = _defaults.FALLBACK_DATA_DEPENDENT_OPS,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
@@ -226,6 +227,7 @@ def cross_compile_for_windows(
             foldable. Supported IDs: ``"attention_mask_arange"``.
             Default is empty.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
+        fold_shared_kv_attention (bool): Whether to run attention whose query heads share one key/value head as two plain matrix products against that head, instead of repeating it per query head as Hugging Face models do. It avoids copying the repeated keys and values and replaces TensorRT's fused attention kernel. At head size 256 this was faster on A100, H100 and Jetson Thor and slower on Jetson Orin, so measure it on the target GPU. With float16 the plain matrix products can accumulate in float16, so set use_fp32_acc=True to keep the accuracy of the fused kernel. Only attention written as matmuls with static shapes changes; scaled_dot_product_attention also needs decompose_attention=True. Default is False.
         fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.
         **kwargs: Any,
     Returns:
@@ -385,6 +387,7 @@ def cross_compile_for_windows(
         "decompose_attention": decompose_attention,
         "disabled_constant_fold_exclusions": disabled_constant_fold_exclusions,
         "attn_bias_is_causal": attn_bias_is_causal,
+        "fold_shared_kv_attention": fold_shared_kv_attention,
         "fallback_data_dependent_ops": fallback_data_dependent_ops,
     }
 
@@ -520,6 +523,7 @@ def compile(
         str
     ] = _defaults.DISABLED_CONSTANT_FOLD_EXCLUSIONS,
     attn_bias_is_causal: bool = _defaults.ATTN_BIAS_IS_CAUSAL,
+    fold_shared_kv_attention: bool = _defaults.FOLD_SHARED_KV_ATTENTION,
     fallback_data_dependent_ops: bool = _defaults.FALLBACK_DATA_DEPENDENT_OPS,
     build_route: Optional[str] = _defaults.BUILD_ROUTE,
     tune_build_routes: Optional[str] = _defaults.TUNE_BUILD_ROUTES,
@@ -634,6 +638,7 @@ def compile(
             foldable. Supported IDs: ``"attention_mask_arange"``.
             Default is empty.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
+        fold_shared_kv_attention (bool): Whether to run attention whose query heads share one key/value head as two plain matrix products against that head, instead of repeating it per query head as Hugging Face models do. It avoids copying the repeated keys and values and replaces TensorRT's fused attention kernel. At head size 256 this was faster on A100, H100 and Jetson Thor and slower on Jetson Orin, so measure it on the target GPU. With float16 the plain matrix products can accumulate in float16, so set use_fp32_acc=True to keep the accuracy of the fused kernel. Only attention written as matmuls with static shapes changes; scaled_dot_product_attention also needs decompose_attention=True. Default is False.
         fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.
         build_route (Optional[str]): TensorRT Global Performance Tuning build route string (space-separated "-knob=value" tokens). None uses the default route. This feature requires TensorRT with Global Performance Tuning enabled; currently unavailable on TensorRT-RTX / Windows.
         tune_build_routes (Optional[str]): Build-route expression for an autotuning sweep that runs each candidate in a spawned child process (e.g. "-slice_fusion=[on|off] -kgen:codegen:cuda_tile=[0|1|2|3]"). None disables tuning.
@@ -839,6 +844,7 @@ def compile(
         "decompose_attention": decompose_attention,
         "disabled_constant_fold_exclusions": disabled_constant_fold_exclusions,
         "attn_bias_is_causal": attn_bias_is_causal,
+        "fold_shared_kv_attention": fold_shared_kv_attention,
         "fallback_data_dependent_ops": fallback_data_dependent_ops,
         "build_route": build_route,
         "tune_build_routes": tune_build_routes,
@@ -1971,6 +1977,7 @@ def convert_exported_program_to_serialized_trt_engine(
         str
     ] = _defaults.DISABLED_CONSTANT_FOLD_EXCLUSIONS,
     attn_bias_is_causal: bool = _defaults.ATTN_BIAS_IS_CAUSAL,
+    fold_shared_kv_attention: bool = _defaults.FOLD_SHARED_KV_ATTENTION,
     lift_mutable_buffers: bool = False,
     arg_input_binding_names: Any = None,
     kwarg_input_binding_names: Any = None,
@@ -2083,6 +2090,7 @@ def convert_exported_program_to_serialized_trt_engine(
             foldable. Supported IDs: ``"attention_mask_arange"``.
             Default is empty.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
+        fold_shared_kv_attention (bool): Whether to run attention whose query heads share one key/value head as two plain matrix products against that head, instead of repeating it per query head as Hugging Face models do. It avoids copying the repeated keys and values and replaces TensorRT's fused attention kernel. At head size 256 this was faster on A100, H100 and Jetson Thor and slower on Jetson Orin, so measure it on the target GPU. With float16 the plain matrix products can accumulate in float16, so set use_fp32_acc=True to keep the accuracy of the fused kernel. Only attention written as matmuls with static shapes changes; scaled_dot_product_attention also needs decompose_attention=True. Default is False.
         **kwargs: Any,
     Returns:
         bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
@@ -2257,6 +2265,7 @@ def convert_exported_program_to_serialized_trt_engine(
         "decompose_attention": decompose_attention,
         "disabled_constant_fold_exclusions": disabled_constant_fold_exclusions,
         "attn_bias_is_causal": attn_bias_is_causal,
+        "fold_shared_kv_attention": fold_shared_kv_attention,
     }
 
     settings = CompilationSettings(**compilation_options)
