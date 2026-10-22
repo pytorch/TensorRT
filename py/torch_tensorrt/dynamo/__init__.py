@@ -19,6 +19,7 @@ if version.parse(sanitized_torch_version()) >= version.parse("2.1.dev"):
     )
     from ._exporter import export
     from ._refit import refit_module_weights
+    from ._reporting import analyze, compile_with_report
     from ._settings import CompilationSettings
     from ._SourceIR import SourceIR
     from ._tracer import trace

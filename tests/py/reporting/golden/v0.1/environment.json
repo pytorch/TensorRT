@@ -1,0 +1,30 @@
+{
+  "created_at": "2026-10-12T00:00:00Z",
+  "cuda_available": true,
+  "cuda_driver_version": "13.0",
+  "cuda_runtime_version": "13.0",
+  "diagnostics": [],
+  "failure": null,
+  "features": {},
+  "gpus": [
+    {
+      "compute_capability": "9.0",
+      "index": 0,
+      "name": "Example GPU",
+      "total_memory_bytes": 1024,
+      "uuid": "GPU-example"
+    }
+  ],
+  "job_id": "example-job",
+  "nvidia_driver_version": "580.65.06",
+  "platform": "Linux",
+  "python_version": "3.12.11",
+  "report_type": "environment",
+  "schema_version": "0.1",
+  "status": "succeeded",
+  "tensorrt_version": "11.3.0",
+  "torch_cuda_build_version": "13.0",
+  "torch_tensorrt_version": "2.15.0",
+  "torch_version": "2.15.0",
+  "unavailable": {}
+}

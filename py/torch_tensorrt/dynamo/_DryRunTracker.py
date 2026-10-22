@@ -6,13 +6,14 @@ import math
 import operator
 import os
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 
 import torch
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import ConverterRegistry
 from torch_tensorrt.dynamo.conversion.converter_utils import get_node_name
 from torch_tensorrt.dynamo.observer import observable
+from torch_tensorrt.reporting import AnalysisReport
 
 logger = logging.getLogger(__name__)
 
@@ -69,9 +70,10 @@ class DryRunTracker:
     )
     unsupported_ops: Dict[str, int] = field(default_factory=dict)
     to_run_in_torch: List[str] = field(default_factory=list)
+    analysis_report: Optional[AnalysisReport] = None
 
 
-@observable()  # type: ignore[misc]
+@observable()
 def dryrun_stats_display(
     dryrun_tracker: DryRunTracker, dryrun_enabled: Union[bool, str]
 ) -> None:
@@ -129,7 +131,7 @@ def dryrun_stats_display(
         formatted_stats += " " * 4 + "...\n"
         formatted_stats += (
             " " * 4
-            + f"TRT Engine #{i+1} - Submodule name: {trt_subgraph_data.subgraph_name}\n"
+            + f"TRT Engine #{i + 1} - Submodule name: {trt_subgraph_data.subgraph_name}\n"
         )
         formatted_stats += (
             " " * 5
