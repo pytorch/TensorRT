@@ -972,6 +972,15 @@ def save(
             from torch_tensorrt.executorch._zero_copy import _refuse_skip_h2d
 
             _refuse_skip_h2d(executorch_backend_config)
+        # Every backend writes its data as <name>.ptd beside the program, so a
+        # program named *.ptd can be replaced by one. Windows ignores case and
+        # trailing dots and spaces in a file name.
+        if os.fspath(file_path).rstrip(". ").lower().endswith(".ptd"):
+            raise ValueError(
+                f"file_path must not end with .ptd, got {file_path!r}. save() writes the "
+                "program's data files as <name>.ptd beside it, so one of them could replace "
+                "the program. Use the .pte extension."
+            )
 
     def _all_are_input_objects(obj: Any) -> bool:
         """Recursively check if all elements in nested collections are Input objects."""
