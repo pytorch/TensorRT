@@ -187,6 +187,30 @@ def test_save_checks_the_name_before_the_model_and_input_checks(tmp_path):
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize(
+    "file_name, value",
+    [
+        ("engines.ptd", "engines"),
+        ("ENGINES.PTD", "engines"),
+        ("engines.ptd.", "engines"),
+        ("engines.ptd ", "engines"),
+        ("aoti_cuda_blob.ptd", None),
+    ],
+)
+def test_save_refuses_a_program_path_a_data_file_could_overwrite(
+    tmp_path, file_name, value
+):
+    with pytest.raises(ValueError, match="file_path must not end with .ptd"):
+        torch_tensorrt.save(
+            torch.fx.symbolic_trace(torch.nn.Identity()),
+            str(tmp_path / file_name),
+            output_format="executorch",
+            external_engine_data=value,
+        )
+    assert not any(tmp_path.iterdir())
+
+
+@pytest.mark.unit
 @pytest.mark.parametrize("value", [None, "engines"])
 def test_save_warns_and_does_not_forward_for_other_formats(
     monkeypatch, tmp_path, program, caplog, value
