@@ -675,7 +675,12 @@ if _FX_FE_AVAIL:
         ["py/torch_tensorrt/fx/test*", "torch_tensorrt/fx/test*"]
     )
 
-package_data = {}
+package_data = {
+    "torch_tensorrt.dynamo.region_compilation._generation": [
+        "skills/kernel-author/SKILL.md",
+        "skills/kernel-author/references/*.md",
+    ],
+}
 
 if not (PY_ONLY or NO_TS):
     tensorrt_x86_64_external_dir = (

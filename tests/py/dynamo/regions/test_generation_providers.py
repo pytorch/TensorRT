@@ -6,6 +6,7 @@ import os
 import subprocess
 import sys
 import time
+import types
 from pathlib import Path
 
 import pytest
@@ -172,8 +173,73 @@ def test_failure_uses_stdout_and_redacts_credentials(monkeypatch, tmp_path):
             provider="claude", model=None, prompt="test", workdir=tmp_path, timeout_s=3
         )
     assert secret not in str(error.value)
+    assert secret not in (tmp_path / "provider.log").read_text()
     assert "[redacted]" in str(error.value)
     assert len(str(error.value)) < 1600
+
+
+def test_invalid_claude_json_preserves_bounded_redacted_diagnostics(
+    monkeypatch, tmp_path
+):
+    secret = "provider-private-token"
+    monkeypatch.setenv("PROVIDER_API_TOKEN", secret)
+    monkeypatch.setattr(_providers.shutil, "which", lambda _: "/bin/claude")
+    output = "x" * 70000 + f"malformed response {secret}\x1b[31m"
+    monkeypatch.setattr(
+        _providers,
+        "run_process",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            [], 0, output, "diagnostic"
+        ),
+    )
+    with pytest.raises(ValueError, match="JSON proposal"):
+        _providers.propose(
+            provider="claude", model=None, prompt="test", workdir=tmp_path, timeout_s=3
+        )
+    log = (tmp_path / "provider.log").read_text()
+    assert len(log.encode()) <= 65536
+    assert "truncated" in log and "malformed response [redacted]" in log
+    assert "diagnostic" in log and "STATUS: exit 0" in log
+    assert secret not in log and "\x1b" not in log
+
+
+@pytest.mark.parametrize("provider", ["claude", "custom_provider:author"])
+def test_provider_timeout_preserves_partial_output_without_credentials(
+    monkeypatch, tmp_path, provider
+):
+    secret = "timeout-private-token"
+    monkeypatch.setenv("PROVIDER_API_TOKEN", secret)
+    monkeypatch.setattr(_providers.shutil, "which", lambda _: "/bin/claude")
+
+    def run(*args, **kwargs):
+        raise _providers.ProcessTimeoutError(
+            3, f"partial {secret}".encode(), b"still compiling"
+        )
+
+    monkeypatch.setattr(_providers, "run_process", run)
+    with pytest.raises(TimeoutError, match="3s timeout"):
+        _providers.propose(
+            provider=provider, model=None, prompt="test", workdir=tmp_path, timeout_s=3
+        )
+    log = (tmp_path / "provider.log").read_text()
+    assert "partial [redacted]" in log and "still compiling" in log
+    assert secret not in log and "3s timeout" in log
+
+
+def test_real_subprocess_timeout_retains_already_captured_output(tmp_path):
+    with pytest.raises(_providers.ProcessTimeoutError) as failure:
+        _providers.run_process(
+            [
+                sys.executable,
+                "-c",
+                "import sys,time; print('partial', flush=True); print('diagnostic', file=sys.stderr, flush=True); time.sleep(60)",
+            ],
+            input=None,
+            cwd=tmp_path,
+            timeout_s=0.5,
+        )
+    assert "partial" in failure.value.stdout
+    assert "diagnostic" in failure.value.stderr
 
 
 def test_run_process_transmits_input_without_a_shell(tmp_path):
@@ -217,3 +283,166 @@ def test_timeout_kills_descendants_even_if_parent_has_exited(tmp_path, parent_ex
         time.sleep(0.01)
     else:
         pytest.fail("The timed-out process left a running descendant")
+
+
+@pytest.mark.parametrize("provider", ["claude", "codex"])
+def test_cli_uses_caller_schema_for_evidence_requests(monkeypatch, tmp_path, provider):
+    schema = {
+        "type": "object",
+        "properties": {"action": {"type": "string", "enum": ["read", "propose"]}},
+        "required": ["action"],
+        "additionalProperties": False,
+    }
+    response = {"action": "read"}
+    monkeypatch.setattr(_providers.shutil, "which", lambda name: f"/bin/{name}")
+
+    def run(argv, **kwargs):
+        assert "ADDITIONAL EVIDENCE" in kwargs["input"]
+        if provider == "claude":
+            assert json.loads(argv[argv.index("--json-schema") + 1]) == schema
+            stdout = json.dumps({"structured_output": response})
+        else:
+            path = Path(argv[argv.index("--output-schema") + 1])
+            assert json.loads(path.read_text()) == schema
+            Path(argv[argv.index("--output-last-message") + 1]).write_text(
+                json.dumps(response)
+            )
+            stdout = ""
+        return subprocess.CompletedProcess(argv, 0, stdout, "")
+
+    monkeypatch.setattr(_providers, "run_process", run)
+    assert (
+        _providers.propose(
+            provider=provider,
+            model=None,
+            prompt="Read relevant evidence, then propose.",
+            workdir=tmp_path,
+            timeout_s=3,
+            schema=schema,
+            evidence={"resources": ["task"]},
+        )
+        == response
+    )
+
+
+@pytest.mark.parametrize("object_adapter", [False, True])
+def test_custom_provider_contract_runs_through_bounded_process(
+    monkeypatch, tmp_path, proposal, object_adapter
+):
+    module = types.ModuleType("kernel_provider_fixture")
+    schema = {"type": "object", "properties": {"source": {"type": "string"}}}
+    evidence = {"resources": ["task"]}
+
+    def author(**kwargs):
+        assert kwargs == {
+            "model": "sdk-model",
+            "prompt": "Generate source.",
+            "workdir": tmp_path,
+            "timeout_s": 3,
+            "schema": schema,
+            "evidence": evidence,
+        }
+        return proposal
+
+    module.author = types.SimpleNamespace(propose=author) if object_adapter else author
+    monkeypatch.setitem(sys.modules, module.__name__, module)
+
+    def run(argv, *, input, cwd, timeout_s):
+        assert input is None
+        assert cwd == tmp_path
+        assert timeout_s == 3
+        assert argv[:2] == [sys.executable, "-m"]
+        request_path = Path(argv[argv.index("--request") + 1])
+        response_path = Path(argv[argv.index("--response") + 1])
+        _providers._run_adapter(request_path, response_path)
+        return subprocess.CompletedProcess(argv, 0, "", "")
+
+    monkeypatch.setattr(_providers, "run_process", run)
+    assert (
+        _providers.propose(
+            provider=f"{module.__name__}:author",
+            model="sdk-model",
+            prompt="Generate source.",
+            workdir=tmp_path,
+            timeout_s=3,
+            schema=schema,
+            evidence=evidence,
+        )
+        == proposal
+    )
+
+
+def test_custom_provider_does_not_reuse_stale_reply(monkeypatch, tmp_path):
+    (tmp_path / "provider-response.json").write_text('{"stale":true}')
+    monkeypatch.setattr(
+        _providers,
+        "run_process",
+        lambda *args, **kwargs: subprocess.CompletedProcess([], 0, "", ""),
+    )
+    with pytest.raises(_providers.ProviderError, match="without a response"):
+        _providers.propose(
+            provider="custom_provider:author",
+            model=None,
+            prompt="test",
+            workdir=tmp_path,
+            timeout_s=3,
+        )
+
+
+def test_custom_provider_failure_redacts_credentials(monkeypatch, tmp_path):
+    secret = "secret-sdk-provider-token"
+    monkeypatch.setenv("CUSTOM_API_TOKEN", secret)
+    monkeypatch.setattr(
+        _providers,
+        "run_process",
+        lambda *args, **kwargs: subprocess.CompletedProcess([], 1, "", secret),
+    )
+    with pytest.raises(_providers.ProviderError, match="redacted") as error:
+        _providers.propose(
+            provider="custom_provider:author",
+            model=None,
+            prompt="test",
+            workdir=tmp_path,
+            timeout_s=3,
+        )
+    assert secret not in str(error.value)
+    assert secret not in (tmp_path / "provider.log").read_text()
+
+
+def test_custom_provider_imports_in_a_real_subprocess(monkeypatch, tmp_path):
+    module = tmp_path / "kernel_sdk_fixture.py"
+    module.write_text(
+        "def author(*, model, prompt, workdir, timeout_s, schema, evidence):\n"
+        "    return {'model': model, 'prompt': prompt, 'cwd': str(workdir), "
+        "'schema': schema, 'evidence': evidence}\n"
+    )
+    monkeypatch.setenv(
+        "PYTHONPATH", os.pathsep.join((str(tmp_path), os.environ.get("PYTHONPATH", "")))
+    )
+    directory = tmp_path / "attempt"
+    schema = {"type": "object"}
+    response = _providers.propose(
+        provider="kernel_sdk_fixture:author",
+        model="fixture-model",
+        prompt="literal $(data)",
+        workdir=directory,
+        timeout_s=30,
+        schema=schema,
+        evidence={"task": "snapshot"},
+    )
+    assert response == {
+        "model": "fixture-model",
+        "prompt": "literal $(data)",
+        "cwd": str(directory),
+        "schema": schema,
+        "evidence": {"task": "snapshot"},
+    }
+    assert "STATUS: exit 0" in (directory / "provider.log").read_text()
+
+
+@pytest.mark.parametrize("provider", ["unknown", "module:", ":author", "../pkg:author"])
+def test_unknown_provider_explains_importable_adapter(provider, tmp_path):
+    with pytest.raises(ValueError, match="module:attribute"):
+        _providers.propose(
+            provider=provider, model=None, prompt="test", workdir=tmp_path, timeout_s=3
+        )

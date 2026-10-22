@@ -45,12 +45,37 @@ def generated(arg0, out0, N: ct.Constant[int], BLOCK: ct.Constant[int]):
 }
 
 
-@pytest.mark.parametrize("backend", ["triton", "cutile"])
+def _cuda_source(dtype):
+    scalar, load, store = {
+        torch.float32: ("float", "float", "float"),
+        torch.float16: ("__half", "__half2float", "__float2half_rn"),
+        torch.bfloat16: ("__nv_bfloat16", "__bfloat162float", "__float2bfloat16_rn"),
+    }[dtype]
+    return f"""#include <cuda_fp16.h>
+#include <cuda_bf16.h>
+
+extern "C" __global__ void generated(const {scalar}* arg0, {scalar}* out0) {{
+    int offset = blockIdx.x * blockDim.x + threadIdx.x;
+    if (offset < 771) {{
+        float value = {load}(arg0[offset]);
+        float scaled = {load}({store}(__fmul_rn(value, 0.75f)));
+        float shifted = {load}({store}(__fadd_rn(scaled, -0.25f)));
+        out0[offset] = {store}(shifted < 0.0f ? 0.0f : shifted);
+    }}
+}}
+"""
+
+
+@pytest.mark.parametrize("backend", ["triton", "cutile", "cuda_cpp"])
 @pytest.mark.parametrize("dtype", [torch.float32, torch.float16, torch.bfloat16])
 def test_generated_kernel_evaluation_engine_and_cache(
     backend, dtype, tmp_path, monkeypatch
 ):
-    pytest.importorskip("triton" if backend == "triton" else "cuda.tile")
+    pytest.importorskip(
+        {"triton": "triton", "cutile": "cuda.tile", "cuda_cpp": "cuda.bindings"}[
+            backend
+        ]
+    )
     if backend == "cutile":
         try:
             from cuda.tile.compilation import export_kernel  # noqa: F401
@@ -76,6 +101,14 @@ def test_generated_kernel_evaluation_engine_and_cache(
 
     def author(**request):
         requests.append(request)
+        if backend == "cuda_cpp":
+            return dict(
+                source=_cuda_source(dtype),
+                kernel_name="generated",
+                grid=[7],
+                block=[128],
+                shared_mem_bytes=0,
+            )
         return dict(
             source=SOURCES[backend],
             kernel_name="generated",

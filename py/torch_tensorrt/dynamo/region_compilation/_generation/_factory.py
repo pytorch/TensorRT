@@ -6,11 +6,11 @@
 from __future__ import annotations
 
 import hashlib
-import importlib.metadata
 import json
 import logging
 import math
 import os
+import secrets
 import sys
 import tempfile
 import time
@@ -21,14 +21,17 @@ from typing import Any
 import torch
 from filelock import FileLock, Timeout
 
+from torch_tensorrt.kernels import KernelSpec
 from torch_tensorrt.region_annotations import KernelGenerator, RegionError
 
 from .._plugins import _boundaries
 from . import _providers
+from ._backends import get_backend
 from ._candidate import make_registration, validate_candidate
+from ._instructions import EvidenceCatalog, load_instructions
 
 _LOGGER = logging.getLogger(__name__)
-_VERSION = 2
+_VERSION = 3
 
 
 def _digest(value: Any) -> str:
@@ -88,6 +91,10 @@ def _reference(
                 else:
                     constants[str(node.target)] = value
             nodes[node] = graph.node_copy(node, lambda old: nodes[old])
+            if node.op != "output":
+                # GraphModule deserialization can rename nodes. Cache identity
+                # depends on operations and dependencies, not incidental names.
+                nodes[node].name = f"value{len(nodes)}"
         nodes[node].meta = {}
     reference = torch.fx.GraphModule(child, graph)
     reference.meta = {}
@@ -95,45 +102,12 @@ def _reference(
 
 
 def _target(device: torch.device, backend: str) -> dict[str, Any]:
-    import tensorrt
-
-    import torch_tensorrt
-
-    properties = torch.cuda.get_device_properties(device)
-    versions = {
-        "torch": torch.__version__,
-        "torch_tensorrt": torch_tensorrt.__version__,
-        "tensorrt": tensorrt.__version__,
-        "cuda": torch.version.cuda,
-    }
-    if backend == "cutile":
-        from torch_tensorrt.kernels._cutile import (
-            _cutile_driver_version,
-            validate_cutile_toolchain,
-        )
-
-        versions["driver"] = list(_cutile_driver_version())
-        versions["cutile_compiler"] = list(
-            validate_cutile_toolchain("agent_generation")
-        )
-    else:
-        from torch_tensorrt.kernels._triton import _driver_max_ptx_version
-
-        versions["driver_ptx"] = _driver_max_ptx_version()
-    package = "triton" if backend == "triton" else "cuda-tile"
-    try:
-        versions[package] = importlib.metadata.version(package)
-    except importlib.metadata.PackageNotFoundError:
-        raise RegionError(f"Kernel generation backend requires {package}") from None
-    return {
-        "name": properties.name,
-        "capability": [properties.major, properties.minor],
-        "multiprocessors": properties.multi_processor_count,
-        "versions": versions,
-    }
+    return get_backend(backend).target_metadata(device)
 
 
-def _prompt_history(history: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _prompt_history(
+    history: list[dict[str, Any]], best: dict[str, Any] | None = None
+) -> list[dict[str, Any]]:
     """Keep recent feedback and the incumbent without resending every kernel."""
     indices = set(range(max(0, len(history) - 3), len(history)))
     passing = [
@@ -141,54 +115,158 @@ def _prompt_history(history: list[dict[str, Any]]) -> list[dict[str, Any]]:
         for index, attempt in enumerate(history)
         if attempt["result"].get("status") == "passed"
     ]
-    if passing:
+    if best is not None:
+        incumbent = next(
+            (i for i in reversed(passing) if history[i]["candidate"] == best), None
+        )
+        if incumbent is not None:
+            indices.add(incumbent)
+    elif passing:
         indices.add(min(passing, key=lambda i: history[i]["result"]["latency_ms"]))
     return [history[index] for index in sorted(indices)]
 
 
 def _prompt(
-    task: dict[str, Any], history: list[dict[str, Any]], remaining_s: float
+    task: dict[str, Any],
+    history: list[dict[str, Any]],
+    remaining_s: float,
+    instructions: dict[str, Any],
+    evidence: EvidenceCatalog,
+    best: dict[str, Any] | None = None,
 ) -> str:
-    backend = task["backend"]
-    syntax = (
-        "Import triton and triton.language as tl. Define exactly one @triton.jit function. "
-        "Tensor parameters have no annotations; constant parameters use tl.constexpr. "
-        "Mask all boundary loads/stores, disable floating-point reassociation when needed, "
-        "and preserve intermediate rounding required by the PyTorch reference. "
-        "For float16/bfloat16, cast each reference operation's result back to that dtype "
-        "before continuing. For exact float32 rounding, you may import "
-        "triton.language.extra.cuda.libdevice as libdevice and use add_rn/mul_rn; "
-        "there is no enable_fp_fusion compiler option in this interface."
-        if backend == "triton"
-        else "Import cuda.tile as ct. Define exactly one @ct.kernel function. Tensor parameters "
-        "have no annotations; constants use ct.Constant[int], ct.Constant[float], or "
-        "ct.Constant[bool]. Arrays are flattened rank-one views. Use ct.bid, ct.load, "
-        "ct.store and tile operations; ct.load(array, index=(block,), shape=(BLOCK,)). "
-        "num_warps and num_stages must be null."
-    )
+    mode = "author"
+    if history:
+        mode = (
+            "optimize" if history[-1]["result"].get("status") == "passed" else "repair"
+        )
     return (
-        "Author a fast, correct GPU kernel for the exact captured region below. "
-        "Return ONLY a JSON object matching the supplied output schema. Do not use tools, "
-        "run programs, write files, change tests, or claim measured results. The executor "
-        "compiles your code into a TensorRT QDP plugin and reports actual validation/timing. "
-        "Implement the entire reference, including all outputs, with one kernel. "
-        "Parameters must be arg0, arg1, ... for inputs, then out0, out1, ... for outputs, "
-        "then constants in the exact order of the constants array. No runtime scalar "
-        "parameters. Use literal JSON grid dimensions (1 to 3 positive integers). "
-        "Only backend imports and this single kernel definition are allowed at module "
-        "scope: no helpers, assignments, allocations, PyTorch fallback or host wrapper. "
-        "All dimensions are static. Choose and tune constants/grid/compiler options. "
-        "Use prior feedback to change the source or launch configuration; unchanged "
-        "passing candidates reuse their prior evaluation. "
-        "Source must use only the selected DSL and safe arithmetic; no host introspection, "
-        "filesystem, network, inline assembly or dynamic Python execution. "
-        + syntax
+        str(instructions["text"])
+        + "\nRESPONSE PROTOCOL: Return a JSON object with action, candidate, resource, offset. "
+        "For action=propose, candidate follows the supplied backend schema and resource/offset are null. "
+        "For action=read, candidate is null and resource/offset identify a page from the evidence catalog. "
+        "Only catalog resources are readable. The controller runs all compilation and evaluation. "
+        "Use feedback to change source or launch settings; unchanged passing candidates reuse their prior evaluation."
+        + f"\nSEARCH STEP: {mode}. Remaining search time: {max(0, int(remaining_s))} seconds."
         + "\nTASK:\n"
         + json.dumps(task, indent=2)
-        + "\nRECENT ATTEMPTS AND BEST CANDIDATE (executor results, fastest passing candidate is retained):\n"
-        + json.dumps(_prompt_history(history), indent=2)
-        + f"\nRemaining search time: {max(0, int(remaining_s))} seconds."
+        + "\nRECENT ATTEMPTS AND BEST CANDIDATE:\n"
+        + json.dumps(_prompt_history(history, best), indent=2)
+        + "\nEVIDENCE CATALOG:\n"
+        + json.dumps(evidence.catalog(), indent=2)
     )
+
+
+def _response_schema(candidate_schema: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "action": {"type": "string", "enum": ["propose", "read"]},
+            "candidate": {"anyOf": [candidate_schema, {"type": "null"}]},
+            "resource": {"type": ["string", "null"]},
+            "offset": {"type": ["integer", "null"], "minimum": 0},
+        },
+        "required": ["action", "candidate", "resource", "offset"],
+    }
+
+
+def _author(
+    config: KernelGenerator,
+    prompt: str,
+    schema: dict[str, Any],
+    directory: Path,
+    deadline: float,
+    evidence: EvidenceCatalog,
+) -> dict[str, Any]:
+    # Reserve time for evaluation, including final validation; evidence reads share
+    # this author deadline rather than receiving a fresh timeout on every turn.
+    remaining = deadline - time.monotonic()
+    reserve = min(2 * config.candidate_timeout_s, remaining / 2)
+    author_deadline = min(
+        deadline - reserve, time.monotonic() + config.author_timeout_s
+    )
+    for turn in range(config.max_context_requests + 1):
+        timeout = author_deadline - time.monotonic()
+        if timeout <= 0:
+            raise TimeoutError(
+                "Authoring budget exhausted; evaluation time is reserved"
+            )
+        turn_dir = directory if turn == 0 else directory / f"read-{turn}"
+        turn_dir.mkdir(exist_ok=True)
+        turn_prompt = prompt + (
+            f"\nAUTHOR BUDGET: {config.max_context_requests - turn} evidence reads "
+            f"remaining; {max(0, int(timeout))} seconds. "
+            "When no reads remain, return action=propose."
+        )
+        (turn_dir / "prompt.txt").write_text(turn_prompt, encoding="utf-8")
+        reply = _providers.propose(
+            provider=config.provider,
+            model=config.model,
+            prompt=turn_prompt,
+            workdir=turn_dir,
+            timeout_s=timeout,
+            schema=schema,
+            evidence=(
+                {"catalog": evidence.catalog()} if ":" in config.provider else None
+            ),
+        )
+        # Imported providers may retain the original direct-candidate interface.
+        if "action" not in reply:
+            return reply
+        if reply.get("action") == "propose":
+            if not isinstance(reply.get("candidate"), dict):
+                raise ValueError("Proposal must contain a candidate object")
+            return dict(reply["candidate"])
+        if reply.get("action") != "read":
+            raise ValueError("Unknown author response action")
+        if turn == config.max_context_requests:
+            raise ValueError("Evidence request limit reached; return a candidate")
+        try:
+            resource = reply.get("resource")
+            if not isinstance(resource, str):
+                raise ValueError("Evidence resource must be a catalog name")
+            offset = reply.get("offset")
+            page = evidence.read(resource, 0 if offset is None else offset)
+        except (ValueError, KeyError, TypeError) as error:
+            page = {"error": str(error)}
+        _write_json(turn_dir / "evidence.json", {"request": reply, "result": page})
+        prompt += "\nEVIDENCE RESULT:\n" + json.dumps(page)
+    raise AssertionError("Author request loop did not return")
+
+
+def _meets_objective(report: dict[str, Any], config: KernelGenerator) -> bool:
+    if report.get("status") != "passed":
+        return False
+    if config.objective == "candidate":
+        return True
+    baseline = report.get("baseline_latency_ms")
+    if (
+        isinstance(baseline, bool)
+        or not isinstance(baseline, (int, float))
+        or not math.isfinite(baseline)
+        or baseline <= 0
+    ):
+        return False
+    measurements = report.get("benchmark", {})
+    baseline_noise = measurements.get("baseline", {}).get("mad_ms", 0)
+    candidate_noise = measurements.get("candidate", {}).get("mad_ms", 0)
+    # A noise allowance, not a statistical confidence bound.
+    return bool(
+        baseline - baseline_noise
+        >= config.min_speedup * (report["latency_ms"] + candidate_noise)
+    )
+
+
+def _improves(report: dict[str, Any], best_report: dict[str, Any] | None) -> bool:
+    if best_report is None:
+        return True
+    incumbent = report.get("incumbent_latency_ms", best_report["latency_ms"])
+    # Within measured noise, retain the incumbent instead of rewarding jitter.
+    measurements = report.get("benchmark", {})
+    noise = sum(
+        measurements.get(arm, {}).get("mad_ms", 0) for arm in ("candidate", "incumbent")
+    )
+    return bool(incumbent - report["latency_ms"] > noise)
 
 
 def _evaluate(
@@ -246,8 +324,16 @@ def _cache_root(config: KernelGenerator) -> Path:
 
 def generate_registration(
     child: torch.fx.GraphModule, config: KernelGenerator, *, region_id: str
-) -> partial[None]:
+) -> KernelSpec | partial[None]:
     """Generate a kernel after capture and return the existing registration form."""
+    registration, _ = _generate(child, config, region_id=region_id)
+    return registration
+
+
+def _generate(
+    child: torch.fx.GraphModule, config: KernelGenerator, *, region_id: str
+) -> tuple[KernelSpec | partial[None], Path]:
+    """Return a registration and the exact run containing its validation evidence."""
     input_specs, output_specs = _boundaries(child, region_id)
     if any(
         spec.dtype not in (torch.float16, torch.float32, torch.bfloat16)
@@ -259,6 +345,13 @@ def generate_registration(
     if any(math.prod(spec.shape) == 0 for spec in input_specs + output_specs):
         raise RegionError("Agent-generated regions require nonempty tensors")
     reference, constants = _reference(child)
+    backend = get_backend(config.backend)
+    instructions = load_instructions(
+        config.backend,
+        backend.instruction_resources,
+        config.instructions,
+        config.instruction_files,
+    )
 
     def describe(spec: Any) -> dict[str, Any]:
         return {
@@ -274,10 +367,16 @@ def generate_registration(
         "inputs": [describe(s) for s in input_specs],
         "outputs": [describe(s) for s in output_specs],
         "backend": config.backend,
+        "backend_version": backend.version,
+        "instructions_sha256": instructions["sha256"],
+        "proposal_schema_sha256": _digest(backend.proposal_schema),
+        "objective": config.objective,
+        "min_speedup": config.min_speedup,
         "target": _target(input_specs[0].device, config.backend),
         "validation": {
             "num_tests": config.num_tests,
             "benchmark_iters": config.benchmark_iters,
+            "benchmark_repeats": config.benchmark_repeats,
             "check_nonfinite": config.check_nonfinite,
             "rtol": config.rtol,
             "atol": config.atol,
@@ -300,6 +399,7 @@ def generate_registration(
                 input_specs,
                 output_specs,
                 region_id,
+                instructions,
             )
     except RegionError:
         raise
@@ -318,18 +418,35 @@ def _generate_locked(
     input_specs: list[Any],
     output_specs: list[Any],
     region_id: str,
-) -> partial[None]:
+    instructions: dict[str, Any],
+) -> tuple[KernelSpec | partial[None], Path]:
     run = Path(tempfile.mkdtemp(prefix="run-", dir=cache))
     _write_json(run / "task.json", task)
+    _write_json(run / "instructions.json", instructions)
+    schema = _response_schema(get_backend(config.backend).proposal_schema)
+    _write_json(run / "proposal.schema.json", schema)
     reference_path = run / "reference.pt"
     torch.save(reference, reference_path)
     evaluation = {
         "reference_path": str(reference_path),
         "backend": config.backend,
+        "backend_version": task["backend_version"],
+        "proposal_schema_sha256": task["proposal_schema_sha256"],
         "inputs": task["inputs"],
         "outputs": task["outputs"],
+        "objective": config.objective,
+        "validation_seed": secrets.randbits(63),
         **task["validation"],
     }
+    _write_json(run / "evaluation-template.json", evaluation)
+    evidence = EvidenceCatalog()
+    for resource in instructions["resources"]:
+        evidence.add(resource["name"], resource["text"])
+    evidence.add("task.json", json.dumps(task, indent=2))
+    # Keep a final evaluator slice independent of author and search timeouts.
+    search_deadline = deadline - min(
+        config.candidate_timeout_s, max(0, deadline - time.monotonic()) / 3
+    )
     history: list[dict[str, Any]] = []
     best: dict[str, Any] | None = None
     best_report: dict[str, Any] | None = None
@@ -337,32 +454,53 @@ def _generate_locked(
     passing_evaluations: dict[str, tuple[dict[str, Any], Path]] = {}
     manifest = cache / "accepted.json"
 
-    def evaluate(candidate: dict[str, Any], directory: Path) -> dict[str, Any]:
-        remaining = deadline - time.monotonic()
+    def evaluate(
+        candidate: dict[str, Any],
+        directory: Path,
+        *,
+        holdout: bool = False,
+        incumbent: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        evaluation_deadline = deadline if holdout else search_deadline
+        remaining = evaluation_deadline - time.monotonic()
         if remaining <= 0:
-            return {"status": "error", "error": "Generation wall-time budget exhausted"}
+            return {
+                "status": "error",
+                "stage": "budget",
+                "error": "Generation wall-time budget exhausted",
+            }
         gpu_lock = FileLock(
             str(cache.parent / f"gpu-{input_specs[0].device.index}.lock")
         )
         try:
             with gpu_lock.acquire(timeout=remaining):
-                remaining = deadline - time.monotonic()
+                remaining = evaluation_deadline - time.monotonic()
                 if remaining <= 0:
                     return {
                         "status": "error",
+                        "stage": "budget",
                         "error": "Generation wall-time budget exhausted waiting for GPU",
                     }
+                request = {**evaluation, "candidate": candidate}
+                if holdout:
+                    request.update(
+                        validation_seed=secrets.randbits(63), validation_phase="holdout"
+                    )
+                elif incumbent is not None:
+                    request["incumbent"] = incumbent
                 return _evaluate(
-                    {**evaluation, "candidate": candidate},
-                    directory,
-                    min(config.candidate_timeout_s, remaining),
+                    request, directory, min(config.candidate_timeout_s, remaining)
                 )
         except Timeout:
-            return {"status": "error", "error": "GPU evaluation lock timed out"}
+            return {
+                "status": "error",
+                "stage": "budget",
+                "error": "GPU evaluation lock timed out",
+            }
 
     if config.use_cache and manifest.exists():
         try:
-            stored = json.loads(manifest.read_text())
+            stored = json.loads(manifest.read_text(encoding="utf-8"))
             candidate = stored["candidate"]
             if stored["task_sha256"] != _digest(task) or stored[
                 "candidate_sha256"
@@ -371,28 +509,27 @@ def _generate_locked(
             candidate = validate_candidate(
                 candidate, config.backend, len(input_specs), len(output_specs)
             )
-            report = evaluate(candidate, run)
+            report = evaluate(candidate, run, holdout=True)
             _write_json(run / "cache_check.json", report)
-            if report.get("status") == "passed":
+            if _meets_objective(report, config):
                 _LOGGER.info("Agent region %s: cache hit (%s)", region_id, cache)
-                cached_registration: partial[None] = make_registration(
-                    candidate, config.backend, input_specs, output_specs, run
+                return (
+                    make_registration(
+                        candidate, config.backend, input_specs, output_specs, run
+                    ),
+                    run,
                 )
-                return cached_registration
-            _LOGGER.warning(
-                "Agent region cache revalidation failed: %s", report.get("error")
-            )
+            _LOGGER.warning("Agent region cache revalidation failed: %s", report)
         except (OSError, KeyError, ValueError, TypeError) as error:
             _LOGGER.warning("Ignoring invalid agent region cache: %s", error)
 
     for attempt in range(config.max_attempts):
-        remaining = deadline - time.monotonic()
+        remaining = search_deadline - time.monotonic()
         if remaining <= 0:
             break
         directory = run / f"attempt-{attempt + 1}"
         directory.mkdir()
-        prompt = _prompt(task, history, remaining)
-        (directory / "prompt.txt").write_text(prompt)
+        prompt = _prompt(task, history, remaining, instructions, evidence, best)
         _LOGGER.info(
             "Agent region %s: attempt %d/%d with %s (%s)",
             region_id,
@@ -404,14 +541,12 @@ def _generate_locked(
         candidate = None
         evaluation_path = directory / "feedback.json"
         provider_failed = False
+        stage = "author"
         try:
-            proposal = _providers.propose(
-                provider=config.provider,
-                model=config.model,
-                prompt=prompt,
-                workdir=directory,
-                timeout_s=remaining,
+            proposal = _author(
+                config, prompt, schema, directory, search_deadline, evidence
             )
+            stage = "source"
             candidate = validate_candidate(
                 proposal, config.backend, len(input_specs), len(output_specs)
             )
@@ -421,21 +556,46 @@ def _generate_locked(
                 previous_report, evaluation_path = passing_evaluations[candidate_digest]
                 report = {**previous_report, "reused_from": str(evaluation_path)}
             else:
-                report = evaluate(candidate, directory)
+                report = evaluate(candidate, directory, incumbent=best)
                 if report.get("status") == "passed":
                     passing_evaluations[candidate_digest] = (report, evaluation_path)
         except _providers.ProviderError as error:
-            report = {"status": "error", "error": str(error)[-3000:]}
+            report = {
+                "status": "error",
+                "stage": "provider",
+                "error": str(error)[-3000:],
+            }
             provider_failed = True
         except (OSError, ValueError, TypeError, TimeoutError, RuntimeError) as error:
-            report = {"status": "error", "error": str(error)[-3000:]}
+            report = {"status": "error", "stage": stage, "error": str(error)[-3000:]}
+        report["meets_objective"] = _meets_objective(report, config)
         _write_json(directory / "feedback.json", report)
         history.append({"candidate": candidate, "result": report})
-        if report.get("status") == "passed" and (
-            best_report is None or report["latency_ms"] < best_report["latency_ms"]
+        evidence.add(
+            f"attempt-{attempt + 1}/feedback.json", json.dumps(report, indent=2)
+        )
+        if candidate is not None:
+            evidence.add(
+                f"attempt-{attempt + 1}/candidate.json", json.dumps(candidate, indent=2)
+            )
+            if isinstance(candidate.get("source"), str):
+                evidence.add(f"attempt-{attempt + 1}/source", candidate["source"])
+        for log in (
+            directory / "worker.log",
+            directory / "provider.log",
+            *sorted(directory.glob("read-*/provider.log")),
         ):
-            best, best_report = candidate, report
-            best_evaluation_path = evaluation_path
+            if log.is_file():
+                evidence.add(
+                    str(log.relative_to(run)),
+                    log.read_text(encoding="utf-8", errors="replace"),
+                )
+        if (
+            report["meets_objective"]
+            and "reused_from" not in report
+            and _improves(report, best_report)
+        ):
+            best, best_report, best_evaluation_path = candidate, report, evaluation_path
         _LOGGER.info("Agent region %s: %s", region_id, report)
         if provider_failed:
             break
@@ -443,28 +603,42 @@ def _generate_locked(
     _write_json(run / "history.json", history)
     if best is None:
         detail = (
-            history[-1]["result"].get("error", "No passing candidate")
+            history[-1]["result"].get(
+                "error", "No candidate met the performance objective"
+            )
             if history
             else "Generation budget exhausted"
         )
         raise RegionError(
             f"Agent generated no valid kernel for region {region_id!r}: {detail}. Artifacts: {run}"
         )
+    final_directory = run / "holdout"
+    final_directory.mkdir()
+    final_report = evaluate(best, final_directory, holdout=True)
+    _write_json(final_directory / "feedback.json", final_report)
+    if not _meets_objective(final_report, config):
+        raise RegionError(
+            f"Generated kernel for region {region_id!r} failed final validation: "
+            f"{final_report.get('error', 'Performance objective not met')}. Artifacts: {run}"
+        )
     accepted = {
         "task_sha256": _digest(task),
         "candidate_sha256": _digest(best),
         "candidate": best,
         "report": best_report,
+        "validation": final_report,
         "evaluation_path": str(best_evaluation_path),
         "provider": config.provider,
         "model": config.model,
+        "instructions_sha256": instructions["sha256"],
         "run": str(run),
     }
+    # Construct the final registration before publishing a successful cache entry.
+    registration = make_registration(
+        best, config.backend, input_specs, output_specs, run
+    )
     _write_json(run / "accepted.json", accepted)
     if config.use_cache:
         _write_json(manifest, accepted)
     _LOGGER.info("Agent region %s: selected kernel; artifacts: %s", region_id, run)
-    registration: partial[None] = make_registration(
-        best, config.backend, input_specs, output_specs, run
-    )
-    return registration
+    return registration, run

@@ -8,28 +8,42 @@ Generate a region kernel with an agent and run it inside TensorRT
 ================================================================
 
 Install and log into the selected Codex or Claude CLI first. Run with CUDA,
-TensorRT QDP support, and Triton >=3.5, or the existing cuTile prerequisites
-(CUDA Toolkit and loaded driver 13.2+, with a matching tileiras compiler)::
+TensorRT QDP support, and the selected backend's toolchain. Triton uses
+``triton_op`` prerequisites; cuTile needs CUDA Toolkit and loaded driver 13.2+
+with a matching tileiras compiler. CUDA C++ needs CUDA Python's ``cuda-core`` and
+``cuda-bindings`` packages plus NVRTC::
 
     codex login
     python examples/dynamo/agentic_region_kernel_generation.py --provider codex
     python examples/dynamo/agentic_region_kernel_generation.py --provider codex --backend cutile
+    python examples/dynamo/agentic_region_kernel_generation.py --provider claude --backend cuda_cpp
+    python examples/dynamo/agentic_region_kernel_generation.py --instructions "Try 256-element tiles."
+    python examples/dynamo/agentic_region_kernel_generation.py --instruction-file kernel-guidance.md
+    python examples/dynamo/agentic_region_kernel_generation.py --objective tensorrt --min-speedup 1.05
 
 For Claude, use its normal interactive login, then pass ``--provider claude``.
 ``--model`` optionally selects a model; otherwise the CLI keeps its default.
 Model calls use your account allowance and receive the annotated graph and
 tensor metadata. Generation and evaluation happen during compilation.
 
-Only the marked region is sent for kernel generation. The agent supplies the
-kernel and launch configuration; Torch-TensorRT tests candidates in isolated
-QDP engines, keeps the fastest passing candidate, and installs its plugin.
+The author receives the marked region, packaged backend guidance, any explicit
+user instructions, and measured feedback. It can request bounded pages of
+recorded evidence. Torch-TensorRT compiles proposals into isolated QDP engines,
+checks correctness, and compares interleaved timing samples. The selected
+candidate receives fresh final validation before its plugin is installed.
 Inference needs neither an agent nor a Python kernel launcher.
 
 Rerun the same command to reuse a kernel without an agent call when cache
-revalidation passes. Logs identify the generated ``.py`` source and the artifact
-directory containing ``task.json``, per-attempt feedback, and ``accepted.json``.
-Candidate timings compare the isolated plugin engine with eager PyTorch, not native TensorRT.
-Passing validation does not guarantee a speedup for every region.
+revalidation passes. Logs identify generated source and the artifact directory
+containing the task, exact instructions, per-attempt feedback, and accepted
+candidate. Changed guidance changes the cache key.
+
+The default ``candidate`` objective ranks correct generated candidates. Choose
+``eager`` or ``tensorrt`` to require a speedup against that region's PyTorch or
+fully compiled TensorRT baseline. ``min_speedup`` is baseline latency divided
+by candidate latency, with a conservative allowance for measured timing variation.
+These measurements do not establish whole-model speedup.
+``cuda_cpp`` generates CUDA C++ compiled through CUDA Python, not Numba kernels.
 """
 
 import argparse
@@ -59,10 +73,28 @@ class Model(torch.nn.Module):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--provider", choices=("codex", "claude"), default="codex")
-    parser.add_argument("--backend", choices=("triton", "cutile"), default="triton")
-    parser.add_argument("--model", help="Optional model name understood by your CLI")
     parser.add_argument(
-        "--attempts", type=int, default=3, help="Maximum author calls per region"
+        "--backend", choices=("triton", "cutile", "cuda_cpp"), default="triton"
+    )
+    parser.add_argument("--model", help="Optional model name understood by your CLI")
+    parser.add_argument("--instructions", help="Additional kernel-authoring guidance")
+    parser.add_argument(
+        "--instruction-file",
+        action="append",
+        default=[],
+        help="Additional guidance file; repeat to include multiple files",
+    )
+    parser.add_argument(
+        "--objective", choices=("candidate", "eager", "tensorrt"), default="candidate"
+    )
+    parser.add_argument(
+        "--min-speedup",
+        type=float,
+        default=1.0,
+        help="Required baseline/candidate latency ratio for eager or tensorrt",
+    )
+    parser.add_argument(
+        "--attempts", type=int, default=3, help="Maximum candidate proposals per region"
     )
     parser.add_argument(
         "--timeout",
@@ -82,6 +114,10 @@ def main():
         provider=args.provider,
         backend=args.backend,
         model=args.model,
+        instructions=args.instructions,
+        instruction_files=tuple(args.instruction_file),
+        objective=args.objective,
+        min_speedup=args.min_speedup,
         max_attempts=args.attempts,
         timeout_s=args.timeout,
         cache_dir=args.cache_dir,
