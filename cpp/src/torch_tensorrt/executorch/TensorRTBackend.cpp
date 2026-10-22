@@ -406,12 +406,15 @@ Error load_engine(
   }
   // A plan serialized without its weights (built with STRIP_PLAN, or saved with EXCLUDE_WEIGHTS)
   // deserializes and runs without an error, but computes with placeholder weights, and this backend
-  // never refits. TensorRT reports -1 stripped bytes for a plan that carries its weights, and a
-  // stripped plan can report 0. A plan with no weights has nothing to restore, so the total is read
-  // first: querying the stripped size of an ordinary engine logs a TensorRT warning, and
-  // isRefittable() cannot skip it, since a plan built with STRIP_PLAN alone is not refittable.
-  if (engine->getEngineStat(nvinfer1::EngineStat::kTOTAL_WEIGHTS_SIZE) > 0 &&
-      engine->getEngineStat(nvinfer1::EngineStat::kSTRIPPED_WEIGHTS_SIZE) >= 0) {
+  // never refits. For such a plan TensorRT reports the weight bytes it still holds, which equal the
+  // total when there was nothing to strip. A plain re-save keeps that. Any other plan reports -1,
+  // including a stripped one saved again with EXCLUDE_WEIGHTS cleared and no refit, so that case is
+  // not caught here. A plan with no weights cannot lack any, and skipping the query for it avoids
+  // the warning TensorRT logs for a plan that is not stripped.
+  const int64_t total_weights = engine->getEngineStat(nvinfer1::EngineStat::kTOTAL_WEIGHTS_SIZE);
+  const int64_t kept_weights =
+      total_weights > 0 ? engine->getEngineStat(nvinfer1::EngineStat::kSTRIPPED_WEIGHTS_SIZE) : -1;
+  if (kept_weights >= 0 && kept_weights < total_weights) {
     ET_LOG(
         Error,
         "TensorRTBackend::init: the TensorRT engine was serialized without its weights, and this backend cannot refit them. Compile it with strip_engine_weights=False, or serialize it with its weights, and export again.");
