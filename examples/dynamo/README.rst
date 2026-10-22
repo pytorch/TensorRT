@@ -40,3 +40,4 @@ Model Zoo
 * :ref:`engine_converter_binding_names`: Naming input / output bindings when emitting a raw serialized TRT engine
 * :ref:`execute_in_torch_example`: Run annotated operations with PyTorch eager or Inductor while keeping surrounding operations in TensorRT
 * :ref:`fuse_in_plugin_example`: Use ``fuse_in_plugin`` to register a supplied Triton kernel automatically inside TensorRT
+* :ref:`agentic_region_kernel_generation_example`: Generate and evaluate a Triton or cuTile kernel for an annotated region during compilation
