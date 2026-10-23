@@ -49,6 +49,7 @@ Notes
 """
 
 import logging
+import operator
 from typing import Dict, List, Optional, Set, Tuple
 
 import psutil
@@ -333,7 +334,8 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
            There are two rules to check:
             1. The subgraphs should be ordered in a way that is safely to partition.
                This is checked by validate_and_correct_subgraphs. Check that function for more details.
-            2. The subgraphs should not break any fusion groups.
+            2. The subgraphs should not break any fusion groups, nor separate a multi-output
+               node from the getitem nodes that unpack its tuple.
         - Move `step_size` nodes from the right to the left subgraph.
         - Run validation/correction to ensure a legal partitioning placement.
         - Get all leaf nodes in the left subgraph and check whether any of them are in a fusion group.
@@ -374,7 +376,8 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
         Given the current split boundary (captured by `leaf_nodes` of the left
         subgraph), check all recorded fusion groups. If any fused node remains
         on the right while its peer is on the left, pull the node and all of its
-        producer chain into the left subgraph to keep fusions intact.
+        producer chain into the left subgraph to keep fusions intact. A leaf's
+        getitem users are treated the same way: a tuple cannot be an engine output.
 
         Returns:
             bool: True if any fusion was migrated (i.e., a split would have
@@ -400,7 +403,8 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
 
         fusion_broken = False
         for leaf in leaf_nodes:
-            for node in self.fusion_patterns.get(leaf, []):
+            getitems = [u for u in leaf.users if u.target is operator.getitem]
+            for node in [*self.fusion_patterns.get(leaf, []), *getitems]:
                 if (
                     node not in nodes_in_first_subgraph
                     and node in nodes_in_second_subgraph
