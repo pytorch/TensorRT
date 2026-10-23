@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=8a1ce37e"></script>
+    <script src="../_static/documentation_options.js?v=ce438fe8"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -59,7 +59,7 @@
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Struct TRTDeleter" href="structtorch__tensorrt_1_1executorch__backend_1_1TRTDeleter.html" />
-    <link rel="prev" title="Struct InputProfileBounds" href="structtorch__tensorrt_1_1executorch__backend_1_1InputProfileBounds.html" />
+    <link rel="prev" title="Struct ProfileTable" href="structtorch__tensorrt_1_1executorch__backend_1_1ProfileTable.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   </head>
@@ -455,8 +455,9 @@ document.write(`
 <li class="toctree-l3"><a class="reference internal" href="namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1Device.html">Struct Device</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1AliasedBinding.html">Struct AliasedBinding</a></li>
-<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle.html">Struct EngineHandle</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1InputProfileBounds.html">Struct InputProfileBounds</a></li>
+<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1OptimizationProfileGuard_1_1AutoTag.html">Struct OptimizationProfileGuard::AutoTag</a></li>
+<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1ProfileTable.html">Struct ProfileTable</a></li>
 <li class="toctree-l3 current active"><a class="current reference internal" href="#">Struct TensorRTBlobHeader</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1TRTDeleter.html">Struct TRTDeleter</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1WsBudget.html">Struct WsBudget</a></li>
@@ -465,13 +466,20 @@ document.write(`
 <li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1torchscript_1_1CompileSpec.html">Struct CompileSpec</a></li>
 <li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1DataType.html">Class DataType</a></li>
 <li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1Device_1_1DeviceType.html">Class Device::DeviceType</a></li>
+<li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1OptimizationProfileGuard.html">Class OptimizationProfileGuard</a></li>
 <li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1TensorRTBackend.html">Class TensorRTBackend</a></li>
 <li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1TRTLogger.html">Class TRTLogger</a></li>
 <li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html">Class TensorFormat</a></li>
 <li class="toctree-l3"><a class="reference internal" href="enum_torch__tensorrt_8h_1a3fbe5d72e4fc624dbd038853079620eb.html">Enum EngineCapability</a></li>
+<li class="toctree-l3"><a class="reference internal" href="enum_OptimizationProfileSelection_8h_1a5e828f9e4f3fea51423b5c701d803840.html">Enum ProfileRequest</a></li>
+<li class="toctree-l3"><a class="reference internal" href="enum_OptimizationProfileSelection_8h_1a327ad4db9a647e041f8c082b069975d8.html">Enum ProfileSelection</a></li>
 <li class="toctree-l3"><a class="reference internal" href="enum_logging_8h_1a130f65408ad8cbaee060f05e8db69558.html">Enum Level</a></li>
 <li class="toctree-l3"><a class="reference internal" href="function_torch__tensorrt_8h_1ad6a4ee8ca6c8f6e5519eb1128ec7f4a1.html">Function torch_tensorrt::dump_build_info</a></li>
+<li class="toctree-l3"><a class="reference internal" href="function_OptimizationProfileSelection_8h_1a415ea7d183f608f93a9447eac6393135.html">Function torch_tensorrt::executorch_backend::dims_fit</a></li>
 <li class="toctree-l3"><a class="reference internal" href="function_WeightStreamingBudget_8h_1ad04b467472f3cbcb8d5d02a35ec73b40.html">Function torch_tensorrt::executorch_backend::parse_weight_streaming_budget</a></li>
+<li class="toctree-l3"><a class="reference internal" href="function_OptimizationProfileSelection_8h_1ab53602e32219b5bee50f56c8ac09d47e.html">Function torch_tensorrt::executorch_backend::profile_fits</a></li>
+<li class="toctree-l3"><a class="reference internal" href="function_OptimizationProfileSelection_8h_1a611c9746189bfa9db2efa54e2718cb92.html">Function torch_tensorrt::executorch_backend::select_profile</a></li>
+<li class="toctree-l3"><a class="reference internal" href="function_OptimizationProfileSelection_8h_1a4f6ab33f9a46a8df5d8e205ebe6cbf3c.html">Template Function torch_tensorrt::executorch_backend::to_profile_index</a></li>
 <li class="toctree-l3"><a class="reference internal" href="function_torch__tensorrt_8h_1ac4ab8313ae72c2c899ea31548b528528.html">Function torch_tensorrt::get_build_info</a></li>
 <li class="toctree-l3"><a class="reference internal" href="function_logging_8h_1a56e110feaaba2c3fd44bd201fd21a76a.html">Function torch_tensorrt::logging::get_is_colored_output_on</a></li>
 <li class="toctree-l3"><a class="reference internal" href="function_logging_8h_1a0593f776f469c20469e2f729fc7861a3.html">Function torch_tensorrt::logging::get_logging_prefix</a></li>
@@ -577,57 +585,68 @@ document.write(`
 <dl class="cpp struct">
 <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt18executorch_backend18TensorRTBlobHeaderE">
 <span class="target" id="structtorch__tensorrt_1_1executorch__backend_1_1TensorRTBlobHeader"></span><span class="k"><span class="pre">struct</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TensorRTBlobHeader</span></span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt18executorch_backend18TensorRTBlobHeaderE" title="Link to this definition">#</a><br /></dt>
-<dd><div class="breathe-sectiondef docutils container">
+<dd><p>Where the metadata and engine live inside a TR01/TR02/TR03 blob, and what the metadata said. </p>
+<div class="breathe-sectiondef docutils container">
 <p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-members">Public Members</p>
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt18executorch_backend18TensorRTBlobHeader15metadata_offsetE">
 <span class="target" id="structtorch__tensorrt_1_1executorch__backend_1_1TensorRTBlobHeader_1ac0f12b84baf3cee17f93817f13ad1215"></span><span class="n"><span class="pre">uint32_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">metadata_offset</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt18executorch_backend18TensorRTBlobHeader15metadata_offsetE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Byte offset of the JSON metadata; never inside the header. </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt18executorch_backend18TensorRTBlobHeader13metadata_sizeE">
 <span class="target" id="structtorch__tensorrt_1_1executorch__backend_1_1TensorRTBlobHeader_1adecea9360ce808c734da49e36e6fca85"></span><span class="n"><span class="pre">uint32_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">metadata_size</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt18executorch_backend18TensorRTBlobHeader13metadata_sizeE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Length of the JSON metadata in bytes. </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt18executorch_backend18TensorRTBlobHeader13engine_offsetE">
 <span class="target" id="structtorch__tensorrt_1_1executorch__backend_1_1TensorRTBlobHeader_1acb4297bd88440e561720f4e39a6afcaa"></span><span class="n"><span class="pre">uint32_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">engine_offset</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt18executorch_backend18TensorRTBlobHeader13engine_offsetE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Byte offset of the serialized engine; 16-byte aligned. </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt18executorch_backend18TensorRTBlobHeader11engine_sizeE">
 <span class="target" id="structtorch__tensorrt_1_1executorch__backend_1_1TensorRTBlobHeader_1a1937c3c490cf8b34d8cdc5672afc0758"></span><span class="n"><span class="pre">uint64_t</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">engine_size</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt18executorch_backend18TensorRTBlobHeader11engine_sizeE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Length of the serialized engine in bytes. </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt18executorch_backend18TensorRTBlobHeader19input_binding_namesE">
 <span class="target" id="structtorch__tensorrt_1_1executorch__backend_1_1TensorRTBlobHeader_1accde314870c3f435ebe7051e16979158"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">input_binding_names</span></span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt18executorch_backend18TensorRTBlobHeader19input_binding_namesE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>TensorRT input binding names, in the order the metadata lists them. </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt18executorch_backend18TensorRTBlobHeader20output_binding_namesE">
 <span class="target" id="structtorch__tensorrt_1_1executorch__backend_1_1TensorRTBlobHeader_1a68c15943d97c8bf3653680a2574bc786"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">output_binding_names</span></span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt18executorch_backend18TensorRTBlobHeader20output_binding_namesE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>TensorRT output binding names, in the order the metadata lists them. </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt18executorch_backend18TensorRTBlobHeader10aliased_ioE">
 <span class="target" id="structtorch__tensorrt_1_1executorch__backend_1_1TensorRTBlobHeader_1afa8a182bc2909f370eafbcc4ef2d761f"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1AliasedBinding.html#_CPPv4N14torch_tensorrt18executorch_backend14AliasedBindingE" title="torch_tensorrt::executorch_backend::AliasedBinding"><span class="n"><span class="pre">AliasedBinding</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">aliased_io</span></span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt18executorch_backend18TensorRTBlobHeader10aliased_ioE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Aliased output-&gt;input binding pairs declared by the metadata. </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt18executorch_backend18TensorRTBlobHeader19hardware_compatibleE">
 <span class="target" id="structtorch__tensorrt_1_1executorch__backend_1_1TensorRTBlobHeader_1a0bf0b175dbbb83eae11a99535236e045"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">hardware_compatible</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="k"><span class="pre">false</span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt18executorch_backend18TensorRTBlobHeader19hardware_compatibleE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Engine built hardware-compatible; false when unstated. </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt18executorch_backend18TensorRTBlobHeader9device_idE">
 <span class="target" id="structtorch__tensorrt_1_1executorch__backend_1_1TensorRTBlobHeader_1a320e74625afda3f21327bf2ab6025ea2"></span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">device_id</span></span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">0</span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt18executorch_backend18TensorRTBlobHeader9device_idE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p><a class="reference internal" href="structtorch__tensorrt_1_1Device.html#structtorch__tensorrt_1_1Device"><span class="std std-ref">Device</span></a> the engine was built for; 0 when unstated. </p>
+</dd></dl>
 
 <dl class="cpp var">
 <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt18executorch_backend18TensorRTBlobHeader10engine_keyE">
 <span class="target" id="structtorch__tensorrt_1_1executorch__backend_1_1TensorRTBlobHeader_1a3526f2ffa1d107141935ba173d8d97b8"></span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">string</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">engine_key</span></span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt18executorch_backend18TensorRTBlobHeader10engine_keyE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Named-data key of an engine stored outside the blob; empty when it is inline. </p>
+</dd></dl>
 
 </div>
 <div class="breathe-sectiondef docutils container">
@@ -635,12 +654,38 @@ document.write(`
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt18executorch_backend18TensorRTBlobHeader11engine_dataEPKvRK18TensorRTBlobHeader">
 <span class="target" id="structtorch__tensorrt_1_1executorch__backend_1_1TensorRTBlobHeader_1a6c6bb0a8448aff690aaa39b8744ae393"></span><span class="k"><span class="pre">static</span></span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="sig-name descname"><span class="n"><span class="pre">engine_data</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">blob</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><a class="reference internal" href="#_CPPv4N14torch_tensorrt18executorch_backend18TensorRTBlobHeaderE" title="torch_tensorrt::executorch_backend::TensorRTBlobHeader"><span class="n"><span class="pre">TensorRTBlobHeader</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">h</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N14torch_tensorrt18executorch_backend18TensorRTBlobHeader11engine_dataEPKvRK18TensorRTBlobHeader" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Start of the serialized engine inside a blob. </p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>blob</strong> – Start of the processed blob <code class="docutils literal notranslate"><span class="pre">h</span></code> was parsed from. </p></li>
+<li><p><strong>h</strong> – Header parsed from that blob. </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Pointer to <a class="reference internal" href="#structtorch__tensorrt_1_1executorch__backend_1_1TensorRTBlobHeader_1a1937c3c490cf8b34d8cdc5672afc0758"><span class="std std-ref">TensorRTBlobHeader::engine_size</span></a> bytes of engine data. </p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt18executorch_backend18TensorRTBlobHeader5parseEPKvNSt6size_tER18TensorRTBlobHeader">
 <span class="target" id="structtorch__tensorrt_1_1executorch__backend_1_1TensorRTBlobHeader_1a51a9da5aaf5664727f9ccfb9b689f1d8"></span><span class="k"><span class="pre">static</span></span><span class="w"> </span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">parse</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">data</span></span>, <span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">size</span></span>, <a class="reference internal" href="#_CPPv4N14torch_tensorrt18executorch_backend18TensorRTBlobHeaderE" title="torch_tensorrt::executorch_backend::TensorRTBlobHeader"><span class="n"><span class="pre">TensorRTBlobHeader</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">out</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N14torch_tensorrt18executorch_backend18TensorRTBlobHeader5parseEPKvNSt6size_tER18TensorRTBlobHeader" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Validates a processed blob and reads its header. </p>
+<p>Checks the <code class="docutils literal notranslate"><span class="pre">TR01</span></code>, <code class="docutils literal notranslate"><span class="pre">TR02</span></code> or <code class="docutils literal notranslate"><span class="pre">TR03</span></code> magic, that the metadata and the engine both lie within <code class="docutils literal notranslate"><span class="pre">size</span></code>, that the engine is 16-byte aligned, and that the metadata ends at or before the engine; then reads the binding names and flags out of the JSON. A <code class="docutils literal notranslate"><span class="pre">TR02</span></code> blob whose metadata yields no <code class="docutils literal notranslate"><span class="pre">aliased_io</span></code> entries is rejected, since running it would silently stop updating the caller’s buffers; a <code class="docutils literal notranslate"><span class="pre">TR01</span></code> blob that does carry them is accepted and read as aliased. A blob must carry exactly one of an inline engine and an <code class="docutils literal notranslate"><span class="pre">engine_key</span></code>, and the key exactly when the magic is <code class="docutils literal notranslate"><span class="pre">TR03</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> – Start of the processed blob. </p></li>
+<li><p><strong>size</strong> – Bytes available at <code class="docutils literal notranslate"><span class="pre">data</span></code>. </p></li>
+<li><p><strong>out</strong> – <strong>[out]</strong> Filled in on success; left in an unspecified state otherwise. </p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>false when the blob is not a well-formed TR01/TR02/TR03 blob. </p>
+</dd>
+</dl>
+</dd></dl>
 
 </div>
 </dd></dl>
@@ -659,12 +704,12 @@ document.write(`
                   
 <div class="prev-next-area">
     <a class="left-prev"
-       href="structtorch__tensorrt_1_1executorch__backend_1_1InputProfileBounds.html"
+       href="structtorch__tensorrt_1_1executorch__backend_1_1ProfileTable.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">Struct InputProfileBounds</p>
+        <p class="prev-next-title">Struct ProfileTable</p>
       </div>
     </a>
     <a class="right-next"

@@ -9,6 +9,7 @@
 #include <cuda_runtime.h>
 #include <executorch/runtime/core/error.h>
 
+#include <cstdint>
 #include <shared_mutex>
 #include <vector>
 
@@ -60,6 +61,7 @@ class ExecutionGraph {
   // dereferenced. A later buffer at the same address keeps the graph safely, since the pool always
   // hands over at least what these shapes need.
   const void* scratch_ = nullptr;
+  int32_t profile_ = -1;
   cudaGraphExec_t graph_exec_ = nullptr;
   cudaStream_t capture_stream_ = nullptr;
   int failed_captures_ = 0;
