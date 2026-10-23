@@ -156,13 +156,13 @@ def _kv_write_will_alias(
     a divergence there mispredicts just as effectively as a divergence in the
     predicate. Returning ``False`` routes the write to copy-back, which is right
     whatever the converter goes on to do with it: it lowers most ineligible writes
-    to a non-aliasing scatter, returns the source outright for a full overwrite, and
-    raises for the rest (a ``slice_scatter`` with dynamic bounds or a bad ``dim``, an
-    ``index_copy`` its fallback cannot express). The first two both have a write-back
-    to preserve -- for a full overwrite the source *is* the buffer's new contents --
-    and the ones that raise never get as far as needing one. One more never reaches a
-    converter: a ``slice_scatter`` written on a dynamic dim, which its validator runs
-    in PyTorch, and which needs the copy-back like any other.
+    to a non-aliasing scatter, returns the source in the input's dtype for a full
+    overwrite, and raises for the rest (a ``slice_scatter`` with dynamic bounds or a
+    bad ``dim``, an ``index_copy`` its fallback cannot express). The first two both
+    have a write-back to preserve -- for a full overwrite the source *is* the
+    buffer's new contents -- and the ones that raise never get as far as needing one.
+    One more never reaches a converter: a ``slice_scatter`` written on a dynamic dim,
+    which its validator runs in PyTorch, and which needs the copy-back like any other.
     Imports are local to avoid a lowering<->conversion import cycle.
     """
     if not (isinstance(value_node, torch.fx.Node) and value_node.op == "call_function"):
