@@ -124,8 +124,20 @@ def transform(
     Returns an inlined torch.fx.GraphModule
     """
     # Make a copy the graph since this function transforms the input graph and changes it's attributes.
-    # This transformed graph is meant to be consumed by `create_trt_exp_program`
-    gm = copy.deepcopy(gm)
+    # This transformed graph is meant to be consumed by `create_trt_exp_program`.
+    # The tensors are shared, not copied: the transform rewires the graph and its attributes but never
+    # writes to a tensor, and a copy would double every weight the compiled module still holds.
+    tensors = {
+        id(value): value
+        for module in gm.modules()
+        for value in [
+            *module.__dict__.get("_parameters", {}).values(),
+            *module.__dict__.get("_buffers", {}).values(),
+            *module.__dict__.values(),
+        ]
+        if isinstance(value, torch.Tensor)
+    }
+    gm = copy.deepcopy(gm, tensors)
 
     # Inline TensorRT submodules
     inline_trt_modules(gm, cross_compile_module, expose_aliased_mutations)
