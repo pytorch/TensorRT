@@ -117,7 +117,8 @@ def lift_fresh_copy_replacement(x: torch.Tensor) -> torch.Tensor:
 
 @register_torch_trt_decomposition(aten.alias, registry=TORCH_TRT_DECOMPOSITIONS)
 def alias_replacement(x: torch.Tensor) -> torch.Tensor:
-    return x
+    # A view op must not return its input, and aten.view becomes a copy in this table.
+    return x.expand(x.shape)
 
 
 @register_torch_trt_decomposition(
