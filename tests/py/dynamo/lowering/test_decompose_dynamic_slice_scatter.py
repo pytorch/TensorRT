@@ -97,6 +97,22 @@ class TestDecomposeDynamicSliceScatter(TestCase):
             M(), (cache, src), {"cache": None, "src": {0: L_dim}}, retry
         )
 
+    def test_src_of_another_dtype(self):
+        """As in torch, src is written in the cache's dtype."""
+
+        class M(torch.nn.Module):
+            def forward(self, cache, src):
+                L = src.shape[2]
+                return torch.slice_scatter(cache, src, dim=2, start=0, end=L)
+
+        cache = torch.zeros(1, 4, 32, 8)
+        src = torch.ones(1, 4, 5, 8, dtype=torch.float16) * 3.0
+        L_dim = Dim("L", min=1, max=16)
+        retry = (torch.zeros(1, 4, 32, 8), torch.ones(1, 4, 9, 8).half() * 2.0)
+        self._compile_and_check(
+            M(), (cache, src), {"cache": None, "src": {2: L_dim}}, retry
+        )
+
 
 @unittest.skipIf(not torch.cuda.is_available(), "CUDA required")
 class TestStaticPathPreserved(TestCase):
