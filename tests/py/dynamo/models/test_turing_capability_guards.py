@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch_tensorrt as torchtrt
+from parameterized import parameterized
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.dynamo._settings import CompilationSettings
@@ -53,9 +54,9 @@ class Conv3d(nn.Module):
 
 
 class ConvTranspose3d(nn.Module):
-    def __init__(self):
+    def __init__(self, stride=1):
         super().__init__()
-        self.conv = nn.ConvTranspose3d(4, 8, 3, padding=1)
+        self.conv = nn.ConvTranspose3d(4, 8, 3, stride=stride, padding=1)
 
     def forward(self, x):
         return self.conv(x)
@@ -155,12 +156,10 @@ def _cdist_inputs(rows1, rows2, dtype=torch.float32):
     "Turing capability guards only apply to TensorRT-RTX",
 )
 class TestTuringCapabilityGuards(TestCase):
-    """TensorRT-RTX cannot serve some ops on Turing (SM 7.5); they must fall back.
+    """Verify PyTorch fallback for operations that TRT-RTX cannot execute on Turing.
 
-    Per the TensorRT-RTX support matrix, Turing does not support FP32 GEMMs or 3D
-    convolutions, and it has no bfloat16 hardware. Without a fallback these produce a
-    null execution context, a segfault, or -- for dynamic-shape FP32 GEMMs -- a
-    silently all-zero result.
+    Turing lacks support for FP32 GEMMs, forward 3D convolution, FP32 transposed 3D convolution, and bfloat16.
+    Without fallback, these operations can cause compile failures, crashes, or incorrect results.
     """
 
     def _compile(self, mod, inputs, **kwargs):
@@ -251,12 +250,71 @@ class TestTuringCapabilityGuards(TestCase):
         self.assertGreater(_trt_submodule_count(compiled), 0)
         self._assert_matches_eager(mod, compiled, inputs)
 
-    def test_declared_turing_target_keeps_transposed_conv3d_on_trt(self):
-        # Transposed 3D convolution is a distinct layer and does work on Turing.
-        mod = ConvTranspose3d()
-        inputs = (torch.randn(1, 4, 8, 8, 8).cuda(),)
-        compiled = self._compile(mod, inputs, target_compute_capabilities=[TURING])
-        self.assertGreater(_trt_submodule_count(compiled), 0)
+    @parameterized.expand(
+        [
+            (f"{precision}_{target}_stride_{stride}", dtype, targets, stride)
+            for precision, dtype in (("fp32", torch.float32), ("fp16", torch.float16))
+            for target, targets in (
+                ("native", None),
+                ("turing", [TURING]),
+                ("mixed", [(8, 0), TURING]),
+            )
+            for stride in (1, 2)
+        ]
+    )
+    def test_transposed_conv3d(self, _, dtype, targets, stride):
+        if dtype == torch.float16 and targets is not None:
+            # Include the current GPU because the test executes the FP16 engine.
+            targets = list(
+                dict.fromkeys([*targets, torch.cuda.get_device_capability()])
+            )
+        mod = ConvTranspose3d(stride=stride).to(dtype)
+        inputs = (torch.randn(1, 4, 8, 8, 8, dtype=dtype).cuda(),)
+        compiled = self._compile(mod, inputs, target_compute_capabilities=targets)
+        targets_turing = _is_turing() if targets is None else TURING in targets
+        expected_engines = 0 if dtype == torch.float32 and targets_turing else 1
+        self.assertEqual(_trt_submodule_count(compiled), expected_engines)
+        self._assert_matches_eager(mod, compiled, inputs)
+
+    @parameterized.expand(
+        [
+            (f"{target}_stride_{stride}", targets, stride)
+            for target, targets in (
+                ("native", None),
+                ("turing", [TURING]),
+                ("mixed", [(8, 0), TURING]),
+            )
+            for stride in (1, 2)
+        ]
+    )
+    def test_fp32_transposed_conv3d_dynamic(self, _, targets, stride):
+        mod = ConvTranspose3d(stride=stride).eval().cuda()
+        inputs = (torch.randn(2, 4, 4, 4, 4).cuda(),)
+        batch = torch.export.Dim("batch", min=1, max=4)
+        ep = torch.export.export(mod, inputs, dynamic_shapes=({0: batch},))
+        compiled = torchtrt.dynamo.compile(
+            ep,
+            inputs=[
+                torchtrt.Input(
+                    min_shape=(1, 4, 4, 4, 4),
+                    opt_shape=(2, 4, 4, 4, 4),
+                    max_shape=(4, 4, 4, 4, 4),
+                    dtype=torch.float32,
+                )
+            ],
+            min_block_size=1,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
+            use_python_runtime=True,
+            target_compute_capabilities=targets,
+        )
+        targets_turing = _is_turing() if targets is None else TURING in targets
+        self.assertEqual(_trt_submodule_count(compiled), 0 if targets_turing else 1)
+        for batch_size in (1, 2, 4):
+            with self.subTest(batch_size=batch_size):
+                self._assert_matches_eager(
+                    mod, compiled, (torch.randn(batch_size, 4, 4, 4, 4).cuda(),)
+                )
 
     def test_declared_turing_target_falls_back_fp32_linear(self):
         mod = Linear()
