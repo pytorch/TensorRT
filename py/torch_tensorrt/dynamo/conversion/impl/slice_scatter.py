@@ -351,12 +351,6 @@ def slice_scatter(
             f"for a rank-{rank} input; dim must be a Python int in [-{rank}, {rank})"
         )
 
-    # Trivial: full overwrite. As torch does, src is written in the input's dtype.
-    if status is KVWriteStatus.FULL_OVERWRITE:
-        return cast_trt_tensor(
-            ctx, src, input.dtype, name + "_full_overwrite", target, source_ir
-        )
-
     if status is KVWriteStatus.DYNAMIC_BOUNDS:
         raise NotImplementedError(
             "slice_scatter with dynamic start/end/step is not yet supported"
@@ -369,8 +363,22 @@ def slice_scatter(
             f"slice_scatter: dim {dim} of the input is dynamic, so this write's bounds "
             "cannot be resolved without its size"
         )
-    # OK is the only status left, and it resolves all three bounds to Python ints.
+    # OK and FULL_OVERWRITE are the statuses left, and both resolve all three bounds
+    # to Python ints.
     assert start is not None and end is not None and step is not None
+
+    slice_len = len(range(start, end, step))
+    if src.shape[dim] not in (DYNAMIC_DIM, slice_len):
+        raise ValueError(
+            f"slice_scatter: src has size {src.shape[dim]} on dim {dim}, but the "
+            f"slice {start}:{end}:{step} it writes has size {slice_len}"
+        )
+
+    # Trivial: full overwrite. As torch does, src is written in the input's dtype.
+    if status is KVWriteStatus.FULL_OVERWRITE:
+        return cast_trt_tensor(
+            ctx, src, input.dtype, name + "_full_overwrite", target, source_ir
+        )
 
     update_len = end - start
 
