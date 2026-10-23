@@ -20,7 +20,14 @@ from torch.testing._internal.common_utils import TestCase, run_tests
 
 @unittest.skipIf(not torch.cuda.is_available(), "CUDA required")
 class TestDecomposeDynamicSliceScatter(TestCase):
-    def _compile_and_check(self, model, sample_inputs, dynamic_shapes, retry_inputs):
+    def _compile_and_check(
+        self,
+        model,
+        sample_inputs,
+        dynamic_shapes,
+        retry_inputs,
+        require_full_compilation=False,
+    ):
         model = model.cuda().eval()
         sample_inputs = tuple(t.cuda() for t in sample_inputs)
         ep = export(model, sample_inputs, dynamic_shapes=dynamic_shapes)
@@ -30,6 +37,7 @@ class TestDecomposeDynamicSliceScatter(TestCase):
             inputs=list(sample_inputs),
             enabled_precisions={torch.float32},
             min_block_size=1,
+            require_full_compilation=require_full_compilation,
         )
         for inputs in [sample_inputs, retry_inputs]:
             inputs = tuple(t.cuda() if t.device.type != "cuda" else t for t in inputs)
@@ -95,6 +103,26 @@ class TestDecomposeDynamicSliceScatter(TestCase):
         retry = (torch.zeros(16, 8), torch.ones(7, 8) * 4.0)
         self._compile_and_check(
             M(), (cache, src), {"cache": None, "src": {0: L_dim}}, retry
+        )
+
+    def test_src_of_another_dtype(self):
+        """As in torch, src is written in the cache's dtype."""
+
+        class M(torch.nn.Module):
+            def forward(self, cache, src):
+                L = src.shape[2]
+                return torch.slice_scatter(cache, src, dim=2, start=0, end=L)
+
+        cache = torch.zeros(1, 4, 32, 8)
+        src = torch.ones(1, 4, 5, 8, dtype=torch.float16) * 3.0
+        L_dim = Dim("L", min=1, max=16)
+        retry = (torch.zeros(1, 4, 32, 8), torch.ones(1, 4, 9, 8).half() * 2.0)
+        self._compile_and_check(
+            M(),
+            (cache, src),
+            {"cache": None, "src": {2: L_dim}},
+            retry,
+            require_full_compilation=True,
         )
 
 
