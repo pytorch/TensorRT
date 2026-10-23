@@ -331,11 +331,16 @@ pending CUDA error to classify TensorRT failures.
 
 An engine serialized without its weights, for example compiled with
 `immutable_weights=False, strip_engine_weights=True`, is refused with
-`Error::InvalidProgram`, since this backend cannot refit it. A stripped engine
-with no weights at all loads, since it has nothing to restore. To tell the two
-apart, loading an ordinary engine that has weights asks TensorRT for its stripped
-size, and TensorRT logs one warning per engine that it was not built with
-`kSTRIP_PLAN`. The backend forwards it at Info level, and it is harmless.
+`Error::InvalidProgram`, since this backend cannot refit it. For a stripped plan,
+TensorRT reports how many weight bytes it still holds, and the backend refuses the
+plan only when that is less than its total. So a stripped plan that kept all its
+weights, because there was nothing to strip, loads, and so does a plan with no
+weights at all. A plain re-save of a stripped plan stays marked and is refused, but
+one saved again with `EXCLUDE_WEIGHTS` cleared and no refit is not marked as
+stripped, so it is not caught. Asking for the kept size of an ordinary engine
+that has weights makes TensorRT log a warning that it was not built with
+`kSTRIP_PLAN`, each time the engine is deserialized. The backend forwards it at
+Info level, and it is harmless.
 
 ## Engines in a .ptd file
 

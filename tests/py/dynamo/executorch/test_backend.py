@@ -917,8 +917,8 @@ def test_preprocess_without_the_spec_writes_no_external_data():
     "specs, message",
     [
         ([_external_engine_spec(), _external_engine_spec()], "at most once"),
-        ([_external_engine_spec(b"")], "must be a non-empty file name"),
-        ([_external_engine_spec(b"../outside")], "without a directory"),
+        ([_external_engine_spec(b"")], "must use only ASCII letters"),
+        ([_external_engine_spec(b"../outside")], "must use only ASCII letters"),
         ([_external_engine_spec(5)], "not int"),
         ([_external_engine_spec(b"\xff\xfe")], "not valid UTF-8"),
     ],

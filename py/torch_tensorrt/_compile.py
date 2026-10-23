@@ -885,7 +885,12 @@ def save(
                 the ``.ptd`` extension and
                 writes every TensorRT engine to ``<name>.ptd`` next to the ``.pte``
                 instead of into it. Pass that file as the program's data file when
-                loading. See :func:`torch_tensorrt.executorch.export`.
+                loading. An existing file with that name is replaced, so give each
+                program in a directory its own name, for example
+                ``external_engine_data="model"`` for ``model.pte``. A program that also
+                has a CUDA backend part needs its own directory and
+                ``external_engine_data="aoti_cuda_blob"`` instead. See
+                :func:`torch_tensorrt.executorch.export`.
     """
     if isinstance(module, CudaGraphsTorchTensorRTModule):
         module = module.compiled_module
@@ -972,6 +977,15 @@ def save(
             from torch_tensorrt.executorch._zero_copy import _refuse_skip_h2d
 
             _refuse_skip_h2d(executorch_backend_config)
+        # Every backend writes its data as <name>.ptd beside the program, so a
+        # program named *.ptd can be replaced by one. Windows ignores case and
+        # trailing dots and spaces in a file name.
+        if os.fspath(file_path).rstrip(". ").lower().endswith(".ptd"):
+            raise ValueError(
+                f"file_path must not end with .ptd, got {file_path!r}. save() writes the "
+                "program's data files as <name>.ptd beside it, so one of them could replace "
+                "the program. Use the .pte extension."
+            )
 
     def _all_are_input_objects(obj: Any) -> bool:
         """Recursively check if all elements in nested collections are Input objects."""
@@ -1507,10 +1521,16 @@ def _write_external_tensor_data(executorch_program: Any, file_path: str) -> None
     if executorch_program._tensor_data:
         out_dir = os.path.dirname(os.path.abspath(file_path))
         executorch_program.write_tensor_data_to_file(out_dir)
+        # write_tensor_data_to_file adds .ptd unless the name already ends with it.
+        paths = [
+            os.path.join(out_dir, name if name.endswith(".ptd") else f"{name}.ptd")
+            for name in executorch_program._tensor_data
+        ]
         logger.info(
-            "Wrote external delegate data (.ptd) to %s; point the runtime's "
-            "data-files at this directory to load them.",
-            out_dir,
+            "Wrote external delegate data to %s. Pass %s, not the directory, "
+            "when loading the program.",
+            ", ".join(paths),
+            "this file" if len(paths) == 1 else "these files",
         )
 
 

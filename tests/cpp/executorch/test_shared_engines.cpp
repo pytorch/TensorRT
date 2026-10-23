@@ -178,6 +178,11 @@ struct BuildOptions {
   int dim = kDim;
   // False builds relu(input) alone: an engine with no weights at all.
   bool weights = true;
+  // The refit flag that strip_weights or refittable sets. kREFIT_INDIVIDUAL with no weight marked refittable
+  // leaves nothing to strip.
+  nvinfer1::BuilderFlag refit = nvinfer1::BuilderFlag::kREFIT;
+  // Sets refit without kSTRIP_PLAN, so the plan can be saved again without its weights.
+  bool refittable = false;
 };
 
 std::vector<float> matmul_weights(float weight_scale, int dim = kDim) {
@@ -243,8 +248,10 @@ std::vector<std::uint8_t> build_matmul_blob(const BuildOptions& options) {
   if (options.weight_streaming) {
     config->setFlag(nvinfer1::BuilderFlag::kWEIGHT_STREAMING);
   }
+  if (options.strip_weights || options.refittable) {
+    config->setFlag(options.refit);
+  }
   if (options.strip_weights) {
-    config->setFlag(nvinfer1::BuilderFlag::kREFIT);
     config->setFlag(nvinfer1::BuilderFlag::kSTRIP_PLAN);
   }
   if (options.dynamic_batch) {
@@ -649,8 +656,8 @@ TEST_F(SharedEnginesTest, APlanSerializedWithoutItsWeightsIsRefused) {
   }
 }
 
-// A small stripped matmul reports 0 stripped weight bytes, though it still lacks its weights. Its total
-// weight size is not 0, which is what tells it apart from a plan with nothing to restore.
+// A small stripped matmul keeps 0 of its weight bytes, so it lacks its weights. Its total weight size
+// is not 0, which is what tells it apart from a plan with nothing to restore.
 TEST_F(SharedEnginesTest, AStrippedPlanThatReportsZeroIsRefused) {
   const auto stripped = build_matmul_blob({1.0f, false, false, true, 64});
   ASSERT_FALSE(stripped.empty());
@@ -693,6 +700,67 @@ TEST_F(SharedEnginesTest, AStrippedPlanWithNoWeightsLoads) {
     ASSERT_EQ(out[i], x > 0.0f ? x : 0.0f) << "element " << i;
   }
   EXPECT_EQ(unshared.run(1, 9), out);
+}
+
+// A stripped plan that had nothing to strip still holds all its weights and computes correctly, so it
+// loads. TensorRT reports its kept weight bytes as the total, not -1.
+TEST_F(SharedEnginesTest, AStrippedPlanThatKeptAllItsWeightsLoads) {
+  BuildOptions options;
+  options.strip_weights = true;
+  options.refit = nvinfer1::BuilderFlag::kREFIT_INDIVIDUAL;
+  const auto kept = build_matmul_blob(options);
+  ASSERT_FALSE(kept.empty());
+  static BuilderLogger logger;
+  TRTUniquePtr<nvinfer1::IRuntime> runtime(nvinfer1::createInferRuntime(logger));
+  const std::size_t offset = plan_offset(kept);
+  TRTUniquePtr<nvinfer1::ICudaEngine> engine(
+      runtime->deserializeCudaEngine(kept.data() + offset, kept.size() - offset));
+  ASSERT_NE(engine, nullptr);
+  ASSERT_GT(engine->getEngineStat(nvinfer1::EngineStat::kTOTAL_WEIGHTS_SIZE), 0);
+  ASSERT_EQ(
+      engine->getEngineStat(nvinfer1::EngineStat::kSTRIPPED_WEIGHTS_SIZE),
+      engine->getEngineStat(nvinfer1::EngineStat::kTOTAL_WEIGHTS_SIZE));
+  const BackendOption private_load = sharing_option(false);
+  Handle reference;
+  Handle shared;
+  Handle unshared;
+  ASSERT_EQ(reference.load(blob_), Error::Ok);
+  ASSERT_EQ(shared.load(kept), Error::Ok);
+  ASSERT_EQ(unshared.load(kept, nullptr, {&private_load, 1}), Error::Ok);
+  const auto expected = reference.run(1, 7);
+  const auto actual = shared.run(1, 7);
+  ASSERT_FALSE(expected.empty());
+  ASSERT_EQ(actual.size(), expected.size());
+  for (std::size_t i = 0; i < expected.size(); ++i) {
+    ASSERT_NEAR(actual[i], expected[i], 1e-2f * (1.0f + std::abs(expected[i]))) << "element " << i;
+  }
+  EXPECT_EQ(unshared.run(1, 7), actual);
+}
+
+// A refittable plan saved with EXCLUDE_WEIGHTS, as Torch-TensorRT writes its engine cache, lacks its
+// weights just like a plan built with STRIP_PLAN.
+TEST_F(SharedEnginesTest, ARefittablePlanSavedWithoutItsWeightsIsRefused) {
+  BuildOptions options;
+  options.refittable = true;
+  const auto refittable = build_matmul_blob(options);
+  ASSERT_FALSE(refittable.empty());
+  static BuilderLogger logger;
+  TRTUniquePtr<nvinfer1::IRuntime> runtime(nvinfer1::createInferRuntime(logger));
+  const std::size_t offset = plan_offset(refittable);
+  TRTUniquePtr<nvinfer1::ICudaEngine> engine(
+      runtime->deserializeCudaEngine(refittable.data() + offset, refittable.size() - offset));
+  ASSERT_NE(engine, nullptr);
+  TRTUniquePtr<nvinfer1::ISerializationConfig> config(engine->createSerializationConfig());
+  ASSERT_TRUE(config->setFlag(nvinfer1::SerializationFlag::kEXCLUDE_WEIGHTS));
+  TRTUniquePtr<nvinfer1::IHostMemory> plan(engine->serializeWithConfig(*config));
+  ASSERT_NE(plan, nullptr);
+  const auto without_weights =
+      wrap_engine_plan(static_cast<const std::uint8_t*>(plan->data()), plan->size(), blob_metadata(0));
+  const BackendOption private_load = sharing_option(false);
+  Handle shared;
+  Handle unshared;
+  EXPECT_EQ(shared.load(without_weights), Error::InvalidProgram);
+  EXPECT_EQ(unshared.load(without_weights, nullptr, {&private_load, 1}), Error::InvalidProgram);
 }
 
 // A .pte stores each engine as named data, which is where an exported stripped plan arrives from.
