@@ -348,10 +348,12 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         return self._context
 
     def invalidate_context(self) -> None:
-        """Drop the live execution context. Next ``self.context`` read
-        rebuilds it with the then-current ``runtime_settings``. Called from
-        every settings-mutation path so reads of ``self.context`` always
-        observe up-to-date settings."""
+        """Drop the live execution context, and the CUDA graph captured on it.
+        Next ``self.context`` read rebuilds it with the then-current
+        ``runtime_settings``. Called from every settings-mutation path so reads
+        of ``self.context`` always observe up-to-date settings."""
+        # The graph replays this context's kernels and memory, so it must go first.
+        self.reset_captured_graph()
         self._context = None
 
     def has_context(self) -> bool:

@@ -272,6 +272,41 @@ class TestCudagraphsPython(TestCase):
                 msg=f"CUDA Graph Python TRT outputs don't match with the original model. (trial: {i})",
             )
 
+    @unittest.skipIf(
+        torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,
+        "Checks the Python runtime engine; test_002_cudagraphs_cpp.py covers the C++ runtime.",
+    )
+    def test_dropping_execution_context_releases_captured_graph(self):
+        model = (
+            torch.nn.Sequential(torch.nn.Conv2d(3, 8, 3), torch.nn.ReLU()).eval().cuda()
+        )
+        x = torch.randn(1, 3, 32, 32, device="cuda")
+        trt_model = torch_tensorrt.compile(
+            model, ir="dynamo", inputs=[x], min_block_size=1
+        )
+        engines = [
+            m.engine
+            for m in trt_model.modules()
+            if isinstance(m, torch_tensorrt.runtime.TorchTensorRTModule)
+        ]
+        self.assertTrue(engines)
+        torch_tensorrt.runtime.set_cudagraphs_mode(True)
+        for name, drop_context in (
+            ("disable_profiling", lambda e: e.disable_profiling()),
+            (
+                "use_dynamically_allocated_resources",
+                lambda e: e.use_dynamically_allocated_resources(True),
+            ),
+        ):
+            trt_model(x)
+            self.assertTrue(all(e.cudagraph is not None for e in engines))
+            for e in engines:
+                drop_context(e)
+            self.assertTrue(
+                all(e.cudagraph is None for e in engines),
+                msg=f"{name} kept the captured graph",
+            )
+
 
 if __name__ == "__main__":
     run_tests()
