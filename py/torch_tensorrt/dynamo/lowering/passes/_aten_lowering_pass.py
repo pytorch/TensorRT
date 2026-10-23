@@ -29,6 +29,7 @@ from .constant_folding import constant_fold
 from .decompose_dynamic_slice_scatter import decompose_dynamic_slice_scatter
 from .decompose_unsupported_attention import decompose_unsupported_attention
 from .eliminate_sym_min_int64_max import eliminate_sym_min_int64_max  # noqa: F401
+from .fold_shared_kv_attention import fold_shared_kv_attention
 from .force_causal_efficient_attention import force_causal_efficient_attention
 from .fuse_pad_into_convolution import fuse_pad_into_convolution
 from .fuse_prims_broadcast import fuse_prims_broadcast
@@ -66,6 +67,8 @@ def complex_lowering_pass(
 
 
 post_lowering_pass_list = [
+    # Reads meta['val'], which replace_fused_rms_norm does not set on its new nodes.
+    fold_shared_kv_attention,
     replace_fused_rms_norm,
     remove_input_alias_fixing_clones,
     lower_associative_scan,

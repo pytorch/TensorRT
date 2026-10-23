@@ -40,6 +40,7 @@ from torch_tensorrt.dynamo._defaults import (
     ENABLE_WEIGHT_STREAMING,
     ENGINE_CAPABILITY,
     FALLBACK_DATA_DEPENDENT_OPS,
+    FOLD_SHARED_KV_ATTENTION,
     HARDWARE_COMPATIBLE,
     IMMUTABLE_WEIGHTS,
     L2_LIMIT_FOR_TILING,
@@ -162,6 +163,7 @@ class CompilationSettings:
             foldable. Supported IDs: ``"attention_mask_arange"``.
             Default is empty.
         attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.
+        fold_shared_kv_attention (bool): Whether to run attention whose query heads share one key/value head as two plain matrix products against that head, instead of repeating it per query head as Hugging Face models do. It avoids copying the repeated keys and values and replaces TensorRT's fused attention kernel. At head size 256 this was faster on A100, H100 and Jetson Thor and slower on Jetson Orin, so measure it on the target GPU. With float16 the plain matrix products can accumulate in float16, so set use_fp32_acc=True to keep the accuracy of the fused kernel. Only attention written as matmuls with static shapes changes; scaled_dot_product_attention also needs decompose_attention=True. Default is False.
         fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.
         build_route (Optional[str]): TensorRT Global Performance Tuning build route string (space-separated "-knob=value" tokens). None uses the default route. This feature requires TensorRT with Global Performance Tuning enabled; currently unavailable on TensorRT-RTX / Windows.
         tune_build_routes (Optional[str]): Build-route expression for an autotuning sweep that runs each candidate in a spawned child process (e.g. "-slice_fusion=[on|off] -kgen:codegen:cuda_tile=[0|1|2|3]"). None disables tuning.
@@ -241,6 +243,7 @@ class CompilationSettings:
         DISABLED_CONSTANT_FOLD_EXCLUSIONS
     )
     attn_bias_is_causal: bool = ATTN_BIAS_IS_CAUSAL
+    fold_shared_kv_attention: bool = FOLD_SHARED_KV_ATTENTION
     fallback_data_dependent_ops: bool = FALLBACK_DATA_DEPENDENT_OPS
     build_route: Optional[str] = BUILD_ROUTE
     tune_build_routes: Optional[str] = TUNE_BUILD_ROUTES
@@ -290,6 +293,7 @@ class CompilationSettings:
             )
         )
         state.setdefault("fallback_data_dependent_ops", FALLBACK_DATA_DEPENDENT_OPS)
+        state.setdefault("fold_shared_kv_attention", FOLD_SHARED_KV_ATTENTION)
         state.setdefault("build_route", BUILD_ROUTE)
         state.setdefault("tune_build_routes", TUNE_BUILD_ROUTES)
         state.setdefault("tune_build_route_file", TUNE_BUILD_ROUTE_FILE)
@@ -330,6 +334,7 @@ _SETTINGS_TO_BE_ENGINE_INVARIANT = {
     "decompose_attention",
     "disabled_constant_fold_exclusions",
     "attn_bias_is_causal",
+    "fold_shared_kv_attention",
     "build_route",
 }
 
