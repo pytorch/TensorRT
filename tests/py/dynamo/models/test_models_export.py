@@ -776,6 +776,11 @@ def test_fp8_mha_fused_kernel(ir):
     import tensorrt as trt
     import torch_tensorrt
 
+    if torchtrt.ENABLED_FEATURES.tensorrt_rtx:
+        rtx_version = Version(trt.__version__).release[:2]
+        if rtx_version <= (1, 7):
+            pytest.skip("FP8 MHA accuracy requires TensorRT-RTX 1.8 or later")
+
     B, H, S, D = 1, 2, 32, 64
     torch.manual_seed(0)
 
