@@ -37,6 +37,7 @@ from torch_tensorrt.dynamo.conversion._ConversionContext import (
     ConversionContext,
 )
 from torch_tensorrt.dynamo.conversion.converter_utils import (
+    cast_trt_tensor,
     get_trt_tensor,
     set_layer_name,
 )
@@ -110,10 +111,10 @@ def resolve_slice_scatter_write(
     * ``OK`` — the bounds are concrete, and the caller goes on to
       ``_kv_eligible(cache_shape, dim, start, end - start, step)``.
     * ``FULL_OVERWRITE`` — the slice spans the whole dim with a step equal to 1, so
-      the converter returns ``src`` and emits no KV layer. ``step`` comes back as the
-      integer 1, which is all this branch establishes: the caller's own step may be a
-      symbolic object that merely compares equal to it, and no caller reads the value
-      under this status.
+      the converter returns ``src`` in the input's dtype and emits no KV layer.
+      ``step`` comes back as the integer 1, which is all this branch establishes: the
+      caller's own step may be a symbolic object that merely compares equal to it, and
+      no caller reads the value under this status.
     * ``DYNAMIC_BOUNDS`` — a bound is not a Python ``int``, so the converter
       raises ``NotImplementedError``.
     * ``DYNAMIC_DIM_SIZE`` — the dim being written is dynamic, so no bound resolves
@@ -300,9 +301,11 @@ def slice_scatter(
             f"for a rank-{rank} input; dim must be a Python int in [-{rank}, {rank})"
         )
 
-    # Trivial: full overwrite.
+    # Trivial: full overwrite. As torch does, src is written in the input's dtype.
     if status is KVWriteStatus.FULL_OVERWRITE:
-        return src
+        return cast_trt_tensor(
+            ctx, src, input.dtype, name + "_full_overwrite", target, source_ir
+        )
 
     if status is KVWriteStatus.DYNAMIC_BOUNDS:
         raise NotImplementedError(

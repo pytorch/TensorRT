@@ -171,6 +171,18 @@ class TestSliceScatterFallbackEndToEnd(TestCase):
             self.FullOverwrite(second_output), (torch.randn(4, 8), torch.randn(4, 8))
         )
 
+    def test_full_overwrite_keeps_the_input_dtype(self):
+        """torch writes ``src`` in the input's dtype, here truncating 2.7 to 2."""
+
+        class M(torch.nn.Module):
+            def forward(self, x, src):
+                return torch.ops.aten.slice_scatter.default(x, src, 1, 0, 8) * 3
+
+        self._assert_matches_eager(
+            M(),
+            (torch.randint(0, 5, (4, 8), dtype=torch.int32), torch.full((4, 8), 2.7)),
+        )
+
     def test_uint8_full_overwrite_feeding_another_layer(self):
         """TensorRT takes a uint8 tensor only as an engine input or output, so the
         result must not be a new uint8 tensor inside the engine."""
