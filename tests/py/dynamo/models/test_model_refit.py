@@ -989,6 +989,53 @@ def test_refit_cumsum():
     "Refit feature is not supported in Python 3.13 or higher",
 )
 @pytest.mark.unit
+def test_refit_input_written_through_returned_alias():
+    class InputWrittenThroughAlias(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.fc1 = nn.Linear(4, 4)
+
+        def forward(self, x):
+            return x[...].add_(self.fc1(x))
+
+    model = InputWrittenThroughAlias().eval().to("cuda")
+    model2 = InputWrittenThroughAlias().eval().to("cuda")
+    x = torch.randn((2, 4)).to("cuda")
+    # Export rejects an in-place write into a view of an input when grad mode is on.
+    with torch.no_grad():
+        exp_program = torch.export.export(model, (x.clone(),))
+        exp_program2 = torch.export.export(model2, (x.clone(),))
+        trt_gm = torchtrt.dynamo.compile(
+            exp_program,
+            (x.clone(),),
+            min_block_size=1,
+            immutable_weights=False,
+        )
+
+        new_trt_gm = refit_module_weights(
+            compiled_module=trt_gm,
+            new_weight_module=exp_program2,
+            arg_inputs=[x.clone()],
+        )
+
+        x_expected, x_refitted = x.clone(), x.clone()
+        assertions.assertTrue(
+            torch.allclose(model2(x_expected), new_trt_gm(x_refitted), 1e-2, 1e-2),
+            "Refit Result is not correct. Refit failed",
+        )
+        assertions.assertTrue(
+            torch.allclose(x_expected, x_refitted, 1e-2, 1e-2),
+            "The input written through the alias was not updated",
+        )
+
+    torch._dynamo.reset()
+
+
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.refit,
+    "Refit feature is not supported in Python 3.13 or higher",
+)
+@pytest.mark.unit
 def test_complex_buffer_refit():
     """Refit a model whose weights include a complex-valued buffer (e.g. RoPE freqs).
 
