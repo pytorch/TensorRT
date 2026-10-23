@@ -48,6 +48,7 @@ class TestGroupedMMConverter(DispatchTestCase):
 
         experts = len(counts)
         offs = torch.cumsum(torch.tensor(counts), 0).to(torch.int32)
+        self.assertEqual(offs[-1].item(), rows, "Offsets must cover every output row.")
         x = torch.randn(rows, k, dtype=dtype)
         w = torch.randn(experts, k, n, dtype=dtype)
         self.run_test(
@@ -66,6 +67,7 @@ class TestGroupedMMConverter(DispatchTestCase):
         rows, k, n, experts = 16, 32, 24, 4
         counts = torch.tensor([3, 5, 0, 8])
         offs = torch.cumsum(counts, 0).to(torch.int32)
+        self.assertEqual(offs[-1].item(), rows, "Offsets must cover every output row.")
         x = torch.randn(rows, k, dtype=torch.bfloat16)
         w = torch.randn(experts, k, n, dtype=torch.bfloat16)
         self.run_test(
