@@ -25,11 +25,14 @@ import unittest
 from types import SimpleNamespace
 
 import numpy as np
+import tensorrt as trt
 import torch
 import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt import Input
+from torch_tensorrt.dynamo._SourceIR import SourceIR
+from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.aten_ops_converters import slice_scatter_validator
 from torch_tensorrt.dynamo.conversion.impl.slice_scatter import (
     slice_scatter as slice_scatter_impl,
@@ -143,6 +146,55 @@ class TestSliceScatterFallback(DispatchTestCase):
 
 
 @unittest.skipIf(not torch.cuda.is_available(), "Skip because CUDA is not available")
+class TestSliceScatterOnANetwork(unittest.TestCase):
+    """The converter run directly on a TensorRT network, and the network it builds."""
+
+    def _write(
+        self, start, end, step, cache_dtype=trt.float32, batch=4, width=None, rows=16
+    ):
+        builder = trt.Builder(trt.Logger(trt.Logger.ERROR))
+        network = builder.create_network(
+            1 << int(trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED)
+        )
+        cache = network.add_input("cache", cache_dtype, (batch, 16, 8))
+        if width is None:
+            width = len(range(start, end, step))
+        update = network.add_input("update", trt.float32, (batch, rows, width))
+        output = slice_scatter_impl(
+            ConversionContext(network),
+            torch.ops.aten.slice_scatter.default,
+            SourceIR.ATEN,
+            "slice_scatter",
+            cache,
+            update,
+            -1,
+            start,
+            end,
+            step,
+        )
+        self.assertEqual(tuple(output.shape), (batch, 16, 8))
+        return network, output
+
+    @parameterized.expand(
+        [
+            ("wider", 3, 5, 1, 5),
+            ("narrower", 3, 5, 1, 1),
+            ("empty", 5, 5, 1, 2),
+            ("strided_one_wide", 3, 5, 2, 2),
+            ("full_overwrite", 0, 8, 1, 5),
+            ("another_dim", 3, 5, 1, 2, 15),
+        ]
+    )
+    def test_src_that_does_not_fit_the_slice_raises(
+        self, _, start, end, step, width, rows=16
+    ):
+        """As in torch, a src wider or narrower than the slice is an error, rather than
+        a result of the wrong size or a numpy broadcast error."""
+        with self.assertRaisesRegex(ValueError, "src has shape"):
+            self._write(start, end, step, width=width, rows=rows)
+
+
+@unittest.skipIf(not torch.cuda.is_available(), "Skip because CUDA is not available")
 class TestSliceScatterFallbackEndToEnd(TestCase):
     """Fallback writes compiled into an engine and checked against PyTorch."""
 
@@ -196,7 +248,8 @@ class TestSliceScatterFallbackEndToEnd(TestCase):
 
 
 class TestSliceScatterEarlyExits(unittest.TestCase):
-    """The converter's three raising exits, driven through the converter itself.
+    """The three raising exits the converter takes before it reads ``src``, driven
+    through the converter itself.
 
     All are reached before the converter touches anything but ``input.shape``, so
     ``_call`` passes ``None`` for ``ctx``, ``target``, ``source_ir`` and ``src``, and

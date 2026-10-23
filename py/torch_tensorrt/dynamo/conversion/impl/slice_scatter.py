@@ -113,8 +113,8 @@ def resolve_slice_scatter_write(
     * ``FULL_OVERWRITE`` — the slice spans the whole dim with a step equal to 1, so
       the converter returns ``src`` in the input's dtype and emits no KV layer.
       ``step`` comes back as the integer 1, which is all this branch establishes: the
-      caller's own step may be a symbolic object that merely compares equal to it, and
-      no caller reads the value under this status.
+      caller's own step may be a symbolic object that merely compares equal to it, so
+      the converter uses the returned 1.
     * ``DYNAMIC_BOUNDS`` — a bound is not a Python ``int``, so the converter
       raises ``NotImplementedError``.
     * ``DYNAMIC_DIM_SIZE`` — the dim being written is dynamic, so no bound resolves
@@ -316,6 +316,17 @@ def slice_scatter(
     # OK and FULL_OVERWRITE are the statuses left, and both resolve all three bounds
     # to Python ints.
     assert start is not None and end is not None and step is not None
+
+    slice_shape = list(input.shape)
+    slice_shape[dim] = len(range(start, end, step))
+    if len(src.shape) != rank or any(
+        DYNAMIC_DIM not in (src_size, size) and src_size != size
+        for src_size, size in zip(src.shape, slice_shape)
+    ):
+        raise ValueError(
+            f"slice_scatter: src has shape {tuple(src.shape)}, but the slice "
+            f"{start}:{end}:{step} it writes on dim {dim} has shape {tuple(slice_shape)}"
+        )
 
     # As torch does, src is written in the input's dtype. IKVCacheUpdateLayer also
     # requires the cache and the update to have the same dtype.
