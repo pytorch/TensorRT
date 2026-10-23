@@ -90,6 +90,40 @@ class TestLowering(TestCase):
             f"The following unexpected ops were encountered: {unexpected_ops_seen}",
         )
 
+    def test_lowering_alias_written_in_place(self):
+        class AliasWrittenInPlace(torch.nn.Module):
+            def forward(self, x):
+                y = torch.ops.aten.alias.default(x + 1)
+                y[:, 0] = 0
+                return y
+
+        x = torch.rand(2, 3)
+        exported = torch.export.export(AliasWrittenInPlace(), (x,))
+        decomposed = exported.run_decompositions(get_decompositions(False))
+
+        self.assertNotIn(
+            torch.ops.aten.alias.default,
+            {node.target for node in decomposed.graph.nodes},
+        )
+        torch.testing.assert_close(
+            decomposed.module()(x), AliasWrittenInPlace()(x), rtol=0, atol=0
+        )
+
+    def test_lowering_alias_stays_a_view(self):
+        class AliasOfIntermediate(torch.nn.Module):
+            def forward(self, x):
+                y = x + 1
+                return y, torch.ops.aten.alias.default(y)
+
+        x = torch.rand(2, 3)
+        exported = torch.export.export(AliasOfIntermediate(), (x,))
+        decomposed = exported.run_decompositions(get_decompositions(False))
+
+        y, alias = decomposed.module()(x)
+        self.assertEqual(
+            y.untyped_storage().data_ptr(), alias.untyped_storage().data_ptr()
+        )
+
     def test_lowering_rsqrt(self):
         class Rsqrt(torch.nn.Module):
             def __init__(self, *args, **kwargs) -> None:

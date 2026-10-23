@@ -154,7 +154,7 @@ def _trt_decomposition_table(
     it returns is built from whatever ``ComplexTensor`` dispatched to, not from
     the ops that survived the decomposition run at export time. Without a table
     that retrace re-introduces ops the flow has already decided to expand
-    (``aten.stack``) or to drop (``aten.alias``), long after the stage that
+    (``aten.stack``) or to rewrite (``aten.alias``), long after the stage that
     would have handled them, and the partitioner then cuts the graph around
     them. Handing the retrace the same table keeps the two in step.
     """
