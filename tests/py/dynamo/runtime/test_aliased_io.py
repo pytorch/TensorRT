@@ -280,7 +280,7 @@ class TestAliasedIORegressions(TestCase):
 
     def test_slice_scatter_fallback_path(self):
         """A slice_scatter that doesn't qualify for KVCacheUpdate should
-        still produce correct results via the scatter fallback."""
+        still produce correct results via the fallback."""
 
         class M(torch.nn.Module):
             def forward(self, x, y):

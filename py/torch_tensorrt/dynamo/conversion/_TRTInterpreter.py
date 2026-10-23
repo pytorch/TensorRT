@@ -1030,6 +1030,13 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             if alias_info is None and i in scalar_output_positions:
                 output = self._reshape_output_to_scalar(output, name)
 
+            # A converter can return one of its inputs as is, but TensorRT rejects a
+            # network input that is also an output, so the output is a copy of it.
+            if output.is_network_input:
+                layer = self.ctx.net.add_cast(output, output.dtype)
+                layer.name = f"Copy input {output.name} to output {name}"
+                output = layer.get_output(0)
+
             output.name = name
             outputs = outputs[:i] + (output,) + outputs[i + 1 :]
             self.ctx.net.mark_output(output)
