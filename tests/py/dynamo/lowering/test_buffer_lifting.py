@@ -391,6 +391,56 @@ class TestCopyBackClassification(TestCase):
         self.assertEqual(len(lifted), 1)
         self.assertEqual(new_gm.meta["_copyback_mutation_buffers"], [])
 
+    def test_kv_cache_update_write_no_copyback(self):
+        """A ``tensorrt::kv_cache_update`` write (a position per batch row) is
+        aliased by the IKVCacheUpdateLayer its converter emits, so it is not
+        copied back."""
+
+        class M(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("cache", torch.zeros(2, 4, 16, 8))
+
+            def forward(self, x, write_indices):
+                self.cache.copy_(
+                    torch.ops.tensorrt.kv_cache_update(self.cache, x, write_indices)
+                )
+                return self.cache.sum()
+
+        gm = _ep_module_decomposed(
+            M(), (torch.ones(2, 4, 1, 8), torch.tensor([3, 5], dtype=torch.int32))
+        )
+        new_gm, lifted = lift_mutated_buffers(gm)
+        self.assertEqual(len(lifted), 1)
+        self.assertEqual(new_gm.meta["_copyback_mutation_buffers"], [])
+        self.assertEqual(new_gm.meta["_predicted_kv_bindings"], ["buf_cache"])
+
+    def test_torch_executed_kv_cache_update_is_copyback(self):
+        """Excluded from TensorRT, a ``tensorrt::kv_cache_update`` write never
+        reaches its converter, so it is copied back rather than dropped."""
+
+        class M(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("cache", torch.zeros(2, 4, 16, 8))
+
+            def forward(self, x, write_indices):
+                self.cache.copy_(
+                    torch.ops.tensorrt.kv_cache_update(self.cache, x, write_indices)
+                )
+                return self.cache.sum()
+
+        gm = _ep_module_decomposed(
+            M(), (torch.ones(2, 4, 1, 8), torch.tensor([3, 5], dtype=torch.int32))
+        )
+        settings = CompilationSettings(
+            torch_executed_ops={"torch.ops.tensorrt.kv_cache_update.default"}
+        )
+        new_gm, lifted = lift_mutated_buffers(gm, settings)
+        self.assertEqual(len(lifted), 1)
+        self.assertEqual(new_gm.meta["_copyback_mutation_buffers"], ["cache"])
+        self.assertEqual(new_gm.meta["_predicted_kv_bindings"], [])
+
     def test_non_kv_mutation_recorded_for_copyback(self):
         """A non-KV in-place mutation is recorded for copy-back by buffer name."""
 
@@ -796,6 +846,33 @@ class TestCacheMustReachTheConverterAsANetworkInput(TestCase):
         )
         return _kv_write_will_alias(node, cache_shape)
 
+    @staticmethod
+    def _classify_kv_cache_update(through_clone, extra_reader=False):
+        """Same, for ``tensorrt::kv_cache_update``, whose predicate also checks the
+        cache it is pointed at."""
+        from torch_tensorrt.dynamo.lowering._buffer_lifting import _kv_write_will_alias
+
+        cache_shape, src_shape = (2, 4, 16, 8), (2, 4, 1, 8)
+        graph = torch.fx.Graph()
+        buffer = graph.placeholder("buf_cache")
+        buffer.meta["val"] = torch.empty(cache_shape, device="meta")
+        cache_arg = buffer
+        if through_clone:
+            cache_arg = graph.call_function(
+                torch.ops.aten.clone.default, args=(buffer,)
+            )
+        if extra_reader:
+            graph.call_function(torch.ops.aten.sum.default, args=(buffer,))
+        src = graph.placeholder("src")
+        src.meta["val"] = torch.empty(src_shape, device="meta")
+        write_indices = graph.placeholder("write_indices")
+        write_indices.meta["val"] = torch.empty((2,), dtype=torch.int32, device="meta")
+        node = graph.call_function(
+            torch.ops.tensorrt.kv_cache_update.default,
+            args=(cache_arg, src, write_indices),
+        )
+        return _kv_write_will_alias(node, cache_shape)
+
     def test_direct_placeholder_is_kv(self):
         self.assertTrue(self._classify(lambda _graph, buffer: buffer))
 
@@ -810,6 +887,15 @@ class TestCacheMustReachTheConverterAsANetworkInput(TestCase):
     def test_index_copy_through_a_shared_clone_is_not_kv(self):
         self.assertFalse(
             self._classify_index_copy(through_clone=True, extra_reader=True)
+        )
+
+    def test_kv_cache_update_through_a_sole_use_clone_is_kv(self):
+        self.assertTrue(self._classify_kv_cache_update(through_clone=False))
+        self.assertTrue(self._classify_kv_cache_update(through_clone=True))
+
+    def test_kv_cache_update_through_a_shared_clone_is_not_kv(self):
+        self.assertFalse(
+            self._classify_kv_cache_update(through_clone=True, extra_reader=True)
         )
 
     def test_index_copy_validator_still_reads_args0_by_default(self):

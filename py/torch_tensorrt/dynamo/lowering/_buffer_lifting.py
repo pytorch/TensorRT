@@ -63,6 +63,9 @@ from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 import torch
 from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.lowering._kv_cache_update import (
+    tensorrt_kv_cache_update_op,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -193,6 +196,14 @@ def _kv_write_will_alias(
         # converter will be handed instead; the partitioner, running after lowering,
         # passes nothing and reads args[0] itself.
         return bool(_index_copy_kv_eligible(value_node, input_node=cache_input))
+
+    if value_node.target is tensorrt_kv_cache_update_op:
+        from torch_tensorrt.dynamo.conversion.custom_ops_converters import (
+            kv_cache_update_will_alias,
+        )
+
+        # Same as index_copy: the predicate checks the cache it is pointed at.
+        return bool(kv_cache_update_will_alias(value_node, input_node=cache_input))
 
     if value_node.target is torch.ops.aten.slice_scatter.default:
         from torch_tensorrt.dynamo.conversion.impl.slice_scatter import (
@@ -445,10 +456,10 @@ def lift_mutated_buffers(
 
     Side effects: the trailing ``copy_`` of each mutated buffer is erased. A write
     the converter will lower to an ``IKVCacheUpdateLayer`` with in-place aliased
-    I/O (an eligible ``slice_scatter`` / ``index_copy``, per
-    :func:`_kv_write_will_alias`) relies on that engine aliasing for its
-    write-back, so nothing further is added. Every other mutation -- a non-KV
-    buffer, or a ``slice_scatter`` / ``index_copy`` that fails eligibility, whether
+    I/O (an eligible ``slice_scatter`` / ``index_copy`` /
+    ``tensorrt::kv_cache_update``, per :func:`_kv_write_will_alias`) relies on that
+    engine aliasing for its write-back, so nothing further is added. Every other
+    mutation -- a non-KV buffer, or one of those writes that fails eligibility, whether
     the converter then lowers it to a non-aliasing scatter, returns the source, or
     raises -- has no engine aliasing, so its new value is re-appended as a graph
     output ("copy-back") and its buffer name recorded, in output order, in
@@ -499,9 +510,10 @@ def lift_mutated_buffers(
     seen_buffers: Dict[str, torch.fx.Node] = {}  # buffer name -> new placeholder node
 
     # Each mutated buffer's write-back is handled one of two ways downstream:
-    #   - Engine-level aliasing (zero-copy): the slice_scatter / index_copy
-    #     converters emit an IKVCacheUpdateLayer whose output is aliased in-place
-    #     to the cache input. We drop the copy_ and rely on that aliasing.
+    #   - Engine-level aliasing (zero-copy): the slice_scatter / index_copy /
+    #     tensorrt::kv_cache_update converters emit an IKVCacheUpdateLayer whose
+    #     output is aliased in-place to the cache input. We drop the copy_ and
+    #     rely on that aliasing.
     #   - Copy-back: any other mutation (a non-KV buffer such as a convolution-
     #     state ring-buffer, OR a slice_scatter / index_copy the converter cannot
     #     turn into an IKVCacheUpdateLayer) has no aliasing, so its new value is
