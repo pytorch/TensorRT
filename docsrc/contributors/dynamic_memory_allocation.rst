@@ -111,7 +111,7 @@ Limitations
 * With CUDA graphs on, the C++ runtime keeps an engine's memory for as long as its
   captured graph, because a replay writes to the memory the graph was recorded with.
 * The Python runtime keeps each engine's memory from its last call, with or without
-  CUDA graphs, until a later call replaces it.
+  CUDA graphs, until a later call replaces it or a settings change drops it.
 * So in both cases, several engines can hold their memory at the same time.
 
 Related

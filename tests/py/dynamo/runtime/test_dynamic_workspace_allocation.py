@@ -277,3 +277,52 @@ class TestDynamicWorkspaceAllocation(unittest.TestCase):
                 output = compiled_module(*inputs)
 
         torch.testing.assert_close(output, expected, rtol=1e-2, atol=1e-2)
+
+    def test_python_runtime_cudagraph_keeps_its_workspace(self):
+        if torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime:
+            self.skipTest("Checks the Python runtime.")
+        if torch_trt.ENABLED_FEATURES.tensorrt_rtx:
+            self.skipTest(
+                "On TensorRT-RTX the Python runtime does not capture a CUDA graph of its own."
+            )
+        model, inputs, compiled_module, runtime_module = (
+            self._compile_with_dynamic_allocation()
+        )
+        engine = runtime_module.engine
+
+        with torch.no_grad():
+            expected = model(*inputs)
+            torch_trt.runtime.set_cudagraphs_mode(True)
+            compiled_module(*inputs)
+            graph, workspace = engine.cudagraph, engine._dynamic_workspace
+            output = compiled_module(*inputs)
+            torch.cuda.synchronize()
+
+        self.assertIs(
+            engine._dynamic_workspace,
+            workspace,
+            msg="the engine replaced the workspace its CUDA graph replays into",
+        )
+        self.assertIs(
+            engine.cudagraph,
+            graph,
+            msg="a same-shape call recorded the CUDA graph again",
+        )
+        torch.testing.assert_close(output, expected, rtol=1e-2, atol=1e-2)
+
+    def test_python_runtime_releases_workspace_with_the_context(self):
+        if torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime:
+            self.skipTest("Checks the Python runtime.")
+        _, inputs, compiled_module, runtime_module = (
+            self._compile_with_dynamic_allocation()
+        )
+        engine = runtime_module.engine
+
+        with torch.no_grad():
+            compiled_module(*inputs)
+        self.assertIsNotNone(engine._dynamic_workspace)
+        runtime_module.use_dynamically_allocated_resources(False)
+        self.assertIsNone(
+            engine._dynamic_workspace,
+            msg="the engine kept its dynamic workspace after switching to static",
+        )

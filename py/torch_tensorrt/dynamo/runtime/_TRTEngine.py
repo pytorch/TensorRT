@@ -348,7 +348,8 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         return self._context
 
     def invalidate_context(self) -> None:
-        """Drop the live execution context, and the CUDA graph captured on it.
+        """Drop the live execution context, the CUDA graph captured on it, and
+        the dynamic workspace.
         Next ``self.context`` read rebuilds it with the then-current
         ``runtime_settings``, and with CUDA graphs on the next execution records
         a new graph. Called from every settings-mutation path so reads of
@@ -357,6 +358,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         self.reset_captured_graph()
         self.runtime_states.context_changed = True
         self._context = None
+        self._dynamic_workspace = None
 
     def has_context(self) -> bool:
         """True iff the execution context has been materialized. Probes
@@ -1403,7 +1405,8 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             if caller_on_default:
                 engine_stream.wait_stream(caller_stream)
             with torch.cuda.stream(engine_stream):
-                if self.resource_allocation_strategy:
+                # A captured graph replays into the workspace it was recorded with.
+                if self.resource_allocation_strategy and self.cudagraph is None:
                     workspace_bytes = self.cuda_engine.device_memory_size_v2
                     self._dynamic_workspace = torch.empty(
                         workspace_bytes,
