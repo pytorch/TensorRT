@@ -9,12 +9,16 @@ import tempfile
 import time
 import unittest
 
+import pytest
 import torch
 import torch_tensorrt as torchtrt
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt._features import ENABLED_FEATURES
+from torch_tensorrt._utils import is_tensorrt_rtx_version_supported
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 from torch_tensorrt.runtime import RuntimeSettings, apply_runtime_settings
+
+pytestmark = [pytest.mark.trt_api, pytest.mark.trt_rtx_only]
 
 
 @unittest.skipIf(
@@ -130,10 +134,16 @@ class TestRuntimeCacheModels(TestCase):
         ref_output = model(input_tensor)
         trt_output = compiled(input_tensor)
 
+        is_turing = torch.cuda.get_device_capability() == (7, 5)
+        threshold = COSINE_THRESHOLD
+        if is_turing and not is_tensorrt_rtx_version_supported("1.8"):
+            # The FP32 projection convolution returns inaccurate values on Turing.
+            threshold = 0.98
+
         cos_sim = cosine_similarity(ref_output, trt_output)
         self.assertTrue(
-            cos_sim > COSINE_THRESHOLD,
-            f"MobileNetV2 cosine similarity {cos_sim} below threshold {COSINE_THRESHOLD}",
+            cos_sim > threshold,
+            f"MobileNetV2 cosine similarity {cos_sim} below threshold {threshold}",
         )
 
         del compiled
