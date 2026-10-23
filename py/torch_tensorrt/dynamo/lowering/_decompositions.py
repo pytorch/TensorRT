@@ -249,8 +249,18 @@ def select_scatter_decomposition(
     input_tensor: torch.Tensor,
     src_tensor: torch.Tensor,
     dim: int,
-    index: int,
+    index: Union[int, torch.SymInt],
 ) -> torch.Tensor:
+    dim_size = input_tensor.shape[dim]
+    if isinstance(index, int):
+        # As torch does. Only an int index on a static dim can be checked here.
+        if isinstance(dim_size, int) and not -dim_size <= index < dim_size:
+            raise IndexError(
+                f"select_scatter: index {index} is out of range for dim {dim} of size {dim_size}"
+            )
+        # Left negative, index -1 would give the empty slice -1:0.
+        if index < 0:
+            index = index + dim_size
     src_tensor = torch.unsqueeze(src_tensor, dim)
     return torch.slice_scatter(input_tensor, src_tensor, dim, index, index + 1, 1)
 
