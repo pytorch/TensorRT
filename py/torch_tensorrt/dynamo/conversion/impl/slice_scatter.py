@@ -11,9 +11,11 @@ Two paths:
   resulting output is recorded in ``ctx.aliased_io`` so the runtime can bind
   it to the input's device pointer.
 
-* **Fallback** — equivalent to the previous Torch-TRT decomposition: build a
-  broadcast index tensor and emit a regular scatter. Used whenever the KV
-  constraints fail.
+* **Fallback**: used whenever the KV constraints fail. A contiguous write
+  (``step == 1``) whose ``src`` has a static size on ``dim`` is the
+  concatenation of the input before the slice, ``src``, and the input after it.
+  Any other write builds a broadcast index tensor and emits a regular scatter,
+  as the previous Torch-TRT decomposition did.
 
 Slice_scatter is intentionally NOT decomposed in the Torch-TRT decomposition
 table; this converter is the single place that handles it.
@@ -155,8 +157,8 @@ def resolve_slice_scatter_write(
         start = dim_size + start
     if isinstance(end, int) and end < 0:
         end = dim_size + end
-    # Aten clamps a slice to its dim, and so must this: unclamped, the open end
-    # reaches the fallback's np.arange as an INT64_MAX-long index range.
+    # Aten clamps a slice to its dim, and so must this: unclamped, an open end reads
+    # as an INT64_MAX-long write, which the scatter's np.arange would try to build.
     if isinstance(start, int):
         start = min(max(start, 0), dim_size)
     if isinstance(end, int):
@@ -276,6 +278,54 @@ def try_emit_kv_cache_update(
     return emit_kv_cache_update_layer(ctx, name, cache, src, write_indices)
 
 
+def _concat_write(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input: TRTTensor,
+    src: TRTTensor,
+    dim: int,
+    start: int,
+    end: int,
+) -> TRTTensor:
+    """A contiguous write as ``cat(input[:start], src, input[end:])`` along ``dim``.
+
+    TensorRT can fuse a concatenation with the layers that produce its parts. A
+    scatter takes an index tensor as large as ``src`` and runs as its own kernel,
+    which is slow when a model writes many small slices, as rotary embeddings do.
+    """
+    # Nothing is written. With end < start, the parts below would also overlap.
+    if end <= start:
+        return input
+    dim = dim % len(input.shape)
+    # As the scatter does, write src in the input's dtype rather than promoting the result.
+    src = cast_trt_tensor(ctx, src, input.dtype, name + "_src_cast", target, source_ir)
+    parts = []
+    if start > 0:
+        parts.append(
+            impl.slice.slice_op(
+                ctx, target, source_ir, name + "_before", input, dim, 0, start, 1
+            )
+        )
+    parts.append(src)
+    if end < input.shape[dim]:
+        parts.append(
+            impl.slice.slice_op(
+                ctx,
+                target,
+                source_ir,
+                name + "_after",
+                input,
+                dim,
+                end,
+                input.shape[dim],
+                1,
+            )
+        )
+    return impl.cat.cat(ctx, target, source_ir, name + "_concat", parts, dim)
+
+
 def slice_scatter(
     ctx: ConversionContext,
     target: Target,
@@ -288,7 +338,7 @@ def slice_scatter(
     end: Optional[int] = None,
     step: Optional[int] = None,
 ) -> TRTTensor:
-    """Emit either an IKVCacheUpdateLayer (with aliased I/O) or a scatter sequence."""
+    """Emit an IKVCacheUpdateLayer (with aliased I/O), a concatenation, or a scatter."""
     rank = len(input.shape)
 
     start, end, step, status = resolve_slice_scatter_write(
@@ -340,7 +390,11 @@ def slice_scatter(
     if kv_out is not None:
         return kv_out
 
-    # Fallback: build broadcast indices and scatter.
+    # A concatenation takes its size from its parts, so a src that is dynamic on dim
+    # would make the output dynamic there too. The scatter keeps the input's shape.
+    if step == 1 and src.shape[dim] != DYNAMIC_DIM:
+        return _concat_write(ctx, target, source_ir, name, input, src, dim, start, end)
+
     indices_np: np.ndarray = np.arange(start, end, step, dtype=np.int64)
     target_shape = [1] * rank
     target_shape[dim] = len(indices_np)

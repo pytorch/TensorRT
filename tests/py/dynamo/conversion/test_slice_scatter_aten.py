@@ -11,25 +11,29 @@ The converter has two paths:
    in ``tests/py/dynamo/runtime/test_aliased_io.py`` (the Python-runtime
    converter harness can't bind aliased addresses).
 
-2. **Scatter fallback** — equivalent to the historical Torch-TensorRT
-   decomposition (``arange + scatter``). Used for any shape that doesn't
-   meet KVCacheUpdate's invariants.
+2. **Fallback**: used for any shape that doesn't meet KVCacheUpdate's
+   invariants. A contiguous write whose ``src`` is static on the written dim
+   is a concatenation; any other write is the historical Torch-TensorRT
+   decomposition (``arange + scatter``).
 
 This file covers the fallback path. To force the fallback regardless of
 shape we add a small no-op (``+ 0``) to the cache so it isn't a direct
 network input — the converter's "input is a placeholder" check fails and
-falls through to scatter.
+falls through to the fallback.
 """
 
 import unittest
 from types import SimpleNamespace
 
 import numpy as np
+import tensorrt as trt
 import torch
 import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt import Input
+from torch_tensorrt.dynamo._SourceIR import SourceIR
+from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.aten_ops_converters import slice_scatter_validator
 from torch_tensorrt.dynamo.conversion.impl.slice_scatter import (
     slice_scatter as slice_scatter_impl,
@@ -55,7 +59,7 @@ class _SliceScatterNotInputModule(torch.nn.Module):
 
     def forward(self, cache_in, update):
         # `cache_in + 0` produces a non-placeholder ITensor, forcing the
-        # converter to take the scatter fallback rather than KVCacheUpdate.
+        # converter to take the fallback rather than KVCacheUpdate.
         cache = cache_in + 0
         return torch.ops.aten.slice_scatter.default(
             cache, update, self.dim, self.start, self.end, self.step
@@ -112,6 +116,25 @@ class TestSliceScatterFallback(DispatchTestCase):
         ]
         self.run_test_with_dynamic_shape(module, input_specs)
 
+    def test_fallback_dynamic_shape_contiguous(self):
+        """A contiguous write on a static dim, with dims 0 and 3 dynamic."""
+        module = _SliceScatterNotInputModule(2, 1, 21)
+        input_specs = [
+            Input(
+                min_shape=(2, 4, 64, 8),
+                opt_shape=(3, 4, 64, 12),
+                max_shape=(4, 4, 64, 16),
+                dtype=torch.float32,
+            ),
+            Input(
+                min_shape=(2, 4, 20, 8),
+                opt_shape=(3, 4, 20, 12),
+                max_shape=(4, 4, 20, 16),
+                dtype=torch.float32,
+            ),
+        ]
+        self.run_test_with_dynamic_shape(module, input_specs)
+
     def test_fallback_open_end_step_two(self):
         """``cache[:, :, ::2, :]``: the open end has to be clamped to the dim, since the
         index range is built with ``np.arange``."""
@@ -121,8 +144,8 @@ class TestSliceScatterFallback(DispatchTestCase):
         self.run_test(module, [cache, update])
 
     def test_fallback_open_end_interior_start(self):
-        """``cache[:, :, 3:, :]``: a start that rules out the full-overwrite shortcut,
-        so the clamp is what makes the write 13 slots wide and not INT64_MAX - 3."""
+        """``cache[:, :, 3:, :]``: an open end, with a start that rules out the
+        full-overwrite shortcut."""
         module = _SliceScatterNotInputModule(2, 3, OPEN_END, step=1)
         cache = torch.randn(2, 4, 16, 8)
         update = torch.randn(2, 4, 13, 8)
@@ -140,6 +163,53 @@ class TestSliceScatterFallback(DispatchTestCase):
         cache = torch.randn(2, 4, 16, 8)
         update = torch.randn(2, 4, 16, 8)
         self.run_test(M(), [cache, update])
+
+
+@unittest.skipIf(not torch.cuda.is_available(), "Skip because CUDA is not available")
+class TestSliceScatterFallbackLayers(unittest.TestCase):
+    """Which layers the fallback emits, read from the network it builds."""
+
+    def _write(self, start, end, step, cache_dtype=trt.float32, batch=4):
+        builder = trt.Builder(trt.Logger(trt.Logger.ERROR))
+        network = builder.create_network(
+            1 << int(trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED)
+        )
+        cache = network.add_input("cache", cache_dtype, (batch, 16, 8))
+        width = len(range(start, end, step))
+        update = network.add_input("update", trt.float32, (batch, 16, width))
+        output = slice_scatter_impl(
+            ConversionContext(network),
+            torch.ops.aten.slice_scatter.default,
+            SourceIR.ATEN,
+            "slice_scatter",
+            cache,
+            update,
+            -1,
+            start,
+            end,
+            step,
+        )
+        self.assertEqual(tuple(output.shape), (batch, 16, 8))
+        return network, output
+
+    def _layer_types(self, step, batch=4):
+        network, _ = self._write(3, 8, step, batch=batch)
+        return {network.get_layer(i).type for i in range(network.num_layers)}
+
+    @parameterized.expand([("static_batch", 4), ("dynamic_batch", -1)])
+    def test_contiguous_write_is_a_concatenation(self, _, batch):
+        """Only the written dim has to be static."""
+        types = self._layer_types(step=1, batch=batch)
+        self.assertIn(trt.LayerType.CONCATENATION, types)
+        self.assertNotIn(trt.LayerType.SCATTER, types)
+
+    def test_strided_write_is_a_scatter(self):
+        self.assertIn(trt.LayerType.SCATTER, self._layer_types(step=2))
+
+    def test_contiguous_write_keeps_the_input_dtype(self):
+        """torch casts ``src`` to the input's dtype; the result must not be promoted."""
+        _, output = self._write(3, 5, 1, cache_dtype=trt.int32)
+        self.assertEqual(output.dtype, trt.int32)
 
 
 @unittest.skipIf(not torch.cuda.is_available(), "Skip because CUDA is not available")
@@ -198,6 +268,54 @@ class TestSliceScatterFallbackEndToEnd(TestCase):
                 torch.randint(0, 256, (4, 8), dtype=torch.uint8),
                 torch.randint(0, 256, (4, 8), dtype=torch.uint8),
             ),
+        )
+
+    class EmptyWrite(torch.nn.Module):
+        """``y = x.clone(); y[..., start:end] = 0``, where the slice selects nothing."""
+
+        def __init__(self, start, end, second_output=False):
+            super().__init__()
+            self.start = start
+            self.end = end
+            self.second_output = second_output
+
+        def forward(self, x):
+            y = x.clone()
+            y[..., self.start : self.end] = 0
+            return (y, x * 2) if self.second_output else y
+
+    @parameterized.expand(
+        [
+            ("open_end", 8, None, False),
+            ("interior", 3, 3, False),
+            ("end_before_start", 5, 3, False),
+            ("open_end_two_outputs", 8, None, True),
+            ("interior_two_outputs", 3, 3, True),
+        ]
+    )
+    def test_empty_write(self, _, start, end, second_output):
+        """The result is the input itself, an engine input that is also an engine
+        output."""
+        self._assert_matches_eager(
+            self.EmptyWrite(start, end, second_output), (torch.randn(4, 8),)
+        )
+
+    def test_two_writes_with_src_dynamic_on_the_written_dim(self):
+        """A reshape with ``-1`` leaves dim 2 of src dynamic for TensorRT. The first
+        write must keep the cache's static size there, or the second cannot resolve."""
+
+        class M(torch.nn.Module):
+            def forward(self, cache, update):
+                src = update.reshape(update.shape[0], 4, -1, update.shape[-1])
+                out = torch.ops.aten.slice_scatter.default(cache, src, 2, 0, 2)
+                return torch.ops.aten.slice_scatter.default(out, src, 2, 4, 6)
+
+        batch = torch.export.Dim("batch", min=1, max=8)
+        width = torch.export.Dim("width", min=2, max=32)
+        self._assert_matches_eager(
+            M(),
+            (torch.randn(2, 4, 8, 16), torch.randn(2, 8, 16)),
+            {"cache": {0: batch, 3: width}, "update": {0: batch, 2: width}},
         )
 
 

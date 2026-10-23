@@ -640,8 +640,9 @@ class TestLowering(TestCase):
                 return y
 
         # slice_scatter is no longer decomposed — the converter handles it
-        # directly (emits IKVCacheUpdateLayer when KV-eligible, scatter
-        # otherwise). select_scatter is still decomposed via slice_scatter.
+        # directly (emits IKVCacheUpdateLayer when KV-eligible, a concatenation
+        # or a scatter otherwise). select_scatter is still decomposed via
+        # slice_scatter.
         expected_ops = {torch.ops.aten.slice_scatter.default}
         unexpected_ops = {torch.ops.aten.select_scatter}
 

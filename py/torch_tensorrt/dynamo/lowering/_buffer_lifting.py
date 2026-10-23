@@ -99,7 +99,8 @@ def _effective_cache_input(cache_node: torch.fx.Node) -> Optional[torch.fx.Node]
 
     A lifted buffer is a placeholder, and ``emit_kv_cache_update_layer`` aliases the
     cache only when the argument it is handed is one -- anything else has no input
-    binding name and the converter falls back to a plain scatter.
+    binding name and the converter falls back to a non-aliasing concatenation or
+    scatter.
 
     One rewrite stands between this classification and the converter:
     ``remove_input_alias_fixing_clones``, an ATEN lowering pass inside
@@ -156,13 +157,13 @@ def _kv_write_will_alias(
     a divergence there mispredicts just as effectively as a divergence in the
     predicate. Returning ``False`` routes the write to copy-back, which is right
     whatever the converter goes on to do with it: it lowers most ineligible writes
-    to a non-aliasing scatter, returns the source outright for a full overwrite, and
-    raises for the rest (a ``slice_scatter`` with dynamic bounds or a bad ``dim``, an
-    ``index_copy`` its fallback cannot express). The first two both have a write-back
-    to preserve -- for a full overwrite the source *is* the buffer's new contents --
-    and the ones that raise never get as far as needing one. One more never reaches a
-    converter: a ``slice_scatter`` written on a dynamic dim, which its validator runs
-    in PyTorch, and which needs the copy-back like any other.
+    to a non-aliasing concatenation or scatter, returns the source outright for a
+    full overwrite, and raises for the rest (a ``slice_scatter`` with dynamic bounds
+    or a bad ``dim``, an ``index_copy`` its fallback cannot express). The first two
+    both have a write-back to preserve -- for a full overwrite the source *is* the
+    buffer's new contents -- and the ones that raise never get as far as needing one.
+    One more never reaches a converter: a ``slice_scatter`` written on a dynamic dim,
+    which its validator runs in PyTorch, and which needs the copy-back like any other.
     Imports are local to avoid a lowering<->conversion import cycle.
     """
     if not (isinstance(value_node, torch.fx.Node) and value_node.op == "call_function"):
@@ -449,10 +450,10 @@ def lift_mutated_buffers(
     :func:`_kv_write_will_alias`) relies on that engine aliasing for its
     write-back, so nothing further is added. Every other mutation -- a non-KV
     buffer, or a ``slice_scatter`` / ``index_copy`` that fails eligibility, whether
-    the converter then lowers it to a non-aliasing scatter, returns the source, or
-    raises -- has no engine aliasing, so its new value is re-appended as a graph
-    output ("copy-back") and its buffer name recorded, in output order, in
-    ``gm.meta['_copyback_mutation_buffers']`` -- the
+    the converter then lowers it to a non-aliasing concatenation or scatter,
+    returns the source, or raises -- has no engine aliasing, so its new value is
+    re-appended as a graph output ("copy-back") and its buffer name recorded, in
+    output order, in ``gm.meta['_copyback_mutation_buffers']`` -- the
     downstream exporters (``create_trt_exp_program`` /
     ``_declare_aliased_kv_mutations_on_ep``) read that list to reclassify those
     outputs as BUFFER_MUTATIONs. Copy-back is correct but not free; see the module
