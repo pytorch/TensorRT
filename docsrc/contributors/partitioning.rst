@@ -209,8 +209,10 @@ The splitter keeps **atomic subgraphs** (operator fusions) intact. It will not s
 fused ``conv → bn → relu`` pattern across a boundary, migrating the whole fusion to
 whichever side contains the most of its nodes.
 
-Empirically, resource partitioning has negligible runtime cost — TRT can optimise
-within each piece nearly as well as across the full subgraph.
+Empirically, resource partitioning has little runtime cost — TRT can optimise
+within each piece nearly as well as across the full subgraph. The exception is memory:
+a split through a region that reuses the same weights (an unrolled loop) gives every
+engine its own copy of them (see :ref:`resource_management`).
 
 Atomic Subgraphs and Fusion Preservation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
