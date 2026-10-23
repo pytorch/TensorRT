@@ -384,6 +384,11 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       // Captured CUDA graph was recorded against the old stream; force re-record.
       compiled_engine->runtime_states.context_changed = true;
     }
+    if (effective_cudagraphs && dynamic_workspace.defined() &&
+        dynamic_workspace.data_ptr() != compiled_engine->cudagraph_workspace) {
+      // The captured graph writes to the workspace it was recorded with, which was freed when that call returned.
+      compiled_engine->runtime_states.context_changed = true;
+    }
 
     // Validate shapes first so auto-selection is skipped entirely when the input
     // shape is unchanged: the previously selected profile still fits, so it stays
@@ -548,6 +553,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
                 "TensorRT failed to run engine " << compiled_engine->name << ", see the TensorRT error above");
           });
           compiled_engine->cudagraph.instantiate();
+          compiled_engine->cudagraph_workspace = dynamic_workspace.defined() ? dynamic_workspace.data_ptr() : nullptr;
           if (compiled_engine->profile_execution) {
             cudaError_t debug_dump_err = cudaGraphDebugDotPrint(
                 compiled_engine->cudagraph.raw_cuda_graph(),

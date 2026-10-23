@@ -71,3 +71,56 @@ class TestDynamicWorkspaceAllocation(unittest.TestCase):
                 f"output={output_bytes}, tolerance={allocator_tolerance}"
             ),
         )
+
+    def test_cudagraph_replay_does_not_write_to_a_freed_workspace(self):
+        if torch_trt.ENABLED_FEATURES.tensorrt_rtx:
+            self.skipTest(
+                "On TensorRT-RTX the C++ runtime does not capture a CUDA graph of its own."
+            )
+        self.addCleanup(torch._dynamo.reset)
+        self.addCleanup(torch_trt.runtime.set_cudagraphs_mode, False)
+
+        model = (
+            torch.nn.Sequential(
+                torch.nn.Conv2d(3, 8, 3), torch.nn.ReLU(), torch.nn.Conv2d(8, 16, 3)
+            )
+            .eval()
+            .cuda()
+        )
+        inputs = [torch.rand((8, 3, 64, 64), device="cuda")]
+        compiled_module = torch_trt.compile(
+            model,
+            inputs=inputs,
+            ir="dynamo",
+            dynamically_allocate_resources=True,
+            min_block_size=1,
+        )
+        (runtime_module,) = [
+            module
+            for module in compiled_module.modules()
+            if isinstance(module, TorchTensorRTModule)
+        ]
+        runtime = trt.Runtime(trt.Logger(trt.Logger.ERROR))
+        engine = runtime.deserialize_cuda_engine(runtime_module.serialized_engine)
+        workspace_bytes = engine.device_memory_size_v2
+        self.assertGreater(workspace_bytes, 0)
+        del engine, runtime
+
+        with torch.no_grad():
+            expected = model(*inputs)
+            torch_trt.runtime.set_cudagraphs_mode(True)
+            torch.cuda.synchronize()
+            torch.cuda.empty_cache()
+            compiled_module(*inputs)
+            torch.cuda.synchronize()
+            # The caching allocator hands out the workspace that the recording call just freed.
+            buffer = torch.zeros(workspace_bytes, dtype=torch.uint8, device="cuda")
+            output = compiled_module(*inputs)
+            torch.cuda.synchronize()
+
+        self.assertEqual(
+            torch.count_nonzero(buffer).item(),
+            0,
+            msg="a CUDA graph replay wrote to a workspace freed after recording",
+        )
+        torch.testing.assert_close(output, expected, rtol=1e-2, atol=1e-2)
