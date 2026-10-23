@@ -129,21 +129,64 @@ class TestSliceScatterFallback(DispatchTestCase):
         self.run_test(module, [cache, update])
 
     def test_full_overwrite_is_identity(self):
-        """When start=0, end=dim_size, step=1, the converter short-circuits
-        and returns ``src`` directly. Wrap the returned tensor in a small op
-        so it isn't simultaneously a network input and a network output —
-        which TRT rejects (handled by ``repair_input_as_output`` in
-        production but bypassed in this lower-level harness)."""
+        """When start=0, end=dim_size, step=1, the result is ``src``, which here is
+        an engine input that is also the engine output."""
 
         class M(torch.nn.Module):
             def forward(self, cache_in, update):
                 cache = cache_in + 0  # force non-placeholder
-                out = torch.ops.aten.slice_scatter.default(cache, update, 2, 0, 16)
-                return out + 0  # avoid placeholder-as-output
+                return torch.ops.aten.slice_scatter.default(cache, update, 2, 0, 16)
 
         cache = torch.randn(2, 4, 16, 8)
         update = torch.randn(2, 4, 16, 8)
         self.run_test(M(), [cache, update])
+
+
+@unittest.skipIf(not torch.cuda.is_available(), "Skip because CUDA is not available")
+class TestSliceScatterFallbackEndToEnd(TestCase):
+    """Fallback writes compiled into an engine and checked against PyTorch."""
+
+    def _assert_matches_eager(self, mod, inputs, dynamic_shapes=None):
+        mod = mod.eval().cuda()
+        inputs = tuple(t.cuda() for t in inputs)
+        ep = torch.export.export(mod, inputs, dynamic_shapes=dynamic_shapes)
+        trt_mod = torch_tensorrt.dynamo.compile(
+            ep, list(inputs), min_block_size=1, require_full_compilation=True
+        )
+        torch.testing.assert_close(trt_mod(*inputs), mod(*inputs))
+
+    class FullOverwrite(torch.nn.Module):
+        def __init__(self, second_output=False):
+            super().__init__()
+            self.second_output = second_output
+
+        def forward(self, x, src):
+            out = torch.ops.aten.slice_scatter.default(x, src, 1, 0, 8)
+            return (out, src * 2) if self.second_output else out
+
+    @parameterized.expand([("one_output", False), ("two_outputs", True)])
+    def test_full_overwrite_with_src_an_input(self, _, second_output):
+        """The result is ``src``, an engine input that is also an engine output."""
+        self._assert_matches_eager(
+            self.FullOverwrite(second_output), (torch.randn(4, 8), torch.randn(4, 8))
+        )
+
+    def test_uint8_full_overwrite_feeding_another_layer(self):
+        """TensorRT takes a uint8 tensor only as an engine input or output, so the
+        result must not be a new uint8 tensor inside the engine."""
+
+        class M(torch.nn.Module):
+            def forward(self, x, src):
+                out = torch.ops.aten.slice_scatter.default(x, src, 1, 0, 8)
+                return out.to(torch.float32)
+
+        self._assert_matches_eager(
+            M(),
+            (
+                torch.randint(0, 256, (4, 8), dtype=torch.uint8),
+                torch.randint(0, 256, (4, 8), dtype=torch.uint8),
+            ),
+        )
 
 
 class TestSliceScatterEarlyExits(unittest.TestCase):
