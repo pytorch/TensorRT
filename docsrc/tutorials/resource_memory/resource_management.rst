@@ -183,4 +183,60 @@ the cost of slightly higher per-call latency:
 Use ``dynamically_allocate_resources=False`` to force static allocation inside the
 context (the opposite direction — useful for profiling or benchmarking).
 
+----
+
+Compiling from Memory-Mapped Weights
+------------------------------------
+
+To compile, a model's weights normally have to be loaded into host memory first, all of them, before
+the first engine is built. ``torch_tensorrt.dynamo.tools.map_weights`` instead points the model's weights at
+zero-copy views of a safetensors file:
+
+- ``torch.export`` reads only shapes, so a weight's pages become resident only when TensorRT reads them,
+  while it builds the engine that uses the weight.
+- With ``release_weights_after_build=True``, the pages are dropped again once the last engine that reads
+  the weight is built. The tensor stays valid; its pages are re-read from the file if it is used again.
+
+.. code-block:: python
+
+    import torch
+    import torch_tensorrt
+    from torch_tensorrt.dynamo.tools import map_weights, save_weights_for_mapping
+
+    # Once, wherever the model loads: write its weights in the dtypes it runs in.
+    save_weights_for_mapping(model, "weights.safetensors")
+
+    # To compile: build the model without allocating weights, and map them.
+    with torch.device("meta"):
+        model = MyModel().eval()
+    mapping = map_weights(model, "weights.safetensors", strict=True)
+    print(f"{mapping.mapped_bytes / 2**30:.2f} GiB mapped")
+
+    example = torch.randn(1, 3, 224, 224)  # CPU: the mapped weights are CPU tensors
+    exported = torch.export.export(model, (example,))
+    trt_model = torch_tensorrt.dynamo.compile(
+        exported, inputs=[example.cuda()], release_weights_after_build=True
+    )
+
+**What to know:**
+
+- **Compile on the CPU.** Mapped weights are CPU tensors, so keep the model and its example inputs on
+  the CPU for ``torch.export``. TensorRT takes weights as host pointers and reads each one in place:
+  there's no GPU copy and no host copy of the weights.
+- **Checkpoints.** Any safetensors file maps if its tensors have the names, dtypes and shapes the model
+  uses; a mismatch raises. ``save_weights_for_mapping`` is for checkpoints whose loader casts, for
+  example stored in float32 and run in bfloat16. It writes the weights as loaded, a tied weight once.
+- **Missing names** are listed in ``mapping.missing`` and left as they were (still on ``meta`` if the
+  model was built there). ``strict=True`` raises instead for any name in the model's ``state_dict``;
+  non-persistent buffers, such as rotary frequencies, aren't required, so recompute those or write them
+  with ``save_weights_for_mapping``. On any error the model is left unchanged.
+- **The file must stay in place** while the model or its weights are in use. ``map_weights`` maps it
+  copy-on-write and never writes to it. A write to a released weight is lost when its pages are dropped.
+- **Releasing pages uses** ``madvise(MADV_DONTNEED)`` **(POSIX).** Elsewhere the mapping works, but the
+  pages stay resident until the file is unmapped.
+
+Combined with CPU compilation and the resource partitioner, the host's peak stays near the largest
+single engine build instead of the whole model. For pi0.5 (6.7 GiB of bfloat16 weights), host RSS before
+compilation went from 8.7 to 2.9 GiB. See :ref:`compile_from_mapped_weights` for a runnable example.
+
 
