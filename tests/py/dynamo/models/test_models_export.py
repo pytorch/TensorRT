@@ -10,9 +10,8 @@ from importlib import metadata
 import pytest
 import torch
 import torch_tensorrt as torchtrt
+from torch_tensorrt._utils import is_tensorrt_rtx_version_supported
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
-
-from packaging.version import Version
 
 if importlib.util.find_spec("torchvision"):
     import torchvision.models as models
@@ -776,10 +775,8 @@ def test_fp8_mha_fused_kernel(ir):
     import tensorrt as trt
     import torch_tensorrt
 
-    if torchtrt.ENABLED_FEATURES.tensorrt_rtx:
-        rtx_version = Version(trt.__version__).release[:2]
-        if rtx_version <= (1, 7):
-            pytest.skip("FP8 MHA accuracy requires TensorRT-RTX 1.8 or later")
+    if not is_tensorrt_rtx_version_supported("1.8"):
+        pytest.skip("FP8 MHA accuracy requires TensorRT-RTX 1.8 or later")
 
     B, H, S, D = 1, 2, 32, 64
     torch.manual_seed(0)
