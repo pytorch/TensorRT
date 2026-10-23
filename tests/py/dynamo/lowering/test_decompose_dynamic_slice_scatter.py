@@ -129,7 +129,7 @@ class TestDecomposeDynamicSliceScatter(TestCase):
 @unittest.skipIf(not torch.cuda.is_available(), "CUDA required")
 class TestStaticPathPreserved(TestCase):
     """All-int start/end/step still hits the converter directly (KV fast path
-    or static scatter fallback), not the lowering decomposition."""
+    or static fallback), not the lowering decomposition."""
 
     def test_static_slice_scatter_untouched(self):
         class M(torch.nn.Module):
