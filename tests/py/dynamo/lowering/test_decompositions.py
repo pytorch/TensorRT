@@ -2854,5 +2854,107 @@ class TestLowering(TestCase):
         )
 
 
+@unittest.skipIf(not torch.cuda.is_available(), "Skip because CUDA is not available")
+class TestSelectScatterEndToEnd(TestCase):
+    """``out[index] = src`` on an int index exports as select_scatter, which is
+    decomposed into a one-wide slice_scatter."""
+
+    def _assert_matches_eager(
+        self, mod, inputs, dynamic_shapes=None, full_compilation=True, more_inputs=()
+    ):
+        mod = mod.eval().cuda()
+        inputs = tuple(t.cuda() for t in inputs)
+        ep = torch.export.export(mod, inputs, dynamic_shapes=dynamic_shapes)
+        trt_mod = torch_tensorrt.dynamo.compile(
+            ep,
+            list(inputs),
+            min_block_size=1,
+            require_full_compilation=full_compilation,
+        )
+        for args in (inputs, *more_inputs):
+            args = tuple(t.cuda() for t in args)
+            torch.testing.assert_close(trt_mod(*args), mod(*args))
+
+    class Write(torch.nn.Module):
+        def __init__(self, index):
+            super().__init__()
+            self.index = index
+
+        def forward(self, x, src):
+            out = x.clone()
+            out[self.index] = src
+            return out
+
+    @parameterized.expand(
+        [
+            ("last_column", (slice(None), -1), (6,)),
+            ("last_column_after_ellipsis", (Ellipsis, -1), (6,)),
+            ("last_row", -1, (8,)),
+            ("negative_interior_column", (slice(None), -3), (6,)),
+            ("positive_column", (slice(None), 7), (6,)),
+        ]
+    )
+    def test_write_matches_eager(self, _, index, src_shape):
+        self._assert_matches_eager(
+            self.Write(index), (torch.randn(6, 8), torch.randn(src_shape))
+        )
+
+    def test_last_row_of_a_dynamic_dim(self):
+        """The index is counted from the end of a size known only at run time."""
+        rows = torch.export.Dim("rows", min=2, max=16)
+        self._assert_matches_eager(
+            self.Write(-1),
+            (torch.randn(6, 8), torch.randn(8)),
+            dynamic_shapes={"x": {0: rows}, "src": None},
+            more_inputs=[(torch.randn(3, 8), torch.randn(8))],
+        )
+
+    def test_src_of_another_dtype_on_a_dynamic_dim(self):
+        class M(torch.nn.Module):
+            def forward(self, x, src):
+                return torch.select_scatter(x, src, 1, -2)
+
+        width = torch.export.Dim("width", min=4, max=16)
+        self._assert_matches_eager(
+            M(),
+            (torch.randn(6, 8), torch.randn(6).half()),
+            dynamic_shapes={"x": {1: width}, "src": None},
+            more_inputs=[(torch.randn(6, 12), torch.randn(6).half())],
+        )
+
+    def test_index_read_from_a_tensor(self):
+        """The index is only known at run time, so the decomposition must not branch
+        on its sign in Python."""
+
+        class M(torch.nn.Module):
+            def forward(self, x, src, index):
+                i = index.item()
+                torch._check(i >= -8)
+                torch._check(i < 8)
+                return torch.select_scatter(x, src, 1, i)
+
+        self._assert_matches_eager(
+            M(),
+            (torch.randn(6, 8), torch.randn(6), torch.tensor(3)),
+            full_compilation=False,
+            more_inputs=[
+                (torch.randn(6, 8), torch.randn(6), torch.tensor(i))
+                for i in (0, -1, -8)
+            ],
+        )
+
+    def test_out_of_range_index_raises(self):
+        """As in torch, rather than wrapping around into range a second time."""
+
+        class M(torch.nn.Module):
+            def forward(self, x, src):
+                return torch.select_scatter(x, src, 1, -10)
+
+        x, src = torch.randn(6, 8).cuda(), torch.randn(6).cuda()
+        ep = torch.export.export(M(), (x, src))
+        with self.assertRaisesRegex(IndexError, "index -10 is out of range"):
+            torch_tensorrt.dynamo.compile(ep, [x, src], min_block_size=1)
+
+
 if __name__ == "__main__":
     run_tests()
