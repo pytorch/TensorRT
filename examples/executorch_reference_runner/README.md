@@ -1,282 +1,207 @@
-# Torch-TensorRT ExecuTorch Reference Runner
+# Torch-TensorRT ExecuTorch Reference Runners
 
-This directory contains minimal C++ reference runners for loading and
-executing Torch-TensorRT compiled models saved in ExecuTorch `.pte` format:
+Small example programs that load and run a `.pte` file written by Torch-TensorRT. They are
+reference code with fixed example inputs, so replace those with your real inputs.
 
-| Target | Shows |
-| ------ | ----- |
-| `example_executorch_runner` (`main.cpp`) | The low-level `Program` / `Method` loading sequence |
-| `example_executorch_multi_profile_runner` (`multi_profile_main.cpp`) | Selecting a TensorRT optimization profile per call through the high-level `Module` API |
-| `example_executorch_multi_profile_benchmark` (`multi_profile_benchmark.cpp`) | What per-call profile switching costs |
+| Program | Source | Shows |
+| --- | --- | --- |
+| `example_executorch_runner` | `main.cpp` | The low-level `Program` and `Method` loading sequence, and running on a green context stream |
+| `kv_cache_decode_check` | `kv_cache_decode_check.cpp` | That a key-value (KV) cache in memory the caller owns keeps its updates from call to call |
+| `example_executorch_multi_profile_runner` | `multi_profile_main.cpp` | Picking a TensorRT optimization profile for each call through the `Module` API (nightly only) |
+| `example_executorch_multi_profile_benchmark` | `multi_profile_benchmark.cpp` | What picking the right profile is worth (nightly only) |
+| `load_model.py` | Python | Loading and running a `.pte` with ExecuTorch's Python runtime |
+| `load_model_device_resident.py` | Python | The same for a program that keeps its inputs and outputs on the GPU |
 
-The `.pte` file contains an ExecuTorch program with embedded TensorRT engine
-payloads. The runner links the TensorRT ExecuTorch backend, loads the `.pte`
-with the ExecuTorch C++ runtime, prepares input tensors, calls `execute()`, and
-prints output shapes and sample values.
+The [ExecuTorch deployment guide](https://docs.pytorch.org/TensorRT/user_guide/runtime_performance/executorch.html)
+explains the concepts used here.
 
-This is reference code. It fills all inputs with `1.0f`; replace that input
-setup with your application's real input buffers.
+## Get a model
 
-## Input Model
-
-You can also generate a sample `.pte` from the Torch-TensorRT source tree:
+The export scripts are in `examples/torchtrt_executorch_example/` of the Torch-TensorRT
+repository. They need Torch-TensorRT with its `executorch` extra, installed as the guide's
+[Installation](https://docs.pytorch.org/TensorRT/user_guide/runtime_performance/executorch.html#installation)
+section shows.
 
 ```bash
+# A minimal program, for example_executorch_runner and load_model.py.
 python examples/torchtrt_executorch_example/export_static_shape.py --model_path=model.pte
 
-# Two-profile Gemma-3 engine for the multi-profile runner below. Needs
-# transformers (pip install "transformers>=5.4.0") for the Gemma-3 definition;
-# the executorch extra does not pull it in. Defaults to a mini Gemma-3 that
-# needs no download and exports in about a minute, most of it spent serializing
-# the engine into the .pte. Add --weights google/gemma-3-1b-it for the real 1B
-# model -- but that .pte is about 2 GB and serialization scales with engine
-# size, so budget hours rather than minutes for it. The export script documents
-# the measured rate.
+# A program split between TensorRT and ExecuTorch's CUDA backend, for the green context example.
+python examples/torchtrt_executorch_example/export_coalesced.py --model_path=coalesced.pte
+
+# A one-layer decoder step, for kv_cache_decode_check.
+python examples/torchtrt_executorch_example/export_kv_cache_decode.py --model_path=kv_cache_decode.pte
+
+# One engine with two optimization profiles, for the two multi-profile programs (nightly only).
 python examples/torchtrt_executorch_example/export_multi_profile.py --model_path=model_gemma3_multi_profile.pte
 ```
 
-## Build The Reference Runner
+`export_coalesced.py` and `export_device_resident.py` also need a CUDA toolkit, because the CUDA
+backend compiles its part with `nvcc`. Both write `aoti_cuda_blob.ptd` next to their `.pte`. Here
+that is harmless, because neither CUDA part has weights, but give your own models one directory
+each, as the guide explains. `export_multi_profile.py` needs `transformers>=5.4.0`,
+which the extra does not install. By default it exports a small Gemma-3 with random weights, which
+needs no download and takes about a minute. With `--weights google/gemma-3-1b-it` it exports the
+real 1B model, whose `.pte` is about 2 GB and takes hours to write. That model is gated on Hugging
+Face, so accept its license and log in first.
 
-A normal reference runner build does not need separate steps for
-`libexecutorch_core.a` and `libexecutorch_trt_backend.a`. The runner CMake adds
-both ExecuTorch and the Torch-TensorRT ExecuTorch source package, and linking
-`executorch::backend_tensorrt` makes the backend archive a dependency of
-`example_executorch_runner`.
+## Build the C++ programs
 
-The build also turns on ExecuTorch's CUDA backend, so the CUDA toolkit has to be
-installed. That is needed even for a program that uses only the TensorRT delegate.
-A Torch-TensorRT export marks its delegate inputs and outputs as CUDA memory, so
-ExecuTorch places device copies around the delegate, and the allocator those copies
-use is registered by the CUDA backend. Build without it and the runner loads the
-program, initializes the TensorRT engine, then stops on the first instruction with
-`_h2d_copy: no device allocator registered for device_type=1`.
+You need:
 
-The `libtorchtrt.tar.gz` package also includes a prebuilt reference runner:
-
-```text
-torch_tensorrt/bin/example_executorch_runner
-```
+- A CUDA toolkit. The build turns on ExecuTorch's CUDA backend, which this build needs even for a
+  program that uses only TensorRT: here the backend registers the allocator for the program's GPU
+  memory.
+- PyTorch, installed in the Python environment that CMake finds. The CUDA backend needs it to
+  configure, but the programs do not link libtorch.
+- A TensorRT SDK. Point `TensorRT_ROOT` at it.
+- `libtorchtrt.tar.gz` from your Torch-TensorRT release, which carries the delegate source and
+  these examples.
+- An ExecuTorch source checkout at the commit that your Torch-TensorRT release pins in its
+  `MODULE.bazel`. The tarball does not carry that file, so look it up in the release's source on
+  GitHub. The default below is the commit pinned in the same source tree as this README.
 
 ```bash
-# Get the ExecuTorch source snapshot this package is built against. Keep this in sync
-# with the executorch commit pinned in MODULE.bazel.
+# The ExecuTorch commit pinned in MODULE.bazel.
 EXECUTORCH_REF="${EXECUTORCH_REF:-5e379f610e034da507b48da61464679609517b52}"
-git clone --filter=blob:none --no-checkout \
-  https://github.com/pytorch/executorch.git executorch
+git clone --filter=blob:none --no-checkout https://github.com/pytorch/executorch.git executorch
 pushd executorch
 git fetch --depth 1 origin "${EXECUTORCH_REF}"
 git checkout FETCH_HEAD
 git submodule update --init --recursive --depth 1
 popd
 
-# download the libtorchtrt.tar.gz
 tar xvf libtorchtrt.tar.gz
 
-export EXECUTORCH_SOURCE_DIR="${PWD}/executorch"
-# tarball untared path
 export TORCH_TENSORRT_ROOT="${PWD}/torch_tensorrt"
-export EXECUTORCH_BACKEND_TENSORRT_SOURCE_DIR="${TORCH_TENSORRT_ROOT}/src/torch_tensorrt/executorch"
 export TensorRT_ROOT=/path/to/extracted/TensorRT
 export LD_LIBRARY_PATH="${TensorRT_ROOT}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
 
 cmake -S "${TORCH_TENSORRT_ROOT}/examples/executorch_reference_runner" \
   -B build-executorch-reference-runner \
-  -DEXECUTORCH_SOURCE_DIR="${EXECUTORCH_SOURCE_DIR}" \
-  -DEXECUTORCH_BACKEND_TENSORRT_SOURCE_DIR="${EXECUTORCH_BACKEND_TENSORRT_SOURCE_DIR}" \
+  -DEXECUTORCH_SOURCE_DIR="${PWD}/executorch" \
+  -DEXECUTORCH_BACKEND_TENSORRT_SOURCE_DIR="${TORCH_TENSORRT_ROOT}/src/torch_tensorrt/executorch" \
   -DTensorRT_ROOT="${TensorRT_ROOT}"
 
-cmake --build build-executorch-reference-runner --target example_executorch_runner -j
+cmake --build build-executorch-reference-runner -j \
+  --target example_executorch_runner kv_cache_decode_check
 ```
 
-This packaged reference-runner flow currently targets Linux x86_64 and SBSA,
-matching the native backend's Bazel compatibility constraints. Windows and
-JetPack packaging are outside this flow.
+This builds the two programs that every release has into `build-executorch-reference-runner/`, and
+the delegate's static archive, `build-executorch-reference-runner/lib/libexecutorch_trt_backend.a`,
+as a dependency. Naming the targets keeps the build from compiling every default ExecuTorch target
+too.
 
-Expected artifact:
+The two multi-profile programs exist only in nightly builds, so build them from a source checkout of
+`main`: point `TORCH_TENSORRT_ROOT` at the checkout, leave out
+`-DEXECUTORCH_BACKEND_TENSORRT_SOURCE_DIR` (the same `CMakeLists.txt` then finds the delegate source
+on its own), and add `example_executorch_multi_profile_runner` and
+`example_executorch_multi_profile_benchmark` to the targets.
 
-```text
-build-executorch-reference-runner/example_executorch_runner
-```
-
-The build also creates the ExecuTorch core, the shared caller-stream extension,
-and the TensorRT backend archive as dependencies:
-
-```text
-build-executorch-reference-runner/executorch/libexecutorch_core.a
-build-executorch-reference-runner/torch_tensorrt_executorch/executorch_extension_cuda/libextension_cuda.so
-build-executorch-reference-runner/lib/libexecutorch_trt_backend.a
-```
-
-## Load And Run A `.pte` Model
-
-### Python
-
-In a fresh Linux CUDA 13 environment, install the `executorch` authoring
-stack through the `[executorch]` extra. Substitute the channel for your CUDA, such
-as `cu134` for CUDA 13.4, keeping PyTorch, ExecuTorch and Torch-TensorRT on the
-same channel:
+This flow covers Linux x86-64 and Arm servers (SBSA). Windows and JetPack are not part of it.
+`libtorchtrt.tar.gz` and the Torch-TensorRT wheels for Linux also carry a prebuilt
+`torch_tensorrt/bin/example_executorch_runner`. It registers the GPU allocator itself, but it has no
+CUDA backend, and of the CPU operators only the copies at the edges of the program, so it runs only
+programs that TensorRT takes in full, such as the one `export_static_shape.py` writes. To find the
+copy in your Python environment:
 
 ```bash
-pip install --pre "torch-tensorrt[executorch]" \
-  --extra-index-url https://download.pytorch.org/whl/nightly/cu132 \
-  --extra-index-url https://pypi.nvidia.com
+python -c 'import importlib.util, pathlib; print(pathlib.Path(importlib.util.find_spec("torch_tensorrt").origin).parent / "bin")'
 ```
 
-Both indexes are required. The extra's ExecuTorch floor names a development build the public index
-does not carry, and that index ships the inference library only as source, which pip spends about
-twenty minutes failing to build.
-`--pre` allows prereleases; it does not request an upgrade. Released versions can
-already declare the extra. If an older installation lacks it, first install the
-intended compatible Torch-TensorRT wheel deliberately. Adding the extra may change
-dependencies, so use a fresh environment to preserve an existing working stack.
-
-The extra also installs the companion wheel, `torch-tensorrt-executorch-runtime`, so there is no
-second command. That wheel ships just the TensorRT delegate, a single shared library that registers
-itself with the ExecuTorch runtime from the `executorch` distribution rather than bundling a runtime
-of its own, and loading a `.pte` through the delegate needs it. To build it from source instead,
-follow `py/torch-tensorrt-executorch-runtime/README.md`.
-
-The Python example uses ExecuTorch's Runtime API to back planned device arenas
-with CUDA memory. Then load and run the model:
+## Run a program from C++
 
 ```bash
-python examples/executorch_reference_runner/load_model.py \
-  --model_path=model.pte \
-  --num_runs=1
+./build-executorch-reference-runner/example_executorch_runner --model_path=model.pte --num_runs=1
 ```
 
-The legacy `torch_tensorrt.load(path, format="executorch")` entry point still
-works, but emits a deprecation warning. Its `method_names` property,
-`run(inputs, method="forward")`, and `forward(*inputs)` interface remain
-supported for at least six months after the deprecation first ships. It still
-copies CUDA inputs to CPU and supports embedded weights only. New applications
-should use the Runtime API shown above; device-resident programs must use it
-directly to keep their inputs on CUDA.
-
-### C++
-
-Run the reference runner against a Torch-TensorRT compiled ExecuTorch model:
-
-```bash
-./build-executorch-reference-runner/example_executorch_runner --model_path=/path/to/model.pte --num_runs=1
-```
-
-The runner demonstrates this C++ loading sequence:
+`main.cpp` shows the low-level loading sequence:
 
 ```text
 executorch::runtime::runtime_init()
 FileDataLoader::from(model_path)
 Program::load(loader)
 program.method_meta(method_name)
-allocate planned ExecuTorch memory
+allocate the method's planned memory
 program.load_method(method_name, memory_manager)
 method.set_input(...)
 method.execute()
 method.get_outputs(...)
 ```
 
-Loading the method initializes the TensorRT ExecuTorch backend for any
-Torch-TensorRT delegate subgraphs embedded in the `.pte`. Applications can
-scope `executorch::extension::cuda::CallerStreamGuard` around execution to run
-TensorRT and CUDA/AOTI delegates on one ordinary caller-owned CUDA stream. On the
-discrete-GPU CI configuration, this runner's host-backed inputs and outputs take
-the synchronized staging path, and that is the path a discrete card always takes: it
-can read pageable host memory, but by faulting pages in one at a time rather than
-through shared page tables, which is far slower than one bulk copy. Only an integrated
-part that shares host page tables has its host storage bound directly. Either way the
-call returns with the work finished.
-The Python `torch_tensorrt` package is needed when exporting the `.pte`; it is not
-needed by this native runner at inference time.
+Loading the method initializes the TensorRT delegate for each engine in the `.pte`. The runner does
+not need the Python `torch_tensorrt` package, which is only needed to export. It takes no data file,
+so it runs a program split with the CUDA backend only when that part has no weights, like the one
+`export_coalesced.py` writes, and it cannot run a program saved with `external_engine_data`.
 
-## Running both delegates on one green-context stream
+### Run on a green context stream
 
-The point of the shared caller stream is that TensorRT and the CUDA/AOTI delegate
-can be driven by one caller-owned stream, including a CUDA green-context stream, so
-both stay inside the same SM partition. To exercise that, build with the CUDA
-delegate enabled and pass `--green_context_sms`:
+A CUDA green context owns a fixed number of the GPU's SMs (streaming multiprocessors). Running the
+program on a stream of one keeps the whole model inside that part of the GPU. Both the TensorRT
+delegate and ExecuTorch's CUDA backend honor it, so test it with the coalesced program:
 
 ```bash
-cmake -S "${TORCH_TENSORRT_ROOT}/examples/executorch_reference_runner" \
-  -B build-executorch-reference-runner \
-  -DEXECUTORCH_BUILD_CUDA=ON \
-  -DEXECUTORCH_SOURCE_DIR="${EXECUTORCH_SOURCE_DIR}" \
-  -DTensorRT_ROOT="${TensorRT_ROOT}"
-cmake --build build-executorch-reference-runner --target example_executorch_runner -j
-
-build-executorch-reference-runner/example_executorch_runner \
-  --model_path=two_delegate.model.pte --num_runs=1 --green_context_sms=8
+./build-executorch-reference-runner/example_executorch_runner \
+  --model_path=coalesced.pte --num_runs=1 --green_context_sms=8
 ```
 
-`--green_context_sms=N` creates the caller stream inside a green context holding N
-SMs. The runner refuses with a distinct status rather than falling back if one
-cannot be created, and says how many the device has, so a
-passing run always means a green context was really used. `N=0`, the default, uses
-an ordinary stream.
+`--green_context_sms=N` creates the stream inside a green context with at least N SMs. If the
+device cannot provide that, the runner stops with exit status 2 and says how many SMs the device
+has, instead of quietly using an ordinary stream. So a passing run really used a green context.
+`0`, the default, uses an ordinary stream.
 
-Enabling `EXECUTORCH_BUILD_CUDA` does not make this runner depend on libtorch. It
-needs `EXECUTORCH_BUILD_EXTENSION_TENSOR=ON`, which is set automatically, and the
-result links no libtorch and no libc10.
+TensorRT warns on such a run that the engine was built without green context constraints, which it
+says may cause crashes or undefined behavior. Torch-TensorRT has no option to build engines with
+those constraints.
 
-CI exercises the green-context option. The verification script runs the coalesced
-program twice, once on an ordinary stream and once with `--green_context_sms=8`, and
-treats the runner's distinct status for "no green context available" as a skip, so the
-green run happens only where the device has the SMs for one. The other reference-runner
-checks use the CUDA-enabled build with an ordinary stream and host-backed method inputs
-and outputs.
-
-## Caller-Owned KV-Cache Persistence Check
-
-`kv_cache_decode_check` is a small self-asserting runner for a caller-owned
-KV-cache decode `.pte` (its aliased KV output is bound in place to the caller's
-mutable buffer, which persists across `execute()` calls).
-
-Export a minimal single-layer decode model:
+## Run a program from Python
 
 ```bash
-python examples/torchtrt_executorch_example/export_kv_cache_decode.py \
-  --model_path=kv_cache_decode.pte
+python examples/executorch_reference_runner/load_model.py --model_path=model.pte --num_runs=1
 ```
 
-The same CMake build produces the check runner (`kv_cache_decode_check`
-target). Run it:
+For a program exported to keep its inputs and outputs on the GPU, `load_model_device_resident.py`
+passes a CUDA input and checks that a CUDA output comes back with the right values:
+
+```bash
+python examples/torchtrt_executorch_example/export_device_resident.py --model_path=device_resident.pte
+python examples/executorch_reference_runner/load_model_device_resident.py --model_path=device_resident.pte
+```
+
+## Check a KV cache the caller owns
+
+`kv_cache_decode_check` tests a decoder step whose KV cache stays in a buffer the caller owns. The
+engine writes the cache in place, and the writes have to persist from one `execute()` call to the
+next.
 
 ```bash
 ./build-executorch-reference-runner/kv_cache_decode_check --model_path=kv_cache_decode.pte
 ```
 
-It loads the method twice, explicitly zeroing the caller-owned KV arenas on each
-load (ExecuTorch drops a mutated buffer's initial value, so the runner must zero
-them itself), and runs a decode at `input_pos=1` once with no prior step and once
-after a step at `input_pos=0`.
-Because the causal attention at position 1 covers positions 0..1, the two logits
-differ only if the KV written at position 0 persisted across `execute()` calls.
-The runner prints `[kv-check] PASS` and returns 0 on success, or fails if the
-two are identical (the update did not persist). It requires a CUDA device.
+It runs a decode step at position 1 twice: once on a fresh cache, and once after a step at
+position 0. Attention at position 1 reads positions 0 and 1, so the two results differ only if
+the cache write at position 0 persisted. The program zeroes the cache itself on each load, because
+ExecuTorch does not keep the initial value of a buffer the program changes. It prints
+`[kv-check] PASS` and returns 0 when the results differ, and fails when they are the same.
 
-That pair runs twice over, printing `caller stream: none` and then `caller
-stream: own`. The second scopes a `CallerStreamGuard` over the decode loop on a
-stream the runner creates, so the engine runs on that stream; the first leaves the
-caller stream unset, so it runs on `cudaStreamPerThread` instead. Both are streams
-a caller can put the backend on, and a `.pte` whose KV writes persist on one but
-not the other is still broken, so both have to pass. `execute()` waits for the
-engine before returning in either case.
+It does all of this twice, printing `caller stream: none` and then `caller stream: own`. The first
+pass runs on `cudaStreamPerThread`, and the second on a stream the program creates and selects with
+`CallerStreamGuard`. Both have to pass. It needs a CUDA device.
 
-## Selecting An Optimization Profile
+## Pick an optimization profile
 
-A TensorRT engine can hold several optimization profiles: one weight set, one
-engine, several kernel tunings, each valid over a different input-shape range.
-Scope an `OptimizationProfileGuard` around the call to pick one.
+**Nightly only.**
 
-A profile is identified by its index in the list declared at export time. The
-library defines no index constants; name them yourself to match the exporter, as
-`export_multi_profile.py` declares decode first and prefill second:
+An engine can hold several optimization profiles: one set of weights, tuned for several input
+shape ranges. Scope an `OptimizationProfileGuard` around a call to pick one:
 
 ```cpp
+#include <executorch/extension/module/module.h>
 #include <torch_tensorrt/executorch/TensorRTBackend.h>
 
 using torch_tensorrt::executorch_backend::OptimizationProfileGuard;
 
-constexpr int32_t kDecodeProfile = 0;
+constexpr int32_t kDecodeProfile = 0;  // export_multi_profile.py declares decode first
 constexpr int32_t kPrefillProfile = 1;
 
 executorch::extension::Module module("model_gemma3_multi_profile.pte");
@@ -290,75 +215,50 @@ executorch::extension::Module module("model_gemma3_multi_profile.pte");
 }
 ```
 
-The guard records an index for the calling thread and nothing else — it does not
-inspect the `Module`, `Method`, or delegate handles, and does not call TensorRT.
-Each TensorRT delegate reads it inside its own `execute()` and switches there.
-Construct it on the thread that calls `forward()`. With no guard in scope, every
-delegate runs profile 0.
+A profile is named by its index in the list declared at export, so define your own constants that
+match the exporter. The guard only records the index for the calling thread. Each TensorRT engine
+reads it inside its own `execute()` and switches there, so create the guard on the thread that
+calls `forward()`. With no guard, every engine runs profile 0. To let each engine pick from the
+input shapes instead, use `auto profile_guard = OptimizationProfileGuard::automatic();`.
 
-To have each delegate choose from the input shapes instead of being told an
-index, use the named constructor:
-
-```cpp
-auto profile_guard = OptimizationProfileGuard::automatic();
-```
-
-The index reaches every TensorRT delegate in the method, and each resolves it
-against its own profile list. Nothing makes index 1 mean the same thing in two
-engines, so pin by index only when the `.pte` holds one TensorRT engine or when
-its engines were compiled from a single profile list. An engine with just one
-profile runs profile 0 and logs that the pin did nothing; a multi-profile engine
-that lacks the index fails the execution.
-
-Build and run:
+The index reaches every TensorRT engine in the method, and each looks it up in its own list of
+profiles. So pin by index only when the `.pte` holds one engine, or when its engines were compiled
+from one list of profiles. An engine with one profile runs profile 0 for any pin above 0 and logs
+that the pin did nothing. An engine with several profiles that lacks the index fails the call, and
+a negative index always fails. The delegate README in `cpp/src/torch_tensorrt/executorch/` has
+the full rules.
 
 ```bash
-cmake --build build-executorch-reference-runner --target example_executorch_multi_profile_runner -j
 ./build-executorch-reference-runner/example_executorch_multi_profile_runner \
   --model_path=model_gemma3_multi_profile.pte
 ```
 
-After the correctness walkthrough it times decode on each profile, the same
-comparison `examples/dynamo/multi_optimization_profiles.py` makes through the
-Python runtime. Everything below is the ExecuTorch delegate, so the numbers are
-not comparable with that example's or with the two-engine table in the
-[tutorial](../../docsrc/tutorials/runtime_opt/multi_optimization_profiles.rst):
-different runtime, and there a separately compiled single-profile engine
-provides the baseline rather than a second profile of this one. It prints the
-per-call latency of decode on each profile and of prefill, then how much faster
-decode is on its own profile.
+After checking that each profile gives correct results, the program times decode on each profile,
+and prefill on the one profile that accepts its 128-token input. It then prints how much faster
+decode is on its own profile. The profile is pinned around each timing loop, so switching is not
+part of the measurement. These numbers come from the ExecuTorch delegate, so do not compare them
+with the [multiple optimization profiles tutorial](https://docs.pytorch.org/TensorRT/tutorials/runtime_opt/multi_optimization_profiles.html),
+which uses a different runtime and a different baseline.
 
-The profile is pinned around each timing loop rather than per call, so profile
-switches stay out of the measurement. Prefill appears once because the decode
-profile does not accept a 128-token input at all — prefill has only one profile
-it can run on.
+### What picking a profile is worth
 
-### What Selecting A Profile Is Worth
-
-`multi_profile_benchmark.cpp` times the same prefill/decode loop twice against
-one engine: once with every call pinned to the prefill profile (it accepts
-`seq == 1` too, so decode runs on prefill-tuned kernels), and once with each
-phase pinned to its own profile. Both sides are the same engine, so what this
-isolates is the choice of profile, not the cost of a separately compiled
-single-profile build.
+`multi_profile_benchmark.cpp` runs the same prefill and decode loop twice on one engine: once with
+every call pinned to the prefill profile, which also accepts one token, and once with each phase
+on its own profile. Both runs use the same engine, so the difference is only the choice of
+profile.
 
 ```bash
-cmake --build build-executorch-reference-runner --target example_executorch_multi_profile_benchmark -j
 ./build-executorch-reference-runner/example_executorch_multi_profile_benchmark \
   --model_path=model_gemma3_multi_profile.pte
 ```
 
-A switch is charged to whichever call makes it, so switching pays off only once
-the per-token decode gain, summed over a round's decode steps, exceeds the
-switch cost. The mini Gemma-3 exported by default exercises the API; export with
-`--weights google/gemma-3-1b-it` to see what the feature is worth.
-
-When comparing wall-clock rounds, keep blocks long (`--block_rounds=8`). With
-short blocks the prefill-only configuration inherits the decode profile from the
-preceding switching block and pays a switch it would never pay in production,
-which inflates switching's margin.
-
-Read the `min` and `p10` columns. The two configurations are interleaved in
-short blocks so that other tenants on the GPU perturb both equally, and since
-interference only ever adds time, the low percentiles are the signal; the median
-and `p90` tell you how busy the machine was, not what switching cost.
+- The call that switches profiles pays for the switch. Switching wins only when the decode gain,
+  added up over a round's decode steps, is larger than that cost.
+- The small default model only exercises the API. Export with `--weights google/gemma-3-1b-it` to
+  see what the feature is worth.
+- To compare whole rounds, use long blocks (`--block_rounds=8`). With short blocks, the
+  prefill-only run inherits the decode profile from the block before it, and pays a switch it would
+  never pay in production.
+- Read the `min` and `p10` (10th percentile) columns. The two runs alternate in short blocks, so
+  other work on the GPU slows both equally. Interference only ever adds time, so the low
+  percentiles are the signal. The median and `p90` show how busy the machine was.

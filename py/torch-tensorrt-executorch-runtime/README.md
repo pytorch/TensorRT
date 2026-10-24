@@ -1,21 +1,79 @@
-# Torch-TensorRT ExecuTorch Runtime Wheel
+# torch-tensorrt-executorch-runtime
 
-This directory builds `torch-tensorrt-executorch-runtime`. The Linux wheel
-contains one shared library, `lib/libexecutorch_backend_tensorrt.so`, holding the
-TensorRT delegate and nothing else. The ExecuTorch runtime it registers with
-comes from the `executorch` wheel.
+This wheel is the TensorRT delegate for the ExecuTorch runtime: the plugin that runs the TensorRT
+engines stored in a `.pte` file. It holds one shared library,
+`lib/libexecutorch_backend_tensorrt.so`, and a CMake package for it. The ExecuTorch runtime that
+the delegate plugs into comes from the `executorch` wheel.
 
-The layout follows the one ExecuTorch uses for its own backends, so the delegate
-is an out-of-tree sibling of them rather than a special case:
+Its layout is close to the one ExecuTorch uses for its own delegates:
 
-```
+```text
 executorch/                            torch_tensorrt_executorch_runtime/
   lib/libexecutorch_backend_cuda.so      lib/libexecutorch_backend_tensorrt.so
   share/cmake/executorch-config.cmake    lib/cmake/executorch_backend_tensorrt/executorch_backend_tensorrt-config.cmake
 ```
 
-Python users just import the package. A C++ app links it the same way it links
-one of ExecuTorch's own backends:
+The [ExecuTorch deployment guide](https://docs.pytorch.org/TensorRT/user_guide/runtime_performance/executorch.html)
+is the main documentation: how to install this wheel together with Torch-TensorRT, export a model,
+and run it from Python and C++. To install, follow its
+[Installation](https://docs.pytorch.org/TensorRT/user_guide/runtime_performance/executorch.html#installation)
+section.
+
+## Version matching
+
+This wheel has to match its Torch-TensorRT wheel: the same PyTorch, ExecuTorch, CUDA and TensorRT,
+built with the same C++ ABI (the compiler's binary conventions). It needs CUDA 13. Builds
+exist for `cu132` and `cu134`. The Linux wheels are tagged `manylinux_2_28_x86_64` and
+`manylinux_2_35_aarch64`, so aarch64 needs glibc 2.35 or newer. The Windows x86-64 wheel, so far
+published only as a nightly build, holds `executorch_backend_tensorrt.dll` (a Windows shared
+library, or DLL) instead.
+
+It pins the exact ExecuTorch build it was compiled against, including its CUDA label, such as
+`+cu132`. The delegate needs `libexecutorch_extension_cuda.so`, which only ExecuTorch's CUDA wheels
+ship, so a CPU build of ExecuTorch would install and then fail on import. The exact pin rules that
+out.
+
+It names PyTorch with no version, because ExecuTorch leaves that choice open too. Installed on its
+own, it can get a PyTorch older than the ExecuTorch it pins, and that fails at the first run with a
+confusing error about a tensor. Installing it as the deployment guide shows avoids that.
+
+## Use it from Python
+
+Import the package once, before you load a program. The import registers the delegate with
+ExecuTorch. Everything after it is ExecuTorch's own runtime API:
+
+```python
+from pathlib import Path
+
+import torch
+import torch_tensorrt_executorch_runtime  # noqa: F401
+from executorch.runtime import Runtime
+
+program = Runtime.get().load_program(Path("model.pte"))
+forward = program.load_method("forward")
+outputs = forward.execute((torch.ones((2, 3, 4, 4)),))
+```
+
+ExecuTorch's own delegates register because they are linked into its Python extension. A delegate
+in a separate wheel cannot join that link, and ExecuTorch has no hook to discover one, so this
+package loads the delegate when it is imported. It replaces nothing: ExecuTorch keeps its own
+delegates and kernels.
+
+- If the delegate cannot load, the import raises `DelegateCompatibilityError` and says what to
+  install. You get the error at the import, not later as a program that cannot find its backend.
+- `register()` does the same step again, for the rare case where you do not control the import
+  order. Calling it twice is harmless.
+- Set `TORCH_TENSORRT_SKIP_DELEGATE_REGISTRATION=1` to import the package without loading the
+  delegate. That is for tools that need only its metadata, such as the path query below.
+
+Load programs through `executorch.runtime`, ExecuTorch's public Python API. Do not use the
+underscore-prefixed loader inside its extension. It is private and can change without notice.
+Load your programs from one thread: loading from several threads at once can crash the process,
+because ExecuTorch's logging and the bindings' output redirection race.
+
+## Use it from C++
+
+A C++ application links the delegate the same way it links one of ExecuTorch's own delegates:
 
 ```cmake
 find_package(executorch REQUIRED COMPONENTS backend_cuda kernels_optimized)
@@ -28,12 +86,37 @@ target_link_libraries(my_app PRIVATE
 )
 ```
 
-The optimized-kernel library supplies the `et_copy` host/device copy operators.
+Point CMake at both wheels. ExecuTorch's location comes from its package metadata, because
+`executorch.__file__` is not set:
 
-Linking that target also records the wheel's own library directory in your binary,
-so it finds the delegate without a library path being set. That is right for an
-application built against an installed wheel and wrong for anything you intend to
-redistribute, so it can be turned off:
+```bash
+ET_CMAKE=$(python -c 'import importlib.metadata as m, pathlib; print(pathlib.Path(str(m.distribution("executorch").locate_file("executorch"))) / "share" / "cmake")')
+DELEGATE=$(TORCH_TENSORRT_SKIP_DELEGATE_REGISTRATION=1 python -c 'import pathlib, torch_tensorrt_executorch_runtime as r; print(pathlib.Path(r.__file__).parent)')
+cmake -DCMAKE_PREFIX_PATH="${ET_CMAKE};${DELEGATE}" ...
+```
+
+The deployment guide explains each target and shows a complete program. The
+[delegate README](https://github.com/pytorch/TensorRT/blob/main/cpp/src/torch_tensorrt/executorch/README.md)
+lists the rules a C++ caller has to keep (threads, buffers, streams), the load errors, and the
+known issues.
+
+- **There is no header.** The delegate registers itself from a static initializer when its library
+  loads. The CMake target links the library with `--no-as-needed`, because your code references no
+  symbol in it, and the linker would otherwise drop it and leave the backend unregistered.
+- **You do not need to find TensorRT.** The delegate finds it in the TensorRT wheel next to it.
+- **CMake 3.28 or newer** is needed for the recipe above: on older versions the ExecuTorch package
+  does not provide the `executorch::` targets. CMake is not part of these wheels, so install it
+  yourself. The section below shows a way for older CMake.
+- **No header for optimization profiles (nightly only).** Choosing a profile needs
+  `OptimizationProfileGuard` from `TensorRTBackend.h`, which only the source tree and
+  `libtorchtrt.tar.gz` carry. On Linux you can compile against it, with the TensorRT headers, and
+  link this wheel's delegate. On Windows the wheel's library does not export the guard. Without it,
+  every engine runs its profile 0.
+
+On Linux, linking the target also records the wheel's library directory in your binary, so it
+finds the delegate with no library path set. That is right for an application built against an
+installed wheel, and wrong for anything you ship to other machines. To turn it off, set both of
+these before `find_package`, then ship the delegate yourself or point a library path at it:
 
 ```cmake
 set(EXECUTORCH_BACKEND_TENSORRT_EMBED_RUNPATH OFF)
@@ -41,213 +124,68 @@ set(CMAKE_SKIP_BUILD_RPATH ON)
 find_package(executorch_backend_tensorrt REQUIRED)
 ```
 
-Set both before `find_package`. The second is needed because CMake records the
-wheel's directory on its own when you link an imported library. Then ship the
-delegate yourself, or point a library path at it at run time.
-For device-resident exports with `alloc_graph_output=False`, C++ Module callers
-must provide a CUDA output tensor with `Module::set_output` before execution.
-Python callers cannot, so that arrangement is C++ only.
+The second line is needed because CMake records the directory on its own when you link an imported
+library.
 
-If you want one program that runs from both, turn off allocation for the inputs
-and leave it on for the outputs. The caller then supplies the input buffer, which
-is the copy worth avoiding, and the program's own device arena owns the output.
-Measured on two architectures, that arrangement runs from Python and from C++ with
-no boundary copies in the program and results identical to eager. Turning
-allocation off for both works only from C++. Leaving it on for both is refused by the
-export step, because a program that allocates its own inputs has nothing for a caller
-to hand in.
+### CMake older than 3.28
 
-Point CMake at both wheels. The example above calls `find_package(executorch)`
-as well, and that package lives in its own distribution. ExecuTorch is a
-namespace package, so `executorch.__file__` is `None` and has to be located
-through its distribution metadata instead. The variable in front is what keeps
-this a path query: importing this package loads the delegate, which raises when
-the delegate cannot be loaded, and a path does not need it loaded.
-
-```bash
-cmake -DCMAKE_PREFIX_PATH="$(TORCH_TENSORRT_SKIP_DELEGATE_REGISTRATION=1 python -c 'import importlib.metadata as m, torch_tensorrt_executorch_runtime as r, pathlib; print(str(pathlib.Path(str(m.distribution("executorch").locate_file("executorch"))) / "share" / "cmake") + ";" + str(pathlib.Path(r.__file__).parent))')" ...
-```
-
-CMake 3.28 or newer is required for the example above, not because of this
-package but because the `backend_cuda` component it pairs with rejects anything
-older: earlier versions write the `$ORIGIN` token in a runtime search path
-incorrectly.
-
-Bring your own CMake. It is not part of these wheels, and a freshly imaged Jetson
-has none at all, which is easy to miss because the Python side needs none.
-
-You do not need to find TensorRT. The delegate needs it, and it records where to
-look relative to its own location, so a linker that reads that record resolves it
-from the sibling wheel without being told. That is also why the example links no
-TensorRT target: your application uses the delegate's interface, not TensorRT's.
-
-This package itself needs only 3.19. On 3.19 through 3.27 you can still use it,
-by asking ExecuTorch for no components and linking the variables it gives you
-instead of its targets:
+This package itself needs only CMake 3.19. On 3.19 to 3.27, find ExecuTorch without components and
+link the variables it sets instead of its targets:
 
 ```cmake
 find_package(executorch REQUIRED)
 find_package(executorch_backend_tensorrt REQUIRED)
-target_include_directories(app PRIVATE ${EXECUTORCH_INCLUDE_DIRS})
-target_compile_definitions(app PRIVATE ${EXECUTORCH_COMPILE_DEFINITIONS})
-target_link_libraries(app PRIVATE
+target_include_directories(my_app PRIVATE ${EXECUTORCH_INCLUDE_DIRS})
+target_compile_definitions(my_app PRIVATE ${EXECUTORCH_COMPILE_DEFINITIONS})
+target_link_libraries(my_app PRIVATE
   ${EXECUTORCH_LIBRARIES}
   executorch::backend_tensorrt
 )
 ```
 
-Without an imported target to carry them, the include directories and the compile
-definitions have to be applied by hand as well, which is what the three variables
-above are for.
-
-There is nothing to include. The wheel ships no header: the delegate registers
-itself with ExecuTorch's backend registry from a static initializer inside the
-shared library, and everything after that is ExecuTorch's own runtime API. The
-one feature this leaves out is choosing an optimization profile, which needs
-`OptimizationProfileGuard` from `torch_tensorrt/executorch/TensorRTBackend.h`.
-Linked from this wheel, every engine runs its profile 0. Build against the
-source tree or the release tarball to select profiles. The
-CMake target links the library with `--no-as-needed`, because nothing in a
-consumer references a symbol the delegate defines, and the default would drop it
-and leave the backend unregistered.
-
-The wheel must use the same Python, PyTorch, ExecuTorch, CUDA, TensorRT, and
-C++ ABI as its matching Torch-TensorRT wheel. This delegate requires CUDA 13;
-the build matrix currently covers `cu132` and `cu134`, on both architectures. Ordinary Torch-TensorRT
-release and JetPack builds retain their separate CUDA 12 support.
-
-## Install
-The `executorch` extra of a Torch-TensorRT wheel brings ExecuTorch. For two kinds of wheel it
-also brings this wheel (the one built together with it), and with it the exact CUDA build of
-ExecuTorch it links: a nightly that pins a development ExecuTorch build, and a release that pins
-an ExecuTorch release. Other wheels, such as one from PyPI, do not, because their index lacks
-that ExecuTorch build. The user guide shows the release command; this is the nightly one.
-Torch-TensorRT brings PyTorch. Swap `cu132` for `cu134` if you run CUDA 13.4:
-```bash
-python -m pip install --pre --upgrade "torch-tensorrt[executorch]" \
-  --index-url https://download.pytorch.org/whl/nightly/cu132 \
-  --extra-index-url https://pypi.org/simple \
-  --extra-index-url https://pypi.nvidia.com
-```
-All three indexes are needed, and so are `--pre` and `--upgrade`. Without `--pre` pip takes
-the stable Torch-TensorRT from the public index, which is far older. Without `--upgrade` pip
-keeps an older nightly that is already installed, and with it an extra that may not bring this
-wheel. Without NVIDIA's index the inference library resolves to a source distribution, and pip
-spends around twenty minutes trying to build it before failing.
-PyTorch you never name: it arrives as a dependency of Torch-TensorRT. This wheel asks for it by
-name with no version, because ExecuTorch imports it and leaves the choice open, so installing this
-wheel on its own lets the resolver pick a PyTorch older than the ExecuTorch it pins. That
-combination installs, imports and loads a program, then fails at the first run with a message about
-a tensor rather than about versions. Install it the way this section shows and the question does not
-arise. Building this wheel
-by hand is only needed to work on it, and those instructions are below.
-
-On Windows there is one extra step. Install PyTorch first, with
-`python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu132`,
-then add `--extra-index-url https://download.pytorch.org/whl/nightly/cpu` to the command above.
-ExecuTorch's Windows nightly needs torchao, and only that index carries its Windows build. With
-PyTorch already installed, pip does not take the CPU build of PyTorch from that index.
-
-On a fresh environment the nightly command was measured installing:
-
-| package | version |
-| --- | --- |
-| torch-tensorrt | 2.15.0.dev20260919+cu132 |
-| torch-tensorrt-executorch-runtime | 0.2.0.dev20260919+cu132 |
-| executorch | 1.6.0.dev20260915+cu132 |
-| torch | 2.15.0.dev20260919+cu132 |
-| tensorrt-cu13-libs | 11.3.0.99 |
-| nvidia-cuda-runtime | 13.4.92 |
-
-ExecuTorch lands on an older date than the rest because this wheel pins the exact build it
-was compiled against. That is deliberate, and the next section says why.
-
-A CUDA build of ExecuTorch is required, not only to build against. The delegate needs a
-library that only ExecuTorch's CUDA wheels carry, so a processor-only build installs and
-then fails on import. This wheel pins the exact ExecuTorch build it was compiled against,
-label and all, which is what stops that happening quietly.
-## Use it from Python
-
-Import the package once, anywhere before you load a program. Importing is what
-registers the delegate, and nothing else about your code changes:
-
-```python
-from pathlib import Path
-
-import torch
-import torch_tensorrt_executorch_runtime  # noqa: F401
-from executorch.runtime import Runtime
-
-program = Runtime.get().load_program(Path("model.pte"))
-forward = program.load_method("forward")
-outputs = forward.execute((torch.ones((2, 3, 4, 4)),))
-```
-
-If the delegate cannot be loaded, that import raises, rather than letting the
-failure surface later as a program that will not load.
-
-A program whose graph is split between TensorRT and ExecuTorch's own CUDA backend
-needs nothing extra here: both backends are registered, and the program says which
-parts go where.
-
 ## Runtime libraries
 
-The wheel bundles no ExecuTorch, PyTorch, c10, TensorRT, or CUDA shared
-libraries. The delegate carries origin-relative runtime search paths, exactly as
-the build sets them:
+The wheel bundles no ExecuTorch, PyTorch, TensorRT or CUDA libraries. The delegate finds them in
+the wheels installed next to it, through these runtime search paths:
 
 - `$ORIGIN`
 - `$ORIGIN/../../executorch/lib`
 - `$ORIGIN/../../tensorrt_libs`
 - `$ORIGIN/../../nvidia/cu13/lib`
 
-There is no `$ORIGIN/../torch/lib` entry, because the delegate links no torch,
-and no `$ORIGIN/../../nvidia/cuda_runtime/lib` entry, because that is the CUDA 12
-layout and this package requires CUDA 13.
+`$ORIGIN` is this package's `lib` directory. The delegate links no PyTorch, so there is no
+`torch/lib` entry. For a TensorRT or CUDA installation outside these places, make its `lib`
+directory visible to the dynamic loader, for example with `LD_LIBRARY_PATH`.
 
-`$ORIGIN` is this package's `lib` directory; the three `../../` entries reach sibling
-distributions, because `libexecutorch.so`, the TensorRT libraries, and the CUDA
-runtime belong to other wheels. These packages are installed transitively with
-the matching `torch-tensorrt` wheel. For a system TensorRT or CUDA installation
-outside these standard locations, its `lib` directory must be available through
-the system dynamic loader configuration or `LD_LIBRARY_PATH`.
+NVIDIA publishes its CUDA runtime wheels for Linux only. On Windows the wheel does not depend on
+one, and the delegate loads the CUDA runtime from a CUDA 13 toolkit install instead: when the
+package is imported, it adds the `bin` directory of `CUDA_PATH` or `CUDA_HOME` to the DLL search
+path.
 
-The shared Linux build tags this wheel with `wheel tags` after the native
-checks: `manylinux_2_28_x86_64` or `manylinux_2_35_aarch64`, with `py3-none`.
-This updates wheel metadata and RECORD without bundling external libraries or
-changing the delegate. Payload, dependency metadata, and installed-library
-resolution are checked before the shared artifact is uploaded.
+## Build from source
 
-## Build
+You need this only to work on the delegate itself. The steps below are for Linux.
 
 > [!IMPORTANT]
-> Build this wheel with `--no-build-isolation`. The delegate links the
-> prebuilt runtime out of the ExecuTorch wheel that is installed at build time,
-> and it must use the exact PyTorch installation the matching Torch-TensorRT
-> artifacts were built against. An isolated build may download a newer,
-> ABI-incompatible PyTorch or ExecuTorch.
+> Build with `--no-build-isolation`. The delegate links the ExecuTorch runtime from the
+> `executorch` wheel installed at build time, and it must use the same PyTorch as the matching
+> Torch-TensorRT build. An isolated build may download a newer PyTorch or ExecuTorch that is not
+> ABI compatible.
 
-The build shells out to Bazel to compile the delegate, so `bazelisk` or `bazel`
-must be on `PATH`. TensorRT itself arrives through Bazel's `@tensorrt` external
-repository, so no local SDK path is needed.
+What you need:
 
-The example below assumes Linux with a matching CUDA 13 PyTorch and
-Torch-TensorRT installation. Substitute the channel for your CUDA throughout, such
-as `cu134` for CUDA 13.4.
+- A matching CUDA 13 PyTorch and Torch-TensorRT installed.
+- `bazelisk` or `bazel` on `PATH`. The build calls Bazel to compile the delegate, and Bazel fetches
+  TensorRT itself, so you need no local TensorRT SDK.
+- On x86-64, a developer toolset like the one in the release containers. Without it, the C++
+  runtime helpers the delegate uses are not built into the library, and the check after linking
+  refuses the result: the library would need a newer C++ runtime than its platform tag promises.
+  An ordinary development machine usually has no such toolset, so build in the release container,
+  or take a wheel that a continuous integration run built. aarch64 does not have this problem.
 
-On x86 the build also needs a developer toolset, the kind the release containers
-carry. Without one, the C++ runtime helpers the delegate references are not
-absorbed into the library, so the check that runs after linking refuses the result
-and names the symbol version it found. That refusal is correct: the library would
-demand a newer C++ runtime than its own platform tag promises. An ordinary
-development machine usually has no such toolset, so build there through the same
-container the release uses, or take the wheel a continuous integration run already
-produced. Arm does not have this problem, and its tag is higher for that reason.
-
-The build reads the CUDA location out of the repository's `MODULE.bazel`, and the
-copy checked in names one specific version. On a machine with a different CUDA, the
-fetch fails saying that path does not exist. That file is generated from a template, so
-render it for your machine before building. The template takes seven values:
+First render `MODULE.bazel` for your machine. The checked-in copy names one CUDA path, and on a
+machine with another CUDA the fetch fails, saying that path does not exist. The command below
+overwrites the checked-in file, so do not commit the result. Substitute your own CUDA version:
 
 ```bash
 export CUDA_HOME=/usr/local/cuda-13.2
@@ -260,10 +198,12 @@ export TENSORRT_RTX_CUDA_VERSION_UPPER_BOUND=14.0
 envsubst < toolchains/ci_workspaces/MODULE.bazel.tmpl > MODULE.bazel
 ```
 
-Render it yourself rather than running `packaging/pre_build_script.sh`. That script is
-for the release containers: it also installs packages, and on a development machine it
-can replace the PyTorch you already have with one from another index, which leaves you
-worse off than when you started.
+Do not run `packaging/pre_build_script.sh` for this. It is for the release containers: it also
+installs packages, and on a development machine it can replace your PyTorch with one from another
+index.
+
+Then install the build dependencies and build the wheel. Use the ExecuTorch version that
+`pyproject.toml` pins:
 
 ```bash
 python -m pip install pyyaml patchelf tensorrt-cu13 \
@@ -275,132 +215,26 @@ python -m pip wheel --no-build-isolation --no-deps \
   --wheel-dir dist py/torch-tensorrt-executorch-runtime
 ```
 
-`TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION`
-sets the companion's own version. A release build of the main wheel (`RELEASE=1`) reads it
-too: it records the version for its error messages, and when
-`TORCH_TENSORRT_EXECUTORCH_RUNTIME_CHANNEL` names the channel that carries the pinned
-ExecuTorch (`nightly` for a development build, `test` for a release), its `executorch` extra
-requires exactly that version. Without `TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION` the version is
-the companion's base version plus a development suffix and Git revision. The shared build
-keeps the main wheel's date and CUDA suffix while retaining the companion's independent
-base version. Its CMake version also describes the companion, not the main wheel.
+- `tensorrt-cu13` is needed at build time so the wheel can record an exact `tensorrt-cu13==`
+  requirement, read from the installed package. It needs NVIDIA's index, because on PyPI its
+  `tensorrt-cu13-libs` dependency is a source package that downloads the real wheel from NVIDIA's
+  index while it builds.
+- The delegate compiles and links against the installed ExecuTorch wheel, which ships the headers,
+  the prebuilt runtime and a CMake package. It must be a CUDA wheel. No ExecuTorch source checkout
+  is involved.
+- `TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION` sets this wheel's version. Without it, the version
+  is the base version in `version.txt` plus `.dev0` and the Git revision. Nightly builds keep this
+  wheel's own base version, with the main wheel's date and CUDA suffix, such as
+  `0.3.0.dev20261023+cu132`. A release uses the base version and the CUDA suffix, such as
+  `0.2.0+cu132`.
+- A release build of the main wheel (`RELEASE=1`) reads the same variable and records the version
+  for its error messages. When `TORCH_TENSORRT_EXECUTORCH_RUNTIME_CHANNEL` also names the channel
+  that carries the pinned ExecuTorch (`nightly` for a development build, `test` for a release), the
+  main wheel's `executorch` extra requires exactly this version of this wheel.
 
-`tensorrt-cu13` is needed at build time so the wheel can record an exact
-`tensorrt-cu13==` requirement: that version is read from the installed
-distribution, which the Bazel-provided libraries alone do not carry. It needs
-`--extra-index-url https://pypi.nvidia.com/` above, because the PyPI
-`tensorrt-cu13` sdist is a stub that downloads the real wheel from NVIDIA's index
-and fails metadata generation without it.
-
-The delegate compiles and links entirely against the installed ExecuTorch
-wheel, which ships the headers, the prebuilt runtime, and a CMake package. A
-CUDA wheel is required: the CPU wheel ships no CUDA extension, and ExecuTorch
-releases up to 1.4.1 ship no linkable runtime at all. ExecuTorch is not built
-from source for this wheel, so no source checkout or `EXECUTORCH_SOURCE_DIR` is
-involved.
-
-### Rebuilding and editable installs
-
-After rebuilding a wheel, install it with `python -m pip install --no-deps
---force-reinstall` followed by its path. This replaces an installed wheel with
-the same version. The delegate is a shared library, not a Python extension;
-`build_ext --inplace` does not rebuild it.
-
-For editable development, use the same matching dependencies and version setting:
-
-```bash
-python -m pip install --no-build-isolation --no-deps \
-  --editable py/torch-tensorrt-executorch-runtime
-```
-
-Repeat this command after native or CMake changes. Stop native consumers before
-rebuilding and restart them afterward; rebuilding does not update a loaded
-library. Python source changes are visible directly. For strict editable mode,
-add `--config-settings editable_mode=strict` and keep the generated link directory.
-The native library and generated CMake files live beside the source package in
-its generated library directory.
-
-`TORCH_TENSORRT_EXECUTORCH_DEBUG`, `TORCH_TENSORRT_ALLOW_UNPINNED_EXECUTORCH`,
-and `TORCH_TENSORRT_SKIP_DELEGATE_REGISTRATION` accept `1`, `true`, `yes`, or
-`on`, ignoring case. All other values, including unset, empty, `0`, and `false`,
-are false.
-
-## Registration
-
-Loading the delegate adds `TensorRTBackend` to the backend registry that the
-installed ExecuTorch runtime owns. It replaces nothing: the stock runtime keeps
-its own backends and kernels, and XNNPACK and CPU fallback regions behave
-exactly as they do without this wheel.
-
-Registration happens in the delegate's static initializer, so the library has
-to be loaded before a delegated program is loaded. Importing this package does
-that, and nothing else, so an import is all a normal program needs. There is a
-`register()` for the rare case where the import order is not yours to choose, and
-calling it twice is harmless.
-
-```python
-from pathlib import Path
-
-import torch
-import torch_tensorrt_executorch_runtime  # noqa: F401
-from executorch.runtime import Runtime
-
-program = Runtime.get().load_program(Path("model.pte"))
-outputs = program.load_method("forward").execute((torch.randn(1, 3, 224, 224),))
-```
-
-ExecuTorch's own delegates register because they are linked into its pybindings
-extension, so loading that extension pulls them in. A delegate shipped in a
-separate wheel cannot join that link, and ExecuTorch has no discovery hook for
-out-of-tree backends, so this package performs the equivalent step at import
-time. Set `TORCH_TENSORRT_SKIP_DELEGATE_REGISTRATION=1` to import it without
-loading the delegate; that is for tooling that wants the metadata only, and the
-path recipe above is exactly that case.
-
-Because registering is the point, an import that cannot register raises
-`DelegateCompatibilityError` naming what to install, rather than returning a
-module that registered nothing and leaving the program to fail later with a
-backend it cannot find.
-
-Loading and running a program is ExecuTorch's API, not this package's. Tensor
-placement, method lookup and output devices are all documented by ExecuTorch. A
-program exported with `skip_h2d_for_method_inputs` keeps its inputs on the
-device, because nothing here copies them.
-
-Such a program does not check that promise, and it will not tell you when you
-break it. Hand it a host tensor and it runs, returns the right answer, and
-stages the copy for you, once per call. So a program you believe is copying
-nothing can be copying on every run with nothing to show it. The other
-direction is refused, so the leniency goes one way only. If the copies are why
-you exported this way, measure them rather than trusting the flag.
-
-Load programs through `executorch.runtime`, which is ExecuTorch's public Python
-runtime API. Do not use the underscore-prefixed loader inside its pybindings
-extension: it is private and can change without notice. The two were measured
-against each other on every arrangement here, host and device, including a graph
-split with ExecuTorch's own CUDA backend, and they agree to the digit.
-
-The choice that does matter is who owns the output buffer. Leave allocation on for
-the graph outputs if Python will run the program, because a Python caller has no
-way to hand one in. Turn it off only for a C++ consumer that supplies the address
-itself.
-
-## Use
-
-A **CUDA** build of `executorch` is required at runtime, not just to build. The delegate carries a
-`DT_NEEDED` on `libexecutorch_extension_cuda.so`, which only ExecuTorch's CUDA wheels ship, and
-those live on PyTorch's indexes: a development build on the nightly one, a release on the test and
-stable ones. `install_requires` names the version including its local
-label, so only the CUDA build the delegate linked satisfies it. A label-free specifier admits any
-label, which let a `+cpu` wheel resolve and then fail to load at import. Carrying the label rules
-that out, because PEP 440 only ignores labels when the specifier omits them. It does bind the wheel
-to one CUDA train, which is correct: the delegate links that train's runtime.
-
-To install the wheel built above, use the same CUDA index as the build. Build it for the
-CUDA train you run on: the requirement names that train, because the delegate links its runtime.
-Its exact development-version requirements already permit the required prereleases.
-CUDA and TensorRT packages may resolve from PyPI or NVIDIA's index; the extra
-index applies to the whole dependency solve.
+Install the result with PyTorch's indexes for your CUDA version. The ExecuTorch build it pins is
+on one of them: a development build on the nightly index, a release on the test index and later
+on the stable one.
 
 ```bash
 python -m pip install dist/torch_tensorrt_executorch_runtime-*.whl \
@@ -408,14 +242,27 @@ python -m pip install dist/torch_tensorrt_executorch_runtime-*.whl \
   --extra-index-url https://download.pytorch.org/whl/test/cu132
 ```
 
-```python
-from pathlib import Path
+### Rebuilding and editable installs
 
-import torch
-import torch_tensorrt_executorch_runtime  # noqa: F401
-from executorch.runtime import Runtime
+To replace an installed wheel of the same version with a rebuilt one, use
+`python -m pip install --no-deps --force-reinstall` and the wheel's path. The delegate is a shared
+library, not a Python extension, so `build_ext --inplace` does not rebuild it.
 
-program = Runtime.get().load_program(Path("model.pte"))
-forward = program.load_method("forward")
-outputs = forward.execute((torch.ones((2, 3, 4, 4)),))
+For editable development, with the same dependencies and version setting:
+
+```bash
+python -m pip install --no-build-isolation --no-deps \
+  --editable py/torch-tensorrt-executorch-runtime
 ```
+
+Run this again after changing native code or CMake files. Restart any process that loaded the
+delegate, because rebuilding does not update a loaded library. Python changes are visible at once.
+For strict editable mode, add `--config-settings editable_mode=strict`.
+
+### Environment variables
+
+- `TORCH_TENSORRT_SKIP_DELEGATE_REGISTRATION`: import the package without loading the delegate.
+- `TORCH_TENSORRT_ALLOW_UNPINNED_EXECUTORCH`: build against an ExecuTorch other than the pinned one.
+- `TORCH_TENSORRT_EXECUTORCH_DEBUG`: build the delegate with debug information.
+
+Each accepts `1`, `true`, `yes` or `on`, in any case. Any other value, or no value, means off.
