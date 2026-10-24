@@ -1,4 +1,7 @@
 import unittest
+from dataclasses import dataclass
+from itertools import product
+from typing import Optional
 from unittest import mock
 
 import torch
@@ -15,6 +18,74 @@ from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
 )
 
 TURING = (7, 5)
+_CONV3D_TARGETS = (None, (TURING,), ((8, 0), TURING))
+
+
+@dataclass(frozen=True, kw_only=True)
+class _Conv3dCase:
+    dtype: torch.dtype
+    groups: int = 1
+    padded: bool = False
+    targets: Optional[tuple[tuple[int, int], ...]] = None
+    dynamic: bool = False
+    stride: int = 1
+
+    @property
+    def name(self) -> str:
+        precision = {torch.float32: "fp32", torch.float16: "fp16"}[self.dtype]
+        if self.targets is None:
+            target = "native"
+        elif self.targets == (TURING,):
+            target = "turing"
+        else:
+            target = "mixed"
+        padding = "padded" if self.padded else "plain"
+        shape = "dynamic" if self.dynamic else "static"
+        return (
+            f"{precision}_groups_{self.groups}_{padding}_{target}_{shape}"
+            f"_stride_{self.stride}"
+        )
+
+
+def _forward_conv3d_cases() -> list[tuple[str, _Conv3dCase]]:
+    dtype_groups = (
+        (torch.float32, 1),
+        (torch.float32, 2),
+        (torch.float16, 1),
+        (torch.float16, 2),
+        (torch.float16, 4),
+    )
+    cases = []
+    for (dtype, groups), padded, targets, dynamic in product(
+        dtype_groups, (False, True), _CONV3D_TARGETS, (False, True)
+    ):
+        case = _Conv3dCase(
+            dtype=dtype,
+            groups=groups,
+            padded=padded,
+            targets=targets,
+            dynamic=dynamic,
+        )
+        cases.append((case.name, case))
+    return cases
+
+
+def _transposed_conv3d_cases(*, dynamic: bool = False) -> list[tuple[str, _Conv3dCase]]:
+    dtypes = (torch.float32,) if dynamic else (torch.float32, torch.float16)
+    group_counts = (1,) if dynamic else (1, 2)
+    cases = []
+    for dtype, targets, stride, groups in product(
+        dtypes, _CONV3D_TARGETS, (1, 2), group_counts
+    ):
+        case = _Conv3dCase(
+            dtype=dtype,
+            groups=groups,
+            targets=targets,
+            dynamic=dynamic,
+            stride=stride,
+        )
+        cases.append((case.name, case))
+    return cases
 
 
 def _is_turing() -> bool:
@@ -229,44 +300,23 @@ class TestTuringCapabilityGuards(TestCase):
         self.assertGreater(_trt_submodule_count(compiled), 0)
         self._assert_matches_eager(mod, compiled, inputs)
 
-    @parameterized.expand(
-        [
-            (
-                f"{precision}_groups_{groups}_{padding}_{target}_{shape}",
-                dtype,
-                groups,
-                padded,
-                targets,
-                dynamic,
-            )
-            for precision, dtype, groups in (
-                ("fp32", torch.float32, 1),
-                ("fp32", torch.float32, 2),
-                ("fp16", torch.float16, 1),
-                ("fp16", torch.float16, 2),
-                ("fp16", torch.float16, 4),
-            )
-            for padding, padded in (("plain", False), ("padded", True))
-            for target, targets in (
-                ("native", None),
-                ("turing", [TURING]),
-                ("mixed", [(8, 0), TURING]),
-            )
-            for shape, dynamic in (("static", False), ("dynamic", True))
-        ]
-    )
-    def test_forward_conv3d(self, _, dtype, groups, padded, targets, dynamic):
+    @parameterized.expand(_forward_conv3d_cases())
+    def test_forward_conv3d(self, _, case: _Conv3dCase):
+        targets = list(case.targets) if case.targets is not None else None
         targets_turing = _is_turing() if targets is None else TURING in targets
         if targets is not None:
             targets = list(
                 dict.fromkeys([*targets, torch.cuda.get_device_capability()])
             )
         mod = (
-            (PaddedConv3d if padded else Conv3d)(groups=groups).eval().cuda().to(dtype)
+            (PaddedConv3d if case.padded else Conv3d)(groups=case.groups)
+            .eval()
+            .cuda()
+            .to(case.dtype)
         )
-        batch_size = 2 if dynamic else 1
-        inputs = (torch.randn(batch_size, 4, 6, 6, 6, dtype=dtype).cuda(),)
-        if dynamic:
+        batch_size = 2 if case.dynamic else 1
+        inputs = (torch.randn(batch_size, 4, 6, 6, 6, dtype=case.dtype).cuda(),)
+        if case.dynamic:
             batch = torch.export.Dim("batch", min=1, max=4)
             ep = torch.export.export(mod, inputs, dynamic_shapes=({0: batch},))
             compiled = torchtrt.dynamo.compile(
@@ -276,7 +326,7 @@ class TestTuringCapabilityGuards(TestCase):
                         min_shape=(1, 4, 6, 6, 6),
                         opt_shape=(2, 4, 6, 6, 6),
                         max_shape=(4, 4, 6, 6, 6),
-                        dtype=dtype,
+                        dtype=case.dtype,
                     )
                 ],
                 min_block_size=1,
@@ -287,62 +337,36 @@ class TestTuringCapabilityGuards(TestCase):
             )
         else:
             compiled = self._compile(mod, inputs, target_compute_capabilities=targets)
-        rejected = targets_turing and (dtype == torch.float32 or groups > 1)
+        rejected = targets_turing and (case.dtype == torch.float32 or case.groups > 1)
         self.assertEqual(_trt_submodule_count(compiled), 0 if rejected else 1)
-        for batch_size in ((1, 2, 4) if dynamic else (1,)):
+        for batch_size in ((1, 2, 4) if case.dynamic else (1,)):
             with self.subTest(batch_size=batch_size):
                 self._assert_matches_eager(
                     mod,
                     compiled,
-                    (torch.randn(batch_size, 4, 6, 6, 6, dtype=dtype).cuda(),),
+                    (torch.randn(batch_size, 4, 6, 6, 6, dtype=case.dtype).cuda(),),
                 )
 
-    @parameterized.expand(
-        [
-            (
-                f"{precision}_{target}_stride_{stride}_groups_{groups}",
-                dtype,
-                targets,
-                stride,
-                groups,
-            )
-            for precision, dtype in (("fp32", torch.float32), ("fp16", torch.float16))
-            for target, targets in (
-                ("native", None),
-                ("turing", [TURING]),
-                ("mixed", [(8, 0), TURING]),
-            )
-            for stride in (1, 2)
-            for groups in (1, 2)
-        ]
-    )
-    def test_transposed_conv3d(self, _, dtype, targets, stride, groups):
-        if dtype == torch.float16 and targets is not None:
+    @parameterized.expand(_transposed_conv3d_cases())
+    def test_transposed_conv3d(self, _, case: _Conv3dCase):
+        targets = list(case.targets) if case.targets is not None else None
+        if case.dtype == torch.float16 and targets is not None:
             # Include the current GPU because the test executes the FP16 engine.
             targets = list(
                 dict.fromkeys([*targets, torch.cuda.get_device_capability()])
             )
-        mod = ConvTranspose3d(stride=stride, groups=groups).to(dtype)
-        inputs = (torch.randn(1, 4, 8, 8, 8, dtype=dtype).cuda(),)
+        mod = ConvTranspose3d(stride=case.stride, groups=case.groups).to(case.dtype)
+        inputs = (torch.randn(1, 4, 8, 8, 8, dtype=case.dtype).cuda(),)
         compiled = self._compile(mod, inputs, target_compute_capabilities=targets)
         targets_turing = _is_turing() if targets is None else TURING in targets
-        expected_engines = 0 if dtype == torch.float32 and targets_turing else 1
+        expected_engines = 0 if case.dtype == torch.float32 and targets_turing else 1
         self.assertEqual(_trt_submodule_count(compiled), expected_engines)
         self._assert_matches_eager(mod, compiled, inputs)
 
-    @parameterized.expand(
-        [
-            (f"{target}_stride_{stride}", targets, stride)
-            for target, targets in (
-                ("native", None),
-                ("turing", [TURING]),
-                ("mixed", [(8, 0), TURING]),
-            )
-            for stride in (1, 2)
-        ]
-    )
-    def test_fp32_transposed_conv3d_dynamic(self, _, targets, stride):
-        mod = ConvTranspose3d(stride=stride).eval().cuda()
+    @parameterized.expand(_transposed_conv3d_cases(dynamic=True))
+    def test_fp32_transposed_conv3d_dynamic(self, _, case: _Conv3dCase):
+        targets = list(case.targets) if case.targets is not None else None
+        mod = ConvTranspose3d(stride=case.stride).eval().cuda()
         inputs = (torch.randn(2, 4, 4, 4, 4).cuda(),)
         batch = torch.export.Dim("batch", min=1, max=4)
         ep = torch.export.export(mod, inputs, dynamic_shapes=({0: batch},))
@@ -353,7 +377,7 @@ class TestTuringCapabilityGuards(TestCase):
                     min_shape=(1, 4, 4, 4, 4),
                     opt_shape=(2, 4, 4, 4, 4),
                     max_shape=(4, 4, 4, 4, 4),
-                    dtype=torch.float32,
+                    dtype=case.dtype,
                 )
             ],
             min_block_size=1,
@@ -362,7 +386,9 @@ class TestTuringCapabilityGuards(TestCase):
             use_python_runtime=True,
             target_compute_capabilities=targets,
         )
-        targets_turing = _is_turing() if targets is None else TURING in targets
+        targets_turing = (
+            _is_turing() if case.targets is None else TURING in case.targets
+        )
         self.assertEqual(_trt_submodule_count(compiled), 0 if targets_turing else 1)
         for batch_size in (1, 2, 4):
             with self.subTest(batch_size=batch_size):

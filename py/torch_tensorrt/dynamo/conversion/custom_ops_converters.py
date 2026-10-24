@@ -34,6 +34,10 @@ from torch_tensorrt.dynamo.lowering.passes.fuse_pad_into_convolution import (
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
+_CONV_ASYM_PAD_ARG_INPUT = 0
+_CONV_ASYM_PAD_ARG_STRIDE = 3
+_CONV_ASYM_PAD_ARG_GROUPS = 7
+
 
 def conv_asym_pad_capability_validator(
     node: Node, settings: Optional[CompilationSettings] = None
@@ -46,9 +50,9 @@ def conv_asym_pad_capability_validator(
     unsupported convolution can cause execution context creation to fail at runtime.
     The fusion pass skips transposed convolution.
     """
-    input_node = node.args[0]
+    input_node = node.args[_CONV_ASYM_PAD_ARG_INPUT]
     val = getattr(input_node, "meta", {}).get("val")
-    stride = args_bounds_check(node.args, 3)
+    stride = args_bounds_check(node.args, _CONV_ASYM_PAD_ARG_STRIDE)
     spatial_rank = len(stride) if stride is not None else None
     return not turing_rejects_convolution(
         getattr(val, "dtype", None),
@@ -56,7 +60,7 @@ def conv_asym_pad_capability_validator(
         settings,
         node_name=node.name,
         transposed=False,
-        groups=args_bounds_check(node.args, 7, 1),
+        groups=args_bounds_check(node.args, _CONV_ASYM_PAD_ARG_GROUPS, 1),
     )
 
 
