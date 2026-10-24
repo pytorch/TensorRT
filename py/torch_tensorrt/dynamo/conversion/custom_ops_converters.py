@@ -38,24 +38,15 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 def conv_asym_pad_capability_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
-    """Apply the aten.convolution capability guards to the fused pad+conv op.
-
-    ``fuse_pad_into_convolution`` rewrites constant_pad_nd -> aten.convolution into
-    this op during lowering, which erases the aten.convolution node that
-    ``convolution_capability_validator`` would otherwise have rejected. Without this,
-    the pass smuggles a 3D convolution past that guard onto Turing (SM 7.5), where it
-    surfaces at runtime as a null execution context. The pass runs in the normal
-    compile path, so this is not confined to tests.
-
-    Spatial rank comes from the argument list rather than node meta, so the guard holds
-    whether or not the caller traced with dynamo.
-    """
-    # conv_asym_pad(source, weight, bias, stride, pre_padding, post_padding, dilation,
-    #               groups) -- no transposed argument; the pass skips those outright.
-    _ARG_STRIDE = 3
-    stride = args_bounds_check(node.args, _ARG_STRIDE)
+    """Apply the Turing forward convolution checks after padding fusion."""
+    stride = args_bounds_check(node.args, 3)
     spatial_rank = len(stride) if stride is not None else None
-    return not turing_rejects_forward_convolution(node, spatial_rank, settings)
+    return not turing_rejects_forward_convolution(
+        node,
+        spatial_rank,
+        settings,
+        groups=args_bounds_check(node.args, 7, 1),
+    )
 
 
 @dynamo_tensorrt_converter(

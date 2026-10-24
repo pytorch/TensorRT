@@ -74,6 +74,27 @@ After installation, verify the import succeeds:
    by the wheel name: ``torch-tensorrt`` vs. ``torch-tensorrt-rtx``).
 
 
+Convolution on Turing
+---------------------
+
+When TensorRT-RTX targets Turing (SM 7.5), Torch-TensorRT uses PyTorch for:
+
+* FP32 3D convolution.
+* FP32 3D transposed convolution.
+* FP16 3D convolution with ``groups > 1``.
+
+FP16 3D convolution with ``groups=1`` remains eligible for TensorRT conversion.
+FP16 3D transposed convolution also remains eligible, including grouped cases.
+The same checks apply after Torch-TensorRT fuses padding into a convolution.
+An explicit ``target_compute_capabilities`` list that includes Turing also applies
+these checks.
+
+With TensorRT-RTX, Torch-TensorRT also uses PyTorch for transposed convolution
+that combines stride greater than 1 with dilation greater than 1.
+This restriction applies on every GPU, including when stride and dilation affect
+different spatial axes.
+
+
 Example: RTX-Only Features
 --------------------------
 
