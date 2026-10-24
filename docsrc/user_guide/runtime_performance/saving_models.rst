@@ -225,6 +225,12 @@ see :ref:`aot_inductor`.
 c) ExecuTorch (.pte)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+.. seealso::
+
+    :ref:`executorch_deployment` is the end to end guide: install the stack, run the
+    saved program from Python and from C++, and tune the runtime. This section covers
+    the saving step itself.
+
 The ``executorch`` output format lowers the compiled module to an ExecuTorch
 ``.pte`` program, delegating the TensorRT engines to the Torch-TensorRT ExecuTorch
 backend. This CUDA integration links CUDA 13 libraries, so it supports Linux with
@@ -269,10 +275,7 @@ Default: ``save()``
     model = MyModel().eval().cuda()
     inputs = [torch.randn((1, 3, 224, 224)).cuda()]
     trt_gm = torch_tensorrt.compile(model, ir="dynamo", arg_inputs=inputs)
-    torch_tensorrt.save(
-        trt_gm, "trt.pte", output_format="executorch",
-        retrace=False, arg_inputs=inputs,
-    )
+    torch_tensorrt.save(trt_gm, "trt.pte", output_format="executorch")
 
 ``save`` writes both the ``.pte`` and any external ``.ptd`` tensor-data files.
 
@@ -473,7 +476,6 @@ one silently would break a runner built before this feature.
 
     torch_tensorrt.save(
         trt_gm, "decode.pte", output_format="executorch",
-        arg_inputs=inputs, retrace=False,
         zero_copy_kv=True,
     )
 
@@ -533,7 +535,6 @@ claims what it can and the ``CudaPartitioner`` picks up the rest as a catch-all:
 
     torch_tensorrt.save(
         trt_gm, "trt.pte", output_format="executorch",
-        retrace=False, arg_inputs=inputs,
         partitioners=[
             CudaPartitioner(
                 [CudaBackend.generate_method_name_compile_spec("forward")]
@@ -623,7 +624,6 @@ and ``zero_copy_kv`` is read by ``save`` on both sides of that boundary.
 
     torch_tensorrt.save(
         trt_gm, "trt.pte", output_format="executorch",
-        retrace=False, arg_inputs=inputs,
         constant_methods={"get_max_seq_len": 2048},
         compile_config=EdgeCompileConfig(_check_ir_validity=False),
         generate_etrecord=True,

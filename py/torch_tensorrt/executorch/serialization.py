@@ -15,14 +15,24 @@ import struct
 from dataclasses import dataclass, field
 from typing import Dict, List, Tuple, Union
 
-# A blob carrying aliased_io means something different to a parser that ignores it:
-# the runtime would bind each aliased output to its own allocation instead of the
-# input it aliases, and return wrong results rather than fail. The only field a
-# pre-aliasing parser validates is the magic, so aliased blobs carry TR02 and it
-# rejects them. Blobs without aliased_io keep TR01 and stay readable everywhere.
+# The magic is the only field an older parser validates, so it marks what an older
+# parser would misread:
+# - TR01: the engine follows the metadata inline.
+# - TR02: inline engine, and the metadata carries aliased_io. A pre-aliasing parser
+#   would bind each aliased output to its own allocation and return wrong results.
+# - TR03: the engine is stored as named data (engine_key) and the blob carries none.
+#   A pre-TR03 parser would read an engine of size zero and fail only inside
+#   TensorRT, with an error that doesn't say the runtime is too old. A parser that
+#   knows TR03 also knows aliased_io, so TR03 covers named engines with or without it.
+# TR01 blobs stay readable by every runtime; TR02 and TR03 need one that knows them.
 TENSORRT_MAGIC = b"TR01"
 TENSORRT_MAGIC_ALIASED_IO = b"TR02"
-SUPPORTED_MAGICS = (TENSORRT_MAGIC, TENSORRT_MAGIC_ALIASED_IO)
+TENSORRT_MAGIC_NAMED_ENGINE = b"TR03"
+SUPPORTED_MAGICS = (
+    TENSORRT_MAGIC,
+    TENSORRT_MAGIC_ALIASED_IO,
+    TENSORRT_MAGIC_NAMED_ENGINE,
+)
 HEADER_FORMAT = "<4sIIIQ8s"
 HEADER_SIZE = struct.calcsize(HEADER_FORMAT)
 
@@ -51,6 +61,9 @@ class TensorRTBlobMetadata:
     device_id: int = 0
     serialized_metadata: str = ""
     target_platform: str = ""
+    # Named-data key of the engine when it is stored outside the blob, which then
+    # carries an empty engine. Empty means the engine follows the metadata inline.
+    engine_key: str = ""
 
     def to_json(self) -> bytes:
         # Keep field order stable because the C++ parser is intentionally small.
@@ -80,6 +93,8 @@ class TensorRTBlobMetadata:
             "serialized_metadata": self.serialized_metadata,
             "target_platform": self.target_platform,
         }
+        if self.engine_key:
+            data["engine_key"] = self.engine_key
         return json.dumps(data, separators=(",", ":")).encode("utf-8")
 
     @classmethod
@@ -103,6 +118,7 @@ class TensorRTBlobMetadata:
             device_id=parsed.get("device_id", 0),
             serialized_metadata=parsed.get("serialized_metadata", ""),
             target_platform=parsed.get("target_platform", ""),
+            engine_key=parsed.get("engine_key", ""),
         )
 
 
@@ -110,13 +126,24 @@ def serialize_engine(
     engine_bytes: Union[bytes, bytearray, memoryview],
     metadata: TensorRTBlobMetadata,
 ) -> bytes:
+    if bool(metadata.engine_key) == bool(memoryview(engine_bytes).nbytes):
+        raise ValueError(
+            "A TensorRT blob carries its engine either inline or as named data "
+            "(engine_key), never both or neither"
+        )
+    if metadata.engine_key:
+        magic = TENSORRT_MAGIC_NAMED_ENGINE
+    elif metadata.aliased_io:
+        magic = TENSORRT_MAGIC_ALIASED_IO
+    else:
+        magic = TENSORRT_MAGIC
     metadata_json = metadata.to_json()
     metadata_offset = HEADER_SIZE
     engine_offset = _align_to_16(metadata_offset + len(metadata_json))
     reserved = b"\x01" + b"\x00" * 7
     header = struct.pack(
         HEADER_FORMAT,
-        TENSORRT_MAGIC_ALIASED_IO if metadata.aliased_io else TENSORRT_MAGIC,
+        magic,
         metadata_offset,
         len(metadata_json),
         engine_offset,
@@ -152,5 +179,13 @@ def deserialize_engine(blob: bytes) -> Tuple[bytes, TensorRTBlobMetadata]:
     metadata = TensorRTBlobMetadata.from_json(
         blob[metadata_offset : metadata_offset + metadata_size]
     )
+    if (magic == TENSORRT_MAGIC_NAMED_ENGINE) != bool(metadata.engine_key):
+        raise ValueError(
+            f"Magic {magic!r} does not match the engine_key in the metadata"
+        )
+    if bool(metadata.engine_key) == bool(engine_size):
+        raise ValueError(
+            "Blob carries its engine both inline and as named data, or neither"
+        )
     engine = blob[engine_offset : engine_offset + engine_size]
     return engine, metadata

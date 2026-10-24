@@ -27,6 +27,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -512,10 +513,6 @@ Error initialize_engine_io(EngineHandle& handle) {
 // Called once the aliased outputs are known. Each reason replay stays off is logged, because a caller
 // who turned it on expects it.
 void enable_cuda_graphs(EngineHandle& handle) {
-  if (handle.claims_pooled_scratch) {
-    ET_LOG(Info, "TensorRTBackend::init: CUDA graph replay is off for an engine on pooled activation scratch");
-    return;
-  }
   if (handle.num_aliased_outputs > 0) {
     ET_LOG(Info, "TensorRTBackend::init: CUDA graph replay is off for an engine with aliased outputs");
     return;
@@ -603,7 +600,14 @@ int cuda_foreign_device_of_ptr(const void* ptr, int engine_device) {
 // is silent: wrong output, no CUDA error, no TensorRT error.
 //
 // This lock nests inside the per-handle EngineHandle::mu, which already spans
-// the enqueue, and is never taken in the other order.
+// the enqueue, and is never taken in the other order. A pooled call only ever
+// tries cuda_graph_capture_mutex() while holding it, never waits for it, and
+// nothing takes this lock while holding that one.
+//
+// Once the drain guard in execute() is armed, an early return drains the stream
+// before this lock is dropped, because the claim is declared before the guard. A
+// failed enqueue can have queued work on the buffer, and a claimant handed it
+// then would race it.
 class SharedScratchClaim {
  public:
   SharedScratchClaim() = default;
@@ -1227,16 +1231,32 @@ Result<DelegateHandle*> TensorRTBackend::init(
   }
 
   const void* engine_data = TensorRTBlobHeader::engine_data(processed->data(), header);
+  std::size_t engine_size = header.engine_size;
+  std::optional<FreeableBuffer> named_engine;
+  if (!header.engine_key.empty()) {
+    const auto* named_data = context.get_named_data_map();
+    TORCHTRT_ET_CHECK_NOT_NULL(
+        named_data, Error::InvalidProgram, "TensorRTBackend::init: engine is named data but the program has none");
+    auto engine_buffer = named_data->get_data(header.engine_key);
+    if (!engine_buffer.ok()) {
+      ET_LOG(Error, "TensorRTBackend::init: named engine '%s' not found", header.engine_key.c_str());
+      return engine_buffer.error();
+    }
+    named_engine.emplace(std::move(engine_buffer.get()));
+    engine_data = named_engine->data();
+    engine_size = named_engine->size();
+  }
   const bool share = !share_spec.ok() || share_spec.get();
   Error err;
   {
     const std::shared_lock<std::shared_mutex> capture_lock(cuda_graph_capture_mutex());
     if (share) {
-      err = acquire_shared_engine(
-          *runtime, engine_data, header.engine_size, handle->device_id, ws_request, handle->engine);
+      err = acquire_shared_engine(*runtime, engine_data, engine_size, handle->device_id, ws_request, handle->engine);
     } else {
-      err = load_engine(*runtime, engine_data, header.engine_size, ws_request, handle->engine);
+      err = load_engine(*runtime, engine_data, engine_size, ws_request, handle->engine);
     }
+    // The engine now lives on the GPU, so release the host copy before building the context.
+    named_engine.reset();
     if (err != Error::Ok) {
       return err;
     }
@@ -1478,6 +1498,9 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
 
   const auto caller_stream = ::executorch::extension::cuda::getCallerStream();
   cudaStream_t stream = caller_stream.value_or(cudaStreamPerThread);
+  // Declared before the drain guard so that on an early return the guard drains
+  // while the claim still holds the device's pool lock; see SharedScratchClaim.
+  SharedScratchClaim scratch_claim;
   StreamDrainOnEarlyReturn drain_on_early_return(stream);
 
   // Settled at init: the option was on at this handle's load and the engine needs
@@ -1889,7 +1912,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // enqueue below; see SharedScratchClaim for why it spans that far. Every return
   // in between drops it through the destructor, which runs ahead of the device
   // restore above, so its free lands on the right device.
-  SharedScratchClaim scratch_claim;
+  void* scratch_buffer = nullptr;
   if (pooled_scratch) {
     const size_t need = ctx->updateDeviceMemorySizeForShapes();
     // The substitution for a zero is made here and once: the same figure has to
@@ -1900,12 +1923,12 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
     // under some shape has to be given a buffer whatever this call's shapes need,
     // or enqueueV3 refuses it.
     const size_t scratch_bytes = need == 0 ? kMinPooledScratchBytes : need;
-    void* pool = nullptr;
-    const Error scratch_err = claim_shared_scratch(scratch_claim, engine->device_id, scratch_bytes, stream, pool);
+    const Error scratch_err =
+        claim_shared_scratch(scratch_claim, engine->device_id, scratch_bytes, stream, scratch_buffer);
     if (scratch_err != Error::Ok) {
       return scratch_err;
     }
-    if (!install_pooled_scratch(*ctx, pool, scratch_bytes, engine->device_id)) {
+    if (!install_pooled_scratch(*ctx, scratch_buffer, scratch_bytes, engine->device_id)) {
       return Error::InvalidState;
     }
   }
@@ -1915,8 +1938,9 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // ------------------------------------------------------------------
   // Armed before the launch, so a partial launch still drains what it submitted.
   drain_on_early_return.arm();
-  const Error enqueue_err = engine->execution_graph ? engine->execution_graph->enqueue(*engine, stream, binding_bytes)
-                                                    : enqueue_plain(*ctx, stream);
+  const Error enqueue_err = engine->execution_graph
+      ? engine->execution_graph->enqueue(*engine, stream, binding_bytes, scratch_buffer)
+      : enqueue_plain(*ctx, stream);
   if (enqueue_err != Error::Ok) {
     return enqueue_err;
   }
@@ -1925,17 +1949,6 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   if (pooled_scratch) {
     const Error mark_err = record_shared_scratch_enqueue(scratch_claim, stream);
     if (mark_err != Error::Ok) {
-      // Nothing will wait for this enqueue otherwise: the record that would have
-      // put it on the marker is the call that just failed.
-      //
-      // Waited for here rather than left to drain_on_early_return, because this
-      // has to happen with the device's pool lock still held and the guard's
-      // destructor runs after the claim's. Releasing first would hand the buffer
-      // to a claimant with nothing ordering it against the enqueue this call just
-      // submitted, which is the silent-corruption case the lock exists for. It is
-      // the one place a pooled call holds the lock across a host wait, so another
-      // pooled engine on this device waits out this inference.
-      (void)cudaStreamSynchronize(stream);
       return mark_err;
     }
   }

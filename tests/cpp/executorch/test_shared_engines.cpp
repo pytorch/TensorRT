@@ -16,6 +16,7 @@
 #include <cuda_runtime.h>
 
 #include <executorch/extension/cuda/caller_stream.h>
+#include <executorch/runtime/core/named_data_map.h>
 #include <executorch/runtime/platform/platform.h>
 #include <executorch/runtime/platform/runtime.h>
 
@@ -26,6 +27,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <future>
+#include <map>
 #include <thread>
 
 namespace {
@@ -108,6 +110,59 @@ std::vector<std::uint8_t> rewrap(const std::vector<std::uint8_t>& blob, const st
   const std::size_t offset = plan_offset(blob);
   return wrap_engine_plan(blob.data() + offset, blob.size() - offset, metadata);
 }
+
+// An engine stored as named data: a TR03 blob that names the entry and carries no engine bytes.
+std::vector<std::uint8_t> named_engine_blob(const std::string& key) {
+  static constexpr std::uint8_t kNoEngine = 0;
+  const std::string metadata = blob_metadata(0);
+  auto blob =
+      wrap_engine_plan(&kNoEngine, 0, metadata.substr(0, metadata.size() - 1) + R"(,"engine_key":")" + key + "\"}");
+  std::memcpy(blob.data(), "TR03", 4);
+  return blob;
+}
+
+// A program's named data, held in memory. Counts the buffers it handed out that were freed, so a case
+// can check that init releases its host copy of an engine once the engine is loaded.
+class InMemoryNamedData : public NamedDataMap {
+ public:
+  void add(const std::string& key, std::vector<std::uint8_t> bytes) {
+    entries_[key] = std::move(bytes);
+  }
+  int freed() const {
+    return freed_.load();
+  }
+
+  Result<const TensorLayout> get_tensor_layout(std::string_view) const override {
+    return Error::NotImplemented;
+  }
+  Result<FreeableBuffer> get_data(std::string_view key) const override {
+    const auto it = entries_.find(std::string(key));
+    if (it == entries_.end()) {
+      return Error::NotFound;
+    }
+    return FreeableBuffer(
+        it->second.data(),
+        it->second.size(),
+        [](void* context, void*, size_t) { static_cast<std::atomic<int>*>(context)->fetch_add(1); },
+        &freed_);
+  }
+  Error load_data_into(std::string_view, void*, size_t) const override {
+    return Error::NotImplemented;
+  }
+  Result<uint32_t> get_num_keys() const override {
+    return static_cast<uint32_t>(entries_.size());
+  }
+  Result<const char*> get_key(uint32_t index) const override {
+    if (index >= entries_.size()) {
+      return Error::InvalidArgument;
+    }
+    return std::next(entries_.begin(), index)->first.c_str();
+  }
+
+ private:
+  std::map<std::string, std::vector<std::uint8_t>> entries_;
+  mutable std::atomic<int> freed_{0};
+};
 
 struct BuildOptions {
   float weight_scale = 1.0f;
@@ -290,13 +345,15 @@ class Handle {
   // `budget` is a weight_streaming_budget compile spec, as export bakes it, or null for none.
   // The blob is copied first and the copy overwritten once init returns, so a handle that kept
   // pointing at the bytes it was loaded from would fail.
+  // `named_data` is the program's named data map, for a blob whose engine is stored there.
   Error load(
       const std::vector<std::uint8_t>& blob,
       const char* budget = nullptr,
-      Span<const BackendOption> options = {}) {
+      Span<const BackendOption> options = {},
+      const NamedDataMap* named_data = nullptr) {
     std::vector<std::uint8_t> bytes = blob;
     FreeableBuffer processed(bytes.data(), bytes.size(), nullptr);
-    BackendInitContext init_context(&arena_, nullptr, nullptr, nullptr, options);
+    BackendInitContext init_context(&arena_, nullptr, nullptr, named_data, options);
     CompileSpec spec{"weight_streaming_budget", {nullptr, 0}};
     if (budget != nullptr) {
       spec.value.buffer = const_cast<char*>(budget);
@@ -1173,6 +1230,31 @@ TEST_F(SharedEnginesTest, AFailedRacingLoadSharesTheEnginePublishedWhileItWaited
   const auto reference = winner.run(1, 12);
   ASSERT_FALSE(reference.empty());
   EXPECT_EQ(loser.run(1, 12), reference);
+}
+
+// A .pte saved with each engine as named data: init reads the engine from the program's named data,
+// it runs like the same plan inline, and the host copy is released once the engine is loaded.
+TEST_F(SharedEnginesTest, AnEngineStoredAsNamedDataLoadsAndItsHostCopyIsFreed) {
+  InMemoryNamedData named;
+  named.add("tensorrt_engine_test", std::vector<std::uint8_t>(blob_.begin() + plan_offset(blob_), blob_.end()));
+  Handle inline_handle;
+  Handle named_handle;
+  ASSERT_EQ(inline_handle.load(blob_), Error::Ok);
+  ASSERT_EQ(named_handle.load(named_engine_blob("tensorrt_engine_test"), nullptr, {}, &named), Error::Ok);
+  EXPECT_EQ(named.freed(), 1) << "init kept its host copy of the engine";
+  EXPECT_EQ(named_handle.engine(), inline_handle.engine()) << "the same plan bytes should share one engine";
+  const auto reference = inline_handle.run(1, 3);
+  ASSERT_FALSE(reference.empty());
+  EXPECT_EQ(named_handle.run(1, 3), reference);
+}
+
+// The key comes from the blob, so a program whose named data lacks it, or that has none, fails at load.
+TEST_F(SharedEnginesTest, ANamedEngineTheProgramDoesNotHoldFailsToLoad) {
+  InMemoryNamedData named;
+  Handle missing_key;
+  EXPECT_NE(missing_key.load(named_engine_blob("tensorrt_engine_absent"), nullptr, {}, &named), Error::Ok);
+  Handle no_named_data;
+  EXPECT_EQ(no_named_data.load(named_engine_blob("tensorrt_engine_absent")), Error::InvalidProgram);
 }
 
 } // namespace
