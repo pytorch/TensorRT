@@ -38,8 +38,9 @@ version. Swap ``cu132`` for ``cu134`` on CUDA 13.4:
       --index-url https://download.pytorch.org/whl/cu132 \
       --extra-index-url https://pypi.org/simple
 
-The PyTorch channel is needed because PyPI has only a CPU build of ExecuTorch, and no delegate
-that matches your wheel. PyPI stays in the list for TensorRT and the other dependencies.
+The PyTorch channel has the CUDA build of ExecuTorch for every CUDA version. PyPI has it only on
+Linux, for CUDA 13.2, and its Windows ExecuTorch is the CPU build. PyPI stays in the list for
+TensorRT and the other dependencies.
 
 What the command installs
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -50,9 +51,15 @@ What the command installs
   built together with your Torch-TensorRT wheel, for the same CUDA version. It requires the
   exact ExecuTorch build it was compiled against, so you get that one rather than the newest.
 
-The extra brings the delegate for a nightly wheel whose ExecuTorch pin is a development build,
-as on main today, and for a release whose pin is an ExecuTorch release, from the PyTorch channel
-or, on Linux, from PyPI. A wheel you build yourself does not bring it.
+Each Torch-TensorRT build is made for one exact ExecuTorch version, its pin. The extra brings
+the delegate for:
+
+* a nightly wheel from the nightly channel, when its pin is an ExecuTorch nightly,
+* a release wheel from the PyTorch channel, when its pin is an ExecuTorch release,
+* the same release wheel from PyPI, on Linux only.
+
+A Windows wheel from PyPI, and a wheel you build yourself, do not bring it. For a wheel you build
+yourself, build the delegate too, as the runtime wheel README shows.
 
 This works for the standard Linux (x86-64 and aarch64) and Windows x86-64 wheels. On aarch64
 it needs glibc 2.35 or newer, the same as TensorRT itself. The TensorRT-RTX and Python-only
@@ -76,6 +83,11 @@ To pick up a change before it ships, or to report a problem against ``main``:
 * ``--upgrade`` is required if a nightly is already installed, or pip keeps the old one and
   tells you nothing.
 * PyPI stays in the list because TensorRT is not published on the nightly channel.
+* On Windows, install PyTorch first, with
+  ``pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu132``.
+  Then add ``--extra-index-url https://download.pytorch.org/whl/nightly/cpu`` to the command.
+  ExecuTorch's Windows nightly needs torchao, and only that index carries its Windows build.
+  With PyTorch already installed, pip does not take the CPU build of PyTorch from that index.
 * Keep PyTorch, ExecuTorch and Torch-TensorRT on the same channel.
 
 ----

@@ -496,8 +496,11 @@ jobs:
           else
             ${CONDA_RUN} ${ENV_SCRIPT} python setup.py bdist_wheel ${BUILD_PARAMS}
           fi
+      # A release wheel has the form PyPI needs, and the delegate cannot load PyPI's Windows
+      # ExecuTorch, so its job builds no delegate. The version is still recorded above for the install
+      # advice.
       - name: Build the ExecuTorch runtime wheel
-        if: ${{ env.TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION != '' }}
+        if: ${{ env.TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION != '' && !inputs.is-release-wheel }}
         working-directory: ${{ inputs.repository }}
         run: |
           set -euxo pipefail
