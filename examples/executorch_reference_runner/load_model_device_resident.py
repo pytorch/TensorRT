@@ -5,11 +5,8 @@
 
 The program this loads was exported with ``skip_h2d_for_method_inputs`` and
 ``skip_d2h_for_method_outputs``, so its boundary carries no copy operators and it
-wants a CUDA input. A host input still gives the right answer, but it costs a
-staging copy that the export existed to remove, so it defeats the point rather
-than breaking the program. Where a host-backed buffer tagged for the device does
-fail is in the runtime rather than in this delegate, on a device that reports it
-cannot read pageable host memory.
+wants a CUDA input. A host input costs a copy on every call when TensorRT reads it
+first and fails when the CUDA backend does, and nightly Python runtimes refuse it.
 
 That contract is what this script checks. ``export_device_resident.py`` already
 asserts the serialized program contains no boundary copy operators; this asserts
@@ -63,11 +60,8 @@ for _ in range(args.num_runs):
     outputs = forward.execute((x,))
 y = outputs[0]
 
-# This catches the export flags not taking, and that is all it catches. It does not prove the buffer is
-# device memory: the tag and the pointer can disagree, and measured here they do, because the bindings
-# hand back a buffer tagged cuda whose pointer is ordinary host memory. Proving residency needs the
-# driver's own view of the pointer, which is more machinery than an example should carry, so the honest
-# claim is the narrow one. The numbers below are still checked, and they are correct.
+# This catches the export flags not taking. It does not ask the driver whether the pointer is device
+# memory, which is more machinery than an example should carry; the numbers below are still checked.
 if not y.is_cuda:
     raise AssertionError(
         f"FATAL: output is tagged {y.device}, not cuda. The usual cause is that "

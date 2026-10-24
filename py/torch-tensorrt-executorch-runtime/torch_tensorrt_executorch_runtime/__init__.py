@@ -262,9 +262,8 @@ def _register_locked() -> None:
                 raise DelegateCompatibilityError(
                     f"Could not load the Torch-TensorRT ExecuTorch delegate from {path}. This "
                     f"requires a CUDA build of executorch, which ships {_EXTENSION_CUDA_LIBRARY}; "
-                    "a CPU build satisfies the version pin but "
-                    "not this dependency. Install torch, executorch, torch-tensorrt, and this "
-                    "package from the same release matrix."
+                    "the installed executorch is a CPU build without it. Install torch, "
+                    "executorch, torch-tensorrt, and this package from the same release matrix."
                 ) from error
             raise DelegateCompatibilityError(
                 f"Could not load the Torch-TensorRT ExecuTorch delegate from {path}: {error}. "

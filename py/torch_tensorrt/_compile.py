@@ -839,16 +839,17 @@ def save(
                 ``weight_streaming_budget_per_engine=``, ``zero_copy_kv=`` and
                 ``external_engine_data=`` are
                 only used with ``output_format="executorch"``; otherwise they are
-                ignored with a warning. Pass ``compile_specs=[CompileSpec("target_device",
-                b"cuda:<i>")]`` to override the default target device (``cuda:0``).
+                ignored with a warning. A ``CompileSpec("target_device", ...)`` in
+                ``compile_specs=`` only labels the delegate's inputs and outputs; each
+                engine runs on the GPU it was built on.
                 ``backend_config=`` takes an ``Optional[ExecutorchBackendConfig]``
                 and is forwarded to ``to_executorch(config=...)`` to customize
                 ExecuTorch lowering (e.g. memory planning or device placement).
                 ``partitioners=`` appends caller partitioners after the TensorRT
                 partitioner, so ops TensorRT does not take can be routed to another
-                delegate -- e.g. a ``CudaPartitioner`` for a coalesced TensorRT +
-                CUDA ``.pte``. See :ref:`the ExecuTorch save guide
-                <executorch_save>` for the ``CudaPartitioner`` recipe, its
+                delegate, for example a ``CudaPartitioner`` for a coalesced TensorRT +
+                CUDA ``.pte``. See :ref:`the ExecuTorch deployment guide
+                <executorch_deployment>` for the ``CudaPartitioner`` recipe, its
                 export-time requirements (CUDA backend + nvcc), and the external
                 ``.ptd`` weight caveats.
                 ``constant_methods=``, ``transform_passes=`` and
@@ -861,7 +862,8 @@ def save(
                 TRT engines.
                 ``generate_etrecord=True`` writes an ETRecord to
                 ``<model>_etrecord.bin`` next to the ``.pte`` for use with the
-                ExecuTorch Inspector.
+                ExecuTorch Inspector. It does not work yet for a program with
+                TensorRT engines: writing the record raises a ``SerializeError``.
                 ``weight_streaming_budget_per_engine=`` takes an ``Optional[int]``
                 number of bytes of engine weights that may stay resident in GPU
                 memory, with the rest streamed from host memory. It applies to
