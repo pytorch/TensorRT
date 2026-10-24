@@ -45,18 +45,18 @@ class Addmm(nn.Module):
 
 
 class Conv3d(nn.Module):
-    def __init__(self):
+    def __init__(self, groups=1):
         super().__init__()
-        self.conv = nn.Conv3d(4, 8, 3, padding=1)
+        self.conv = nn.Conv3d(4, 8, 3, padding=1, groups=groups)
 
     def forward(self, x):
         return self.conv(x)
 
 
 class ConvTranspose3d(nn.Module):
-    def __init__(self, stride=1):
+    def __init__(self, stride=1, groups=1):
         super().__init__()
-        self.conv = nn.ConvTranspose3d(4, 8, 3, stride=stride, padding=1)
+        self.conv = nn.ConvTranspose3d(4, 8, 3, stride=stride, padding=1, groups=groups)
 
     def forward(self, x):
         return self.conv(x)
@@ -72,16 +72,11 @@ class Conv2d(nn.Module):
 
 
 class PaddedConv3d(nn.Module):
-    """A conv3d the 3D-conv guard never sees as a convolution.
+    """Apply asymmetric padding before a 3D convolution."""
 
-    fuse_pad_into_convolution folds the pad into the conv and rewrites the pair as
-    tensorrt::conv_asym_pad, erasing the aten.convolution node. It fires for any
-    zero-fill, non-negative pad -- asymmetry is not required.
-    """
-
-    def __init__(self):
+    def __init__(self, groups=1):
         super().__init__()
-        self.conv = nn.Conv3d(4, 8, 3, padding=0)
+        self.conv = nn.Conv3d(4, 8, 3, padding=0, groups=groups)
 
     def forward(self, x):
         return self.conv(F.pad(x, (1, 1, 1, 1, 2, 0)))
@@ -158,7 +153,7 @@ def _cdist_inputs(rows1, rows2, dtype=torch.float32):
 class TestTuringCapabilityGuards(TestCase):
     """Verify PyTorch fallback for operations that TRT-RTX cannot execute on Turing.
 
-    Turing lacks support for FP32 GEMMs, forward 3D convolution, FP32 transposed 3D convolution, and bfloat16.
+    Turing rejects FP32 GEMMs, FP32 3D convolution, FP32 3D deconvolution, grouped FP16 3D convolution, and bfloat16.
     Without fallback, these operations can cause compile failures, crashes, or incorrect results.
     """
 
@@ -210,13 +205,6 @@ class TestTuringCapabilityGuards(TestCase):
         self.assertEqual(_trt_submodule_count(compiled), 0)
         self._assert_matches_eager(mod, compiled, inputs)
 
-    def test_declared_turing_target_falls_back_conv3d(self):
-        mod = Conv3d()
-        inputs = (torch.randn(1, 4, 8, 8, 8).cuda(),)
-        compiled = self._compile(mod, inputs, target_compute_capabilities=[TURING])
-        self.assertEqual(_trt_submodule_count(compiled), 0)
-        self._assert_matches_eager(mod, compiled, inputs)
-
     def test_declared_turing_target_keeps_fp16_gemm_on_trt(self):
         mod = MatMul()
         inputs = (
@@ -233,15 +221,6 @@ class TestTuringCapabilityGuards(TestCase):
         compiled = self._compile(mod, inputs, target_compute_capabilities=[TURING])
         self.assertGreater(_trt_submodule_count(compiled), 0)
 
-    def test_declared_turing_target_falls_back_padded_conv3d(self):
-        # The fused op needs its own guard: by partitioning time the aten.convolution
-        # node the conv guard keys on no longer exists.
-        mod = PaddedConv3d()
-        inputs = (torch.randn(1, 4, 8, 8, 8).cuda(),)
-        compiled = self._compile(mod, inputs, target_compute_capabilities=[TURING])
-        self.assertEqual(_trt_submodule_count(compiled), 0)
-        self._assert_matches_eager(mod, compiled, inputs)
-
     def test_declared_turing_target_keeps_padded_conv2d_on_trt(self):
         # Only rank 3 is rejected; the fused op must keep serving 2D.
         mod = PaddedConv2d()
@@ -252,7 +231,81 @@ class TestTuringCapabilityGuards(TestCase):
 
     @parameterized.expand(
         [
-            (f"{precision}_{target}_stride_{stride}", dtype, targets, stride)
+            (
+                f"{precision}_groups_{groups}_{padding}_{target}_{shape}",
+                dtype,
+                groups,
+                padded,
+                targets,
+                dynamic,
+            )
+            for precision, dtype, groups in (
+                ("fp32", torch.float32, 1),
+                ("fp32", torch.float32, 2),
+                ("fp16", torch.float16, 1),
+                ("fp16", torch.float16, 2),
+                ("fp16", torch.float16, 4),
+            )
+            for padding, padded in (("plain", False), ("padded", True))
+            for target, targets in (
+                ("native", None),
+                ("turing", [TURING]),
+                ("mixed", [(8, 0), TURING]),
+            )
+            for shape, dynamic in (("static", False), ("dynamic", True))
+        ]
+    )
+    def test_forward_conv3d(self, _, dtype, groups, padded, targets, dynamic):
+        targets_turing = _is_turing() if targets is None else TURING in targets
+        if targets is not None:
+            targets = list(
+                dict.fromkeys([*targets, torch.cuda.get_device_capability()])
+            )
+        mod = (
+            (PaddedConv3d if padded else Conv3d)(groups=groups).eval().cuda().to(dtype)
+        )
+        batch_size = 2 if dynamic else 1
+        inputs = (torch.randn(batch_size, 4, 6, 6, 6, dtype=dtype).cuda(),)
+        if dynamic:
+            batch = torch.export.Dim("batch", min=1, max=4)
+            ep = torch.export.export(mod, inputs, dynamic_shapes=({0: batch},))
+            compiled = torchtrt.dynamo.compile(
+                ep,
+                inputs=[
+                    torchtrt.Input(
+                        min_shape=(1, 4, 6, 6, 6),
+                        opt_shape=(2, 4, 6, 6, 6),
+                        max_shape=(4, 4, 6, 6, 6),
+                        dtype=dtype,
+                    )
+                ],
+                min_block_size=1,
+                cache_built_engines=False,
+                reuse_cached_engines=False,
+                use_python_runtime=True,
+                target_compute_capabilities=targets,
+            )
+        else:
+            compiled = self._compile(mod, inputs, target_compute_capabilities=targets)
+        rejected = targets_turing and (dtype == torch.float32 or groups > 1)
+        self.assertEqual(_trt_submodule_count(compiled), 0 if rejected else 1)
+        for batch_size in ((1, 2, 4) if dynamic else (1,)):
+            with self.subTest(batch_size=batch_size):
+                self._assert_matches_eager(
+                    mod,
+                    compiled,
+                    (torch.randn(batch_size, 4, 6, 6, 6, dtype=dtype).cuda(),),
+                )
+
+    @parameterized.expand(
+        [
+            (
+                f"{precision}_{target}_stride_{stride}_groups_{groups}",
+                dtype,
+                targets,
+                stride,
+                groups,
+            )
             for precision, dtype in (("fp32", torch.float32), ("fp16", torch.float16))
             for target, targets in (
                 ("native", None),
@@ -260,15 +313,16 @@ class TestTuringCapabilityGuards(TestCase):
                 ("mixed", [(8, 0), TURING]),
             )
             for stride in (1, 2)
+            for groups in (1, 2)
         ]
     )
-    def test_transposed_conv3d(self, _, dtype, targets, stride):
+    def test_transposed_conv3d(self, _, dtype, targets, stride, groups):
         if dtype == torch.float16 and targets is not None:
             # Include the current GPU because the test executes the FP16 engine.
             targets = list(
                 dict.fromkeys([*targets, torch.cuda.get_device_capability()])
             )
-        mod = ConvTranspose3d(stride=stride).to(dtype)
+        mod = ConvTranspose3d(stride=stride, groups=groups).to(dtype)
         inputs = (torch.randn(1, 4, 8, 8, 8, dtype=dtype).cuda(),)
         compiled = self._compile(mod, inputs, target_compute_capabilities=targets)
         targets_turing = _is_turing() if targets is None else TURING in targets

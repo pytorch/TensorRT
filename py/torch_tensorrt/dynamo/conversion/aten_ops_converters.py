@@ -3754,27 +3754,30 @@ _CONV_ARG_INPUT = 0
 _CONV_ARG_STRIDE = 3
 _CONV_ARG_DILATION = 5
 _CONV_ARG_TRANSPOSED = 6
+_CONV_ARG_GROUPS = 8
 
 
 def turing_rejects_forward_convolution(
     node: Node,
     spatial_rank: Optional[int],
     settings: Optional[CompilationSettings] = None,
+    *,
+    groups: int = 1,
 ) -> bool:
-    """Return True when TRT-RTX cannot execute a forward convolution on Turing.
-
-    TRT-RTX does not support forward 3D convolution on Turing (SM 7.5).
-    The caller checks transposed convolution separately because its support depends on dtype.
-    """
-    unsupported_spatial_rank = 3
-    if spatial_rank != unsupported_spatial_rank:
+    """Reject FP32 and grouped FP16 forward 3D convolution on Turing."""
+    if spatial_rank != 3 or not trt_rtx_targets_turing(settings):
         return False
-    if not trt_rtx_targets_turing(settings):
+    input_node = node.args[0]
+    val = input_node.meta.get("val") if hasattr(input_node, "meta") else None
+    dtype = getattr(val, "dtype", None)
+    if dtype != torch.float32 and not (dtype == torch.float16 and groups > 1):
         return False
     _LOGGER.debug(
-        "3D convolution '%s' is not supported on TensorRT-RTX for Turing "
-        "(SM 7.5). Falling back to PyTorch.",
+        "3D convolution '%s' with dtype %s and groups=%s is not supported on "
+        "TensorRT-RTX for Turing (SM 7.5). Use PyTorch.",
         node.name,
+        dtype,
+        groups,
     )
     return True
 
@@ -3785,7 +3788,7 @@ def convolution_capability_validator(
     """Reject convolutions that TRT-RTX cannot execute.
 
     TRT-RTX does not support transposed convolution with stride > 1 and dilation > 1.
-    On Turing, it also rejects forward 3D convolution and FP32 transposed 3D convolution.
+    On Turing, reject FP32 3D convolution, FP32 3D deconvolution, and grouped FP16 3D convolution.
     """
     if not ENABLED_FEATURES.tensorrt_rtx:
         return True
@@ -3819,7 +3822,12 @@ def convolution_capability_validator(
                 node.name,
             )
             return False
-    elif turing_rejects_forward_convolution(node, spatial_rank, settings):
+    elif turing_rejects_forward_convolution(
+        node,
+        spatial_rank,
+        settings,
+        groups=args_bounds_check(node.args, _CONV_ARG_GROUPS, 1),
+    ):
         return False
 
     return True
