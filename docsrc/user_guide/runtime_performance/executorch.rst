@@ -38,7 +38,8 @@ version. Swap ``cu132`` for ``cu134`` on CUDA 13.4:
       --index-url https://download.pytorch.org/whl/cu132 \
       --extra-index-url https://pypi.org/simple
 
-The PyTorch channel is needed because the CUDA build of ExecuTorch is published only there.
+The PyTorch channel is needed because PyPI has only a CPU build of ExecuTorch, and no delegate
+that matches your wheel. PyPI stays in the list for TensorRT and the other dependencies.
 
 What the command installs
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -48,6 +49,11 @@ What the command installs
   which you need to run a ``.pte``. The extra installs the one built together with your
   Torch-TensorRT wheel, for the same CUDA version. It requires the exact ExecuTorch build
   it was compiled against, so you get that one rather than the newest.
+
+The extra brings the delegate for two kinds of wheel: a nightly that pins a development
+ExecuTorch build, and a release that pins an ExecuTorch release. Other wheels, such as one from
+PyPI or one you build yourself, do not. If it is missing when you load a ``.pte``, the error
+message says how to get the one that matches your wheel.
 
 This works for the standard Linux (x86-64 and aarch64) and Windows x86-64 wheels. On aarch64
 it needs glibc 2.35 or newer, the same as TensorRT itself. The TensorRT-RTX and Python-only
@@ -71,6 +77,11 @@ To pick up a change before it ships, or to report a problem against ``main``:
 * ``--upgrade`` is required if a nightly is already installed, or pip keeps the old one and
   tells you nothing.
 * PyPI stays in the list because TensorRT is not published on the nightly channel.
+* On Windows, install PyTorch first, with
+  ``pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu132``.
+  Then add ``--extra-index-url https://download.pytorch.org/whl/nightly/cpu`` to the command.
+  ExecuTorch's Windows nightly needs torchao, and only that index carries its Windows build.
+  With PyTorch already installed, pip does not take the CPU build of PyTorch from that index.
 * Keep PyTorch, ExecuTorch and Torch-TensorRT on the same channel.
 
 ----

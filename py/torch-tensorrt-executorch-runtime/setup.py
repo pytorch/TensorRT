@@ -488,12 +488,7 @@ class PlatformDistribution(Distribution):
 # environment means that environment has to be present. The CUDA check leads, so an unsupported
 # CUDA says so before anything else is attempted rather than failing later and less clearly.
 require_supported_cuda()
-runtime_version = get_runtime_version()
 executorch_version = installed_version("executorch")
-# A wheel for PyPI has no local label, because PyPI refuses one, and neither does PyPI's ExecuTorch,
-# so its requirement drops the label too. Every other build names the exact CUDA build it linked.
-if "+" not in runtime_version:
-    executorch_version = public_version(executorch_version)
 tensorrt_version = installed_version(TENSORRT_DISTRIBUTION)
 cuda_requirements = []
 # NVIDIA's CUDA runtime pip wheels are Linux-only. Windows uses the CUDA
@@ -505,7 +500,7 @@ if sys.platform != "win32":
     ]
 setup(
     name="torch-tensorrt-executorch-runtime",
-    version=runtime_version,
+    version=get_runtime_version(),
     description="Torch-TensorRT delegate for the ExecuTorch Python runtime",
     packages=find_packages(),
     distclass=PlatformDistribution,

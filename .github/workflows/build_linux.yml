@@ -337,7 +337,7 @@ jobs:
           key: trt-bazel-${{ inputs.architecture }}-${{ matrix.desired_cuda }}-rtx${{ inputs.use-rtx }}-${{ hashFiles('**/MODULE.bazel', '**/WORKSPACE', '**/.bazelrc', '**/dev_dep_versions.yml') }}
           restore-keys: |
             trt-bazel-${{ inputs.architecture }}-${{ matrix.desired_cuda }}-rtx${{ inputs.use-rtx }}-
-      # Named before either wheel is built: the main wheel's executorch extra requires exactly this
+      # Named before either wheel is built: the main wheel's executorch extra can require exactly this
       # companion, and the companion build below takes its version from the same variable.
       - name: Name the ExecuTorch runtime companion
         if: ${{ inputs.build-executorch-runtime }}
@@ -348,6 +348,10 @@ jobs:
           source "${BUILD_ENV_FILE}"
           version="$(${CONDA_RUN} python packaging/executorch_runtime_version.py ${{ inputs.is-release-wheel }})"
           echo "TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION=${version}" >> "${GITHUB_ENV}"
+          # A release wheel goes to PyPI. Any other build goes to this run's PyTorch channel.
+          if [[ ${{ inputs.is-release-wheel }} != true ]]; then
+            echo "TORCH_TENSORRT_EXECUTORCH_RUNTIME_CHANNEL=${CHANNEL}" >> "${GITHUB_ENV}"
+          fi
       - name: Build the wheel (python-build-package)
         if: ${{ inputs.build-platform == 'python-build-package' }}
         working-directory: ${{ inputs.repository }}
@@ -447,17 +451,19 @@ jobs:
               sys.exit("The main wheel declares no CUDA 13 TensorRT dependencies")
           subprocess.check_call([sys.executable, "-m", "pip", "install", *tensorrt])
           PY
-          # The nightly channel is named directly rather than through the channel variable, on release
-          # rows too, because the pin is a dated development build that only that channel carries.
-          # The default index stays in the set for the other requirements, which means a pin naming a
-          # version the default index also publishes could resolve to the processor-only build from
-          # there. What refuses that is the delegate's own build, which reads the installed
+          # Both channels that carry a pinned ExecuTorch are named directly rather than through the
+          # channel variable: a dated development build is only on the nightly channel, and a release
+          # is on the test channel. The default index stays in the set for the other requirements,
+          # which means a pin naming a version the default index also publishes could resolve to the
+          # processor-only build from there. pip prefers the labelled CUDA build of the same version,
+          # and what refuses the other is the delegate's own build, which reads the installed
           # ExecuTorch's local label and stops unless it names a CUDA build, so the failure is a clear
           # message rather than a configure error about a missing extension.
           # The version itself comes from the requirement file, so moving the pin to a newer
           # nightly changes no file in this directory.
           ${CONDA_RUN} python -m pip install pyyaml patchelf "wheel>=0.40" \
             --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" \
+            --extra-index-url "https://download.pytorch.org/whl/test/${CU_VERSION}" \
             -r packaging/executorch_pin.txt
           echo "TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION=${TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION:?}"
           ${CONDA_RUN} python -m pip wheel --no-build-isolation --no-deps --wheel-dir dist \
