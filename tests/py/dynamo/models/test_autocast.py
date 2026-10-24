@@ -95,6 +95,43 @@ def test_no_pytorch_autocast():
 
 @pytest.mark.unit
 @pytest.mark.critical
+def test_trace_without_autocast_then_compile_with_autocast():
+    class TupleMetadataModel(nn.Module):
+        def forward(self, x):
+            return torch.nn.functional.max_pool2d(x, kernel_size=2, stride=2)
+
+    model = TupleMetadataModel().cuda().eval()
+    inputs = (torch.randn((2, 3, 8, 8), dtype=torch.float32, device="cuda"),)
+
+    # trace() applies one-shot decompositions by default. Some decomposed operators
+    # carry tuple-valued meta["val"], which compile(..., enable_autocast=True) must
+    # handle before it reruns decompositions for the autocast-inserted nodes.
+    ep = torch_tensorrt.dynamo.trace(model, inputs)
+    assert any(
+        isinstance(node.meta.get("val"), tuple)
+        for node in ep.graph.nodes
+        if node.op == "call_function"
+    )
+    compiled = torch_tensorrt.dynamo.compile(
+        ep,
+        arg_inputs=inputs,
+        min_block_size=1,
+        enable_autocast=True,
+        autocast_low_precision_type=torch.float16,
+    )
+
+    actual = compiled(*inputs)
+    expected = model(*inputs)
+    torch.testing.assert_close(
+        actual.to(torch.float32),
+        expected,
+        atol=1e-2,
+        rtol=1e-2,
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.critical
 def test_whole_pytorch_autocast():
     class WholePytorchAutocastModel(nn.Module):
         def __init__(self):
