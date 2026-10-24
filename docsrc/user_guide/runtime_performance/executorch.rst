@@ -38,16 +38,21 @@ version. Swap ``cu132`` for ``cu134`` on CUDA 13.4:
       --index-url https://download.pytorch.org/whl/cu132 \
       --extra-index-url https://pypi.org/simple
 
-The PyTorch channel is needed because the CUDA build of ExecuTorch is published only there.
+The PyTorch channel is needed because PyPI has only a CPU build of ExecuTorch, and no delegate
+that matches your wheel. PyPI stays in the list for TensorRT and the other dependencies.
 
 What the command installs
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 * ExecuTorch, the CUDA build, from the ``executorch`` extra. That is all you need to export.
 * ``torch-tensorrt-executorch-runtime``, one shared library holding the TensorRT delegate,
-  which you need to run a ``.pte``. The extra installs the one built together with your
-  Torch-TensorRT wheel, for the same CUDA version. It requires the exact ExecuTorch build
-  it was compiled against, so you get that one rather than the newest.
+  which you need to run a ``.pte``. Where the extra brings it (see below), it installs the one
+  built together with your Torch-TensorRT wheel, for the same CUDA version. It requires the
+  exact ExecuTorch build it was compiled against, so you get that one rather than the newest.
+
+The extra brings the delegate for a nightly wheel whose ExecuTorch pin is a development build,
+as on main today, and for a release whose pin is an ExecuTorch release, from the PyTorch channel
+or, on Linux, from PyPI. A wheel you build yourself does not bring it.
 
 This works for the standard Linux (x86-64 and aarch64) and Windows x86-64 wheels. On aarch64
 it needs glibc 2.35 or newer, the same as TensorRT itself. The TensorRT-RTX and Python-only

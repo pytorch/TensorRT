@@ -68,3 +68,9 @@ will result in a minor version bump and significant bug fixes will result in a p
         - TODO: Build a manylinux container for aarch64
         - `docker run -it -v$(pwd)/..:/workspace/Torch-TensorRT build_torch_tensorrt_wheel /bin/bash /workspace/Torch-TensorRT/py/build_whl.sh` generates all wheels
             - To build container `docker build -t build_torch_tensorrt_wheel .`
+
+7. Publish ExecuTorch and the ExecuTorch delegate before torch-tensorrt
+    - A release that pins an ExecuTorch release requires `torch-tensorrt-executorch-runtime` from its `executorch` extra. pip does not fail when it cannot meet that extra. It quietly installs another torch-tensorrt, which brings no delegate.
+    - Stable index: set `TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION` with the other release versions, then promote `executorch`, then `torch_tensorrt_executorch_runtime`, then `torch_tensorrt`.
+    - PyPI: the release workflows build every wheel for cu132 and cu134. Release wheels carry no CUDA label, so the cu132 and cu134 wheels share file names and only one set can go to PyPI. Upload the cu132 set, because PyTorch's and ExecuTorch's Linux wheels on PyPI are CUDA 13.2 builds. Upload `executorch`, whose Linux wheels must be its CUDA 13.2 build, then the cu132 Linux `torch-tensorrt-executorch-runtime` wheels (PyPI's Windows ExecuTorch is the CPU build, which the delegate cannot load), then the cu132 `torch-tensorrt` wheels.
+    - Then check in a fresh environment that `pip install --dry-run "torch_tensorrt[executorch]"` lists `torch-tensorrt-executorch-runtime`.

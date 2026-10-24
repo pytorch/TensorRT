@@ -13,6 +13,7 @@ import os
 import re
 import runpy
 import shlex
+import shutil
 import subprocess
 import sys
 import types
@@ -538,14 +539,10 @@ def test_derived_requirements_match_the_pin(monkeypatch) -> None:
             for element in getattr(value, "elts", [])
             if isinstance(element, ast.Name)
         ]
-        assert named.count("EXECUTORCH_REQUIREMENT") == 1, (
-            f"extra {getattr(key, 'value', key)!r} does not reference "
-            f"EXECUTORCH_REQUIREMENT exactly once: {named}. The authoring extra "
-            "must follow the source pin without waiting for a companion wheel."
-        )
-        assert "EXECUTORCH_RUNTIME_REQUIREMENT" not in named, (
-            f"extra {getattr(key, 'value', key)!r} depends on the native companion: "
-            f"{named}. Install its matching build separately."
+        assert named == ["EXECUTORCH_REQUIREMENT"], (
+            f"extra {getattr(key, 'value', key)!r} should name only EXECUTORCH_REQUIREMENT, "
+            f"found {named}. Source builds follow the source pin; a published build adds "
+            "its companion after this literal."
         )
 
     # The doc build reads the pin through shell substitution, outside the literal scan.
@@ -574,24 +571,39 @@ def _companion_version(build_version: str, cuda: str, release_wheel: bool) -> st
     return script["companion_version"](build_version, cuda, release_wheel)
 
 
-def _published_extras(monkeypatch, companion, release: bool = True) -> dict:
-    """Run setup.py's companion requirement block with the companion the workflow named."""
+def _published_extras(
+    monkeypatch,
+    companion,
+    release: bool = True,
+    channel: str | None = "nightly",
+    executorch_version: str | None = None,
+) -> dict:
+    """Run setup.py's companion requirement block with what the workflow named.
+
+    ``executorch_version`` stands in for the repository's ExecuTorch pin.
+    """
     tree = ast.parse((REPO_ROOT / "setup.py").read_text(encoding="utf-8"))
     blocks = [
         node
         for node in tree.body
         if isinstance(node, (ast.Assign, ast.If))
-        and "EXECUTORCH_RUNTIME_VERSION"
-        in {n.id for n in ast.walk(node) if isinstance(n, ast.Name)}
+        and {"EXECUTORCH_RUNTIME_VERSION", "EXECUTORCH_CHANNEL"}
+        & {n.id for n in ast.walk(node) if isinstance(n, ast.Name)}
     ]
-    assert len(blocks) == 2, "setup.py no longer names the companion in one place"
-    if companion is None:
-        monkeypatch.delenv("TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION", raising=False)
-    else:
-        monkeypatch.setenv("TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION", companion)
+    assert len(blocks) == 4, "setup.py's companion requirement blocks changed shape"
+    for variable, value in (
+        ("TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION", companion),
+        ("TORCH_TENSORRT_EXECUTORCH_RUNTIME_CHANNEL", channel),
+    ):
+        if value is None:
+            monkeypatch.delenv(variable, raising=False)
+        else:
+            monkeypatch.setenv(variable, value)
     requirement = _setup_py_requirement(_versions()["__executorch_version__"])
     namespace: dict = {
         "os": os,
+        "__executorch_version__": executorch_version
+        or _versions()["__executorch_version__"],
         "RELEASE": release,
         "EXECUTORCH_REQUIREMENT": requirement,
         "EXTRAS_REQUIRE": {"executorch": [requirement], "all": [requirement]},
@@ -609,6 +621,65 @@ def _companion_requirements(extras: dict) -> list:
     ]
 
 
+_DEVELOPMENT_PIN = "1.6.0.dev20261009"
+_RELEASE_PIN = "1.6.0"
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "build_version, cuda, release_wheel, channel, pin, required",
+    [
+        # Nightly wheels pinning a development build: the nightly index carries all three.
+        ("2.16.0.dev20261019+cu132", "cu132", False, "nightly", _DEVELOPMENT_PIN, True),
+        ("2.16.0.dev20261019+cu134", "cu134", False, "nightly", _DEVELOPMENT_PIN, True),
+        # A release candidate pinning an ExecuTorch release: the test index carries all three.
+        ("2.16.0+cu132", "cu132", False, "test", _RELEASE_PIN, True),
+        ("2.16.0+cu134", "cu134", False, "test", _RELEASE_PIN, True),
+        # The pinned ExecuTorch is not on the wheel's index, so the companion cannot install.
+        ("2.16.0+cu132", "cu132", False, "test", _DEVELOPMENT_PIN, False),
+        ("2.16.0.dev20261019+cu132", "cu132", False, "nightly", _RELEASE_PIN, False),
+        # PyPI carries an ExecuTorch release, as the CUDA build for PyTorch's PyPI CUDA version.
+        ("2.16.0+cu132", "cu132", True, "pypi", _RELEASE_PIN, True),
+        ("2.16.0+cu132", "cu132", True, "pypi", _DEVELOPMENT_PIN, False),
+        # A Windows PyPI wheel records no channel: PyPI's Windows ExecuTorch is the CPU build.
+        ("2.16.0+cu132", "cu132", True, None, _RELEASE_PIN, False),
+    ],
+)
+def test_published_extras_require_the_companion_built_beside_them(
+    monkeypatch, build_version, cuda, release_wheel, channel, pin, required
+):
+    """A wheel requires exactly the companion its own job built, CUDA label included, where it can.
+
+    It can where the wheel's own index also carries the ExecuTorch build the companion pins. pip
+    answers an extra it cannot meet by quietly installing another torch-tensorrt, so everywhere
+    else the extra must not name the companion. Without the label a cu134 wheel accepts a cu132
+    companion, so upgrading from the cu132 index to the cu134 one keeps the old companion and the
+    ExecuTorch and CUDA runtime it pins.
+    """
+    main = (REPO_ROOT / "version.txt").read_text().strip().removesuffix("a0")
+    build_version = build_version.replace("2.16.0", main)
+    companion = _companion_version(build_version, cuda, release_wheel)
+    marker = Requirement(
+        _setup_py_requirement(_versions()["__executorch_version__"])
+    ).marker
+    requirements = _companion_requirements(
+        _published_extras(
+            monkeypatch, companion, channel=channel, executorch_version=pin
+        )
+    )
+    assert len(requirements) == (2 if required else 0), requirements
+    for requirement in requirements:
+        assert str(requirement.specifier) == f"=={companion}"
+        assert str(requirement.marker) == str(marker)
+        # PyPI holds one companion, so only a labelled one has another CUDA build to refuse.
+        if release_wheel:
+            continue
+        other = "cu134" if cuda == "cu132" else "cu132"
+        assert not requirement.specifier.contains(
+            companion.replace(cuda, other), prereleases=True
+        ), f"{requirement} accepts the {other} companion"
+
+
 @pytest.mark.unit
 @pytest.mark.parametrize(
     "build_version, cuda, release_wheel, expected",
@@ -619,36 +690,20 @@ def _companion_requirements(extras: dict) -> list:
         ("2.16.0+cu132", "cu132", True, ""),
     ],
 )
-def test_published_extras_require_the_companion_built_beside_them(
-    monkeypatch, build_version, cuda, release_wheel, expected
+def test_the_companion_takes_the_wheel_s_suffix_and_label(
+    build_version, cuda, release_wheel, expected
 ):
-    """A published wheel requires exactly the companion its own job built, CUDA label included.
-
-    Without the label a cu134 wheel accepts a cu132 companion, so upgrading from the cu132 index
-    to the cu134 one keeps the old companion and the ExecuTorch and CUDA runtime it pins.
-    """
+    """The companion keeps its own base version and takes the wheel's suffix and CUDA label."""
     main = (REPO_ROOT / "version.txt").read_text().strip().removesuffix("a0")
-    build_version = build_version.replace("2.16.0", main)
     base = (
         (REPO_ROOT / "py/torch-tensorrt-executorch-runtime/version.txt")
         .read_text()
         .strip()
     )
-    companion = _companion_version(build_version, cuda, release_wheel)
+    companion = _companion_version(
+        build_version.replace("2.16.0", main), cuda, release_wheel
+    )
     assert companion == f"{base}{expected}"
-    marker = Requirement(
-        _setup_py_requirement(_versions()["__executorch_version__"])
-    ).marker
-    requirements = _companion_requirements(_published_extras(monkeypatch, companion))
-    assert len(requirements) == 2, requirements
-    for requirement in requirements:
-        assert str(requirement.specifier) == f"=={companion}"
-        assert str(requirement.marker) == str(marker)
-        if not release_wheel:
-            other = "cu134" if cuda == "cu132" else "cu132"
-            assert not requirement.specifier.contains(
-                companion.replace(cuda, other), prereleases=True
-            ), f"{requirement} accepts the {other} companion"
 
 
 @pytest.mark.unit
@@ -666,6 +721,17 @@ def test_an_unexpected_build_version_is_refused():
         _companion_version("9.9.9.dev20261019+cu132", "cu132", False)
 
 
+_NAMING_GATES = {
+    "build_linux.yml": "${{ inputs.build-executorch-runtime }}",
+    # Windows builds no companion for ARM64, cross-compiled, Python-only, RTX or tarball jobs.
+    "build_windows.yml": (
+        "${{ inputs.build-executorch-runtime && inputs.architecture == 'x64' && "
+        "!inputs.cross-compile && !inputs.python-only && !inputs.use-rtx && "
+        "!inputs.is-release-tarball }}"
+    ),
+}
+
+
 @pytest.mark.unit
 @pytest.mark.parametrize(
     "workflow, main_build",
@@ -675,12 +741,13 @@ def test_an_unexpected_build_version_is_refused():
     ],
 )
 def test_the_companion_and_the_requirement_on_it_share_one_version(
-    workflow, main_build
+    tmp_path, workflow, main_build
 ):
     """Each build workflow names the companion once, before the main wheel is built.
 
     The main wheel's requirement and the companion build both read that one variable, so they
-    cannot name different versions, and only a job that names a companion builds one.
+    cannot name different versions, and only a job that names a companion builds one. The step
+    is run, not read, so a disabled export fails here.
     """
     steps = yaml.safe_load((REPO_ROOT / ".github/workflows" / workflow).read_text())[
         "jobs"
@@ -692,17 +759,75 @@ def test_the_companion_and_the_requirement_on_it_share_one_version(
         main_build
     )
     assert names.index(main_build) < names.index("Build the ExecuTorch runtime wheel")
-    assert (
-        "python packaging/executorch_runtime_version.py ${{ inputs.is-release-wheel }}"
-        in naming["run"]
-    )
-    assert (
-        'TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION=${version}" >> "${GITHUB_ENV}"'
-        in (naming["run"])
-    )
+    # The gate decides whether the companion is named and built; setup.py decides whether the
+    # extra then requires it.
+    assert naming["if"] == _NAMING_GATES[workflow]
+    main = (REPO_ROOT / "version.txt").read_text().strip().removesuffix("a0")
+    for release_wheel, channel, build_version in (
+        (False, "nightly", f"{main}.dev20261019+cu132"),
+        (False, "test", f"{main}+cu132"),
+        (True, "test", main),
+    ):
+        recorded = _run_naming_step(
+            tmp_path / f"{release_wheel}-{channel}",
+            naming["run"],
+            release_wheel,
+            {"BUILD_VERSION": build_version, "CU_VERSION": "cu132", "CHANNEL": channel},
+        )
+        expected = {
+            "TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION": _companion_version(
+                build_version, "cu132", release_wheel
+            )
+        }
+        # A release wheel goes to PyPI, whatever PyTorch channel the run is on. PyPI's Windows
+        # ExecuTorch is the CPU build, so a Windows release wheel records no channel.
+        if not release_wheel:
+            expected["TORCH_TENSORRT_EXECUTORCH_RUNTIME_CHANNEL"] = channel
+        elif workflow == "build_linux.yml":
+            expected["TORCH_TENSORRT_EXECUTORCH_RUNTIME_CHANNEL"] = "pypi"
+        assert recorded == expected, (workflow, release_wheel, channel)
     assert build["if"] == "${{ env.TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION != '' }}"
     assert "export TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION" not in build["run"]
     assert "version.txt" not in build["run"]
+
+
+def _run_naming_step(root: Path, script: str, release_wheel: bool, env: dict) -> dict:
+    """Run a workflow's naming step in bash and return what it wrote to GITHUB_ENV."""
+    packaging = root / "packaging"
+    packaging.mkdir(parents=True)
+    shutil.copy2(REPO_ROOT / "packaging/executorch_runtime_version.py", packaging)
+    shutil.copy2(REPO_ROOT / "version.txt", root)
+    runtime = root / "py/torch-tensorrt-executorch-runtime"
+    runtime.mkdir(parents=True)
+    shutil.copy2(
+        REPO_ROOT / "py/torch-tensorrt-executorch-runtime/version.txt", runtime
+    )
+    (root / "build-env").write_text("export CONDA_RUN=''\n")
+    (root / "bin").mkdir()
+    (root / "bin/python").symlink_to(sys.executable)
+    result = subprocess.run(
+        [
+            shutil.which("bash"),
+            "-c",
+            script.replace(
+                "${{ inputs.is-release-wheel }}", str(release_wheel).lower()
+            ),
+        ],
+        cwd=root,
+        env={
+            "PATH": f"{root / 'bin'}{os.pathsep}{os.environ['PATH']}",
+            "BUILD_ENV_FILE": str(root / "build-env"),
+            "GITHUB_ENV": str(root / "github-env"),
+            **env,
+        },
+        text=True,
+        capture_output=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    return dict(
+        line.split("=", 1) for line in (root / "github-env").read_text().splitlines()
+    )
 
 
 _RUNTIME_SETUP_PY = "py/torch-tensorrt-executorch-runtime/setup.py"
@@ -3065,14 +3190,36 @@ def test_the_install_script_leaves_the_companion_out(tmp_path, branch):
 
 
 @pytest.mark.unit
-def test_every_requirement_file_install_names_the_nightly_channel():
+def test_the_readme_pin_install_names_both_executorch_channels():
+    """The README's build-time install names the exact pin, so it needs the index the pin lives on.
+
+    A development build is only on the nightly index and a release only on the test index. Without
+    the test index, a release pin resolves to PyPI's processor-only build and the delegate build
+    stops.
+    """
+    path = "py/torch-tensorrt-executorch-runtime/README.md"
+    pin = f'"executorch=={_versions()["__executorch_version__"]}"'
+    lines = (REPO_ROOT / path).read_text().splitlines()
+    numbers = [n for n, line in enumerate(lines, 1) if pin in line]
+    assert numbers, f"{path} no longer installs {pin}, so this test is not looking"
+    for number in numbers:
+        command = _pip_command_around(path, number)
+        for channel in ("nightly", "test"):
+            assert (
+                f"download.pytorch.org/whl/{channel}/${{CU_VERSION}}" in command
+            ), f"{path}:{number} installs the pin without the {channel} channel"
+
+
+@pytest.mark.unit
+def test_every_requirement_file_install_names_both_executorch_channels():
     """A ``-r`` install carries no requirement literal, so the channel scan cannot see it.
 
     That scan walks requirement literals inside pip commands, which is how it checks the index.
-    Passing the pin through a file removes the literal from the command, so without this the
-    nightly channel could be dropped or pointed at another index and every other guard here
-    would still pass. ExecuTorch's CUDA wheels exist only on the nightly index, so an install
-    that names another one resolves to a processor-only build.
+    Passing the pin through a file removes the literal from the command, so without this a
+    channel could be dropped or pointed at another index and every other guard here would still
+    pass. ExecuTorch's CUDA wheels exist only on PyTorch's indexes: a development build on the
+    nightly one, a release on the test one. An install missing the channel of the current pin
+    resolves to a processor-only build, and one missing the other breaks when the pin moves.
     """
     wrong = []
     for line in _git("grep", "-nI", "-e", "-r packaging/executorch_").splitlines():
@@ -3080,12 +3227,14 @@ def test_every_requirement_file_install_names_the_nightly_channel():
         if _is_source_test(path):
             continue
         command = _pip_command_around(path, int(number))
-        if not re.search(
-            r"download\.pytorch\.org/whl/nightly/\$\{CU_VERSION\}", command
-        ):
-            wrong.append(
-                f"{path}:{number} installs a pinned requirement file without the nightly channel"
-            )
+        for channel in ("nightly", "test"):
+            if not re.search(
+                rf"download\.pytorch\.org/whl/{channel}/\$\{{CU_VERSION\}}", command
+            ):
+                wrong.append(
+                    f"{path}:{number} installs a pinned requirement file without the "
+                    f"{channel} channel"
+                )
     assert not wrong, wrong
     assert _git(
         "grep", "-lI", "-e", "-r packaging/executorch_"
