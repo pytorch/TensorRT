@@ -215,6 +215,8 @@ class TestConvolutionConverter(DispatchTestCase):
         [
             ("default", 1),
             param("no_bias", 1, bias=False),
+            param("fp16", 3, padding=1, dtype=torch.float16),
+            param("fp16_groups", 3, padding=1, groups=3, dtype=torch.float16),
             ("tuple_parameters", 1, (1, 1, 1), (1, 1, 1)),
             param("list_stride", 2, stride=[2]),
             param("non_zero_padding", 1, padding=1),
@@ -235,8 +237,10 @@ class TestConvolutionConverter(DispatchTestCase):
         dilation=1,
         groups=1,
         bias=True,
+        dtype=torch.float32,
     ):
-        skip_if_trt_rtx_turing(self, "3D convolution")
+        if dtype == torch.float32 or (dtype == torch.float16 and groups > 1):
+            skip_if_trt_rtx_turing(self, "FP32 or grouped FP16 3D convolution")
 
         class TestModule(torch.nn.Module):
             def __init__(self):
@@ -248,9 +252,9 @@ class TestConvolutionConverter(DispatchTestCase):
             def forward(self, x):
                 return self.conv(x)
 
-        inputs = [torch.randn(1, 3, 32, 32, 32)]
+        inputs = [torch.randn(1, 3, 32, 32, 32, dtype=dtype)]
         self.run_test(
-            TestModule(),
+            TestModule().to(dtype),
             inputs,
             use_dynamo_tracer=True,
             enable_passes=True,
@@ -259,8 +263,10 @@ class TestConvolutionConverter(DispatchTestCase):
     # Testing with (-1, -1, -1, -1, -1) results into Error:
     # AssertionError: Channel dim can't be dynamic for convolution.
 
-    def test_conv3d_with_dynamic_shape(self):
-        skip_if_trt_rtx_turing(self, "3D convolution")
+    @parameterized.expand([("fp32", torch.float32), ("fp16", torch.float16)])
+    def test_conv3d_with_dynamic_shape(self, _, dtype):
+        if dtype == torch.float32:
+            skip_if_trt_rtx_turing(self, "FP32 3D convolution")
 
         class TestModule(torch.nn.Module):
             def __init__(self):
@@ -273,12 +279,12 @@ class TestConvolutionConverter(DispatchTestCase):
         input_specs = [
             Input(
                 shape=(-1, 3, -1, -1, -1),
-                dtype=torch.float32,
+                dtype=dtype,
                 shape_ranges=[((1, 3, 1, 1, 1), (2, 3, 4, 4, 4), (8, 3, 32, 32, 32))],
             ),
         ]
         self.run_test_with_dynamic_shape(
-            TestModule(),
+            TestModule().to(dtype),
             input_specs,
             use_dynamo_tracer=True,
             enable_passes=True,

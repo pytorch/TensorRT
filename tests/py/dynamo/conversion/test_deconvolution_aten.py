@@ -1,15 +1,13 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
-import unittest
-
 import torch
 import torch_tensorrt
 from parameterized import param, parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
 
-from .harness import DispatchTestCase
+from .harness import DispatchTestCase, skip_if_trt_rtx_turing
 
 
 def _any_gt_1(v):
@@ -269,6 +267,7 @@ class TestDeconvolutionConverter(DispatchTestCase):
         output_padding=0,
     ):
         _skip_if_rtx_strided_dilated_deconv(self, stride, dilation)
+        skip_if_trt_rtx_turing(self, "FP32 3D deconvolution")
 
         class TestModule(torch.nn.Module):
             def __init__(self):
@@ -300,6 +299,8 @@ class TestDeconvolutionConverter(DispatchTestCase):
     # AssertionError: Channel dim can't be dynamic for deconvolution.
 
     def test_deconv3d_with_dynamic_shape(self):
+        skip_if_trt_rtx_turing(self, "FP32 3D deconvolution")
+
         class TestModule(torch.nn.Module):
             def __init__(self):
                 super().__init__()

@@ -3754,40 +3754,45 @@ _CONV_ARG_INPUT = 0
 _CONV_ARG_STRIDE = 3
 _CONV_ARG_DILATION = 5
 _CONV_ARG_TRANSPOSED = 6
+_CONV_ARG_GROUPS = 8
 
 
-def turing_rejects_forward_convolution(
-    node: Node,
+def turing_rejects_convolution(
+    dtype: Optional[torch.dtype],
     spatial_rank: Optional[int],
     settings: Optional[CompilationSettings] = None,
+    *,
+    node_name: str,
+    transposed: bool,
+    groups: int = 1,
 ) -> bool:
-    """Whether a forward convolution over ``spatial_rank`` spatial dims must fall back.
+    """Reject FP32 3D convolution and deconvolution on Turing.
 
-    No valid kernel config for 3D ConvFwd on SM 7.5 for TensorRT-RTX, a known gap.
-    Transposed 3D is a distinct layer and is unaffected, so callers must only ask about
-    non-transposed convolutions.
+    Also reject grouped FP16 forward 3D convolution.
     """
-    unsupported_spatial_rank = 3
-    if spatial_rank != unsupported_spatial_rank:
+    if spatial_rank != 3 or not trt_rtx_targets_turing(settings):
         return False
-    if not trt_rtx_targets_turing(settings):
-        return False
-    _LOGGER.debug(
-        "3D convolution '%s' is not supported on TensorRT-RTX for Turing "
-        "(SM 7.5). Falling back to PyTorch.",
-        node.name,
-    )
-    return True
+    is_grouped_fp16_forward = dtype == torch.float16 and groups > 1 and not transposed
+    if dtype == torch.float32 or is_grouped_fp16_forward:
+        _LOGGER.debug(
+            "TensorRT-RTX cannot execute 3D convolution '%s' on Turing (SM 7.5) "
+            "with dtype=%s, groups=%s, and transposed=%s. Use PyTorch.",
+            node_name,
+            dtype,
+            groups,
+            transposed,
+        )
+        return True
+    return False
 
 
 def convolution_capability_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
-    """Reject transposed convolutions (deconvolutions) that combine
-    stride > 1 with dilation > 1 on TensorRT-RTX — there is no kernel
-    for this case and the build fails with "Strided & Dilated Deconv
-    are currently not supported". Applies to 1D / 2D / 3D ConvTranspose;
-    regular convolutions are unaffected.
+    """Reject convolutions that TRT-RTX cannot execute.
+
+    TRT-RTX does not support transposed convolution with stride > 1 and dilation > 1.
+    On Turing, reject FP32 3D convolution, FP32 3D deconvolution, and grouped FP16 3D convolution.
     """
     if not ENABLED_FEATURES.tensorrt_rtx:
         return True
@@ -3806,17 +3811,21 @@ def convolution_capability_validator(
         )
         return False
 
-    # aten.convolution input is (N, C, *spatial), so ndim - 2 is the spatial rank.
-    # Like every validator in this module this relies on meta["val"] and fails open
-    # when it is absent.
-    if not args_bounds_check(node.args, _CONV_ARG_TRANSPOSED):
-        input_node = node.args[_CONV_ARG_INPUT]
-        val = input_node.meta.get("val") if hasattr(input_node, "meta") else None
-        spatial_rank = val.ndim - 2 if val is not None else None
-        if turing_rejects_forward_convolution(node, spatial_rank, settings):
-            return False
-
-    return True
+    input_node = node.args[_CONV_ARG_INPUT]
+    if (val := getattr(input_node, "meta", {}).get("val")) is not None:
+        dtype = val.dtype
+        spatial_rank = val.ndim - 2
+    else:
+        dtype = None
+        spatial_rank = None
+    return not turing_rejects_convolution(
+        dtype,
+        spatial_rank,
+        settings,
+        node_name=node.name,
+        transposed=args_bounds_check(node.args, _CONV_ARG_TRANSPOSED, False),
+        groups=args_bounds_check(node.args, _CONV_ARG_GROUPS, 1),
+    )
 
 
 @dynamo_tensorrt_converter(
