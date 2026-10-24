@@ -38,13 +38,23 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 def conv_asym_pad_capability_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
-    """Apply the Turing forward convolution checks after padding fusion."""
+    """Apply the Turing forward convolution checks after padding fusion.
+
+    ``fuse_pad_into_convolution`` replaces constant_pad_nd and aten.convolution
+    with this operation during normal compilation. The ATen convolution validator
+    no longer sees the convolution node. Apply the same guard here because an
+    unsupported convolution can cause execution context creation to fail at runtime.
+    The fusion pass skips transposed convolution.
+    """
+    input_node = node.args[0]
+    val = getattr(input_node, "meta", {}).get("val")
     stride = args_bounds_check(node.args, 3)
     spatial_rank = len(stride) if stride is not None else None
     return not turing_rejects_convolution(
-        node,
+        getattr(val, "dtype", None),
         spatial_rank,
         settings,
+        node_name=node.name,
         transposed=False,
         groups=args_bounds_check(node.args, 7, 1),
     )

@@ -3758,10 +3758,11 @@ _CONV_ARG_GROUPS = 8
 
 
 def turing_rejects_convolution(
-    node: Node,
+    dtype: Optional[torch.dtype],
     spatial_rank: Optional[int],
     settings: Optional[CompilationSettings] = None,
     *,
+    node_name: str,
     transposed: bool,
     groups: int = 1,
 ) -> bool:
@@ -3771,16 +3772,12 @@ def turing_rejects_convolution(
     """
     if spatial_rank != 3 or not trt_rtx_targets_turing(settings):
         return False
-    input_node = node.args[0]
-    val = input_node.meta.get("val") if hasattr(input_node, "meta") else None
-    dtype = getattr(val, "dtype", None)
-    if dtype == torch.float32 or (
-        dtype == torch.float16 and groups > 1 and not transposed
-    ):
+    is_grouped_fp16_forward = dtype == torch.float16 and groups > 1 and not transposed
+    if dtype == torch.float32 or is_grouped_fp16_forward:
         _LOGGER.debug(
             "TensorRT-RTX cannot execute 3D convolution '%s' on Turing (SM 7.5) "
             "with dtype=%s, groups=%s, and transposed=%s. Use PyTorch.",
-            node.name,
+            node_name,
             dtype,
             groups,
             transposed,
@@ -3815,12 +3812,17 @@ def convolution_capability_validator(
         return False
 
     input_node = node.args[_CONV_ARG_INPUT]
-    val = input_node.meta.get("val") if hasattr(input_node, "meta") else None
-    spatial_rank = val.ndim - 2 if val is not None else None
+    if (val := getattr(input_node, "meta", {}).get("val")) is not None:
+        dtype = val.dtype
+        spatial_rank = val.ndim - 2
+    else:
+        dtype = None
+        spatial_rank = None
     return not turing_rejects_convolution(
-        node,
+        dtype,
         spatial_rank,
         settings,
+        node_name=node.name,
         transposed=args_bounds_check(node.args, _CONV_ARG_TRANSPOSED, False),
         groups=args_bounds_check(node.args, _CONV_ARG_GROUPS, 1),
     )
