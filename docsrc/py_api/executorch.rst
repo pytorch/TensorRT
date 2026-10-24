@@ -9,7 +9,8 @@ torch_tensorrt.executorch
 
 .. note::
 
-   This module requires ExecuTorch and is only supported on Linux.
+   This module needs the ``executorch`` extra. It runs on Linux, and on Windows x86-64 in builds
+   newer than 2.15. See :ref:`executorch_deployment`.
 
 Overview
 --------

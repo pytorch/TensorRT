@@ -936,15 +936,45 @@ def test_install_channel_guard_rejects_unsupported_nightly_recipes(
 
 @pytest.mark.unit
 @pytest.mark.parametrize(
-    ("path", "command", "allowed"),
+    ("path", "command", "error"),
     [
-        ("docsrc/install.rst", 'pip install "torch-tensorrt[executorch]"', True),
-        ("README.md", 'pip install "torch-tensorrt[executorch]"', False),
-        ("docsrc/install.rst", 'pip install --pre "torch-tensorrt[executorch]"', False),
+        ("docsrc/install.rst", 'pip install "torch-tensorrt[executorch]"', None),
+        (
+            "README.md",
+            'pip install "torch-tensorrt[executorch]"',
+            "names no nightly channel",
+        ),
+        (
+            "docsrc/install.rst",
+            'pip install --pre "torch-tensorrt[executorch]"',
+            "names no nightly channel",
+        ),
+        (
+            "docsrc/install.rst",
+            'pip install --upgrade "torch-tensorrt[executorch]==2.15.*" '
+            '"torch-tensorrt-executorch-runtime==0.2.*" '
+            "--index-url https://download.pytorch.org/whl/cu132 "
+            "--extra-index-url https://download.pytorch.org/whl/test/cu132 "
+            "--extra-index-url https://download.pytorch.org/whl/nightly/cu132",
+            None,
+        ),
+        (
+            "docsrc/install.rst",
+            'pip install "torch-tensorrt[executorch]==2.15.*" '
+            '"torch-tensorrt-executorch-runtime~=0.2.1" '
+            "--extra-index-url https://download.pytorch.org/whl/nightly/cu126",
+            "not a supported",
+        ),
+        (
+            "docsrc/install.rst",
+            'pip install "torch-tensorrt[executorch]" '
+            "--extra-index-url https://download.pytorch.org/whl/nightly/cu132",
+            "without --pre",
+        ),
     ],
 )
 def test_only_user_docs_may_print_the_release_install(
-    tmp_path, monkeypatch, path, command, allowed
+    tmp_path, monkeypatch, path, command, error
 ):
     recipe = tmp_path / path
     recipe.parent.mkdir(parents=True, exist_ok=True)
@@ -952,10 +982,10 @@ def test_only_user_docs_may_print_the_release_install(
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
     subprocess.run(["git", "-C", str(tmp_path), "add", path], check=True)
     monkeypatch.setattr(sys.modules[__name__], "REPO_ROOT", tmp_path)
-    if allowed:
+    if error is None:
         test_every_printed_install_instruction_names_the_nightly_channel()
     else:
-        with pytest.raises(AssertionError, match="names no nightly channel"):
+        with pytest.raises(AssertionError, match=error):
             test_every_printed_install_instruction_names_the_nightly_channel()
 
 
@@ -2106,7 +2136,17 @@ def test_every_printed_install_instruction_names_the_nightly_channel():
             named_distribution = re.fullmatch(
                 r"torch[-_]tensorrt\[[^]]*executorch[^]]*\]", match.group(0)
             )
-            if named_distribution and not re.search(r"(?:^|\s)--pre(?:\s|$)", block):
+            # A release whose extra does not bring the delegate names the delegate's version in the
+            # user docs and takes the nightly channel only for the ExecuTorch build it pins. --pre
+            # there would let pip take nightly builds of everything else.
+            names_release_delegate = name.startswith("docsrc/") and re.search(
+                r"torch[-_]tensorrt[-_]executorch[-_]runtime\s*(?:==|~=)", block
+            )
+            if (
+                named_distribution
+                and not names_release_delegate
+                and not re.search(r"(?:^|\s)--pre(?:\s|$)", block)
+            ):
                 missing.append(
                     f"{name}:{line} installs {match.group(0)} without --pre, so pip resolves the "
                     "stable release rather than allowing the intended nightly prerelease"

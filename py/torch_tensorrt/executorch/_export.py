@@ -593,7 +593,8 @@ def export(
             update discarded. ``torch_tensorrt.save(output_format="executorch",
             zero_copy_kv=True)`` owns both steps and needs only the one flag.
         generate_etrecord (bool): Ask ExecuTorch for an ETRecord for later debugging.
-            This copies the whole program, engines included.
+            This copies the whole program, engines included. Saving the record does not
+            work yet for a program with TensorRT engines: it raises a ``SerializeError``.
         weight_streaming_budget_per_engine (Optional[int]): Bytes of engine weights that
             may stay resident in GPU memory, with the rest streamed from host memory.
             It applies to **each** TensorRT engine separately, not as a total for the
