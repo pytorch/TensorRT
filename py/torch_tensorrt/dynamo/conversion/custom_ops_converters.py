@@ -17,7 +17,7 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     dynamo_tensorrt_converter,
 )
 from torch_tensorrt.dynamo.conversion.aten_ops_converters import (
-    turing_rejects_forward_convolution,
+    turing_rejects_convolution,
 )
 from torch_tensorrt.dynamo.conversion.converter_utils import args_bounds_check
 from torch_tensorrt.dynamo.lowering.passes.fuse_distributed_ops import (
@@ -41,10 +41,11 @@ def conv_asym_pad_capability_validator(
     """Apply the Turing forward convolution checks after padding fusion."""
     stride = args_bounds_check(node.args, 3)
     spatial_rank = len(stride) if stride is not None else None
-    return not turing_rejects_forward_convolution(
+    return not turing_rejects_convolution(
         node,
         spatial_rank,
         settings,
+        transposed=False,
         groups=args_bounds_check(node.args, 7, 1),
     )
 
