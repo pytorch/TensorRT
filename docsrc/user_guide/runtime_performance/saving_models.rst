@@ -16,13 +16,13 @@ Dynamo IR
 -------------
 
 The output type of `ir=dynamo` compilation of Torch-TensorRT is `torch.fx.GraphModule` object by default.
-We can save this object in either `TorchScript` (`torch.jit.ScriptModule`), `ExportedProgram` (`torch.export.ExportedProgram`) or `PT2` formats by
+We can save this object in either `TorchScript` (`torch.jit.ScriptModule`), `ExportedProgram` (`torch.export.ExportedProgram`), `PT2` or ExecuTorch formats by
 specifying the `output_format` flag. Here are the options `output_format` will accept
 
 * `exported_program` : This is the default. We perform transformations on the graphmodule first and use `torch.export.save` to save the module.
 * `torchscript` : We trace the graphmodule via `torch.jit.trace` and save it via `torch.jit.save`.
 * `PT2 Format` : This is a next generation runtime for PyTorch models, allowing them to run in Python and in C++
-* `executorch` : We lower the graphmodule to an ExecuTorch ``.pte`` program, delegating the TensorRT engines to the ExecuTorch backend. Linux-only; requires the ``executorch`` package.
+* `executorch` : We lower the graphmodule to an ExecuTorch ``.pte`` program, with the TensorRT engines stored inside it. Requires the ``executorch`` extra; see :ref:`executorch_deployment`.
 
 a) ExportedProgram
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -227,41 +227,17 @@ c) ExecuTorch (.pte)
 
 .. seealso::
 
-    :ref:`executorch_deployment` is the end to end guide: install the stack, run the
-    saved program from Python and from C++, and tune the runtime. This section covers
-    the saving step itself.
+    :ref:`executorch_deployment` is the end to end guide. It shows how to install the packages,
+    run the saved program from Python and from C++, and tune it at run time. This section covers
+    the saving step.
 
-The ``executorch`` output format lowers the compiled module to an ExecuTorch
-``.pte`` program, delegating the TensorRT engines to the Torch-TensorRT ExecuTorch
-backend. This CUDA integration links CUDA 13 libraries, so it supports Linux with
-any CUDA 13 PyTorch build and needs an ExecuTorch nightly wheel. Install from the
-channel matching your CUDA, for example a CUDA 13.2 environment:
+``output_format="executorch"`` writes an ExecuTorch ``.pte`` program. The TensorRT engines are
+stored in it, and the TensorRT delegate runs them at run time. There are two ways to write one:
 
-.. code-block:: bash
-
-    pip install --pre "torch_tensorrt[executorch]" \
-      --extra-index-url https://download.pytorch.org/whl/nightly/cu132
-
-Substitute the channel for your CUDA, such as ``cu134`` for CUDA 13.4. ExecuTorch
-publishes a channel later than PyTorch does, so a very new CUDA minor may not have
-ExecuTorch wheels yet. Keep PyTorch, ExecuTorch and Torch-TensorRT on the
-same CUDA channel. ``--pre`` permits prereleases; it does not request an upgrade
-of an installed package. An existing version that declares the extra can gain
-its missing dependencies, and dependency resolution may change other packages.
-If an older version does not declare the extra, deliberately install the intended
-compatible Torch-TensorRT wheel first. A fresh virtual environment avoids changing
-an existing working stack.
-
-There are two ways to produce a ``.pte``, and they suit different needs:
-
-* **Use** ``torch_tensorrt.save()``. This is the default, and the right choice
-  whenever a ``.pte`` file is all that is needed. It runs the whole pipeline in one
-  call and writes the file.
-* **Use** ``torch_tensorrt.executorch.export()`` only when the program has to be
-  changed before it is written to disk. It stops at the Edge program, hands it back
-  for inspection or customization, and leaves serialization to the caller.
-
-Start with ``save()``. Reach for ``export()`` when something below is required.
+* ``torch_tensorrt.save()`` does everything in one call and writes the file. Start here.
+* ``torch_tensorrt.executorch.export()`` stops before the file is written, and returns
+  ExecuTorch's Edge program, the form the program has before it becomes a file. Use it to inspect
+  or change the program first, or to put several methods in one file.
 
 Default: ``save()``
 """""""""""""""""""
@@ -270,61 +246,103 @@ Default: ``save()``
 
     import torch
     import torch_tensorrt
-    import torch_tensorrt.executorch
 
     model = MyModel().eval().cuda()
     inputs = [torch.randn((1, 3, 224, 224)).cuda()]
     trt_gm = torch_tensorrt.compile(model, ir="dynamo", arg_inputs=inputs)
     torch_tensorrt.save(trt_gm, "trt.pte", output_format="executorch")
 
-``save`` writes both the ``.pte`` and any external ``.ptd`` tensor-data files.
+``save()`` writes the ``.pte``, and any ``.ptd`` data files next to it. It writes one method,
+``forward``, plus any constant methods you pass.
+
+.. note::
+
+    Saving the graph as it is by default is nightly only. In Torch-TensorRT 2.15, ``save()``
+    re-exports the graph by default, so on 2.15 add ``retrace=False`` to every ``save()`` call shown
+    here.
+
+These keyword arguments of ``save()`` apply only to this format. With any other format they log a
+warning and are ignored. With this format, an unknown keyword raises a ``TypeError``.
+
+* ``partitioners``: more partitioners, run after TensorRT's. For example, a ``CudaPartitioner``
+  sends the operators TensorRT rejects to ExecuTorch's CUDA backend. See
+  :ref:`executorch_deployment` for that recipe.
+* ``compile_specs``: extra compile specs for TensorRT's partitioner. You rarely need it: the
+  options below set their own specs, and passing one of those specs here raises a ``ValueError``.
+* ``backend_config``: an ``ExecutorchBackendConfig`` for ExecuTorch's ``to_executorch()``, for
+  example to keep inputs and outputs on the GPU.
+* ``constant_methods``: extra methods that return a constant, such as
+  ``{"get_max_seq_len": 2048}`` for an LLM runner.
+* ``transform_passes``: extra Edge transform passes to run before lowering.
+* ``compile_config``: an ``EdgeCompileConfig``. The default turns off Edge IR validation
+  (``_check_ir_validity=False``), because the TensorRT engine placeholder does not pass it. A
+  config you pass is used as it is, so set ``_check_ir_validity=False`` on it yourself.
+* ``use_cuda_graphs``: save CUDA graph replay on or off for every engine.
+* ``weight_streaming_budget_per_engine``: how many bytes of each engine's weights stay on the GPU,
+  for an engine compiled with ``enable_weight_streaming=True``.
+* ``external_engine_data``: a file name, without ``.ptd``, to store the engines in instead of the
+  ``.pte``. **Nightly only.**
+* ``zero_copy_kv``: let an engine update its KV cache in place. See
+  :ref:`Zero-copy KV cache <executorch_zero_copy_kv>`.
+* ``generate_etrecord``: also write an ETRecord, a debug record for the ExecuTorch Developer Tools
+  ``Inspector``, as ``<name>_etrecord.bin``. It does not work yet for a program with TensorRT
+  engines: writing the record fails with a ``SerializeError``.
+
+:ref:`executorch_deployment` explains the run time side of ``use_cuda_graphs``,
+``weight_streaming_budget_per_engine`` and ``external_engine_data``.
+
+For example:
+
+.. code-block:: python
+
+    from executorch.exir import EdgeCompileConfig
+
+    torch_tensorrt.save(
+        trt_gm,
+        "trt.pte",
+        output_format="executorch",
+        constant_methods={"get_max_seq_len": 2048},
+        compile_config=EdgeCompileConfig(_check_ir_validity=False),
+    )
 
 Advanced: ``export()``
 """"""""""""""""""""""
 
-Stop at the standard Edge program boundary when the program needs work before it is
-serialized: inspecting the delegated graph, adding metadata, controlling final memory
-planning, or carrying more than one method. The caller then serializes it:
+``torch_tensorrt.executorch.export()`` takes a TensorRT-compiled ``GraphModule``, an
+``ExportedProgram`` that already holds engines, or a dict that maps method names to such
+programs. It runs TensorRT's partitioner first, then yours in order, and returns ExecuTorch's
+``EdgeProgramManager``. You then finalize and write the program yourself. Here
+``extra_partitioners``, ``passes``, ``edge_config`` and ``backend_config`` stand for your own
+values of the options above:
 
 .. code-block:: python
 
+    import torch_tensorrt.executorch
+
     edge = torch_tensorrt.executorch.export(
         trt_gm,
-        arg_inputs=inputs,
-        retrace=False,
         partitioners=extra_partitioners,
         transform_passes=passes,
         compile_config=edge_config,
         constant_methods={"get_vocab_size": 256},
     )
 
-    # Inspect edge.exported_program() or apply additional Edge transforms here.
+    # Inspect edge.exported_program() or apply more Edge transforms here.
     program = edge.to_executorch(config=backend_config)
     with open("trt.pte", "wb") as output:
         program.write_to_file(output)
     program.write_tensor_data_to_file(".")
 
-``executorch.export`` accepts a TensorRT-compiled ``GraphModule``, an
-engine-bearing ``ExportedProgram``, or a mapping of independently exported
-methods. It always applies the TensorRT partitioner first, followed by caller
-``partitioners`` in order, and returns ExecuTorch's native
-``EdgeProgramManager``. Use ``save`` for the one-shot path where Torch-TensorRT
-manages Edge lowering, finalization, and persistence.
+It takes the same options as ``save()``, except ``backend_config``, which goes to
+``to_executorch()``. ``partitioners``, ``compile_specs`` and ``transform_passes`` can also be a dict
+keyed by method name.
 
 **Several methods in one .pte**
 
-Pass a mapping of method name to ``ExportedProgram`` to keep independent entry
-points, such as a separate prefill and decode, in one program. Give each method
-its own partitioner instances when a partitioner carries method-specific state: a
-partitioner holds its compile specs from construction, so one instance whose specs
-name a method would tag every method sharing it with that same name. Reusing such
-an instance across methods is rejected.
-
-Sharing an instance whose specs name no method is not rejected, because some
-backends are built to share one. A backend that instead reads its own method name
-from its specs, such as the CUDA backend below, raises
-``Could not find method name in compile specs`` during lowering, so give it one
-instance per method carrying that method's name spec.
+Pass a dict of method name to ``ExportedProgram`` to keep separate entry points, such as prefill
+and decode, in one program. Give each method its own partitioner instances. The CUDA backend
+reads its method name from its compile specs, so it needs one ``CudaPartitioner`` per method,
+each with that method's name:
 
 .. code-block:: python
 
@@ -335,311 +353,74 @@ instance per method carrying that method's name spec.
         {"prefill": prefill_program, "decode": decode_program},
         partitioners={
             "prefill": [
-                CudaPartitioner(
-                    [CudaBackend.generate_method_name_compile_spec("prefill")]
-                )
+                CudaPartitioner([CudaBackend.generate_method_name_compile_spec("prefill")])
             ],
             "decode": [
-                CudaPartitioner(
-                    [CudaBackend.generate_method_name_compile_spec("decode")]
-                )
+                CudaPartitioner([CudaBackend.generate_method_name_compile_spec("decode")])
             ],
         },
     )
 
-Each method is validated before any program is rewritten, so an error in one
-method leaves the others untouched. A method mapping preserves independent entry
-points but does not by itself give them shared mutable state.
+``export()`` refuses one partitioner instance shared by methods when its specs name a method. The
+methods share no state: two methods do not share a buffer unless you plan it that way.
 
 .. warning::
 
-    **The returned Edge program shares tensor storage with the programs you
-    passed in.** Only structure is copied: the graph, the graph signature, the
-    ``state_dict`` keys, and node metadata. Weights and every other tensor
-    payload are shared by reference.
+    **The returned Edge program shares its weights with the programs you passed in.** Do not
+    change a weight in place in a transform pass, for example with ``weight.data.mul_(scale)``,
+    and do not change a source program after ``export()``. Either change shows up in the other
+    program too, with no error. Build a new tensor instead.
 
-    TensorRT engines are not shared. Export never deep copies an engine object,
-    since that would serialize and deserialize it, but every engine is decoded
-    once into a byte buffer the returned program owns. Plan for the bytes of a
-    multi-gigabyte engine to be resident twice while both programs are alive.
-
-    Two consequences to plan for:
-
-    * A transform pass must not modify a shared payload in place. An in-place
-      edit such as ``weight.data.mul_(scale)`` changes the program you passed in,
-      and every other Edge program exported from it. Build a new tensor and
-      rebind it instead of mutating the existing one.
-    * Modifying a source program after calling ``export`` is also visible in the
-      Edge program. Finish preparing a program before exporting it.
-
-    Neither case raises an error or a warning, so treat every shared payload as
-    read-only.
+    Engines are not shared. ``export()`` copies each engine into the Edge program once, so a large
+    engine is in host memory twice while both programs exist.
 
 .. _executorch_zero_copy_kv:
 
 **Zero-copy KV cache**
 
-When a TensorRT engine has aliased I/O -- a KV cache it updates through an
-aliased binding -- running the engine over the cache already is the update.
-ExecuTorch does not know that, so by default it pays for the update twice per
-execution: it hands the delegate an ``_h2d_copy`` staging copy of the buffer
-instead of the buffer itself, then copies the engine's aliased output back into
-the buffer afterwards. For a KV cache both copies are cache-sized, per token.
+An LLM's TensorRT engine can update its KV cache in place, through an input and an output that
+alias the same buffer. By default ExecuTorch does not know that. It hands the engine a copy of
+the cache, and then copies the engine's result back: two cache-sized copies for every token.
+``zero_copy_kv=True`` removes both, so the engine writes the cache directly.
 
-``zero_copy_kv=True`` removes them, so the engine writes the caller's buffer
-directly. Through the two-step ``export`` + ``to_executorch`` path it takes two
-calls, one at each end of the Edge boundary:
+With ``save()``, one flag does it:
 
 .. code-block:: python
 
-    from torch_tensorrt.executorch import (
-        check_zero_copy_kv,
-        export,
-        zero_copy_backend_config,
-    )
+    torch_tensorrt.save(trt_gm, "decode.pte", output_format="executorch", zero_copy_kv=True)
 
-    edge = export(
-        {"prefill": prefill_program, "decode": decode_program},
-        zero_copy_kv=True,
-    )
+With ``export()``, it takes two more calls, one at each end of the Edge program:
 
-    # The argument is optional. Pass your own ExecutorchBackendConfig and
-    # zero_copy_backend_config composes onto it; every other field (memory
-    # planning, passes) is preserved.
+.. code-block:: python
+
+    from torch_tensorrt.executorch import check_zero_copy_kv, export, zero_copy_backend_config
+
+    edge = export({"prefill": prefill_program, "decode": decode_program}, zero_copy_kv=True)
     program = edge.to_executorch(zero_copy_backend_config())
-
-    # Neither call is enforced -- see the warning below.
     check_zero_copy_kv(program)
 
-Two fields of that config are not merely carried. The engine writes the cache
-wherever memory planning put it, so ``enable_non_cpu_memory_planning=False`` --
-which plans every tensor into a single host arena whatever device its
-``TensorSpec`` asks for -- cannot be combined with zero-copy KV:
-``to_executorch`` raises instead of writing a ``.pte`` whose every ``execute()``
-fails on a host pointer. That refusal reads the config object
-``zero_copy_backend_config`` returned, so two ways of setting the field are
-outside it. Building a new config out of the returned one with
-``dataclasses.replace`` copies the field by value and the pass by reference, so
-the pass goes on reading the config it was built for: call
-``zero_copy_backend_config`` again on the derived config. And a
-``memory_planning_pass`` of your own that does not already have an attribute of
-that name never receives the field at all -- ``to_executorch`` assigns it onto
-the planner rather than passing it -- so where the caches land is that planner's
-own business. Neither has to be left to the runtime to discover:
-``check_zero_copy_kv`` reads the arena planning actually chose -- on this path
-it is yours to call, as the warning below says. That planner does have to record
-the device of each arena it places, or the check refuses the program for saying
-nothing about where the cache lives -- see below. And
-``propagate_device_config.skip_h2d_for_method_inputs`` is refused outright:
-``PropagateDevicePass`` refuses to un-stage a method input
-whose placeholder does not have exactly one user, and a zero-copy cache always
-has two, so preserving that option would hand back a configuration that cannot
-finalize at all. It is refused wherever it is written -- in one
-``PropagateDeviceConfig`` or in a per-method dict of them -- and on every value
-that pass reads as on rather than only on ``True``, because it tests the field
-for truth without ever resolving it per method, so even a dict of ``False`` is
-on for every method. ``False`` and the empty dict are what it reads as off, and
-those are carried unchanged.
-
-It is opt-in rather than automatic because the resulting ``.pte`` needs a
-runtime that understands a delegate whose aliased outputs are elided. Producing
-one silently would break a runner built before this feature.
-
 .. warning::
 
-    **Both calls are required, and nothing enforces them.** Exporting with
-    ``zero_copy_kv=True`` removes the copy-back; finalizing without
-    ``zero_copy_backend_config`` leaves the engine writing a per-call staging
-    copy that is discarded, so the cache never updates. For a KV cache that is
-    wrong output, not a crash -- and it is a ``.pte`` that was written without
-    complaint, since ``to_executorch`` belongs to ExecuTorch and finalizes
-    whatever config it is given.
+    **Nothing makes you call both.** If you finalize with a config that did not come from
+    ``zero_copy_backend_config``, ``to_executorch()`` still writes a program, but the engine then
+    writes a copy that is thrown away, so the cache never updates. That is wrong output, not a
+    crash. ``check_zero_copy_kv`` refuses such a program before you write the file.
+    ``save(..., zero_copy_kv=True)`` does both steps for you.
 
-    So finalizing a zero-copy export yourself is two obligations, on any manager
-    and by whatever route it was reached: pass ``zero_copy_backend_config``, and
-    hand the program that comes back to
-    ``torch_tensorrt.executorch.check_zero_copy_kv``, which reads the finalized
-    program and refuses one whose caches never reach the engine or ended up
-    planned somewhere it cannot write them -- while there is still no ``.pte``::
+* ``zero_copy_backend_config(config)`` starts from your own config, if you pass one, and keeps
+  every field of it. It refuses ``skip_h2d_for_method_inputs``. The caches have to be planned in
+  GPU memory, so ``enable_non_cpu_memory_planning=False`` makes finalizing fail.
+* If you build a new config from the returned one, for example with ``dataclasses.replace``,
+  call ``zero_copy_backend_config`` again on the new one.
+* It is opt-in because the ``.pte`` needs a runtime that knows about it. A runner built before
+  this feature would break on it.
+* To share one cache between two methods, such as prefill and decode, both methods' buffers have
+  to be planned at the same place. Pass your own ``memory_planning_pass`` for that.
+  ``zero_copy_backend_config`` keeps it. That planner must record which device each memory area
+  is on, which ExecuTorch's ``apply_algo`` does when it runs with
+  ``enable_non_cpu_memory_planning=True``. Otherwise ``check_zero_copy_kv`` refuses the program.
 
-        program = edge.transform(passes).to_executorch(zero_copy_backend_config())
-        torch_tensorrt.executorch.check_zero_copy_kv(program)
-
-    ``torch_tensorrt.save`` owns both ends and does both for you; it is the path
-    on which forgetting is not possible, and it is single-method only -- a
-    multi-method program has to take the two calls above.
-
-``torch_tensorrt.save`` finalizes the program itself, so a single
-``zero_copy_kv=True`` covers both steps:
-
-.. code-block:: python
-
-    torch_tensorrt.save(
-        trt_gm, "decode.pte", output_format="executorch",
-        zero_copy_kv=True,
-    )
-
-It installs ``zero_copy_backend_config`` for you, so there is no need to hand it
-one as ``backend_config`` as well: that installs the pass twice, which is
-redundant rather than an error -- the second run finds the buffers already
-un-staged. The two entry points are alternatives, not a pair.
-
-Three further responsibilities are the caller's. The first two nothing checks;
-the third is refused where it is visible in the ``.pte``:
-
-* **One CUDA stream for every delegate**, if the ``.pte`` is coalesced. Getting
-  this wrong is a race, not a deterministic error: it is intermittent and can
-  surface as wrong results *or* as an illegal memory access. See
-  :ref:`Running a coalesced .pte <executorch_single_stream>`.
-
-* **Synchronizing that stream before reading a cache on the host**, for any
-  zero-copy ``.pte`` a runner drives on a caller stream, coalesced or not. A
-  delegate whose aliased outputs are threaded through it reflects each one into
-  its delegate output and so waits for the engine before returning; zero-copy
-  elides those outputs, so there is nothing to reflect and ``execute()`` returns
-  with the engine still running. A single-delegate decode loop owes the
-  synchronization as much as a coalesced program does. It is only the caller
-  stream that brings the duty: with none installed ``execute()`` synchronizes
-  before it returns, as it does whenever a delegate input or output is staged
-  through the host.
-
-* **Sharing one cache between methods.** Zero-copy is per method: it makes each
-  method's engine write that method's buffer. Giving a prefill and a decode
-  method *the same* cache is a memory-planning question -- their mutable buffers
-  have to land at the same arena offsets -- which ExecuTorch's memory planner
-  owns and which is deployment-specific. Supply your own
-  ``memory_planning_pass`` for it; ``zero_copy_backend_config`` preserves it.
-  Such a planner has to record the device of each arena it places, which means
-  running ExecuTorch's ``apply_algo`` -- the only thing that writes
-  ``non_const_buffer_device`` -- and running it with
-  ``enable_non_cpu_memory_planning=True``, since that parameter defaults to
-  ``False`` and with it off ``apply_algo`` plans every spec into one CPU bucket
-  and records nothing either. Without that record the ``.pte`` reports every
-  planned buffer as CPU, and a runner that honours it backs the cache with host
-  memory the engine cannot write. ``check_zero_copy_kv`` refuses a program in
-  that state, under a message of its own rather than the host-arena one: what
-  it can read is that nothing says where the cache lives, not that your planner
-  put it among the host tensors.
-
-**Coalesced TensorRT + CUDA .pte**
-
-To run the ops TensorRT does not take on ExecuTorch's CUDA (AOTInductor) backend
-instead of leaving them non-delegated, pass a ``CudaPartitioner`` via
-``partitioners=``. It is appended after the TensorRT partitioner, so TensorRT
-claims what it can and the ``CudaPartitioner`` picks up the rest as a catch-all:
-
-.. code-block:: python
-
-    from executorch.backends.cuda.cuda_backend import CudaBackend
-    from executorch.backends.cuda.cuda_partitioner import CudaPartitioner
-
-    torch_tensorrt.save(
-        trt_gm, "trt.pte", output_format="executorch",
-        partitioners=[
-            CudaPartitioner(
-                [CudaBackend.generate_method_name_compile_spec("forward")]
-            )
-        ],
-    )
-
-This needs ExecuTorch's CUDA backend and a CUDA toolkit (nvcc/ptxas) at export
-time, and produces a ``.pte`` that requires a CUDA runtime at load. Any external
-CUDA weights are written as ``.ptd`` data file(s) next to the ``.pte``; the runtime
-must be pointed at those data files to load them.
-
-.. warning::
-
-    The CUDA backend names its external weight blob per-device (e.g.
-    ``aoti_cuda_blob.ptd``), not per-model, so saving two different coalesced
-    ``.pte`` into the same directory overwrites the blob and the first ``.pte``
-    will fail to load. Save each coalesced model into its own directory.
-
-.. _executorch_single_stream:
-
-**Running a coalesced .pte: use a single CUDA stream**
-
-A coalesced ``.pte`` runs on more than one backend delegate (the TensorRT delegate
-plus the CUDA backend). By default each backend enqueues its GPU work on its *own*
-CUDA stream, and delegate execution is asynchronous -- a delegate returns after
-*enqueuing* its work, not after it completes. Because separate CUDA streams are not
-ordered relative to one another, at a delegate boundary the consuming delegate can
-begin before the producing delegate's writes have finished, reading incomplete
-data. This is a race: it is intermittent and can surface as wrong results or an
-illegal memory access.
-
-The runtime does not impose a shared stream across delegates, so it is the
-**runner's responsibility** to run all delegates on one CUDA stream. Create a
-single stream and scope ``executorch::extension::cuda::CallerStreamGuard`` over it
-for the duration of execution. That one guard reaches every CUDA-capable
-delegate: they resolve a single shared ``libextension_cuda``, so the TensorRT
-backend and the CUDA backend read the same caller-stream storage. All GPU work is
-then enqueued in order and every cross-boundary dependency is satisfied, while
-execution stays asynchronous.
-
-If the runner reads a delegate's outputs between calls (for example, an
-autoregressive decode loop), synchronize the shared stream before reading: the
-work may still be in flight when ``execute()`` returns, and a host-side copy on
-the default stream will not wait for a non-blocking stream. A model that threads
-its aliased outputs through the delegate is insulated from this in practice:
-reflecting each aliased output into its delegate output makes the delegate wait
-for the engine before it returns. Under
-:ref:`zero-copy KV <executorch_zero_copy_kv>` those outputs are elided, so there
-is nothing to reflect and the delegate returns with the engine still running --
-the synchronization is then the only thing making a host read see the new values.
-
-**ExecuTorch lowering options**
-
-``torch_tensorrt.save`` takes these extra keyword arguments. They are only
-consulted for the ``executorch`` format; passing them with any other
-``output_format`` logs a warning and is otherwise ignored. Of the six below,
-``constant_methods``, ``transform_passes`` and ``compile_config`` are forwarded
-to ExecuTorch's ``to_edge_transform_and_lower(...)``, and so is
-``generate_etrecord``, which ``save`` also reads itself to write the record
-beside the ``.pte``. ``backend_config`` goes to ``to_executorch(...)`` instead,
-and ``zero_copy_kv`` is read by ``save`` on both sides of that boundary.
-
-* ``constant_methods`` — a ``dict`` of extra constant methods to embed in the
-  ``.pte`` (e.g. ``{"get_max_seq_len": 2048}`` for an LLM runner).
-* ``transform_passes`` — additional edge-dialect transform passes to run before
-  lowering.
-* ``compile_config`` — an ``EdgeCompileConfig``. When omitted, Torch-TensorRT
-  supplies a default with ``_check_ir_validity=False`` (the TensorRT
-  ``execute_engine`` placeholder graph does not pass edge-IR validation). A
-  caller-supplied config is forwarded **verbatim**, so if you pass your own and
-  your graph carries TensorRT engines, set ``_check_ir_validity=False`` explicitly.
-* ``backend_config`` — an ``ExecutorchBackendConfig`` forwarded to
-  ``to_executorch(...)``.
-* ``zero_copy_kv`` — a ``bool`` (default ``False``, single-method only). Lets the
-  TensorRT engine update an aliased KV cache in place. ``save`` owns both ends of
-  the Edge boundary, so this one argument covers what the two-call path spells
-  out; see :ref:`Zero-copy KV cache <executorch_zero_copy_kv>`.
-* ``generate_etrecord`` — a ``bool`` (default ``False``). When ``True``, an
-  `ETRecord <https://pytorch.org/executorch/stable/etrecord.html>`_ is written
-  next to the ``.pte`` as ``<base>_etrecord.bin`` (e.g. ``trt.pte`` →
-  ``trt_etrecord.bin``) for use with the ExecuTorch Developer Tools ``Inspector``.
-
-.. code-block:: python
-
-    from executorch.exir import EdgeCompileConfig
-
-    torch_tensorrt.save(
-        trt_gm, "trt.pte", output_format="executorch",
-        constant_methods={"get_max_seq_len": 2048},
-        compile_config=EdgeCompileConfig(_check_ir_validity=False),
-        generate_etrecord=True,
-    )
-
-The ETRecord sidecar can be parsed back and paired with a runtime ETDump in the
-Developer Tools ``Inspector``:
-
-.. code-block:: python
-
-    from executorch.devtools import Inspector
-    from executorch.devtools.etrecord import parse_etrecord
-
-    etrecord = parse_etrecord("trt_etrecord.bin")
-    inspector = Inspector(etdump_path="etdump.etdp", etrecord=etrecord)
-    inspector.print_data_tabular()
+The :ref:`API reference <torch_tensorrt_executorch_py>` describes every refusal in detail.
 
 
 Saving torch.compile models
