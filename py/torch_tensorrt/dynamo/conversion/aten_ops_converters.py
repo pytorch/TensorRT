@@ -3757,29 +3757,36 @@ _CONV_ARG_TRANSPOSED = 6
 _CONV_ARG_GROUPS = 8
 
 
-def turing_rejects_forward_convolution(
+def turing_rejects_convolution(
     node: Node,
     spatial_rank: Optional[int],
     settings: Optional[CompilationSettings] = None,
     *,
+    transposed: bool,
     groups: int = 1,
 ) -> bool:
-    """Reject FP32 and grouped FP16 forward 3D convolution on Turing."""
+    """Reject FP32 3D convolution and deconvolution on Turing.
+
+    Also reject grouped FP16 forward 3D convolution.
+    """
     if spatial_rank != 3 or not trt_rtx_targets_turing(settings):
         return False
     input_node = node.args[0]
     val = input_node.meta.get("val") if hasattr(input_node, "meta") else None
     dtype = getattr(val, "dtype", None)
-    if dtype != torch.float32 and not (dtype == torch.float16 and groups > 1):
-        return False
-    _LOGGER.debug(
-        "3D convolution '%s' with dtype %s and groups=%s is not supported on "
-        "TensorRT-RTX for Turing (SM 7.5). Use PyTorch.",
-        node.name,
-        dtype,
-        groups,
-    )
-    return True
+    if dtype == torch.float32 or (
+        dtype == torch.float16 and groups > 1 and not transposed
+    ):
+        _LOGGER.debug(
+            "TensorRT-RTX cannot execute 3D convolution '%s' on Turing (SM 7.5) "
+            "with dtype=%s, groups=%s, and transposed=%s. Use PyTorch.",
+            node.name,
+            dtype,
+            groups,
+            transposed,
+        )
+        return True
+    return False
 
 
 def convolution_capability_validator(
@@ -3810,27 +3817,13 @@ def convolution_capability_validator(
     input_node = node.args[_CONV_ARG_INPUT]
     val = input_node.meta.get("val") if hasattr(input_node, "meta") else None
     spatial_rank = val.ndim - 2 if val is not None else None
-    if args_bounds_check(node.args, _CONV_ARG_TRANSPOSED):
-        if (
-            spatial_rank == 3
-            and getattr(val, "dtype", None) == torch.float32
-            and trt_rtx_targets_turing(settings)
-        ):
-            _LOGGER.debug(
-                "FP32 3D transposed convolution '%s' is not supported on "
-                "TensorRT-RTX for Turing (SM 7.5). Use PyTorch.",
-                node.name,
-            )
-            return False
-    elif turing_rejects_forward_convolution(
+    return not turing_rejects_convolution(
         node,
         spatial_rank,
         settings,
+        transposed=args_bounds_check(node.args, _CONV_ARG_TRANSPOSED, False),
         groups=args_bounds_check(node.args, _CONV_ARG_GROUPS, 1),
-    ):
-        return False
-
-    return True
+    )
 
 
 @dynamo_tensorrt_converter(
