@@ -142,7 +142,13 @@ a tensor rather than about versions. Install it the way this section shows and t
 arise. Building this wheel
 by hand is only needed to work on it, and those instructions are below.
 
-On a fresh environment that command was measured installing:
+On Windows there is one extra step. Install PyTorch first, with
+`python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu132`,
+then add `--extra-index-url https://download.pytorch.org/whl/nightly/cpu` to the command above.
+ExecuTorch's Windows nightly needs torchao, and only that index carries its Windows build. With
+PyTorch already installed, pip does not take the CPU build of PyTorch from that index.
+
+On a fresh environment the nightly command was measured installing:
 
 | package | version |
 | --- | --- |

@@ -7,6 +7,7 @@ Discover requirements independently of the writer, and require known sites to re
 """
 
 import ast
+import builtins
 import importlib.abc
 import json
 import os
@@ -1127,15 +1128,27 @@ def test_runner_channel_check_detects_removed_validator(monkeypatch):
         )
 
 
-def _load_utils_channel_helpers(
-    fake_cuda: str | None, platform: str = "linux", machine: str = "x86_64"
-):
-    """Execute the real helpers without importing their torch and TensorRT dependencies."""
+_INSTALLED_VERSION = "2.16.0.dev20261019+cu132"
+
+
+def _utils_namespace(
+    fake_cuda: str | None,
+    platform: str = "linux",
+    machine: str = "x86_64",
+    recorded: dict | None = None,
+) -> dict:
+    """Execute the real helpers without importing their torch and TensorRT dependencies.
+
+    ``recorded`` stands in for what the build wrote into _version.py.
+    """
     source = (REPO_ROOT / "py/torch_tensorrt/_utils.py").read_text(encoding="utf-8")
     tree = ast.parse(source)
     wanted = {
+        "_build_record",
+        "_executorch_index_options",
         "executorch_install_channel",
         "executorch_install_command",
+        "executorch_runtime_install_command",
         "is_platform_supported_for_executorch",
     }
     functions = [
@@ -1144,9 +1157,17 @@ def _load_utils_channel_helpers(
         if isinstance(node, ast.FunctionDef) and node.name in wanted
     ]
     assert {f.name for f in functions} == wanted, (
-        "py/torch_tensorrt/_utils.py must define executorch_install_channel and "
-        f"executorch_install_command; found {sorted(f.name for f in functions)}"
+        f"py/torch_tensorrt/_utils.py must define {sorted(wanted)}; "
+        f"found {sorted(f.name for f in functions)}"
     )
+    # Every build records the ExecuTorch channel; nightly is what a development pin records. A
+    # field given as None is left out, as in a version file written before it existed.
+    record = {
+        "__version__": _INSTALLED_VERSION,
+        "__executorch_channel__": "nightly",
+        **(recorded or {}),
+    }
+    record = {name: value for name, value in record.items() if value is not None}
 
     class _Version:
         cuda = fake_cuda
@@ -1172,8 +1193,25 @@ def _load_utils_channel_helpers(
         ),
         **constants,
     }
+    # The real _build_record imports torch_tensorrt._version. Answer that import with a module
+    # holding only the recorded fields, so a missing field exercises the helper's own default.
+    version_module = types.SimpleNamespace(**record)
+
+    def _import(name, *args, **kwargs):
+        if name == "torch_tensorrt":
+            return types.SimpleNamespace(_version=version_module)
+        return builtins.__import__(name, *args, **kwargs)
+
+    namespace["__builtins__"] = {**vars(builtins), "__import__": _import}
     module = ast.Module(body=functions, type_ignores=[])
     exec(compile(module, "<utils-extract>", "exec"), namespace)
+    return namespace
+
+
+def _load_utils_channel_helpers(
+    fake_cuda: str | None, platform: str = "linux", machine: str = "x86_64"
+):
+    namespace = _utils_namespace(fake_cuda, platform, machine)
     return (
         namespace["executorch_install_channel"],
         namespace["executorch_install_command"],
@@ -1237,69 +1275,114 @@ def test_the_executorch_install_message_names_the_torch_channel() -> None:
         )
 
 
-def _load_runtime_install_command(monkeypatch, recorded, cuda="13.2"):
-    """Run the real helper against a build that recorded the given companion version."""
-    tree = ast.parse((REPO_ROOT / "py/torch_tensorrt/_utils.py").read_text("utf-8"))
-    function = next(
-        node
-        for node in tree.body
-        if isinstance(node, ast.FunctionDef)
-        and node.name == "executorch_runtime_install_command"
+@pytest.mark.unit
+@pytest.mark.parametrize("executorch", ["nightly", "test"])
+def test_the_executorch_install_message_keeps_the_installed_wheel(executorch):
+    """The extra is requested for the installed version, from the index with its ExecuTorch.
+
+    Without the version pip may answer the extra with a different torch-tensorrt from that
+    index, for example a nightly in place of a release candidate.
+    """
+    message = _utils_namespace("13.2", recorded={"__executorch_channel__": executorch})[
+        "executorch_install_command"
+    ]()
+    assert message == (
+        f'pip install --pre "torch_tensorrt[executorch]=={_INSTALLED_VERSION}" '
+        f"--extra-index-url https://download.pytorch.org/whl/{executorch}/cu132"
     )
-    channel, command = _load_utils_channel_helpers(cuda)
-    version = types.ModuleType("torch_tensorrt._version")
-    if recorded is not None:
-        version.__executorch_runtime_version__ = recorded
-    package = types.ModuleType("torch_tensorrt")
-    package._version = version
-    monkeypatch.setitem(sys.modules, "torch_tensorrt", package)
-    monkeypatch.setitem(sys.modules, "torch_tensorrt._version", version)
-    namespace = {
-        "executorch_install_channel": channel,
-        "executorch_install_command": command,
+
+
+@pytest.mark.unit
+def test_the_extra_advice_follows_the_wheel_s_cuda_channel():
+    """The extra may require the delegate built for the wheel's CUDA channel, not torch's."""
+    message = _utils_namespace(
+        "13.4",
+        recorded={
+            "__executorch_runtime_version__": "0.3.0.dev20261019+cu132",
+            "__executorch_runtime_channel__": "nightly",
+        },
+    )["executorch_install_command"]()
+    assert message.endswith(
+        "--extra-index-url https://download.pytorch.org/whl/nightly/cu132"
+    ), message
+
+
+@pytest.mark.unit
+def test_an_older_version_file_still_names_the_nightly_index():
+    """A source build's version file from before the ExecuTorch record came from a development pin.
+
+    Without a default the advice names a malformed index URL.
+    """
+    message = _utils_namespace("13.2", recorded={"__executorch_channel__": None})[
+        "executorch_install_command"
+    ]()
+    assert message.endswith(
+        "--extra-index-url https://download.pytorch.org/whl/nightly/cu132"
+    ), message
+
+
+def _load_runtime_install_command(
+    recorded, channel="", executorch="nightly", cuda="13.2"
+):
+    """Run the real helper against a build that recorded the given companion and channels."""
+    record = {
+        "__executorch_runtime_channel__": channel,
+        "__executorch_channel__": executorch,
     }
-    exec(compile(ast.Module([function], []), "<utils-extract>", "exec"), namespace)
+    if recorded is not None:
+        record["__executorch_runtime_version__"] = recorded
+    namespace = _utils_namespace(cuda, recorded=record)
     return namespace["executorch_runtime_install_command"]()
+
+
+def _indexes(*names: str) -> str:
+    return " ".join(
+        f"--extra-index-url https://download.pytorch.org/whl/{name}" for name in names
+    )
 
 
 @pytest.mark.unit
 @pytest.mark.parametrize(
-    "recorded, expected",
+    "recorded, channel, executorch, indexes",
     [
-        (
-            "0.3.0.dev20261019+cu132",
-            'pip install "torch-tensorrt-executorch-runtime==0.3.0.dev20261019+cu132" '
-            "--extra-index-url https://download.pytorch.org/whl/nightly/cu132",
-        ),
-        (
-            "0.3.0+cu134",
-            'pip install "torch-tensorrt-executorch-runtime==0.3.0+cu134" '
-            "--extra-index-url https://download.pytorch.org/whl/cu134",
-        ),
-        (
-            "0.3.0",
-            'pip install "torch-tensorrt-executorch-runtime==0.3.0" '
-            "--extra-index-url https://download.pytorch.org/whl/cu132",
-        ),
+        # A nightly delegate and the development ExecuTorch it pins share the nightly index.
+        ("0.3.0.dev20261019+cu132", "nightly", "nightly", _indexes("nightly/cu132")),
+        # A release candidate's version looks final, but only the test index carries it. A
+        # development ExecuTorch it pins is only on the nightly index; a release, on the test one.
+        # The delegate's own label picks the CUDA row.
+        ("0.3.0+cu134", "test", "nightly", _indexes("test/cu134", "nightly/cu134")),
+        ("0.3.0+cu134", "test", "test", _indexes("test/cu134")),
+        # A PyPI release records no label and no channel. PyPI holds one build for one CUDA
+        # version, while the test index keeps this release's delegate for every CUDA version.
+        ("0.3.0", "", "nightly", _indexes("test/cu132", "nightly/cu132")),
+        ("0.3.0", "", "test", _indexes("test/cu132")),
     ],
 )
-def test_a_missing_delegate_names_the_exact_companion(monkeypatch, recorded, expected):
-    """The advice names the companion this wheel was built with and the index carrying it."""
-    assert _load_runtime_install_command(monkeypatch, recorded) == expected
+def test_a_missing_delegate_names_the_exact_companion(
+    recorded, channel, executorch, indexes
+):
+    """The advice names the companion this wheel was built with and the indexes carrying it."""
+    assert _load_runtime_install_command(recorded, channel, executorch) == (
+        f'pip install "torch-tensorrt-executorch-runtime=={recorded}" {indexes}'
+    )
 
 
 @pytest.mark.unit
 @pytest.mark.parametrize("recorded", ["", None])
-def test_a_build_without_a_companion_says_it_has_none(monkeypatch, recorded):
+def test_a_build_without_a_companion_says_it_has_none(recorded):
     """RTX, Python-only, JetPack and source builds, and a version file from before the field."""
-    message = _load_runtime_install_command(monkeypatch, recorded)
+    message = _load_runtime_install_command(recorded)
     assert "has no matching delegate" in message, message
     assert "pip install" not in message, message
+    # Read from the constant, so a new CUDA major cannot leave this text behind.
+    major = _utils_namespace("13.2")["EXECUTORCH_CUDA_MAJOR"]
+    assert f"CUDA {major} wheels for Linux (x86-64 and aarch64)" in message, message
+    assert "py/torch-tensorrt-executorch-runtime/README.md" in message, message
 
 
 @pytest.mark.unit
 def test_the_build_records_the_companion_it_requires(tmp_path) -> None:
-    """The version file carries the same companion the extras require, for the error above."""
+    """The version file carries the companion and both channels, for the errors above."""
     tree = ast.parse((REPO_ROOT / "setup.py").read_text(encoding="utf-8"))
     function = next(
         node
@@ -1316,12 +1399,17 @@ def test_the_build_records_the_companion_it_requires(tmp_path) -> None:
         "__tensorrt_version__": "11.4.0",
         "__tensorrt_rtx_version__": "1.7.1",
         "__tensorrt_llm_version__": "0.17.0",
-        "EXECUTORCH_RUNTIME_VERSION": "0.3.0.dev20261019+cu132",
+        "EXECUTORCH_RUNTIME_VERSION": "0.3.0+cu132",
+        # A release candidate pinning a development build: the two channels differ.
+        "EXECUTORCH_RUNTIME_CHANNEL": "test",
+        "EXECUTORCH_CHANNEL": "nightly",
     }
     exec(compile(ast.Module([function], []), "setup.py", "exec"), namespace)
     namespace["gen_version_file"]()
     recorded = runpy.run_path(str(tmp_path / "torch_tensorrt/_version.py"))
-    assert recorded["__executorch_runtime_version__"] == "0.3.0.dev20261019+cu132"
+    assert recorded["__executorch_runtime_version__"] == "0.3.0+cu132"
+    assert recorded["__executorch_runtime_channel__"] == "test"
+    assert recorded["__executorch_channel__"] == "nightly"
 
 
 @pytest.mark.parametrize("cuda", ["13.0", "13.2", None])
@@ -3108,8 +3196,47 @@ def test_the_install_message_does_not_hand_a_no_op_command_to_other_platforms(
 @pytest.mark.unit
 def test_the_install_message_supports_windows_x64(machine: str) -> None:
     _, command = _load_utils_channel_helpers("13.2", platform="win32", machine=machine)
-    assert 'pip install --pre "torch_tensorrt[executorch]"' in command()
+    assert 'pip install --pre "torch_tensorrt[executorch]==' in command()
     assert "nightly/cu132" in command()
+
+
+@pytest.mark.parametrize(
+    "platform, machine, windows",
+    [("win32", "AMD64", True), ("linux", "x86_64", False)],
+)
+@pytest.mark.parametrize(
+    "channel, executorch, nightly",
+    [
+        ("nightly", "nightly", True),
+        ("test", "nightly", True),
+        ("test", "test", False),
+        ("nightly", "test", False),
+    ],
+)
+@pytest.mark.unit
+def test_windows_advice_names_the_cpu_nightly_index(
+    platform, machine, windows, channel, executorch, nightly
+) -> None:
+    """The nightly ExecuTorch for Windows needs torchao, which only the CPU nightly index has.
+
+    Without that index neither command resolves on Windows. A release ExecuTorch takes a
+    release torchao, which PyPI publishes for every platform, so the index is left out there,
+    even beside a nightly delegate.
+    """
+    namespace = _utils_namespace(
+        "13.2",
+        platform=platform,
+        machine=machine,
+        recorded={
+            "__executorch_runtime_version__": "0.3.0+cu132",
+            "__executorch_runtime_channel__": channel,
+            "__executorch_channel__": executorch,
+        },
+    )
+    cpu = "--extra-index-url https://download.pytorch.org/whl/nightly/cpu"
+    for helper in ("executorch_install_command", "executorch_runtime_install_command"):
+        message = namespace[helper]()
+        assert message.endswith(cpu) == (windows and nightly), (helper, message)
 
 
 @pytest.mark.parametrize("agree", [True, False])

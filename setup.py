@@ -417,6 +417,10 @@ def gen_version_file():
         f.write(
             '__executorch_runtime_version__ = "' + EXECUTORCH_RUNTIME_VERSION + '"\n'
         )
+        f.write(
+            '__executorch_runtime_channel__ = "' + EXECUTORCH_RUNTIME_CHANNEL + '"\n'
+        )
+        f.write('__executorch_channel__ = "' + EXECUTORCH_CHANNEL + '"\n')
 
 
 def copy_libtorchtrt(multilinux=False, rt_only=False):
