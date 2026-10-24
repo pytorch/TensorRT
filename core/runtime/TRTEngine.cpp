@@ -675,6 +675,7 @@ std::vector<std::string> TRTEngine::serialize() {
 
 void TRTEngine::reset_captured_graph() {
   cudagraph.reset();
+  cudagraph_workspace.reset();
 }
 
 void TRTEngine::setup_input_binding_infos() {
