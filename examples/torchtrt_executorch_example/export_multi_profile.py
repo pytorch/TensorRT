@@ -45,18 +45,14 @@ seconds per megabyte of engine, so its ~2 GB engine is a couple of hours.
 
 Prerequisites
 -------------
-Install Torch-TensorRT with the ExecuTorch extra before running this example.
+This example needs a nightly build: optimization profiles in the ExecuTorch
+delegate are not in Torch-TensorRT 2.15. Install a nightly Torch-TensorRT with
+its ``executorch`` extra, as the Nightly builds part of the ExecuTorch
+deployment guide shows:
+https://docs.pytorch.org/TensorRT/user_guide/runtime_performance/executorch.html#nightly-builds
+
 The Gemma-3 definition comes from ``transformers``, which that extra does not
-pull in::
-
-    pip install --pre -e ".[executorch]" "transformers>=5.4.0" \
-        --extra-index-url https://download.pytorch.org/whl/nightly/cu132
-
-``--pre`` is required: the ExecuTorch companion package has only prerelease
-versions on the nightly index, and without it pip falls back to the last
-release, which pins an older torch and fails to resolve.
-
-See https://pytorch.org/executorch/stable/getting-started-setup.html for details.
+install, so also install ``transformers>=5.4.0``.
 """
 
 # %%
