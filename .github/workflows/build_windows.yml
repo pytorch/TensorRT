@@ -429,7 +429,7 @@ jobs:
           else
             export PYTORCH_VERSION="$(${CONDA_RUN} pip show torch | grep ^Version: | sed 's/Version:  *//')"
           fi
-      # Named before either wheel is built: the main wheel's executorch extra requires exactly this
+      # Named before either wheel is built: the main wheel's executorch extra can require exactly this
       # companion, and the companion build below takes its version from the same variable.
       - name: Name the ExecuTorch runtime companion
         if: ${{ inputs.build-executorch-runtime && inputs.architecture == 'x64' && !inputs.cross-compile && !inputs.python-only && !inputs.use-rtx && !inputs.is-release-tarball }}
@@ -439,6 +439,10 @@ jobs:
           source "${BUILD_ENV_FILE}"
           version="$(${CONDA_RUN} python packaging/executorch_runtime_version.py ${{ inputs.is-release-wheel }})"
           echo "TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION=${version}" >> "${GITHUB_ENV}"
+          # A release wheel goes to PyPI. Any other build goes to this run's PyTorch channel.
+          if [[ ${{ inputs.is-release-wheel }} != true ]]; then
+            echo "TORCH_TENSORRT_EXECUTORCH_RUNTIME_CHANNEL=${CHANNEL}" >> "${GITHUB_ENV}"
+          fi
       - name: Build the wheel (python-build-package) X64
         if: ${{ inputs.build-platform == 'python-build-package' && inputs.architecture == 'x64' && inputs.cross-compile == false }}
         working-directory: ${{ inputs.repository }}
@@ -498,9 +502,11 @@ jobs:
           source "${BUILD_ENV_FILE}"
           case "${CU_VERSION}" in cu132|cu134) ;; *) echo "Unsupported ExecuTorch CUDA row: ${CU_VERSION}" >&2; exit 1 ;; esac
           ${CONDA_RUN} python -m pip install --no-deps dist/torch_tensorrt-*.whl
+          # A development ExecuTorch pin is on the nightly channel, a release pin on the test channel.
           # Windows uses torchao's Python-only nightly wheel from the CPU index.
           ${CONDA_RUN} python -m pip install --pre "cmake>=3.28" ninja pyyaml "wheel>=0.40" \
             --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" \
+            --extra-index-url "https://download.pytorch.org/whl/test/${CU_VERSION}" \
             --extra-index-url "https://download.pytorch.org/whl/nightly/cpu" \
             -r packaging/executorch_pin.txt
           # The core build has fetched the TensorRT SDK containing headers and import libraries.
