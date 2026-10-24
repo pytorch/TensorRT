@@ -111,7 +111,8 @@ def resolve_slice_scatter_write(
     * ``OK`` — the bounds are concrete, and the caller goes on to
       ``_kv_eligible(cache_shape, dim, start, end - start, step)``.
     * ``FULL_OVERWRITE`` — the slice spans the whole dim with a step equal to 1, so
-      the converter returns ``src`` in the input's dtype and emits no KV layer.
+      the converter returns ``src`` in the input's dtype, reshaped to the input's
+      static sizes where TensorRT sees it as dynamic, and emits no KV layer.
       ``step`` comes back as the integer 1, which is all this branch establishes: the
       caller's own step may be a symbolic object that merely compares equal to it, so
       the converter uses the returned 1.
@@ -307,7 +308,8 @@ def slice_scatter(
         )
 
     if status is KVWriteStatus.DYNAMIC_DIM_SIZE:
-        # The validator keeps these out of TensorRT, so this is only reachable for a
+        # The validator keeps these out of TensorRT, so this is only reachable when
+        # TensorRT sees a dim as dynamic that the graph records as static, or for a
         # node it could not read a shape from.
         raise NotImplementedError(
             f"slice_scatter: dim {dim} of the input is dynamic, so this write's bounds "
@@ -328,12 +330,46 @@ def slice_scatter(
             f"{start}:{end}:{step} it writes on dim {dim} has shape {tuple(slice_shape)}"
         )
 
+    # A full overwrite returns src. A src that is dynamic where the input is static
+    # would make the output dynamic there too, so it is reshaped to the input's static
+    # sizes. TensorRT cannot reshape uint8, so a uint8 src is cast first, and otherwise
+    # the reshape comes before the cast, in case the input is uint8. A uint8 src for a
+    # uint8 input keeps its own shape.
+    full_overwrite = status is KVWriteStatus.FULL_OVERWRITE
+    if full_overwrite and any(
+        src_size == DYNAMIC_DIM and size != DYNAMIC_DIM
+        for src_size, size in zip(src.shape, input.shape)
+    ):
+        if src.dtype == trt.uint8:
+            src = cast_trt_tensor(
+                ctx, src, input.dtype, name + "_src_cast", target, source_ir
+            )
+        if src.dtype != trt.uint8:
+            shape = [
+                (
+                    size
+                    if size != DYNAMIC_DIM
+                    else get_shape(
+                        ctx, target, source_ir, name + f"_src_shape_{axis}", src, axis
+                    )
+                )
+                for axis, size in enumerate(input.shape)
+            ]
+            src = impl.shuffle.reshape(
+                ctx,
+                target,
+                source_ir,
+                name + "_full_overwrite",
+                src,
+                shape,
+                zero_is_placeholder=False,
+            )
+
     # As torch does, src is written in the input's dtype. IKVCacheUpdateLayer also
     # requires the cache and the update to have the same dtype.
     src = cast_trt_tensor(ctx, src, input.dtype, name + "_src_cast", target, source_ir)
 
-    # Trivial: full overwrite.
-    if status is KVWriteStatus.FULL_OVERWRITE:
+    if full_overwrite:
         return src
 
     update_len = end - start

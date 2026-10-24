@@ -229,6 +229,30 @@ class TestSliceScatterFallbackEndToEnd(TestCase):
             (torch.randint(0, 5, (4, 8), dtype=torch.int32), torch.full((4, 8), 2.7)),
         )
 
+    @parameterized.expand([("on_the_written_dim", 2), ("on_another_dim", 1)])
+    def test_full_overwrite_with_a_dynamic_src(self, _, dim):
+        """A reshape with ``-1`` leaves dim 2 of src dynamic for TensorRT. The full
+        overwrite must keep the cache's static size there, or the write on dim 2
+        after it cannot resolve its bounds."""
+
+        class M(torch.nn.Module):
+            def forward(self, cache, update):
+                src = update.reshape(update.shape[0], 4, -1, update.shape[-1])
+                out = torch.ops.aten.slice_scatter.default(
+                    cache, src, dim, 0, cache.shape[dim]
+                )
+                return torch.ops.aten.slice_scatter.default(
+                    out, cache[:, :, :2] * 2, 2, 4, 6
+                )
+
+        batch = torch.export.Dim("batch", min=1, max=8)
+        width = torch.export.Dim("width", min=2, max=32)
+        self._assert_matches_eager(
+            M(),
+            (torch.randn(2, 4, 8, 16), torch.randn(2, 32, 16)),
+            {"cache": {0: batch, 3: width}, "update": {0: batch, 2: width}},
+        )
+
     def test_uint8_full_overwrite_feeding_another_layer(self):
         """TensorRT takes a uint8 tensor only as an engine input or output, so the
         result must not be a new uint8 tensor inside the engine."""
