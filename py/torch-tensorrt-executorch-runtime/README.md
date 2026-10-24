@@ -113,19 +113,23 @@ the build matrix currently covers `cu132` and `cu134`, on both architectures. Or
 release and JetPack builds retain their separate CUDA 12 support.
 
 ## Install
-The `executorch` extra of a published Torch-TensorRT wheel brings this wheel (the one
-built together with it) and the CUDA build of ExecuTorch it links. Torch-TensorRT brings
-PyTorch. Swap `cu132` for `cu134` if you run CUDA 13.4:
+The `executorch` extra of a Torch-TensorRT wheel brings ExecuTorch. For two kinds of wheel it
+also brings this wheel (the one built together with it), and with it the exact CUDA build of
+ExecuTorch it links: a nightly that pins a development ExecuTorch build, and a release that pins
+an ExecuTorch release. Other wheels, such as one from PyPI, do not, because their index lacks
+that ExecuTorch build. The user guide shows the release command; this is the nightly one.
+Torch-TensorRT brings PyTorch. Swap `cu132` for `cu134` if you run CUDA 13.4:
 ```bash
-python -m pip install --pre "torch-tensorrt[executorch]" \
+python -m pip install --pre --upgrade "torch-tensorrt[executorch]" \
   --index-url https://download.pytorch.org/whl/nightly/cu132 \
   --extra-index-url https://pypi.org/simple \
   --extra-index-url https://pypi.nvidia.com
 ```
-All three indexes are needed, and so is `--pre`. Without `--pre` pip takes the stable
-Torch-TensorRT from the public index, which is far older. Without NVIDIA's index the
-inference library resolves to a source distribution, and pip spends around twenty minutes
-trying to build it before failing.
+All three indexes are needed, and so are `--pre` and `--upgrade`. Without `--pre` pip takes
+the stable Torch-TensorRT from the public index, which is far older. Without `--upgrade` pip
+keeps an older nightly that is already installed, and with it an extra that may not bring this
+wheel. Without NVIDIA's index the inference library resolves to a source distribution, and pip
+spends around twenty minutes trying to build it before failing.
 PyTorch you never name: it arrives as a dependency of Torch-TensorRT. This wheel asks for it by
 name with no version, because ExecuTorch imports it and leaves the choice open, so installing this
 wheel on its own lets the resolver pick a PyTorch older than the ExecuTorch it pins. That
@@ -134,7 +138,13 @@ a tensor rather than about versions. Install it the way this section shows and t
 arise. Building this wheel
 by hand is only needed to work on it, and those instructions are below.
 
-On a fresh environment that command was measured installing:
+On Windows there is one extra step. Install PyTorch first, with
+`python -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu132`,
+then add `--extra-index-url https://download.pytorch.org/whl/nightly/cpu` to the command above.
+ExecuTorch's Windows nightly needs torchao, and only that index carries its Windows build. With
+PyTorch already installed, pip does not take the CPU build of PyTorch from that index.
+
+On a fresh environment the nightly command was measured installing:
 
 | package | version |
 | --- | --- |
@@ -262,9 +272,13 @@ python -m pip wheel --no-build-isolation --no-deps \
 ```
 
 `TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION`
-sets only the companion's own version.
-base version plus a development suffix and Git revision. The shared build keeps
-the main wheel's date and CUDA suffix while retaining the companion's independent
+sets the companion's own version. A release build of the main wheel (`RELEASE=1`) reads it
+too: it records the version for its error messages, and when
+`TORCH_TENSORRT_EXECUTORCH_RUNTIME_CHANNEL` names the channel that carries the pinned
+ExecuTorch (`nightly` for a development build, `test` for a release), its `executorch` extra
+requires exactly that version. Without `TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION` the version is
+the companion's base version plus a development suffix and Git revision. The shared build
+keeps the main wheel's date and CUDA suffix while retaining the companion's independent
 base version. Its CMake version also describes the companion, not the main wheel.
 
 `tensorrt-cu13` is needed at build time so the wheel can record an exact
@@ -371,7 +385,8 @@ itself.
 
 A **CUDA** build of `executorch` is required at runtime, not just to build. The delegate carries a
 `DT_NEEDED` on `libexecutorch_extension_cuda.so`, which only ExecuTorch's CUDA wheels ship, and
-those live on the PyTorch nightly index. `install_requires` names the version including its local
+those live on PyTorch's indexes: a development build on the nightly one, a release on the test and
+stable ones. `install_requires` names the version including its local
 label, so only the CUDA build the delegate linked satisfies it. A label-free specifier admits any
 label, which let a `+cpu` wheel resolve and then fail to load at import. Carrying the label rules
 that out, because PEP 440 only ignores labels when the specifier omits them. It does bind the wheel
@@ -385,7 +400,8 @@ index applies to the whole dependency solve.
 
 ```bash
 python -m pip install dist/torch_tensorrt_executorch_runtime-*.whl \
-  --extra-index-url https://download.pytorch.org/whl/nightly/cu132
+  --extra-index-url https://download.pytorch.org/whl/nightly/cu132 \
+  --extra-index-url https://download.pytorch.org/whl/test/cu132
 ```
 
 ```python

@@ -269,6 +269,7 @@ def test_shared_build_provisions_tensorrt_metadata(tmp_path, arch, cuda, release
         "BUILD_ENV_FILE": str(tmp_path / "build-env"),
         "BUILD_VERSION": version if release else f"{version}.dev20260911",
         "CU_VERSION": cuda,
+        "CHANNEL": "nightly",
         "ARCH": arch,
         "EVENTS": str(tmp_path / "events"),
         "BUILT_VERSION": str(tmp_path / "built-version"),
@@ -367,6 +368,74 @@ def test_missing_tensorrt_provisioning_is_detected(tmp_path, monkeypatch, arch):
         AssertionError, match="No package metadata was found for tensorrt-cu13"
     ):
         test_shared_build_provisions_tensorrt_metadata(tmp_path, arch, "cu132", True)
+
+
+def _device_extra_check() -> str:
+    script = _workflow("executorch-test-linux.yml")["jobs"]["test"]["with"]["script"]
+    start = script.index("python - <<'PY'\n") + len("python - <<'PY'\n")
+    return script[start : script.index("\nPY\n", start)]
+
+
+@pytest.mark.parametrize(
+    "channel, executorch, pin, passes",
+    [
+        # A development ExecuTorch build is only on the nightly index.
+        ("nightly", "1.6.0.dev20261014", "built", True),
+        ("nightly", "1.6.0.dev20261014", "other", False),
+        ("nightly", "1.6.0.dev20261014", None, False),
+        ("test", "1.6.0.dev20261014", None, True),
+        ("test", "1.6.0.dev20261014", "built", False),
+        # An ExecuTorch release is on the test index.
+        ("test", "1.6.0", "built", True),
+        ("test", "1.6.0", "other", False),
+        ("test", "1.6.0", None, False),
+        ("nightly", "1.6.0", None, True),
+        ("nightly", "1.6.0", "built", False),
+    ],
+)
+def test_the_device_job_checks_the_published_extra(
+    tmp_path, channel, executorch, pin, passes
+):
+    """Run the device job's metadata check against installed wheels with known extras.
+
+    A wheel must require exactly the companion built beside it when its own index also carries
+    the ExecuTorch build that companion pins. Anywhere else pip could not meet that requirement,
+    and would quietly pick an older wheel, so the wheel must not name the companion.
+    """
+    suffix = ".dev20261019" if channel == "nightly" else ""
+    companion = f"0.3.0{suffix}+cu132"
+    pins = {"built": companion, "other": f"0.3.0{suffix}+cu134"}
+    requires = [f"executorch>={executorch},<1.7; extra == 'executorch'"]
+    if pin:
+        requires.append(
+            f"torch-tensorrt-executorch-runtime=={pins[pin]}; extra == 'executorch'"
+        )
+    for name, version, deps in (
+        ("torch_tensorrt", f"2.16.0{suffix}+cu132", requires),
+        (
+            "torch_tensorrt_executorch_runtime",
+            companion,
+            ["torch", f"executorch=={executorch}+cu132"],
+        ),
+    ):
+        info = tmp_path / f"{name}-{version}.dist-info"
+        info.mkdir()
+        (info / "METADATA").write_text(
+            f"Metadata-Version: 2.1\nName: {name.replace('_', '-')}\nVersion: {version}\n"
+            + "".join(f"Requires-Dist: {r}\n" for r in deps)
+        )
+    result = subprocess.run(
+        [sys.executable, "-"],
+        input=_device_extra_check(),
+        env={**os.environ, "PYTHONPATH": str(tmp_path), "CHANNEL": channel},
+        # "python -" puts the working directory first on sys.path, where a built checkout's own
+        # egg-info would shadow the fake metadata.
+        cwd=tmp_path,
+        text=True,
+        capture_output=True,
+        timeout=30,
+    )
+    assert (result.returncode == 0) == passes, result.stderr
 
 
 _DEVICE_EXPORT = 'python examples/torchtrt_executorch_example/export_device_resident.py \\\n  --model_path="${RUNNER_TEMP}/torchtrt-device-resident.pte"\n'
@@ -479,6 +548,12 @@ def _assert_device_commands(tmp_path, workflow, failure=""):
     resolve = [e for e in events if "--dry-run" in e]
     assert len(resolve) == 1, resolve
     assert resolve[0][-1] == f"torch-tensorrt[executorch]=={runner}", resolve
+    # The companion pins a development ExecuTorch from the nightly index or a release from the
+    # test one, so the resolve needs both to meet the extra on either kind of branch.
+    for channel in ("nightly", "test"):
+        assert (
+            f"https://download.pytorch.org/whl/{channel}/cu132" in resolve[0]
+        ), resolve
     examples = [
         event[1:]
         for event in events

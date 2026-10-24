@@ -765,7 +765,7 @@ def test_a_present_but_broken_cuda_extension_is_not_diagnosed_as_a_cpu_wheel(
     with pytest.raises(delegate.DelegateCompatibilityError) as raised:
         delegate.register()
 
-    says_cpu = "a CPU build satisfies the version pin" in str(raised.value)
+    says_cpu = "the installed executorch is a CPU build" in str(raised.value)
     assert says_cpu is expect_cpu_advice, (
         "the CPU-wheel advice fired for a present extension"
         if says_cpu

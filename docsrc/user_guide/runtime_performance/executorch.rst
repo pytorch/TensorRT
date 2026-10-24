@@ -30,24 +30,38 @@ Installation
 -------------
 
 Install Torch-TensorRT with the ``executorch`` extra from the PyTorch channel for your CUDA
-version. Swap ``cu132`` for ``cu134`` on CUDA 13.4:
+version, and name the delegate package beside it. Swap ``cu132`` for ``cu134`` on CUDA 13.4:
 
 .. code-block:: bash
 
-    pip install "torch-tensorrt[executorch]" \
+    pip install "torch-tensorrt[executorch]" "torch-tensorrt-executorch-runtime==0.2.*" \
       --index-url https://download.pytorch.org/whl/cu132 \
+      --extra-index-url https://download.pytorch.org/whl/test/cu132 \
+      --extra-index-url https://download.pytorch.org/whl/nightly/cu132 \
       --extra-index-url https://pypi.org/simple
 
-The PyTorch channel is needed because the CUDA build of ExecuTorch is published only there.
+This release pins a development build of ExecuTorch, which only the nightly channel carries, and
+only for a limited time. The extra brings the delegate only where the wheel's own index also has
+that build, so this release's extra does not bring it, and the command names it. The delegate
+comes from the test channel, where the release was first published as a release candidate.
+PyPI has only a CPU build of ExecuTorch, and stays in the list for TensorRT and the other
+dependencies. The delegate version in the command belongs to this release, so if the delegate or
+its ExecuTorch build cannot be found, pip stops with an error instead of quietly installing an
+older Torch-TensorRT.
+On Windows, add ``--extra-index-url https://download.pytorch.org/whl/nightly/cpu``. ExecuTorch's
+Windows nightly needs torchao, and only that index carries its Windows build.
 
 What the command installs
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 * ExecuTorch, the CUDA build, from the ``executorch`` extra. That is all you need to export.
 * ``torch-tensorrt-executorch-runtime``, one shared library holding the TensorRT delegate,
-  which you need to run a ``.pte``. The extra installs the one built together with your
-  Torch-TensorRT wheel, for the same CUDA version. It requires the exact ExecuTorch build
-  it was compiled against, so you get that one rather than the newest.
+  which you need to run a ``.pte``. It requires the exact ExecuTorch build it was compiled
+  against, so you get that one rather than the newest.
+
+A wheel from PyPI, or one you build yourself, does not bring the delegate either. If it is
+missing when you load a ``.pte``, the error message says how to get the one that matches your
+wheel.
 
 This works for the standard Linux (x86-64 and aarch64) and Windows x86-64 wheels. On aarch64
 it needs glibc 2.35 or newer, the same as TensorRT itself. The TensorRT-RTX and Python-only
@@ -67,10 +81,18 @@ To pick up a change before it ships, or to report a problem against ``main``:
       --index-url https://download.pytorch.org/whl/nightly/cu132 \
       --extra-index-url https://pypi.org/simple
 
+* The ``executorch`` extra of a nightly wheel that pins a development ExecuTorch build, as
+  ``main`` normally does, also installs the delegate built together with it, for the same CUDA
+  version, so the command does not name it.
 * ``--pre`` is required. Without it pip takes the stable release instead.
 * ``--upgrade`` is required if a nightly is already installed, or pip keeps the old one and
   tells you nothing.
 * PyPI stays in the list because TensorRT is not published on the nightly channel.
+* On Windows, install PyTorch first, with
+  ``pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu132``.
+  Then add ``--extra-index-url https://download.pytorch.org/whl/nightly/cpu`` to the command.
+  ExecuTorch's Windows nightly needs torchao, and only that index carries its Windows build.
+  With PyTorch already installed, pip does not take the CPU build of PyTorch from that index.
 * Keep PyTorch, ExecuTorch and Torch-TensorRT on the same channel.
 
 ----
