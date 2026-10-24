@@ -2432,18 +2432,15 @@ def test_runtime_wheel_pins_its_cuda_13_dependencies(monkeypatch, cuda, companio
         runpy.run_path(str(_RUNTIME_SETUP_PY))
         assert queries == list(versions)
         assert metadata["version"] == companion
-        # Only what the delegate links, and ExecuTorch keeps the label (except on PyPI, below) because the delegate links one
+        # Only what the delegate links, and ExecuTorch keeps the label because the delegate links one
         # specific build of it. The inference library and the CUDA runtime have no label to keep.
         # PyTorch and Torch-TensorRT are deliberately absent: neither is linked, requiring the second
         # would make this wheel depend on the project that builds it, and ExecuTorch leaves the choice
         # of PyTorch build to the user rather than pinning one.
-        # A wheel for PyPI has no label, so neither does its ExecuTorch requirement: PyPI's
-        # ExecuTorch has none to match.
-        executorch = versions["executorch"]
-        if "+" not in companion:
-            executorch = executorch.partition("+")[0]
+        # A wheel for PyPI has no label of its own, but its ExecuTorch requirement keeps one: PyPI's
+        # ExecuTorch is a CPU build, which the delegate refuses at import.
         assert set(metadata["install_requires"]) == {
-            f"executorch=={executorch}",
+            f"executorch=={versions['executorch']}",
             "torch",
             f"tensorrt-cu13=={versions['tensorrt-cu13'].partition('+')[0]}",
             f"nvidia-cuda-runtime=={versions['nvidia-cuda-runtime'].partition('+')[0]}",
@@ -3148,9 +3145,9 @@ def _elf_object(architecture: str) -> bytes:
     [
         ("well_formed", True),
         ("aarch64_tag", True),
-        # A wheel for PyPI has no label, and its ExecuTorch requirement must not have one either.
+        # A wheel for PyPI has no label, but its ExecuTorch requirement must keep one.
         ("pypi_release", True),
-        ("pypi_release_keeps_the_executorch_label", False),
+        ("pypi_release_drops_the_executorch_label", False),
         ("payload_for_the_other_architecture", False),
         ("truncated_payload", False),
         ("unrepaired_tag", False),
@@ -3385,7 +3382,7 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
     wheel_version = "0.1.0+cu132"
     if case.startswith("pypi_release"):
         wheel_version = "0.1.0"
-        if case == "pypi_release":
+        if case == "pypi_release_drops_the_executorch_label":
             requires = [
                 r.partition("+")[0] if r.startswith("executorch==") else r
                 for r in requires
@@ -3455,6 +3452,7 @@ def test_the_wheel_checker_rejects_a_bad_wheel(tmp_path, case, should_pass):
         "requires_an_unpinned_executorch": "the repository pins executorch==",
         "requires_a_mismatched_executorch_pin": "the repository pins executorch==",
         "requires_no_executorch": "the repository pins executorch==",
+        "pypi_release_drops_the_executorch_label": "the repository pins executorch==",
         "pins_torch": "is required unbounded so the user chooses it",
         "requires_torch_tensorrt": (
             "the wheel requires torch-tensorrt, which the delegate does not link"
