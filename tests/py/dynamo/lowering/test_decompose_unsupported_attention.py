@@ -1,3 +1,4 @@
+import unittest
 from unittest import mock
 
 import torch
@@ -121,6 +122,36 @@ class TestDecomposeUnsupportedAttention(TestCase):
             len(unexpected_ops_seen),
             0,
             f"SDPA should have been decomposed for MLA shapes: {unexpected_ops_seen}",
+        )
+
+    @unittest.skipIf(not torch.cuda.is_available(), "builds a TensorRT engine")
+    def test_decomposed_attention_runs_in_tensorrt(self):
+        # The per-node fallback once left aten.transpose.int and aten._unsafe_view to
+        # PyTorch, splitting the model across engines.
+        import torch_tensorrt
+
+        class MLA(nn.Module):
+            def forward(self, q, k, v):
+                return torch.nn.functional.scaled_dot_product_attention(q, k, v)
+
+        inputs = (
+            torch.randn(1, 2, 16, 64, device="cuda", dtype=torch.float16),
+            torch.randn(1, 2, 16, 64, device="cuda", dtype=torch.float16),
+            torch.randn(1, 2, 16, 32, device="cuda", dtype=torch.float16),
+        )
+        trt_model = torch_tensorrt.dynamo.compile(
+            torch.export.export(MLA(), inputs),
+            arg_inputs=list(inputs),
+            min_block_size=1,
+            decompose_attention=False,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
+        )
+        torch.testing.assert_close(
+            trt_model(*inputs), MLA()(*inputs), rtol=1e-2, atol=1e-2
+        )
+        self.assertEqual(
+            [name for name, _ in trt_model.named_children()], ["_run_on_acc_0"]
         )
 
 
