@@ -120,8 +120,10 @@ def decompose_unsupported_attention(
     if settings.decompose_attention:
         return gm
 
-    changed = False
-    for node in list(gm.graph.nodes):
+    # Decide for every node before changing the graph: whether a node is supported can depend on the other
+    # attention nodes, such as two that read the same query.
+    declined = []
+    for node in gm.graph.nodes:
         if node.op != "call_function" or node.target not in _ATTENTION_FALLBACKS:
             continue
 
@@ -131,16 +133,16 @@ def decompose_unsupported_attention(
             continue
 
         validator, decomp = _ATTENTION_FALLBACKS[node.target]
-        if validator(node, settings):
-            continue
+        if not validator(node, settings):
+            declined.append((node, decomp))
 
+    for node, decomp in declined:
         logger.info(
-            "Attention converter declined %s; decomposing that node in place "
-            "(native IAttention kept for other attention nodes)",
+            "Attention converter declined %s; decomposing that node in place",
             node.name,
         )
         _inline_traced_decomp(gm, node, decomp, settings)
-        changed = True
+    changed = bool(declined)
 
     if changed:
         gm = clean_up_graph_after_modifications(gm)

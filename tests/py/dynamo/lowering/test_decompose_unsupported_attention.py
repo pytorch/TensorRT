@@ -154,6 +154,98 @@ class TestDecomposeUnsupportedAttention(TestCase):
             [name for name, _ in trt_model.named_children()], ["_run_on_acc_0"]
         )
 
+    def test_attentions_sharing_a_bf16_query_are_decomposed(self):
+        # Wan2.1's image-to-video cross-attention reads one query against text and image keys.
+        class TwoAttentions(nn.Module):
+            def forward(self, q, text, image):
+                q = q.transpose(1, 2)
+                return torch.nn.functional.scaled_dot_product_attention(
+                    q, text, text
+                ) + torch.nn.functional.scaled_dot_product_attention(q, image, image)
+
+        sdpa = torch.ops.aten.scaled_dot_product_attention.default
+        settings = CompilationSettings(min_block_size=1, decompose_attention=False)
+        for dtype, remaining in ((torch.bfloat16, 0), (torch.float16, 2)):
+            with self.subTest(dtype=dtype):
+                inputs = (
+                    torch.randn(1, 6, 2, 8, dtype=dtype),
+                    torch.randn(1, 2, 5, 8, dtype=dtype),
+                    torch.randn(1, 2, 3, 8, dtype=dtype),
+                )
+                gm = torch.export.export(TwoAttentions(), inputs).module()
+                gm = decompose_unsupported_attention(gm, settings)
+                self.assertEqual(
+                    sum(n.target == sdpa for n in gm.graph.nodes), remaining
+                )
+                if dtype == torch.bfloat16:
+                    torch.testing.assert_close(
+                        gm(*inputs), TwoAttentions()(*inputs), rtol=1e-2, atol=1e-2
+                    )
+
+    def test_attentions_reading_one_tensor_in_different_dtypes_are_kept(self):
+        # Only one of the two queries is bfloat16, so they cannot become one tensor in TensorRT.
+        class TwoDtypes(nn.Module):
+            def forward(self, q, k16, kbf16):
+                cast = torch.ops.aten._to_copy.default
+                a = torch.nn.functional.scaled_dot_product_attention(
+                    cast(q, dtype=torch.float16), k16, k16
+                )
+                b = torch.nn.functional.scaled_dot_product_attention(
+                    cast(q, dtype=torch.bfloat16), kbf16, kbf16
+                )
+                return a.float() + b.float()
+
+        inputs = (
+            torch.randn(1, 2, 6, 8),
+            torch.randn(1, 2, 5, 8, dtype=torch.float16),
+            torch.randn(1, 2, 5, 8, dtype=torch.bfloat16),
+        )
+        gm = torch.export.export(TwoDtypes(), inputs).module()
+        gm = decompose_unsupported_attention(
+            gm, CompilationSettings(min_block_size=1, decompose_attention=False)
+        )
+        sdpa = torch.ops.aten.scaled_dot_product_attention.default
+        self.assertEqual(sum(n.target == sdpa for n in gm.graph.nodes), 2)
+
+    @unittest.skipIf(not torch.cuda.is_available(), "builds a TensorRT engine")
+    def test_attentions_sharing_a_query_build(self):
+        # TensorRT crashed or failed building these before the attentions were decomposed.
+        import torch_tensorrt
+
+        class TwoAttentions(nn.Module):
+            def __init__(self, combine):
+                super().__init__()
+                self.combine = combine
+
+            def forward(self, q, text, image):
+                return self.combine(
+                    torch.nn.functional.scaled_dot_product_attention(q, text, text),
+                    torch.nn.functional.scaled_dot_product_attention(q, image, image),
+                )
+
+        inputs = tuple(
+            torch.randn(1, 8, n, 128, device="cuda", dtype=torch.bfloat16)
+            for n in (256, 512, 257)
+        )
+        for combine in (torch.add, lambda a, b: torch.cat([a, b], dim=-1)):
+            with self.subTest(combine=combine):
+                model = TwoAttentions(combine)
+                trt_model = torch_tensorrt.dynamo.compile(
+                    torch.export.export(model, inputs),
+                    arg_inputs=list(inputs),
+                    min_block_size=1,
+                    decompose_attention=False,
+                    cache_built_engines=False,
+                    reuse_cached_engines=False,
+                )
+                torch.testing.assert_close(
+                    trt_model(*inputs), model(*inputs), rtol=1e-2, atol=1e-2
+                )
+                # The decomposed attentions run in TensorRT, not in PyTorch between engines.
+                self.assertEqual(
+                    [name for name, _ in trt_model.named_children()], ["_run_on_acc_0"]
+                )
+
 
 if __name__ == "__main__":
     run_tests()

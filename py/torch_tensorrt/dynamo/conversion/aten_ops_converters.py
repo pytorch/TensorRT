@@ -5182,10 +5182,63 @@ def attention_capability_validator(
     return True
 
 
+# Ops that only reshape, copy or cast a tensor. TensorRT can fold them away, so tensors reached through them
+# from one producer may become one tensor in the network.
+_PASS_THROUGH_OPS = {
+    torch.ops.aten.view.default,
+    torch.ops.aten._unsafe_view.default,
+    torch.ops.aten.reshape.default,
+    torch.ops.aten._reshape_copy.default,
+    torch.ops.aten.transpose.int,
+    torch.ops.aten.permute.default,
+    torch.ops.aten.expand.default,
+    torch.ops.aten.unsqueeze.default,
+    torch.ops.aten.squeeze.dim,
+    torch.ops.aten.squeeze.dims,
+    torch.ops.aten.clone.default,
+    torch.ops.aten._to_copy.default,
+}
+
+
+def _pass_through_source(arg: Argument) -> Argument:
+    while isinstance(arg, Node) and arg.target in _PASS_THROUGH_OPS:
+        arg = arg.args[0]
+    return arg
+
+
+def _is_bf16(arg: Argument) -> bool:
+    val = arg.meta.get("val") if isinstance(arg, Node) else None
+    return getattr(val, "dtype", None) == torch.bfloat16
+
+
+def _shares_bf16_query_with_another_attention(node: Node) -> bool:
+    if not _is_bf16(node.args[0]):
+        return False
+    query = _pass_through_source(node.args[0])
+    return any(
+        other is not node
+        and other.target == torch.ops.aten.scaled_dot_product_attention.default
+        and _is_bf16(other.args[0])
+        and _pass_through_source(other.args[0]) is query
+        for other in node.graph.nodes
+    )
+
+
 def scaled_dot_product_attention_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
     if not attention_capability_validator(node, settings):
+        return False
+
+    # TensorRT 11.3 and 11.4 crash or fail while building two attention layers that read the same
+    # bfloat16 query (float16 builds). Seen on a Jetson AGX Thor and an H100, and declined on every
+    # version, because the decomposition is always correct.
+    if _shares_bf16_query_with_another_attention(node):
+        _LOGGER.debug(
+            "Decomposing attention %s: it reads the same bfloat16 query as another attention, which "
+            "TensorRT's attention layer cannot build.",
+            node.name,
+        )
         return False
 
     attn_mask = args_bounds_check(node.args, 3, None)
