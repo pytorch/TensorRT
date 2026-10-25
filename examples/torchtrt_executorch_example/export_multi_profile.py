@@ -45,8 +45,8 @@ seconds per megabyte of engine, so its ~2 GB engine is a couple of hours.
 
 Prerequisites
 -------------
-This example needs a build newer than Torch-TensorRT 2.15: optimization
-profiles in the ExecuTorch delegate are not in 2.15. Install a nightly Torch-TensorRT with
+This example needs a build newer than Torch-TensorRT 2.15, because 2.15's
+ExecuTorch delegate has no optimization profiles. Install a nightly Torch-TensorRT with
 its ``executorch`` extra, as the Nightly builds part of the ExecuTorch
 deployment guide shows:
 https://docs.pytorch.org/TensorRT/user_guide/runtime_performance/executorch.html#nightly-builds

@@ -70,12 +70,12 @@ What the command installs
   for the same CUDA version. It requires the exact ExecuTorch build it was compiled against, so
   you get that one rather than the newest.
 
-A wheel you build yourself does not bring the delegate. If it is missing when you load a
-``.pte``, the error message says how to get the one that matches your wheel.
+A wheel you build yourself does not bring the delegate. Build it as well, as the runtime wheel
+README shows.
 
 The delegate is built for the standard Linux wheels (x86-64 and aarch64), and for Windows x86-64.
 On aarch64 it needs glibc 2.35 or newer, the same as TensorRT itself.
-The TensorRT-RTX and Python-only builds have no delegate. To export a coalesced program you also
+The JetPack, TensorRT-RTX and Python-only builds have no delegate. To export a coalesced program you also
 need a CUDA toolkit, because ExecuTorch's CUDA backend compiles the leftover operators with
 ``nvcc``.
 
@@ -202,14 +202,14 @@ already on the GPU, those copies are wasted time. Turn them off at export:
   before the call: in C++ you set it with ``Module::set_output``, and the Python runtime allocates
   one for you.
 
-Pass CUDA tensors to a program exported this way. A CPU tensor costs a copy on every call when the
-first delegate to use that input is TensorRT, and fails when it is the CUDA backend. In builds
-newer than 2.15, the Python runtime refuses it in both cases.
+Pass CUDA tensors to a program exported this way. ExecuTorch's Python runtime refuses a CPU
+tensor. From C++, a CPU tensor costs a copy on every call when the first delegate to use that
+input is TensorRT, and fails when it is the CUDA backend.
 
 Keep the engines in a separate file
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-**Not in 2.15.**
+**Newer than 2.15.** Needs a nightly build or a later release.
 
 By default the engines are stored inside the ``.pte``, so the file is as large as the model. With
 ``external_engine_data``, they go to an ExecuTorch data file (``.ptd``) next to the ``.pte``
@@ -287,13 +287,20 @@ Run from C++
 -------------
 
 The wheels ship a prebuilt delegate and a CMake package, so a C++ application can link it without
-building anything. The steps below are for Linux.
+building anything. The steps below are for Linux. Put the program shown further down in
+``main.cpp``, the ``model.pte`` from `Export a Model`_ in the same folder, and this next to them as
+``CMakeLists.txt``:
 
 .. code-block:: cmake
+
+    cmake_minimum_required(VERSION 3.28)
+    project(my_app CXX)
+    set(CMAKE_CXX_STANDARD 17)
 
     find_package(executorch REQUIRED COMPONENTS backend_cuda kernels_optimized)
     find_package(executorch_backend_tensorrt REQUIRED)
 
+    add_executable(my_app main.cpp)
     target_link_libraries(my_app PRIVATE
       executorch::runtime
       executorch::backend_cuda
@@ -308,13 +315,16 @@ building anything. The steps below are for Linux.
   TensorRT needs it too. Without it, loading fails with ``No device allocator registered``.
 
 The two CMake packages are inside two Python packages, so point CMake at both. ExecuTorch's
-location comes from its package metadata, because ``executorch.__file__`` is not set:
+location comes from its package metadata, because ``executorch.__file__`` is not set. Build and
+run in the Python environment where you installed the packages:
 
 .. code-block:: bash
 
     ET_CMAKE=$(python -c 'import importlib.metadata as m, pathlib; print(pathlib.Path(str(m.distribution("executorch").locate_file("executorch"))) / "share" / "cmake")')
     DELEGATE=$(TORCH_TENSORRT_SKIP_DELEGATE_REGISTRATION=1 python -c 'import pathlib, torch_tensorrt_executorch_runtime as r; print(pathlib.Path(r.__file__).parent)')
-    cmake -DCMAKE_PREFIX_PATH="${ET_CMAKE};${DELEGATE}" ...
+    cmake -S . -B build -DCMAKE_PREFIX_PATH="${ET_CMAKE};${DELEGATE}"
+    cmake --build build
+    ./build/my_app
 
 The variable in the second line lets Python import the delegate package to read its path, without
 loading the delegate.
@@ -488,7 +498,8 @@ it runs a coalesced program only when the CUDA part has no weights, like the one
 ``export_coalesced.py`` writes, and it cannot run a program saved with ``external_engine_data``.
 
 A prebuilt copy of the runner ships as ``torch_tensorrt/bin/example_executorch_runner``, in
-``libtorchtrt.tar.gz`` and in the Torch-TensorRT wheels for Linux. It has no CUDA backend, and of
+``libtorchtrt.tar.gz`` and in the Torch-TensorRT wheels for Linux, except the JetPack and
+TensorRT-RTX builds. It has no CUDA backend, and of
 the CPU operators only the copies at the edges of the program, so it runs only programs that
 TensorRT takes in full, not coalesced ones.
 
@@ -590,7 +601,7 @@ the budget on the GPU. With no budget, TensorRT chooses one from the free memory
 Optimization profiles
 ^^^^^^^^^^^^^^^^^^^^^^
 
-**Not in 2.15.**
+**Newer than 2.15.** Needs a nightly build or a later release.
 
 An engine can hold several optimization profiles: one set of weights, tuned for several ranges
 of input shapes. The usual case is an LLM, with one profile for decoding one token at a time and
@@ -668,7 +679,7 @@ In ``examples/torchtrt_executorch_example/``:
 * ``export_coalesced.py`` splits one graph between the TensorRT delegate and the CUDA backend.
 * ``export_device_resident.py`` does the same with no copies at the edges of the program.
 * ``export_kv_cache_decode.py`` exports a decoder step whose KV cache stays in memory you own.
-* ``export_multi_profile.py`` exports one engine with two optimization profiles (not in 2.15).
+* ``export_multi_profile.py`` exports one engine with two optimization profiles (newer than 2.15).
 
 ``examples/executorch_reference_runner/`` loads and runs a ``.pte`` from Python and from C++,
-including optimization profiles (not in 2.15) and the green context option.
+including optimization profiles (newer than 2.15) and the green context option.

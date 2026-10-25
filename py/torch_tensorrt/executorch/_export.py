@@ -609,9 +609,10 @@ def export(
             program total split proportionally across engines.
         use_cuda_graphs (Optional[bool]): Bake CUDA graph replay on (True) or off
             (False) into every method's TensorRT compile specs. None leaves the choice
-            unset so the runtime default applies. A load-time option overrides this
-            value. Non-booleans and raw ``CompileSpec("use_cuda_graphs", ...)`` entries
-            are rejected; use this keyword instead.
+            unset so the runtime default applies. A load option, or a process option
+            set to False, overrides this value. Non-booleans and raw
+            ``CompileSpec("use_cuda_graphs", ...)`` entries are rejected; use this
+            keyword instead.
         external_engine_data (Optional[str]): Write every TensorRT engine to an
             ExecuTorch data file named ``<external_engine_data>.ptd`` instead of into
             the ``.pte``, which then holds only a key per engine. Pass the name without

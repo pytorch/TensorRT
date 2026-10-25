@@ -92,7 +92,7 @@ Point CMake at both wheels. ExecuTorch's location comes from its package metadat
 ```bash
 ET_CMAKE=$(python -c 'import importlib.metadata as m, pathlib; print(pathlib.Path(str(m.distribution("executorch").locate_file("executorch"))) / "share" / "cmake")')
 DELEGATE=$(TORCH_TENSORRT_SKIP_DELEGATE_REGISTRATION=1 python -c 'import pathlib, torch_tensorrt_executorch_runtime as r; print(pathlib.Path(r.__file__).parent)')
-cmake -DCMAKE_PREFIX_PATH="${ET_CMAKE};${DELEGATE}" ...
+cmake -S . -B build -DCMAKE_PREFIX_PATH="${ET_CMAKE};${DELEGATE}"
 ```
 
 The deployment guide explains each target and shows a complete program. The
@@ -107,7 +107,7 @@ known issues.
 - **CMake 3.28 or newer** is needed for the recipe above: on older versions the ExecuTorch package
   does not provide the `executorch::` targets. CMake is not part of these wheels, so install it
   yourself. The section below shows a way for older CMake.
-- **No header for optimization profiles (not in 2.15).** Choosing a profile needs
+- **No header for optimization profiles (newer than 2.15).** Choosing a profile needs
   `OptimizationProfileGuard` from `TensorRTBackend.h`, which only the source tree and
   `libtorchtrt.tar.gz` carry. On Linux you can compile against it, with the TensorRT headers, and
   link this wheel's delegate. On Windows the wheel's library does not export the guard. Without it,
@@ -226,8 +226,8 @@ python -m pip wheel --no-build-isolation --no-deps \
 - `TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION` sets this wheel's version. Without it, the version
   is the base version in `version.txt` plus `.dev0` and the Git revision. Nightly builds keep this
   wheel's own base version, with the main wheel's date and CUDA suffix, such as
-  `0.3.0.dev20261023+cu132`. A release uses the base version and the CUDA suffix, such as
-  `0.2.0+cu132`.
+  `0.3.0.dev20261023+cu132`. A release on the PyTorch indexes uses the base version and the CUDA
+  suffix, such as `0.3.0+cu132`; the PyPI release has none, such as `0.3.0`.
 - A release build of the main wheel (`RELEASE=1`) reads the same variable and records the version
   for its error messages. When `TORCH_TENSORRT_EXECUTORCH_RUNTIME_CHANNEL` names a place that
   carries the pinned ExecuTorch build (`nightly` for a development build, `test` or `pypi` for a

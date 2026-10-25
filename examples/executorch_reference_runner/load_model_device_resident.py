@@ -5,8 +5,9 @@
 
 The program this loads was exported with ``skip_h2d_for_method_inputs`` and
 ``skip_d2h_for_method_outputs``, so its boundary carries no copy operators and it
-wants a CUDA input. A host input costs a copy on every call when TensorRT reads it
-first and fails when the CUDA backend does, and nightly Python runtimes refuse it.
+wants a CUDA input. ExecuTorch's Python runtime refuses a host input. From C++,
+a host input costs a copy on every call when TensorRT reads it first, and fails
+when the CUDA backend does.
 
 That contract is what this script checks. ``export_device_resident.py`` already
 asserts the serialized program contains no boundary copy operators; this asserts

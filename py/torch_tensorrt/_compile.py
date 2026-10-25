@@ -829,8 +829,9 @@ def save(
                   parameter takes precedence.
         use_cuda_graphs (Optional[bool]): Bake CUDA graph replay on (True) or off
                 (False) into every TensorRT delegate for ``output_format="executorch"``.
-                None leaves the choice unset so the runtime default applies. A load-time
-                option overrides this value. Non-booleans are rejected for ExecuTorch;
+                None leaves the choice unset so the runtime default applies. A load
+                option, or a process option set to False, overrides this value.
+                Non-booleans are rejected for ExecuTorch;
                 other formats ignore non-None values with a warning. Use this keyword,
                 not a raw ``CompileSpec("use_cuda_graphs", ...)``.
         kwargs: Additional format-specific kwargs. ``partitioners=``,
@@ -947,7 +948,7 @@ def save(
     if output_format == "executorch" and not _has_executorch_exir():
         raise ImportError(
             "Saving with output_format='executorch' requires executorch.exir. "
-            "This CUDA integration supports Linux. Setup: "
+            "This CUDA integration supports Linux and Windows x86-64. Setup: "
             + executorch_install_command()
         )
     if output_format == "executorch":
@@ -1588,7 +1589,8 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
     except ImportError:
         raise ImportError(
             "Could not import the ExecuTorch export integration for "
-            "output_format='executorch'. This CUDA integration supports Linux. "
+            "output_format='executorch'. This CUDA integration supports Linux and "
+            "Windows x86-64. "
             "Setup: " + executorch_install_command()
         )
     # save() only ever lowers a single method, so keep rejecting the per-method

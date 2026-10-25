@@ -7,8 +7,8 @@ reference code with fixed example inputs, so replace those with your real inputs
 | --- | --- | --- |
 | `example_executorch_runner` | `main.cpp` | The low-level `Program` and `Method` loading sequence, and running on a green context stream |
 | `kv_cache_decode_check` | `kv_cache_decode_check.cpp` | That a key-value (KV) cache in memory the caller owns keeps its updates from call to call |
-| `example_executorch_multi_profile_runner` | `multi_profile_main.cpp` | Picking a TensorRT optimization profile for each call through the `Module` API (not in 2.15) |
-| `example_executorch_multi_profile_benchmark` | `multi_profile_benchmark.cpp` | What picking the right profile is worth (not in 2.15) |
+| `example_executorch_multi_profile_runner` | `multi_profile_main.cpp` | Picking a TensorRT optimization profile for each call through the `Module` API (newer than 2.15) |
+| `example_executorch_multi_profile_benchmark` | `multi_profile_benchmark.cpp` | What picking the right profile is worth (newer than 2.15) |
 | `load_model.py` | Python | Loading and running a `.pte` with ExecuTorch's Python runtime |
 | `load_model_device_resident.py` | Python | The same for a program that keeps its inputs and outputs on the GPU |
 
@@ -32,7 +32,7 @@ python examples/torchtrt_executorch_example/export_coalesced.py --model_path=coa
 # A one-layer decoder step, for kv_cache_decode_check.
 python examples/torchtrt_executorch_example/export_kv_cache_decode.py --model_path=kv_cache_decode.pte
 
-# One engine with two optimization profiles, for the two multi-profile programs (not in 2.15).
+# One engine with two optimization profiles, for the two multi-profile programs (newer than 2.15).
 python examples/torchtrt_executorch_example/export_multi_profile.py --model_path=model_gemma3_multi_profile.pte
 ```
 
@@ -93,7 +93,7 @@ the delegate's static archive, `build-executorch-reference-runner/lib/libexecuto
 as a dependency. Naming the targets keeps the build from compiling every default ExecuTorch target
 too.
 
-The two multi-profile programs are not in 2.15, so build them from a source checkout of
+The two multi-profile programs need a build newer than 2.15, so build them from a source checkout of
 `main`: point `TORCH_TENSORRT_ROOT` at the checkout, leave out
 `-DEXECUTORCH_BACKEND_TENSORRT_SOURCE_DIR` (the same `CMakeLists.txt` then finds the delegate source
 on its own), and add `example_executorch_multi_profile_runner` and
@@ -191,7 +191,7 @@ pass runs on `cudaStreamPerThread`, and the second on a stream the program creat
 
 ## Pick an optimization profile
 
-**Not in 2.15.**
+**Newer than 2.15.** Needs a nightly build or a later release.
 
 An engine can hold several optimization profiles: one set of weights, tuned for several input
 shape ranges. Scope an `OptimizationProfileGuard` around a call to pick one:
