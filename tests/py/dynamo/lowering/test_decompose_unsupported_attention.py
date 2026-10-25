@@ -1,3 +1,5 @@
+import importlib.util
+import platform
 import unittest
 from unittest import mock
 
@@ -207,6 +209,41 @@ class TestDecomposeUnsupportedAttention(TestCase):
         sdpa = torch.ops.aten.scaled_dot_product_attention.default
         self.assertEqual(sum(n.target == sdpa for n in gm.graph.nodes), 2)
 
+    @unittest.skipIf(
+        importlib.util.find_spec("modelopt") is None or platform.system() != "Linux",
+        "needs NVIDIA Model Optimizer's quantize op, which is only supported on Linux",
+    )
+    def test_attention_whose_output_is_quantized_to_fp8_is_decomposed(self):
+        import modelopt.torch.quantization  # noqa: F401  # registers tensorrt.quantize_op
+
+        quantize = torch.ops.tensorrt.quantize_op.default
+
+        def graph(fp8_inputs: bool) -> torch.fx.GraphModule:
+            g = torch.fx.Graph()
+            q, k, v, amax = (g.placeholder(n) for n in ("q", "k", "v", "amax"))
+            if fp8_inputs:
+                q, k, v = (
+                    g.call_function(quantize, (t, amax, 8, 4, False, False))
+                    for t in (q, k, v)
+                )
+            out = g.call_function(
+                torch.ops.aten.scaled_dot_product_attention.default, (q, k, v)
+            )
+            out = g.call_function(torch.ops.aten.transpose.int, (out, 1, 2))
+            g.output(g.call_function(quantize, (out, amax, 8, 4, False, False)))
+            return torch.fx.GraphModule({}, g)
+
+        for fp8_inputs, supported in ((False, False), (True, True)):
+            with self.subTest(fp8_inputs=fp8_inputs):
+                sdpa = next(
+                    n
+                    for n in graph(fp8_inputs).graph.nodes
+                    if n.target == torch.ops.aten.scaled_dot_product_attention.default
+                )
+                self.assertEqual(
+                    scaled_dot_product_attention_validator(sdpa, None), supported
+                )
+
     @unittest.skipIf(not torch.cuda.is_available(), "builds a TensorRT engine")
     def test_attentions_sharing_a_query_build(self):
         # TensorRT crashed or failed building these before the attentions were decomposed.
@@ -245,6 +282,47 @@ class TestDecomposeUnsupportedAttention(TestCase):
                 self.assertEqual(
                     [name for name, _ in trt_model.named_children()], ["_run_on_acc_0"]
                 )
+
+    @unittest.skipIf(
+        not torch.cuda.is_available()
+        or torch.cuda.get_device_capability() < (8, 9)
+        or importlib.util.find_spec("modelopt") is None
+        or platform.system() != "Linux",
+        "needs an FP8 GPU and NVIDIA Model Optimizer's quantize op (Linux only)",
+    )
+    def test_attention_whose_output_is_quantized_to_fp8_builds(self):
+        # TensorRT 11.4 failed to build this before the attention was decomposed.
+        import modelopt.torch.quantization  # noqa: F401  # registers tensorrt.quantize_op
+        import torch_tensorrt
+
+        class AttentionThenFP8(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("amax", torch.tensor(4.0))
+                self.out = nn.Linear(256, 256)
+
+            def forward(self, q, k, v):
+                x = torch.nn.functional.scaled_dot_product_attention(q, k, v)
+                x = x.transpose(1, 2).reshape(1, 128, 256)
+                x = torch.ops.tensorrt.quantize_op(x, self.amax, 8, 4, False, False)
+                return self.out(x)
+
+        model = AttentionThenFP8().cuda().half().eval()
+        inputs = tuple(
+            torch.randn(1, 4, 128, 64, device="cuda", dtype=torch.float16)
+            for _ in range(3)
+        )
+        trt_model = torch_tensorrt.dynamo.compile(
+            torch.export.export(model, inputs),
+            arg_inputs=list(inputs),
+            min_block_size=1,
+            decompose_attention=False,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
+        )
+        torch.testing.assert_close(
+            trt_model(*inputs), model(*inputs), rtol=0.1, atol=0.1
+        )
 
 
 if __name__ == "__main__":

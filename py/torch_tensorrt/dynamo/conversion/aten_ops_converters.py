@@ -5224,6 +5224,33 @@ def _shares_bf16_query_with_another_attention(node: Node) -> bool:
     )
 
 
+def _output_quantized_to_fp8(node: Node) -> bool:
+    # Imported here: the lowering passes import this module.
+    from torch_tensorrt.dynamo.lowering.passes.annotate_fp8_sdpa import (
+        _is_fp8_quantize_op,
+    )
+
+    users = list(node.users)
+    while users:
+        user = users.pop()
+        if _is_fp8_quantize_op(user):
+            return True
+        if user.target in _PASS_THROUGH_OPS:
+            users.extend(user.users)
+    return False
+
+
+def _inputs_quantized_to_fp8(node: Node) -> bool:
+    from torch_tensorrt.dynamo.lowering.passes.annotate_fp8_sdpa import (
+        _is_fp8_quantize_op,
+    )
+
+    # Directly, as annotate_fp8_sdpa requires for the fused FP8 attention.
+    return all(
+        isinstance(arg, Node) and _is_fp8_quantize_op(arg) for arg in node.args[:3]
+    )
+
+
 def scaled_dot_product_attention_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
@@ -5237,6 +5264,16 @@ def scaled_dot_product_attention_validator(
         _LOGGER.debug(
             "Decomposing attention %s: it reads the same bfloat16 query as another attention, which "
             "TensorRT's attention layer cannot build.",
+            node.name,
+        )
+        return False
+    # TensorRT 11.4 fails to build an attention layer whose output is quantized to FP8, unless its query,
+    # key and value are FP8 too (the fused FP8 attention that annotate_fp8_sdpa sets up). Seen on a Jetson
+    # AGX Thor and an H100, and declined on every version for the same reason.
+    if _output_quantized_to_fp8(node) and not _inputs_quantized_to_fp8(node):
+        _LOGGER.debug(
+            "Decomposing attention %s: its output is quantized to FP8, which TensorRT's attention layer "
+            "cannot build unless its inputs are FP8 too.",
             node.name,
         )
         return False
