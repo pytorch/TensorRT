@@ -19,6 +19,10 @@ class TestSliceConverter(DispatchTestCase):
             ("slice_dim_start_stop_step_max_int", 2, 0, 2**63 - 1, 1),
             ("slice_dim_start_stop_step_past_end", 2, 0, 2048, 1),
             ("slice_dim_start_stop_step_none", 2, None, None, 1),
+            # A start below -dim_size clamps to 0 like Python, not wrapping to start % dim_size.
+            ("slice_dim_start_below_negative_extent", 1, -15, None, 1),
+            ("slice_dim_start_below_negative_extent_step", 1, -13, 8, 2),
+            ("slice_dim_start_below_negative_extent_stop_negative", 0, -4095, -2, 1),
         ]
     )
     def test_slice(self, _, dim, start, stop, step):
@@ -44,6 +48,26 @@ class TestSliceConverter(DispatchTestCase):
             def forward(self, input):
                 out = torch.ops.aten.slice.Tensor(input)
                 return out
+
+        input = [torch.randn(10, 10, 3, 1)]
+        self.run_test(
+            TestModule(),
+            input,
+        )
+
+    @parameterized.expand(
+        [
+            ("start_past_stop", 1, 7, 3, 1),
+            ("stop_below_negative_extent", 1, 0, -15, 1),
+            ("start_and_stop_below_negative_extent", 0, -20, -12, 1),
+        ]
+    )
+    def test_slice_empty_result(self, _, dim, start, stop, step):
+        # Python gives an empty slice for these; the bounds must not wrap into the axis.
+        class TestModule(torch.nn.Module):
+            def forward(self, input):
+                out = torch.ops.aten.slice.Tensor(input, dim, start, stop, step)
+                return out, input + 1
 
         input = [torch.randn(10, 10, 3, 1)]
         self.run_test(
