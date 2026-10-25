@@ -4176,13 +4176,23 @@ def aten_ops_reshape(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    shape = args[1]
+    # TensorRT infers a -1 as dynamic when the other sizes are runtime values
+    # (e.g. taken from another input), so use the size PyTorch inferred when static
+    node = ctx.current_node
+    out_val = node.meta.get("val") if node is not None else None
+    if isinstance(out_val, torch.Tensor) and len(out_val.shape) == len(shape):
+        shape = [
+            d if isinstance(s, int) and s == -1 and isinstance(d, int) else s
+            for s, d in zip(shape, out_val.shape)
+        ]
     return impl.shuffle.reshape(
         ctx,
         target,
         SourceIR.ATEN,
         name,
         input=args[0],
-        shape=args[1],
+        shape=shape,
     )
 
 
