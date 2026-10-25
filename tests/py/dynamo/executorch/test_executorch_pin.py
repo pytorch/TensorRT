@@ -951,24 +951,8 @@ def test_install_channel_guard_rejects_unsupported_nightly_recipes(
         ),
         (
             "docsrc/install.rst",
-            'pip install --upgrade "torch-tensorrt[executorch]==2.15.*" '
-            '"torch-tensorrt-executorch-runtime==0.2.*" '
-            "--index-url https://download.pytorch.org/whl/cu132 "
-            "--extra-index-url https://download.pytorch.org/whl/test/cu132 "
-            "--extra-index-url https://download.pytorch.org/whl/nightly/cu132",
-            None,
-        ),
-        (
-            "docsrc/install.rst",
-            'pip install "torch-tensorrt[executorch]==2.15.*" '
-            '"torch-tensorrt-executorch-runtime~=0.2.1" '
-            "--extra-index-url https://download.pytorch.org/whl/nightly/cu126",
-            "not a supported",
-        ),
-        (
-            "docsrc/install.rst",
             'pip install "torch-tensorrt[executorch]" '
-            "--extra-index-url https://download.pytorch.org/whl/nightly/cu132",
+            "--index-url https://download.pytorch.org/whl/nightly/cu132",
             "without --pre",
         ),
     ],
@@ -2136,17 +2120,7 @@ def test_every_printed_install_instruction_names_the_nightly_channel():
             named_distribution = re.fullmatch(
                 r"torch[-_]tensorrt\[[^]]*executorch[^]]*\]", match.group(0)
             )
-            # A release whose extra does not bring the delegate names the delegate's version in the
-            # user docs and takes the nightly channel only for the ExecuTorch build it pins. --pre
-            # there would let pip take nightly builds of everything else.
-            names_release_delegate = name.startswith("docsrc/") and re.search(
-                r"torch[-_]tensorrt[-_]executorch[-_]runtime\s*(?:==|~=)", block
-            )
-            if (
-                named_distribution
-                and not names_release_delegate
-                and not re.search(r"(?:^|\s)--pre(?:\s|$)", block)
-            ):
+            if named_distribution and not re.search(r"(?:^|\s)--pre(?:\s|$)", block):
                 missing.append(
                     f"{name}:{line} installs {match.group(0)} without --pre, so pip resolves the "
                     "stable release rather than allowing the intended nightly prerelease"

@@ -255,11 +255,6 @@ Default: ``save()``
 ``save()`` writes the ``.pte``, and any ``.ptd`` data files next to it. It writes one method,
 ``forward``, plus any constant methods you pass.
 
-.. note::
-
-    In Torch-TensorRT 2.15, ``save()`` re-exports the graph by default, so on 2.15 add
-    ``retrace=False`` to every ``save()`` call shown here.
-
 These keyword arguments of ``save()`` apply only to this format. With any other format they log a
 warning and are ignored. With this format, an unknown keyword raises a ``TypeError``.
 

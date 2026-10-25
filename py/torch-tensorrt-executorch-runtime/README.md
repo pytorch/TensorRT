@@ -24,8 +24,8 @@ section.
 This wheel has to match its Torch-TensorRT wheel: the same PyTorch, ExecuTorch, CUDA and TensorRT,
 built with the same C++ ABI (the compiler's binary conventions). It needs CUDA 13. Builds
 exist for `cu132` and `cu134`. The Linux wheels are tagged `manylinux_2_28_x86_64` and
-`manylinux_2_35_aarch64`, so aarch64 needs glibc 2.35 or newer. The Windows x86-64 wheel, which
-2.15 does not have, holds `executorch_backend_tensorrt.dll` (a Windows shared
+`manylinux_2_35_aarch64`, so aarch64 needs glibc 2.35 or newer. The Windows x86-64 wheel holds
+`executorch_backend_tensorrt.dll` (a Windows shared
 library, or DLL) instead.
 
 On the PyTorch indexes it pins the exact ExecuTorch build it was compiled against, including its

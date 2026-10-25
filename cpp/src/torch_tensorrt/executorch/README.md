@@ -227,7 +227,7 @@ but corrupted engine bytes can load and return wrong answers.
 The delegate reads these options. A load option applies to one `Module::load` call. A process
 option applies to every program loaded after it is set with `executorch::runtime::set_option`.
 The [deployment guide](https://docs.pytorch.org/TensorRT/user_guide/runtime_performance/executorch.html#runtime-options)
-shows how to set both: from C++, or from Python with a build newer than 2.15.
+shows how to set both, from C++ or from Python.
 
 | Option | Kind | Default | What it does |
 | --- | --- | --- | --- |
@@ -276,7 +276,7 @@ Some calls do not replay:
 - After three failed recordings for one set of shapes, the engine logs an error and stays on the
   ordinary path until its shapes or its profile change.
 
-Engines on the shared activation scratch replay too. In Torch-TensorRT 2.15 they never replay.
+Engines on the shared activation scratch replay too.
 
 **When recording is unsafe.** The delegate keeps its own engine loads and destroys from overlapping
 a recording. It cannot protect against the rest of the process. While a recording runs, these are

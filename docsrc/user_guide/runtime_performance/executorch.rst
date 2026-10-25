@@ -22,7 +22,7 @@ Use ExecuTorch when you want to:
 
 .. note::
 
-    The delegate runs on Linux (x86-64 and aarch64), and on Windows x86-64 (not in 2.15). The
+    The delegate runs on Linux (x86-64 and aarch64), and on Windows x86-64. The
     prebuilt delegate needs CUDA 13. On Windows, the delegate loads the CUDA runtime from a CUDA 13
     toolkit install, so make sure ``CUDA_PATH`` or ``CUDA_HOME`` points at one.
 
@@ -36,71 +36,45 @@ Use ExecuTorch when you want to:
 Installation
 -------------
 
-Use a fresh virtual environment, and pick the command for the Torch-TensorRT you want. Swap
-``cu132`` for ``cu134`` on CUDA 13.4.
+One command installs everything: PyTorch, Torch-TensorRT, TensorRT, the CUDA build of
+ExecuTorch, and the TensorRT delegate. Use a fresh virtual environment.
 
-Torch-TensorRT 2.15
-^^^^^^^^^^^^^^^^^^^^
+Releases
+^^^^^^^^^
 
 .. code-block:: bash
 
-    pip install --upgrade "torch-tensorrt[executorch]==2.15.*" "torch-tensorrt-executorch-runtime==0.2.*" \
-      --index-url https://download.pytorch.org/whl/cu132 \
-      --extra-index-url https://download.pytorch.org/whl/test/cu132 \
-      --extra-index-url https://download.pytorch.org/whl/nightly/cu132 \
-      --extra-index-url https://pypi.org/simple
+    pip install "torch_tensorrt[executorch]"
 
-* No release brings the delegate through its extra yet, so the command names it. It comes from
-  the test channel, where the release was first published as a release candidate.
-* The delegate pins a development build of ExecuTorch, which only the nightly channel carries, and
-  only for a limited time. Once that build is gone from the nightly channel, this command fails.
-* So far the 2.15 delegate is published for Linux only.
+This installs the CUDA 13.2 builds. On Windows, PyPI has only the CPU builds of PyTorch and
+ExecuTorch, so add ``--extra-index-url https://download.pytorch.org/whl/cu132``.
 
 Nightly builds
 ^^^^^^^^^^^^^^^
 
-To pick up a change before it ships, or to report a problem against ``main``. Here the extra
-brings the delegate:
+To pick up a change before it ships, or to report a problem against ``main``:
 
 .. code-block:: bash
 
-    pip install --pre --upgrade "torch-tensorrt[executorch]" \
-      --index-url https://download.pytorch.org/whl/nightly/cu132 \
-      --extra-index-url https://pypi.org/simple
+    pip install --pre "torch_tensorrt[executorch]" --index-url https://download.pytorch.org/whl/nightly/cu132
 
-* ``--pre`` is required. Without it pip takes the stable release instead.
-* ``--upgrade`` is required if a nightly is already installed, or pip keeps the old one and
-  tells you nothing.
-* PyPI stays in the list because TensorRT is not published on the nightly channel.
-* On Windows, install PyTorch first, with
-  ``pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu132``.
-  Then add ``--extra-index-url https://download.pytorch.org/whl/nightly/cpu`` to the command.
-  ExecuTorch's Windows nightly needs torchao, and only that index carries its Windows build.
-  With PyTorch already installed, pip does not take the CPU build of PyTorch from that index.
-* Keep PyTorch, ExecuTorch and Torch-TensorRT on the same channel.
+Swap ``cu132`` for ``cu134`` on CUDA 13.4.
 
-What the commands install
+What the command installs
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-* ExecuTorch, the CUDA build, from the ``executorch`` extra. That is all you need to export.
+* PyTorch and TensorRT, which Torch-TensorRT depends on.
+* ExecuTorch, the CUDA build. That is all you need to export.
 * ``torch-tensorrt-executorch-runtime``, one shared library holding the TensorRT delegate,
   which you need to run a ``.pte``. It is the one built together with your Torch-TensorRT wheel,
   for the same CUDA version. It requires the exact ExecuTorch build it was compiled against, so
   you get that one rather than the newest.
 
-The extra brings the delegate for a nightly wheel whose ExecuTorch pin is a development build,
-as on main today. A release does not bring it yet, because the delegate is not published on the
-stable channel, and neither does a wheel you build yourself. If it is missing when you load a
+A wheel you build yourself does not bring the delegate. If it is missing when you load a
 ``.pte``, the error message says how to get the one that matches your wheel.
 
-The plain form, ``pip install "torch-tensorrt[executorch]"`` with
-``--index-url https://download.pytorch.org/whl/cu132 --extra-index-url https://pypi.org/simple``,
-is enough once a release brings the delegate through its extra. The PyTorch channel is needed in
-every form because PyPI has only a CPU build of ExecuTorch. PyPI stays in the list for TensorRT
-and the other dependencies.
-
-The delegate is built for the standard Linux wheels (x86-64 and aarch64), and for Windows x86-64
-in builds newer than 2.15. On aarch64 it needs glibc 2.35 or newer, the same as TensorRT itself.
+The delegate is built for the standard Linux wheels (x86-64 and aarch64), and for Windows x86-64.
+On aarch64 it needs glibc 2.35 or newer, the same as TensorRT itself.
 The TensorRT-RTX and Python-only builds have no delegate. To export a coalesced program you also
 need a CUDA toolkit, because ExecuTorch's CUDA backend compiles the leftover operators with
 ``nvcc``.
@@ -135,11 +109,6 @@ Compile with ``torch_tensorrt.dynamo.compile``, then save with ``output_format="
     torch_tensorrt.save(trt_gm, "model.pte", output_format="executorch")
 
 ``save()`` writes the compiled graph as it is, so it needs no example inputs.
-
-.. note::
-
-    In Torch-TensorRT 2.15, ``save()`` re-exports the graph by default, so on 2.15 add
-    ``retrace=False`` to every ``save()`` call on this page.
 
 :ref:`executorch_save` lists every option that ``save()`` takes for this format. It also shows
 how to put several methods in one file, and how to let the engine of a large language model (LLM)
@@ -432,8 +401,7 @@ A *load option* applies to one program. In C++, pass it to ``Module::load`` befo
     backend_options.set_options("TensorRTBackend", options.view());
     const Error error = module.load(backend_options);
 
-In Python, pass it to ``load_program``. **Not in 2.15:** the ExecuTorch build that Torch-TensorRT
-2.15 installs has no ``backend_options`` argument.
+In Python, pass it to ``load_program``:
 
 .. code-block:: python
 
@@ -456,7 +424,7 @@ A *process option* applies to every program loaded after it is set. In C++:
 
 ``Error::NotFound`` from ``set_option`` means the delegate is not linked into your binary.
 
-In Python, also **not in 2.15**:
+In Python:
 
 .. code-block:: python
 
@@ -565,8 +533,7 @@ Some calls never replay:
   path for that call.
 
 An engine on the shared activation scratch below also replays. It records again whenever the
-shared buffer grows. In Torch-TensorRT 2.15, an engine on the shared scratch
-never replays.
+shared buffer grows.
 
 .. warning::
 
@@ -609,8 +576,6 @@ hashes the engine bytes, which takes about 0.15 seconds per GB on a Jetson AGX T
 does not resist deliberate collisions, so every program in the process must be trusted.
 
 To keep one program's engines private, pass the ``use_shared_engines`` load option as ``false``.
-From Python that needs a build newer than 2.15, as `Setting a runtime option`_ explains, so Python loads
-with Torch-TensorRT 2.15 always share.
 
 Weight streaming
 ^^^^^^^^^^^^^^^^^
@@ -619,8 +584,7 @@ An engine compiled with ``enable_weight_streaming=True`` can keep part of its we
 memory and stream them to the GPU when needed. The budget is the number of bytes of weights that
 stay on the GPU. Save one with ``weight_streaming_budget_per_engine``, or set one at run time
 with the ``weight_streaming_budget`` load option, which takes the number of bytes as a decimal
-string, or as an int below 2 GiB. From Python, that load option needs a build newer than 2.15.
-The budget applies to each engine separately, so a program with N engines can keep up to N times
+string, or as an int below 2 GiB. The budget applies to each engine separately, so a program with N engines can keep up to N times
 the budget on the GPU. With no budget, TensorRT chooses one from the free memory of the device.
 
 Optimization profiles
@@ -689,7 +653,7 @@ PyTorch's ahead-of-time compiler, packages the whole model, and :ref:`aot_induct
      - ExecuTorch CUDA backend, or the CPU
      - Compiled by AOTInductor
    * - Platform
-     - Linux (x86-64 and aarch64) and Windows x86-64 (not in 2.15), with CUDA 13
+     - Linux (x86-64 and aarch64) and Windows x86-64, with CUDA 13
      - Linux
 
 ----
