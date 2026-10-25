@@ -492,6 +492,7 @@ def test_ptx_isa_capped_to_driver(monkeypatch, driver_max, default_isa, expected
         ({"num_warps": 0}, "invalid num_warps"),
         ({"shared": -1}, "invalid shared memory"),
         ({"shared": 2**31}, "invalid shared memory"),
+        ({"shared": 48 * 1024 + 1}, "opting in"),
         ({"num_warps": True}, "must be an integer"),
         ({"shared": 1.5}, "must be an integer"),
     ],
@@ -513,6 +514,15 @@ def test_missing_launch_metadata_fails_closed(monkeypatch):
     _stub_triton(monkeypatch, [], omitted_metadata=("global_scratch_size",))
     with pytest.raises(RuntimeError, match="missing.*global_scratch_size"):
         _triton.compile_triton_to_ptx(object(), CAPPING_SIG, {})
+
+
+def test_shared_memory_at_launch_limit_accepted(monkeypatch):
+    from torch_tensorrt.kernels import _triton
+
+    monkeypatch.setattr(_triton, "_driver_max_ptx_version", lambda: None)
+    _stub_triton(monkeypatch, [], shared=48 * 1024)
+    artifact = _triton.compile_triton_to_ptx(_FakeKernel(CAPPING_SIG), CAPPING_SIG, {})
+    assert artifact.shared_mem == 48 * 1024
 
 
 @skip_no_qdp
