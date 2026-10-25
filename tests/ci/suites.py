@@ -50,7 +50,7 @@ ALL_PLATFORMS: tuple[Platform, ...] = ("linux-x86_64", "windows")
 # worker builds its own TensorRT engine, so N workers ≈ N× peak GPU memory.
 # `-n auto` (= CPU count, up to ~48 on big runners) is a footgun here — it OOMs
 # the model/runtime suites on real 24 GB runners, and an OOM'd engine build fails
-# `assert cuda_engine` and then *reruns*, doubling wall-clock. So workers are
+# ("TensorRT could not build the engine") and then *reruns*, doubling wall-clock. So workers are
 # tiered by worst-case engine size, not by core count:
 _LIGHT = "8"  # small single-op / graph tests (conversion, partitioning, hlo)
 _HEAVY = "4"  # full compile+execute suites (lowering, runtime) — OOM'd at -n 8

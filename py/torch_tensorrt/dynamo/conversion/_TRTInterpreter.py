@@ -580,25 +580,31 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             builder_config, self.compilation_settings.timing_cache_path
         )
 
-        if (
-            ENABLED_FEATURES.tensorrt_rtx
-            or self.compilation_settings.version_compatible
-        ):
-            # TODO: When TRT-RTX matures, change it to build_engine_with_config
-            serialized_engine = self.builder.build_serialized_network(
-                self.ctx.net, builder_config
-            )
-            if serialized_engine is None:
-                raise RuntimeError(
-                    "TensorRT build_serialized_network returned None; engine build failed."
+        with TRT_LOGGER.capture_errors() as build_errors:
+            if (
+                ENABLED_FEATURES.tensorrt_rtx
+                or self.compilation_settings.version_compatible
+            ):
+                # TODO: When TRT-RTX matures, change it to build_engine_with_config
+                serialized_engine = self.builder.build_serialized_network(
+                    self.ctx.net, builder_config
                 )
-            runtime = trt.Runtime(TRT_LOGGER)
-            cuda_engine = runtime.deserialize_cuda_engine(serialized_engine)
-        else:
-            cuda_engine = self.builder.build_engine_with_config(
-                self.ctx.net, builder_config
+                cuda_engine = (
+                    None
+                    if serialized_engine is None
+                    else trt.Runtime(TRT_LOGGER).deserialize_cuda_engine(
+                        serialized_engine
+                    )
+                )
+            else:
+                cuda_engine = self.builder.build_engine_with_config(
+                    self.ctx.net, builder_config
+                )
+        if cuda_engine is None:
+            raise RuntimeError(
+                "TensorRT could not build the engine"
+                + (": " + " | ".join(build_errors) if build_errors else ".")
             )
-        assert cuda_engine
 
         _LOGGER.debug(
             f"CPU memory usage after engine building: {get_cpu_memory_usage()} MB"
