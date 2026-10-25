@@ -3,9 +3,14 @@
 
 import torch
 import torch.nn as nn
+import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
+from torch_tensorrt.dynamo.conversion.aten_ops_converters import (
+    scaled_dot_product_attention_validator,
+    scaled_dot_product_efficient_attention_validator,
+)
 
 from .harness import DispatchTestCase, skip_if_trt_rtx_turing
 
@@ -406,6 +411,38 @@ class TestScaledDotProductAttention(DispatchTestCase):
             )
         self.run_test_with_dynamic_shape(SDPA(), input_specs, output_dtypes=[dtype])
 
+    @parameterized.expand([("all_constant", True), ("constant_key_value", False)])
+    def test_sdpa_constant_inputs(self, _, constant_query):
+        # q/k/v can be graph constants, e.g. attention over learned query tokens in
+        # DETR's first decoder layer
+        class SDPA(nn.Module):
+            def __init__(self):
+                super().__init__()
+                for n in ("query", "key", "value"):
+                    self.register_buffer(n, torch.rand(2, 4, 8, 16).half())
+
+            def forward(self, x):
+                query = self.query if constant_query else x
+                out = torch.ops.aten.scaled_dot_product_attention.default(
+                    query, self.key, self.value
+                )
+                return out + x
+
+        model = SDPA().eval().cuda()
+        x = torch.randn(2, 4, 8, 16, dtype=torch.float16, device="cuda")
+        ep = torch.export.export(model, (x,))
+        if not constant_query:
+            # Mixed constant and computed q/k/v stay in PyTorch
+            sdpa = next(
+                n
+                for n in ep.module().graph.nodes
+                if n.target == torch.ops.aten.scaled_dot_product_attention.default
+            )
+            self.assertFalse(scaled_dot_product_attention_validator(sdpa))
+            return
+        trt_model = torch_tensorrt.dynamo.compile(ep, arg_inputs=(x,), min_block_size=1)
+        torch.testing.assert_close(trt_model(x), model(x), rtol=1e-2, atol=1e-2)
+
 
 class TestScaledDotProductEfficientAttention(DispatchTestCase):
     @parameterized.expand(
@@ -650,6 +687,28 @@ class TestScaledDotProductEfficientAttention(DispatchTestCase):
             atol=1e-2,
             enable_passes=True,
         )
+
+    def test_efficient_sdpa_constant_key_value_stays_in_pytorch(self):
+        class SDPA(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("key", torch.rand(2, 4, 8, 16).half())
+                self.register_buffer("value", torch.rand(2, 4, 8, 16).half())
+
+            def forward(self, query):
+                return torch.ops.aten._scaled_dot_product_efficient_attention.default(
+                    query, self.key, self.value, None, False
+                )[0]
+
+        query = torch.randn(2, 4, 8, 16, dtype=torch.float16, device="cuda")
+        graph = torch.export.export(SDPA().cuda(), (query,)).module().graph
+        sdpa = next(
+            n
+            for n in graph.nodes
+            if n.target
+            == torch.ops.aten._scaled_dot_product_efficient_attention.default
+        )
+        self.assertFalse(scaled_dot_product_efficient_attention_validator(sdpa))
 
 
 if __name__ == "__main__":
