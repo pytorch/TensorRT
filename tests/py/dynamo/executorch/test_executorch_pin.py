@@ -3237,45 +3237,7 @@ def test_the_install_message_supports_windows_x64(machine: str) -> None:
     _, command = _load_utils_channel_helpers("13.2", platform="win32", machine=machine)
     assert 'pip install --pre "torch_tensorrt[executorch]==' in command()
     assert "nightly/cu132" in command()
-
-
-@pytest.mark.parametrize(
-    "platform, machine, windows",
-    [("win32", "AMD64", True), ("linux", "x86_64", False)],
-)
-@pytest.mark.parametrize(
-    "channel, executorch, nightly",
-    [
-        ("nightly", "nightly", True),
-        ("test", "nightly", True),
-        ("test", "test", False),
-        ("nightly", "test", False),
-    ],
-)
-@pytest.mark.unit
-def test_windows_advice_names_the_cpu_nightly_index(
-    platform, machine, windows, channel, executorch, nightly
-) -> None:
-    """The nightly ExecuTorch for Windows needs torchao, which only the CPU nightly index has.
-
-    Without that index neither command resolves on Windows. A release ExecuTorch takes a
-    release torchao, which PyPI publishes for every platform, so the index is left out there,
-    even beside a nightly delegate.
-    """
-    namespace = _utils_namespace(
-        "13.2",
-        platform=platform,
-        machine=machine,
-        recorded={
-            "__executorch_runtime_version__": "0.3.0+cu132",
-            "__executorch_runtime_channel__": channel,
-            "__executorch_channel__": executorch,
-        },
-    )
-    cpu = "--extra-index-url https://download.pytorch.org/whl/nightly/cpu"
-    for helper in ("executorch_install_command", "executorch_runtime_install_command"):
-        message = namespace[helper]()
-        assert message.endswith(cpu) == (windows and nightly), (helper, message)
+    assert "nightly/cpu" not in command()
 
 
 @pytest.mark.parametrize("agree", [True, False])

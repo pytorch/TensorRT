@@ -68,7 +68,6 @@ def _executorch_index_options(cuda: str) -> str:
     """Return the pip options naming the indexes with this wheel's delegate and pinned ExecuTorch.
 
     A development ExecuTorch build is only on the nightly index, a release on the test index.
-    Windows with a nightly ExecuTorch also needs the CPU nightly index, for torchao.
     """
     # A version file older than this record was written by a source build pinning a development
     # ExecuTorch.
@@ -82,9 +81,6 @@ def _executorch_index_options(cuda: str) -> str:
         if delegate in ("", "pypi"):
             delegate = "test"
     indexes = [f"{channel}/{cuda}" for channel in dict.fromkeys((delegate, executorch))]
-    # Nightly ExecuTorch requires nightly torchao, whose only Windows wheel is on this index.
-    if platform.system() == "Windows" and executorch == "nightly":
-        indexes.append("nightly/cpu")
     return " ".join(
         f"--extra-index-url https://download.pytorch.org/whl/{index}"
         for index in indexes
