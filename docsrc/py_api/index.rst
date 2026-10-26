@@ -13,6 +13,7 @@ Core
    dynamo
    logging
    runtime
+   region
    kernels
    executorch
    ../cli/torchtrtc
