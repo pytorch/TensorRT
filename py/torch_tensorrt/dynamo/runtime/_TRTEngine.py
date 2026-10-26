@@ -348,11 +348,17 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         return self._context
 
     def invalidate_context(self) -> None:
-        """Drop the live execution context. Next ``self.context`` read
-        rebuilds it with the then-current ``runtime_settings``. Called from
-        every settings-mutation path so reads of ``self.context`` always
-        observe up-to-date settings."""
+        """Drop the live execution context, the CUDA graph captured on it, and
+        the dynamic workspace.
+        Next ``self.context`` read rebuilds it with the then-current
+        ``runtime_settings``, and with CUDA graphs on the next execution records
+        a new graph. Called from every settings-mutation path so reads of
+        ``self.context`` always observe up-to-date settings."""
+        # The graph replays this context's kernels and memory, so it must go first.
+        self.reset_captured_graph()
+        self.runtime_states.context_changed = True
         self._context = None
+        self._dynamic_workspace = None
 
     def has_context(self) -> bool:
         """True iff the execution context has been materialized. Probes
@@ -753,7 +759,6 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         self._rtx_native_cudagraphs = ENABLED_FEATURES.tensorrt_rtx and (
             self.runtime_settings.cuda_graph_strategy != "disabled"
         )
-        self.runtime_states.context_changed = True
 
     def _is_monolithic_capturable(self, stream: torch.cuda.Stream) -> bool:
         """Return True iff manual ``torch.cuda.CUDAGraph`` capture is safe."""
@@ -1036,10 +1041,8 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         if budget_bytes < 0:
             budget_bytes = self.streamable_device_memory_budget
         # TRT 11+ rejects setWeightStreamingBudgetV2 while a live
-        # IExecutionContext exists (its use_count must be 1). A captured
-        # cudagraph also keeps the context alive, so drop the graph first and
-        # then the context -- matching the C++ TRTEngine::set_device_memory_budget.
-        self.reset_captured_graph()
+        # IExecutionContext exists (its use_count must be 1), so drop it first,
+        # matching the C++ TRTEngine::set_device_memory_budget.
         self.invalidate_context()
         self.cuda_engine.weight_streaming_budget_v2 = budget_bytes
         if self.cuda_engine.weight_streaming_budget_v2 != budget_bytes:
@@ -1056,7 +1059,6 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             self.enable_profiling()
         else:
             _ = self.context
-        self.runtime_states.context_changed = True
 
     def reset_captured_graph(self) -> None:
         if self.cudagraph:
@@ -1069,7 +1071,6 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             return
         self.resource_allocation_strategy = new_strategy
         self.invalidate_context()
-        self.runtime_states.context_changed = True
 
     def set_output_tensors_as_unowned(self, enabled: bool) -> None:
         self.output_tensors_are_unowned = enabled
@@ -1092,7 +1093,6 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         torch.cuda.synchronize()
         self.invalidate_context()
         self._profile_execution = False
-        self.runtime_states.context_changed = True
 
     def get_engine_layer_info(self) -> str:
         inspector = self.cuda_engine.create_engine_inspector()
@@ -1405,7 +1405,8 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
             if caller_on_default:
                 engine_stream.wait_stream(caller_stream)
             with torch.cuda.stream(engine_stream):
-                if self.resource_allocation_strategy:
+                # A captured graph replays into the workspace it was recorded with.
+                if self.resource_allocation_strategy and self.cudagraph is None:
                     workspace_bytes = self.cuda_engine.device_memory_size_v2
                     self._dynamic_workspace = torch.empty(
                         workspace_bytes,
