@@ -30,12 +30,13 @@ log says "Error copying tensor data at input 0". So ``alloc_graph_input=False``
 is required. ``enable_non_cpu_memory_planning``, on by default, is what lets
 planning place tensors in GPU memory at all.
 
-The outputs can go either way. This script also passes
-``alloc_graph_output=False``, so the program does not own its output buffers: a
-C++ caller sets them with ``Module::set_output``. From Python, a method loaded
-through ``executorch.runtime`` gets GPU memory for them from ExecuTorch itself.
-Leaving the outputs planned instead puts them in the program's own GPU memory,
-and that works from Python and C++ too.
+This script also passes ``alloc_graph_output=False``, so the runtime does not
+copy the outputs: a C++ caller sets their memory once with
+``Module::set_output``, and from Python the runtime allocates it and does not
+overwrite an output the caller still holds. Planned outputs work too, but they
+live in the program's own GPU memory, which the next call overwrites, and
+Python's ``execute()`` copies them on every call unless it gets
+``clone_outputs=False``.
 
 This script asserts on the serialized program rather than trusting the flags:
 the exported ``.pte`` must contain neither copy operator, and it must still carry
@@ -128,8 +129,8 @@ def main() -> None:
                 ),
                 enable_non_cpu_memory_planning=True,
                 # The runtime refuses to copy the caller's CUDA tensor into a
-                # planned input, so the input must not be planned. Outputs work
-                # either way.
+                # planned input, so the input must not be planned. An unplanned
+                # output is not copied either.
                 memory_planning_pass=MemoryPlanningPass(
                     alloc_graph_input=False, alloc_graph_output=False
                 ),

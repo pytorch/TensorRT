@@ -188,19 +188,24 @@ already on the GPU, those copies are wasted time. Turn them off at export:
                 skip_h2d_for_method_inputs=True,
                 skip_d2h_for_method_outputs=True,
             ),
-            memory_planning_pass=MemoryPlanningPass(alloc_graph_input=False),
+            memory_planning_pass=MemoryPlanningPass(
+                alloc_graph_input=False, alloc_graph_output=False
+            ),
         ),
     )
 
 * **The two skip flags work only with** ``enable_non_cpu_memory_planning``, which is on by
   default. With either flag set, turning it off makes the export raise an error.
 * **Do not let the program allocate its inputs:** pass ``alloc_graph_input=False``. Otherwise
-  the program keeps its own input buffer, and handing it a GPU tensor fails with error ``0x10``
-  (``NotSupported``). The log then says ``Error copying tensor data at input 0``.
-* **The outputs can stay in the program's own GPU memory**, as above. To give each output its
-  own buffer instead, also pass ``alloc_graph_output=False``. Then each output needs a GPU buffer
-  before the call: in C++ you set it with ``Module::set_output``, and the Python runtime allocates
-  one for you.
+  the program keeps its own input buffer, and every call fails with error ``0x10``
+  (``NotSupported``). The log then says ``Planned-buffer copy needs host memory on both sides``.
+* **Do not let it allocate its outputs either:** ``alloc_graph_output=False`` keeps the outputs
+  out of the program's memory. From Python, the runtime allocates GPU memory for each output, and
+  the next call does not overwrite an output you still hold, unless you pass
+  ``clone_outputs=False``. From C++, you must give the method your own GPU buffer once with
+  ``Module::set_output``, before the first run. If you keep outputs planned instead, the next call
+  overwrites them, so Python's ``execute()`` copies them on every call unless you pass
+  ``clone_outputs=False``.
 
 Pass CUDA tensors to a program exported this way. ExecuTorch's Python runtime refuses a CPU
 tensor. From C++, a CPU tensor costs a copy on every call when the first delegate to use that
