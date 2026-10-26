@@ -14,6 +14,9 @@ try the quick start guide below.
 **Ready to optimize a model?** See :doc:`user_guide/compilation/torch_compile` for ``torch.compile``
 or :doc:`user_guide/compilation/dynamo_export` for ahead-of-time export with ``torch.export``.
 
+To keep selected operations in PyTorch or replace them with your own kernel,
+see :doc:`tutorials/execute_in_torch`.
+
 Additional resources:
 
 * `Torch-TensorRT 2.0 GTC Talk <https://www.nvidia.com/en-us/on-demand/session/gtcspring23-s51714/>`_

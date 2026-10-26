@@ -640,57 +640,18 @@ dynamo_packages = [
     "torch_tensorrt.dynamo.lowering.passes",
     "torch_tensorrt.dynamo.lowering.constant_fold_exclusions",
     "torch_tensorrt.dynamo.partitioning",
+    "torch_tensorrt.dynamo.region_compilation",
     "torch_tensorrt.dynamo.runtime",
     "torch_tensorrt.dynamo.runtime.meta_ops",
     "torch_tensorrt.dynamo.tools",
     "torch_tensorrt.dynamo.tuning",
     "torch_tensorrt.executorch",
+    "torch_tensorrt.region",
     "torch_tensorrt.runtime",
 ]
 
-fx_package_dir = {
-    "torch_tensorrt.fx": "py/torch_tensorrt/fx",
-    "torch_tensorrt.fx.converters": "py/torch_tensorrt/fx/converters",
-    "torch_tensorrt.fx.converters.impl": "py/torch_tensorrt/fx/converters/impl",
-    "torch_tensorrt.fx.passes": "py/torch_tensorrt/fx/passes",
-    "torch_tensorrt.fx.tools": "py/torch_tensorrt/fx/tools",
-    "torch_tensorrt.fx.tracer": "py/torch_tensorrt/fx/tracer",
-    "torch_tensorrt.fx.tracer.acc_tracer": "py/torch_tensorrt/fx/tracer/acc_tracer",
-    "torch_tensorrt.fx.tracer.dispatch_tracer": "py/torch_tensorrt/fx/tracer/dispatch_tracer",
-}
-
-
-dynamo_package_dir = {
-    "torch_tensorrt": "py/torch_tensorrt",
-    "torch_tensorrt.distributed": "py/torch_tensorrt/distributed",
-    "torch_tensorrt.distributed.run": "py/torch_tensorrt/distributed/run",
-    "torch_tensorrt.kernels": "py/torch_tensorrt/kernels",
-    "torch_tensorrt.dynamo": "py/torch_tensorrt/dynamo",
-    "torch_tensorrt.dynamo.backend": "py/torch_tensorrt/dynamo/backend",
-    "torch_tensorrt.dynamo.conversion": "py/torch_tensorrt/dynamo/conversion",
-    "torch_tensorrt.dynamo.conversion.impl": "py/torch_tensorrt/dynamo/conversion/impl",
-    "torch_tensorrt.dynamo.conversion.impl.activation": "py/torch_tensorrt/dynamo/conversion/impl/activation",
-    "torch_tensorrt.dynamo.conversion.impl.condition": "py/torch_tensorrt/dynamo/conversion/impl/condition",
-    "torch_tensorrt.dynamo.conversion.impl.elementwise": "py/torch_tensorrt/dynamo/conversion/impl/elementwise",
-    "torch_tensorrt.dynamo.conversion.impl.normalization": "py/torch_tensorrt/dynamo/conversion/impl/normalization",
-    "torch_tensorrt.dynamo.conversion.impl.slice": "py/torch_tensorrt/dynamo/conversion/impl/slice",
-    "torch_tensorrt.dynamo.conversion.impl.unary": "py/torch_tensorrt/dynamo/conversion/impl/unary",
-    "torch_tensorrt.dynamo.conversion.plugins": "py/torch_tensorrt/dynamo/conversion/plugins",
-    "torch_tensorrt.dynamo.debug": "py/torch_tensorrt/dynamo/debug",
-    "torch_tensorrt.dynamo.lowering": "py/torch_tensorrt/dynamo/lowering",
-    "torch_tensorrt.dynamo.lowering.passes": "py/torch_tensorrt/dynamo/lowering/passes",
-    "torch_tensorrt.dynamo.lowering.constant_fold_exclusions": "py/torch_tensorrt/dynamo/lowering/constant_fold_exclusions",
-    "torch_tensorrt.dynamo.partitioning": "py/torch_tensorrt/dynamo/partitioning",
-    "torch_tensorrt.dynamo.runtime": "py/torch_tensorrt/dynamo/runtime",
-    "torch_tensorrt.dynamo.runtime.meta_ops": "py/torch_tensorrt/dynamo/runtime/meta_ops",
-    "torch_tensorrt.dynamo.tools": "py/torch_tensorrt/dynamo/tools",
-    "torch_tensorrt.dynamo.tuning": "py/torch_tensorrt/dynamo/tuning",
-    "torch_tensorrt.executorch": "py/torch_tensorrt/executorch",
-    "torch_tensorrt.runtime": "py/torch_tensorrt/runtime",
-}
-
-package_dir = dynamo_package_dir
-packages = dynamo_packages
+packages = dynamo_packages + (fx_packages if _FX_FE_AVAIL else [])
+package_dir = {package: f"py/{package.replace('.', '/')}" for package in packages}
 exclude_package_data = {
     "": [
         "py/torch_tensorrt/csrc/*.cpp",
@@ -707,8 +668,6 @@ exclude_package_data = {
 }
 
 if _FX_FE_AVAIL:
-    package_dir = package_dir | fx_package_dir
-    packages = packages + fx_packages
     exclude_package_data["torch_tensorrt.fx"] = ["test/*.py"]
     exclude_package_data[""].extend(
         ["py/torch_tensorrt/fx/test*", "torch_tensorrt/fx/test*"]
