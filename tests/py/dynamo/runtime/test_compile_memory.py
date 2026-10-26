@@ -47,9 +47,11 @@ def _peak_rss_growth(fn: Callable[[], Any]) -> Tuple[Any, int]:
 
 
 def _build_plan(width: int = 2048, layers: int = 8) -> Tuple[bytes, List[torch.Tensor]]:
-    """A plan for ``x @ w.T`` chained over ``layers`` fp16 weights, plus the weights."""
+    """A plan for ``x @ w.T`` chained over ``layers`` fp32 weights, plus the weights."""
+    # fp32, not fp16: TensorRT may accumulate fp16 matmuls in fp16, which over a chain
+    # this long can err by more than the tolerance the tests check against torch with.
     weights = [
-        torch.randn(width, width, dtype=torch.float16) * width**-0.5
+        torch.randn(width, width, dtype=torch.float32) * width**-0.5
         for _ in range(layers)
     ]
     builder = trt.Builder(TRT_LOGGER)
@@ -57,10 +59,10 @@ def _build_plan(width: int = 2048, layers: int = 8) -> Tuple[bytes, List[torch.T
     if not ENABLED_FEATURES.tensorrt_rtx:
         flags = 1 << int(trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED)
     net = builder.create_network(flags)
-    t = net.add_input("x", trt.float16, (4, width))
+    t = net.add_input("x", trt.float32, (4, width))
     for w in weights:
         c = net.add_constant(
-            (width, width), trt.Weights(trt.float16, w.data_ptr(), w.numel())
+            (width, width), trt.Weights(trt.float32, w.data_ptr(), w.numel())
         )
         t = net.add_matrix_multiply(
             t, trt.MatrixOperation.NONE, c.get_output(0), trt.MatrixOperation.TRANSPOSE
@@ -178,7 +180,7 @@ class TestEngineSetupMemory(unittest.TestCase):
         # of the plan; it used to hold two while it was converted for the C++ runtime.
         self.assertLess(growth, len(self.plan) // 2)
 
-        x = torch.randn(4, 2048, dtype=torch.float16, device="cuda")
+        x = torch.randn(4, 2048, dtype=torch.float32, device="cuda")
         expected = x
         for w in self.weights:
             expected = expected @ w.cuda().T
@@ -193,7 +195,7 @@ class TestPlanRetention(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.plan, cls.weights = _build_plan(width=512, layers=4)
-        cls.x = torch.randn(4, 512, dtype=torch.float16, device="cuda")
+        cls.x = torch.randn(4, 512, dtype=torch.float32, device="cuda")
         expected = cls.x
         for w in cls.weights:
             expected = expected @ w.cuda().T
