@@ -140,11 +140,20 @@ def test_the_example_loader_test_leaves_no_stand_in_behind():
         "sys.modules.pop('torch_tensorrt_executorch_runtime', None)\n"
         "rc = pytest.main(['-q', '-p', 'no:cacheprovider', '--noconftest', '-o', 'addopts=', "
         f"{__file__!r} + '::test_examples_use_the_module_loader'])\n"
-        "if rc != 0 or 'torch_tensorrt_executorch_runtime' in sys.modules:\n"
-        "    sys.exit(1)\n"
+        "if rc != 0:\n"
+        "    sys.exit(f'the test failed with exit code {rc}')\n"
+        "if 'torch_tensorrt_executorch_runtime' in sys.modules:\n"
+        "    sys.exit('the test left torch_tensorrt_executorch_runtime in sys.modules')\n"
     )
+    # PYTEST_ADDOPTS reaches pytest.main too, and with -n the test runs in a worker process,
+    # so this process would never see the module and the check would pass with the leak back.
+    env = {k: v for k, v in os.environ.items() if k != "PYTEST_ADDOPTS"}
     result = subprocess.run(
-        [sys.executable, "-c", script], capture_output=True, text=True
+        [sys.executable, "-c", script],
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=120,
     )
     assert result.returncode == 0, result.stdout + result.stderr
 

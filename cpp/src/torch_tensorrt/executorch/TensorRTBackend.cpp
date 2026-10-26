@@ -406,12 +406,15 @@ Error load_engine(
   }
   // A plan serialized without its weights (built with STRIP_PLAN, or saved with EXCLUDE_WEIGHTS)
   // deserializes and runs without an error, but computes with placeholder weights, and this backend
-  // never refits. TensorRT reports -1 stripped bytes for a plan that carries its weights, and a
-  // stripped plan can report 0. A plan with no weights has nothing to restore, so the total is read
-  // first: querying the stripped size of an ordinary engine logs a TensorRT warning, and
-  // isRefittable() cannot skip it, since a plan built with STRIP_PLAN alone is not refittable.
-  if (engine->getEngineStat(nvinfer1::EngineStat::kTOTAL_WEIGHTS_SIZE) > 0 &&
-      engine->getEngineStat(nvinfer1::EngineStat::kSTRIPPED_WEIGHTS_SIZE) >= 0) {
+  // never refits. For such a plan TensorRT reports the weight bytes it still holds, which equal the
+  // total when there was nothing to strip. A plain re-save keeps that. Any other plan reports -1,
+  // including a stripped one saved again with EXCLUDE_WEIGHTS cleared and no refit, so that case is
+  // not caught here. A plan with no weights cannot lack any, and skipping the query for it avoids
+  // the warning TensorRT logs for a plan that is not stripped.
+  const int64_t total_weights = engine->getEngineStat(nvinfer1::EngineStat::kTOTAL_WEIGHTS_SIZE);
+  const int64_t kept_weights =
+      total_weights > 0 ? engine->getEngineStat(nvinfer1::EngineStat::kSTRIPPED_WEIGHTS_SIZE) : -1;
+  if (kept_weights >= 0 && kept_weights < total_weights) {
     ET_LOG(
         Error,
         "TensorRTBackend::init: the TensorRT engine was serialized without its weights, and this backend cannot refit them. Compile it with strip_engine_weights=False, or serialize it with its weights, and export again.");
@@ -684,6 +687,15 @@ Error validate_input_dims(const EngineHandle& handle, int32_t profile, const std
   return Error::Ok;
 }
 
+// setTensorAddress documents this alignment and does not check it. A tensor viewed at an offset into a
+// larger buffer misses it, and the engine then returns a wrong answer or faults and leaves the CUDA
+// context unusable.
+constexpr uintptr_t kTensorAddressAlignment = 256;
+
+bool is_tensor_address_aligned(const void* ptr) {
+  return reinterpret_cast<uintptr_t>(ptr) % kTensorAddressAlignment == 0;
+}
+
 bool is_cuda_accessible_ptr(const void* ptr) {
   if (ptr == nullptr) {
     return false;
@@ -954,7 +966,7 @@ constexpr size_t kMinPooledScratchBytes = 1;
 // execute() calls this ahead of every CUDA call it makes that a capture cannot
 // take, not just the pool's own: the cudaFree(nullptr) that makes a context
 // current for a default stream, the cudaEventSynchronize on a previous enqueue,
-// the cudaMalloc that grows a host-input staging buffer, and the
+// the cudaMalloc that grows an input staging buffer, and the
 // cudaStreamSynchronize that ends a call this backend does not let return early.
 // Any of them leaves a refusal made after it nothing to save. Only the device
 // query and the device switch run earlier, and a capture takes both.
@@ -1800,6 +1812,23 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // ------------------------------------------------------------------
   // 2. Bind input shapes and addresses
   // ------------------------------------------------------------------
+  const auto report_unaligned = [&engine](const std::string& name, const void* ptr) {
+    if (engine->unaligned_io_reported) {
+      return;
+    }
+    engine->unaligned_io_reported = true;
+    ET_LOG(
+        Info,
+        "TensorRTBackend::execute: '%s' is at an address %zu bytes past a %zu-byte boundary, and TensorRT "
+        "needs that boundary, so it is copied through an aligned buffer (reported once per engine)",
+        name.c_str(),
+        static_cast<size_t>(reinterpret_cast<uintptr_t>(ptr) % kTensorAddressAlignment),
+        static_cast<size_t>(kTensorAddressAlignment));
+  };
+  // Caller-owned KV: (dst, src, nbytes) copies issued after enqueue. One kind reflects an engine
+  // in-place update into the delegate output EValue, so ExecuTorch's write-back copy_ sees the updated
+  // cache. The other carries that update from an aligned staging buffer back to the caller's input.
+  std::vector<std::tuple<void*, void*, size_t>> aliased_reflects;
   for (size_t i = 0; i < num_inputs; ++i) {
     exec_aten::Tensor et_in = args[i]->toTensor();
     const std::string& name = engine->input_binding_names[i];
@@ -1810,23 +1839,19 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       return Error::InvalidState;
     }
 
+    const bool device_reachable =
+        et_in.nbytes() > 0 && (engine->pageable_host_access || is_cuda_accessible_ptr(et_in.const_data_ptr()));
     // Caller-owned aliased input: an aliased output binds in-place to this
-    // input's device pointer, so its update must land in the caller's storage.
-    // If it isn't device-resident the branches below would stage it through
-    // delegate scratch, and the in-place update (bound to that scratch) would be
-    // silently lost on the next execute() when the staging copy re-reads the
-    // caller's unchanged buffer. Fail loudly instead.
-    if (engine->input_is_alias_target[i]) {
-      const bool device_resident =
-          et_in.nbytes() > 0 && (engine->pageable_host_access || is_cuda_accessible_ptr(et_in.const_data_ptr()));
-      if (!device_resident) {
-        ET_LOG(
-            Error,
-            "TensorRTBackend::execute: aliased input '%s' must be device-reachable without staging, "
-            "because its caller-owned in-place update cannot go through host scratch",
-            name.c_str());
-        return Error::InvalidArgument;
-      }
+    // input's pointer, so its update must land in the caller's storage. Host
+    // memory is refused. A device buffer the branches below stage for alignment
+    // gets its update copied back after the enqueue.
+    if (engine->input_is_alias_target[i] && !device_reachable) {
+      ET_LOG(
+          Error,
+          "TensorRTBackend::execute: aliased input '%s' must be device-reachable, "
+          "because its caller-owned in-place update cannot go through host scratch",
+          name.c_str());
+      return Error::InvalidArgument;
     }
 
     void* bind_ptr = nullptr;
@@ -1839,9 +1864,12 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
         engine->cached_input_sizes[i] = 1;
       }
       bind_ptr = engine->cached_input_ptrs[i];
-    } else if (engine->pageable_host_access || is_cuda_accessible_ptr(et_in.const_data_ptr())) {
+    } else if (device_reachable && is_tensor_address_aligned(et_in.const_data_ptr())) {
       bind_ptr = et_in.mutable_data_ptr();
     } else {
+      if (device_reachable) {
+        report_unaligned(name, et_in.const_data_ptr());
+      }
       const size_t needed = et_in.nbytes();
       if (needed > engine->cached_input_sizes[i]) {
         if (engine->cached_input_ptrs[i] != nullptr) {
@@ -1856,15 +1884,18 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
         engine->cached_input_sizes[i] = needed;
       }
       bind_ptr = engine->cached_input_ptrs[i];
-      cuda_err = cudaMemcpyAsync(bind_ptr, et_in.const_data_ptr(), needed, cudaMemcpyHostToDevice, stream);
+      cuda_err = cudaMemcpyAsync(bind_ptr, et_in.const_data_ptr(), needed, cudaMemcpyDefault, stream);
       drain_on_early_return.arm();
       if (cuda_err != cudaSuccess) {
         ET_LOG(
             Error,
-            "TensorRTBackend::execute: H2D copy failed for input '%s': %s",
+            "TensorRTBackend::execute: staging copy failed for input '%s': %s",
             name.c_str(),
             cudaGetErrorString(cuda_err));
         return Error::InvalidProgram;
+      }
+      if (engine->input_is_alias_target[i]) {
+        aliased_reflects.emplace_back(et_in.mutable_data_ptr(), bind_ptr, needed);
       }
     }
 
@@ -1894,15 +1925,10 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   // dynamic models.  After inferShapes() TRT knows the actual output
   // dims, so update the ExecuTorch TensorImpl's sizes before computing
   // nbytes() and before the Python binding reads back the shape.
-  // If the buffer is CPU, stage through a temporary CUDA allocation.
+  // If the buffer is CPU or not aligned for TensorRT, stage through a CUDA allocation.
   // ------------------------------------------------------------------
   // (arg index, device_src ptr) for outputs staged through a device buffer.
   std::vector<std::pair<size_t, void*>> outputs_needing_copy;
-  // Caller-owned KV: (dst = delegate output EValue ptr, src = aliased input ptr,
-  // nbytes). The engine updates the aliased input in place; reflect that into the
-  // delegate output EValue after enqueue so ExecuTorch's write-back copy_ sees the
-  // updated cache.
-  std::vector<std::tuple<void*, void*, size_t>> aliased_reflects;
   for (size_t o = 0; o < num_outputs; ++o) {
     const std::string& name = engine->output_binding_names[o];
 
@@ -1920,7 +1946,8 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
         return Error::InvalidState;
       }
       // Elided: setTensorAddress above pointed this output binding at the caller's
-      // buffer, so the engine writes the buffer itself; nothing to reflect into.
+      // buffer, or at the aligned copy the input loop already copies back, so the
+      // engine's write reaches the buffer; nothing to reflect into.
       if (aliased_outputs_elided) {
         continue;
       }
@@ -2042,6 +2069,8 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
 
     binding_bytes[num_inputs + o] = et_out.nbytes();
     void* bind_ptr = nullptr;
+    const bool device_reachable =
+        et_out.nbytes() > 0 && (engine->pageable_host_access || is_cuda_accessible_ptr(et_out.const_data_ptr()));
     if (et_out.nbytes() == 0) {
       if (engine->cached_output_sizes[o] == 0) {
         cuda_err = cudaMalloc(&engine->cached_output_ptrs[o], 1);
@@ -2051,9 +2080,12 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
         engine->cached_output_sizes[o] = 1;
       }
       bind_ptr = engine->cached_output_ptrs[o];
-    } else if (engine->pageable_host_access || is_cuda_accessible_ptr(et_out.const_data_ptr())) {
+    } else if (device_reachable && is_tensor_address_aligned(et_out.const_data_ptr())) {
       bind_ptr = et_out.mutable_data_ptr();
     } else {
+      if (device_reachable) {
+        report_unaligned(name, et_out.const_data_ptr());
+      }
       const size_t needed = et_out.nbytes();
       if (needed > engine->cached_output_sizes[o]) {
         if (engine->cached_output_ptrs[o] != nullptr) {
@@ -2176,7 +2208,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   }
 
   // Caller-owned KV: reflect each engine in-place update into its delegate output
-  // EValue (D2D on the same stream, after the engine work).
+  // EValue or the input it was staged from (on the same stream, after the engine work).
   for (const auto& r : aliased_reflects) {
     cuda_err = cudaMemcpyAsync(std::get<0>(r), std::get<1>(r), std::get<2>(r), cudaMemcpyDefault, stream);
     drain_on_early_return.arm();
@@ -2195,8 +2227,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   Error copy_err = Error::Ok;
   for (auto& output : outputs_needing_copy) {
     exec_aten::Tensor et_out = args[output.first]->toTensor();
-    cuda_err =
-        cudaMemcpyAsync(et_out.mutable_data_ptr(), output.second, et_out.nbytes(), cudaMemcpyDeviceToHost, stream);
+    cuda_err = cudaMemcpyAsync(et_out.mutable_data_ptr(), output.second, et_out.nbytes(), cudaMemcpyDefault, stream);
     if (cuda_err != cudaSuccess) {
       // Name the output and number it the way the caller does. output.first indexes the whole
       // argument list, so on a one-input engine the first output read as "output 1", and the

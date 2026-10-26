@@ -145,6 +145,56 @@ where TensorRT cannot take ``erfinv``, the saved program's delegate list reads
     still loads, still reports finding its weights, and returns a wrong answer with no error.
     Give each export its own directory.
 
+.. _executorch_external_engine_data:
+
+Keeping engines in a .ptd file
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+By default every TensorRT engine is stored inside the ``.pte``. Pass ``external_engine_data=``
+with a file name, without the ``.ptd`` extension, and the engines go to ``<name>.ptd`` next to
+the ``.pte`` instead:
+
+.. code-block:: python
+
+    torch_tensorrt.save(
+        trt_gm, "model.pte", output_format="executorch", external_engine_data="model"
+    )
+
+The program then needs that file to load. Pass the file itself, not its directory:
+
+.. code-block:: python
+
+    from pathlib import Path
+
+    import torch_tensorrt_executorch_runtime  # noqa: F401
+    from executorch.runtime import Runtime
+
+    program = Runtime.get().load_program(Path("model.pte"), data_path=Path("model.ptd"))
+
+In C++, pass the file as the second argument of ``Module``:
+
+.. code-block:: cpp
+
+    Module module("model.pte", "model.ptd");
+
+Without the file, the method fails to load. In C++ the error is ``Error::InvalidExternalData``.
+In Python, ``load_method`` raises a ``RuntimeError`` that ends in ``error: 0x:24``, the same
+error. The engines are GPU code, so treat the ``.ptd`` as trusted input,
+just like the ``.pte``: nothing checks at load that its engines are the ones that were saved.
+
+.. warning::
+
+    The ``.ptd`` name does not follow the ``.pte`` name, and ``save()`` replaces any file with
+    that name. Say you save two programs into one directory with the same
+    ``external_engine_data=``. The ``.ptd`` then holds only the second program's engines, and the
+    first program fails to load. Name the file after its program, as above, or give each program
+    its own directory.
+
+    A program with a ``CudaPartitioner`` part needs its own directory anyway (see the warning
+    above). The CUDA backend already writes ``aoti_cuda_blob.ptd`` for it. If you also want the
+    engines in a ``.ptd``, pass ``external_engine_data="aoti_cuda_blob"`` so they go into that same
+    file: ``load_program`` takes only one ``data_path``.
+
 Keeping inputs and outputs on the GPU
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 

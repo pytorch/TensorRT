@@ -49,7 +49,8 @@ struct EngineHandle {
   // Per output binding [0..num_outputs): index into input_binding_names of the
   // input it aliases (in-place KV-cache / user alias), or -1 for a normal output.
   // Built at init from the blob's aliased_io. Either way execute() binds the
-  // aliased TRT output binding to its aliased input's caller-provided pointer,
+  // aliased TRT output binding to its aliased input's binding, the caller's
+  // pointer or, for an unaligned one, an aligned copy that execute() copies back,
   // so the engine's write lands in the caller's buffer; what differs is how the
   // .pte carries the buffer. Threaded: the buffer is both a delegate input arg
   // and a delegate output arg (the caller-owned mutable buffer's mutation slot),
@@ -61,7 +62,7 @@ struct EngineHandle {
   // Per input binding [0..num_inputs): true if any output aliases this input, so
   // its in-place (KV/user) update must land in the caller-owned storage. Built at
   // init from aliased_io; execute() uses it to reject a non-device-resident
-  // aliased input instead of silently staging its update into delegate scratch.
+  // aliased input, and to copy back the update of one it staged for alignment.
   std::vector<bool> input_is_alias_target;
   size_t num_aliased_outputs = 0;
   int device_id = 0;
@@ -91,6 +92,8 @@ struct EngineHandle {
   // call, so it would otherwise be reported identically on every execute(). One
   // engine, one report: a decode loop must not turn it into a log flood.
   bool pin_ignored_reported = false;
+  // Same reasoning: an unaligned buffer is usually the same view on every call.
+  bool unaligned_io_reported = false;
 
   ~EngineHandle();
 };
