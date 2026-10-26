@@ -78,6 +78,69 @@ def test_real_module_keeps_its_parameter_objects(tmp_path):
     torch.testing.assert_close(model.proj.weight, ref.proj.weight)
 
 
+def test_a_meta_module_is_written_from_a_checkpoint_in_chunks(tmp_path):
+    """A model built on meta, in other dtypes than its float32 checkpoint and under other names, is
+    written from the checkpoint chunk by chunk, and the file maps back to the checkpoint's values.
+    """
+    pytest.importorskip("safetensors")
+    from safetensors.torch import save_file
+
+    torch.manual_seed(0)
+    reference = _Tied(torch.float32).eval()
+    checkpoint = str(tmp_path / "checkpoint.safetensors")
+    save_file(
+        {
+            f"model.{k}": v
+            for k, v in reference.state_dict().items()
+            if k != "head.weight"
+        },
+        checkpoint,
+    )
+    with torch.device("meta"):
+        model = _Tied(torch.bfloat16)
+    chunks = []
+    read = weight_mapping.checkpoint_source(
+        checkpoint, lambda name: f"model.{name}", chunk_bytes=64
+    )
+
+    def source(name, like):
+        for chunk in read(name, like):
+            chunks.append(chunk.numel())
+            yield chunk
+
+    path = str(tmp_path / "w.safetensors")
+    save_weights_for_mapping(model, path, source=source)
+    assert max(chunks) * 4 <= 64  # never a whole tensor: 64-byte chunks of float32
+    mapped = _Tied(torch.bfloat16)
+    map_weights(mapped, path, strict=True)
+    for name, value in reference.state_dict().items():
+        torch.testing.assert_close(mapped.state_dict()[name], value.to(torch.bfloat16))
+    assert mapped.head.weight is mapped.embed.weight
+
+
+def test_a_source_of_the_wrong_size_raises_and_leaves_no_file(tmp_path):
+    with torch.device("meta"):
+        model = torch.nn.Linear(4, 4)
+    path = tmp_path / "w.safetensors"
+    with pytest.raises(ValueError, match="bytes, expected"):
+        save_weights_for_mapping(
+            model, path, source=lambda name, like: torch.zeros(2, *like.shape[1:])
+        )
+    assert not path.exists() and not (tmp_path / "w.safetensors.partial").exists()
+    with pytest.raises(ValueError, match="meta device"):
+        save_weights_for_mapping(model, path)
+
+
+def test_a_submodule_maps_from_the_whole_model_with_a_prefix(tmp_path):
+    path = str(tmp_path / "w.safetensors")
+    model = _reference(path)
+    proj = torch.nn.Linear(8, 8, device="meta")
+    result = map_weights(proj, path, prefix="proj.", strict=True)
+    assert result.missing == []
+    assert torch.equal(proj.weight, model.proj.weight)
+    assert torch.equal(proj.bias, model.proj.bias)
+
+
 def test_missing_names_are_listed_or_raise_with_strict(tmp_path):
     _reference(tmp_path / "w.safetensors")
     with torch.device("meta"):
