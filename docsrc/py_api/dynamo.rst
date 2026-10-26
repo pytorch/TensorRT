@@ -45,6 +45,8 @@ Weight mapping: compile from a safetensors checkpoint's weights in place (see th
 
 .. autofunction:: save_weights_for_mapping
 
+.. autofunction:: checkpoint_source
+
 .. autofunction:: release_mapped_storage
 
 .. autoclass:: MappedWeights

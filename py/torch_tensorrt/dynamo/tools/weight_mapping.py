@@ -11,10 +11,12 @@ the engine that uses the weight (it takes weights as host pointers, so a CPU vie
 used again. ``release_weights_after_build`` calls it once a weight's last engine is built.
 
 ``save_weights_for_mapping`` writes a module's weights as they are after loading, for checkpoints whose
-loader casts (a view must already have the model's dtype).
+loader casts (a view must already have the model's dtype). With ``source=`` it converts a checkpoint
+without loading it: the module is built on ``meta``, and each weight is read, cast and written in turn.
 """
 
 import ctypes
+import io
 import json
 import mmap
 import os
@@ -22,7 +24,7 @@ import struct
 import threading
 import weakref
 from dataclasses import dataclass, field
-from typing import Dict, Iterator, List, Tuple, Union
+from typing import Callable, Dict, Iterable, Iterator, List, Optional, Tuple, Union
 
 import torch
 
@@ -40,6 +42,10 @@ _DTYPES: Dict[str, torch.dtype] = {
 }
 _DTYPE_NAMES = {dtype: name for name, dtype in _DTYPES.items()}
 _MAX_HEADER_BYTES = 100 * 1024 * 1024  # the safetensors format's limit
+# For a tensor on ``meta``: (its name, the tensor) -> its data, whole or as chunks along dimension 0.
+WeightSource = Callable[
+    [str, torch.Tensor], Union[torch.Tensor, Iterable[torch.Tensor]]
+]
 
 # Mapped files as (start address, size, weak reference to the mmap). A storage inside one is a mapped weight.
 # The weak reference keeps an entry exactly as long as some view keeps its mmap alive.
@@ -227,38 +233,119 @@ def release_mapped_storage(storage: torch.UntypedStorage) -> bool:
 
 
 def save_weights_for_mapping(
-    module: torch.nn.Module, path: Union[str, "os.PathLike[str]"]
+    module: torch.nn.Module,
+    path: Union[str, "os.PathLike[str]"],
+    *,
+    source: Optional[WeightSource] = None,
 ) -> None:
-    """Write ``module``'s parameters and buffers, as they are now (dtypes included), to a safetensors file
-    ``map_weights`` can map. A tied weight is written once, under its first name."""
+    """Write ``module``'s parameters and buffers, with their dtypes, to a safetensors file ``map_weights`` can
+    map. A tied weight is written once, under its first name.
+
+    Tensors are copied to the host and written one at a time. A tensor on the ``meta`` device is read from
+    ``source(name, tensor)`` instead, which returns its data in any dtype, as one tensor or as chunks that
+    concatenate along dimension 0 into it. Each chunk is cast to the tensor's dtype and written as it comes.
+    Converting a checkpoint this way holds one chunk in memory at a time: build the model on ``meta``, change
+    it as the compiled model will be (dtypes, shapes), and let ``source`` read the checkpoint. The file is
+    written under a temporary name and renamed when complete.
+    """
     entries: Dict[int, Tuple[str, torch.Tensor]] = {}
     for name, table, key in _registrations(module):
         tensor = table[key]
         if id(tensor) in entries:
             continue
-        if tensor.is_meta:
+        if tensor.is_meta and source is None:
             raise ValueError(
-                f"{name} is on the meta device; materialize it before saving"
+                f"{name} is on the meta device; pass source= to read it, or materialize it"
             )
         if tensor.dtype not in _DTYPE_NAMES:
             raise ValueError(f"{name}: dtype {tensor.dtype} has no safetensors name")
-        entries[id(tensor)] = (name, tensor.detach().contiguous().cpu())
+        entries[id(tensor)] = (name, tensor)
     # Largest element size first, so every tensor's offset stays aligned to its dtype.
     ordered = sorted(entries.values(), key=lambda e: -e[1].element_size())
     header: Dict[str, object] = {"__metadata__": {"format": "pt"}}
     offset = 0
     for name, t in ordered:
+        nbytes = t.numel() * t.element_size()
         header[name] = {
             "dtype": _DTYPE_NAMES[t.dtype],
             "shape": list(t.shape),
-            "data_offsets": [offset, offset + t.nbytes],
+            "data_offsets": [offset, offset + nbytes],
         }
-        offset += t.nbytes
+        offset += nbytes
     blob = json.dumps(header, separators=(",", ":")).encode()
     blob += b" " * (-len(blob) % 8)  # data starts 8-byte aligned
-    with open(os.fspath(path), "wb") as f:
-        f.write(struct.pack("<Q", len(blob)))
-        f.write(blob)
-        for _, t in ordered:
-            if t.numel():
-                f.write(t.reshape(-1).view(torch.uint8).numpy().data)
+    path = os.fspath(path)
+    partial = path + ".partial"
+    try:
+        with open(partial, "wb") as f:
+            f.write(struct.pack("<Q", len(blob)))
+            f.write(blob)
+            for name, t in ordered:
+                _write_tensor(f, name, t, source)
+        os.replace(partial, path)
+    finally:
+        if os.path.exists(partial):
+            os.remove(partial)
+
+
+def _write_tensor(
+    f: "io.BufferedWriter",
+    name: str,
+    like: torch.Tensor,
+    source: Optional[WeightSource],
+) -> None:
+    """Write `like`'s data, from `source` if it is on ``meta``, one chunk at a time, in `like`'s dtype."""
+    chunks: Union[torch.Tensor, Iterable[torch.Tensor]] = like
+    if like.is_meta:
+        assert source is not None
+        chunks = source(name, like)
+    if isinstance(chunks, torch.Tensor):
+        chunks = [chunks]
+    expected, written = like.numel() * like.element_size(), 0
+    for chunk in chunks:
+        if chunk.is_meta or (
+            like.dim() and tuple(chunk.shape[1:]) != tuple(like.shape[1:])
+        ):
+            raise ValueError(
+                f"{name}: source gave a {'meta' if chunk.is_meta else list(chunk.shape)} chunk "
+                f"for a {list(like.shape)} tensor"
+            )
+        data = chunk.detach().to(device="cpu", dtype=like.dtype).contiguous()
+        if data.numel():
+            f.write(data.reshape(-1).view(torch.uint8).numpy().data)
+        written += data.numel() * data.element_size()
+        del data
+    if written != expected:
+        raise ValueError(f"{name}: source gave {written} bytes, expected {expected}")
+
+
+def checkpoint_source(
+    path: Union[str, "os.PathLike[str]"],
+    key: Callable[[str], str] = lambda name: name,
+    *,
+    chunk_bytes: int = 64 << 20,
+) -> WeightSource:
+    """A ``source=`` for ``save_weights_for_mapping`` that reads each tensor from the safetensors file
+    ``path``, under ``key(name)``, in chunks of at most ``chunk_bytes`` along dimension 0, so no whole
+    checkpoint tensor is ever in memory. The file's dtype may differ; the writer casts each chunk.
+    """
+    from safetensors import safe_open
+
+    checkpoint = safe_open(os.fspath(path), framework="pt", device="cpu")
+
+    def read(name: str, like: torch.Tensor) -> Iterable[torch.Tensor]:
+        stored = checkpoint.get_slice(key(name))
+        shape = list(stored.get_shape())
+        if shape != list(like.shape):
+            raise ValueError(
+                f"{name}: {key(name)} in {path} has shape {shape}, the model {list(like.shape)}"
+            )
+        if not shape:
+            return [checkpoint.get_tensor(key(name))]
+        row_bytes = _DTYPES[stored.get_dtype()].itemsize
+        for size in shape[1:]:
+            row_bytes *= size
+        rows = max(1, chunk_bytes // max(1, row_bytes))
+        return (stored[i : i + rows] for i in range(0, shape[0], rows))
+
+    return read

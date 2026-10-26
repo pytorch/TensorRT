@@ -226,6 +226,25 @@ zero-copy views of a safetensors file:
 - **Checkpoints.** Any safetensors file maps if its tensors have the names, dtypes and shapes the model
   uses; a mismatch raises. ``save_weights_for_mapping`` is for checkpoints whose loader casts, for
   example stored in float32 and run in bfloat16. It writes the weights as loaded, a tied weight once.
+- **Converting without loading.** ``save_weights_for_mapping(model, path, source=...)`` writes a model
+  built on ``meta`` straight from a checkpoint. It writes one tensor at a time. For each meta tensor it
+  calls ``source(name, tensor)``, which returns the data whole or in chunks along dimension 0, and it
+  casts each chunk to the model's dtype. ``checkpoint_source(checkpoint, key=...)`` is a ready source that
+  reads a safetensors file in 64 MiB chunks, so even a float32 checkpoint is never loaded. Change the meta
+  model the way the compiled model will be changed first, such as casting it to bfloat16, so the file
+  holds the dtypes and shapes the export maps. For pi0.5, converting the 14.5 GB float32 checkpoint held
+  0.9 GiB of process memory, against 9.3 GiB for loading it on the CPU and writing the loaded model.
+
+  .. code-block:: python
+
+      from torch_tensorrt.dynamo.tools import checkpoint_source, save_weights_for_mapping
+
+      with torch.device("meta"):
+          model = MyModel().to(torch.bfloat16)
+      save_weights_for_mapping(
+          model, "weights.safetensors", source=checkpoint_source("checkpoint.safetensors")
+      )
+
 - **Missing names** are listed in ``mapping.missing`` and left as they were (still on ``meta`` if the
   model was built there). ``strict=True`` raises instead for any name in the model's ``state_dict``;
   non-persistent buffers, such as rotary frequencies, aren't required, so recompute those or write them
