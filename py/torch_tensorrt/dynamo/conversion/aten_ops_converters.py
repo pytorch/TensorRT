@@ -1564,9 +1564,8 @@ def _index_copy_kv_eligible(
     * Input has rank 4 and fully static shape [b, d, s_max, h].
     * dim argument is exactly 2.
     * Source tensor has rank 4 with shape[2] == 1 (single-position
-      write; matches HF's per-step StaticCache.update call).
-    * Batch is 1 (avoids writeIndices broadcasting; trivially extensible
-      to larger batches when needed).
+      write; matches HF's per-step StaticCache.update call). Any batch:
+      every row is written at that position.
 
     Cases that fail this validator fall through to
     aten_ops_index_copy_fallback.
@@ -1598,8 +1597,6 @@ def _index_copy_kv_eligible(
         return False
     if any(not isinstance(s, int) or s < 0 for s in input_shape):
         return False
-    if input_shape[0] != 1:
-        return False  # batch > 1 deferred; see index_copy.index_copy_kv
 
     # IKVCacheUpdateLayer scatters along the sequence axis, which is axis 2 in
     # the KV-cache layout it requires: [batch, num_heads, s_max, head_dim].

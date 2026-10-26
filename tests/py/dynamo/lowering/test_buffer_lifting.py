@@ -373,7 +373,7 @@ class TestCopyBackClassification(TestCase):
         self.assertEqual(new_gm.meta["_predicted_kv_bindings"], ["buf_cache"])
 
     def test_kv_index_copy_write_no_copyback(self):
-        """An eligible ``index_copy`` KV write (4-D static cache, dim=2, batch 1,
+        """An eligible ``index_copy`` KV write (4-D static cache, dim=2,
         single-position source) is aliased by the KV converter, so it is not
         copied back."""
 
@@ -491,6 +491,24 @@ class TestCopyBackClassification(TestCase):
         new_gm, lifted = lift_mutated_buffers(gm)
         self.assertEqual(len(lifted), 1)
         self.assertEqual(new_gm.meta["_copyback_mutation_buffers"], ["cache"])
+
+    def test_kv_index_copy_batched_write_no_copyback(self):
+        """Batch > 1 too: the converter writes every row at the index."""
+
+        class M(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("cache", torch.zeros(2, 4, 16, 8))
+
+            def forward(self, x):
+                self.cache.index_copy_(2, torch.tensor([3]), x)
+                return self.cache.sum()
+
+        gm = _ep_module_decomposed(M(), (torch.ones(2, 4, 1, 8),))
+        new_gm, lifted = lift_mutated_buffers(gm)
+        self.assertEqual(len(lifted), 1)
+        self.assertEqual(new_gm.meta["_copyback_mutation_buffers"], [])
+        self.assertEqual(new_gm.meta["_predicted_kv_bindings"], ["buf_cache"])
 
     def test_ineligible_slice_scatter_is_copyback(self):
         """Regression: a ``slice_scatter`` on a KV-shaped 4-D cache but the wrong
