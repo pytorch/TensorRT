@@ -67,7 +67,8 @@ def _build_record(name: str) -> str:
 def _executorch_index_options(cuda: str) -> str:
     """Return the pip options naming the indexes with this wheel's delegate and pinned ExecuTorch.
 
-    A development ExecuTorch build is only on the nightly index, a release on the test index.
+    A development ExecuTorch build is only on the nightly index, a release candidate on the test
+    index, and a release on the stable index.
     """
     # A version file older than this record was written by a source build pinning a development
     # ExecuTorch.
@@ -75,12 +76,17 @@ def _executorch_index_options(cuda: str) -> str:
     delegate = executorch
     if _build_record("__executorch_runtime_version__"):
         # A PyPI wheel records pypi, or no channel on Windows or before that record existed. PyPI has
-        # one delegate per platform at most, while the test index keeps the release's delegate for
-        # every CUDA version.
+        # one delegate per platform at most, while the stable index keeps the release's delegate, and
+        # the ExecuTorch release it pins, for every CUDA version.
         delegate = _build_record("__executorch_runtime_channel__")
         if delegate in ("", "pypi"):
-            delegate = "test"
-    indexes = [f"{channel}/{cuda}" for channel in dict.fromkeys((delegate, executorch))]
+            delegate = ""
+            if executorch == "test":
+                executorch = ""
+    indexes = [
+        f"{channel}/{cuda}" if channel else cuda
+        for channel in dict.fromkeys((delegate, executorch))
+    ]
     return " ".join(
         f"--extra-index-url https://download.pytorch.org/whl/{index}"
         for index in indexes

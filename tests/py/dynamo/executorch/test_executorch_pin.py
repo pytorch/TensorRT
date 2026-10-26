@@ -1342,7 +1342,7 @@ def test_the_executorch_install_message_names_the_recorded_delegate(channel):
     assert message == (
         f'pip install --pre "torch_tensorrt[executorch]=={_INSTALLED_VERSION}" '
         '"torch-tensorrt-executorch-runtime==0.3.0" '
-        + _indexes("test/cu132", "nightly/cu132")
+        + _indexes("cu132", "nightly/cu132")
     )
 
 
@@ -1391,10 +1391,11 @@ def _indexes(*names: str) -> str:
         # The delegate's own label picks the CUDA row.
         ("0.3.0+cu134", "test", "nightly", _indexes("test/cu134", "nightly/cu134")),
         ("0.3.0+cu134", "test", "test", _indexes("test/cu134")),
-        # A PyPI release records no label and no channel. PyPI holds one build for one CUDA
-        # version, while the test index keeps this release's delegate for every CUDA version.
-        ("0.3.0", "", "nightly", _indexes("test/cu132", "nightly/cu132")),
-        ("0.3.0", "", "test", _indexes("test/cu132")),
+        # A PyPI release records no label, and on Windows no channel. PyPI holds one build for one
+        # CUDA version, while the stable index keeps this release's delegate, and the ExecuTorch
+        # release it pins, for every CUDA version.
+        ("0.3.0", "", "nightly", _indexes("cu132", "nightly/cu132")),
+        ("0.3.0", "", "test", _indexes("cu132")),
     ],
 )
 def test_a_missing_delegate_names_the_exact_companion(
