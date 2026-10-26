@@ -186,6 +186,19 @@ reads it the memory belongs to somebody else. So the rule is the caller's to kee
 alive and unchanged until the call returns. The Python path cannot reach this, because a tensor there
 owns its storage.
 
+### A buffer off the 256-byte boundary is copied
+
+TensorRT needs every input and output address to be a multiple of 256 bytes, and it does not check.
+A view that starts partway into its storage, such as `x[1:]` of a 1-D tensor, misses that. Bound as
+it is, the engine returns a wrong answer, or its kernel faults and every later CUDA call in the
+process fails. So the backend copies such a buffer through an aligned one of its own, and logs this
+once per engine. The answer is right. The cost is one copy per buffer per call, and two for a
+buffer the engine updates in place, which is copied in and then back.
+
+ExecuTorch's memory planner places tensors on 16-byte boundaries by default, so a buffer it plans can
+take this path too. On a device that reads host memory directly, an unaligned host buffer is copied
+the same way instead of being read in place.
+
 ### Running from several threads at once
 
 One program per thread works. Sharing one program across threads does not, and is refused
@@ -623,7 +636,7 @@ the ordinary path does not guarantee that a stream from another context works
 with the engine; the call can still fail.
 
 If allocating a graph buffer fails, the engine uses the ordinary path until an
-input shape or the profile changes. Host staging allocations can still fail with
+input shape or the profile changes. Staging allocations can still fail with
 `Error::MemoryAllocationFailed`; retained graph buffers are not reclaimed to
 retry them. A failed recording is retried on the next call, and after three
 failures for one set of shapes the engine logs an error and uses the ordinary
@@ -861,7 +874,7 @@ of it only when `cudaStreamEndCapture` hands back
 caused it.
 
 The capture check runs before the wait on a previous enqueue, the `cudaMalloc`
-that grows a host-input staging buffer, and the `cudaFree(nullptr)` that makes a
+that grows an input staging buffer, and the `cudaFree(nullptr)` that makes a
 context current for a default stream. These calls precede the pool's own calls
 and, outside `Relaxed`, can invalidate the capture. Only the device query and
 the device switch run before the check, and a capture takes both.

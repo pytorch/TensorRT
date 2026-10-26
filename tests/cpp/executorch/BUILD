@@ -18,6 +18,7 @@ test_suite(
         ":test_shared_engines",
         ":test_shared_scratch_backend",
         ":test_shared_scratch_pool",
+        ":test_unaligned_io",
     ],
 )
 
@@ -230,6 +231,35 @@ cc_test(
         "@executorch//:executorch_core",
         "@executorch//:executorch_headers",
         "@executorch//:extension_cuda",
+        "@googletest//:gtest_main",
+    ] + select({
+        "//cpp:linux_x86_64": [
+            "@cuda//:cudart",
+            "@tensorrt//:nvinfer",
+        ],
+        "//cpp:sbsa": [
+            "@cuda//:cudart",
+            "@tensorrt_sbsa//:nvinfer",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+# Its own target because the failure it guards against is a device fault, which leaves
+# the CUDA context unusable for every later case in the same process.
+cc_test(
+    name = "test_unaligned_io",
+    srcs = ["test_unaligned_io.cpp"],
+    target_compatible_with = select({
+        "//cpp:linux_x86_64": [],
+        "//cpp:sbsa": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "//cpp:tensorrt_executorch_backend",
+        "//cpp:tensorrt_executorch_engine_handle_test_access",
+        "@executorch//:executorch_core",
+        "@executorch//:executorch_headers",
         "@googletest//:gtest_main",
     ] + select({
         "//cpp:linux_x86_64": [
