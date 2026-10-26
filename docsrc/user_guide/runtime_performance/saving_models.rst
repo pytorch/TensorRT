@@ -280,7 +280,7 @@ warning and are ignored. With this format, an unknown keyword raises a ``TypeErr
 * ``zero_copy_kv``: let an engine update its KV cache in place. See
   :ref:`Zero-copy KV cache <executorch_zero_copy_kv>`.
 * ``generate_etrecord``: also write an ETRecord, a debug record for the ExecuTorch Developer Tools
-  ``Inspector``, as ``<name>_etrecord.bin``. It does not work yet for a program with TensorRT
+  ``Inspector``, as ``<name>_etrecord.bin``. It does not work for a program with TensorRT
   engines: writing the record fails with a ``SerializeError``.
 
 :ref:`executorch_deployment` explains the run time side of ``use_cuda_graphs``,
@@ -429,7 +429,7 @@ Saving torch.compile models
 lazily on the first call and live in memory only. There is no direct way to call
 ``torch_tensorrt.save()`` on a ``torch.compile``-compiled model.
 
-**Workaround: switch to the AOT path**
+**Use the AOT path instead**
 
 Replace ``torch.compile`` with ``torch_tensorrt.compile(ir="dynamo")`` to get a
 serializable ``torch.fx.GraphModule``:

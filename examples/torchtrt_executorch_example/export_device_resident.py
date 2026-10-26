@@ -33,10 +33,9 @@ planning place tensors in GPU memory at all.
 The outputs can go either way. This script also passes
 ``alloc_graph_output=False``, so the program does not own its output buffers: a
 C++ caller sets them with ``Module::set_output``. From Python, a method loaded
-through ``executorch.runtime`` gets GPU memory for them from ExecuTorch itself,
-in builds from 1.6.0.dev20261008 on (pytorch/executorch#23547); older builds
-give them host memory. Leaving the outputs planned instead puts them in the
-program's own GPU memory, and that works from Python and C++ too.
+through ``executorch.runtime`` gets GPU memory for them from ExecuTorch itself.
+Leaving the outputs planned instead puts them in the program's own GPU memory,
+and that works from Python and C++ too.
 
 This script asserts on the serialized program rather than trusting the flags:
 the exported ``.pte`` must contain neither copy operator, and it must still carry

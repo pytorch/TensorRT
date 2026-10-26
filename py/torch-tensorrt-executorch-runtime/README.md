@@ -236,8 +236,8 @@ python -m pip wheel --no-build-isolation --no-deps \
   build.
 
 Install the result with PyTorch's indexes for your CUDA version. The ExecuTorch build it pins is
-on one of them: a development build on the nightly index, a release on the test index and later
-on the stable one.
+on one of them: a development build on the nightly index, a release on the test and stable
+indexes.
 
 ```bash
 python -m pip install dist/torch_tensorrt_executorch_runtime-*.whl \

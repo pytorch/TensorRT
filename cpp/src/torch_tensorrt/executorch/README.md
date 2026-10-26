@@ -220,7 +220,7 @@ but corrupted engine bytes can load and return wrong answers.
 - **A coalesced program may fail on any GPU but the first**, with an illegal memory access. This
   was seen only with a program whose recorded device was edited by hand, not one exported for that
   device, so it is not confirmed. On a machine with several GPUs, prefer the first one for a
-  coalesced program until it is.
+  coalesced program.
 
 ## Runtime options
 

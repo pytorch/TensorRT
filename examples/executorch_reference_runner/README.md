@@ -93,18 +93,18 @@ the delegate's static archive, `build-executorch-reference-runner/lib/libexecuto
 as a dependency. Naming the targets keeps the build from compiling every default ExecuTorch target
 too.
 
-The two multi-profile programs need a build newer than 2.15, so build them from a source checkout of
-`main`: point `TORCH_TENSORRT_ROOT` at the checkout, leave out
-`-DEXECUTORCH_BACKEND_TENSORRT_SOURCE_DIR` (the same `CMakeLists.txt` then finds the delegate source
-on its own), and add `example_executorch_multi_profile_runner` and
-`example_executorch_multi_profile_benchmark` to the targets.
+The two multi-profile programs need a build newer than 2.15. Add
+`example_executorch_multi_profile_runner` and `example_executorch_multi_profile_benchmark` to the
+targets. To build from a source checkout instead of the tarball, point `TORCH_TENSORRT_ROOT` at the
+checkout and leave out `-DEXECUTORCH_BACKEND_TENSORRT_SOURCE_DIR`: the same `CMakeLists.txt` then
+finds the delegate source on its own.
 
 This flow covers Linux x86-64 and Arm servers (SBSA). Windows and JetPack are not part of it.
 Except in the JetPack and TensorRT-RTX builds, `libtorchtrt.tar.gz` and the Torch-TensorRT wheels
-for Linux also carry a prebuilt `torch_tensorrt/bin/example_executorch_runner`. It registers the GPU allocator itself, but it has no
-CUDA backend, and of the CPU operators only the copies at the edges of the program, so it runs only
-programs that TensorRT takes in full, such as the one `export_static_shape.py` writes. To find the
-copy in your Python environment:
+for Linux also carry a prebuilt `torch_tensorrt/bin/example_executorch_runner`. It registers the
+GPU allocator itself. It has no CUDA backend, and its only CPU operators are the copies at the edges
+of the program. So it runs only programs that TensorRT takes in full, such as the one
+`export_static_shape.py` writes. To find the copy in your Python environment:
 
 ```bash
 python -c 'import importlib.util, pathlib; print(pathlib.Path(importlib.util.find_spec("torch_tensorrt").origin).parent / "bin")'
@@ -191,7 +191,7 @@ pass runs on `cudaStreamPerThread`, and the second on a stream the program creat
 
 ## Pick an optimization profile
 
-**Newer than 2.15.** Needs a nightly build or a later release.
+**Needs Torch-TensorRT newer than 2.15**, such as a nightly build.
 
 An engine can hold several optimization profiles: one set of weights, tuned for several input
 shape ranges. Scope an `OptimizationProfileGuard` around a call to pick one:

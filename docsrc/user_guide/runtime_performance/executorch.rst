@@ -60,8 +60,8 @@ To pick up a change before it ships, or to report a problem against ``main``:
 
 Swap ``cu132`` for ``cu134`` on CUDA 13.4.
 
-What the command installs
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+What these commands install
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 * PyTorch and TensorRT, which Torch-TensorRT depends on.
 * ExecuTorch, the CUDA build. That is all you need to export.
@@ -197,8 +197,8 @@ already on the GPU, those copies are wasted time. Turn them off at export:
 * **Do not let the program allocate its inputs:** pass ``alloc_graph_input=False``. Otherwise
   the program keeps its own input buffer, and handing it a GPU tensor fails with error ``0x10``
   (``NotSupported``). The log then says ``Error copying tensor data at input 0``.
-* **The outputs can stay in the program's own GPU memory**, as above. To receive them in memory
-  you own instead, also pass ``alloc_graph_output=False``. Then each output needs a GPU buffer
+* **The outputs can stay in the program's own GPU memory**, as above. To give each output its
+  own buffer instead, also pass ``alloc_graph_output=False``. Then each output needs a GPU buffer
   before the call: in C++ you set it with ``Module::set_output``, and the Python runtime allocates
   one for you.
 
@@ -209,7 +209,7 @@ input is TensorRT, and fails when it is the CUDA backend.
 Keep the engines in a separate file
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-**Newer than 2.15.** Needs a nightly build or a later release.
+**Needs Torch-TensorRT newer than 2.15**, such as a nightly build.
 
 By default the engines are stored inside the ``.pte``, so the file is as large as the model. With
 ``external_engine_data``, they go to an ExecuTorch data file (``.ptd``) next to the ``.pte``
@@ -499,9 +499,8 @@ it runs a coalesced program only when the CUDA part has no weights, like the one
 
 A prebuilt copy of the runner ships as ``torch_tensorrt/bin/example_executorch_runner``, in
 ``libtorchtrt.tar.gz`` and in the Torch-TensorRT wheels for Linux, except the JetPack and
-TensorRT-RTX builds. It has no CUDA backend, and of
-the CPU operators only the copies at the edges of the program, so it runs only programs that
-TensorRT takes in full, not coalesced ones.
+TensorRT-RTX builds. It has no CUDA backend, and its only CPU operators are the copies at the
+edges of the program. So it runs only programs that TensorRT takes in full, not coalesced ones.
 
 CUDA graph replay
 ^^^^^^^^^^^^^^^^^^
@@ -601,7 +600,7 @@ the budget on the GPU. With no budget, TensorRT chooses one from the free memory
 Optimization profiles
 ^^^^^^^^^^^^^^^^^^^^^^
 
-**Newer than 2.15.** Needs a nightly build or a later release.
+**Needs Torch-TensorRT newer than 2.15**, such as a nightly build.
 
 An engine can hold several optimization profiles: one set of weights, tuned for several ranges
 of input shapes. The usual case is an LLM, with one profile for decoding one token at a time and

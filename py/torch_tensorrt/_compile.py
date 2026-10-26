@@ -865,7 +865,7 @@ def save(
                 TRT engines.
                 ``generate_etrecord=True`` writes an ETRecord to
                 ``<model>_etrecord.bin`` next to the ``.pte`` for use with the
-                ExecuTorch Inspector. It does not work yet for a program with
+                ExecuTorch Inspector. It does not work for a program with
                 TensorRT engines: writing the record raises a ``SerializeError``.
                 ``weight_streaming_budget_per_engine=`` takes an ``Optional[int]``
                 number of bytes of engine weights that may stay resident in GPU
