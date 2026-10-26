@@ -202,8 +202,9 @@ but corrupted engine bytes can load and return wrong answers.
   `immutable_weights=False, strip_engine_weights=True`, is refused with `Error::InvalidProgram`,
   because this delegate cannot refit it. To check, the delegate asks TensorRT how many weight bytes
   the engine still holds, and refuses it when that is less than its total. An engine that had
-  nothing to strip, or has no weights at all, loads. A stripped engine saved again with its weights
-  but not refitted first no longer counts as stripped, so refit before you save it again. For an
+  nothing to strip, or has no weights at all, loads. A stripped engine saved again as it is stays
+  refused. Saved again without `SerializationFlag::kEXCLUDE_WEIGHTS` and not refitted first, it no
+  longer counts as stripped and this check misses it, so refit before you save it again. For an
   ordinary engine, TensorRT logs one harmless warning each time it is deserialized, saying it was
   not built with `kSTRIP_PLAN`.
 
@@ -408,7 +409,7 @@ which sharing does not tell apart. A private load does not hash the bytes.
 
 **Newer than 2.15.** A program exported with `external_engine_data=` keeps its engines in a `.ptd` file
 next to the `.pte`. Load it with that file, for example
-`Module module("model.pte", "engines.ptd");`. Without the file, or with one that lacks the engine,
+`Module module("model.pte", "model.ptd");`. Without the file, or with one that lacks the engine,
 loading returns `Error::InvalidExternalData`. A program whose engines share `aoti_cuda_blob.ptd`
 with the CUDA backend can fail first in that backend, with `Error::NotFound`. Each engine is
 stored under a key made from its SHA-256 hash, but the key is only a name: nothing checks the

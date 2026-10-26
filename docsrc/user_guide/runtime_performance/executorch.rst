@@ -226,15 +226,22 @@ instead. Give the name without the extension:
         trt_gm,
         "small.pte",
         output_format="executorch",
-        external_engine_data="engines",
+        external_engine_data="small",
     )
 
-This writes a small ``small.pte`` and an ``engines.ptd`` next to it. Pass the ``.ptd`` when you
-load the program. Without it, loading the method fails. The Python runtime takes one data file per
+This writes a small ``small.pte`` and a ``small.ptd`` next to it. Pass the ``.ptd`` file itself,
+not its directory, when you load the program. Without it, loading the method fails. The Python runtime takes one data file per
 program, so for a coalesced program pass ``external_engine_data="aoti_cuda_blob"``: the engines
 then go into the CUDA backend's file.
 
 Treat a ``.ptd`` file as trusted input, the same as a ``.pte``. The engines in it are GPU code.
+
+.. warning::
+
+    The ``.ptd`` name does not follow the ``.pte`` name, and ``save()`` replaces any file with that
+    name. Save two programs into one directory with the same ``external_engine_data``, and the
+    ``.ptd`` holds only the second program's engines, so the first fails to load. Name the file
+    after its program, as above, or give each program its own directory.
 
 ----
 
