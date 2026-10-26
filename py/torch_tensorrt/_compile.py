@@ -844,6 +844,8 @@ def save(
                 ``backend_config=`` takes an ``Optional[ExecutorchBackendConfig]``
                 and is forwarded to ``to_executorch(config=...)`` to customize
                 ExecuTorch lowering (e.g. memory planning or device placement).
+                Its ``MemoryPlanningPass`` is aligned to 256 bytes on a copy, the
+                boundary TensorRT needs for every input and output.
                 ``partitioners=`` appends caller partitioners after the TensorRT
                 partitioner, so ops TensorRT does not take can be routed to another
                 delegate -- e.g. a ``CudaPartitioner`` for a coalesced TensorRT +
@@ -1534,6 +1536,45 @@ def _write_external_tensor_data(executorch_program: Any, file_path: str) -> None
         )
 
 
+# TensorRT needs every input and output address to be a multiple of this, and the delegate copies a
+# buffer that misses it.
+_TENSORRT_ADDRESS_ALIGNMENT = 256
+
+
+def _with_tensorrt_alignment(backend_config: Any) -> Any:
+    """Return ``backend_config`` with memory planning on TensorRT's 256-byte boundary.
+
+    ExecuTorch plans buffers on 16-byte boundaries by default, so a planned delegate input or output
+    can miss 256 and be copied on every call. Each ``MemoryPlanningPass`` gets the least common
+    multiple of its own alignment and 256, on a copy, so the caller's alignment still holds and the
+    caller's planner keeps its own. Any other planner is left as it is.
+    """
+    import copy
+    import dataclasses
+    import math
+
+    from executorch.exir import ExecutorchBackendConfig
+    from executorch.exir.passes import MemoryPlanningPass
+
+    def aligned(planner: Any) -> Any:
+        if (
+            not isinstance(planner, MemoryPlanningPass)
+            or planner.alignment % _TENSORRT_ADDRESS_ALIGNMENT == 0
+        ):
+            return planner
+        planner = copy.copy(planner)
+        planner.alignment = math.lcm(planner.alignment, _TENSORRT_ADDRESS_ALIGNMENT)
+        return planner
+
+    config = backend_config if backend_config is not None else ExecutorchBackendConfig()
+    planner = config.memory_planning_pass
+    if isinstance(planner, dict):
+        planner = {name: aligned(p) for name, p in planner.items()}
+    else:
+        planner = aligned(planner)
+    return dataclasses.replace(config, memory_planning_pass=planner)
+
+
 def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None:
     """Save an engine-bearing ExportedProgram as an ExecuTorch program."""
     try:
@@ -1579,6 +1620,7 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
         zero_copy_kv=zero_copy_kv,
         external_engine_data=kwargs.get("external_engine_data"),
     )
+    backend_config = _with_tensorrt_alignment(kwargs.get("backend_config"))
     # Unlike the direct export()+to_executorch() path -- where the two steps
     # belong to different owners and pairing them is the caller's job -- save()
     # owns both, so it installs the finalization pass itself. Wrapping preserves
@@ -1587,7 +1629,6 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
     # writes, and the pass refuses it. A backend_config that already carries
     # the pass is wrapped again here; the second run finds the buffers already
     # un-staged and changes nothing.
-    backend_config = kwargs.get("backend_config")
     if zero_copy_kv:
         backend_config = zero_copy_backend_config(backend_config)
     executorch_program = edge_program.to_executorch(config=backend_config)

@@ -195,9 +195,11 @@ process fails. So the backend copies such a buffer through an aligned one of its
 once per engine. The answer is right. The cost is one copy per buffer per call, and two for a
 buffer the engine updates in place, which is copied in and then back.
 
-ExecuTorch's memory planner places tensors on 16-byte boundaries by default, so a buffer it plans can
-take this path too. On a device that reads host memory directly, an unaligned host buffer is copied
-the same way instead of being read in place.
+`torch_tensorrt.save()` plans memory on 256-byte boundaries, so buffers a program plans in GPU memory
+are bound directly. ExecuTorch's own default is 16 bytes, so a program finalized with `to_executorch()`
+directly should pass `MemoryPlanningPass(alignment=256)`, or its planned buffers take this path too.
+On a device that reads host memory directly, an unaligned host buffer is copied the same way instead
+of being read in place.
 
 ### Running from several threads at once
 

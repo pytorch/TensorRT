@@ -306,6 +306,10 @@ planning, or carrying more than one method. The caller then serializes it:
         program.write_to_file(output)
     program.write_tensor_data_to_file(".")
 
+TensorRT needs every input and output on a 256-byte boundary, and ExecuTorch plans memory on
+16-byte boundaries by default. ``save`` plans on 256 for you. Here, give ``backend_config`` a
+``MemoryPlanningPass(alignment=256)``, or the delegate copies each misaligned buffer on every call.
+
 ``executorch.export`` accepts a TensorRT-compiled ``GraphModule``, an
 engine-bearing ``ExportedProgram``, or a mapping of independently exported
 methods. It always applies the TensorRT partitioner first, followed by caller
@@ -407,7 +411,8 @@ calls, one at each end of the Edge boundary:
 
     # The argument is optional. Pass your own ExecutorchBackendConfig and
     # zero_copy_backend_config composes onto it; every other field (memory
-    # planning, passes) is preserved.
+    # planning, passes) is preserved, so give it MemoryPlanningPass(alignment=256)
+    # to keep the cache on the boundary TensorRT needs.
     program = edge.to_executorch(zero_copy_backend_config())
 
     # Neither call is enforced -- see the warning below.
@@ -610,7 +615,7 @@ and ``zero_copy_kv`` is read by ``save`` on both sides of that boundary.
   caller-supplied config is forwarded **verbatim**, so if you pass your own and
   your graph carries TensorRT engines, set ``_check_ir_validity=False`` explicitly.
 * ``backend_config`` — an ``ExecutorchBackendConfig`` forwarded to
-  ``to_executorch(...)``.
+  ``to_executorch(...)``, with its ``MemoryPlanningPass`` aligned to 256 bytes on a copy.
 * ``zero_copy_kv`` — a ``bool`` (default ``False``, single-method only). Lets the
   TensorRT engine update an aliased KV cache in place. ``save`` owns both ends of
   the Edge boundary, so this one argument covers what the two-call path spells
