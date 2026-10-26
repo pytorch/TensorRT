@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=ce438fe8"></script>
+    <script src="../_static/documentation_options.js?v=ede72c6b"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -780,6 +780,8 @@ ignored with a warning. Pass <code class="docutils literal notranslate"><span cl
 <code class="docutils literal notranslate"><span class="pre">backend_config=</span></code> takes an <code class="docutils literal notranslate"><span class="pre">Optional[ExecutorchBackendConfig]</span></code>
 and is forwarded to <code class="docutils literal notranslate"><span class="pre">to_executorch(config=...)</span></code> to customize
 ExecuTorch lowering (e.g. memory planning or device placement).
+Its <code class="docutils literal notranslate"><span class="pre">MemoryPlanningPass</span></code> is aligned to 256 bytes on a copy, the
+boundary TensorRT needs for every input and output.
 <code class="docutils literal notranslate"><span class="pre">partitioners=</span></code> appends caller partitioners after the TensorRT
 partitioner, so ops TensorRT does not take can be routed to another
 delegate – e.g. a <code class="docutils literal notranslate"><span class="pre">CudaPartitioner</span></code> for a coalesced TensorRT +
@@ -820,7 +822,12 @@ finalized program before writing the file, so a single
 the <code class="docutils literal notranslate"><span class="pre">.ptd</span></code> extension and
 writes every TensorRT engine to <code class="docutils literal notranslate"><span class="pre">&lt;name&gt;.ptd</span></code> next to the <code class="docutils literal notranslate"><span class="pre">.pte</span></code>
 instead of into it. Pass that file as the program’s data file when
-loading. See <code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">torch_tensorrt.executorch.export()</span></code>.</p></li>
+loading. An existing file with that name is replaced, so give each
+program in a directory its own name, for example
+<code class="docutils literal notranslate"><span class="pre">external_engine_data=&quot;model&quot;</span></code> for <code class="docutils literal notranslate"><span class="pre">model.pte</span></code>. A program that also
+has a CUDA backend part needs its own directory and
+<code class="docutils literal notranslate"><span class="pre">external_engine_data=&quot;aoti_cuda_blob&quot;</span></code> instead. See
+<code class="xref cpp cpp-func docutils literal notranslate"><span class="pre">torch_tensorrt.executorch.export()</span></code>.</p></li>
 </ul>
 </dd>
 </dl>

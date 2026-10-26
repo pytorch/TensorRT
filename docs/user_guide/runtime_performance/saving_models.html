@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=ce438fe8"></script>
+    <script src="../../_static/documentation_options.js?v=ede72c6b"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -779,7 +779,9 @@ for inspection or customization, and leaves serialization to the caller.</p></li
 <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="s2">"trt.pte"</span><span class="p">,</span> <span class="n">output_format</span><span class="o">=</span><span class="s2">"executorch"</span><span class="p">)</span>
 </pre></div>
 </div>
-<p><code class="docutils literal notranslate"><span class="pre">save</span></code> writes both the <code class="docutils literal notranslate"><span class="pre">.pte</span></code> and any external <code class="docutils literal notranslate"><span class="pre">.ptd</span></code> tensor-data files.</p>
+<p><code class="docutils literal notranslate"><span class="pre">save</span></code> writes both the <code class="docutils literal notranslate"><span class="pre">.pte</span></code> and any external <code class="docutils literal notranslate"><span class="pre">.ptd</span></code> tensor-data files. To keep the
+TensorRT engines in a <code class="docutils literal notranslate"><span class="pre">.ptd</span></code> file instead of the <code class="docutils literal notranslate"><span class="pre">.pte</span></code>, see
+<a class="reference internal" href="executorch.html#executorch-external-engine-data"><span class="std std-ref">Keeping engines in a .ptd file</span></a>.</p>
 </section>
 <section id="advanced-export">
 <h4>Advanced: <code class="docutils literal notranslate"><span class="pre">export()</span></code><a class="headerlink" href="#advanced-export" title="Link to this heading">#</a></h4>
@@ -803,6 +805,9 @@ planning, or carrying more than one method. The caller then serializes it:</p>
 <span class="n">program</span><span class="o">.</span><span class="n">write_tensor_data_to_file</span><span class="p">(</span><span class="s2">"."</span><span class="p">)</span>
 </pre></div>
 </div>
+<p>TensorRT needs every input and output on a 256-byte boundary, and ExecuTorch plans memory on
+16-byte boundaries by default. <code class="docutils literal notranslate"><span class="pre">save</span></code> plans on 256 for you. Here, give <code class="docutils literal notranslate"><span class="pre">backend_config</span></code> a
+<code class="docutils literal notranslate"><span class="pre">MemoryPlanningPass(alignment=256)</span></code>, or the delegate copies each misaligned buffer on every call.</p>
 <p><code class="docutils literal notranslate"><span class="pre">executorch.export</span></code> accepts a TensorRT-compiled <code class="docutils literal notranslate"><span class="pre">GraphModule</span></code>, an
 engine-bearing <code class="docutils literal notranslate"><span class="pre">ExportedProgram</span></code>, or a mapping of independently exported
 methods. It always applies the TensorRT partitioner first, followed by caller
@@ -889,7 +894,8 @@ calls, one at each end of the Edge boundary:</p>
 
 <span class="c1"># The argument is optional. Pass your own ExecutorchBackendConfig and</span>
 <span class="c1"># zero_copy_backend_config composes onto it; every other field (memory</span>
-<span class="c1"># planning, passes) is preserved.</span>
+<span class="c1"># planning, passes) is preserved, so give it MemoryPlanningPass(alignment=256)</span>
+<span class="c1"># to keep the cache on the boundary TensorRT needs.</span>
 <span class="n">program</span> <span class="o">=</span> <span class="n">edge</span><span class="o">.</span><span class="n">to_executorch</span><span class="p">(</span><span class="n">zero_copy_backend_config</span><span class="p">())</span>
 
 <span class="c1"># Neither call is enforced -- see the warning below.</span>
@@ -1074,7 +1080,7 @@ supplies a default with <code class="docutils literal notranslate"><span class="
 caller-supplied config is forwarded <strong>verbatim</strong>, so if you pass your own and
 your graph carries TensorRT engines, set <code class="docutils literal notranslate"><span class="pre">_check_ir_validity=False</span></code> explicitly.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">backend_config</span></code> — an <code class="docutils literal notranslate"><span class="pre">ExecutorchBackendConfig</span></code> forwarded to
-<code class="docutils literal notranslate"><span class="pre">to_executorch(...)</span></code>.</p></li>
+<code class="docutils literal notranslate"><span class="pre">to_executorch(...)</span></code>, with its <code class="docutils literal notranslate"><span class="pre">MemoryPlanningPass</span></code> aligned to 256 bytes on a copy.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">zero_copy_kv</span></code> — a <code class="docutils literal notranslate"><span class="pre">bool</span></code> (default <code class="docutils literal notranslate"><span class="pre">False</span></code>, single-method only). Lets the
 TensorRT engine update an aliased KV cache in place. <code class="docutils literal notranslate"><span class="pre">save</span></code> owns both ends of
 the Edge boundary, so this one argument covers what the two-call path spells
