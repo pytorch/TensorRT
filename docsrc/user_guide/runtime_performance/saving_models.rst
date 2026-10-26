@@ -276,7 +276,7 @@ warning and are ignored. With this format, an unknown keyword raises a ``TypeErr
 * ``weight_streaming_budget_per_engine``: how many bytes of each engine's weights stay on the GPU,
   for an engine compiled with ``enable_weight_streaming=True``.
 * ``external_engine_data``: a file name, without ``.ptd``, to store the engines in instead of the
-  ``.pte``. **Newer than 2.15.**
+  ``.pte``.
 * ``zero_copy_kv``: let an engine update its KV cache in place. See
   :ref:`Zero-copy KV cache <executorch_zero_copy_kv>`.
 * ``generate_etrecord``: also write an ETRecord, a debug record for the ExecuTorch Developer Tools

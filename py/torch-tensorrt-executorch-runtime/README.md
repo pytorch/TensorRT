@@ -107,7 +107,7 @@ known issues.
 - **CMake 3.28 or newer** is needed for the recipe above: on older versions the ExecuTorch package
   does not provide the `executorch::` targets. CMake is not part of these wheels, so install it
   yourself. The section below shows a way for older CMake.
-- **No header for optimization profiles (newer than 2.15).** Choosing a profile needs
+- **No header for optimization profiles.** Choosing a profile needs
   `OptimizationProfileGuard` from `TensorRTBackend.h`, which only the source tree and
   `libtorchtrt.tar.gz` carry. On Linux you can compile against it, with the TensorRT headers, and
   link this wheel's delegate. On Windows the wheel's library does not export the guard. Without it,

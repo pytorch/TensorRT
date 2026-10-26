@@ -7,8 +7,8 @@ reference code with fixed example inputs, so replace those with your real inputs
 | --- | --- | --- |
 | `example_executorch_runner` | `main.cpp` | The low-level `Program` and `Method` loading sequence, and running on a green context stream |
 | `kv_cache_decode_check` | `kv_cache_decode_check.cpp` | That a key-value (KV) cache in memory the caller owns keeps its updates from call to call |
-| `example_executorch_multi_profile_runner` | `multi_profile_main.cpp` | Picking a TensorRT optimization profile for each call through the `Module` API (newer than 2.15) |
-| `example_executorch_multi_profile_benchmark` | `multi_profile_benchmark.cpp` | What picking the right profile is worth (newer than 2.15) |
+| `example_executorch_multi_profile_runner` | `multi_profile_main.cpp` | Picking a TensorRT optimization profile for each call through the `Module` API |
+| `example_executorch_multi_profile_benchmark` | `multi_profile_benchmark.cpp` | What picking the right profile is worth |
 | `load_model.py` | Python | Loading and running a `.pte` with ExecuTorch's Python runtime |
 | `load_model_device_resident.py` | Python | The same for a program that keeps its inputs and outputs on the GPU |
 
@@ -32,7 +32,7 @@ python examples/torchtrt_executorch_example/export_coalesced.py --model_path=coa
 # A one-layer decoder step, for kv_cache_decode_check.
 python examples/torchtrt_executorch_example/export_kv_cache_decode.py --model_path=kv_cache_decode.pte
 
-# One engine with two optimization profiles, for the two multi-profile programs (newer than 2.15).
+# One engine with two optimization profiles, for the two multi-profile programs.
 python examples/torchtrt_executorch_example/export_multi_profile.py --model_path=model_gemma3_multi_profile.pte
 ```
 
@@ -88,12 +88,12 @@ cmake --build build-executorch-reference-runner -j \
   --target example_executorch_runner kv_cache_decode_check
 ```
 
-This builds the two programs that every release has into `build-executorch-reference-runner/`, and
+This builds the runner and the KV cache check into `build-executorch-reference-runner/`, and
 the delegate's static archive, `build-executorch-reference-runner/lib/libexecutorch_trt_backend.a`,
 as a dependency. Naming the targets keeps the build from compiling every default ExecuTorch target
 too.
 
-The two multi-profile programs need a build newer than 2.15. Add
+For the two multi-profile programs, add
 `example_executorch_multi_profile_runner` and `example_executorch_multi_profile_benchmark` to the
 targets. To build from a source checkout instead of the tarball, point `TORCH_TENSORRT_ROOT` at the
 checkout and leave out `-DEXECUTORCH_BACKEND_TENSORRT_SOURCE_DIR`: the same `CMakeLists.txt` then
@@ -190,8 +190,6 @@ pass runs on `cudaStreamPerThread`, and the second on a stream the program creat
 `CallerStreamGuard`. Both have to pass. It needs a CUDA device.
 
 ## Pick an optimization profile
-
-**Needs Torch-TensorRT newer than 2.15**, such as a nightly build.
 
 An engine can hold several optimization profiles: one set of weights, tuned for several input
 shape ranges. Scope an `OptimizationProfileGuard` around a call to pick one:

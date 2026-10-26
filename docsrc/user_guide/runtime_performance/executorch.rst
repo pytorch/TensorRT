@@ -214,8 +214,6 @@ input is TensorRT, and fails when it is the CUDA backend.
 Keep the engines in a separate file
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-**Needs Torch-TensorRT newer than 2.15**, such as a nightly build.
-
 By default the engines are stored inside the ``.pte``, so the file is as large as the model. With
 ``external_engine_data``, they go to an ExecuTorch data file (``.ptd``) next to the ``.pte``
 instead. Give the name without the extension:
@@ -612,8 +610,6 @@ the budget on the GPU. With no budget, TensorRT chooses one from the free memory
 Optimization profiles
 ^^^^^^^^^^^^^^^^^^^^^^
 
-**Needs Torch-TensorRT newer than 2.15**, such as a nightly build.
-
 An engine can hold several optimization profiles: one set of weights, tuned for several ranges
 of input shapes. The usual case is an LLM, with one profile for decoding one token at a time and
 one for a long prompt. Declare the profiles with ``torch_tensorrt.Input(profiles=[...])``, as
@@ -690,7 +686,7 @@ In ``examples/torchtrt_executorch_example/``:
 * ``export_coalesced.py`` splits one graph between the TensorRT delegate and the CUDA backend.
 * ``export_device_resident.py`` does the same with no copies at the edges of the program.
 * ``export_kv_cache_decode.py`` exports a decoder step whose KV cache stays in memory you own.
-* ``export_multi_profile.py`` exports one engine with two optimization profiles (newer than 2.15).
+* ``export_multi_profile.py`` exports one engine with two optimization profiles.
 
 ``examples/executorch_reference_runner/`` loads and runs a ``.pte`` from Python and from C++,
-including optimization profiles (newer than 2.15) and the green context option.
+including optimization profiles and the green context option.

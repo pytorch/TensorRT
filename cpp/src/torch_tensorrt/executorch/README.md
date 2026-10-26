@@ -198,7 +198,7 @@ but corrupted engine bytes can load and return wrong answers.
   deserializes the engine, applies the weight streaming budget, or creates the execution context.
   The log then shows the free and total GPU memory. Other TensorRT load failures return
   `Error::InvalidProgram`, with TensorRT's reason in the log.
-- **Newer than 2.15.** An engine saved without its weights, for example compiled with
+- An engine saved without its weights, for example compiled with
   `immutable_weights=False, strip_engine_weights=True`, is refused with `Error::InvalidProgram`,
   because this delegate cannot refit it. To check, the delegate asks TensorRT how many weight bytes
   the engine still holds, and refuses it when that is less than its total. An engine that had
@@ -407,7 +407,7 @@ which sharing does not tell apart. A private load does not hash the bytes.
 
 ### Engines in a .ptd file
 
-**Newer than 2.15.** A program exported with `external_engine_data=` keeps its engines in a `.ptd` file
+A program exported with `external_engine_data=` keeps its engines in a `.ptd` file
 next to the `.pte`. Load it with that file, for example
 `Module module("model.pte", "model.ptd");`. Without the file, or with one that lacks the engine,
 loading returns `Error::InvalidExternalData`. A program whose engines share `aoti_cuda_blob.ptd`
@@ -417,7 +417,7 @@ engine against it.
 
 ### Optimization profiles
 
-**Newer than 2.15.** An engine exported with several optimization profiles, for example one for
+An engine exported with several optimization profiles, for example one for
 decoding one token at a time and one for a long prompt, runs one profile at a time. A C++ host
 picks it for each call with `OptimizationProfileGuard` from
 `torch_tensorrt/executorch/TensorRTBackend.h`:
