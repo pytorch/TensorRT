@@ -20,6 +20,12 @@ def _is_turing() -> bool:
     return torch.cuda.is_available() and torch.cuda.get_device_capability() == TURING
 
 
+def _turing_and_current_targets():
+    # Turing drives the capability guards; the current GPU must also be targeted
+    # because compilation deserializes the engine locally before returning it.
+    return list(dict.fromkeys([TURING, torch.cuda.get_device_capability()]))
+
+
 def _trt_submodule_count(compiled) -> int:
     """Number of TensorRT engine submodules in a compiled module.
 
@@ -190,12 +196,14 @@ class TestTuringCapabilityGuards(TestCase):
 
     # -- declared-target tests: these run on ANY GPU ------------------------------
     # Declaring Turing as a build target must produce Turing's partitioning even on
-    # non-Turing hardware. This is what makes the guards testable without a Turing GPU.
+    # non-Turing hardware. Include the current GPU so engines can also load locally.
 
     def test_declared_turing_target_falls_back_fp32_gemm(self):
         mod = MatMul()
         inputs = (torch.randn(4, 8).cuda(), torch.randn(8, 16).cuda())
-        compiled = self._compile(mod, inputs, target_compute_capabilities=[TURING])
+        compiled = self._compile(
+            mod, inputs, target_compute_capabilities=_turing_and_current_targets()
+        )
         self.assertEqual(_trt_submodule_count(compiled), 0)
         self._assert_matches_eager(mod, compiled, inputs)
 
@@ -207,14 +215,18 @@ class TestTuringCapabilityGuards(TestCase):
             torch.randn(4, 5).cuda(),
             torch.randn(5, 6).cuda(),
         )
-        compiled = self._compile(mod, inputs, target_compute_capabilities=[TURING])
+        compiled = self._compile(
+            mod, inputs, target_compute_capabilities=_turing_and_current_targets()
+        )
         self.assertEqual(_trt_submodule_count(compiled), 0)
         self._assert_matches_eager(mod, compiled, inputs)
 
     def test_declared_turing_target_falls_back_conv3d(self):
         mod = Conv3d()
         inputs = (torch.randn(1, 4, 8, 8, 8).cuda(),)
-        compiled = self._compile(mod, inputs, target_compute_capabilities=[TURING])
+        compiled = self._compile(
+            mod, inputs, target_compute_capabilities=_turing_and_current_targets()
+        )
         self.assertEqual(_trt_submodule_count(compiled), 0)
         self._assert_matches_eager(mod, compiled, inputs)
 
@@ -224,14 +236,18 @@ class TestTuringCapabilityGuards(TestCase):
             torch.randn(4, 8, dtype=torch.half).cuda(),
             torch.randn(8, 16, dtype=torch.half).cuda(),
         )
-        compiled = self._compile(mod, inputs, target_compute_capabilities=[TURING])
+        compiled = self._compile(
+            mod, inputs, target_compute_capabilities=_turing_and_current_targets()
+        )
         self.assertGreater(_trt_submodule_count(compiled), 0)
         self._assert_matches_eager(mod, compiled, inputs)
 
     def test_declared_turing_target_keeps_conv2d_on_trt(self):
         mod = Conv2d()
         inputs = (torch.randn(1, 4, 16, 16).cuda(),)
-        compiled = self._compile(mod, inputs, target_compute_capabilities=[TURING])
+        compiled = self._compile(
+            mod, inputs, target_compute_capabilities=_turing_and_current_targets()
+        )
         self.assertGreater(_trt_submodule_count(compiled), 0)
 
     def test_declared_turing_target_falls_back_padded_conv3d(self):
@@ -239,7 +255,9 @@ class TestTuringCapabilityGuards(TestCase):
         # node the conv guard keys on no longer exists.
         mod = PaddedConv3d()
         inputs = (torch.randn(1, 4, 8, 8, 8).cuda(),)
-        compiled = self._compile(mod, inputs, target_compute_capabilities=[TURING])
+        compiled = self._compile(
+            mod, inputs, target_compute_capabilities=_turing_and_current_targets()
+        )
         self.assertEqual(_trt_submodule_count(compiled), 0)
         self._assert_matches_eager(mod, compiled, inputs)
 
@@ -247,7 +265,9 @@ class TestTuringCapabilityGuards(TestCase):
         # Only rank 3 is rejected; the fused op must keep serving 2D.
         mod = PaddedConv2d()
         inputs = (torch.randn(1, 4, 16, 16).cuda(),)
-        compiled = self._compile(mod, inputs, target_compute_capabilities=[TURING])
+        compiled = self._compile(
+            mod, inputs, target_compute_capabilities=_turing_and_current_targets()
+        )
         self.assertGreater(_trt_submodule_count(compiled), 0)
         self._assert_matches_eager(mod, compiled, inputs)
 
@@ -255,13 +275,17 @@ class TestTuringCapabilityGuards(TestCase):
         # Transposed 3D convolution is a distinct layer and does work on Turing.
         mod = ConvTranspose3d()
         inputs = (torch.randn(1, 4, 8, 8, 8).cuda(),)
-        compiled = self._compile(mod, inputs, target_compute_capabilities=[TURING])
+        compiled = self._compile(
+            mod, inputs, target_compute_capabilities=_turing_and_current_targets()
+        )
         self.assertGreater(_trt_submodule_count(compiled), 0)
 
     def test_declared_turing_target_falls_back_fp32_linear(self):
         mod = Linear()
         inputs = (torch.randn(8, 16).cuda(),)
-        compiled = self._compile(mod, inputs, target_compute_capabilities=[TURING])
+        compiled = self._compile(
+            mod, inputs, target_compute_capabilities=_turing_and_current_targets()
+        )
         self.assertEqual(_trt_submodule_count(compiled), 0)
         self._assert_matches_eager(mod, compiled, inputs)
 
@@ -271,7 +295,7 @@ class TestTuringCapabilityGuards(TestCase):
         compiled = self._compile(
             mod,
             inputs,
-            target_compute_capabilities=[TURING],
+            target_compute_capabilities=_turing_and_current_targets(),
             decompose_attention=False,
         )
         self.assertEqual(_trt_submodule_count(compiled), 0)
@@ -283,7 +307,7 @@ class TestTuringCapabilityGuards(TestCase):
         compiled = self._compile(
             mod,
             inputs,
-            target_compute_capabilities=[TURING],
+            target_compute_capabilities=_turing_and_current_targets(),
             decompose_attention=False,
         )
         self.assertEqual(_trt_submodule_count(compiled), 0)
@@ -293,7 +317,9 @@ class TestTuringCapabilityGuards(TestCase):
         # The GEMM guards key on FP32 only; FP16 GEMMs run fine on Turing.
         mod = Linear(dtype=torch.half)
         inputs = (torch.randn(8, 16, dtype=torch.half).cuda(),)
-        compiled = self._compile(mod, inputs, target_compute_capabilities=[TURING])
+        compiled = self._compile(
+            mod, inputs, target_compute_capabilities=_turing_and_current_targets()
+        )
         self.assertGreater(_trt_submodule_count(compiled), 0)
         self._assert_matches_eager(mod, compiled, inputs)
 
@@ -301,7 +327,9 @@ class TestTuringCapabilityGuards(TestCase):
         # compute_mode=1 is "always use the matrix multiply", whatever the row count.
         mod = Cdist(compute_mode=1)
         inputs = _cdist_inputs(6, 8)
-        compiled = self._compile(mod, inputs, target_compute_capabilities=[TURING])
+        compiled = self._compile(
+            mod, inputs, target_compute_capabilities=_turing_and_current_targets()
+        )
         self.assertEqual(_trt_submodule_count(compiled), 0)
         self._assert_matches_eager(mod, compiled, inputs)
 
@@ -310,7 +338,9 @@ class TestTuringCapabilityGuards(TestCase):
         # more than 25 rows". The validator has to normalise None to 0 as the converter does.
         mod = Cdist()
         inputs = _cdist_inputs(35, 45)
-        compiled = self._compile(mod, inputs, target_compute_capabilities=[TURING])
+        compiled = self._compile(
+            mod, inputs, target_compute_capabilities=_turing_and_current_targets()
+        )
         self.assertEqual(_trt_submodule_count(compiled), 0)
         self._assert_matches_eager(mod, compiled, inputs)
 
@@ -320,7 +350,9 @@ class TestTuringCapabilityGuards(TestCase):
         # enabled_precisions setting, even though a bare FP16 GEMM runs there fine.
         mod = Cdist(compute_mode=1)
         inputs = _cdist_inputs(6, 8, dtype=torch.half)
-        compiled = self._compile(mod, inputs, target_compute_capabilities=[TURING])
+        compiled = self._compile(
+            mod, inputs, target_compute_capabilities=_turing_and_current_targets()
+        )
         self.assertEqual(_trt_submodule_count(compiled), 0)
         self._assert_matches_eager(mod, compiled, inputs)
 
@@ -328,7 +360,9 @@ class TestTuringCapabilityGuards(TestCase):
         # compute_mode=2 is "never use the matrix multiply", so there is no GEMM to reject.
         mod = Cdist(compute_mode=2)
         inputs = _cdist_inputs(35, 45)
-        compiled = self._compile(mod, inputs, target_compute_capabilities=[TURING])
+        compiled = self._compile(
+            mod, inputs, target_compute_capabilities=_turing_and_current_targets()
+        )
         self.assertGreater(_trt_submodule_count(compiled), 0)
         self._assert_matches_eager(mod, compiled, inputs)
 
@@ -338,7 +372,9 @@ class TestTuringCapabilityGuards(TestCase):
         # implementation, so for FP16 the fallback raises where TensorRT-RTX succeeds.
         mod = Cdist(compute_mode=0)
         inputs = _cdist_inputs(6, 8)
-        compiled = self._compile(mod, inputs, target_compute_capabilities=[TURING])
+        compiled = self._compile(
+            mod, inputs, target_compute_capabilities=_turing_and_current_targets()
+        )
         self.assertGreater(_trt_submodule_count(compiled), 0)
         self._assert_matches_eager(mod, compiled, inputs)
 
@@ -346,7 +382,9 @@ class TestTuringCapabilityGuards(TestCase):
         # Only p == 2 has a matrix-multiply path at all.
         mod = Cdist(p=1.0, compute_mode=0)
         inputs = _cdist_inputs(35, 45)
-        compiled = self._compile(mod, inputs, target_compute_capabilities=[TURING])
+        compiled = self._compile(
+            mod, inputs, target_compute_capabilities=_turing_and_current_targets()
+        )
         self.assertGreater(_trt_submodule_count(compiled), 0)
         self._assert_matches_eager(mod, compiled, inputs)
 
@@ -393,7 +431,7 @@ class TestTuringCapabilityGuards(TestCase):
         self.assertTrue(all(count == 1 for count in counts), counts)
 
     def test_declared_target_sets_a_capability_per_declared_target(self):
-        targets = [TURING]
+        targets = _turing_and_current_targets()
         counts = self._compute_capability_counts(
             Conv2d(),
             (torch.randn(1, 4, 8, 8).cuda(),),
