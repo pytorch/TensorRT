@@ -36,6 +36,7 @@ def test_save_as_executorch_uses_public_lowering_and_persists_data(
     monkeypatch, tmp_path
 ):
     import torch_tensorrt.executorch as executorch_api
+    from executorch.exir import ExecutorchBackendConfig
 
     program = SimpleNamespace(
         _tensor_data={"forward": b"weights"},
@@ -50,7 +51,7 @@ def test_save_as_executorch_uses_public_lowering_and_persists_data(
     source = object()
     partitioners = [object()]
     compile_specs = [object()]
-    backend_config = object()
+    backend_config = ExecutorchBackendConfig(run_reinplace_pass=True)
     _save_as_executorch(
         source,
         str(pte),
@@ -76,9 +77,12 @@ def test_save_as_executorch_uses_public_lowering_and_persists_data(
         zero_copy_kv=False,
         external_engine_data=None,
     )
-    # With zero_copy_kv off the caller's backend_config reaches to_executorch()
-    # exactly as given: save() wraps it only to install the un-staging pass.
-    edge.to_executorch.assert_called_once_with(config=backend_config)
+    # With zero_copy_kv off the caller's backend_config reaches to_executorch() with
+    # only its memory planning moved to TensorRT's 256-byte boundary.
+    edge.to_executorch.assert_called_once()
+    config = edge.to_executorch.call_args.kwargs["config"]
+    assert config.run_reinplace_pass is True
+    assert config.memory_planning_pass.alignment == 256
     program.write_to_file.assert_called_once()
     program.write_tensor_data_to_file.assert_called_once_with(str(tmp_path))
 

@@ -110,6 +110,18 @@ def normalize_use_cuda_graphs(use_cuda_graphs: bool | None) -> bytes | None:
     return b"1" if use_cuda_graphs else b"0"
 
 
+# Characters every file system accepts in a file name, with no path separator or drive colon. A
+# leading dot or dash would make a hidden file or a name that reads as a command line option.
+_EXTERNAL_ENGINE_DATA_NAME = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]*")
+# ExecuTorch writes <name>.ptd, and most file systems limit a file name to 255 bytes.
+_MAX_EXTERNAL_ENGINE_DATA_LENGTH = 255 - len(".ptd")
+# Windows opens these as devices, with any extension.
+_WINDOWS_DEVICE_NAMES = frozenset(
+    ["CON", "PRN", "AUX", "NUL"]
+    + [f"{port}{i}" for port in ("COM", "LPT") for i in range(10)]
+)
+
+
 def normalize_external_engine_data(external_engine_data: str | None) -> bytes | None:
     """Validate the .ptd file name, given without its extension; None embeds every engine."""
     if external_engine_data is None:
@@ -119,18 +131,28 @@ def normalize_external_engine_data(external_engine_data: str | None) -> bytes | 
             "external_engine_data must be a str or None, got "
             f"{type(external_engine_data).__name__}."
         )
-    # ExecuTorch writes <name>.ptd beside the .pte, so the name may not leave that directory; on
-    # Windows "D:engines" is relative to drive D, hence ":". It appends .ptd only when missing, so
-    # "x.ptd" would share x.ptd with another backend's "x" data and the second write would replace
-    # the first.
-    if (
-        external_engine_data in ("", ".", "..")
-        or any(c in external_engine_data for c in "/\\:\0")
-        or external_engine_data.endswith(".ptd")
-    ):
+    if not _EXTERNAL_ENGINE_DATA_NAME.fullmatch(external_engine_data):
         raise ValueError(
-            "external_engine_data must be a non-empty file name without a directory, a drive or the "
-            f".ptd extension, got {external_engine_data!r}."
+            "external_engine_data must use only ASCII letters, digits, '.', '-' and '_', and "
+            f"start with a letter, a digit or '_', got {external_engine_data!r}."
+        )
+    if len(external_engine_data) > _MAX_EXTERNAL_ENGINE_DATA_LENGTH:
+        raise ValueError(
+            f"external_engine_data must be at most {_MAX_EXTERNAL_ENGINE_DATA_LENGTH} "
+            "characters, so the .ptd file name fits the 255 byte limit, got "
+            f"{len(external_engine_data)}."
+        )
+    # ExecuTorch adds .ptd only when it is missing, so "x.ptd" would share x.ptd with another
+    # backend's "x" data and the second write would replace the first.
+    if external_engine_data.endswith(".ptd"):
+        raise ValueError(
+            "external_engine_data must not end with .ptd, which ExecuTorch adds, got "
+            f"{external_engine_data!r}."
+        )
+    if external_engine_data.split(".")[0].upper() in _WINDOWS_DEVICE_NAMES:
+        raise ValueError(
+            "external_engine_data must not be a Windows device name such as NUL or CON, got "
+            f"{external_engine_data!r}."
         )
     return external_engine_data.encode()
 
