@@ -3,9 +3,11 @@
 
 import logging
 import operator
-from typing import Any, Callable, Optional, Sequence, Union
+from typing import Any, Callable, List, Optional, Sequence, Union
 
 import torch
+import torch.utils._pytree as pytree
+from torch.fx.experimental.symbolic_shapes import statically_known_true
 from torch_tensorrt._utils import is_tegra_platform
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes._FakeTensorUpdater import FakeTensorUpdater
@@ -195,10 +197,53 @@ def post_lowering(
     if fake_mode is not None:
         fake_tensor_updater.incremental_update(fake_mode)
 
-    for sub in iter_cond_subgraphs(gm):
-        post_lowering(sub, settings)
+    # A branch shared by several cond nodes is lowered once.
+    for branch in dict.fromkeys(iter_cond_subgraphs(gm)):
+        lowered = post_lowering(branch, settings)
+        # A pass can return a new module instead of editing the branch in place.
+        # The cond node was traced against the old one, so take the new module only
+        # if its inputs and outputs keep their dtypes and memory layout.
+        if lowered is branch or not _same_io(lowered, branch):
+            continue
+        for name, module in list(gm.named_modules(remove_duplicate=False)):
+            if module is branch:
+                gm.set_submodule(name, lowered)
 
     return gm
+
+
+def _io_values(gm: torch.fx.GraphModule) -> List[Any]:
+    """The meta value of each graph input and output, in order."""
+
+    def value(node: Any) -> Any:
+        return node.meta.get("val") if isinstance(node, torch.fx.Node) else None
+
+    placeholders = [value(n) for n in gm.graph.nodes if n.op == "placeholder"]
+    outputs = [value(n) for n in pytree.tree_leaves(gm.graph.output_node().args)]
+    return placeholders + outputs
+
+
+def _same_io(a: torch.fx.GraphModule, b: torch.fx.GraphModule) -> bool:
+    """Whether two modules take and return tensors of the same dtype and layout."""
+
+    def same(x: Any, y: Any) -> bool:
+        if not isinstance(x, torch.Tensor) or not isinstance(y, torch.Tensor):
+            return not isinstance(x, torch.Tensor) and not isinstance(y, torch.Tensor)
+        # A symbolic value that cannot be proven equal counts as different.
+        return (
+            x.dtype == y.dtype
+            and x.dim() == y.dim()
+            and statically_known_true(
+                x.untyped_storage().nbytes() == y.untyped_storage().nbytes()
+            )
+            and statically_known_true(x.storage_offset() == y.storage_offset())
+            and all(
+                statically_known_true(p == q) for p, q in zip(x.stride(), y.stride())
+            )
+        )
+
+    a_values, b_values = _io_values(a), _io_values(b)
+    return len(a_values) == len(b_values) and all(map(same, a_values, b_values))
 
 
 def pre_export_lowering(
