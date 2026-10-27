@@ -28,7 +28,7 @@ from typing import Any, Optional, Tuple
 import numpy as np
 import tensorrt as trt
 from tensorrt import ITensor as TRTTensor
-from torch.fx.node import Target
+from torch.fx.node import Node, Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import (
@@ -376,9 +376,14 @@ def slice_scatter(
 
     # KV fast path, unless the write carries _trt_no_kv_alias: the classifier already
     # filed it copy-back and re-attached its value as a graph output, and a buffer
-    # that is both copy-back and engine-aliased raises on every call.
-    kv_forbidden = ctx.current_node is not None and ctx.current_node.meta.get(
-        "_trt_no_kv_alias"
+    # that is both copy-back and engine-aliased raises on every call. The layer also
+    # updates its cache in place, so the write must be on a graph input, as for
+    # index_copy: a converter like clone hands back its input as is, and writing
+    # through that would change the caller's tensor.
+    node = ctx.current_node
+    kv_forbidden = node is not None and (
+        node.meta.get("_trt_no_kv_alias")
+        or not (isinstance(node.args[0], Node) and node.args[0].op == "placeholder")
     )
     kv_out = (
         None

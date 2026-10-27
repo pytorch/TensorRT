@@ -79,6 +79,27 @@ class TestSliceScatterFallback(TestCase):
         self.assertTrue(torch.allclose(actual, expected))
         self.assertTrue(torch.equal(cache_run, cache))
 
+    def test_write_on_a_clone_leaves_the_input_alone(self):
+        """The clone converter hands back its input, which the write must not then
+        update in place as a KV cache."""
+
+        class M(torch.nn.Module):
+            def forward(self, cache, update):
+                out = cache.clone()
+                out[:, :, 3:4] = update
+                return out
+
+        cache = torch.zeros(2, 4, 16, 8, device="cuda")
+        update = torch.ones(2, 4, 1, 8, device="cuda")
+        compiled = _compile_cpp(M().cuda(), (cache.clone(), update))
+
+        cache_run = cache.clone()
+        actual = compiled(cache_run, update)
+        actual = actual[0] if isinstance(actual, tuple) else actual
+
+        self.assertTrue(torch.allclose(actual, M()(cache.clone(), update)))
+        self.assertTrue(torch.equal(cache_run, cache))
+
 
 class TestUserInputKVCache(TestCase):
     """User passes the cache tensor on every call; engine mutates in place."""
