@@ -191,7 +191,7 @@ overwrites the checked-in file, so do not commit the result. Substitute your own
 export CUDA_HOME=/usr/local/cuda-13.2
 export CU_VERSION=cu132
 export CHANNEL=nightly
-export BUILD_VERSION=0.2.0.dev0
+export BUILD_VERSION=0.2.1.dev0
 export TORCH_INSTALL_PATH="$(python -c 'import torch; print(torch.__path__[0])')"
 export TENSORRT_CUDA_VERSION_UPPER_BOUND=13.4
 export TENSORRT_RTX_CUDA_VERSION_UPPER_BOUND=13.4
@@ -211,7 +211,7 @@ python -m pip install pyyaml patchelf tensorrt-cu13 \
   --extra-index-url "https://download.pytorch.org/whl/test/${CU_VERSION}" \
   --extra-index-url https://pypi.nvidia.com/ \
   "executorch==1.6.0.dev20261009"
-export TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION="0.2.0.dev0+${CU_VERSION}"
+export TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION="0.2.1.dev0+${CU_VERSION}"
 python -m pip wheel --no-build-isolation --no-deps \
   --wheel-dir dist py/torch-tensorrt-executorch-runtime
 ```
@@ -226,8 +226,8 @@ python -m pip wheel --no-build-isolation --no-deps \
 - `TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION` sets this wheel's version. Without it, the version
   is the base version in `version.txt` plus `.dev0` and the Git revision. Nightly builds keep this
   wheel's own base version, with the main wheel's date and CUDA suffix, such as
-  `0.3.0.dev20261023+cu132`. A release on the PyTorch indexes uses the base version and the CUDA
-  suffix, such as `0.3.0+cu132`; the PyPI release has none, such as `0.3.0`.
+  `0.2.1.dev20261023+cu132`. A release on the PyTorch indexes uses the base version and the CUDA
+  suffix, such as `0.2.1+cu132`; the PyPI release has none, such as `0.2.1`.
 - A release build of the main wheel (`RELEASE=1`) reads the same variable and records the version
   for its error messages. When `TORCH_TENSORRT_EXECUTORCH_RUNTIME_CHANNEL` names a place that
   carries the pinned ExecuTorch build (`nightly` for a development build, `test` or `pypi` for a
