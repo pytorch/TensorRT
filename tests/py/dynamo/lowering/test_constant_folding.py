@@ -3,11 +3,13 @@
 
 import copy
 import unittest
+from unittest import mock
 
 import torch
 import torch_tensorrt
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.lowering.passes import complex_decomposition_adapter
 from torch_tensorrt.dynamo.lowering.passes.constant_folding import constant_fold
 
 
@@ -153,6 +155,52 @@ class TestConstantFolding(TestCase):
                     actual = compiled_model(example_input)
 
                 torch.testing.assert_close(actual, expected)
+
+    @unittest.skipIf(
+        not torch.cuda.is_available()
+        or not complex_decomposition_adapter.has_complex_decomposition(),
+        "needs CUDA and the upstream complex decomposition",
+    )
+    def test_offloaded_constants_reach_the_complex_decomposition(self):
+        # offload_module_to_cpu leaves folded constants on the CPU; the complex
+        # decomposition retraces the graph and must not fall back over them.
+        class Rotary(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                angles = torch.outer(torch.arange(16.0), torch.ones(4))
+                self.register_buffer(
+                    "freqs", torch.polar(torch.ones_like(angles), angles)
+                )
+                # Read only by constant folding, so the retraced module drops it.
+                self.scale = torch.nn.Parameter(torch.ones(4))
+
+            def forward(self, x):
+                freqs = self.freqs[: x.shape[0]] * self.scale.mean()
+                z = torch.view_as_complex(x.reshape(x.shape[0], 4, 2))
+                return torch.view_as_real(z * freqs).flatten(1)
+
+        model = Rotary().eval().cuda()
+        example_input = torch.randn(8, 8, device="cuda")
+        with (
+            torch.no_grad(),
+            mock.patch.object(
+                complex_decomposition_adapter,
+                "complex_graph_detection",
+                side_effect=AssertionError("fell back to the legacy complex pass"),
+            ),
+        ):
+            expected = model(example_input)
+            exported_program = torch.export.export(model, (example_input,))
+            compiled_model = torch_tensorrt.dynamo.compile(
+                exported_program,
+                inputs=[example_input],
+                min_block_size=1,
+                offload_module_to_cpu=True,
+            )
+            actual = compiled_model(example_input)
+
+        torch.testing.assert_close(actual, expected)
+        self.assertEqual(model.scale.device.type, "cpu")
 
 
 if __name__ == "__main__":

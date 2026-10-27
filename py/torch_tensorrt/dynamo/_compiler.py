@@ -428,12 +428,16 @@ def cross_compile_for_windows(
 
     # Apply lowering on the graph module. Note: constant_fold runs inside post_lowering and requires
     # module parameters to still be on GPU, so we must not deallocate before this call.
+    unlowered_gm = gm
     gm = post_lowering(gm, settings)
     logger.debug(f"CPU memory usage after post_lowering: {get_cpu_memory_usage()} MB")
     logger.debug("Lowered Input graph: " + str(gm.graph))
 
     # Move the weights in the state_dict to CPU
     if offload_module_to_cpu:
+        # Complex lowering can return a new module without the weights that only
+        # constant folding read, so offload the module lowering started from too.
+        deallocate_module(unlowered_gm)
         deallocate_module(gm)
         logger.info(
             "The PyTorch model was moved to the CPU to allocate all GPU memory to TensorRT. To retain the model on the GPU, set offload_module_to_cpu=False"
@@ -909,6 +913,7 @@ def compile(
 
     # Apply lowering on the graph module. Note: constant_fold runs inside post_lowering and requires
     # module parameters to still be on GPU, so we must not deallocate before this call.
+    unlowered_gm = gm
     gm = post_lowering(gm, settings)
     logger.debug(f"CPU memory usage after post_lowering: {get_cpu_memory_usage()} MB")
     logger.debug("Lowered Input graph: " + str(gm.graph))
@@ -921,6 +926,9 @@ def compile(
 
     # Move the weights in the state_dict to CPU
     if offload_module_to_cpu:
+        # Complex lowering can return a new module without the weights that only
+        # constant folding read, so offload the module lowering started from too.
+        deallocate_module(unlowered_gm)
         deallocate_module(gm)
         logger.info(
             "The PyTorch model was moved to the CPU to allocate all GPU memory to TensorRT. To retain the model on the GPU, set offload_module_to_cpu=False"
