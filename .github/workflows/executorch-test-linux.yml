@@ -63,12 +63,14 @@ jobs:
         chmod +x "${RUNNER_TEMP}/bin/bazel"
         export PATH="${RUNNER_TEMP}/bin:${PATH}"
 
-        # ExecuTorch's CUDA wheels live only on the PyTorch nightly index, so the channel is
-        # needed. No --pre: a specifier naming a prerelease admits prereleases by itself, and
-        # --pre would apply to every other requirement in the same command too. The version
-        # comes from the requirement file so a bump changes no file in this directory.
+        # ExecuTorch's CUDA wheels live only on the PyTorch indexes: a development build on the
+        # nightly one, a release on the test one. No --pre: a specifier naming a prerelease admits
+        # prereleases by itself, and --pre would apply to every other requirement in the same
+        # command too. The version comes from the requirement file so a bump changes no file in
+        # this directory.
         python -m pip install pyyaml "wheel>=0.40" \
           --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" \
+          --extra-index-url "https://download.pytorch.org/whl/test/${CU_VERSION}" \
           -r packaging/executorch_pin.txt
 
         # The shared artifact carries the matching core and companion wheels.
@@ -108,18 +110,27 @@ jobs:
         # Resolve the user-facing range without reusing the build's installed pin.
         python -m venv "${RUNNER_TEMP}/range-check-venv"
         # pin-check: range-ok
-        "${RUNNER_TEMP}/range-check-venv/bin/python" -m pip install --no-deps --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" -r packaging/executorch_range.txt
+        "${RUNNER_TEMP}/range-check-venv/bin/python" -m pip install --no-deps --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" --extra-index-url "https://download.pytorch.org/whl/test/${CU_VERSION}" -r packaging/executorch_range.txt
 
         # pip does not fail when an extra cannot be satisfied; it quietly picks an older
-        # torch-tensorrt. So check here that the main wheel's executorch extra requires exactly the
-        # companion built beside it, and that pip resolves that extra for the version just built.
+        # torch-tensorrt. So check here that the executorch extra requires exactly the companion
+        # built beside it when this run's channel also carries the ExecuTorch build that companion
+        # pins (nightly for a development build, test for a release), that it requires none
+        # otherwise, and that pip resolves that extra for the version just built.
         python - <<'PY'
         import importlib.metadata as metadata
+        import os
         import sys
 
         from packaging.requirements import Requirement
 
         companion = metadata.version("torch-tensorrt-executorch-runtime")
+        (executorch,) = [
+            r
+            for r in map(Requirement, metadata.requires("torch-tensorrt-executorch-runtime") or [])
+            if r.name == "executorch"
+        ]
+        executorch_channel = "nightly" if ".dev" in str(executorch.specifier) else "test"
         pins = [
             r
             for r in map(Requirement, metadata.requires("torch-tensorrt") or [])
@@ -127,12 +138,14 @@ jobs:
             and r.marker is not None
             and r.marker.evaluate({"extra": "executorch"})
         ]
-        if [str(r.specifier) for r in pins] != [f"=={companion}"]:
-            sys.exit(f"the executorch extra requires {pins}, not the companion built beside it ({companion})")
+        expected = [f"=={companion}"] if os.environ["CHANNEL"] == executorch_channel else []
+        if [str(r.specifier) for r in pins] != expected:
+            sys.exit(f"the executorch extra requires {pins}, not {expected} (companion {companion}, channel {os.environ['CHANNEL']}, {executorch})")
         PY
         built="$(python -c 'import importlib.metadata as m; print(m.version("torch-tensorrt"))')"
         python -m pip install --pre --dry-run --find-links /opt/torch-tensorrt-builds \
           --extra-index-url "https://download.pytorch.org/whl/nightly/${CU_VERSION}" \
+          --extra-index-url "https://download.pytorch.org/whl/test/${CU_VERSION}" \
           --extra-index-url https://pypi.nvidia.com \
           "torch-tensorrt[executorch]==${built}"
 

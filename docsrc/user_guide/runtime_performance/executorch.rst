@@ -29,32 +29,18 @@ program, so the whole model stays on the GPU.
 Installation
 -------------
 
-Install Torch-TensorRT with the ``executorch`` extra from the PyTorch channel for your CUDA
-version. Swap ``cu132`` for ``cu134`` on CUDA 13.4:
+One command installs everything: PyTorch, Torch-TensorRT, TensorRT, the CUDA build of
+ExecuTorch, and the TensorRT delegate. Use a fresh virtual environment.
+
+Releases
+^^^^^^^^^
 
 .. code-block:: bash
 
-    pip install "torch-tensorrt[executorch]" \
-      --index-url https://download.pytorch.org/whl/cu132 \
-      --extra-index-url https://pypi.org/simple
+    pip install "torch_tensorrt[executorch]"
 
-The PyTorch channel is needed because the CUDA build of ExecuTorch is published only there.
-
-What the command installs
-^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-* ExecuTorch, the CUDA build, from the ``executorch`` extra. That is all you need to export.
-* ``torch-tensorrt-executorch-runtime``, one shared library holding the TensorRT delegate,
-  which you need to run a ``.pte``. The extra installs the one built together with your
-  Torch-TensorRT wheel, for the same CUDA version. It requires the exact ExecuTorch build
-  it was compiled against, so you get that one rather than the newest.
-
-This works for the standard Linux (x86-64 and aarch64) and Windows x86-64 wheels. On aarch64
-it needs glibc 2.35 or newer, the same as TensorRT itself. The TensorRT-RTX and Python-only
-builds have no delegate.
-
-Use a fresh virtual environment. To export a coalesced program you also need a CUDA toolkit,
-because ExecuTorch's CUDA backend compiles the leftover operators with ``nvcc``.
+This installs the CUDA 13.2 builds. On Windows, PyPI has only the CPU builds of PyTorch and
+ExecuTorch, so add ``--extra-index-url https://download.pytorch.org/whl/cu132``.
 
 Nightly builds
 ^^^^^^^^^^^^^^^
@@ -63,15 +49,28 @@ To pick up a change before it ships, or to report a problem against ``main``:
 
 .. code-block:: bash
 
-    pip install --pre --upgrade "torch-tensorrt[executorch]" \
-      --index-url https://download.pytorch.org/whl/nightly/cu132 \
-      --extra-index-url https://pypi.org/simple
+    pip install --pre "torch_tensorrt[executorch]" --index-url https://download.pytorch.org/whl/nightly/cu132
 
-* ``--pre`` is required. Without it pip takes the stable release instead.
-* ``--upgrade`` is required if a nightly is already installed, or pip keeps the old one and
-  tells you nothing.
-* PyPI stays in the list because TensorRT is not published on the nightly channel.
-* Keep PyTorch, ExecuTorch and Torch-TensorRT on the same channel.
+Swap ``cu132`` for ``cu134`` on CUDA 13.4.
+
+What these commands install
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+* PyTorch and TensorRT, which Torch-TensorRT depends on.
+* ExecuTorch, the CUDA build. That is all you need to export.
+* ``torch-tensorrt-executorch-runtime``, one shared library holding the TensorRT delegate,
+  which you need to run a ``.pte``. It is the one built together with your Torch-TensorRT wheel,
+  for the same CUDA version. It requires the exact ExecuTorch build it was compiled against, so
+  you get that one rather than the newest.
+
+A wheel you build yourself does not bring the delegate. Build it as well, as the runtime wheel
+README shows.
+
+The delegate is built for the standard Linux wheels (x86-64 and aarch64), and for Windows x86-64.
+On aarch64 it needs glibc 2.35 or newer, the same as TensorRT itself.
+The TensorRT-RTX and Python-only builds have no delegate. To export a coalesced program you also
+need a CUDA toolkit, because ExecuTorch's CUDA backend compiles the leftover operators with
+``nvcc``.
 
 ----
 
