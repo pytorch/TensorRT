@@ -5,11 +5,13 @@
 
 from ._context import execute_in_torch, fused_kernel, fused_op
 from ._errors import RegionCaptureError, RegionError
+from ._generation import KernelGenerator
 
 __all__ = [
     "execute_in_torch",
     "fused_op",
     "fused_kernel",
+    "KernelGenerator",
     "RegionError",
     "RegionCaptureError",
 ]

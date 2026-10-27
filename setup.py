@@ -641,6 +641,7 @@ dynamo_packages = [
     "torch_tensorrt.dynamo.lowering.constant_fold_exclusions",
     "torch_tensorrt.dynamo.partitioning",
     "torch_tensorrt.dynamo.region_compilation",
+    "torch_tensorrt.dynamo.region_compilation._generation",
     "torch_tensorrt.dynamo.runtime",
     "torch_tensorrt.dynamo.runtime.meta_ops",
     "torch_tensorrt.dynamo.tools",

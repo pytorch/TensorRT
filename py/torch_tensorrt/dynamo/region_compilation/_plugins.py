@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import copy
+import inspect
 import logging
 import uuid
 from dataclasses import dataclass, replace
@@ -289,6 +290,17 @@ def register_region_plugin(
                 ),
                 **common,
             )
+        elif registration.func is kernels.cutile_op:
+            # cuTile checks the callback's named inputs against the explicit schema.
+            meta_fn.__signature__ = inspect.Signature(  # type: ignore[attr-defined]
+                [
+                    inspect.Parameter(
+                        f"arg{i}", inspect.Parameter.POSITIONAL_OR_KEYWORD
+                    )
+                    for i in range(len(input_specs))
+                ]
+            )
+            registration(op_name, **common)
         else:
             signature = _triton_signature(
                 registration, input_specs, output_specs, region_id

@@ -503,14 +503,23 @@ def materialize_regions(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
         route = record.route
         plugin_op = None
         if route == "plugin":
+            from torch_tensorrt.region import KernelGenerator
+
             from ._plugins import register_region_plugin
 
             if session is None or record.plugin_key not in session.plugins:
                 raise RegionError(
                     "fused_kernel requires its owning compilation session"
                 )
+            registration = session.plugins[record.plugin_key]
+            if isinstance(registration, KernelGenerator):
+                from ._generation._factory import generate_registration
+
+                registration = generate_registration(
+                    child, registration, region_id=record.id
+                )
             plugin_op = register_region_plugin(
-                child, session.plugins[record.plugin_key], region_id=record.id
+                child, registration, region_id=record.id
             )
         else:
             if record.operator_key >= 0:
