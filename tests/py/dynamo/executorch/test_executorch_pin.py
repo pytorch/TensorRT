@@ -974,6 +974,25 @@ def test_only_user_docs_may_print_the_release_install(
 
 
 @pytest.mark.unit
+def test_the_release_install_is_one_command() -> None:
+    """The guide installs this release from PyPI with the extra alone.
+
+    The release's PyPI wheel is built for the CUDA version of PyTorch's PyPI wheel, and once the
+    pin is an ExecuTorch release its extra brings ExecuTorch's CUDA build and the delegate built
+    with it, so naming either would only let them drift apart.
+    """
+    guide = REPO_ROOT / "docsrc/user_guide/runtime_performance/executorch.rst"
+    commands = [
+        shlex.split(block.replace("\\\n", ""))
+        for block in re.findall(
+            r"^ *pip install (?:.*\\\n)*.*$", guide.read_text(encoding="utf-8"), re.M
+        )
+    ]
+    releases = [argv for argv in commands if "--pre" not in argv]
+    assert releases == [["pip", "install", "torch_tensorrt[executorch]"]], commands
+
+
+@pytest.mark.unit
 @pytest.mark.parametrize("variable", [False, True])
 def test_install_channel_check_detects_removed_suffix_fix(
     tmp_path, monkeypatch, variable
