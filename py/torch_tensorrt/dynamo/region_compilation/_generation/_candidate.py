@@ -14,7 +14,10 @@ import math
 import sys
 from functools import partial
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from torch_tensorrt.kernels import KernelSpec
 
 _LOGGER = logging.getLogger(__name__)
 _FIELDS = {"source", "kernel_name", "constants", "grid", "num_warps", "num_stages"}
@@ -195,7 +198,7 @@ def _validate_source(
                 )
 
 
-def validate_candidate(
+def _validate_dsl_candidate(
     candidate: dict[str, Any], backend: str, num_inputs: int, num_outputs: int
 ) -> dict[str, Any]:
     """Enforce the source and ABI contract; this is not a hostile-code sandbox."""
@@ -203,6 +206,10 @@ def validate_candidate(
         raise ValueError("Generated kernel backend must be 'triton' or 'cutile'")
     if any(type(count) is not int or count < 1 for count in (num_inputs, num_outputs)):
         raise ValueError("Generated kernels need at least one tensor input and output")
+    if backend == "cutile" and isinstance(candidate, dict):
+        candidate = dict(candidate)
+        candidate.setdefault("num_warps", None)
+        candidate.setdefault("num_stages", None)
     if not isinstance(candidate, dict) or set(candidate) != _FIELDS:
         raise ValueError(f"Generated candidate must contain exactly {sorted(_FIELDS)}")
     source = candidate["source"]
@@ -268,7 +275,7 @@ def validate_candidate(
     )
 
 
-def make_registration(
+def _make_dsl_registration(
     candidate: dict[str, Any],
     backend: str,
     input_specs: list[Any],
@@ -281,7 +288,7 @@ def make_registration(
     from torch_tensorrt import kernels
     from torch_tensorrt.kernels import _triton
 
-    candidate = validate_candidate(
+    candidate = _validate_dsl_candidate(
         candidate, backend, len(input_specs), len(output_specs)
     )
     names = [f"arg{i}" for i in range(len(input_specs))] + [
@@ -351,4 +358,28 @@ def make_registration(
         grid=grid,
         num_warps=candidate["num_warps"],
         num_stages=candidate["num_stages"],
+    )
+
+
+def validate_candidate(
+    candidate: dict[str, Any], backend: str, num_inputs: int, num_outputs: int
+) -> dict[str, Any]:
+    """Validate against the selected backend, including importable extensions."""
+    from ._backends import get_backend
+
+    return get_backend(backend).validate_candidate(candidate, num_inputs, num_outputs)
+
+
+def make_registration(
+    candidate: dict[str, Any],
+    backend: str,
+    input_specs: list[Any],
+    output_specs: list[Any],
+    directory: Path,
+) -> KernelSpec | partial[None]:
+    """Reconstruct a backend registration from its serializable proposal."""
+    from ._backends import get_backend
+
+    return get_backend(backend).make_registration(
+        candidate, input_specs, output_specs, directory
     )

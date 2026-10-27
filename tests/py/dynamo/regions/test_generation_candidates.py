@@ -111,6 +111,14 @@ def test_cutile_requires_matching_constant_types_and_no_triton_options():
         validate_candidate(dict(candidate("cutile"), num_warps=4), "cutile", 1, 1)
 
 
+def test_cutile_schema_does_not_require_triton_compile_options():
+    proposal = candidate("cutile")
+    del proposal["num_warps"]
+    del proposal["num_stages"]
+    normalized = validate_candidate(proposal, "cutile", 1, 1)
+    assert normalized == candidate("cutile")
+
+
 def test_triton_libdevice_supports_explicit_rounding():
     source = TRITON_SOURCE.replace(
         "import triton.language as tl",
