@@ -7,10 +7,6 @@ needs the preprocessor on the policy wrapper.
 
 from __future__ import annotations
 
-import argparse
-import sys
-from pathlib import Path
-
 import torch
 import torch_tensorrt
 from exporters import EdgeConfig, EdgeExporter
@@ -52,20 +48,13 @@ def load_pi05(device: torch.device) -> PI05Policy:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--compile", action="store_true", help="Build TRT engines (default: dryrun)"
-    )
-    parser.add_argument("--engine-dir", default="/tmp/pi05_edge_exporter")
-    args = parser.parse_args()
-
     load_plugins_for_trt()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     dtype = torch.float16
 
     policy = load_pi05(device)
-    # Weights on GPU; spec still needs the policy object for the preprocessor.
+
     policy.model.to(device=device, dtype=dtype).eval()
     paligemma = policy.model.paligemma_with_expert.paligemma.model
     force_hf_attention(paligemma.vision_tower, "eager")
@@ -75,15 +64,12 @@ def main() -> None:
     exporter = EdgeExporter()
     config = EdgeConfig(
         model_type="pi05",  # optional; inferred from paligemma_with_expert
-        engine_dir=args.engine_dir,
+        engine_dir="/tmp/pi05",
         max_seq_len=968,
     )
 
-    # Spec loads libero + preprocessor because we pass the policy, not a tensor dict.
     sample_inputs = {"device": device, "dtype": dtype}
-
     program = exporter.export(policy, sample_inputs, config=config)
-
     print("engines:", exporter.engines)
 
     # Runtime kwargs are tensors only (pixel_values, lang_embeds, rope, KVs, …).
@@ -91,10 +77,7 @@ def main() -> None:
     print("runtime keys:", sorted(runtime_kwargs))
 
     with torch.no_grad():
-        if hasattr(program, "module"):
-            velocity = program.module()(**runtime_kwargs)
-        else:
-            velocity = program(**runtime_kwargs)
+        velocity = program.module()(**runtime_kwargs)
 
     out = velocity[0] if isinstance(velocity, (tuple, list)) else velocity
     print("velocity", tuple(out.shape), "mean", float(out.float().mean()))
