@@ -20,6 +20,7 @@ from torch_tensorrt.dynamo.region_compilation._generation import _factory
 from torch_tensorrt.region import (
     KernelGenerator,
     RegionError,
+    SearchPolicy,
     fused_kernel,
 )
 from torch_tensorrt.region._session import RegionCompilationSession
@@ -700,3 +701,84 @@ def test_search_worker_cannot_consume_final_validation_budget(factory, monkeypat
         "reserved"
     )
     assert factory.finalize.call_args.args[2] == pytest.approx(30)
+
+
+def test_author_stop_finalizes_the_measured_winner(factory):
+    candidate = _candidate("enough")
+    factory.author.side_effect = [candidate, {"action": "stop"}]
+    factory.evaluate.return_value = _passed(0.2)
+    assert _generate(factory, max_attempts=4) == candidate
+    assert factory.author.call_count == 2
+    factory.evaluate.assert_called_once()
+    factory.finalize.assert_called_once()
+    search = json.loads(next(factory.root.glob("*/run-*/search.json")).read_text())
+    assert search["stop_reason"] == "author_stop"
+
+
+def test_author_diagnostic_uses_current_winner_and_shared_evaluation_budget(factory):
+    candidate = _candidate("measured")
+    factory.author.side_effect = [candidate, {"action": "diagnose"}, {"action": "stop"}]
+    factory.evaluate.side_effect = [
+        _passed(0.2),
+        {**_passed(0.3), "diagnostics": {"candidate": {"compilation_ms": 123}}},
+    ]
+    assert (
+        _generate(
+            factory,
+            max_attempts=3,
+            diagnostics=True,
+            search=SearchPolicy(max_candidates=2),
+        )
+        == candidate
+    )
+    assert factory.evaluate.call_count == 2
+    diagnostic = factory.evaluate.call_args.args[0]
+    assert diagnostic["candidate"] == candidate
+    assert diagnostic["diagnostics"] is True
+    assert "compilation_ms" in factory.author.call_args.kwargs["prompt"]
+    assert "123" in factory.author.call_args.kwargs["prompt"]
+    factory.finalize.assert_called_once()
+
+
+def test_disabled_diagnostics_return_feedback_without_gpu_work(factory):
+    factory.author.side_effect = [{"action": "diagnose"}, _candidate("normal")]
+    factory.evaluate.return_value = _passed(0.2)
+    assert _generate(factory) == _candidate("normal")
+    assert "Diagnostics are not enabled" in factory.author.call_args.kwargs["prompt"]
+    factory.evaluate.assert_called_once()
+
+
+def test_stagnation_stops_after_complete_author_rounds(factory):
+    first, tied, ignored = [_candidate(name) for name in ("first", "tied", "ignored")]
+    factory.author.side_effect = [first, tied, ignored]
+    factory.evaluate.return_value = _passed(0.2)
+    assert (
+        _generate(factory, max_attempts=5, search=SearchPolicy(max_no_improvement=1))
+        == first
+    )
+    assert factory.author.call_count == 2
+    assert factory.evaluate.call_count == 2
+
+
+@pytest.mark.parametrize(
+    "stage,action",
+    [("compile", "repair_compile"), ("correctness", "repair_correctness")],
+)
+def test_measured_failure_selects_targeted_repair(factory, stage, action):
+    factory.author.side_effect = [_candidate("broken"), _candidate("fixed")]
+    factory.evaluate.side_effect = [
+        {"status": "error", "stage": stage, "error": "failed"},
+        _passed(0.2),
+    ]
+    assert _generate(factory, max_attempts=2) == _candidate("fixed")
+    assert f"SEARCH STEP: {action}" in factory.author.call_args.kwargs["prompt"]
+
+
+def test_author_cannot_exceed_batch_policy(factory):
+    factory.author.return_value = {
+        "action": "propose",
+        "candidates": [_candidate("one"), _candidate("two")],
+    }
+    with pytest.raises(RegionError, match="bounded batch"):
+        _generate(factory)
+    factory.evaluate.assert_not_called()

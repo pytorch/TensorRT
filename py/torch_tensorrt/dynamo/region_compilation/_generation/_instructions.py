@@ -81,6 +81,10 @@ def load_instructions(
         snapshots.append(_snapshot(str(file_path), data.decode("utf-8"), "file"))
     if instructions and instructions.strip():
         snapshots.append(_snapshot("user-instructions", instructions, "inline"))
+    return _bundle(backend_name, snapshots)
+
+
+def _bundle(backend_name: str, snapshots: list[dict[str, str]]) -> dict[str, Any]:
     bundle: dict[str, Any] = {
         "version": 1,
         "backend": backend_name,
@@ -91,6 +95,42 @@ def load_instructions(
         f"INSTRUCTION RESOURCE: {entry['name']}\n{entry['text']}" for entry in snapshots
     )
     return bundle
+
+
+def validate_instructions(bundle: dict[str, Any], backend_name: str) -> dict[str, Any]:
+    """Validate and copy a saved bundle for exact replay without reading its paths."""
+    if (
+        not isinstance(bundle, dict)
+        or set(bundle) != {"version", "backend", "resources", "sha256", "text"}
+        or type(bundle.get("version")) is not int
+        or bundle["version"] != 1
+        or bundle["backend"] != backend_name
+        or not isinstance(bundle["resources"], list)
+        or not bundle["resources"]
+    ):
+        raise ValueError("Invalid saved instruction bundle or backend mismatch")
+    snapshots = []
+    for resource in bundle["resources"]:
+        if (
+            not isinstance(resource, dict)
+            or set(resource) != {"name", "text", "origin", "sha256"}
+            or any(not isinstance(value, str) for value in resource.values())
+            or not resource["name"]
+            or resource["origin"] not in {"builtin", "package", "file", "inline"}
+        ):
+            raise ValueError("Invalid saved instruction resource")
+        snapshot = _snapshot(resource["name"], resource["text"], resource["origin"])
+        if snapshot["sha256"] != resource["sha256"]:
+            raise ValueError(
+                f"Instruction resource digest mismatch: {resource['name']}"
+            )
+        snapshots.append(snapshot)
+    restored = _bundle(backend_name, snapshots)
+    if restored["sha256"] != bundle["sha256"]:
+        raise ValueError("Saved instruction bundle digest mismatch")
+    if restored["text"] != bundle["text"]:
+        raise ValueError("Saved instruction text does not match its resources")
+    return restored
 
 
 class EvidenceCatalog:

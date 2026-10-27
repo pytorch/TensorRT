@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES.
 # SPDX-License-Identifier: BSD-3-Clause
 
+import copy
 import importlib
 import json
 import sys
@@ -54,6 +55,36 @@ def test_blank_inline_instructions_are_optional(instructions):
     assert _instructions.load_instructions(
         "triton", instructions=instructions
     ) == _instructions.load_instructions("triton", instructions=None)
+
+
+def test_saved_instructions_restore_exact_snapshot_after_source_disappears(tmp_path):
+    path = tmp_path / "guide.md"
+    path.write_text("Use coalesced loads.")
+    bundle = _instructions.load_instructions("triton", instruction_files=(path,))
+    path.unlink()
+    restored = _instructions.validate_instructions(bundle, "triton")
+    assert restored == bundle
+    restored["resources"][0]["text"] = "modified copy"
+    assert bundle["resources"][0]["text"] != "modified copy"
+
+
+@pytest.mark.parametrize(
+    "field", ["resource_text", "resource_digest", "digest", "text", "backend"]
+)
+def test_saved_instructions_reject_corrupt_snapshots(field):
+    bundle = copy.deepcopy(_instructions.load_instructions("triton"))
+    if field == "resource_text":
+        bundle["resources"][0]["text"] += "tampered"
+    elif field == "resource_digest":
+        bundle["resources"][0]["sha256"] = "wrong"
+    elif field == "digest":
+        bundle["sha256"] = "wrong"
+    elif field == "text":
+        bundle["text"] += "tampered"
+    else:
+        bundle["backend"] = "cutile"
+    with pytest.raises(ValueError, match="mismatch|does not match"):
+        _instructions.validate_instructions(bundle, "triton")
 
 
 @pytest.mark.parametrize("name", ["../outside.md", "/tmp/outside.md", r"..\outside.md"])

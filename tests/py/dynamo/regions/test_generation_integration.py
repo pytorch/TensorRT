@@ -195,3 +195,83 @@ def test_generated_kernel_evaluation_engine_and_cache(
     checks = list(tmp_path.glob("*/run-*/cache_check.json"))
     assert len(checks) == 1
     assert json.loads(checks[0].read_text())["status"] == "passed"
+
+
+def test_batched_tuning_selects_a_correct_kernel_inside_tensorrt(tmp_path, monkeypatch):
+    pytest.importorskip("triton")
+    generator = region.KernelGenerator(
+        cache_dir=tmp_path,
+        max_attempts=1,
+        timeout_s=240,
+        candidate_timeout_s=90,
+        num_tests=2,
+        benchmark_iters=3,
+        diagnostics=True,
+        search=region.SearchPolicy(
+            batch_size=2,
+            max_candidates=3,
+            finalists=2,
+            tuning={"num_warps": (4, 8)},
+        ),
+    )
+    candidates = []
+    for scale in (0.5, 0.75):
+        candidates.append(
+            dict(
+                source=SOURCES["triton"].replace("0.75", str(scale)),
+                kernel_name="generated",
+                grid=[7],
+                constants=[
+                    {"name": "N", "value": 771},
+                    {"name": "BLOCK", "value": 128},
+                ],
+                num_warps=32,
+                num_stages=None,
+            )
+        )
+    requests = []
+
+    def author(**request):
+        requests.append(request)
+        return {"action": "propose", "candidates": candidates}
+
+    monkeypatch.setattr(_providers, "propose", author)
+
+    class Model(torch.nn.Module):
+        def forward(self, x):
+            with region.fused_kernel(
+                generator=generator, name="batched_activation"
+            ):
+                return torch.relu(x * 0.75 - 0.25)
+
+    model = Model().eval()
+    inputs = [torch.linspace(-2, 2, 771, device="cuda").reshape(3, 257)]
+    with torch.inference_mode():
+        compiled = torch_tensorrt.compile(
+            model,
+            inputs=inputs,
+            ir="dynamo",
+            strict=True,
+            min_block_size=1,
+            offload_module_to_cpu=False,
+        )
+        torch.testing.assert_close(compiled(*inputs), model(*inputs))
+    assert len(requests) == 1
+    accepted = json.loads(next(tmp_path.glob("*/accepted.json")).read_text())
+    assert accepted["candidate"]["num_warps"] == 4
+    assert accepted["validation"]["status"] == "passed"
+    reports = [
+        json.loads(path.read_text())
+        for path in tmp_path.glob("*/run-*/attempt-*/candidate-*/feedback.json")
+    ]
+    assert len(reports) == 3
+    assert sum(report["status"] == "passed" for report in reports) == 1
+    assert all(
+        report["diagnostics"]["candidate"]["compilation_ms"] > 0 for report in reports
+    )
+    records = get_region_records(compiled)
+    assert len(records) == 1 and records[0].route == "plugin"
+    assert (
+        str(records[0].plugin_op)
+        in compiled.get_submodule(records[0].owner).get_layer_info()
+    )

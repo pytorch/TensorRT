@@ -15,7 +15,9 @@ import operator
 import re
 import secrets
 import statistics
+import time
 import traceback
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Callable, Iterator, Sequence, TypeVar
 
@@ -30,6 +32,7 @@ class _EvaluationError(RuntimeError):
     def __init__(self, stage: str, message: str) -> None:
         super().__init__(message)
         self.stage = stage
+        self.diagnostics: dict[str, Any] | None = None
 
 
 def _run_stage(
@@ -364,7 +367,63 @@ def _verify_case(
 
 
 def evaluate(request: dict[str, Any], directory: Path) -> dict[str, Any]:
-    return _run_stage("compile", _evaluate, request, directory)
+    enabled = request.get("diagnostics", False)
+    if type(enabled) is not bool:
+        raise _EvaluationError("source", "diagnostics must be a boolean")
+    diagnostics: dict[str, Any] | None = {} if enabled else None
+    try:
+        result = _run_stage("compile", _evaluate, request, directory, diagnostics)
+    except _EvaluationError as error:
+        error.diagnostics = diagnostics
+        raise
+    if diagnostics is not None:
+        result["diagnostics"] = diagnostics
+    return result
+
+
+def _candidate_diagnostics(candidate: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "launch": {
+            key: copy.deepcopy(candidate[key])
+            for key in (
+                "kernel_name",
+                "grid",
+                "block",
+                "constants",
+                "num_warps",
+                "num_stages",
+                "shared_mem_bytes",
+            )
+            if key in candidate
+        },
+        "launch_basis": "validated_proposal",
+        "compilation_scope": "backend_registration_and_tensorrt_engine_build",
+        "compilation_ms": None,
+        "compilation_status": "not_started",
+        "compiler_resources": {
+            "registers_per_thread": None,
+            "shared_memory_bytes": None,
+            "unavailable_reason": (
+                "The registration API does not expose compiled resource metadata; "
+                "launch shared_mem_bytes is requested dynamic shared memory."
+            ),
+        },
+    }
+
+
+@contextmanager
+def _compilation_diagnostics(details: dict[str, Any] | None) -> Iterator[None]:
+    """Time existing build work without compiling or profiling anything extra."""
+    if details is None:
+        yield
+        return
+    started = time.perf_counter()
+    details["compilation_status"] = "failed"
+    try:
+        yield
+        details["compilation_status"] = "completed"
+    finally:
+        details["compilation_ms"] = (time.perf_counter() - started) * 1000
 
 
 def _check_backend_identity(backend: Any, request: dict[str, Any]) -> None:
@@ -382,7 +441,11 @@ def _check_backend_identity(backend: Any, request: dict[str, Any]) -> None:
             )
 
 
-def _evaluate(request: dict[str, Any], directory: Path) -> dict[str, Any]:
+def _evaluate(
+    request: dict[str, Any],
+    directory: Path,
+    diagnostics: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     from ._backends import get_backend
 
     backend = _run_stage("source", get_backend, request["backend"])
@@ -400,6 +463,8 @@ def _evaluate(request: dict[str, Any], directory: Path) -> dict[str, Any]:
             len(input_specs),
             len(output_specs),
         )
+        if diagnostics is not None:
+            diagnostics[name] = _candidate_diagnostics(candidates[name])
     objective = request.get("objective", "candidate")
     if objective not in {"candidate", "eager", "tensorrt"}:
         raise _EvaluationError("baseline", f"Unsupported objective: {objective}")
@@ -428,21 +493,37 @@ def _evaluate(request: dict[str, Any], directory: Path) -> dict[str, Any]:
     _restore_metadata(reference, first, expected)
     functions: dict[str, Callable[..., Any]] = {"reference": reference}
     for name, candidate in candidates.items():
-        registration = _run_stage(
-            "compile",
-            backend.make_registration,
-            candidate,
-            input_specs,
-            output_specs,
-            directory / name,
-        )
-        functions[name] = _run_stage(
-            "compile", _build_engine, reference, registration, first, len(output_specs)
-        )
+        with _compilation_diagnostics(
+            diagnostics[name] if diagnostics is not None else None
+        ):
+            registration = _run_stage(
+                "compile",
+                backend.make_registration,
+                candidate,
+                input_specs,
+                output_specs,
+                directory / name,
+            )
+            functions[name] = _run_stage(
+                "compile",
+                _build_engine,
+                reference,
+                registration,
+                first,
+                len(output_specs),
+            )
     if objective == "tensorrt":
-        functions["baseline"] = _run_stage(
-            "baseline", _build_reference_engine, reference, first
+        baseline_diagnostics = (
+            {"compilation_scope": "tensorrt_reference_engine_build"}
+            if diagnostics is not None
+            else None
         )
+        if diagnostics is not None:
+            diagnostics["baseline"] = baseline_diagnostics
+        with _compilation_diagnostics(baseline_diagnostics):
+            functions["baseline"] = _run_stage(
+                "baseline", _build_reference_engine, reference, first
+            )
     tests = 0
     for inputs in itertools.chain((first,), cases):
         for name, function in functions.items():
@@ -503,12 +584,16 @@ def _error_report(error: Exception, directory: Path, phase: str) -> dict[str, An
         diagnostic = diagnostic.replace(str(path), replacement)
     diagnostic = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", diagnostic)
     diagnostic = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", diagnostic)
-    return {
+    result: dict[str, Any] = {
         "status": "error",
         "stage": getattr(error, "stage", "compile"),
         "validation_phase": phase,
         "error": diagnostic[-16000:],
     }
+    details = getattr(error, "diagnostics", None)
+    if details is not None:
+        result["diagnostics"] = details
+    return result
 
 
 def _write_result(path: Path, result: dict[str, Any]) -> None:

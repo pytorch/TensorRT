@@ -11,7 +11,10 @@ import math
 import tempfile
 import time
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from torch_tensorrt.region import KernelGenerator
 
 
 def _read(path: Path) -> dict[str, Any]:
@@ -30,6 +33,9 @@ def _run_directory(path: Path) -> Path:
         manifest = _read(path)
         if "run" in manifest:
             return _run_directory(Path(manifest["run"]))
+        state = manifest.get("state")
+        if isinstance(state, dict) and isinstance(state.get("run"), str):
+            return _run_directory(Path(state["run"]))
     raise ValueError(
         "PATH must identify a saved generation run, task, attempt, or accepted manifest"
     )
@@ -56,6 +62,7 @@ def _evaluate(args: argparse.Namespace, run: Path) -> dict[str, Any]:
         "outputs": task["outputs"],
         "objective": task.get("objective", "candidate"),
         "validation_phase": "holdout",
+        "diagnostics": task.get("diagnostics", False),
         **task["validation"],
         "candidate": candidate,
     }
@@ -77,16 +84,23 @@ def _evaluate(args: argparse.Namespace, run: Path) -> dict[str, Any]:
     return {"directory": str(directory), "report": report}
 
 
-def _generate(args: argparse.Namespace, run: Path) -> dict[str, Any]:
-    import torch
+def _tuning(value: str) -> dict[str, tuple[Any, ...]]:
+    try:
+        domains = json.loads(value)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError("tuning must be a JSON object") from error
+    if not isinstance(domains, dict) or any(
+        not isinstance(domain, list) for domain in domains.values()
+    ):
+        raise argparse.ArgumentTypeError("tuning must map knob names to JSON arrays")
+    return {name: tuple(domain) for name, domain in domains.items()}
 
-    from torch_tensorrt.region import KernelGenerator
 
-    from ._factory import _cache_root
-    from ._factory import _generate as generate
-    from ._worker import _dtype, _outputs, _restore_metadata
+def _generation_config(
+    args: argparse.Namespace, task: dict[str, Any], run: Path
+) -> KernelGenerator:
+    from torch_tensorrt.region import KernelGenerator, SearchPolicy
 
-    task = _read(run / "task.json")
     guidance = args.instructions
     if (
         guidance is None
@@ -102,7 +116,28 @@ def _generate(args: argparse.Namespace, run: Path) -> dict[str, Any]:
             )
             or None
         )
-    config = KernelGenerator(
+    saved_search = task.get("search", {})
+    if not isinstance(saved_search, dict):
+        raise ValueError("Saved task search policy must be a JSON object")
+    search = dict(saved_search)
+    for name in (
+        "batch_size",
+        "max_candidates",
+        "max_no_improvement",
+        "max_variants",
+        "finalists",
+        "resume",
+        "tuning",
+    ):
+        value = getattr(args, name, None)
+        if value is not None:
+            search[name] = value
+    diagnostics = getattr(args, "diagnostics", None)
+    policy = SearchPolicy(**search)
+    cache_dir = args.cache_dir
+    if cache_dir is None and policy.resume:
+        cache_dir = run.parent.parent
+    return KernelGenerator(
         provider=args.provider,
         backend=args.backend or task["backend"],
         model=args.model,
@@ -110,15 +145,31 @@ def _generate(args: argparse.Namespace, run: Path) -> dict[str, Any]:
         instruction_files=tuple(args.instruction_file),
         max_attempts=args.attempts,
         timeout_s=args.timeout,
-        cache_dir=args.cache_dir,
+        cache_dir=cache_dir,
         objective=args.objective or task.get("objective", "candidate"),
         min_speedup=(
             args.min_speedup
             if args.min_speedup is not None
             else task.get("min_speedup", 1.0)
         ),
+        search=policy,
+        diagnostics=(
+            diagnostics if diagnostics is not None else task.get("diagnostics", False)
+        ),
         **task["validation"],
     )
+
+
+def _generate(args: argparse.Namespace, run: Path) -> dict[str, Any]:
+    import torch
+
+    from ._factory import _cache_root
+    from ._factory import _generate as generate
+    from ._worker import _dtype, _outputs, _restore_metadata
+
+    task = _read(run / "task.json")
+    instruction_bundle = _saved_instruction_bundle(args, task, run)
+    config = _generation_config(args, task, run)
     device = torch.device(task["inputs"][0]["device"])
     with torch.cuda.device(device), torch.inference_mode():
         reference = torch.load(
@@ -131,7 +182,12 @@ def _generate(args: argparse.Namespace, run: Path) -> dict[str, Any]:
             for spec in task["inputs"]
         )
         _restore_metadata(reference, inputs, _outputs(reference(*inputs)))
-        _, directory = generate(reference, config, region_id="interactive")
+        _, directory = generate(
+            reference,
+            config,
+            region_id="interactive",
+            instruction_bundle=instruction_bundle,
+        )
     accepted = directory / "accepted.json"
     report = (
         _read(accepted)["validation"]
@@ -146,6 +202,26 @@ def _generate(args: argparse.Namespace, run: Path) -> dict[str, Any]:
         "directory": str(directory),
         "report": report,
     }
+
+
+def _saved_instruction_bundle(
+    args: argparse.Namespace, task: dict[str, Any], run: Path
+) -> dict[str, Any] | None:
+    from ._instructions import validate_instructions
+
+    if (
+        args.instructions is not None
+        or args.instruction_file
+        or (args.backend is not None and args.backend != task["backend"])
+    ):
+        return None
+    path = run / "instructions.json"
+    if not path.is_file():
+        return None
+    bundle = validate_instructions(_read(path), task["backend"])
+    if task.get("instructions_sha256") != bundle["sha256"]:
+        raise ValueError("Saved instructions do not match the task instruction digest")
+    return bundle
 
 
 def main() -> None:
@@ -177,6 +253,40 @@ def main() -> None:
     generate.add_argument("--cache-dir", type=Path)
     generate.add_argument("--objective", choices=("candidate", "eager", "tensorrt"))
     generate.add_argument("--min-speedup", type=float)
+    generate.add_argument("--batch-size", type=int, help="Proposals per author round")
+    generate.add_argument(
+        "--max-candidates",
+        type=int,
+        help="Search evaluations, including tuning and resume",
+    )
+    generate.add_argument(
+        "--max-no-improvement",
+        type=int,
+        help="Stop after this many author rounds without improvement",
+    )
+    generate.add_argument(
+        "--max-variants",
+        type=int,
+        help="Maximum tuning variants per authored candidate",
+    )
+    generate.add_argument(
+        "--finalists", type=int, help="Maximum candidates to try in final validation"
+    )
+    generate.add_argument(
+        "--resume",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Restore compatible search evidence and remeasure retained candidates",
+    )
+    generate.add_argument(
+        "--diagnostics",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Collect compiler and execution facts from the evaluator",
+    )
+    generate.add_argument(
+        "--tuning", type=_tuning, help='JSON knob domains, e.g. {"num_warps":[4,8]}'
+    )
     args = parser.parse_args()
     try:
         if args.command == "instructions":
@@ -196,6 +306,7 @@ def main() -> None:
                 "accepted.json",
                 "cache_check.json",
                 "history.json",
+                "search.json",
             )
             result = {
                 "directory": str(run),
@@ -205,6 +316,9 @@ def main() -> None:
                     if (run / name).is_file()
                 },
             }
+            checkpoint = run.parent / "checkpoint.json"
+            if checkpoint.is_file():
+                result["checkpoint.json"] = _read(checkpoint)
         elif args.command == "evaluate":
             result = _evaluate(args, run)
         else:
