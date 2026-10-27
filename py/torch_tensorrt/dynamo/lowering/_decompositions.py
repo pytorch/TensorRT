@@ -700,6 +700,25 @@ def masked_scatter_decomposition(
     return replaced.view(input_b.shape)
 
 
+@register_torch_trt_decomposition(aten.masked_select, registry=TORCH_TRT_DECOMPOSITIONS)
+def masked_select_decomposition(
+    input: torch.Tensor, mask: torch.Tensor
+) -> torch.Tensor:
+    """
+    Decomposition of `aten.masked_select` for TensorRT.
+
+    The output size is the number of True values in `mask`, which is only known at run
+    time. Boolean indexing gives the same result, and its converter handles the
+    data-dependent size with nonzero and the TensorRT output allocator.
+
+    Steps:
+      1) Broadcast `input` and `mask` to a common shape.
+      2) Flatten both, so that a single 1-D boolean index selects in row-major order.
+    """
+    input_b, mask_b = aten.broadcast_tensors([input, mask])
+    return aten.index.Tensor(input_b.flatten(), [mask_b.flatten()])
+
+
 ATTENTION_DECOMPOSITION_OPS = {
     aten.scaled_dot_product_attention.default,
     aten._scaled_dot_product_flash_attention.default,
