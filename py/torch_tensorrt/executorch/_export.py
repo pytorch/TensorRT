@@ -614,8 +614,9 @@ def export(
         external_engine_data (Optional[str]): Write every TensorRT engine to an
             ExecuTorch data file named ``<external_engine_data>.ptd`` instead of into
             the ``.pte``, which then holds only a key per engine. Pass the name without
-            the ``.ptd`` extension. The engine is the same bytes either way. Load the
-            program with that file as its data file,
+            the ``.ptd`` extension. Use only ASCII letters, digits, ``.``, ``-`` and
+            ``_``, and start with a letter, a digit or ``_``. The engine is the same
+            bytes either way. Load the program with that file as its data file,
             for example ``Runtime.get().load_program(pte, data_path=ptd)``; without it
             the method fails to load. That loader takes one data file. If another
             backend in the program writes its own ``.ptd``, pass that backend's name

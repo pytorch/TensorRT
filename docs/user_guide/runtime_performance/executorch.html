@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=ce438fe8"></script>
+    <script src="../../_static/documentation_options.js?v=ede72c6b"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -655,6 +655,46 @@ still loads, still reports finding its weights, and returns a wrong answer with 
 Give each export its own directory.</p>
 </div>
 </section>
+<section id="keeping-engines-in-a-ptd-file">
+<span id="executorch-external-engine-data"></span><h3>Keeping engines in a .ptd file<a class="headerlink" href="#keeping-engines-in-a-ptd-file" title="Link to this heading">#</a></h3>
+<p>By default every TensorRT engine is stored inside the <code class="docutils literal notranslate"><span class="pre">.pte</span></code>. Pass <code class="docutils literal notranslate"><span class="pre">external_engine_data=</span></code>
+with a file name, without the <code class="docutils literal notranslate"><span class="pre">.ptd</span></code> extension, and the engines go to <code class="docutils literal notranslate"><span class="pre">&lt;name&gt;.ptd</span></code> next to
+the <code class="docutils literal notranslate"><span class="pre">.pte</span></code> instead:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span>
+    <span class="n">trt_gm</span><span class="p">,</span> <span class="s2">"model.pte"</span><span class="p">,</span> <span class="n">output_format</span><span class="o">=</span><span class="s2">"executorch"</span><span class="p">,</span> <span class="n">external_engine_data</span><span class="o">=</span><span class="s2">"model"</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>The program then needs that file to load. Pass the file itself, not its directory:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt_executorch_runtime</span>  <span class="c1"># noqa: F401</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">executorch.runtime</span><span class="w"> </span><span class="kn">import</span> <span class="n">Runtime</span>
+
+<span class="n">program</span> <span class="o">=</span> <span class="n">Runtime</span><span class="o">.</span><span class="n">get</span><span class="p">()</span><span class="o">.</span><span class="n">load_program</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">"model.pte"</span><span class="p">),</span> <span class="n">data_path</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">"model.ptd"</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>In C++, pass the file as the second argument of <code class="docutils literal notranslate"><span class="pre">Module</span></code>:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">Module</span><span class="w"> </span><span class="k">module</span><span class="p">(</span><span class="s">"model.pte"</span><span class="p">,</span><span class="w"> </span><span class="s">"model.ptd"</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>Without the file, the method fails to load. In C++ the error is <code class="docutils literal notranslate"><span class="pre">Error::InvalidExternalData</span></code>.
+In Python, <code class="docutils literal notranslate"><span class="pre">load_method</span></code> raises a <code class="docutils literal notranslate"><span class="pre">RuntimeError</span></code> that ends in <code class="docutils literal notranslate"><span class="pre">error:</span> <span class="pre">0x:24</span></code>, the same
+error. The engines are GPU code, so treat the <code class="docutils literal notranslate"><span class="pre">.ptd</span></code> as trusted input,
+just like the <code class="docutils literal notranslate"><span class="pre">.pte</span></code>: nothing checks at load that its engines are the ones that were saved.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">.ptd</span></code> name does not follow the <code class="docutils literal notranslate"><span class="pre">.pte</span></code> name, and <code class="docutils literal notranslate"><span class="pre">save()</span></code> replaces any file with
+that name. Say you save two programs into one directory with the same
+<code class="docutils literal notranslate"><span class="pre">external_engine_data=</span></code>. The <code class="docutils literal notranslate"><span class="pre">.ptd</span></code> then holds only the second program’s engines, and the
+first program fails to load. Name the file after its program, as above, or give each program
+its own directory.</p>
+<p>A program with a <code class="docutils literal notranslate"><span class="pre">CudaPartitioner</span></code> part needs its own directory anyway (see the warning
+above). The CUDA backend already writes <code class="docutils literal notranslate"><span class="pre">aoti_cuda_blob.ptd</span></code> for it. If you also want the
+engines in a <code class="docutils literal notranslate"><span class="pre">.ptd</span></code>, pass <code class="docutils literal notranslate"><span class="pre">external_engine_data=&quot;aoti_cuda_blob&quot;</span></code> so they go into that same
+file: <code class="docutils literal notranslate"><span class="pre">load_program</span></code> takes only one <code class="docutils literal notranslate"><span class="pre">data_path</span></code>.</p>
+</div>
+</section>
 <section id="keeping-inputs-and-outputs-on-the-gpu">
 <h3>Keeping inputs and outputs on the GPU<a class="headerlink" href="#keeping-inputs-and-outputs-on-the-gpu" title="Link to this heading">#</a></h3>
 <p>By default ExecuTorch copies host to device before the first delegate and back after the
@@ -1059,6 +1099,7 @@ C++, including the green-context option.</p></li>
 </li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#compile-and-save">Compile and Save</a><ul class="visible nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#coalescing-the-leftover-operators-onto-the-cuda-backend">Coalescing the leftover operators onto the CUDA backend</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#keeping-engines-in-a-ptd-file">Keeping engines in a .ptd file</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#keeping-inputs-and-outputs-on-the-gpu">Keeping inputs and outputs on the GPU</a></li>
 </ul>
 </li>

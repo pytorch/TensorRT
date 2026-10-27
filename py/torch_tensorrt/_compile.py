@@ -844,6 +844,8 @@ def save(
                 ``backend_config=`` takes an ``Optional[ExecutorchBackendConfig]``
                 and is forwarded to ``to_executorch(config=...)`` to customize
                 ExecuTorch lowering (e.g. memory planning or device placement).
+                Its ``MemoryPlanningPass`` is aligned to 256 bytes on a copy, the
+                boundary TensorRT needs for every input and output.
                 ``partitioners=`` appends caller partitioners after the TensorRT
                 partitioner, so ops TensorRT does not take can be routed to another
                 delegate -- e.g. a ``CudaPartitioner`` for a coalesced TensorRT +
@@ -885,7 +887,12 @@ def save(
                 the ``.ptd`` extension and
                 writes every TensorRT engine to ``<name>.ptd`` next to the ``.pte``
                 instead of into it. Pass that file as the program's data file when
-                loading. See :func:`torch_tensorrt.executorch.export`.
+                loading. An existing file with that name is replaced, so give each
+                program in a directory its own name, for example
+                ``external_engine_data="model"`` for ``model.pte``. A program that also
+                has a CUDA backend part needs its own directory and
+                ``external_engine_data="aoti_cuda_blob"`` instead. See
+                :func:`torch_tensorrt.executorch.export`.
     """
     if isinstance(module, CudaGraphsTorchTensorRTModule):
         module = module.compiled_module
@@ -972,6 +979,15 @@ def save(
             from torch_tensorrt.executorch._zero_copy import _refuse_skip_h2d
 
             _refuse_skip_h2d(executorch_backend_config)
+        # Every backend writes its data as <name>.ptd beside the program, so a
+        # program named *.ptd can be replaced by one. Windows ignores case and
+        # trailing dots and spaces in a file name.
+        if os.fspath(file_path).rstrip(". ").lower().endswith(".ptd"):
+            raise ValueError(
+                f"file_path must not end with .ptd, got {file_path!r}. save() writes the "
+                "program's data files as <name>.ptd beside it, so one of them could replace "
+                "the program. Use the .pte extension."
+            )
 
     def _all_are_input_objects(obj: Any) -> bool:
         """Recursively check if all elements in nested collections are Input objects."""
@@ -1507,11 +1523,56 @@ def _write_external_tensor_data(executorch_program: Any, file_path: str) -> None
     if executorch_program._tensor_data:
         out_dir = os.path.dirname(os.path.abspath(file_path))
         executorch_program.write_tensor_data_to_file(out_dir)
+        # write_tensor_data_to_file adds .ptd unless the name already ends with it.
+        paths = [
+            os.path.join(out_dir, name if name.endswith(".ptd") else f"{name}.ptd")
+            for name in executorch_program._tensor_data
+        ]
         logger.info(
-            "Wrote external delegate data (.ptd) to %s; point the runtime's "
-            "data-files at this directory to load them.",
-            out_dir,
+            "Wrote external delegate data to %s. Pass %s, not the directory, "
+            "when loading the program.",
+            ", ".join(paths),
+            "this file" if len(paths) == 1 else "these files",
         )
+
+
+# TensorRT needs every input and output address to be a multiple of this, and the delegate copies a
+# buffer that misses it.
+_TENSORRT_ADDRESS_ALIGNMENT = 256
+
+
+def _with_tensorrt_alignment(backend_config: Any) -> Any:
+    """Return ``backend_config`` with memory planning on TensorRT's 256-byte boundary.
+
+    ExecuTorch plans buffers on 16-byte boundaries by default, so a planned delegate input or output
+    can miss 256 and be copied on every call. Each ``MemoryPlanningPass`` gets the least common
+    multiple of its own alignment and 256, on a copy, so the caller's alignment still holds and the
+    caller's planner keeps its own. Any other planner is left as it is.
+    """
+    import copy
+    import dataclasses
+    import math
+
+    from executorch.exir import ExecutorchBackendConfig
+    from executorch.exir.passes import MemoryPlanningPass
+
+    def aligned(planner: Any) -> Any:
+        if (
+            not isinstance(planner, MemoryPlanningPass)
+            or planner.alignment % _TENSORRT_ADDRESS_ALIGNMENT == 0
+        ):
+            return planner
+        planner = copy.copy(planner)
+        planner.alignment = math.lcm(planner.alignment, _TENSORRT_ADDRESS_ALIGNMENT)
+        return planner
+
+    config = backend_config if backend_config is not None else ExecutorchBackendConfig()
+    planner = config.memory_planning_pass
+    if isinstance(planner, dict):
+        planner = {name: aligned(p) for name, p in planner.items()}
+    else:
+        planner = aligned(planner)
+    return dataclasses.replace(config, memory_planning_pass=planner)
 
 
 def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None:
@@ -1559,6 +1620,7 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
         zero_copy_kv=zero_copy_kv,
         external_engine_data=kwargs.get("external_engine_data"),
     )
+    backend_config = _with_tensorrt_alignment(kwargs.get("backend_config"))
     # Unlike the direct export()+to_executorch() path -- where the two steps
     # belong to different owners and pairing them is the caller's job -- save()
     # owns both, so it installs the finalization pass itself. Wrapping preserves
@@ -1567,7 +1629,6 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
     # writes, and the pass refuses it. A backend_config that already carries
     # the pass is wrapped again here; the second run finds the buffers already
     # un-staged and changes nothing.
-    backend_config = kwargs.get("backend_config")
     if zero_copy_kv:
         backend_config = zero_copy_backend_config(backend_config)
     executorch_program = edge_program.to_executorch(config=backend_config)

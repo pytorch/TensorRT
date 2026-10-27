@@ -180,6 +180,12 @@ the cost of slightly higher per-call latency:
         output = trt_model(*inputs)
     # Submodules revert to static allocation on exit
 
+Some memory stays allocated between calls. With CUDA graphs on, the C++ runtime keeps
+each engine's memory for as long as its captured graph, because a replay writes to the
+memory the graph was recorded with. The Python runtime keeps each engine's memory from
+its last call, with or without CUDA graphs, until a later call replaces it or a settings
+change drops it.
+
 Use ``dynamically_allocate_resources=False`` to force static allocation inside the
 context (the opposite direction — useful for profiling or benchmarking).
 

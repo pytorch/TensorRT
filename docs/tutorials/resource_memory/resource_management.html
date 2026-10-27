@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=ce438fe8"></script>
+    <script src="../../_static/documentation_options.js?v=ede72c6b"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -758,6 +758,11 @@ the cost of slightly higher per-call latency:</p>
 <span class="c1"># Submodules revert to static allocation on exit</span>
 </pre></div>
 </div>
+<p>Some memory stays allocated between calls. With CUDA graphs on, the C++ runtime keeps
+each engine’s memory for as long as its captured graph, because a replay writes to the
+memory the graph was recorded with. The Python runtime keeps each engine’s memory from
+its last call, with or without CUDA graphs, until a later call replaces it or a settings
+change drops it.</p>
 <p>Use <code class="docutils literal notranslate"><span class="pre">dynamically_allocate_resources=False</span></code> to force static allocation inside the
 context (the opposite direction — useful for profiling or benchmarking).</p>
 </section>

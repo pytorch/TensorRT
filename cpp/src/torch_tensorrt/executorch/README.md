@@ -186,6 +186,21 @@ reads it the memory belongs to somebody else. So the rule is the caller's to kee
 alive and unchanged until the call returns. The Python path cannot reach this, because a tensor there
 owns its storage.
 
+### A buffer off the 256-byte boundary is copied
+
+TensorRT needs every input and output address to be a multiple of 256 bytes, and it does not check.
+A view that starts partway into its storage, such as `x[1:]` of a 1-D tensor, misses that. Bound as
+it is, the engine returns a wrong answer, or its kernel faults and every later CUDA call in the
+process fails. So the backend copies such a buffer through an aligned one of its own, and logs this
+once per engine. The answer is right. The cost is one copy per buffer per call, and two for a
+buffer the engine updates in place, which is copied in and then back.
+
+`torch_tensorrt.save()` plans memory on 256-byte boundaries, so buffers a program plans in GPU memory
+are bound directly. ExecuTorch's own default is 16 bytes, so a program finalized with `to_executorch()`
+directly should pass `MemoryPlanningPass(alignment=256)`, or its planned buffers take this path too.
+On a device that reads host memory directly, an unaligned host buffer is copied the same way instead
+of being read in place.
+
 ### Running from several threads at once
 
 One program per thread works. Sharing one program across threads does not, and is refused
@@ -331,17 +346,26 @@ pending CUDA error to classify TensorRT failures.
 
 An engine serialized without its weights, for example compiled with
 `immutable_weights=False, strip_engine_weights=True`, is refused with
-`Error::InvalidProgram`, since this backend cannot refit it. A stripped engine
-with no weights at all loads, since it has nothing to restore. To tell the two
-apart, loading an ordinary engine that has weights asks TensorRT for its stripped
-size, and TensorRT logs one warning per engine that it was not built with
-`kSTRIP_PLAN`. The backend forwards it at Info level, and it is harmless.
+`Error::InvalidProgram`, because this backend cannot refit it. To check, the backend
+asks TensorRT how many weight bytes the plan still holds, and refuses the plan when that
+is less than its total:
+
+- A stripped plan that had nothing to strip still holds all its weights, so it loads.
+- A plan with no weights at all loads.
+- A stripped plan saved again as it is still counts as stripped, so it is refused.
+- A stripped plan saved again without `SerializationFlag::kEXCLUDE_WEIGHTS`, and not
+  refitted first, no longer counts as stripped, so this check does not catch it. Refit a
+  stripped plan before you save it again with its weights.
+
+For an ordinary engine with weights, the question makes TensorRT log a warning that the
+engine was not built with `BuilderFlag::kSTRIP_PLAN`, each time the engine is
+deserialized. The backend forwards it at Info level, and it is harmless.
 
 ## Engines in a .ptd file
 
 A program exported with `external_engine_data=` keeps its engines in a `.ptd` file
 next to the `.pte`. Load it with that file, for example
-`Module module("model.pte", "engines.ptd");`. Without the file, or with one that
+`Module module("model.pte", "model.ptd");`. Without the file, or with one that
 lacks the engine, loading returns `Error::InvalidExternalData`. A program that shares
 `aoti_cuda_blob.ptd` with the CUDA backend can fail first in that backend, with
 `Error::NotFound`.
@@ -614,7 +638,7 @@ the ordinary path does not guarantee that a stream from another context works
 with the engine; the call can still fail.
 
 If allocating a graph buffer fails, the engine uses the ordinary path until an
-input shape or the profile changes. Host staging allocations can still fail with
+input shape or the profile changes. Staging allocations can still fail with
 `Error::MemoryAllocationFailed`; retained graph buffers are not reclaimed to
 retry them. A failed recording is retried on the next call, and after three
 failures for one set of shapes the engine logs an error and uses the ordinary
@@ -852,7 +876,7 @@ of it only when `cudaStreamEndCapture` hands back
 caused it.
 
 The capture check runs before the wait on a previous enqueue, the `cudaMalloc`
-that grows a host-input staging buffer, and the `cudaFree(nullptr)` that makes a
+that grows an input staging buffer, and the `cudaFree(nullptr)` that makes a
 context current for a default stream. These calls precede the pool's own calls
 and, outside `Relaxed`, can invalidate the capture. Only the device query and
 the device switch run before the check, and a capture takes both.

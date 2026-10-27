@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=ce438fe8"></script>
+    <script src="../_static/documentation_options.js?v=ede72c6b"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -720,8 +720,9 @@ are rejected; use this keyword instead.</p></li>
 <li><p><strong>external_engine_data</strong> (<em>Optional</em><em>[</em><em>str</em><em>]</em>) – Write every TensorRT engine to an
 ExecuTorch data file named <code class="docutils literal notranslate"><span class="pre">&lt;external_engine_data&gt;.ptd</span></code> instead of into
 the <code class="docutils literal notranslate"><span class="pre">.pte</span></code>, which then holds only a key per engine. Pass the name without
-the <code class="docutils literal notranslate"><span class="pre">.ptd</span></code> extension. The engine is the same bytes either way. Load the
-program with that file as its data file,
+the <code class="docutils literal notranslate"><span class="pre">.ptd</span></code> extension. Use only ASCII letters, digits, <code class="docutils literal notranslate"><span class="pre">.</span></code>, <code class="docutils literal notranslate"><span class="pre">-</span></code> and
+<code class="docutils literal notranslate"><span class="pre">_</span></code>, and start with a letter, a digit or <code class="docutils literal notranslate"><span class="pre">_</span></code>. The engine is the same
+bytes either way. Load the program with that file as its data file,
 for example <code class="docutils literal notranslate"><span class="pre">Runtime.get().load_program(pte,</span> <span class="pre">data_path=ptd)</span></code>; without it
 the method fails to load. That loader takes one data file. If another
 backend in the program writes its own <code class="docutils literal notranslate"><span class="pre">.ptd</span></code>, pass that backend’s name

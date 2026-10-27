@@ -2821,7 +2821,7 @@ def _patch_executorch_lowering(monkeypatch, captured):
 def test_save_executorch_forwards_lowering_kwargs(monkeypatch, tmp_path):
     pytest.importorskip("executorch.exir")
     import torch_tensorrt._compile as tc
-    from executorch.exir import EdgeCompileConfig
+    from executorch.exir import EdgeCompileConfig, ExecutorchBackendConfig
 
     captured = {}
     _patch_executorch_lowering(monkeypatch, captured)
@@ -2832,6 +2832,7 @@ def test_save_executorch_forwards_lowering_kwargs(monkeypatch, tmp_path):
     out = str(tmp_path / "model.pte")
 
     ep = torch.export.export(_AddOne(), (torch.randn(2, 2),))
+    default_alignment = ExecutorchBackendConfig().memory_planning_pass.alignment
     tc._save_as_executorch(
         ep,
         out,
@@ -2857,8 +2858,12 @@ def test_save_executorch_forwards_lowering_kwargs(monkeypatch, tmp_path):
     # _check_ir_validity=True).
     assert captured["compile_config"] is caller_cfg
     assert captured["compile_config"]._check_ir_validity is True
-    # backend_config flows to edge_program.to_executorch(config=...).
-    assert captured["backend_config"] is None
+    # With no backend_config, to_executorch() gets ExecuTorch's defaults with memory
+    # planned on TensorRT's 256-byte boundary.
+    assert captured["backend_config"].memory_planning_pass.alignment == 256
+    # ExecutorchBackendConfig's default planner is one instance shared by every config in the
+    # process, so it must be copied rather than raised in place.
+    assert ExecutorchBackendConfig().memory_planning_pass.alignment == default_alignment
     # ETRecord persisted next to the .pte per ET's "<base>_etrecord.bin" convention.
     assert (tmp_path / "model_etrecord.bin").exists()
 

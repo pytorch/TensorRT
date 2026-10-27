@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=ce438fe8"></script>
+    <script src="../../_static/documentation_options.js?v=ede72c6b"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -1334,6 +1334,8 @@ document.write(`
 <span class="sd">                ``backend_config=`` takes an ``Optional[ExecutorchBackendConfig]``</span>
 <span class="sd">                and is forwarded to ``to_executorch(config=...)`` to customize</span>
 <span class="sd">                ExecuTorch lowering (e.g. memory planning or device placement).</span>
+<span class="sd">                Its ``MemoryPlanningPass`` is aligned to 256 bytes on a copy, the</span>
+<span class="sd">                boundary TensorRT needs for every input and output.</span>
 <span class="sd">                ``partitioners=`` appends caller partitioners after the TensorRT</span>
 <span class="sd">                partitioner, so ops TensorRT does not take can be routed to another</span>
 <span class="sd">                delegate -- e.g. a ``CudaPartitioner`` for a coalesced TensorRT +</span>
@@ -1375,7 +1377,12 @@ document.write(`
 <span class="sd">                the ``.ptd`` extension and</span>
 <span class="sd">                writes every TensorRT engine to ``&lt;name&gt;.ptd`` next to the ``.pte``</span>
 <span class="sd">                instead of into it. Pass that file as the program's data file when</span>
-<span class="sd">                loading. See :func:`torch_tensorrt.executorch.export`.</span>
+<span class="sd">                loading. An existing file with that name is replaced, so give each</span>
+<span class="sd">                program in a directory its own name, for example</span>
+<span class="sd">                ``external_engine_data="model"`` for ``model.pte``. A program that also</span>
+<span class="sd">                has a CUDA backend part needs its own directory and</span>
+<span class="sd">                ``external_engine_data="aoti_cuda_blob"`` instead. See</span>
+<span class="sd">                :func:`torch_tensorrt.executorch.export`.</span>
 <span class="sd">    """</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">CudaGraphsTorchTensorRTModule</span><span class="p">):</span>
         <span class="n">module</span> <span class="o">=</span> <span class="n">module</span><span class="o">.</span><span class="n">compiled_module</span>
@@ -1462,6 +1469,15 @@ document.write(`
             <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch._zero_copy</span><span class="w"> </span><span class="kn">import</span> <span class="n">_refuse_skip_h2d</span>
 
             <span class="n">_refuse_skip_h2d</span><span class="p">(</span><span class="n">executorch_backend_config</span><span class="p">)</span>
+        <span class="c1"># Every backend writes its data as &lt;name&gt;.ptd beside the program, so a</span>
+        <span class="c1"># program named *.ptd can be replaced by one. Windows ignores case and</span>
+        <span class="c1"># trailing dots and spaces in a file name.</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">fspath</span><span class="p">(</span><span class="n">file_path</span><span class="p">)</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(</span><span class="s2">". "</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">".ptd"</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"file_path must not end with .ptd, got </span><span class="si">{</span><span class="n">file_path</span><span class="si">!r}</span><span class="s2">. save() writes the "</span>
+                <span class="s2">"program's data files as &lt;name&gt;.ptd beside it, so one of them could replace "</span>
+                <span class="s2">"the program. Use the .pte extension."</span>
+            <span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_all_are_input_objects</span><span class="p">(</span><span class="n">obj</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""Recursively check if all elements in nested collections are Input objects."""</span>
@@ -1998,11 +2014,56 @@ document.write(`
     <span class="k">if</span> <span class="n">executorch_program</span><span class="o">.</span><span class="n">_tensor_data</span><span class="p">:</span>
         <span class="n">out_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">file_path</span><span class="p">))</span>
         <span class="n">executorch_program</span><span class="o">.</span><span class="n">write_tensor_data_to_file</span><span class="p">(</span><span class="n">out_dir</span><span class="p">)</span>
+        <span class="c1"># write_tensor_data_to_file adds .ptd unless the name already ends with it.</span>
+        <span class="n">paths</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">out_dir</span><span class="p">,</span> <span class="n">name</span> <span class="k">if</span> <span class="n">name</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">".ptd"</span><span class="p">)</span> <span class="k">else</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">.ptd"</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">executorch_program</span><span class="o">.</span><span class="n">_tensor_data</span>
+        <span class="p">]</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-            <span class="s2">"Wrote external delegate data (.ptd) to </span><span class="si">%s</span><span class="s2">; point the runtime's "</span>
-            <span class="s2">"data-files at this directory to load them."</span><span class="p">,</span>
-            <span class="n">out_dir</span><span class="p">,</span>
+            <span class="s2">"Wrote external delegate data to </span><span class="si">%s</span><span class="s2">. Pass </span><span class="si">%s</span><span class="s2">, not the directory, "</span>
+            <span class="s2">"when loading the program."</span><span class="p">,</span>
+            <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">paths</span><span class="p">),</span>
+            <span class="s2">"this file"</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">paths</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">else</span> <span class="s2">"these files"</span><span class="p">,</span>
         <span class="p">)</span>
+
+
+<span class="c1"># TensorRT needs every input and output address to be a multiple of this, and the delegate copies a</span>
+<span class="c1"># buffer that misses it.</span>
+<span class="n">_TENSORRT_ADDRESS_ALIGNMENT</span> <span class="o">=</span> <span class="mi">256</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_with_tensorrt_alignment</span><span class="p">(</span><span class="n">backend_config</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Return ``backend_config`` with memory planning on TensorRT's 256-byte boundary.</span>
+
+<span class="sd">    ExecuTorch plans buffers on 16-byte boundaries by default, so a planned delegate input or output</span>
+<span class="sd">    can miss 256 and be copied on every call. Each ``MemoryPlanningPass`` gets the least common</span>
+<span class="sd">    multiple of its own alignment and 256, on a copy, so the caller's alignment still holds and the</span>
+<span class="sd">    caller's planner keeps its own. Any other planner is left as it is.</span>
+<span class="sd">    """</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">copy</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">dataclasses</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+
+    <span class="kn">from</span><span class="w"> </span><span class="nn">executorch.exir</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExecutorchBackendConfig</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">executorch.exir.passes</span><span class="w"> </span><span class="kn">import</span> <span class="n">MemoryPlanningPass</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">aligned</span><span class="p">(</span><span class="n">planner</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">planner</span><span class="p">,</span> <span class="n">MemoryPlanningPass</span><span class="p">)</span>
+            <span class="ow">or</span> <span class="n">planner</span><span class="o">.</span><span class="n">alignment</span> <span class="o">%</span> <span class="n">_TENSORRT_ADDRESS_ALIGNMENT</span> <span class="o">==</span> <span class="mi">0</span>
+        <span class="p">):</span>
+            <span class="k">return</span> <span class="n">planner</span>
+        <span class="n">planner</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">planner</span><span class="p">)</span>
+        <span class="n">planner</span><span class="o">.</span><span class="n">alignment</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">lcm</span><span class="p">(</span><span class="n">planner</span><span class="o">.</span><span class="n">alignment</span><span class="p">,</span> <span class="n">_TENSORRT_ADDRESS_ALIGNMENT</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">planner</span>
+
+    <span class="n">config</span> <span class="o">=</span> <span class="n">backend_config</span> <span class="k">if</span> <span class="n">backend_config</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">ExecutorchBackendConfig</span><span class="p">()</span>
+    <span class="n">planner</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">memory_planning_pass</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">planner</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+        <span class="n">planner</span> <span class="o">=</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="n">aligned</span><span class="p">(</span><span class="n">p</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">planner</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">planner</span> <span class="o">=</span> <span class="n">aligned</span><span class="p">(</span><span class="n">planner</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">dataclasses</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">memory_planning_pass</span><span class="o">=</span><span class="n">planner</span><span class="p">)</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_save_as_executorch</span><span class="p">(</span><span class="n">exp_program</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">file_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -2050,6 +2111,7 @@ document.write(`
         <span class="n">zero_copy_kv</span><span class="o">=</span><span class="n">zero_copy_kv</span><span class="p">,</span>
         <span class="n">external_engine_data</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"external_engine_data"</span><span class="p">),</span>
     <span class="p">)</span>
+    <span class="n">backend_config</span> <span class="o">=</span> <span class="n">_with_tensorrt_alignment</span><span class="p">(</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"backend_config"</span><span class="p">))</span>
     <span class="c1"># Unlike the direct export()+to_executorch() path -- where the two steps</span>
     <span class="c1"># belong to different owners and pairing them is the caller's job -- save()</span>
     <span class="c1"># owns both, so it installs the finalization pass itself. Wrapping preserves</span>
@@ -2058,7 +2120,6 @@ document.write(`
     <span class="c1"># writes, and the pass refuses it. A backend_config that already carries</span>
     <span class="c1"># the pass is wrapped again here; the second run finds the buffers already</span>
     <span class="c1"># un-staged and changes nothing.</span>
-    <span class="n">backend_config</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"backend_config"</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">zero_copy_kv</span><span class="p">:</span>
         <span class="n">backend_config</span> <span class="o">=</span> <span class="n">zero_copy_backend_config</span><span class="p">(</span><span class="n">backend_config</span><span class="p">)</span>
     <span class="n">executorch_program</span> <span class="o">=</span> <span class="n">edge_program</span><span class="o">.</span><span class="n">to_executorch</span><span class="p">(</span><span class="n">config</span><span class="o">=</span><span class="n">backend_config</span><span class="p">)</span>

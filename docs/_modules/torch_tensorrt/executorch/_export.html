@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=ce438fe8"></script>
+    <script src="../../../_static/documentation_options.js?v=ede72c6b"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -1095,8 +1095,9 @@ document.write(`
 <span class="sd">        external_engine_data (Optional[str]): Write every TensorRT engine to an</span>
 <span class="sd">            ExecuTorch data file named ``&lt;external_engine_data&gt;.ptd`` instead of into</span>
 <span class="sd">            the ``.pte``, which then holds only a key per engine. Pass the name without</span>
-<span class="sd">            the ``.ptd`` extension. The engine is the same bytes either way. Load the</span>
-<span class="sd">            program with that file as its data file,</span>
+<span class="sd">            the ``.ptd`` extension. Use only ASCII letters, digits, ``.``, ``-`` and</span>
+<span class="sd">            ``_``, and start with a letter, a digit or ``_``. The engine is the same</span>
+<span class="sd">            bytes either way. Load the program with that file as its data file,</span>
 <span class="sd">            for example ``Runtime.get().load_program(pte, data_path=ptd)``; without it</span>
 <span class="sd">            the method fails to load. That loader takes one data file. If another</span>
 <span class="sd">            backend in the program writes its own ``.ptd``, pass that backend's name</span>

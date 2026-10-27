@@ -306,6 +306,8 @@ struct TRTEngine : torch::CustomClassHolder {
   // explicit ownership makes capture/replay behavior consistent across x86-64
   // and AArch64.
   at::cuda::CUDAGraph cudagraph = {true};
+  // Dynamically allocated workspace that ``cudagraph`` replays write to, kept for as long as the graph.
+  at::Tensor cudagraph_workspace;
   at::cuda::CUDAStream engine_stream = c10::cuda::getDefaultCUDAStream();
   at::cuda::CUDAStream caller_stream = c10::cuda::getDefaultCUDAStream();
   at::cuda::CUDAStream default_stream = c10::cuda::getDefaultCUDAStream();
@@ -475,8 +477,10 @@ struct TRTEngine : torch::CustomClassHolder {
   // factory throws if creation fails).
   nvinfer1::IExecutionContext* exec_ctx();
 
-  // Drop the live execution context without recreating. The next ``exec_ctx()``
-  // call rebuilds from the current ``runtime_cfg`` settings.
+  // Drop the live execution context, and this engine's own CUDA graph captured
+  // on it with its workspace, without recreating. The next ``exec_ctx()`` call
+  // rebuilds from the current ``runtime_cfg`` settings. If CUDA graphs mode is
+  // on, the next execution records a new graph.
   void invalidate_exec_ctx() noexcept;
 
   // True iff the execution context has been materialized. Probes WITHOUT
