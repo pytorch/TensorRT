@@ -157,8 +157,11 @@ def slice_op(  # TODO: This should be slice not whatever is in base
     output_shape = list(input.shape)
 
     if input.shape[dim] != -1 and isinstance(start, int) and isinstance(stop, int):
-        start = get_positive_dim(start, input.shape[dim])
-        stop = get_positive_dim(stop, input.shape[dim])
+        # Clamp out-of-range bounds like Python slicing instead of wrapping them
+        # like a dimension index: x[-15:] on a size-10 dim is the whole dim.
+        dim_size = input.shape[dim]
+        start = max(start + dim_size, 0) if start < 0 else min(start, dim_size)
+        stop = max(stop + dim_size, 0) if stop < 0 else min(stop, dim_size)
         start_slice[dim] = start
     else:
         # the start and stop or None is dynamic along dim or or start or stop is an ITensor
@@ -272,7 +275,7 @@ def slice_op(  # TODO: This should be slice not whatever is in base
             layer.set_input(3, stride_slice_tensor)
             return layer.get_output(0)
 
-    output_shape[dim] = math.ceil((stop - start) / step)
+    output_shape[dim] = max(math.ceil((stop - start) / step), 0)
     return slice(
         ctx, target, source_ir, name, input, start_slice, output_shape, stride_slice
     )
