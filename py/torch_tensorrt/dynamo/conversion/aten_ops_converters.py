@@ -2142,12 +2142,45 @@ def aten_ops_permute(
     )
 
 
+def _truncatable_float64_copy(node: Node) -> bool:
+    """Whether a float64 copy can run as a float32 copy and give PyTorch's result.
+
+    The source has to be a float type TensorRT casts to float32, and the PyTorch
+    result has to have the contiguous layout a TensorRT copy produces. The check
+    does not depend on where the copy sits, because partitioning can turn any copy
+    into an engine output and the converter is validated again then.
+    """
+    input_node = node.args[0] if node.args else None
+    input_meta = input_node.meta.get("val") if isinstance(input_node, Node) else None
+    if not isinstance(input_meta, torch.Tensor) or input_meta.dtype not in (
+        torch.float16,
+        torch.bfloat16,
+        torch.float32,
+        torch.float64,
+    ):
+        return False
+    # Alone on a placeholder after partitioning, a dynamic copy must also pass
+    # _dynamic_placeholder_copy_supported, which refuses any explicit memory_format.
+    if node.kwargs.get("memory_format") is not None and node_has_dynamic_shapes(node):
+        return False
+    output_meta = node.meta.get("val")
+    if not isinstance(output_meta, torch.Tensor):
+        return False
+    # A data-dependent stride cannot be decided here, so leave the copy to PyTorch.
+    try:
+        return bool(output_meta.is_contiguous())
+    except Exception:
+        return False
+
+
 def to_copy_dtype_validator(
     placeholder_only: bool, settings: Optional[CompilationSettings] = None
 ) -> Callable[[Node, CompilationSettings], bool]:
     """Return validator for to_copy node with placeholder restrictions"""
 
-    def validate_dtype(to_copy_node: Node) -> bool:
+    def validate_dtype(
+        to_copy_node: Node, settings: Optional[CompilationSettings]
+    ) -> bool:
         """Returns true if the to_copy node can be converted to TRT
 
         Based on data type being casted to
@@ -2187,6 +2220,15 @@ def to_copy_dtype_validator(
         if "dtype" in to_copy_node.kwargs:
             if to_copy_node.kwargs["dtype"] in allowed_casts:
                 return True
+            # truncate_double means the caller accepts float32 for float64, and
+            # the converter maps it.
+            elif (
+                to_copy_node.kwargs["dtype"] is torch.float64
+                and settings is not None
+                and settings.truncate_double
+                and _truncatable_float64_copy(to_copy_node)
+            ):
+                return True
             else:
                 _LOGGER.debug(
                     f"_to_copy converter rejected node {to_copy_node} with dtype {to_copy_node.kwargs['dtype']}"
@@ -2206,7 +2248,7 @@ def to_copy_dtype_validator(
         """
         # The placeholder restriction is satsfied if placeholder_only is the same
         # truth value as is_only_operator_on_placeholder(to_copy_node)
-        return validate_dtype(to_copy_node) and (
+        return validate_dtype(to_copy_node, settings) and (
             (not placeholder_only) ^ is_only_operator_on_placeholder(to_copy_node)
         )
 

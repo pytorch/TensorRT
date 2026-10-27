@@ -34,6 +34,16 @@ def to_copy(
     if not isinstance(input, TRTTensor):
         input = get_trt_tensor(ctx, input, f"{name}_copy_tensor")
 
+    # TensorRT has no float64. With truncate_double the caller accepts float32,
+    # which holds these source types exactly but not every larger integer.
+    if (
+        ctx.compilation_settings.truncate_double
+        and _enums.dtype._from(dtype) == _enums.dtype.f64
+        and input.dtype
+        in {trt.bool, trt.int8, trt.uint8, trt.float16, trt.bfloat16, trt.float32}
+    ):
+        dtype = torch.float32
+
     # If cast is forced, insert identity layer regardless of whether the dtype
     # doesn't change
     if force_layer:
