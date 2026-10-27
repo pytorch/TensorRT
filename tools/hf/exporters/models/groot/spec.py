@@ -5,22 +5,23 @@ from typing import Any
 
 import torch
 import torch.nn as nn
-from torch_tensorrt.hf.exporters.models.common.helpers import (
-    causal_lm_flat,
-    kv_kwargs,
-    split_flat_to_kwargs,
-)
-from torch_tensorrt.hf.exporters.models.groot.helpers import (
-    _groot,
-    make_embodiment_id,
-)
-from torch_tensorrt.hf.exporters.models.groot.patches import GROOT
-from torch_tensorrt.hf.exporters.ops import call_engine, scatter_image_tokens
-from torch_tensorrt.hf.exporters.spec import (
+
+from ...ops import call_engine, scatter_image_tokens
+from ...spec import (
     ComponentBundle,
     EdgeSpec,
     register_edge_spec,
 )
+from ..common.helpers import (
+    causal_lm_flat,
+    kv_kwargs,
+    split_flat_to_kwargs,
+)
+from .helpers import (
+    _groot,
+    make_embodiment_id,
+)
+from .patches import apply_groot_patches
 
 
 def _export_module(module: nn.Module, sample: Mapping[str, Any]) -> nn.Module:
@@ -44,10 +45,7 @@ class GrootSpec(EdgeSpec):  # type: ignore[misc]
     components = ("vision", "language", "context_projection", "action")
 
     def apply_patches(self, model=None):
-        del model
-        from torch_tensorrt.hf.exporters.plugin.attn_patches import apply_patches
-
-        return apply_patches(GROOT)
+        return apply_groot_patches(model)
 
     def prepare_sample_inputs(
         self, model: nn.Module, raw: Mapping[str, Any], config: Any
@@ -57,7 +55,8 @@ class GrootSpec(EdgeSpec):  # type: ignore[misc]
 
         from lerobot.policies.factory import make_pre_post_processors
         from lerobot.policies.groot.processor_groot import GrootEagleEncodeStep
-        from torch_tensorrt.hf.exporters.data import (
+
+        from ...data import (
             create_pil_messages,
             load_test_data,
             pack_state,
@@ -127,7 +126,7 @@ class GrootSpec(EdgeSpec):  # type: ignore[misc]
         upstream: Mapping[str, Any],
         config: Any,
     ) -> ComponentBundle:
-        from torch_tensorrt.hf.exporters.plugin.attention import (
+        from ...plugin.attention import (
             ContextAttentionMaskType,
         )
 
