@@ -6,6 +6,8 @@
 import os
 import subprocess
 import sys
+from contextlib import nullcontext
+from functools import partial
 from types import SimpleNamespace
 
 import pytest
@@ -139,6 +141,85 @@ def test_cuda_pointer_dtype_must_match_captured_boundary(tmp_path):
         make_registration(candidate(), "cuda_cpp", [spec], [spec], tmp_path)
 
 
+def test_cuda_region_reuses_validated_ptx_and_guards_engine_bindings(
+    tmp_path, monkeypatch
+):
+    import tensorrt as trt
+    import tensorrt.plugin as trtp
+
+    from torch_tensorrt import kernels
+    from torch_tensorrt.dynamo.region_compilation import _plugins
+    from torch_tensorrt.kernels import _nvrtc, _ops, _register
+
+    ptx = b".visible .entry generated(.param .u64 arg0, .param .u64 out0) { ret; }"
+    compilations = []
+
+    def compile_source(source, name, include_paths, *, load_kernel):
+        compilations.append((source, name, load_kernel))
+        return (
+            ptx,
+            None,
+            SimpleNamespace(
+                attributes=SimpleNamespace(
+                    max_threads_per_block=1024, shared_size_bytes=0
+                )
+            ),
+        )
+
+    monkeypatch.setattr(_nvrtc, "compile_to_ptx", compile_source)
+    monkeypatch.setattr(torch.cuda, "device", lambda device: nullcontext())
+    monkeypatch.setattr(
+        torch.cuda,
+        "get_device_properties",
+        lambda device: SimpleNamespace(
+            max_threads_per_block=1024, shared_memory_per_block=49152
+        ),
+    )
+    spec = {"dtype": "float32", "shape": [257], "device": "cuda:0"}
+    registration = make_registration(candidate(), "cuda_cpp", [spec], [spec], tmp_path)
+    assert isinstance(registration, partial) and registration.func is kernels.ptx_op
+    assert registration.keywords["ptx"] is ptx
+
+    child = torch.fx.symbolic_trace(lambda x: x + 1)
+    boundary = _plugins._TensorBoundary((257,), torch.float32, torch.device("cuda:0"))
+    monkeypatch.setattr(_plugins, "_boundaries", lambda *args: ([boundary], [boundary]))
+    monkeypatch.setattr(_ops, "_require_qdp_plugin", lambda: None)
+    captured = {}
+
+    def capture_registration(**options):
+        captured.update(options)
+        namespace, name = options["op_name"].split("::")
+        monkeypatch.setattr(
+            getattr(torch.ops, namespace),
+            name,
+            SimpleNamespace(default=object()),
+            raising=False,
+        )
+
+    monkeypatch.setattr(
+        _register, "register_precompiled_qdp_plugin", capture_registration
+    )
+    _plugins.register_region_plugin(child, registration, region_id="generated_cuda")
+    assert compilations == [(CUDA_SOURCE, "generated", True)]
+    assert captured["ptx"] is ptx
+    assert captured["schema"] == "(Tensor arg0) -> Tensor"
+    assert captured["supports_dynamic_shapes"] is False
+    assert callable(captured["capability_validator"])
+    actual = SimpleNamespace(dtype=trt.float32)
+    wrong = SimpleNamespace(dtype=trt.float16)
+    for inputs, outputs in (([wrong], [actual]), ([actual], [wrong])):
+        with pytest.raises(ValueError, match="descriptor has dtype"):
+            captured["aot_fn"](inputs, outputs, 0)
+    for inputs, outputs in (([], [actual]), ([actual], [])):
+        with pytest.raises(ValueError, match="expected 1"):
+            captured["aot_fn"](inputs, outputs, 0)
+    monkeypatch.setattr(trtp, "KernelLaunchParams", SimpleNamespace)
+    launch, extras = captured["aot_fn"]([actual], [actual], 0)
+    assert (launch.grid_x, launch.grid_y, launch.grid_z) == (3, 1, 1)
+    assert (launch.block_x, launch.block_y, launch.block_z) == (128, 1, 1)
+    assert launch.shared_mem == 0 and len(extras) == 0
+
+
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA")
 def test_cuda_registration_compiles_real_source_and_derives_trusted_launch(
     tmp_path, monkeypatch
@@ -146,13 +227,14 @@ def test_cuda_registration_compiles_real_source_and_derives_trusted_launch(
     pytest.importorskip("cuda.core")
     import tensorrt.plugin as trtp
 
-    from torch_tensorrt.kernels import KernelSpec
+    from torch_tensorrt.kernels import ptx_op
 
     spec = {"dtype": "float32", "shape": [257], "device": "cuda:0"}
     registration = make_registration(candidate(), "cuda_cpp", [spec], [spec], tmp_path)
-    assert isinstance(registration, KernelSpec)
+    assert isinstance(registration, partial) and registration.func is ptx_op
+    _validate_ptx(registration.keywords["ptx"], "generated", 2, (128, 1, 1))
     monkeypatch.setattr(trtp, "KernelLaunchParams", SimpleNamespace)
-    params, extras = registration.geometry.fn([], [], None)
+    params, extras = registration.keywords["aot_fn"]([], [], None)
     assert params.grid_x == 3
     assert params.block_x == 128
     assert len(extras) == 0

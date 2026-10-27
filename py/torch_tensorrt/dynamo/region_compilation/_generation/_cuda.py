@@ -13,11 +13,9 @@ from __future__ import annotations
 import hashlib
 import math
 import re
+from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:
-    from torch_tensorrt.kernels import KernelSpec
+from typing import Any
 
 _FIELDS = {"source", "kernel_name", "grid", "block", "shared_mem_bytes"}
 _HEADERS = {"cuda_fp16.h", "cuda_bf16.h", "math.h", "cmath", "stdint.h"}
@@ -152,11 +150,11 @@ def make_cuda_registration(
     input_specs: list[Any],
     output_specs: list[Any],
     directory: Path,
-) -> KernelSpec:
+) -> partial[None]:
     import tensorrt.plugin as trtp
     import torch
 
-    from torch_tensorrt.kernels import Custom, KernelSpec
+    from torch_tensorrt.kernels import ptx_op
     from torch_tensorrt.kernels._nvrtc import compile_to_ptx
 
     candidate = validate_cuda_candidate(candidate, len(input_specs), len(output_specs))
@@ -209,8 +207,11 @@ def make_cuda_registration(
         params.shared_mem = candidate["shared_mem_bytes"]
         return params, trtp.SymIntExprs(0)
 
-    return KernelSpec(
-        kernel_source=candidate["source"],
+    # Reuse the artifact whose ABI and resource limits were checked above.
+    # Returning source in a KernelSpec would compile it again during registration.
+    return partial(
+        ptx_op,
+        ptx=ptx,
         kernel_name=candidate["kernel_name"],
-        geometry=Custom(launch),
+        aot_fn=launch,
     )

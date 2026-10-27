@@ -293,7 +293,9 @@ def test_generate_cli_rejects_malformed_tuning_before_execution(
 
 
 def test_replay_old_tasks_use_default_search_policy(run):
-    config = cli._generation_config(_arguments(), cli._read(run / "task.json"), run)
+    task = cli._read(run / "task.json")
+    assert cli._saved_instruction_bundle(_arguments(), task, run) is None
+    config = cli._generation_config(_arguments(), task, run)
     assert config.search.batch_size == 1
     assert config.search.max_candidates is None
     assert config.search.resume is False
@@ -355,3 +357,21 @@ def test_replay_rejects_instruction_bundle_from_a_different_task(run):
     task["instructions_sha256"] = "different-task"
     with pytest.raises(ValueError, match="task instruction digest"):
         cli._saved_instruction_bundle(_arguments(), task, run)
+
+
+def test_replay_missing_instruction_snapshot_fails_before_execution(
+    run, monkeypatch, capsys
+):
+    _saved_bundle(run)
+    (run / "instructions.json").unlink()
+
+    def unexpected_execution(*args, **kwargs):
+        pytest.fail("Replay must validate saved instructions before execution")
+
+    monkeypatch.setattr(torch.cuda, "device", unexpected_execution)
+    monkeypatch.setattr(_factory, "_generate", unexpected_execution)
+    monkeypatch.setattr(sys, "argv", ["generation", "generate", str(run)])
+    with pytest.raises(SystemExit) as error:
+        cli.main()
+    assert error.value.code == 1
+    assert "instructions.json is missing" in capsys.readouterr().err

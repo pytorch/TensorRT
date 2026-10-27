@@ -115,7 +115,7 @@ def fused_kernel(
     and runs normally outside owned compilation.
 
     Alternatively, ``generator=KernelGenerator(...)`` authors and evaluates a
-    Triton or cuTile kernel during compilation using the selected agent CLI.
+    kernel during compilation using the selected backend and agent CLI.
     Generated regions currently require floating-point tensor boundaries.
     """
     if (kernel is None) == (generator is None):

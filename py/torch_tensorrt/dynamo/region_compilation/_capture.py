@@ -518,9 +518,7 @@ def materialize_regions(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
                 registration = generate_registration(
                     child, registration, region_id=record.id
                 )
-            plugin_op = register_region_plugin(
-                child, registration, region_id=record.id
-            )
+            plugin_op = register_region_plugin(child, registration, region_id=record.id)
         else:
             if record.operator_key >= 0:
                 if session is None or record.operator_key not in session.operators:

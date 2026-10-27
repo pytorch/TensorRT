@@ -301,6 +301,21 @@ def register_region_plugin(
                 ]
             )
             registration(op_name, **common)
+        elif registration.func is kernels.ptx_op:
+            from torch_tensorrt.kernels._common import check_aot_dtypes
+
+            # Generated CUDA already validated and compiled this pointer ABI.
+            # Keep the engine binding guard when using the precompiled funnel.
+            registration(
+                op_name,
+                aot_fn=check_aot_dtypes(
+                    op_name,
+                    registration.keywords["aot_fn"],
+                    [boundary.dtype for boundary in input_specs],
+                    [boundary.dtype for boundary in output_specs],
+                ),
+                **common,
+            )
         else:
             signature = _triton_signature(
                 registration, input_specs, output_specs, region_id

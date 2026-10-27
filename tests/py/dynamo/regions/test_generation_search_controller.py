@@ -7,11 +7,12 @@ import json
 from types import SimpleNamespace
 
 import pytest
-from test_kernel_generation import _candidate, _generate, _passed
-from test_kernel_generation import factory as factory  # noqa: F401
 
 from torch_tensorrt.dynamo.region_compilation._generation import _factory
 from torch_tensorrt.region import RegionError, SearchPolicy
+
+from .test_kernel_generation import _candidate, _generate, _passed
+from .test_kernel_generation import factory as factory  # noqa: F401
 
 
 @pytest.fixture

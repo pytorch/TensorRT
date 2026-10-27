@@ -217,6 +217,11 @@ def _saved_instruction_bundle(
         return None
     path = run / "instructions.json"
     if not path.is_file():
+        if "instructions_sha256" in task:
+            raise ValueError(
+                "Saved instructions.json is missing; exact replay requires the "
+                "instruction bundle recorded by the task"
+            )
         return None
     bundle = validate_instructions(_read(path), task["backend"])
     if task.get("instructions_sha256") != bundle["sha256"]:

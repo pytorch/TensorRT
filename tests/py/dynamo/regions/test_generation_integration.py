@@ -123,9 +123,7 @@ def test_generated_kernel_evaluation_engine_and_cache(
     class Model(torch.nn.Module):
         def forward(self, x):
             x = x + 1
-            with region.fused_kernel(
-                generator=generator, name="generated_activation"
-            ):
+            with region.fused_kernel(generator=generator, name="generated_activation"):
                 y = torch.relu(x * 0.75 - 0.25)
             return y - 0.5
 
@@ -239,9 +237,7 @@ def test_batched_tuning_selects_a_correct_kernel_inside_tensorrt(tmp_path, monke
 
     class Model(torch.nn.Module):
         def forward(self, x):
-            with region.fused_kernel(
-                generator=generator, name="batched_activation"
-            ):
+            with region.fused_kernel(generator=generator, name="batched_activation"):
                 return torch.relu(x * 0.75 - 0.25)
 
     model = Model().eval()
