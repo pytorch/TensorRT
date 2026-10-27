@@ -6,7 +6,7 @@ import torch.nn as nn
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 
-from .harness import DispatchTestCase
+from .harness import DispatchTestCase, skip_if_trt_rtx_turing
 
 
 class TestBmmConverter(DispatchTestCase):
@@ -18,6 +18,8 @@ class TestBmmConverter(DispatchTestCase):
         ]
     )
     def test_bmm(self, _, input_shape, mat2_shape):
+        skip_if_trt_rtx_turing(self, "FP32 GEMM")
+
         class BMM(nn.Module):
             def forward(self, input, mat2):
                 return torch.ops.aten.bmm.default(input, mat2)
