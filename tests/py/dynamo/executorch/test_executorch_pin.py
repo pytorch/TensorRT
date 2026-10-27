@@ -918,7 +918,7 @@ def test_required_setup_steps_fail_their_suite(monkeypatch) -> None:
     source = (REPO_ROOT / "tests/ci/runner.py").read_text(encoding="utf-8")
     body = source[source.index('    for step in v["setup"]:') :]
     body = body[: body.index('\n    print(f"==>')]
-    assert 'if step in {"executorch", "cuda-tile"}:' in body, body
+    assert 'if step in {"executorch", "cuda-tile", "cutedsl"}:' in body, body
     assert body.count("return rc") == 1, body
     assert "::warning::setup step" in body, body
 

@@ -620,9 +620,7 @@ def cutedsl_op(
         (len(schema_info.tensor_arg_names), schema_info.num_outputs),
         extra_args_fn,
     )
-    artifact = _cutedsl.compile_to_ptx(
-        kernel, signature, constants, layout, block, shared_mem
-    )
+    artifact = _cutedsl.compile_to_ptx(kernel, constants, layout, block, shared_mem)
 
     ptx_op(
         op_name,

@@ -312,6 +312,16 @@ Install ``nvidia-cutlass-dsl>=4.8.1,<5``. Registration targets the current CUDA
 device; use ``with torch.cuda.device(device):`` to select another. Pointer
 dtypes and GPU architecture are fixed for each registration, and conversion
 rejects mismatches. Use a separate operator name for another dtype or target.
+Architecture-specific targets such as ``sm_90a`` and ``sm_120a`` preserve
+Hopper and Blackwell instructions.
+
+The loaded CUDA driver must support the kernel's PTX ISA. If CuTe's bundled
+compiler emits a newer ISA, the frontend recompiles with a driver-compatible
+compiler target and verifies that the driver can load the result. It does not
+rewrite PTX version headers. Kernels or architectures that require a newer
+ISA still need a driver upgrade or a compatible CuTe toolchain; installing a
+newer CUDA toolkit alone does not update the driver's PTX compiler. Serialized
+engines retain the same GPU and driver compatibility requirements.
 
 ``signature`` lists runtime parameters in declaration order:
 ``(input_ptrs..., extra_scalars..., output_ptrs...)``, using pointer spellings

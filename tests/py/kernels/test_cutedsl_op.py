@@ -7,6 +7,7 @@ import inspect
 import subprocess
 import sys
 from types import ModuleType, SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 import tensorrt as trt
@@ -121,19 +122,132 @@ def test_compiler_added_workspace_is_rejected(fake_kernel, monkeypatch):
     runtime = ModuleType("cutlass.cute.runtime")
     runtime.make_ptr = lambda *args, **kwargs: object()
     monkeypatch.setitem(sys.modules, "cutlass.cute.runtime", runtime)
-    fake_kernel[1].compile = lambda *args, **kwargs: SimpleNamespace(
+    compiler = ModuleType("cutlass.base_dsl.compiler")
+    for name in ("GPUArch", "KeepPTX", "DumpDir", "ExtraCompilerOpts"):
+        setattr(compiler, name, lambda *args: object())
+    monkeypatch.setitem(sys.modules, "cutlass.base_dsl.compiler", compiler)
+    fake_kernel[1].compile = MagicMock()
+    fake_kernel[1].compile.__getitem__.return_value.return_value = SimpleNamespace(
         __ptx__=PTX, total_added_arguments=1, kernel_extra_args={}
     )
     monkeypatch.setattr(torch.cuda, "get_device_capability", lambda: (9, 0))
+    monkeypatch.setattr(_cutedsl, "_target_arch", lambda arch: "sm_90a")
+    monkeypatch.setattr(_cutedsl, "_driver_ptx_version", lambda: 90)
     with pytest.raises(RuntimeError, match="workspace"):
         _cutedsl.compile_to_ptx(
             fake_kernel[0],
-            SIGNATURE,
             {"block": 128},
             _common.analyze_signature(SIGNATURE, (1, 1)),
             (128, 1, 1),
             0,
         )
+
+
+@pytest.mark.parametrize(
+    "arch,target",
+    [
+        ((8, 0), "sm_80"),
+        ((8, 9), "sm_89"),
+        ((9, 0), "sm_90a"),
+        ((10, 0), "sm_100a"),
+        ((10, 1), "sm_110a"),
+        ((12, 0), "sm_120a"),
+    ],
+)
+def test_target_preserves_architecture_features(arch, target, monkeypatch):
+    pytest.importorskip("cutlass.base_dsl")
+    monkeypatch.setenv("CUTE_DSL_ARCH", "sm_80")
+    assert _cutedsl._target_arch(arch) == target
+
+
+def test_unsupported_target_fails_clearly():
+    pytest.importorskip("cutlass.base_dsl")
+    with pytest.raises(RuntimeError, match="does not support CUDA target sm_70"):
+        _cutedsl._target_arch((7, 0))
+
+
+@pytest.mark.parametrize(
+    "version,expected",
+    [(12050, 85), (12060, 85), (12080, 87), (12090, 88), (13000, 90), (13030, 93)],
+)
+def test_driver_ptx_ceiling_uses_loaded_driver(version, expected, monkeypatch):
+    driver = pytest.importorskip("cuda.bindings.driver")
+    monkeypatch.setattr(driver, "cuDriverGetVersion", lambda: (0, version))
+    assert _cutedsl._driver_ptx_version() == expected
+
+
+@pytest.mark.parametrize("result", [(0, 0), (0, 11080), (1, 13030)])
+def test_unavailable_driver_ptx_support_fails_clearly(result, monkeypatch):
+    driver = pytest.importorskip("cuda.bindings.driver")
+    monkeypatch.setattr(driver, "cuDriverGetVersion", lambda: result)
+    with pytest.raises(RuntimeError, match="queryable PTX support"):
+        _cutedsl._driver_ptx_version()
+
+
+@pytest.mark.parametrize("emitted", [88, 93, 94])
+def test_driver_isa_ceiling_recompiles_only_newer_ptx(emitted, monkeypatch):
+    monkeypatch.setattr(_cutedsl, "_driver_ptx_version", lambda: 93)
+    calls = []
+
+    def compile(version):
+        calls.append(version)
+        isa = emitted if version is None else version
+        # A distinct body proves the compiler's new output is used, rather than
+        # only relabeling the original PTX header.
+        return f".version {isa // 10}.{isa % 10}\n// compiled for {version}\n"
+
+    ptx = _cutedsl._compile_within_driver_isa(compile)
+    if emitted > 93:
+        assert calls == [None, 93]
+        assert ptx == ".version 9.3\n// compiled for 93\n"
+    else:
+        assert calls == [None]
+        assert ptx == f".version {emitted // 10}.{emitted % 10}\n// compiled for None\n"
+
+
+def test_compiler_must_honor_driver_isa_ceiling(monkeypatch):
+    monkeypatch.setattr(_cutedsl, "_driver_ptx_version", lambda: 87)
+    with pytest.raises(RuntimeError, match="did not honor.*8.7"):
+        _cutedsl._compile_within_driver_isa(lambda version: PTX)
+
+
+def test_unsupported_compiler_isa_has_actionable_error(monkeypatch):
+    monkeypatch.setattr(_cutedsl, "_driver_ptx_version", lambda: 87)
+    failure = ValueError("unsupported compiler target")
+
+    def compile(version):
+        if version is not None:
+            raise failure
+        return PTX
+
+    with pytest.raises(RuntimeError, match="PTX ISA 8.7.*Upgrade") as error:
+        _cutedsl._compile_within_driver_isa(compile)
+    assert error.value.__cause__ is failure
+
+
+@skip_no_cuda
+def test_hopper_warpgroup_instruction_compiles(tmp_path):
+    cutlass = pytest.importorskip("cutlass")
+    cute = pytest.importorskip("cutlass.cute")
+    from cutlass.base_dsl.compiler import DumpDir, GPUArch, KeepPTX
+    from cutlass.cute.runtime import make_ptr
+
+    @cute.kernel
+    def kernel(x: cute.Pointer, out: cute.Pointer):
+        cute.nvgpu.warpgroup.fence()
+        out[0] = x[0]
+
+    @cute.jit
+    def launch(x: cute.Pointer, out: cute.Pointer):
+        kernel(x, out).launch(grid=(1, 1, 1), block=(128, 1, 1))
+
+    ptr = make_ptr(cutlass.Float32, 0, cute.AddressSpace.gmem, assumed_align=1)
+    # Compile only: this verifies Hopper code generation even on another GPU.
+    compiled = cute.compile[
+        GPUArch(_cutedsl._target_arch((9, 0))), KeepPTX(), DumpDir(str(tmp_path))
+    ](launch, ptr, ptr)
+    assert ".target sm_90a" in compiled.__ptx__
+    assert "wgmma.fence.sync.aligned" in compiled.__ptx__
 
 
 def _run_plan(plan, x, y):
@@ -173,12 +287,39 @@ def _run_plan(plan, x, y):
 
 @skip_no_cuda
 @skip_no_qdp
-@pytest.mark.parametrize("dtype", [torch.float16, torch.float32])
-def test_dynamic_multi_output_engine_and_standalone_serialization(dtype, tmp_path):
+@pytest.mark.parametrize(
+    "dtype,ptx_ceiling",
+    [(torch.float16, None), (torch.float32, None), (torch.float32, 87)],
+    ids=["fp16", "fp32", "fp32-driver-ptx87"],
+)
+def test_dynamic_multi_output_engine_and_standalone_serialization(
+    dtype, ptx_ceiling, tmp_path, monkeypatch
+):
     cutlass = pytest.importorskip("cutlass")
     cute = pytest.importorskip("cutlass.cute")
     import tensorrt.plugin as trtp
     from cutlass.memory import SmemAllocator
+
+    if ptx_ceiling is not None:
+        if torch.cuda.get_device_capability() not in {
+            (8, 0),
+            (8, 6),
+            (8, 7),
+            (8, 9),
+            (9, 0),
+            (10, 0),
+            (12, 0),
+        }:
+            pytest.skip("This forced PTX 8.7 case requires a GPU supported by PTX 8.7")
+        ceiling = min(ptx_ceiling, _cutedsl._driver_ptx_version())
+        monkeypatch.setattr(_cutedsl, "_driver_ptx_version", lambda: ceiling)
+        load_ptx = _common.load_ptx
+
+        def checked_load(ptx, name):
+            assert _cutedsl._ptx_version(ptx) <= ceiling
+            return load_ptx(ptx, name)
+
+        monkeypatch.setattr(_common, "load_ptx", checked_load)
 
     @cute.kernel
     def kernel(
@@ -218,7 +359,8 @@ def test_dynamic_multi_output_engine_and_standalone_serialization(dtype, tmp_pat
         return x + y, x - y
 
     spelling = "fp16" if dtype == torch.float16 else "fp32"
-    op_name = f"cutedsl_tests::sum_difference_{spelling}"
+    name = f"sum_difference_{spelling}_{ptx_ceiling}"
+    op_name = f"cutedsl_tests::{name}"
     signature = {
         "x": f"*{spelling}",
         "y": f"*{spelling}",
@@ -241,7 +383,7 @@ def test_dynamic_multi_output_engine_and_standalone_serialization(dtype, tmp_pat
             extra_args_fn=lambda i, o: [trtp.SymInt32(i[0].shape_expr.numel())],
         ),
     )
-    target = getattr(torch.ops.cutedsl_tests, f"sum_difference_{spelling}")
+    target = getattr(torch.ops.cutedsl_tests, name)
 
     class Model(torch.nn.Module):
         def forward(self, x, y):

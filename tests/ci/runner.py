@@ -252,7 +252,7 @@ def run_suite(
                 # These suites gate on optional dependencies, so a failed setup skips
                 # those files, leaves the rest passing, and reports success with a populated
                 # junit xml: the run looks green precisely when the thing it exists to test is
-                # absent. A missing ExecuTorch build or required cuTile compiler must fail
+                # absent. Missing ExecuTorch, cuTile or CuTe DSL dependencies must fail
                 # explicitly. Other steps keep warning and continuing, because their
                 # suites fail visibly on a missing dependency and a flaky checkpoint download
                 # should not fail a suite that would otherwise report honestly.

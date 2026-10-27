@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import inspect
+import logging
 import re
 import tempfile
 from typing import (
@@ -23,6 +24,8 @@ import torch
 
 from packaging.version import InvalidVersion, Version
 from torch_tensorrt.kernels import _common
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class CompiledCuteDSLArtifact(NamedTuple):
@@ -153,15 +156,82 @@ def _validate_ptx(
     return name
 
 
+def _target_arch(arch: Tuple[int, int]) -> str:
+    """Keep architecture-specific instructions enabled on the current device."""
+    from cutlass.base_dsl import Arch
+
+    base = f"sm_{arch[0]}{arch[1]}"
+    target = Arch.__members__.get(base + "a") or Arch.__members__.get(base)
+    if target is None:
+        raise RuntimeError(f"Installed CuTe DSL does not support CUDA target {base}.")
+    return str(target.to_string())
+
+
+def _driver_ptx_version() -> int:
+    """PTX ISA supported by the loaded driver, independent of the CUDA toolkit."""
+    from cuda.bindings import driver
+
+    status, raw_version = driver.cuDriverGetVersion()
+    version = int(raw_version)
+    if int(status) != 0 or version < 12000:
+        raise RuntimeError(
+            "cutedsl_op requires a CUDA 12+ driver with queryable PTX support; "
+            f"cuDriverGetVersion returned {status}, version {version}."
+        )
+    major, minor = version // 1000, (version % 1000) // 10
+    # CUDA 12.6 still uses PTX 8.5; CUDA 12.8/12.9 use 8.7/8.8.
+    if major == 12:
+        return 80 + minor - (minor >= 6)
+    return 90 + (major - 13) * 10 + minor
+
+
+def _ptx_version(ptx: str) -> int:
+    match = re.search(r"(?m)^\s*\.version\s+(\d+)\.(\d+)\b", ptx)
+    if match is None:
+        raise RuntimeError("CuTe DSL PTX is missing its ISA version.")
+    return int(match[1]) * 10 + int(match[2])
+
+
+def _compile_within_driver_isa(compile_fn: Callable[[Optional[int]], str]) -> str:
+    """Recompile newer PTX for the driver; never relabel an existing artifact."""
+    ceiling = _driver_ptx_version()
+    ptx = compile_fn(None)
+    emitted = _ptx_version(ptx)
+    if emitted <= ceiling:
+        return ptx
+    label = f"{ceiling // 10}.{ceiling % 10}"
+    guidance = (
+        "Upgrade the CUDA driver or select a CuTe DSL toolchain compatible "
+        "with that driver."
+    )
+    _LOGGER.info(
+        "CuTe DSL emitted PTX ISA %d; recompiling for driver ceiling %d",
+        emitted,
+        ceiling,
+    )
+    try:
+        ptx = compile_fn(ceiling)
+    except Exception as exc:
+        raise RuntimeError(
+            f"CuTe DSL could not compile this kernel for driver PTX ISA {label}. "
+            + guidance
+        ) from exc
+    if _ptx_version(ptx) > ceiling:
+        raise RuntimeError(
+            f"CuTe DSL did not honor the driver PTX ISA ceiling {label}. " + guidance
+        )
+    return ptx
+
+
 def compile_to_ptx(
     kernel: Any,
-    signature: Dict[str, str],
     constants: Mapping[str, Any],
     layout: _common.SignatureLayout,
     block: Tuple[int, int, int],
     shared_mem: int,
 ) -> CompiledCuteDSLArtifact:
     cutlass, cute = _cutedsl_import()
+    from cutlass.base_dsl.compiler import DumpDir, ExtraCompilerOpts, GPUArch, KeepPTX
     from cutlass.cute.runtime import make_ptr
 
     type_names = {
@@ -175,7 +245,8 @@ def compile_to_ptx(
         torch.uint8: "Uint8",
         torch.float8_e4m3fn: "Float8E4M3FN",
     }
-    runtime_names = tuple(signature)
+    params = layout.inputs + layout.scalars + layout.outputs
+    runtime_names = tuple(param.name for param in params)
     constants = dict(constants)
 
     @cute.jit  # type: ignore[misc]
@@ -195,32 +266,45 @@ def compile_to_ptx(
             if param.is_pointer
             else cutlass.Int32(1)
         )
-        for param in layout.inputs + layout.scalars + layout.outputs
+        for param in params
     ]
     arch = torch.cuda.get_device_capability()
+    target = _target_arch(arch)
     with tempfile.TemporaryDirectory(prefix="torch_tensorrt_cutedsl_") as directory:
-        compiled = cute.compile(
-            launch,
-            # Host-only placeholders keep grid dimensions dynamic in the compiler.
-            # TensorRT supplies the actual grid independently of device arguments.
-            cutlass.Int32(1),
-            cutlass.Int32(1),
-            cutlass.Int32(1),
-            *args,
-            options=f"--gpu-arch sm_{arch[0]}{arch[1]} --keep-ptx --dump-dir {directory}",
-        )
-        ptx = compiled.__ptx__
-    if compiled.total_added_arguments or compiled.kernel_extra_args:
-        raise RuntimeError(
-            "cutedsl_op cannot supply compiler-added workspace arguments."
-        )
-    if not isinstance(ptx, str):
-        raise RuntimeError("CuTe DSL did not expose the compiled PTX text.")
+
+        def compile(ptx_version: Optional[int]) -> str:
+            options: Tuple[Any, ...] = (GPUArch(target), KeepPTX(), DumpDir(directory))
+            if ptx_version is not None:
+                # CuTe forwards this option to its NVVM lowering pipeline. A
+                # compiler target constrains code generation, unlike editing
+                # the PTX .version header after compilation.
+                options += (ExtraCompilerOpts(f"ptx-version=+ptx{ptx_version}"),)
+            compiled = cute.compile[options](
+                launch,
+                # Host-only placeholders keep grid dimensions dynamic in the compiler.
+                # TensorRT supplies the actual grid independently of device arguments.
+                cutlass.Int32(1),
+                cutlass.Int32(1),
+                cutlass.Int32(1),
+                *args,
+            )
+            if compiled.total_added_arguments or compiled.kernel_extra_args:
+                raise RuntimeError(
+                    "cutedsl_op cannot supply compiler-added workspace arguments."
+                )
+            ptx = compiled.__ptx__
+            if not isinstance(ptx, str):
+                raise RuntimeError("CuTe DSL did not expose the compiled PTX text.")
+            return ptx
+
+        ptx = _compile_within_driver_isa(compile)
     name = _validate_ptx(ptx, layout, block, shared_mem)
     error = _common.load_ptx(ptx, name)
     if int(error) != 0:
         raise RuntimeError(
-            f"The CUDA driver could not load CuTe DSL PTX for '{name}': {error}."
+            f"The CUDA driver could not load CuTe DSL PTX for '{name}': {error}. "
+            "Use a CUDA driver and CuTe DSL toolchain that support this kernel's "
+            "PTX ISA and target architecture."
         )
     return CompiledCuteDSLArtifact(ptx.encode(), name, block, shared_mem, arch)
 
