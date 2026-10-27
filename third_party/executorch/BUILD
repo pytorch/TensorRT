@@ -72,10 +72,12 @@ cc_library(
     name = "extension_cuda_impl",
     srcs = [
         "executorch/extension/cuda/caller_stream.cpp",
+        "executorch/extension/cuda/cuda_allocator.cpp",
         "executorch/extension/cuda/device_guard.cpp",
     ],
     hdrs = [
         "executorch/extension/cuda/caller_stream.h",
+        "executorch/extension/cuda/cuda_allocator.h",
         "executorch/extension/cuda/device_guard.h",
         "executorch/extension/cuda/export.h",
     ],
@@ -127,6 +129,7 @@ cc_library(
     name = "extension_cuda",
     hdrs = [
         "executorch/extension/cuda/caller_stream.h",
+        "executorch/extension/cuda/cuda_allocator.h",
         "executorch/extension/cuda/device_guard.h",
         "executorch/extension/cuda/export.h",
     ],
@@ -139,28 +142,6 @@ cc_library(
         # runtime always lands after that shared object on a link line, which is the
         # only order in which a static archive can satisfy it.
         ":executorch_core",
-        "@cuda//:cudart",
-    ],
-)
-
-# The CUDA DeviceAllocator that serves device planned buffers. In the pinned
-# ExecuTorch release this source is compiled only into the CUDA/AOTI delegate,
-# so a binary that delegates to TensorRT alone cannot get one without linking a
-# delegate it never calls. Compile it on its own instead. It has no delegate
-# dependencies: cuda_runtime.h, the caller-stream header already in
-# libextension_cuda.so, and the ExecuTorch runtime headers.
-#
-# This target names a path that goes away when the allocator stops living under
-# backends/cuda upstream, so the pin cannot move forward while it is still here.
-cc_library(
-    name = "executorch_cuda_allocator",
-    srcs = ["executorch/backends/cuda/runtime/cuda_allocator.cpp"],
-    hdrs = ["executorch/backends/cuda/runtime/cuda_allocator.h"],
-    include_prefix = "executorch",
-    strip_include_prefix = "executorch",
-    deps = [
-        ":executorch_headers",
-        ":extension_cuda",
         "@cuda//:cudart",
     ],
 )

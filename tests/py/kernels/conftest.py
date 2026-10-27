@@ -39,24 +39,25 @@ skip_no_triton = pytest.mark.skipif(
 )
 
 
-def _has_cutile_toolchain() -> bool:
-    """Whether the AOT API and a compiler discoverable by cuTile are present."""
+def _cutile_skip_reason() -> str | None:
+    """Use the same driver/compiler requirements as the production frontend."""
     if not _has_module("cuda.tile"):
-        return False
-
+        return "cuda-tile >=1.3 and CUDA Toolkit 13.2+ are required"
     try:
-        from cuda.tile._compile import _find_compiler_bin
         from cuda.tile.compilation import export_kernel  # noqa: F401
 
-        _find_compiler_bin()
-    except (ImportError, AttributeError, FileNotFoundError, OSError, ValueError):
-        return False
-    return True
+        from torch_tensorrt.kernels._cutile import validate_cutile_toolchain
+
+        validate_cutile_toolchain("cuTile integration tests")
+    except (ImportError, RuntimeError) as exc:
+        return str(exc)
+    return None
 
 
+_CUTILE_SKIP_REASON = _cutile_skip_reason()
 skip_no_cutile = pytest.mark.skipif(
-    not _has_cutile_toolchain(),
-    reason="cuda-tile >=1.3 and its tileiras compiler are required",
+    _CUTILE_SKIP_REASON is not None,
+    reason=_CUTILE_SKIP_REASON or "cuTile unavailable",
 )
 
 # The cuda-core ``cuda.core`` API is the NVRTC/QDP backend.

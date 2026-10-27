@@ -323,7 +323,10 @@ def test_the_config_looks_for_the_delegate_in_one_place_only() -> None:
     assert "get_filename_component" in config, config
     # One test for the library, at the fixed distance the wheel installs this file at.
     assert (
-        config.count('EXISTS "${_executorch_backend_tensorrt_root}/lib/') == 1
+        config.count(
+            'EXISTS "${_executorch_backend_tensorrt_root}/lib/${_executorch_backend_tensorrt_filename}"'
+        )
+        == 1
     ), config
 
 

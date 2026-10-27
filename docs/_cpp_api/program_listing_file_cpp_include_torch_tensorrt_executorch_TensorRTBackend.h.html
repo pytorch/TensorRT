@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=0866734c"></script>
+    <script src="../_static/documentation_options.js?v=ede72c6b"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -498,23 +498,19 @@ document.write(`
 <span class="cm"> *</span>
 <span class="cm"> * This source code is licensed under the BSD-style license found in the</span>
 <span class="cm"> * LICENSE file in the root directory of this source tree.</span>
-<span class="cm"> *</span>
-<span class="cm"> * ExecuTorch backend delegate that runs TensorRT engines serialized by</span>
-<span class="cm"> * torch_tensorrt. The processed blob uses the standalone wire format from</span>
-<span class="cm"> * py/torch_tensorrt/executorch/serialization.py and is parsed directly here.</span>
-<span class="cm"> * This runtime path intentionally does not depend on the legacy</span>
-<span class="cm"> * Torch-TensorRT C++ runtime or libtorch.</span>
 <span class="cm"> */</span>
+
 <span class="cp">#pragma once</span>
 
 <span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;NvInfer.h&gt;</span>
 
 <span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;executorch/runtime/backend/interface.h&gt;</span>
 
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"torch_tensorrt/executorch/OptimizationProfileSelection.h"</span>
+
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;cstdint&gt;</span>
 <span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;memory&gt;</span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;mutex&gt;</span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;string&gt;</span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;vector&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;type_traits&gt;</span>
 
 <span class="k">namespace</span><span class="w"> </span><span class="nn">torch_tensorrt</span><span class="w"> </span><span class="p">{</span>
 <span class="k">namespace</span><span class="w"> </span><span class="nn">executorch_backend</span><span class="w"> </span><span class="p">{</span>
@@ -534,46 +530,11 @@ document.write(`
 <span class="w">  </span><span class="kt">void</span><span class="w"> </span><span class="n">log</span><span class="p">(</span><span class="n">Severity</span><span class="w"> </span><span class="n">severity</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">msg</span><span class="p">)</span><span class="w"> </span><span class="k">noexcept</span><span class="w"> </span><span class="k">override</span><span class="p">;</span>
 <span class="p">};</span>
 
-<span class="k">struct</span><span class="w"> </span><span class="nc">InputProfileBounds</span><span class="w"> </span><span class="p">{</span>
-<span class="w">  </span><span class="n">nvinfer1</span><span class="o">::</span><span class="n">Dims</span><span class="w"> </span><span class="n">min</span><span class="p">{};</span>
-<span class="w">  </span><span class="n">nvinfer1</span><span class="o">::</span><span class="n">Dims</span><span class="w"> </span><span class="n">max</span><span class="p">{};</span>
-<span class="p">};</span>
+<span class="kr">inline</span><span class="w"> </span><span class="k">constexpr</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="n">kSharedActivationScratchKey</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"use_shared_activation_scratch"</span><span class="p">;</span>
 
-<span class="k">struct</span><span class="w"> </span><span class="nc">EngineHandle</span><span class="w"> </span><span class="p">{</span>
-<span class="w">  </span><span class="n">TRTUniquePtr</span><span class="o">&lt;</span><span class="n">nvinfer1</span><span class="o">::</span><span class="n">ICudaEngine</span><span class="o">&gt;</span><span class="w"> </span><span class="n">engine</span><span class="p">;</span>
-<span class="w">  </span><span class="n">TRTUniquePtr</span><span class="o">&lt;</span><span class="n">nvinfer1</span><span class="o">::</span><span class="n">IExecutionContext</span><span class="o">&gt;</span><span class="w"> </span><span class="n">exec_ctx</span><span class="p">;</span>
-<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;</span><span class="w"> </span><span class="n">input_binding_names</span><span class="p">;</span>
-<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;</span><span class="w"> </span><span class="n">output_binding_names</span><span class="p">;</span>
-<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">InputProfileBounds</span><span class="o">&gt;</span><span class="w"> </span><span class="n">input_profile_bounds</span><span class="p">;</span>
-<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">void</span><span class="o">*&gt;</span><span class="w"> </span><span class="n">cached_input_ptrs</span><span class="p">;</span>
-<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">size_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">cached_input_sizes</span><span class="p">;</span>
-<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">void</span><span class="o">*&gt;</span><span class="w"> </span><span class="n">cached_output_ptrs</span><span class="p">;</span>
-<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">size_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">cached_output_sizes</span><span class="p">;</span>
-<span class="w">  </span><span class="kt">size_t</span><span class="w"> </span><span class="n">num_inputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
-<span class="w">  </span><span class="kt">size_t</span><span class="w"> </span><span class="n">num_outputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
-<span class="w">  </span><span class="c1">// Per output binding [0..num_outputs): index into input_binding_names of the</span>
-<span class="w">  </span><span class="c1">// input it aliases (in-place KV-cache / user alias), or -1 for a normal output.</span>
-<span class="w">  </span><span class="c1">// Built at init from the blob's aliased_io. The KV buffers are threaded by</span>
-<span class="w">  </span><span class="c1">// ExecuTorch as caller-owned mutable-buffer delegate args (input AND aliased</span>
-<span class="w">  </span><span class="c1">// output): execute() binds each aliased TRT output binding to its aliased</span>
-<span class="w">  </span><span class="c1">// input's caller-provided pointer (in-place) and reflects the result into the</span>
-<span class="w">  </span><span class="c1">// delegate output EValue, which ExecuTorch's write-back copy_ then reads.</span>
-<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">output_aliased_input_idx</span><span class="p">;</span>
-<span class="w">  </span><span class="c1">// Per input binding [0..num_inputs): true if any output aliases this input, so</span>
-<span class="w">  </span><span class="c1">// its in-place (KV/user) update must land in the caller-owned storage. Built at</span>
-<span class="w">  </span><span class="c1">// init from aliased_io; execute() uses it to reject a non-device-resident</span>
-<span class="w">  </span><span class="c1">// aliased input instead of silently staging its update into delegate scratch.</span>
-<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">bool</span><span class="o">&gt;</span><span class="w"> </span><span class="n">input_is_alias_target</span><span class="p">;</span>
-<span class="w">  </span><span class="kt">size_t</span><span class="w"> </span><span class="n">num_aliased_outputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
-<span class="w">  </span><span class="kt">int</span><span class="w"> </span><span class="n">device_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
-<span class="w">  </span><span class="c1">// Whether this device can reach pageable host memory through shared host page tables, which is the</span>
-<span class="w">  </span><span class="c1">// question the uses of this flag ask. A discrete card answers no: it can reach pageable memory, but</span>
-<span class="w">  </span><span class="c1">// only by faulting pages in one at a time, so it takes the staged-copy path instead.</span>
-<span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">pageable_host_access</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
-<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">mutex</span><span class="w"> </span><span class="n">mu</span><span class="p">;</span>
+<span class="kr">inline</span><span class="w"> </span><span class="k">constexpr</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="n">kSharedEnginesKey</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"use_shared_engines"</span><span class="p">;</span>
 
-<span class="w">  </span><span class="o">~</span><span class="n">EngineHandle</span><span class="p">();</span>
-<span class="p">};</span>
+<span class="kr">inline</span><span class="w"> </span><span class="k">constexpr</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="n">kCudaGraphsKey</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"use_cuda_graphs"</span><span class="p">;</span>
 
 <span class="k">class</span><span class="w"> </span><span class="nc">TensorRTBackend</span><span class="w"> </span><span class="k">final</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="o">::</span><span class="n">executorch</span><span class="o">::</span><span class="n">runtime</span><span class="o">::</span><span class="n">BackendInterface</span><span class="w"> </span><span class="p">{</span>
 <span class="w"> </span><span class="k">public</span><span class="o">:</span>
@@ -584,18 +545,46 @@ document.write(`
 <span class="w">      </span><span class="o">::</span><span class="n">executorch</span><span class="o">::</span><span class="n">runtime</span><span class="o">::</span><span class="n">FreeableBuffer</span><span class="o">*</span><span class="w"> </span><span class="n">processed</span><span class="p">,</span>
 <span class="w">      </span><span class="o">::</span><span class="n">executorch</span><span class="o">::</span><span class="n">runtime</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;::</span><span class="n">executorch</span><span class="o">::</span><span class="n">runtime</span><span class="o">::</span><span class="n">CompileSpec</span><span class="o">&gt;</span><span class="w"> </span><span class="n">compile_specs</span><span class="p">)</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="k">override</span><span class="p">;</span>
 
-<span class="w">  </span><span class="c1">// Runs the engine and returns once the work is finished, whatever memory it was given, so</span>
-<span class="w">  </span><span class="c1">// outputs are readable as soon as this returns. The stream in use must be on the engine's</span>
-<span class="w">  </span><span class="c1">// device, and calls on one handle must not overlap each other or its destruction.</span>
-<span class="w">  </span><span class="c1">// Every buffer passed in must stay alive and unchanged until this returns. Freeing one while the</span>
-<span class="w">  </span><span class="c1">// call runs is not detectable here or anywhere below, and returns a plausible wrong answer rather</span>
-<span class="w">  </span><span class="c1">// than an error.</span>
 <span class="w">  </span><span class="o">::</span><span class="n">executorch</span><span class="o">::</span><span class="n">runtime</span><span class="o">::</span><span class="n">Error</span><span class="w"> </span><span class="nf">execute</span><span class="p">(</span>
 <span class="w">      </span><span class="o">::</span><span class="n">executorch</span><span class="o">::</span><span class="n">runtime</span><span class="o">::</span><span class="n">BackendExecutionContext</span><span class="o">&amp;</span><span class="w"> </span><span class="n">context</span><span class="p">,</span>
 <span class="w">      </span><span class="o">::</span><span class="n">executorch</span><span class="o">::</span><span class="n">runtime</span><span class="o">::</span><span class="n">DelegateHandle</span><span class="o">*</span><span class="w"> </span><span class="n">handle</span><span class="p">,</span>
 <span class="w">      </span><span class="o">::</span><span class="n">executorch</span><span class="o">::</span><span class="n">runtime</span><span class="o">::</span><span class="n">Span</span><span class="o">&lt;::</span><span class="n">executorch</span><span class="o">::</span><span class="n">runtime</span><span class="o">::</span><span class="n">EValue</span><span class="o">*&gt;</span><span class="w"> </span><span class="n">args</span><span class="p">)</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="k">override</span><span class="p">;</span>
 
+<span class="w">  </span><span class="o">::</span><span class="n">executorch</span><span class="o">::</span><span class="n">runtime</span><span class="o">::</span><span class="n">Error</span><span class="w"> </span><span class="nf">set_option</span><span class="p">(</span>
+<span class="w">      </span><span class="n">ET_UNUSED</span><span class="w"> </span><span class="o">::</span><span class="n">executorch</span><span class="o">::</span><span class="n">runtime</span><span class="o">::</span><span class="n">BackendOptionContext</span><span class="o">&amp;</span><span class="w"> </span><span class="n">context</span><span class="p">,</span>
+<span class="w">      </span><span class="k">const</span><span class="w"> </span><span class="o">::</span><span class="n">executorch</span><span class="o">::</span><span class="n">runtime</span><span class="o">::</span><span class="n">Span</span><span class="o">&lt;::</span><span class="n">executorch</span><span class="o">::</span><span class="n">runtime</span><span class="o">::</span><span class="n">BackendOption</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">backend_options</span><span class="p">)</span><span class="w"> </span><span class="k">override</span><span class="p">;</span>
+
 <span class="w">  </span><span class="kt">void</span><span class="w"> </span><span class="nf">destroy</span><span class="p">(</span><span class="o">::</span><span class="n">executorch</span><span class="o">::</span><span class="n">runtime</span><span class="o">::</span><span class="n">DelegateHandle</span><span class="o">*</span><span class="w"> </span><span class="n">handle</span><span class="p">)</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="k">override</span><span class="p">;</span>
+
+<span class="w"> </span><span class="k">private</span><span class="o">:</span>
+<span class="w">  </span><span class="k">static</span><span class="w"> </span><span class="n">nvinfer1</span><span class="o">::</span><span class="n">IRuntime</span><span class="o">*</span><span class="w"> </span><span class="n">shared_runtime</span><span class="p">();</span>
+<span class="w">  </span><span class="k">friend</span><span class="w"> </span><span class="n">nvinfer1</span><span class="o">::</span><span class="n">IRuntime</span><span class="o">*</span><span class="w"> </span><span class="nf">shared_runtime_for_testing</span><span class="p">();</span>
+<span class="p">};</span>
+
+<span class="k">class</span><span class="w"> </span><span class="p">[[</span><span class="na">nodiscard</span><span class="p">]]</span><span class="w"> </span><span class="nc">OptimizationProfileGuard</span><span class="w"> </span><span class="p">{</span>
+<span class="w"> </span><span class="k">public</span><span class="o">:</span>
+<span class="w">  </span><span class="p">[[</span><span class="na">nodiscard</span><span class="p">]]</span><span class="w"> </span><span class="k">explicit</span><span class="w"> </span><span class="n">OptimizationProfileGuard</span><span class="p">(</span><span class="kt">int32_t</span><span class="w"> </span><span class="n">profile_index</span><span class="p">);</span>
+
+<span class="w">  </span><span class="k">template</span><span class="w"> </span><span class="o">&lt;</span>
+<span class="w">      </span><span class="k">typename</span><span class="w"> </span><span class="nc">T</span><span class="p">,</span>
+<span class="w">      </span><span class="k">typename</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">enable_if_t</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">is_integral_v</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="o">!</span><span class="n">std</span><span class="o">::</span><span class="n">is_same_v</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">remove_cv_t</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="kt">bool</span><span class="o">&gt;&gt;&gt;</span>
+<span class="w">  </span><span class="p">[[</span><span class="na">nodiscard</span><span class="p">]]</span><span class="w"> </span><span class="k">explicit</span><span class="w"> </span><span class="n">OptimizationProfileGuard</span><span class="p">(</span><span class="n">T</span><span class="w"> </span><span class="n">profile_index</span><span class="p">)</span>
+<span class="w">      </span><span class="o">:</span><span class="w"> </span><span class="n">OptimizationProfileGuard</span><span class="p">(</span><span class="n">to_profile_index</span><span class="p">(</span><span class="n">profile_index</span><span class="p">))</span><span class="w"> </span><span class="p">{}</span>
+
+<span class="w">  </span><span class="n">OptimizationProfileGuard</span><span class="p">(</span><span class="kt">bool</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">delete</span><span class="p">;</span>
+
+<span class="w">  </span><span class="p">[[</span><span class="na">nodiscard</span><span class="p">]]</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="n">OptimizationProfileGuard</span><span class="w"> </span><span class="n">automatic</span><span class="p">();</span>
+
+<span class="w">  </span><span class="o">~</span><span class="n">OptimizationProfileGuard</span><span class="p">();</span>
+<span class="w">  </span><span class="n">OptimizationProfileGuard</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">OptimizationProfileGuard</span><span class="o">&amp;</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">delete</span><span class="p">;</span>
+<span class="w">  </span><span class="n">OptimizationProfileGuard</span><span class="o">&amp;</span><span class="w"> </span><span class="k">operator</span><span class="o">=</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">OptimizationProfileGuard</span><span class="o">&amp;</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">delete</span><span class="p">;</span>
+
+<span class="w"> </span><span class="k">private</span><span class="o">:</span>
+<span class="w">  </span><span class="k">struct</span><span class="w"> </span><span class="nc">AutoTag</span><span class="w"> </span><span class="p">{};</span>
+<span class="w">  </span><span class="k">explicit</span><span class="w"> </span><span class="n">OptimizationProfileGuard</span><span class="p">(</span><span class="n">AutoTag</span><span class="p">);</span>
+
+<span class="w">  </span><span class="n">ProfileRequest</span><span class="w"> </span><span class="n">prev_request_</span><span class="p">;</span>
+<span class="w">  </span><span class="kt">int32_t</span><span class="w"> </span><span class="n">prev_index_</span><span class="p">;</span>
 <span class="p">};</span>
 
 <span class="p">}</span><span class="w"> </span><span class="c1">// namespace executorch_backend</span>

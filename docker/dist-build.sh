@@ -7,7 +7,7 @@ set -x
 
 TOP_DIR=$(cd $(dirname $0); pwd)/..
 
-BUILD_CMD="python -m pip wheel .  --extra-index-url https://download.pytorch.org/whl/nightly/cu130 -w dist"
+BUILD_CMD="python -m pip wheel .  --extra-index-url https://download.pytorch.org/whl/nightly/cu134 -w dist"
 
 # TensorRT restricts our pip version
 cd ${TOP_DIR} \

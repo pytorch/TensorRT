@@ -273,6 +273,12 @@ _L1: list[Suite] = [
         tier="l1",
         lanes=("full", "nightly"),
         paths=("backend/",),
+        # g5.8xlarge rather than the default g5.4xlarge validation runner.
+        # Measured on the smaller pod: this suite holds a ~34 GiB plateau
+        # against a 41 GiB limit, so a passing run has 8 GiB of headroom and
+        # an unlucky one is OOM-killed with the hook reporting only "RPC
+        # server process died". The EC2 label this replaced had 64 GiB.
+        runner="mt-l-x86aavx2-29-113-a10g",
     ),
     Suite(
         "torch-compile-models-critical",
@@ -281,6 +287,9 @@ _L1: list[Suite] = [
         paths=("models/test_models.py", "models/test_dyn_models.py"),
         markers="critical",
         ir="torch_compile",
+        # The RPC server died on the 41 GiB runner during this suite. Use
+        # the same larger RAM runner as torch-compile-backend, with one A10G.
+        runner="mt-l-x86aavx2-29-113-a10g",
     ),
     Suite(
         "ts-models",
@@ -353,6 +362,15 @@ _L2: list[Suite] = [
         jobs="auto",
         variants=("standard",),
         platforms=("linux-x86_64",),
+    ),
+    Suite(
+        "executorch-windows",
+        tier="l2",
+        lanes=("full", "nightly"),
+        paths=("executorch/test_windows_runtime.py",),
+        jobs="1",
+        variants=("standard",),
+        platforms=("windows",),
     ),
     Suite(
         # Standard: automatic plugins and the in-place regression tests.
@@ -456,7 +474,7 @@ _L2: list[Suite] = [
         env={"USE_HOST_DEPS": "1", "CI_BUILD": "1", "USE_TRTLLM_PLUGINS": "1"},
         # The --multirank follow-ups need 2 GPUs, so this suite cannot run on
         # the default single-GPU validation_runner.
-        runner="linux.g4dn.12xlarge.nvidia.gpu",
+        runner="mt-l-x86iavx512-45-172-t4-4",
         # TensorRT-RTX has no TensorRT-LLM plugin path, so multi-device runs
         # entirely on the native TRT DistCollective API. Drop test_nccl_ops.py
         # (every test in it is gated on ENABLED_FEATURES.trtllm_for_nccl and
@@ -471,7 +489,7 @@ _L2: list[Suite] = [
                 # Multi-GPU box: the --multirank follow-ups need 2 devices.
                 # g5 is A10G (SM 8.6) rather than g4dn's T4 (SM 7.5), since the
                 # TensorRT docs describe DistCollective as needing Ampere+.
-                "runner": "linux.g5.12xlarge.nvidia.gpu",
+                "runner": "mt-l-x86aavx2-45-167-a10g-4",
             }
         },
         follow=(
@@ -508,7 +526,11 @@ _PYTHON_ONLY: list[Suite] = [
         "python-only-executorch-export",
         tier="l1",
         lanes=("python-only",),
-        paths=("executorch/test_export.py",),
+        paths=(
+            "executorch/test_export.py",
+            "executorch/test_cuda_graphs.py",
+            "executorch/test_partitioner_target_device.py",
+        ),
         setup=("executorch",),
         variants=("standard",),
         platforms=("linux-x86_64",),

@@ -9,7 +9,7 @@ requires = [
     "ninja>=1.11.0",
     "pyyaml>=6.0",
     "cffi>=1.15.1",
-    "torch>=2.15.0.dev,<2.16.0",
+    "torch>=2.16.0.dev,<2.17.0",
     "pybind11==2.6.2",
 ]
 build-backend = "setuptools.build_meta"
@@ -38,7 +38,7 @@ readme = { file = "README.md", content-type = "text/markdown" }
 # Capped because the resolver has to find a solution for every version this admits, and the
 # pinned ExecuTorch ships no wheel above 3.14, so an open upper bound fails the lock on a
 # version nothing supports. The required-environments below already stop at 3.13.
-requires-python = ">=3.10,<3.15"
+requires-python = ">=3.11,<3.15"
 keywords = [
     "pytorch",
     "torch",
@@ -130,14 +130,10 @@ docs = [
     "pillow",
 ]
 
-quantization-base = [
+quantization = [
     "nvidia-modelopt[hf]>=0.44.0; python_version > '3.9' and python_version < '3.13'",
     "torchao",
-]
-
-quantization = [
-    {include-group = "quantization-base"},
-    "mslk>=1.0.0",
+    "mslk>=1.0.0; sys_platform == 'linux'",
 ]
 
 # Optional runtime deps for the torch_tensorrt.kernels QDP-plugin layer,
@@ -201,9 +197,9 @@ environments = [
     "sys_platform == 'win32' and platform_machine == 'AMD64'",
 ]
 required-environments = [
-    "sys_platform == 'linux' and python_version >= '3.10' and python_version <= '3.13' and platform_machine == 'x86_64'",
-    "sys_platform == 'linux' and python_version >= '3.10' and python_version <= '3.13' and platform_machine == 'aarch64'",
-    "sys_platform == 'win32' and python_version >= '3.10' and python_version <= '3.13' and platform_machine == 'AMD64'"
+    "sys_platform == 'linux' and python_version >= '3.11' and python_version <= '3.13' and platform_machine == 'x86_64'",
+    "sys_platform == 'linux' and python_version >= '3.11' and python_version <= '3.13' and platform_machine == 'aarch64'",
+    "sys_platform == 'win32' and python_version >= '3.11' and python_version <= '3.13' and platform_machine == 'AMD64'"
 ]
 # The lock records this mode, so every writer has to agree on it or the next one
 # re-resolves and rewrites the file. CI passes --prerelease=allow, and the pinned
@@ -217,22 +213,27 @@ conflicts = [
       { group = "test_ext" },
       { group = "quantization" },
     ],
-    [
-      { group = "test_ext" },
-      { group = "quantization-base" },
-    ],
 ]
 constraint-dependencies = [
     "transformers>=5.14.1",
 ]
 
 [tool.uv.sources]
+torchao = [
+    # Match the Windows companion build's Python-only torchao nightly.
+    { index = "pytorch-nightly-cpu", marker = "sys_platform == 'win32'" },
+]
 torch = [
     { index = "pytorch-nightly-cu132" },
 ]
 torchvision = [
     { index = "pytorch-nightly-cu132" },
 ]
+
+[[tool.uv.index]]
+name = "pytorch-nightly-cpu"
+url = "https://download.pytorch.org/whl/nightly/cpu"
+explicit = true
 
 [[tool.uv.index]]
 name = "pytorch-nightly-cu132"
@@ -438,7 +439,7 @@ skip = ["py/torch_tensorrt/fx"]
 
 [tool.black]
 #line-length = 120
-target-version = ["py38", "py39", "py310", "py311", "py312"]
+target-version = ["py311", "py312"]
 force-exclude = """
 elu_converter/setup.py
 | docs/

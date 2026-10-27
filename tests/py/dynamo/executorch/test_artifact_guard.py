@@ -7,6 +7,7 @@ import ast
 import json
 import os
 import re
+import runpy
 import shlex
 import shutil
 import subprocess
@@ -36,6 +37,61 @@ _BASE_VERSIONS = "CXXABI_1.3 GLIBCXX_3.4.21 GLIBC_2.17 GCC_3.0"
 # rest has to be installed by the job, or those tests skip and take the job's green with them.
 _NATIVE_TOOLS = ("cmake", "c++", "readelf", "patchelf")
 _IMAGE_TOOLS = ("cmake", "c++", "readelf")
+
+
+@pytest.mark.parametrize("cuda_import", ["CUDART64_13.dll", ""])
+def test_windows_accepts_traditional_and_hybrid_cuda_runtime(
+    tmp_path, monkeypatch, cuda_import
+):
+    checker = runpy.run_path(
+        str(_ROOT / ".github/scripts/check-executorch-runtime-wheel.py")
+    )
+    imports = "EXECUTORCH.dll\nEXECUTORCH_EXTENSION_CUDA.dll\nNVINFER_11.dll\n"
+    monkeypatch.setattr(
+        subprocess, "check_output", lambda *args, **kwargs: imports + cuda_import
+    )
+    checker["check_windows_dependencies"](tmp_path / "delegate.dll")
+
+
+@pytest.mark.parametrize("cuda_import", ["cudart64_12.dll", "cudart64_110.dll"])
+def test_windows_rejects_a_different_cuda_runtime(tmp_path, monkeypatch, cuda_import):
+    checker = runpy.run_path(
+        str(_ROOT / ".github/scripts/check-executorch-runtime-wheel.py")
+    )
+    imports = "executorch.dll\nexecutorch_extension_cuda.dll\nnvinfer_11.dll\n"
+    monkeypatch.setattr(
+        subprocess, "check_output", lambda *args, **kwargs: imports + cuda_import
+    )
+    with pytest.raises(SystemExit, match="CUDA runtime other than CUDA 13"):
+        checker["check_windows_dependencies"](tmp_path / "delegate.dll")
+
+
+@pytest.mark.parametrize(
+    "missing", ["executorch.dll", "executorch_extension_cuda.dll", "nvinfer_11.dll"]
+)
+def test_windows_cuda_import_does_not_replace_required_shared_libraries(
+    tmp_path, monkeypatch, missing
+):
+    checker = runpy.run_path(
+        str(_ROOT / ".github/scripts/check-executorch-runtime-wheel.py")
+    )
+    dependencies = (
+        "executorch.dll",
+        "executorch_extension_cuda.dll",
+        "nvinfer_11.dll",
+        "cudart64_13.dll",
+    )
+    monkeypatch.setattr(
+        subprocess,
+        "check_output",
+        lambda *args, **kwargs: "\n".join(
+            name for name in dependencies if name != missing
+        ),
+    )
+    with pytest.raises(
+        SystemExit, match=f"the delegate does not import {re.escape(missing)}"
+    ):
+        checker["check_windows_dependencies"](tmp_path / "delegate.dll")
 
 
 def _run(argv, **kwargs):
@@ -472,7 +528,10 @@ def _native_project(tmp_path, tools, *, mutation=None, static_cuda=False):
     guard_command = '    COMMAND sh\n      "${CMAKE_CURRENT_LIST_DIR}/check_imports_executorch_runtime.sh"'
     if mutation == "remove":
         start = cmake.index(
-            "  add_custom_command", cmake.index("if(TORCH_TENSORRT_READELF)")
+            "  add_custom_command",
+            cmake.index(
+                'if(TORCH_TENSORRT_READELF AND CMAKE_SYSTEM_NAME STREQUAL "Linux")'
+            ),
         )
         end = cmake.index("    VERBATIM)", start) + len("    VERBATIM)")
         cmake = cmake[:start] + cmake[end:]
@@ -1141,7 +1200,9 @@ def test_the_backend_refuses_a_buffer_on_another_device(mutation) -> None:
         _assert_wrong_device_buffers_are_refused(source)
 
 
-@pytest.mark.parametrize("mutation", [None, "availability-builds-one", "commented-out"])
+@pytest.mark.parametrize(
+    "mutation", [None, "availability-builds-one", "commented-out", "handle-owns-one"]
+)
 @pytest.mark.unit
 def test_the_backend_shares_one_tensorrt_runtime(mutation) -> None:
     """A runtime per program bought nothing and warned on every load after the first.
@@ -1161,13 +1222,19 @@ def test_the_backend_shares_one_tensorrt_runtime(mutation) -> None:
     source = (
         _ROOT / "cpp/src/torch_tensorrt/executorch/TensorRTBackend.cpp"
     ).read_text(encoding="utf-8")
-    header = (
-        _ROOT / "cpp/include/torch_tensorrt/executorch/TensorRTBackend.h"
-    ).read_text(encoding="utf-8")
+    header = (_ROOT / "cpp/src/torch_tensorrt/executorch/EngineHandle.h").read_text(
+        encoding="utf-8"
+    )
     if mutation is None:
         _assert_one_shared_runtime(source, header)
         return
-    if mutation == "availability-builds-one":
+    if mutation == "handle-owns-one":
+        original = "  std::shared_ptr<nvinfer1::ICudaEngine> engine;"
+        assert original in header
+        header = header.replace(
+            original, "  TRTUniquePtr<nvinfer1::IRuntime> runtime;\n" + original
+        )
+    elif mutation == "availability-builds-one":
         # The arrangement this change replaced: its own runtime, from a logger on the stack.
         original = "return shared_runtime() != nullptr;"
         assert original in source

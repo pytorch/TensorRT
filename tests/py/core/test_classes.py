@@ -87,12 +87,14 @@ class TestPlatform(unittest.TestCase):
             )
 
     def test_current_platform_prefers_loaded_runtime_platform(self):
-        with mock.patch("platform.system", return_value="Windows"), mock.patch(
-            "platform.machine", return_value="ARM64"
-        ), mock.patch.object(
-            torch.ops.tensorrt,
-            "get_current_platform",
-            return_value=torch.ops.tensorrt._platform_win_x86_64(),
+        with (
+            mock.patch("platform.system", return_value="Windows"),
+            mock.patch("platform.machine", return_value="ARM64"),
+            mock.patch.object(
+                torch.ops.tensorrt,
+                "get_current_platform",
+                return_value=torch.ops.tensorrt._platform_win_x86_64(),
+            ),
         ):
             self.assertEqual(
                 torchtrt.Platform.current_platform(), torchtrt.Platform.WIN_X86_64
@@ -102,12 +104,13 @@ class TestPlatform(unittest.TestCase):
         disabled_runtime_features = torchtrt_enums.ENABLED_FEATURES._replace(
             torch_tensorrt_runtime=False
         )
-        with mock.patch.object(
-            torchtrt_enums, "ENABLED_FEATURES", disabled_runtime_features
-        ), mock.patch("platform.system", return_value="Windows"), mock.patch(
-            "platform.machine", return_value="ARM64"
-        ), mock.patch(
-            "sysconfig.get_platform", return_value="win-amd64"
+        with (
+            mock.patch.object(
+                torchtrt_enums, "ENABLED_FEATURES", disabled_runtime_features
+            ),
+            mock.patch("platform.system", return_value="Windows"),
+            mock.patch("platform.machine", return_value="ARM64"),
+            mock.patch("sysconfig.get_platform", return_value="win-amd64"),
         ):
             self.assertEqual(
                 torchtrt.Platform.current_platform(), torchtrt.Platform.WIN_X86_64
@@ -117,12 +120,13 @@ class TestPlatform(unittest.TestCase):
         disabled_runtime_features = torchtrt_enums.ENABLED_FEATURES._replace(
             torch_tensorrt_runtime=False
         )
-        with mock.patch.object(
-            torchtrt_enums, "ENABLED_FEATURES", disabled_runtime_features
-        ), mock.patch("platform.system", return_value="Windows"), mock.patch(
-            "platform.machine", return_value="ARM64"
-        ), mock.patch(
-            "sysconfig.get_platform", return_value="win-arm64"
+        with (
+            mock.patch.object(
+                torchtrt_enums, "ENABLED_FEATURES", disabled_runtime_features
+            ),
+            mock.patch("platform.system", return_value="Windows"),
+            mock.patch("platform.machine", return_value="ARM64"),
+            mock.patch("sysconfig.get_platform", return_value="win-arm64"),
         ):
             self.assertEqual(
                 torchtrt.Platform.current_platform(), torchtrt.Platform.WIN_ARM64

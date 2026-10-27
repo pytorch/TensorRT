@@ -225,6 +225,12 @@ see :ref:`aot_inductor`.
 c) ExecuTorch (.pte)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+.. seealso::
+
+    :ref:`executorch_deployment` is the end to end guide: install the stack, run the
+    saved program from Python and from C++, and tune the runtime. This section covers
+    the saving step itself.
+
 The ``executorch`` output format lowers the compiled module to an ExecuTorch
 ``.pte`` program, delegating the TensorRT engines to the Torch-TensorRT ExecuTorch
 backend. This CUDA integration links CUDA 13 libraries, so it supports Linux with
@@ -269,12 +275,11 @@ Default: ``save()``
     model = MyModel().eval().cuda()
     inputs = [torch.randn((1, 3, 224, 224)).cuda()]
     trt_gm = torch_tensorrt.compile(model, ir="dynamo", arg_inputs=inputs)
-    torch_tensorrt.save(
-        trt_gm, "trt.pte", output_format="executorch",
-        retrace=False, arg_inputs=inputs,
-    )
+    torch_tensorrt.save(trt_gm, "trt.pte", output_format="executorch")
 
-``save`` writes both the ``.pte`` and any external ``.ptd`` tensor-data files.
+``save`` writes both the ``.pte`` and any external ``.ptd`` tensor-data files. To keep the
+TensorRT engines in a ``.ptd`` file instead of the ``.pte``, see
+:ref:`executorch_external_engine_data`.
 
 Advanced: ``export()``
 """"""""""""""""""""""
@@ -300,6 +305,10 @@ planning, or carrying more than one method. The caller then serializes it:
     with open("trt.pte", "wb") as output:
         program.write_to_file(output)
     program.write_tensor_data_to_file(".")
+
+TensorRT needs every input and output on a 256-byte boundary, and ExecuTorch plans memory on
+16-byte boundaries by default. ``save`` plans on 256 for you. Here, give ``backend_config`` a
+``MemoryPlanningPass(alignment=256)``, or the delegate copies each misaligned buffer on every call.
 
 ``executorch.export`` accepts a TensorRT-compiled ``GraphModule``, an
 engine-bearing ``ExportedProgram``, or a mapping of independently exported
@@ -402,7 +411,8 @@ calls, one at each end of the Edge boundary:
 
     # The argument is optional. Pass your own ExecutorchBackendConfig and
     # zero_copy_backend_config composes onto it; every other field (memory
-    # planning, passes) is preserved.
+    # planning, passes) is preserved, so give it MemoryPlanningPass(alignment=256)
+    # to keep the cache on the boundary TensorRT needs.
     program = edge.to_executorch(zero_copy_backend_config())
 
     # Neither call is enforced -- see the warning below.
@@ -473,7 +483,6 @@ one silently would break a runner built before this feature.
 
     torch_tensorrt.save(
         trt_gm, "decode.pte", output_format="executorch",
-        arg_inputs=inputs, retrace=False,
         zero_copy_kv=True,
     )
 
@@ -533,7 +542,6 @@ claims what it can and the ``CudaPartitioner`` picks up the rest as a catch-all:
 
     torch_tensorrt.save(
         trt_gm, "trt.pte", output_format="executorch",
-        retrace=False, arg_inputs=inputs,
         partitioners=[
             CudaPartitioner(
                 [CudaBackend.generate_method_name_compile_spec("forward")]
@@ -607,7 +615,7 @@ and ``zero_copy_kv`` is read by ``save`` on both sides of that boundary.
   caller-supplied config is forwarded **verbatim**, so if you pass your own and
   your graph carries TensorRT engines, set ``_check_ir_validity=False`` explicitly.
 * ``backend_config`` — an ``ExecutorchBackendConfig`` forwarded to
-  ``to_executorch(...)``.
+  ``to_executorch(...)``, with its ``MemoryPlanningPass`` aligned to 256 bytes on a copy.
 * ``zero_copy_kv`` — a ``bool`` (default ``False``, single-method only). Lets the
   TensorRT engine update an aliased KV cache in place. ``save`` owns both ends of
   the Edge boundary, so this one argument covers what the two-call path spells
@@ -623,7 +631,6 @@ and ``zero_copy_kv`` is read by ``save`` on both sides of that boundary.
 
     torch_tensorrt.save(
         trt_gm, "trt.pte", output_format="executorch",
-        retrace=False, arg_inputs=inputs,
         constant_methods={"get_max_seq_len": 2048},
         compile_config=EdgeCompileConfig(_check_ir_validity=False),
         generate_etrecord=True,

@@ -14,25 +14,16 @@ if [[ $(uname -m) == "aarch64" ]]; then
 fi
 
 # Install all the dependencies required for Torch-TensorRT
-python -m pip install --upgrade "pip>=25.1" "tomli>=1.1.0; python_version < '3.11'"
-QUANTIZATION_GROUP=quantization
-# cu132 publishes Windows MSLK wheels, but cu134 currently does not.
-# Keep TorchAO and ModelOpt on that row without requesting unavailable MSLK.
-if [[ ${PLATFORM} == win32 && ${CU_VERSION} == cu134 ]]; then
-    QUANTIZATION_GROUP=quantization-base
-fi
+python -m pip install --upgrade "pip>=25.1"
 python -m pip install \
     --pre \
     --extra-index-url https://pypi.nvidia.com \
     --extra-index-url https://download.pytorch.org/whl/${CHANNEL}/${CU_VERSION} \
     --group test \
     --group test-ext \
-    --group "${QUANTIZATION_GROUP}"
+    --group quantization
 TORCHVISION=$(python - <<'PY'
-try:
-    import tomllib
-except ModuleNotFoundError:
-    import tomli as tomllib
+import tomllib
 
 with open("pyproject.toml", "rb") as f:
     deps = tomllib.load(f)["dependency-groups"]["test-ext"]

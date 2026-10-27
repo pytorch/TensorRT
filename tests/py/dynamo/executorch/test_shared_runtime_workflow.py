@@ -258,26 +258,41 @@ def test_shared_build_provisions_tensorrt_metadata(tmp_path, arch, cuda, release
     shutil.copy2(
         ROOT / "packaging/executorch_pin.txt", packaging / "executorch_pin.txt"
     )
-    step = next(
-        s
-        for s in _workflow("build_linux.yml")["jobs"]["build"]["steps"]
-        if s.get("id") == "executorch-runtime"
+    shutil.copy2(
+        ROOT / "packaging/executorch_runtime_version.py",
+        packaging / "executorch_runtime_version.py",
     )
-    script = step["run"].replace("${{ inputs.is-release-wheel }}", str(release).lower())
+    steps = _workflow("build_linux.yml")["jobs"]["build"]["steps"]
+    env = {
+        "PATH": f"{bin_dir}:{os.environ['PATH']}",
+        "PYTHONPATH": str(site),
+        "BUILD_ENV_FILE": str(tmp_path / "build-env"),
+        "BUILD_VERSION": version if release else f"{version}.dev20260911",
+        "CU_VERSION": cuda,
+        "CHANNEL": "nightly",
+        "ARCH": arch,
+        "EVENTS": str(tmp_path / "events"),
+        "BUILT_VERSION": str(tmp_path / "built-version"),
+        "GITHUB_ENV": str(tmp_path / "github-env"),
+    }
+    # The step that names the companion runs first and hands the version over through GITHUB_ENV,
+    # as GitHub Actions does between steps.
+    naming = next(
+        s for s in steps if s.get("name") == "Name the ExecuTorch runtime companion"
+    )
     result = _run(
-        script,
+        naming["run"].replace("${{ inputs.is-release-wheel }}", str(release).lower()),
         tmp_path,
-        {
-            "PATH": f"{bin_dir}:{os.environ['PATH']}",
-            "PYTHONPATH": str(site),
-            "BUILD_ENV_FILE": str(tmp_path / "build-env"),
-            "BUILD_VERSION": version if release else f"{version}.dev20260911",
-            "CU_VERSION": cuda,
-            "ARCH": arch,
-            "EVENTS": str(tmp_path / "events"),
-            "BUILT_VERSION": str(tmp_path / "built-version"),
-        },
+        env,
     )
+    assert result.returncode == 0, result.stdout + result.stderr
+    env.update(
+        line.split("=", 1)
+        for line in (tmp_path / "github-env").read_text().splitlines()
+    )
+    step = next(s for s in steps if s.get("id") == "executorch-runtime")
+    script = step["run"].replace("${{ inputs.is-release-wheel }}", str(release).lower())
+    result = _run(script, tmp_path, env)
     assert result.returncode == 0, result.stdout + result.stderr
     events = [
         json.loads(line) for line in (tmp_path / "events").read_text().splitlines()
@@ -355,6 +370,74 @@ def test_missing_tensorrt_provisioning_is_detected(tmp_path, monkeypatch, arch):
         test_shared_build_provisions_tensorrt_metadata(tmp_path, arch, "cu132", True)
 
 
+def _device_extra_check() -> str:
+    script = _workflow("executorch-test-linux.yml")["jobs"]["test"]["with"]["script"]
+    start = script.index("python - <<'PY'\n") + len("python - <<'PY'\n")
+    return script[start : script.index("\nPY\n", start)]
+
+
+@pytest.mark.parametrize(
+    "channel, executorch, pin, passes",
+    [
+        # A development ExecuTorch build is only on the nightly index.
+        ("nightly", "1.6.0.dev20261014", "built", True),
+        ("nightly", "1.6.0.dev20261014", "other", False),
+        ("nightly", "1.6.0.dev20261014", None, False),
+        ("test", "1.6.0.dev20261014", None, True),
+        ("test", "1.6.0.dev20261014", "built", False),
+        # An ExecuTorch release is on the test index.
+        ("test", "1.6.0", "built", True),
+        ("test", "1.6.0", "other", False),
+        ("test", "1.6.0", None, False),
+        ("nightly", "1.6.0", None, True),
+        ("nightly", "1.6.0", "built", False),
+    ],
+)
+def test_the_device_job_checks_the_published_extra(
+    tmp_path, channel, executorch, pin, passes
+):
+    """Run the device job's metadata check against installed wheels with known extras.
+
+    A wheel must require exactly the companion built beside it when its own index also carries
+    the ExecuTorch build that companion pins. Anywhere else pip could not meet that requirement,
+    and would quietly pick another wheel, so the wheel must not name it.
+    """
+    suffix = ".dev20261019" if channel == "nightly" else ""
+    companion = f"0.3.0{suffix}+cu132"
+    pins = {"built": companion, "other": f"0.3.0{suffix}+cu134"}
+    requires = [f"executorch>={executorch},<1.7; extra == 'executorch'"]
+    if pin:
+        requires.append(
+            f"torch-tensorrt-executorch-runtime=={pins[pin]}; extra == 'executorch'"
+        )
+    for name, version, deps in (
+        ("torch_tensorrt", f"2.16.0{suffix}+cu132", requires),
+        (
+            "torch_tensorrt_executorch_runtime",
+            companion,
+            ["torch", f"executorch=={executorch}+cu132"],
+        ),
+    ):
+        info = tmp_path / f"{name}-{version}.dist-info"
+        info.mkdir()
+        (info / "METADATA").write_text(
+            f"Metadata-Version: 2.1\nName: {name.replace('_', '-')}\nVersion: {version}\n"
+            + "".join(f"Requires-Dist: {r}\n" for r in deps)
+        )
+    result = subprocess.run(
+        [sys.executable, "-"],
+        input=_device_extra_check(),
+        env={**os.environ, "PYTHONPATH": str(tmp_path), "CHANNEL": channel},
+        # "python -" puts the working directory first on sys.path, where a built checkout's own
+        # egg-info would shadow the fake metadata.
+        cwd=tmp_path,
+        text=True,
+        capture_output=True,
+        timeout=30,
+    )
+    assert (result.returncode == 0) == passes, result.stderr
+
+
 _DEVICE_EXPORT = 'python examples/torchtrt_executorch_example/export_device_resident.py \\\n  --model_path="${RUNNER_TEMP}/torchtrt-device-resident.pte"\n'
 _DEVICE_RUN = 'python examples/executorch_reference_runner/load_model_device_resident.py \\\n  --model_path="${RUNNER_TEMP}/torchtrt-device-resident.pte" --num_runs=2\n'
 
@@ -394,6 +477,8 @@ def _assert_device_commands(tmp_path, workflow, failure=""):
         "    elif args[:2] == ['-m', 'venv']:\n"
         "        p = Path(args[2]) / 'bin/python'; p.parent.mkdir(parents=True); p.symlink_to(os.environ['DISPATCH'])\n"
         "    elif args[:4] == ['-u', '-X', 'faulthandler', '-c']: pass\n"
+        # The extra check reads installed metadata from a script on stdin.
+        "    elif args == ['-']: sys.stdin.read()\n"
         # The step that builds the module consumer asks python where the two packages put their
         # CMake files. Answer with a directory that exists, so the configure step it feeds is
         # given something plausible rather than an empty string.
@@ -457,6 +542,18 @@ def _assert_device_commands(tmp_path, workflow, failure=""):
         event for event in events if event[:4] == ["python", "-m", "pip", "install"]
     )
     _assert_test_wheel_dependency(setup)
+    # The published extra is checked against the wheels just built: its metadata, then a resolve
+    # pinned to the built version so a fallback to an older torch-tensorrt cannot pass.
+    assert ["python", "-"] in events
+    resolve = [e for e in events if "--dry-run" in e]
+    assert len(resolve) == 1, resolve
+    assert resolve[0][-1] == f"torch-tensorrt[executorch]=={runner}", resolve
+    # The companion pins a development ExecuTorch from the nightly index or a release from the
+    # test one, so the resolve needs both to meet the extra on either kind of branch.
+    for channel in ("nightly", "test"):
+        assert (
+            f"https://download.pytorch.org/whl/{channel}/cu132" in resolve[0]
+        ), resolve
     examples = [
         event[1:]
         for event in events
@@ -632,7 +729,7 @@ def test_the_delegate_lane_narrows_the_matrix_to_cuda_13_rows() -> None:
         return {row["desired_cuda"] for row in json.loads(result.stdout)["include"]}
 
     rows = [
-        {"desired_cuda": cuda, "python_version": "3.10", "gpu_arch_type": "cuda"}
+        {"desired_cuda": cuda, "python_version": "3.11", "gpu_arch_type": "cuda"}
         for cuda in ("cu126", "cu132", "cu134")
     ]
     assert kept(rows, "--executorch-runtime") == {"cu132", "cu134"}
@@ -726,6 +823,12 @@ def test_the_kept_entry_points_actually_warn_and_forward(monkeypatch) -> None:
     ]:
         monkeypatch.delitem(sys.modules, name)
     delegate = importlib.import_module("torch_tensorrt_executorch_runtime")
+    # Recorded, so teardown removes this unregistered copy rather than leaving it for a later test
+    # in the same process to import in place of the real package.
+    for name in [
+        n for n in sys.modules if n.startswith("torch_tensorrt_executorch_runtime")
+    ]:
+        monkeypatch.setitem(sys.modules, name, sys.modules.pop(name))
 
     registered = []
     monkeypatch.setattr(delegate, "register", lambda: registered.append("register"))
@@ -746,6 +849,32 @@ def test_the_kept_entry_points_actually_warn_and_forward(monkeypatch) -> None:
         assert any(
             issubclass(w.category, DeprecationWarning) for w in caught
         ), f"{shim} raised no DeprecationWarning: {[w.category for w in caught]}"
+
+
+def test_the_shim_test_leaves_no_delegate_module_behind():
+    # A module left in sys.modules is what a later test in the same process would import in place
+    # of the real package, so run the test above in its own pytest process and check after.
+    script = (
+        "import sys, pytest\n"
+        "sys.modules.pop('torch_tensorrt_executorch_runtime', None)\n"
+        "rc = pytest.main(['-q', '-p', 'no:cacheprovider', '--noconftest', '-o', 'addopts=', "
+        f"{__file__!r} + '::test_the_kept_entry_points_actually_warn_and_forward'])\n"
+        "if rc != 0:\n"
+        "    sys.exit(f'the test failed with exit code {rc}')\n"
+        "if 'torch_tensorrt_executorch_runtime' in sys.modules:\n"
+        "    sys.exit('the test left torch_tensorrt_executorch_runtime in sys.modules')\n"
+    )
+    # PYTEST_ADDOPTS reaches pytest.main too, and with -n the test runs in a worker process,
+    # so this process would never see the module and the check would pass with the leak back.
+    env = {k: v for k, v in os.environ.items() if k != "PYTEST_ADDOPTS"}
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=120,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 @pytest.mark.unit

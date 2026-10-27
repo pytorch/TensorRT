@@ -221,10 +221,13 @@ def compile_tensorrt(
         inputs = [torch.rand((BATCH_SIZE, 3, 224, 224), dtype=torch.float16).cuda()]
 
     with tempfile.TemporaryDirectory() as debug_dir:
-        with export_torch_mode(), torch_tensorrt.dynamo.Debugger(
-            log_level="info",
-            save_layer_info=True,
-            logging_dir=debug_dir,
+        with (
+            export_torch_mode(),
+            torch_tensorrt.dynamo.Debugger(
+                log_level="info",
+                save_layer_info=True,
+                logging_dir=debug_dir,
+            ),
         ):
             trt_compiled = torch_tensorrt.compile(
                 model,

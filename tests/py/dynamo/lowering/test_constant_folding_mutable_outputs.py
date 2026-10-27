@@ -172,6 +172,80 @@ class TestFoldedConstantGraphBreak(TestCase):
         returned.add_(1)
         self.assertTrue(torch.equal(supplied, torch.ones(8)))
 
+    def test_folded_module_state_view_keeps_alias(self):
+        root = torch.nn.Module()
+        root.register_buffer("state", torch.zeros(4))
+        g = Graph()
+        state = g.get_attr("state")
+        view = g.call_function(torch.ops.aten.view.default, (state, [2, 2]))
+        g.output(view)
+        gm = GraphModule(root, g)
+
+        gm = constant_fold(gm, CompilationSettings())
+        gm = reset_folded_constructors(gm, CompilationSettings())
+
+        result = gm()
+        self.assertEqual(result.data_ptr(), gm.state.data_ptr())
+        result.add_(1)
+        self.assertTrue(torch.equal(gm.state, torch.ones(4)))
+
+    def test_folded_constructor_view_keeps_alias_and_fresh_storage(self):
+        g = Graph()
+        value = g.call_function(
+            torch.ops.aten.zeros.default, ([4],), {"dtype": torch.float32}
+        )
+        view = g.call_function(torch.ops.aten.view.default, (value, [2, 2]))
+        g.output((value, view))
+        gm = GraphModule(torch.nn.Module(), g)
+
+        gm = constant_fold(gm, CompilationSettings())
+        gm = reset_folded_constructors(gm, CompilationSettings())
+        gm = reset_folded_constructors(gm, CompilationSettings())
+
+        value, view = gm()
+        self.assertEqual(value.data_ptr(), view.data_ptr())
+        value.add_(1)
+        self.assertTrue(torch.equal(view, torch.ones(2, 2)))
+        next_value, next_view = gm()
+        self.assertTrue(torch.equal(next_value, torch.zeros(4)))
+        self.assertEqual(next_value.data_ptr(), next_view.data_ptr())
+        self.assertNotEqual(value.data_ptr(), next_value.data_ptr())
+
+    def test_mutation_through_constructor_view_is_reset(self):
+        g = Graph()
+        increment = g.placeholder("increment")
+        value = g.call_function(
+            torch.ops.aten.zeros.default, ([4],), {"dtype": torch.float32}
+        )
+        view = g.call_function(torch.ops.aten.view.default, (value, [2, 2]))
+        g.call_function(torch.ops.aten.add_.Tensor, (view, increment))
+        g.output(value)
+        gm = GraphModule(torch.nn.Module(), g)
+
+        gm = constant_fold(gm, CompilationSettings())
+        gm = reset_folded_constructors(gm, CompilationSettings())
+
+        self.assertTrue(torch.equal(gm(torch.ones(2, 2)), torch.ones(4)))
+        self.assertTrue(torch.equal(gm(torch.ones(2, 2)), torch.ones(4)))
+
+    def test_constructor_returned_only_through_view_is_reset(self):
+        g = Graph()
+        value = g.call_function(
+            torch.ops.aten.zeros.default, ([4],), {"dtype": torch.float32}
+        )
+        view = g.call_function(torch.ops.aten.view.default, (value, [2, 2]))
+        g.output(view)
+        gm = GraphModule(torch.nn.Module(), g)
+
+        gm = constant_fold(gm, CompilationSettings())
+        gm = reset_folded_constructors(gm, CompilationSettings())
+
+        first = gm()
+        first.add_(1)
+        second = gm()
+        self.assertTrue(torch.equal(second, torch.zeros(2, 2)))
+        self.assertNotEqual(first.data_ptr(), second.data_ptr())
+
     def _mutate_and_return_attr(self, root, attr, folded):
         """Graph for `self.<attr> += 1; return self.<attr>`."""
         g = Graph()

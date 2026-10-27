@@ -429,20 +429,15 @@ def test_arange_export(ir, tmpdir):
     outputs_pyt = model(input)
     outputs_trt = trt_module(input)
 
-    for idx in range(len(outputs_pyt)):
-        cos_sim = cosine_similarity(outputs_pyt[idx], outputs_trt[idx])
-        assertions.assertTrue(
-            cos_sim > COSINE_THRESHOLD,
-            msg=f"test_arange_export TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
-        )
-
+    torch.testing.assert_close(outputs_trt, outputs_pyt, rtol=0, atol=0)
     outputs_trt_deser = deser_trt_module(input)
-    for idx in range(len(outputs_pyt)):
-        cos_sim = cosine_similarity(outputs_pyt[idx], outputs_trt_deser[idx])
-        assertions.assertTrue(
-            cos_sim > COSINE_THRESHOLD,
-            msg=f"test_arange_export deserialized TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
-        )
+    torch.testing.assert_close(outputs_trt_deser, outputs_pyt, rtol=0, atol=0)
+
+    # Re-export must preserve fresh storage for constant-only engine outputs.
+    for module in (trt_module, deser_trt_module):
+        first = module(input)
+        first.zero_()
+        torch.testing.assert_close(module(input), outputs_pyt, rtol=0, atol=0)
 
 
 @pytest.mark.unit

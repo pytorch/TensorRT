@@ -8,10 +8,9 @@ from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
 
 logger = logging.getLogger(__name__)
 
-# Set by constant folding on every attribute it creates. Such a value was built
-# by an op in the graph body, so eager semantics allocate it again on every
-# call. Attributes that already existed on the module are never folded, so they
-# never carry this tag and keep their persistent, caller-visible identity.
+# Set by constant folding on values computed in the graph body. Observable
+# alias-producing operations stay in the graph, so this tag identifies storage
+# that can be copied without severing an alias to caller-owned state.
 FOLDED_CONSTRUCTOR_META = "folded_constructor"
 
 # Marks the copy inserted below, so running this pass again (once per TensorRT
@@ -24,6 +23,29 @@ def _mutates_its_input(user: torch.fx.Node) -> bool:
     if not isinstance(target, torch._ops.OpOverload):
         return False
     return bool(target._schema.is_mutable)
+
+
+def _aliases_input(node: torch.fx.Node) -> bool:
+    target = node.target
+    return isinstance(target, torch._ops.OpOverload) and any(
+        result.alias_info is not None for result in target._schema.returns
+    )
+
+
+def _storage_escapes(node: torch.fx.Node) -> bool:
+    """Check outputs and mutations, including uses reached through views."""
+    pending = list(node.users)
+    visited = set()
+    while pending:
+        user = pending.pop()
+        if user in visited:
+            continue
+        visited.add(user)
+        if user.op == "output" or _mutates_its_input(user):
+            return True
+        if _aliases_input(user):
+            pending.extend(user.users)
+    return False
 
 
 def reset_folded_constructors(
@@ -55,7 +77,7 @@ def reset_folded_constructors(
         users = list(node.users)
         if not users or any(user.meta.get(_FRESH_COPY_META) for user in users):
             continue
-        if not any(user.op == "output" or _mutates_its_input(user) for user in users):
+        if not _storage_escapes(node):
             continue
 
         with gm.graph.inserting_after(node):

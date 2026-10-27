@@ -51,9 +51,10 @@ def fx_dynamo_testing_backend(
     fake_mode = detect_fake_mode(sample_inputs)
 
     # Place backend tracing within FakeTensor context allowing nonfake Tensors
-    with unittest.mock.patch.object(
-        fake_mode, "allow_non_fake_inputs", True
-    ), fake_mode:
+    with (
+        unittest.mock.patch.object(fake_mode, "allow_non_fake_inputs", True),
+        fake_mode,
+    ):
         repair_input_aliasing(gm, settings)
 
         # Invoke AOTAutograd to translate operators to aten

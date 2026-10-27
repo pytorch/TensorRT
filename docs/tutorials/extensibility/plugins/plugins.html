@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=0866734c"></script>
+    <script src="../../../_static/documentation_options.js?v=ede72c6b"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -471,6 +471,8 @@ document.write(`
 <li class="toctree-l3"><a class="reference internal" href="../../_rendered_examples/dynamo/nvrtc_aot_plugin.html">Example: Custom Kernels with NVRTC in TensorRT AOT Plugins</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../_rendered_examples/dynamo/cuda_kernel_op.html">Example: Auto-derived CUDA Kernel Plugins via cuda_kernel_op</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../_rendered_examples/dynamo/ptx_op.html">Example: Pre-compiled PTX Kernels via ptx_op</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../_rendered_examples/dynamo/triton_op.html">Example: Triton Kernel AOT Plugins via triton_op</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../_rendered_examples/dynamo/cutile_op.html">Example: cuTile Kernel AOT Plugins via cutile_op</a></li>
 </ul>
 </details></li>
 </ul>
@@ -603,7 +605,7 @@ document.write(`
   <section id="plugin-system">
 <span id="plugins"></span><h1>Plugin System<a class="headerlink" href="#plugin-system" title="Link to this heading">#</a></h1>
 <p>Torch-TensorRT’s plugin system lets you run custom kernels <em>inside</em> a TensorRT engine,
-avoiding graph breaks and their associated overhead. There are three main approaches
+avoiding graph breaks and their associated overhead. There are five main approaches
 depending on your kernel language and performance requirements:</p>
 <div class="pst-scrollable-table-container"><table class="table">
 <colgroup>
@@ -630,10 +632,20 @@ depending on your kernel language and performance requirements:</p>
 <td><p>Pre-compiled PTX embedded in engine</p></td>
 <td><p><span class="xref std std-ref">aot_plugin</span></p></td>
 </tr>
-<tr class="row-even"><td><p>QDP auto-generate (AOT)</p></td>
+<tr class="row-even"><td><p>QDP kernels API (AOT/JIT)</p></td>
+<td><p>CUDA C++ / Triton / PTX</p></td>
+<td><p>Embedded PTX, or JIT for CUDA scalar attributes</p></td>
+<td><p><span class="xref std std-ref">cuda_kernel_op</span>, <span class="xref std std-ref">ptx_op</span>, <span class="xref std std-ref">triton_op</span></p></td>
+</tr>
+<tr class="row-odd"><td><p>QDP auto-generate (AOT)</p></td>
 <td><p>CUDA C++ via NVRTC</p></td>
 <td><p>Pre-compiled PTX embedded in engine</p></td>
 <td><p><span class="xref std std-ref">nvrtc_aot_plugin</span></p></td>
+</tr>
+<tr class="row-even"><td><p>QDP declarative (AOT)</p></td>
+<td><p>cuTile</p></td>
+<td><p>Pre-compiled PTX embedded in engine</p></td>
+<td><p><span class="xref std std-ref">cutile_op</span></p></td>
 </tr>
 <tr class="row-odd"><td><p>Manual (legacy)</p></td>
 <td><p>Triton / any</p></td>
@@ -713,15 +725,74 @@ implementation when one is registered (<code class="docutils literal notranslate
 Falls back to JIT plugin if the AOT impl is absent.</p>
 </dd>
 </dl>
+</section>
+</section>
+<hr class="docutils" />
+<section id="mutating-custom-operators">
+<h2>Mutating Custom Operators<a class="headerlink" href="#mutating-custom-operators" title="Link to this heading">#</a></h2>
+<p>Declare every modified tensor in <code class="docutils literal notranslate"><span class="pre">mutates_args</span></code>. Operators that return
+<code class="docutils literal notranslate"><span class="pre">None</span></code> can use the usual fake implementation:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
+
+<span class="nd">@torch</span><span class="o">.</span><span class="n">library</span><span class="o">.</span><span class="n">custom_op</span><span class="p">(</span><span class="s2">"example::state_add"</span><span class="p">,</span> <span class="n">mutates_args</span><span class="o">=</span><span class="p">(</span><span class="s2">"state"</span><span class="p">,))</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">state_add</span><span class="p">(</span><span class="n">state</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">update</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="n">state</span><span class="o">.</span><span class="n">add_</span><span class="p">(</span><span class="n">update</span><span class="p">)</span>
+
+<span class="nd">@state_add</span><span class="o">.</span><span class="n">register_fake</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">update</span><span class="p">):</span>
+    <span class="k">return</span> <span class="kc">None</span>
+
+<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">conversion</span><span class="o">.</span><span class="n">plugins</span><span class="o">.</span><span class="n">custom_op</span><span class="p">(</span>
+    <span class="s2">"example::state_add"</span><span class="p">,</span> <span class="n">supports_dynamic_shapes</span><span class="o">=</span><span class="kc">True</span>
+<span class="p">)</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Model</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">,</span> <span class="n">update</span><span class="p">):</span>
+        <span class="n">state_add</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">update</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">state</span> <span class="o">*</span> <span class="mi">2</span>
+</pre></div>
+</div>
+<p>The generated plugin has one synthetic aliased output per mutated tensor, in
+tensor-argument order. Torch-TensorRT preserves these outputs even when the
+model returns <code class="docutils literal notranslate"><span class="pre">None</span></code>, and binds outputs that update engine inputs to those
+inputs’ storage. Hidden mutation outputs are excluded from the model’s return
+value. Static shapes, dynamic profiles, and multiple mutated base tensors are
+supported.</p>
+<p>For tensor-returning mutating operators, the fake implementation must return
+each mutated input by object identity. The real implementation must return
+non-aliasing tensors, as required by PyTorch custom operators. For example,
+the fake kernel can return <code class="docutils literal notranslate"><span class="pre">state</span></code> while the real kernel returns
+<code class="docutils literal notranslate"><span class="pre">state.clone()</span></code>. Missing alias signals produce a descriptive error.</p>
+<p>Mutations through views and tensor-list arguments remain in PyTorch. Consuming
+an aliased output from a plugin with multiple outputs also remains in PyTorch
+because TensorRT may insert copies around the plugin. These restrictions do
+not prevent returning multiple mutated base tensors from the model.</p>
+<p>For a manually registered QDP plugin corresponding to a <code class="docutils literal notranslate"><span class="pre">None</span></code>-returning
+operator, return <code class="docutils literal notranslate"><span class="pre">input_desc.aliased()</span></code> for each mutated tensor from the
+descriptor function, in tensor-argument order. Then register the converter with
+<code class="docutils literal notranslate"><span class="pre">generate_plugin_converter(&quot;example::state_add&quot;,</span> <span class="pre">supports_dynamic_shapes=True)</span></code>.
+An AOT implementation must write the corresponding buffers directly. Automatic
+<code class="docutils literal notranslate"><span class="pre">custom_op</span></code> registration generates a JIT implementation; standalone deployment
+without Python requires an AOT implementation whose kernels are embedded in the
+engine.</p>
+<p>Standalone engine callers must retain the input/output alias mapping and bind
+both names of each pair to the same device pointer. A compiled
+<code class="docutils literal notranslate"><span class="pre">TorchTensorRTModule</span></code> exposes the mapping as <code class="docutils literal notranslate"><span class="pre">aliased_io</span></code>; its serialized
+state also preserves the mapping and the user output count. Hidden bindings
+have names beginning with <code class="docutils literal notranslate"><span class="pre">__torch_tensorrt_mutation_</span></code>. TensorRT’s
+<code class="docutils literal notranslate"><span class="pre">get_aliased_input_tensor</span></code> does not necessarily report plugin aliases, so
+discovering them solely through that API is insufficient.</p>
 <hr class="docutils" />
 <p>For complete end-to-end examples see:</p>
 <ul class="simple">
 <li><p><span class="xref std std-ref">auto_generate_plugins</span> — Triton kernel, QDP JIT plugin</p></li>
 <li><p><span class="xref std std-ref">aot_plugin</span> — Triton kernel, QDP AOT plugin (pre-compiled PTX, no Python overhead at runtime)</p></li>
+<li><p><span class="xref std std-ref">triton_op</span> — the same Triton AOT plugin registered in one <code class="docutils literal notranslate"><span class="pre">triton_op</span></code> call</p></li>
 <li><p><span class="xref std std-ref">nvrtc_aot_plugin</span> — CUDA C++ kernel compiled with NVRTC, QDP AOT plugin</p></li>
+<li><p><span class="xref std std-ref">cutile_op</span> — cuTile kernel, QDP AOT plugin registered in one <code class="docutils literal notranslate"><span class="pre">cutile_op</span></code> call</p></li>
 <li><p><span class="xref std std-ref">custom_kernel_plugins</span> — manual plugin + converter registration (legacy approach)</p></li>
 </ul>
-</section>
 </section>
 <hr class="docutils" />
 <section id="debugging-plugin-converters">
@@ -798,6 +869,7 @@ dryrun report (see <a class="reference internal" href="../../compilation_analysi
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#parameters">Parameters</a></li>
 </ul>
 </li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#mutating-custom-operators">Mutating Custom Operators</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#debugging-plugin-converters">Debugging Plugin Converters</a></li>
 </ul>
   </nav></div>

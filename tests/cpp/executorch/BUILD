@@ -9,12 +9,16 @@ test_suite(
     name = "executorch_backend_tests",
     tests = [
         ":test_caller_stream",
+        ":test_execution_graph",
         ":test_executorch_binding_names",
         ":test_executorch_blob_header",
         ":test_executorch_weight_streaming_budget",
+        ":test_optimization_profile_backend",
+        ":test_optimization_profile_selection",
         ":test_shared_engines",
         ":test_shared_scratch_backend",
         ":test_shared_scratch_pool",
+        ":test_unaligned_io",
     ],
 )
 
@@ -54,6 +58,101 @@ cc_test(
     ],
 )
 
+cc_test(
+    name = "test_execution_graph",
+    timeout = "long",
+    srcs = [
+        "execution_graph_cuda_wrappers.cpp",
+        "execution_graph_cuda_wrappers.h",
+        "test_execution_graph.cpp",
+    ],
+    # Route CUDA calls through test wrappers to count calls and inject failures.
+    linkopts = [
+        "-Wl,--wrap=cudaMalloc",
+        "-Wl,--wrap=cudaFree",
+        "-Wl,--wrap=cudaFreeAsync",
+        "-Wl,--wrap=cudaMemcpyAsync",
+        "-Wl,--wrap=cudaStreamBeginCapture",
+        "-Wl,--wrap=cudaGraphLaunch",
+        "-Wl,--wrap=cudaDeviceGetAttribute",
+        "-Wl,--wrap=cudaStreamSynchronize",
+        "-Wl,--wrap=cudaGetDriverEntryPointByVersion",
+    ],
+    linkstatic = True,
+    target_compatible_with = select({
+        "//cpp:linux_x86_64": [],
+        "//cpp:sbsa": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "//cpp:tensorrt_executorch_backend",
+        "//cpp:tensorrt_executorch_engine_handle_test_access",
+        "//cpp:tensorrt_executorch_shared_scratch_pool",
+        "//cpp:tensorrt_executorch_shared_scratch_pool_test_hooks",
+        "@executorch//:executorch_core",
+        "@executorch//:executorch_headers",
+        "@executorch//:extension_cuda",
+        "@googletest//:gtest_main",
+    ] + select({
+        "//cpp:linux_x86_64": [
+            "@cuda//:cudart",
+            "@tensorrt//:nvinfer",
+        ],
+        "//cpp:sbsa": [
+            "@cuda//:cudart",
+            "@tensorrt_sbsa//:nvinfer",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+cc_test(
+    name = "test_optimization_profile_backend",
+    srcs = ["test_optimization_profile_backend.cpp"],
+    target_compatible_with = select({
+        "//cpp:linux_x86_64": [],
+        "//cpp:sbsa": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "//cpp:tensorrt_executorch_backend",
+        "//cpp:tensorrt_executorch_engine_handle_test_access",
+        "@executorch//:executorch_core",
+        "@executorch//:executorch_headers",
+        "@executorch//:extension_cuda",
+        "@googletest//:gtest_main",
+    ] + select({
+        "//cpp:linux_x86_64": [
+            "@cuda//:cudart",
+            "@tensorrt//:nvinfer",
+        ],
+        "//cpp:sbsa": [
+            "@cuda//:cudart",
+            "@tensorrt_sbsa//:nvinfer",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+# Asserts against the profile-selection policy only, so unlike the runtime tests
+# it needs neither a GPU nor a TensorRT engine. It does need TensorRT headers,
+# hence the same platform gate the backend carries.
+cc_test(
+    name = "test_optimization_profile_selection",
+    srcs = ["test_optimization_profile_selection.cpp"],
+    # Turns an out-of-bounds read in the policy into an abort instead of a pass.
+    copts = ["-D_GLIBCXX_ASSERTIONS"],
+    target_compatible_with = select({
+        "//cpp:linux_x86_64": [],
+        "//cpp:sbsa": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "//cpp:tensorrt_executorch_optimization_profile_selection",
+        "@googletest//:gtest_main",
+    ],
+)
+
 # The long timeout is what makes the fork case's per-child deadline mean anything:
 # it reaps 24 children at 30 s each, so the path where they wedge budgets 720 s
 # against Bazel's 300 s default for a target that names neither size nor timeout.
@@ -76,6 +175,9 @@ cc_test(
 cc_test(
     name = "test_shared_engines",
     srcs = ["test_shared_engines.cpp"],
+    linkopts = ["-Wl,--wrap=cudaMemGetInfo"],
+    # The wrapper needs the backend's CUDA reference at this executable's link.
+    linkstatic = True,
     target_compatible_with = select({
         "//cpp:linux_x86_64": [],
         "//cpp:sbsa": [],
@@ -83,6 +185,7 @@ cc_test(
     }),
     deps = [
         "//cpp:tensorrt_executorch_backend",
+        "//cpp:tensorrt_executorch_engine_handle_test_access",
         "//cpp:tensorrt_executorch_shared_engine_key",
         "//cpp:tensorrt_executorch_shared_engine_test_hooks",
         "@executorch//:executorch_core",
@@ -108,6 +211,10 @@ cc_test(
     name = "test_shared_scratch_backend",
     timeout = "long",
     srcs = ["test_shared_scratch_backend.cpp"],
+    # Injects allocation failures without taking real device memory.
+    linkopts = ["-Wl,--wrap=cudaMalloc"],
+    # The wrapper needs the backend's CUDA reference at this executable's link.
+    linkstatic = True,
     tags = ["exclusive"],
     target_compatible_with = select({
         "//cpp:linux_x86_64": [],
@@ -117,12 +224,42 @@ cc_test(
     deps = [
         "//cpp:tensorrt_executorch_backend",
         "//cpp:tensorrt_executorch_blob_header",
+        "//cpp:tensorrt_executorch_engine_handle_test_access",
         "//cpp:tensorrt_executorch_pooled_scratch_install",
         "//cpp:tensorrt_executorch_shared_scratch_pool",
         "//cpp:tensorrt_executorch_shared_scratch_pool_test_hooks",
         "@executorch//:executorch_core",
         "@executorch//:executorch_headers",
         "@executorch//:extension_cuda",
+        "@googletest//:gtest_main",
+    ] + select({
+        "//cpp:linux_x86_64": [
+            "@cuda//:cudart",
+            "@tensorrt//:nvinfer",
+        ],
+        "//cpp:sbsa": [
+            "@cuda//:cudart",
+            "@tensorrt_sbsa//:nvinfer",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+# Its own target because the failure it guards against is a device fault, which leaves
+# the CUDA context unusable for every later case in the same process.
+cc_test(
+    name = "test_unaligned_io",
+    srcs = ["test_unaligned_io.cpp"],
+    target_compatible_with = select({
+        "//cpp:linux_x86_64": [],
+        "//cpp:sbsa": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "//cpp:tensorrt_executorch_backend",
+        "//cpp:tensorrt_executorch_engine_handle_test_access",
+        "@executorch//:executorch_core",
+        "@executorch//:executorch_headers",
         "@googletest//:gtest_main",
     ] + select({
         "//cpp:linux_x86_64": [

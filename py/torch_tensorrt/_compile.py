@@ -712,9 +712,8 @@ def load(
 
 
 # The keyword arguments save() consumes only for output_format="executorch",
-# each with the default it is popped with. One table, because the unexpected-keyword
-# error spells the supported set out for the caller: an option added to the pops
-# alone would leave that message telling someone their flag is unsupported.
+# including explicit keyword-only parameters, with their defaults. Keep the
+# unexpected-keyword error's supported set in sync with the accepted options.
 _EXECUTORCH_SAVE_OPTIONS: Dict[str, Any] = {
     "partitioners": None,
     "compile_specs": None,
@@ -724,7 +723,9 @@ _EXECUTORCH_SAVE_OPTIONS: Dict[str, Any] = {
     "compile_config": None,
     "generate_etrecord": False,
     "weight_streaming_budget_per_engine": None,
+    "use_cuda_graphs": None,
     "zero_copy_kv": False,
+    "external_engine_data": None,
 }
 
 
@@ -739,10 +740,11 @@ def save(
     inputs: Optional[Sequence[torch.Tensor | Input]] = None,
     arg_inputs: Optional[Sequence[torch.Tensor | Input]] = None,
     kwarg_inputs: Optional[Dict[str, Any]] = None,
-    retrace: bool = True,
+    retrace: Optional[bool] = None,
     use_legacy_exporter: Optional[bool] = None,
     pickle_protocol: int = 2,
     dynamic_shapes: Optional[Dict[str, Any]] = None,
+    use_cuda_graphs: bool | None = None,
     **kwargs: Any,
 ) -> None:
     """
@@ -754,7 +756,10 @@ def save(
         arg_inputs (Tuple[Union[torch.Tensor, torch_tensorrt.Input], ...]): Same as inputs. Alias for better understanding with kwarg_inputs.
         kwarg_inputs (dict[str, Union[torch.Tensor, torch_tensorrt.Input]]): Optional, kwarg inputs to the module forward function.
         output_format (str): Format to save the model. Options include exported_program | torchscript | aot_inductor | executorch.
-        retrace (bool): When the module type is a fx.GraphModule, this option re-exports the graph using torch.export.export(strict=False) to save it.
+        retrace (Optional[bool]): When the module type is a fx.GraphModule, this option re-exports the graph using torch.export.export(strict=False) to save it.
+
+                Defaults to True, except for ``output_format="executorch"``, where it defaults to False:
+                the compiled graph is lowered as it is, so no example inputs are needed.
 
                 For TRT-compiled modules with dynamic shapes, both retrace=True and retrace=False are supported:
 
@@ -822,16 +827,25 @@ def save(
 
                 - If both dynamic_shapes and Input objects are provided, the explicit dynamic_shapes
                   parameter takes precedence.
+        use_cuda_graphs (Optional[bool]): Bake CUDA graph replay on (True) or off
+                (False) into every TensorRT delegate for ``output_format="executorch"``.
+                None leaves the choice unset so the runtime default applies. A load-time
+                option overrides this value. Non-booleans are rejected for ExecuTorch;
+                other formats ignore non-None values with a warning. Use this keyword,
+                not a raw ``CompileSpec("use_cuda_graphs", ...)``.
         kwargs: Additional format-specific kwargs. ``partitioners=``,
                 ``compile_specs=``, ``backend_config=``, ``constant_methods=``,
                 ``transform_passes=``, ``compile_config=``, ``generate_etrecord=``,
-                ``weight_streaming_budget_per_engine=`` and ``zero_copy_kv=`` are
+                ``weight_streaming_budget_per_engine=``, ``zero_copy_kv=`` and
+                ``external_engine_data=`` are
                 only used with ``output_format="executorch"``; otherwise they are
                 ignored with a warning. Pass ``compile_specs=[CompileSpec("target_device",
                 b"cuda:<i>")]`` to override the default target device (``cuda:0``).
                 ``backend_config=`` takes an ``Optional[ExecutorchBackendConfig]``
                 and is forwarded to ``to_executorch(config=...)`` to customize
                 ExecuTorch lowering (e.g. memory planning or device placement).
+                Its ``MemoryPlanningPass`` is aligned to 256 bytes on a copy, the
+                boundary TensorRT needs for every input and output.
                 ``partitioners=`` appends caller partitioners after the TensorRT
                 partitioner, so ops TensorRT does not take can be routed to another
                 delegate -- e.g. a ``CudaPartitioner`` for a coalesced TensorRT +
@@ -869,9 +883,23 @@ def save(
                 :func:`torch_tensorrt.executorch.check_zero_copy_kv` on the
                 finalized program before writing the file, so a single
                 ``zero_copy_kv=True`` is enough.
+                ``external_engine_data=`` (default ``None``) takes a file name without
+                the ``.ptd`` extension and
+                writes every TensorRT engine to ``<name>.ptd`` next to the ``.pte``
+                instead of into it. Pass that file as the program's data file when
+                loading. An existing file with that name is replaced, so give each
+                program in a directory its own name, for example
+                ``external_engine_data="model"`` for ``model.pte``. A program that also
+                has a CUDA backend part needs its own directory and
+                ``external_engine_data="aoti_cuda_blob"`` instead. See
+                :func:`torch_tensorrt.executorch.export`.
     """
     if isinstance(module, CudaGraphsTorchTensorRTModule):
         module = module.compiled_module
+    if retrace is None:
+        # Match torch_tensorrt.executorch.export, which lowers a compiled GraphModule as it
+        # is, so writing a .pte needs no example inputs.
+        retrace = output_format != "executorch"
     module_type = _parse_module_type(module)
     accepted_formats = {"exported_program", "torchscript", "aot_inductor", "executorch"}
     if arg_inputs is not None and not all(
@@ -908,6 +936,7 @@ def save(
         "weight_streaming_budget_per_engine"
     ]
     executorch_zero_copy_kv = executorch_options["zero_copy_kv"]
+    executorch_external_engine_data = executorch_options["external_engine_data"]
 
     if output_format not in accepted_formats:
         raise ValueError(
@@ -929,15 +958,18 @@ def save(
                 f"output_format='executorch': {sorted(kwargs)}. Supported executorch "
                 f"options are {supported}."
             )
-        # Validate the budget before the input and model-shape checks below, so a wrong
-        # type is not reported as an unrelated failure.
+        # Validate options before input and model-shape checks can obscure type errors.
         from torch_tensorrt.executorch.partitioner import (
+            normalize_external_engine_data,
+            normalize_use_cuda_graphs,
             normalize_weight_streaming_budget_per_engine,
         )
 
         normalize_weight_streaming_budget_per_engine(
             executorch_weight_streaming_budget_per_engine
         )
+        normalize_use_cuda_graphs(use_cuda_graphs)
+        normalize_external_engine_data(executorch_external_engine_data)
         # For the same reason, the one refusal zero-copy makes on the config
         # alone. _save_as_executorch reaches it only through
         # zero_copy_backend_config, which it calls after export() has partitioned
@@ -947,6 +979,15 @@ def save(
             from torch_tensorrt.executorch._zero_copy import _refuse_skip_h2d
 
             _refuse_skip_h2d(executorch_backend_config)
+        # Every backend writes its data as <name>.ptd beside the program, so a
+        # program named *.ptd can be replaced by one. Windows ignores case and
+        # trailing dots and spaces in a file name.
+        if os.fspath(file_path).rstrip(". ").lower().endswith(".ptd"):
+            raise ValueError(
+                f"file_path must not end with .ptd, got {file_path!r}. save() writes the "
+                "program's data files as <name>.ptd beside it, so one of them could replace "
+                "the program. Use the .pte extension."
+            )
 
     def _all_are_input_objects(obj: Any) -> bool:
         """Recursively check if all elements in nested collections are Input objects."""
@@ -1096,6 +1137,16 @@ def save(
             "output_format='executorch' and will be ignored for "
             f"output_format='{output_format}'."
         )
+    if use_cuda_graphs is not None and output_format != "executorch":
+        logger.warning(
+            "use_cuda_graphs= is only used with output_format='executorch' and will "
+            f"be ignored for output_format='{output_format}'."
+        )
+    if executorch_external_engine_data is not None and output_format != "executorch":
+        logger.warning(
+            "external_engine_data= is only used with output_format='executorch' and "
+            f"will be ignored for output_format='{output_format}'."
+        )
     if executorch_zero_copy_kv and output_format != "executorch":
         logger.warning(
             "zero_copy_kv= is only used with output_format='executorch' and will "
@@ -1105,9 +1156,11 @@ def save(
         raise ValueError(
             f"The AOT Inductor format is only supported on Linux, {platform.system()} is not a supported platform for this format"
         )
-    if output_format == "executorch" and platform.system() != "Linux":
+    from torch_tensorrt._utils import is_platform_supported_for_executorch
+
+    if output_format == "executorch" and not is_platform_supported_for_executorch():
         raise ValueError(
-            f"The executorch format is only supported on Linux, {platform.system()} is not a supported platform for this format"
+            f"The executorch format supports Linux and Windows x86-64, {platform.system()} is not a supported platform for this format"
         )
     if not file_path:
         raise ValueError("File path cannot be empty. Please provide a valid file path")
@@ -1194,7 +1247,9 @@ def save(
                     compile_config=executorch_compile_config,
                     generate_etrecord=executorch_generate_etrecord,
                     weight_streaming_budget_per_engine=executorch_weight_streaming_budget_per_engine,
+                    use_cuda_graphs=use_cuda_graphs,
                     zero_copy_kv=executorch_zero_copy_kv,
+                    external_engine_data=executorch_external_engine_data,
                 )
             else:
                 raise RuntimeError(
@@ -1312,7 +1367,9 @@ def save(
                         compile_config=executorch_compile_config,
                         generate_etrecord=executorch_generate_etrecord,
                         weight_streaming_budget_per_engine=executorch_weight_streaming_budget_per_engine,
+                        use_cuda_graphs=use_cuda_graphs,
                         zero_copy_kv=executorch_zero_copy_kv,
+                        external_engine_data=executorch_external_engine_data,
                     )
                 else:
                     raise RuntimeError(
@@ -1439,7 +1496,9 @@ def save(
                         compile_config=executorch_compile_config,
                         generate_etrecord=executorch_generate_etrecord,
                         weight_streaming_budget_per_engine=executorch_weight_streaming_budget_per_engine,
+                        use_cuda_graphs=use_cuda_graphs,
                         zero_copy_kv=executorch_zero_copy_kv,
+                        external_engine_data=executorch_external_engine_data,
                     )
                 else:
                     raise RuntimeError(
@@ -1451,23 +1510,69 @@ def _write_external_tensor_data(executorch_program: Any, file_path: str) -> None
     """Write an ExecuTorch program's external named tensor data (``.ptd``) next to the ``.pte``.
 
     The CUDA (AOTInductor) backend emits its weights as external named data
-    (``save_data_externally``), which ExecuTorch serializes only via
+    (``save_data_externally``), and so does the TensorRT backend for its engines
+    when saved with ``external_engine_data=``. ExecuTorch serializes that data only via
     ``write_tensor_data_to_file`` -- ``ExecutorchProgram.write_to_file`` does not
-    persist it. So a partition that carries external weights (e.g. a
-    ``CudaPartitioner`` delegate) would lose its blob and the ``.pte`` could not
+    persist it. So a partition that carries external data (e.g. a
+    ``CudaPartitioner`` delegate) would lose it and the ``.pte`` could not
     load. This writes the ``.ptd`` data file(s) into the ``.pte``'s directory when
     the program has any; the runtime must then be given those data file(s) (e.g.
-    via the ExecuTorch ``Module`` data-files argument) to load the weights.
+    via the ExecuTorch ``Module`` data-files argument) to load the program.
     """
     # Direct attribute access (no getattr default) so a future rename fails loud.
     if executorch_program._tensor_data:
         out_dir = os.path.dirname(os.path.abspath(file_path))
         executorch_program.write_tensor_data_to_file(out_dir)
+        # write_tensor_data_to_file adds .ptd unless the name already ends with it.
+        paths = [
+            os.path.join(out_dir, name if name.endswith(".ptd") else f"{name}.ptd")
+            for name in executorch_program._tensor_data
+        ]
         logger.info(
-            "Wrote external delegate weights (.ptd) to %s; point the runtime's "
-            "data-files at this directory to load them.",
-            out_dir,
+            "Wrote external delegate data to %s. Pass %s, not the directory, "
+            "when loading the program.",
+            ", ".join(paths),
+            "this file" if len(paths) == 1 else "these files",
         )
+
+
+# TensorRT needs every input and output address to be a multiple of this, and the delegate copies a
+# buffer that misses it.
+_TENSORRT_ADDRESS_ALIGNMENT = 256
+
+
+def _with_tensorrt_alignment(backend_config: Any) -> Any:
+    """Return ``backend_config`` with memory planning on TensorRT's 256-byte boundary.
+
+    ExecuTorch plans buffers on 16-byte boundaries by default, so a planned delegate input or output
+    can miss 256 and be copied on every call. Each ``MemoryPlanningPass`` gets the least common
+    multiple of its own alignment and 256, on a copy, so the caller's alignment still holds and the
+    caller's planner keeps its own. Any other planner is left as it is.
+    """
+    import copy
+    import dataclasses
+    import math
+
+    from executorch.exir import ExecutorchBackendConfig
+    from executorch.exir.passes import MemoryPlanningPass
+
+    def aligned(planner: Any) -> Any:
+        if (
+            not isinstance(planner, MemoryPlanningPass)
+            or planner.alignment % _TENSORRT_ADDRESS_ALIGNMENT == 0
+        ):
+            return planner
+        planner = copy.copy(planner)
+        planner.alignment = math.lcm(planner.alignment, _TENSORRT_ADDRESS_ALIGNMENT)
+        return planner
+
+    config = backend_config if backend_config is not None else ExecutorchBackendConfig()
+    planner = config.memory_planning_pass
+    if isinstance(planner, dict):
+        planner = {name: aligned(p) for name, p in planner.items()}
+    else:
+        planner = aligned(planner)
+    return dataclasses.replace(config, memory_planning_pass=planner)
 
 
 def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None:
@@ -1511,8 +1616,11 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
         weight_streaming_budget_per_engine=kwargs.get(
             "weight_streaming_budget_per_engine"
         ),
+        use_cuda_graphs=kwargs.get("use_cuda_graphs"),
         zero_copy_kv=zero_copy_kv,
+        external_engine_data=kwargs.get("external_engine_data"),
     )
+    backend_config = _with_tensorrt_alignment(kwargs.get("backend_config"))
     # Unlike the direct export()+to_executorch() path -- where the two steps
     # belong to different owners and pairing them is the caller's job -- save()
     # owns both, so it installs the finalization pass itself. Wrapping preserves
@@ -1521,7 +1629,6 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
     # writes, and the pass refuses it. A backend_config that already carries
     # the pass is wrapped again here; the second run finds the buffers already
     # un-staged and changes nothing.
-    backend_config = kwargs.get("backend_config")
     if zero_copy_kv:
         backend_config = zero_copy_backend_config(backend_config)
     executorch_program = edge_program.to_executorch(config=backend_config)

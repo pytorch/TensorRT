@@ -10,6 +10,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -231,10 +232,16 @@ struct TRTEngine : torch::CustomClassHolder {
       const std::unordered_map<std::string, AliasedIOSpec>& aliased_io = {});
 
   TRTEngine(std::vector<std::string> serialized_info);
+  // Same as above, but the TensorRT plan comes from serialized_engine and
+  // serialized_info[ENGINE_IDX] is ignored. Lets callers hand over a plan they already
+  // hold (e.g. a Python bytes object) without copying it into a std::string.
+  TRTEngine(const std::vector<std::string>& serialized_info, std::string_view serialized_engine);
 
+  // serialized_engine is only read during construction, so it may point into a buffer
+  // the caller owns.
   TRTEngine(
       const std::string& mod_name,
-      const std::string& serialized_engine,
+      std::string_view serialized_engine,
       const RTDevice& cuda_device,
       const std::vector<std::string>& in_binding_names,
       const std::vector<std::string>& out_binding_names,
@@ -299,6 +306,8 @@ struct TRTEngine : torch::CustomClassHolder {
   // explicit ownership makes capture/replay behavior consistent across x86-64
   // and AArch64.
   at::cuda::CUDAGraph cudagraph = {true};
+  // Dynamically allocated workspace that ``cudagraph`` replays write to, kept for as long as the graph.
+  at::Tensor cudagraph_workspace;
   at::cuda::CUDAStream engine_stream = c10::cuda::getDefaultCUDAStream();
   at::cuda::CUDAStream caller_stream = c10::cuda::getDefaultCUDAStream();
   at::cuda::CUDAStream default_stream = c10::cuda::getDefaultCUDAStream();
@@ -332,7 +341,7 @@ struct TRTEngine : torch::CustomClassHolder {
   // method names are exposed via torchbind in register_jit_hooks.cpp
   // (``num_optimization_profiles``, ``_active_profile_index``,
   // ``_auto_select_profiles``, ``set_active_profile``). Index validation lives
-  // in the runtime-agnostic TorchTensorRTModule.resolve_profile_index.
+  // in the runtime-agnostic TorchTensorRTModule.set_optimization_profile.
   int64_t num_optimization_profiles = 1; // cuda_engine->getNbOptimizationProfiles()
   int64_t active_profile_index = 0; // profile currently loaded in exec_ctx
   bool auto_select_profiles = false; // opt-in shape-based selection (per call)
@@ -468,8 +477,10 @@ struct TRTEngine : torch::CustomClassHolder {
   // factory throws if creation fails).
   nvinfer1::IExecutionContext* exec_ctx();
 
-  // Drop the live execution context without recreating. The next ``exec_ctx()``
-  // call rebuilds from the current ``runtime_cfg`` settings.
+  // Drop the live execution context, and this engine's own CUDA graph captured
+  // on it with its workspace, without recreating. The next ``exec_ctx()`` call
+  // rebuilds from the current ``runtime_cfg`` settings. If CUDA graphs mode is
+  // on, the next execution records a new graph.
   void invalidate_exec_ctx() noexcept;
 
   // True iff the execution context has been materialized. Probes WITHOUT

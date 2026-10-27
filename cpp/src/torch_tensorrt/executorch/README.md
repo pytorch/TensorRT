@@ -3,6 +3,7 @@
 This package is included in `libtorchtrt.tar.gz` as
 `torch_tensorrt/src/torch_tensorrt/executorch/`. It builds the TensorRT
 backend delegate for ExecuTorch from source.
+Building this backend requires CUDA Toolkit 12.5 or newer.
 
 ```text
 user_runner_project/
@@ -185,6 +186,21 @@ reads it the memory belongs to somebody else. So the rule is the caller's to kee
 alive and unchanged until the call returns. The Python path cannot reach this, because a tensor there
 owns its storage.
 
+### A buffer off the 256-byte boundary is copied
+
+TensorRT needs every input and output address to be a multiple of 256 bytes, and it does not check.
+A view that starts partway into its storage, such as `x[1:]` of a 1-D tensor, misses that. Bound as
+it is, the engine returns a wrong answer, or its kernel faults and every later CUDA call in the
+process fails. So the backend copies such a buffer through an aligned one of its own, and logs this
+once per engine. The answer is right. The cost is one copy per buffer per call, and two for a
+buffer the engine updates in place, which is copied in and then back.
+
+`torch_tensorrt.save()` plans memory on 256-byte boundaries, so buffers a program plans in GPU memory
+are bound directly. ExecuTorch's own default is 16 bytes, so a program finalized with `to_executorch()`
+directly should pass `MemoryPlanningPass(alignment=256)`, or its planned buffers take this path too.
+On a device that reads host memory directly, an unaligned host buffer is copied the same way instead
+of being read in place.
+
 ### Running from several threads at once
 
 One program per thread works. Sharing one program across threads does not, and is refused
@@ -315,6 +331,49 @@ requirements, which previously lived on the removed `CudaStreamGuard`:
   context is only exercised where the device has the SMs for one.
 
 
+## Engine load errors
+
+Loading returns `Error::MemoryAllocationFailed` when TensorRT's last error contains
+`OutOfMemory` or `out of memory`, ignoring case. This covers deserialization,
+weight streaming budget application and execution context creation. Other TensorRT
+load failures return `Error::InvalidProgram`.
+
+The log names the failed operation and preserves up to 1023 characters of the
+TensorRT reason across short lines. Allocation failures include free and total
+device memory in bytes, or the memory query error if those figures are unavailable.
+These figures are not the failed allocation size. Loading does not clear a caller's
+pending CUDA error to classify TensorRT failures.
+
+An engine serialized without its weights, for example compiled with
+`immutable_weights=False, strip_engine_weights=True`, is refused with
+`Error::InvalidProgram`, because this backend cannot refit it. To check, the backend
+asks TensorRT how many weight bytes the plan still holds, and refuses the plan when that
+is less than its total:
+
+- A stripped plan that had nothing to strip still holds all its weights, so it loads.
+- A plan with no weights at all loads.
+- A stripped plan saved again as it is still counts as stripped, so it is refused.
+- A stripped plan saved again without `SerializationFlag::kEXCLUDE_WEIGHTS`, and not
+  refitted first, no longer counts as stripped, so this check does not catch it. Refit a
+  stripped plan before you save it again with its weights.
+
+For an ordinary engine with weights, the question makes TensorRT log a warning that the
+engine was not built with `BuilderFlag::kSTRIP_PLAN`, each time the engine is
+deserialized. The backend forwards it at Info level, and it is harmless.
+
+## Engines in a .ptd file
+
+A program exported with `external_engine_data=` keeps its engines in a `.ptd` file
+next to the `.pte`. Load it with that file, for example
+`Module module("model.pte", "model.ptd");`. Without the file, or with one that
+lacks the engine, loading returns `Error::InvalidExternalData`. A program that shares
+`aoti_cuda_blob.ptd` with the CUDA backend can fail first in that backend, with
+`Error::NotFound`.
+
+The engine is GPU code, so treat the `.ptd` as trusted input, just like the `.pte`.
+Each engine is stored under a key made from its sha256, but the key is only a name:
+nothing checks the engine against it at load.
+
 ## Shared engines
 
 Loading the same program twice in one process, for example once per robot arm, used to
@@ -382,6 +441,209 @@ Turn it off when two loads of one program must not share an engine, for example 
 their memory, or when the loads run under different CUDA driver contexts on one device, which
 sharing does not tell apart.
 
+## Optimization profiles
+
+An engine exported with several optimization profiles, for example one for single-token decode
+and one for prefill, runs one profile at a time. A C++ host chooses it per thread with
+`OptimizationProfileGuard` from `torch_tensorrt/executorch/TensorRTBackend.h`, scoped around the
+call:
+
+```cpp
+#include <torch_tensorrt/executorch/TensorRTBackend.h>
+
+using torch_tensorrt::executorch_backend::OptimizationProfileGuard;
+
+constexpr int32_t kDecodeProfile = 0; // indices follow the export-time profile order
+constexpr int32_t kPrefillProfile = 1;
+
+{
+  OptimizationProfileGuard guard(kPrefillProfile);
+  module.forward(prefill_inputs);
+}
+{
+  auto guard = OptimizationProfileGuard::automatic();
+  module.forward(inputs);
+}
+```
+
+- Without a guard every engine runs profile 0. An input outside its range fails with
+  `Error::InvalidArgument`, and when the engine has more profiles the message says how many and
+  points at the guard.
+- A pinned index runs that profile, and only the shapes it covers. An index the engine lacks fails
+  the call. An engine with a single profile ignores a nonnegative pin, runs profile 0 and logs that
+  once, so a pin meant for another engine in the same method does not fail it. A negative index
+  always fails.
+- `automatic()` keeps the current profile while the inputs fit it, and otherwise takes the lowest
+  index that fits. Where ranges overlap the choice depends on earlier calls, so pin when it matters.
+- The request belongs to the thread that made it, and a nested guard restores the enclosing one
+  when it ends. Every TensorRT delegate in the method reads the same index and resolves it against
+  its own profile list, so pin by index only when the engines were built from one list.
+- Each handle keeps its own active profile, so handles of a shared engine switch independently. A
+  switch is issued on the call's stream, before the pooled scratch is claimed, and a switch drops
+  the handle's recorded CUDA graph (see [CUDA graph replay](#cuda-graph-replay)).
+- Profile selection needs the header. The `torch-tensorrt-executorch-runtime` wheel ships none,
+  and on Windows its DLL does not export the guard, so an app that links the delegate from the
+  wheel always runs profile 0. Build against the source tree or the release tarball, which carries
+  the headers under `include/torch_tensorrt/executorch/`. Python has no way to choose a profile.
+
+## CUDA graph replay
+
+CUDA graph replay is off by default. When it is on, the delegate records an
+engine's kernel launches once as a CUDA graph and then replays the whole engine
+with one launch. This helps engines with fixed shapes that launch many short
+kernels, where launch work on the CPU is a large share of each call.
+
+### Turning it on, and off
+
+Three settings choose it, all read when an engine loads, so a later change does
+not affect engines already loaded. They apply in this order:
+
+1. The `use_cuda_graphs` load option passed to `Module::load` wins over every
+   other setting. It must be a boolean; any other type fails the load with
+   `Error::InvalidArgument`.
+2. With no load option, an explicit false set through
+   `executorch::runtime::set_option` turns replay off for the process, even if
+   the program saved true.
+3. Otherwise, the `use_cuda_graphs` compile spec saved at export chooses replay:
+   `b"1"` turns it on and `b"0"` turns it off. It wins over a process option set
+   to true and over the default when the process option was never set. Any other
+   value, or the key twice, fails the load with `Error::InvalidProgram`.
+4. If the program has no saved choice, the process option applies. Replay stays
+   off when that option was never set.
+
+In Python, at export:
+
+```python
+import torch_tensorrt
+
+torch_tensorrt.save(
+    trt_module,
+    "model.pte",
+    output_format="executorch",
+    use_cuda_graphs=True,
+)
+```
+
+Both `save()` and `torch_tensorrt.executorch.export()` accept `use_cuda_graphs=True`
+(on), `False` (off), or `None` (default, no baked choice). The choice applies to every
+method's TensorRT delegates. Export rejects non-booleans and raw
+`CompileSpec("use_cuda_graphs", ...)` entries; pass the keyword instead.
+
+In C++, a host that must not replay refuses it for one load:
+
+```cpp
+#include <executorch/extension/module/module.h>
+
+using namespace executorch::extension;
+using namespace executorch::runtime;
+
+Error load_without_cuda_graphs(Module& module) {
+  BackendOptions<1> options;
+  const Error stored = options.set_option("use_cuda_graphs", false);
+  if (stored != Error::Ok) {
+    return stored;
+  }
+  LoadBackendOptionsMap by_backend;
+  const Error mapped = by_backend.set_options("TensorRTBackend", options.view());
+  if (mapped != Error::Ok) {
+    return mapped;
+  }
+  return module.load(by_backend);
+}
+```
+
+A C++ host can also turn it on for every program that does not choose, before it
+loads them:
+
+```cpp
+BackendOptions<1> options;
+options.set_option("use_cuda_graphs", true);
+set_option("TensorRTBackend", options.view());
+```
+
+### When recording is unsafe
+
+Recording can recur throughout an engine's lifetime. Every input shape change
+and every optimization profile switch starts another warmup and recording cycle. A growth of the shared activation
+scratch pool also drops the recorded graph: when any engine on a device needs
+more than the pool holds, every engine on that device's pool records again. That
+can happen long after warm-up, for example when a dynamic engine sees a larger
+shape, so warming up every shape does not end the risk for those engines.
+A failed recording is retried on the next call, up to three failures for that
+set of shapes. A shape change or a profile switch resets that budget and a pool
+growth does not, so an engine that used up its three failures stays on the
+ordinary path until its shapes or its profile change. Loading everything before the first replay does not end the risk.
+
+A lock shared across this backend prevents recording from overlapping its own
+engine and execution context creation and destruction. Loading or destroying a
+program through this backend is protected from this recording race. A handle
+must still not be destroyed while it is executing. An engine on the shared
+activation scratch pool records while it holds its device's pool lock, so it
+does not wait for this lock: while a load, a destroy, or another engine's
+recording holds it, the engine runs that call with an ordinary launch and records
+on a later call.
+
+The lock does not cover work outside this backend. Creating or destroying a
+TensorRT engine or execution context elsewhere in the process remains unsafe
+while recording runs. A whole device sync on any thread, such as
+`cudaDeviceSynchronize` or `torch.cuda.synchronize()`, is also unsafe. The sync
+itself can fail with `cudaErrorStreamCaptureUnsupported`, and the overlap can
+crash the process inside the CUDA driver. Loading a program with ExecuTorch's
+CUDA delegate can make such a sync too.
+
+Leave replay off when other threads may perform any of that work. Use an
+explicit false process option to refuse a program's saved request, or a false
+load option for one load. Replay also does not support wrapping `execute()` in
+a caller's own CUDA capture.
+
+### What it costs
+
+Each engine keeps one stable device buffer per input and output, and every call
+that runs through the graph copies each input in and each output out. For an
+engine with few kernels, or with large inputs or outputs, these copies can cost
+more than the launches they save. Shapes that change on every call never replay
+and still pay the copies. Engines on the shared activation scratch pool pay this
+too, so turning replay on for a model split into many small engines adds these
+buffers back for every engine. For example, four pooled engines with a 4 MiB
+input and a 4 MiB output each keep 32 MiB of these buffers next to the shared
+scratch, and make 8 copies per round.
+
+### How it works
+
+The first call with a set of input shapes runs on the stable buffers with an
+ordinary launch, the second records the graph on a private stream and launches
+it on the caller's stream, and later calls replay. A shape change starts this
+again, and so does an optimization profile switch at the same shapes, because a
+graph replays the kernels of the profile it was recorded under. A handle keeps
+one graph, so a loop that switches profile on every call, such as alternating
+prefill and decode on one handle, records on every switch and never replays.
+A new activation scratch buffer also starts recording again: an engine on the shared
+activation scratch pool records against the buffer the pool hands it, and when a
+larger request from any engine moves the pool to a new buffer, the engine's next
+call drops the old graph. Recording then starts again on a later call, unless
+the engine already used up its recording failures. Changing the caller stream
+does not restart recording when the stream is in the same current CUDA context
+and is not a green context stream. This includes the legacy default stream and
+the default stream for each thread. A call with no caller stream replays on
+`cudaStreamPerThread`. `execute()` waits for the stream before it returns, as it
+always does.
+
+Engines with aliased outputs, GPUs without support for stream ordered memory,
+and drivers older than CUDA 12.5 keep the ordinary path. Each reason is logged
+once at load or first call. A call on a green context stream or a stream from
+another context also takes the ordinary path, and the recorded graph is kept for
+the next compatible call unless the scratch buffer, the shapes, or the profile
+changed. Taking
+the ordinary path does not guarantee that a stream from another context works
+with the engine; the call can still fail.
+
+If allocating a graph buffer fails, the engine uses the ordinary path until an
+input shape or the profile changes. Staging allocations can still fail with
+`Error::MemoryAllocationFailed`; retained graph buffers are not reclaimed to
+retry them. A failed recording is retried on the next call, and after three
+failures for one set of shapes the engine logs an error and uses the ordinary
+path until a shape or the profile changes.
+
 ## Shared activation scratch
 
 A TensorRT execution context allocates its own activation scratch and holds it
@@ -423,6 +685,10 @@ whose contexts should use the pool, and read the `use_shared_activation_scratch`
 bullet of the caller-stream contract above: contexts sharing a buffer do not run
 concurrently on the device. The pool never shrinks, so the largest scratch it was
 ever asked for stays allocated until the process exits.
+
+Turning on `use_cuda_graphs` as well adds memory back: each replaying engine
+keeps its own stable buffer for every input and output, as "What it costs" under
+CUDA graph replay describes.
 
 A call that asks for nothing never grows a pool that already holds a buffer: it is
 handed that buffer, whatever size it is. Against an empty pool it does allocate,
@@ -595,7 +861,7 @@ call whose shapes need more than every call before them, so with one of those in
 the program no run order bounds the number of allocations. One engine over a
 `[1..4, 512, 512]` profile is either, depending on how it was built.
 
-### CUDA graph capture is not supported
+### Capturing execute from the caller is not supported
 
 A pooled call whose selected stream is capturing is refused with
 `Error::NotSupported`. The handoff between one enqueue and the next waits on an
@@ -610,7 +876,7 @@ of it only when `cudaStreamEndCapture` hands back
 caused it.
 
 The capture check runs before the wait on a previous enqueue, the `cudaMalloc`
-that grows a host-input staging buffer, and the `cudaFree(nullptr)` that makes a
+that grows an input staging buffer, and the `cudaFree(nullptr)` that makes a
 context current for a default stream. These calls precede the pool's own calls
 and, outside `Relaxed`, can invalidate the capture. Only the device query and
 the device switch run before the check, and a capture takes both.

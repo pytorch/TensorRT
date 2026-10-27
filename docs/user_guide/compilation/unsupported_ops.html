@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=0866734c"></script>
+    <script src="../../_static/documentation_options.js?v=ede72c6b"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -470,6 +470,7 @@ document.write(`
 <li class="toctree-l2"><a class="reference internal" href="../runtime_performance/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../runtime_performance/serialized_engine.html">Extracting a Raw TensorRT Engine</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../runtime_performance/aot_inductor.html">AOTInductor Deployment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../runtime_performance/executorch.html">ExecuTorch Deployment</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../runtime_performance/mutable_module.html">MutableTorchTensorRTModule</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/save_dynamic_shapes_example.html">Example: Saving and Loading Models with Dynamic Shapes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/save_dynamic_shapes_both_methods.html">Example: Saving Models with Dynamic Shapes - Both Methods</a></li>
@@ -760,9 +761,16 @@ functions that can’t be traced. Use the <code class="docutils literal notransl
 </div></blockquote>
 <p><strong>“I have a Triton kernel. Can I use it in a serialized TRT engine?”</strong></p>
 <blockquote>
-<div><p>Triton kernels can be wrapped as TRT plugins via the AOT plugin path. See
-<span class="xref std std-ref">aot_plugin</span> for an end-to-end example of compiling a Triton kernel as a
-TRT plugin for use in a serialized engine.</p>
+<div><p>Triton kernels can be wrapped as TRT plugins via the AOT plugin path. The
+shortest route is <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.kernels.triton_op</span></code>, which compiles the
+kernel and registers the op, plugin, and converter in one call — see
+<span class="xref std std-ref">triton_op</span>. <span class="xref std std-ref">aot_plugin</span> shows the same thing built by hand.</p>
+</div></blockquote>
+<p><strong>“I have a cuTile kernel. Can I use it in a serialized TRT engine?”</strong></p>
+<blockquote>
+<div><p>Yes — <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.kernels.cutile_op</span></code> compiles a <code class="docutils literal notranslate"><span class="pre">&#64;ct.kernel</span></code> program
+ahead of time and registers the op, plugin, and converter in one call, with
+the PTX embedded in the engine. See <span class="xref std std-ref">cutile_op</span>.</p>
 </div></blockquote>
 <p><strong>“Operator X is listed as supported but my model still falls back”</strong></p>
 <blockquote>

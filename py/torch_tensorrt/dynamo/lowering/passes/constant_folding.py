@@ -15,6 +15,8 @@ from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
 )
 from torch_tensorrt.dynamo.lowering.passes.reset_folded_constructors import (
     FOLDED_CONSTRUCTOR_META,
+    _aliases_input,
+    _storage_escapes,
 )
 
 from packaging import version
@@ -26,6 +28,36 @@ else:
     from torch._inductor.constant_folding import ConstantFolder
 
 logger = logging.getLogger(__name__)
+
+# Skip installing large folded tensors that already share storage with an
+# existing module attribute (typically weight permutes/views). On Flux NVFP4
+# those dominate replace cost via cpu().contiguous() under offload_module_to_cpu.
+# Do NOT skip materialized folds (e.g. VLA position embedding outputs) — those
+# can be required for TRT legality (int64 indices never reach the converter).
+_MAX_CONSTANT_FOLD_BYTES = 1 << 20  # 1 MiB
+
+# Only skip installing aliased folds whose converters are verified to accept
+# constant inputs. Unknown operations retain the established install behavior.
+_SAFE_ALIASED_FOLD_SKIP_OPS: Set[torch._ops.OpOverload] = {
+    torch.ops.aten.permute.default,
+}
+
+
+def _tensor_reuses_module_storage(
+    gm: torch.fx.GraphModule, constant: torch.Tensor
+) -> bool:
+    try:
+        ptr = constant.untyped_storage().data_ptr()
+    except Exception:
+        return False
+    for tensor in gm.state_dict().values():
+        if isinstance(tensor, torch.Tensor):
+            try:
+                if tensor.untyped_storage().data_ptr() == ptr:
+                    return True
+            except Exception:
+                continue
+    return False
 
 
 @torch.utils._python_dispatch._disable_current_modes()  # type: ignore
@@ -44,7 +76,26 @@ def constant_fold(
 
     # The constants are created on CPU to save GPU memory for TensorRT compilation.
     # For TRT INetwork construction the constants are moved to CPU in get_attr call.
+    skipped_alias = 0
     for node, constant in cf.node_replacements.items():
+        if (
+            isinstance(constant, torch.Tensor)
+            and node.target in _SAFE_ALIASED_FOLD_SKIP_OPS
+        ):
+            nbytes = int(constant.numel() * constant.element_size())
+            if nbytes > _MAX_CONSTANT_FOLD_BYTES and _tensor_reuses_module_storage(
+                gm, constant
+            ):
+                skipped_alias += 1
+                logger.debug(
+                    "Skipping constant-fold install for supported aliased op %s "
+                    "(%d bytes > %d)",
+                    node.target,
+                    nbytes,
+                    _MAX_CONSTANT_FOLD_BYTES,
+                )
+                continue
+
         if settings.offload_module_to_cpu:
             replace_node_with_constant(
                 gm,
@@ -55,6 +106,14 @@ def constant_fold(
             replace_node_with_constant(
                 gm, node, torch.nn.Parameter(constant, requires_grad=False)
             )
+
+    if skipped_alias:
+        logger.info(
+            "Skipped installing %d large aliased folded constant(s) (>%d bytes); "
+            "leaving original view/permute ops in the graph",
+            skipped_alias,
+            _MAX_CONSTANT_FOLD_BYTES,
+        )
 
     erased_params = []
     for node in gm.graph.nodes:
@@ -81,7 +140,7 @@ def replace_node_with_constant(
     """Adapted from:
     https://github.com/pytorch/pytorch/blob/bcf35c6ae62bb6560befa3550e37a8283944e5f4/torch/_inductor/constant_folding.py#L17-L43
 
-    Modified to register parameters, instead of buffers for frozen constants
+    Registers frozen constants as non-trainable parameters.
     """
     g = gm.graph
 
@@ -176,6 +235,12 @@ class _TorchTensorRTConstantFolder(ConstantFolder):  # type: ignore[misc]
 
     # TODO: Update this function when quantization is added
     def is_impure(self, node: torch.fx.node.Node) -> bool:
+
+        # Folding an observable view loses its relation to the original storage.
+        # Keep the view so the reset pass can clone a fresh allocation once and
+        # rebuild its views, while views of module state keep their aliases.
+        if _aliases_input(node) and _storage_escapes(node):
+            return True
 
         if node.target in self.quantization_ops:
             return True

@@ -8,6 +8,7 @@ from torch_tensorrt.executorch.serialization import (
     HEADER_SIZE,
     TENSORRT_MAGIC,
     TENSORRT_MAGIC_ALIASED_IO,
+    TENSORRT_MAGIC_NAMED_ENGINE,
     TensorRTBlobMetadata,
     TensorRTIOBinding,
     deserialize_engine,
@@ -167,3 +168,45 @@ def test_to_json_writes_every_scalar_after_both_arrays():
     assert restored.device_id == 6
     assert restored.aliased_io == {"out_k": ("in_k", "kv_cache_update")}
     assert [b.name for b in restored.io_bindings] == ["in_k", "out_k"]
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("aliased_io", [{}, {"out_k": ("x", "kv_cache_update")}])
+def test_named_engine_blob_carries_its_own_magic(aliased_io):
+    """A blob whose engine is named data carries none, so a parser that predates
+    engine_key would read an empty engine and fail inside TensorRT. TR03 makes such
+    a parser refuse it up front; a parser that knows TR03 also knows aliased_io."""
+    metadata = TensorRTBlobMetadata(
+        io_bindings=[
+            TensorRTIOBinding(name="x", is_input=True),
+            TensorRTIOBinding(name="out_k", is_input=False),
+        ],
+        aliased_io=aliased_io,
+        engine_key="tensorrt_engine_ab",
+    )
+    blob = serialize_engine(b"", metadata)
+    assert blob[:4] == TENSORRT_MAGIC_NAMED_ENGINE
+    engine, restored = deserialize_engine(blob)
+    assert engine == b"" and restored.engine_key == "tensorrt_engine_ab"
+    assert restored.aliased_io == aliased_io
+
+
+@pytest.mark.unit
+def test_an_engine_is_inline_or_named_never_both_or_neither():
+    bindings = [TensorRTIOBinding(name="x", is_input=True)]
+    named = TensorRTBlobMetadata(io_bindings=bindings, engine_key="tensorrt_engine_ab")
+    inline = TensorRTBlobMetadata(io_bindings=bindings)
+    with pytest.raises(ValueError, match="never both or neither"):
+        serialize_engine(b"engine-bytes", named)
+    with pytest.raises(ValueError, match="never both or neither"):
+        serialize_engine(b"", inline)
+
+    # A named blob relabelled TR01, and an inline one relabelled TR03.
+    named_blob = bytearray(serialize_engine(b"", named))
+    named_blob[:4] = TENSORRT_MAGIC
+    with pytest.raises(ValueError, match="engine_key"):
+        deserialize_engine(bytes(named_blob))
+    inline_blob = bytearray(serialize_engine(b"engine-bytes", inline))
+    inline_blob[:4] = TENSORRT_MAGIC_NAMED_ENGINE
+    with pytest.raises(ValueError, match="engine_key"):
+        deserialize_engine(bytes(inline_blob))

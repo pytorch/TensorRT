@@ -36,6 +36,7 @@ from torch_tensorrt.dynamo.lowering import (
 from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
     ENGINE_IDX,
     SERIALIZED_METADATA_IDX,
+    create_cpp_engine,
 )
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
 from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
@@ -423,30 +424,35 @@ def refit_module_weights(
         if hasattr(trt.SerializationFlag, "INCLUDE_REFIT"):
             serialization_config.set_flag(trt.SerializationFlag.INCLUDE_REFIT)
         serialized_engine = engine.serialize_with_config(serialization_config)
+        # Only the plan is needed from here on. Free the refitted copy before the
+        # runtime engine is rebuilt from it, so the weights are not on the device twice.
+        # The serialization config keeps its engine alive, so it has to go too.
+        del engine, serialization_config
 
         if isinstance(compiled_submodule, TorchTensorRTModule):
-            new_serialized_engine = bytes(serialized_engine)
-            compiled_submodule.serialized_engine = new_serialized_engine
             if isinstance(compiled_submodule.engine, TRTEngine):
                 # Refit already updated ``cuda_engine`` in place; avoid deserialize (slow).
+                new_serialized_engine = bytes(serialized_engine)
+                compiled_submodule.serialized_engine = new_serialized_engine
                 py_eng = compiled_submodule.engine
                 py_eng.serialized_info[ENGINE_IDX] = new_serialized_engine
                 py_eng.serialized_engine = new_serialized_engine
             else:
+                compiled_submodule.serialized_engine = serialized_engine
                 compiled_submodule.engine = None
                 compiled_submodule.setup_engine()
         elif inline_module:
             new_engine_info = list(engine_info)
-            new_engine_info[ENGINE_IDX] = bytes(serialized_engine)
-            refitted_engine = torch.classes.tensorrt.Engine(tuple(new_engine_info))
+            new_engine_info[ENGINE_IDX] = serialized_engine
+            refitted_engine = create_cpp_engine(new_engine_info)
             setattr(compiled_module, f"{name}_engine", refitted_engine)
         elif isinstance(compiled_submodule, torch.nn.Module):
             # Torch retrace module
             new_engine_info = list(engine_info)
-            new_engine_info[ENGINE_IDX] = bytes(serialized_engine)
-            refitted_engine = torch.classes.tensorrt.Engine(tuple(new_engine_info))
+            new_engine_info[ENGINE_IDX] = serialized_engine
+            refitted_engine = create_cpp_engine(new_engine_info)
             compiled_submodule.engine = refitted_engine
-        del engine
+        del serialized_engine
         gc.collect()
         torch.cuda.empty_cache()
 

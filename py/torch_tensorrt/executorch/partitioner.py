@@ -25,6 +25,7 @@ from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import DEVICE_IDX
 from torch_tensorrt.executorch.backend import (
     ZERO_COPY_KV_COMPILE_SPEC_KEY,
     TensorRTBackend,
+    _external_engine_tag,
     _get_engine_info_for_node,
     _get_engine_nodes_in,
     _get_str,
@@ -55,6 +56,12 @@ except ImportError:
 # The delegate also reads this same key as a load-time backend option (runtime
 # spec), which takes precedence over this baked value when provided at load.
 WEIGHT_STREAMING_BUDGET_COMPILE_SPEC_KEY = "weight_streaming_budget"
+
+# Compile spec key that turns CUDA graph replay on (b"1") or off (b"0") for every
+# TensorRT engine in the program. Must match kCudaGraphsKey on the C++ side
+# (cpp/include/torch_tensorrt/executorch/TensorRTBackend.h). A load-time backend
+# option of the same name wins over it.
+CUDA_GRAPHS_COMPILE_SPEC_KEY = "use_cuda_graphs"
 
 # The C++ side parses the value into an int64_t, so anything at or above 2**63 has no
 # representation there.
@@ -89,6 +96,65 @@ def normalize_weight_streaming_budget_per_engine(
             f"{weight_streaming_budget_per_engine}."
         )
     return str(weight_streaming_budget_per_engine).encode("ascii")
+
+
+def normalize_use_cuda_graphs(use_cuda_graphs: bool | None) -> bytes | None:
+    """Validate the replay choice; None leaves the runtime default unchanged."""
+    if use_cuda_graphs is None:
+        return None
+    if not isinstance(use_cuda_graphs, bool):
+        raise TypeError(
+            "use_cuda_graphs must be a bool or None, got "
+            f"{type(use_cuda_graphs).__name__}."
+        )
+    return b"1" if use_cuda_graphs else b"0"
+
+
+# Characters every file system accepts in a file name, with no path separator or drive colon. A
+# leading dot or dash would make a hidden file or a name that reads as a command line option.
+_EXTERNAL_ENGINE_DATA_NAME = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]*")
+# ExecuTorch writes <name>.ptd, and most file systems limit a file name to 255 bytes.
+_MAX_EXTERNAL_ENGINE_DATA_LENGTH = 255 - len(".ptd")
+# Windows opens these as devices, with any extension.
+_WINDOWS_DEVICE_NAMES = frozenset(
+    ["CON", "PRN", "AUX", "NUL"]
+    + [f"{port}{i}" for port in ("COM", "LPT") for i in range(10)]
+)
+
+
+def normalize_external_engine_data(external_engine_data: str | None) -> bytes | None:
+    """Validate the .ptd file name, given without its extension; None embeds every engine."""
+    if external_engine_data is None:
+        return None
+    if not isinstance(external_engine_data, str):
+        raise TypeError(
+            "external_engine_data must be a str or None, got "
+            f"{type(external_engine_data).__name__}."
+        )
+    if not _EXTERNAL_ENGINE_DATA_NAME.fullmatch(external_engine_data):
+        raise ValueError(
+            "external_engine_data must use only ASCII letters, digits, '.', '-' and '_', and "
+            f"start with a letter, a digit or '_', got {external_engine_data!r}."
+        )
+    if len(external_engine_data) > _MAX_EXTERNAL_ENGINE_DATA_LENGTH:
+        raise ValueError(
+            f"external_engine_data must be at most {_MAX_EXTERNAL_ENGINE_DATA_LENGTH} "
+            "characters, so the .ptd file name fits the 255 byte limit, got "
+            f"{len(external_engine_data)}."
+        )
+    # ExecuTorch adds .ptd only when it is missing, so "x.ptd" would share x.ptd with another
+    # backend's "x" data and the second write would replace the first.
+    if external_engine_data.endswith(".ptd"):
+        raise ValueError(
+            "external_engine_data must not end with .ptd, which ExecuTorch adds, got "
+            f"{external_engine_data!r}."
+        )
+    if external_engine_data.split(".")[0].upper() in _WINDOWS_DEVICE_NAMES:
+        raise ValueError(
+            "external_engine_data must not be a Windows device name such as NUL or CON, got "
+            f"{external_engine_data!r}."
+        )
+    return external_engine_data.encode()
 
 
 def _keep_mutated_buffers_above_delegate(exported_program: ExportedProgram) -> None:
@@ -175,6 +241,20 @@ class TensorRTPartitioner(Partitioner):  # type: ignore[misc]
                     'so the value has to be "cuda" or "cuda:N".'
                 )
         self._has_explicit_target_device = bool(explicit)
+        # The delegate refuses any other value at load, which is too late: on the device, after the
+        # program has shipped.
+        cuda_graphs = [
+            s for s in self.compile_specs if s.key == CUDA_GRAPHS_COMPILE_SPEC_KEY
+        ]
+        if len(cuda_graphs) > 1 or any(
+            s.value not in (b"0", b"1") for s in cuda_graphs
+        ):
+            raise ValueError(
+                f"{CUDA_GRAPHS_COMPILE_SPEC_KEY} must appear at most once, with the value "
+                f'b"0" or b"1", got {[s.value for s in cuda_graphs]!r}.'
+            )
+        # export() checks this name too, but a caller can lower with this partitioner directly.
+        _external_engine_tag(self.compile_specs)
         self.delegation_spec = DelegationSpec(
             backend_id=TensorRTBackend.__name__,
             compile_specs=self.compile_specs,

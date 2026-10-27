@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=0866734c"></script>
+    <script src="../../../_static/documentation_options.js?v=ede72c6b"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -484,7 +484,7 @@ document.write(`
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">Tuple</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">executorch.exir.backend.compile_spec_schema</span><span class="w"> </span><span class="kn">import</span> <span class="n">CompileSpec</span>
@@ -496,12 +496,20 @@ document.write(`
 <span class="kn">from</span><span class="w"> </span><span class="nn">executorch.exir.backend.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">tag_constant_data</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch.export</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExportedProgram</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch.fx.passes.infra.partitioner</span><span class="w"> </span><span class="kn">import</span> <span class="n">CapabilityBasedPartitioner</span><span class="p">,</span> <span class="n">Partition</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._serialized_engine_layout</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">OUTPUT_BINDING_NAMES_IDX</span><span class="p">,</span>
+    <span class="n">deserialize_binding_names</span><span class="p">,</span>
+<span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._TorchTensorRTModule</span><span class="w"> </span><span class="kn">import</span> <span class="n">DEVICE_IDX</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch.backend</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">ZERO_COPY_KV_COMPILE_SPEC_KEY</span><span class="p">,</span>
     <span class="n">TensorRTBackend</span><span class="p">,</span>
+    <span class="n">_external_engine_tag</span><span class="p">,</span>
     <span class="n">_get_engine_info_for_node</span><span class="p">,</span>
     <span class="n">_get_engine_nodes_in</span><span class="p">,</span>
+    <span class="n">_get_str</span><span class="p">,</span>
     <span class="n">_parse_device_id</span><span class="p">,</span>
+    <span class="n">_serialize_elided_output_names</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch.operator_support</span><span class="w"> </span><span class="kn">import</span> <span class="n">TensorRTOperatorSupport</span>
 
@@ -527,6 +535,12 @@ document.write(`
 <span class="c1"># The delegate also reads this same key as a load-time backend option (runtime</span>
 <span class="c1"># spec), which takes precedence over this baked value when provided at load.</span>
 <span class="n">WEIGHT_STREAMING_BUDGET_COMPILE_SPEC_KEY</span> <span class="o">=</span> <span class="s2">"weight_streaming_budget"</span>
+
+<span class="c1"># Compile spec key that turns CUDA graph replay on (b"1") or off (b"0") for every</span>
+<span class="c1"># TensorRT engine in the program. Must match kCudaGraphsKey on the C++ side</span>
+<span class="c1"># (cpp/include/torch_tensorrt/executorch/TensorRTBackend.h). A load-time backend</span>
+<span class="c1"># option of the same name wins over it.</span>
+<span class="n">CUDA_GRAPHS_COMPILE_SPEC_KEY</span> <span class="o">=</span> <span class="s2">"use_cuda_graphs"</span>
 
 <span class="c1"># The C++ side parses the value into an int64_t, so anything at or above 2**63 has no</span>
 <span class="c1"># representation there.</span>
@@ -561,6 +575,65 @@ document.write(`
             <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">weight_streaming_budget_per_engine</span><span class="si">}</span><span class="s2">."</span>
         <span class="p">)</span>
     <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="n">weight_streaming_budget_per_engine</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">"ascii"</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">normalize_use_cuda_graphs</span><span class="p">(</span><span class="n">use_cuda_graphs</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Validate the replay choice; None leaves the runtime default unchanged."""</span>
+    <span class="k">if</span> <span class="n">use_cuda_graphs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">use_cuda_graphs</span><span class="p">,</span> <span class="nb">bool</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+            <span class="s2">"use_cuda_graphs must be a bool or None, got "</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">use_cuda_graphs</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">."</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="sa">b</span><span class="s2">"1"</span> <span class="k">if</span> <span class="n">use_cuda_graphs</span> <span class="k">else</span> <span class="sa">b</span><span class="s2">"0"</span>
+
+
+<span class="c1"># Characters every file system accepts in a file name, with no path separator or drive colon. A</span>
+<span class="c1"># leading dot or dash would make a hidden file or a name that reads as a command line option.</span>
+<span class="n">_EXTERNAL_ENGINE_DATA_NAME</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">"[A-Za-z0-9_][A-Za-z0-9_.-]*"</span><span class="p">)</span>
+<span class="c1"># ExecuTorch writes &lt;name&gt;.ptd, and most file systems limit a file name to 255 bytes.</span>
+<span class="n">_MAX_EXTERNAL_ENGINE_DATA_LENGTH</span> <span class="o">=</span> <span class="mi">255</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="s2">".ptd"</span><span class="p">)</span>
+<span class="c1"># Windows opens these as devices, with any extension.</span>
+<span class="n">_WINDOWS_DEVICE_NAMES</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">(</span>
+    <span class="p">[</span><span class="s2">"CON"</span><span class="p">,</span> <span class="s2">"PRN"</span><span class="p">,</span> <span class="s2">"AUX"</span><span class="p">,</span> <span class="s2">"NUL"</span><span class="p">]</span>
+    <span class="o">+</span> <span class="p">[</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">port</span><span class="si">}{</span><span class="n">i</span><span class="si">}</span><span class="s2">"</span> <span class="k">for</span> <span class="n">port</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"COM"</span><span class="p">,</span> <span class="s2">"LPT"</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">)]</span>
+<span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">normalize_external_engine_data</span><span class="p">(</span><span class="n">external_engine_data</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Validate the .ptd file name, given without its extension; None embeds every engine."""</span>
+    <span class="k">if</span> <span class="n">external_engine_data</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">external_engine_data</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+            <span class="s2">"external_engine_data must be a str or None, got "</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">external_engine_data</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">."</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">_EXTERNAL_ENGINE_DATA_NAME</span><span class="o">.</span><span class="n">fullmatch</span><span class="p">(</span><span class="n">external_engine_data</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"external_engine_data must use only ASCII letters, digits, '.', '-' and '_', and "</span>
+            <span class="sa">f</span><span class="s2">"start with a letter, a digit or '_', got </span><span class="si">{</span><span class="n">external_engine_data</span><span class="si">!r}</span><span class="s2">."</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">external_engine_data</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">_MAX_EXTERNAL_ENGINE_DATA_LENGTH</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"external_engine_data must be at most </span><span class="si">{</span><span class="n">_MAX_EXTERNAL_ENGINE_DATA_LENGTH</span><span class="si">}</span><span class="s2"> "</span>
+            <span class="s2">"characters, so the .ptd file name fits the 255 byte limit, got "</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">external_engine_data</span><span class="p">)</span><span class="si">}</span><span class="s2">."</span>
+        <span class="p">)</span>
+    <span class="c1"># ExecuTorch adds .ptd only when it is missing, so "x.ptd" would share x.ptd with another</span>
+    <span class="c1"># backend's "x" data and the second write would replace the first.</span>
+    <span class="k">if</span> <span class="n">external_engine_data</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">".ptd"</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"external_engine_data must not end with .ptd, which ExecuTorch adds, got "</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">external_engine_data</span><span class="si">!r}</span><span class="s2">."</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="n">external_engine_data</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">"."</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span> <span class="ow">in</span> <span class="n">_WINDOWS_DEVICE_NAMES</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"external_engine_data must not be a Windows device name such as NUL or CON, got "</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">external_engine_data</span><span class="si">!r}</span><span class="s2">."</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="n">external_engine_data</span><span class="o">.</span><span class="n">encode</span><span class="p">()</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_keep_mutated_buffers_above_delegate</span><span class="p">(</span><span class="n">exported_program</span><span class="p">:</span> <span class="n">ExportedProgram</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -612,6 +685,20 @@ document.write(`
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">compile_specs</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">compile_specs</span><span class="p">)</span> <span class="k">if</span> <span class="n">compile_specs</span> <span class="k">else</span> <span class="p">[]</span>
+        <span class="c1"># The zero-copy KV spec is stamped per-partition in partition(), never</span>
+        <span class="c1"># applied to every partition like the rest of compile_specs. Its presence</span>
+        <span class="c1"># here only records that this method asked for zero-copy; the actual</span>
+        <span class="c1"># elided binding names are derived per engine at partition time, so a</span>
+        <span class="c1"># method that lowers to several TensorRT delegates marks only the one</span>
+        <span class="c1"># whose aliased outputs were elided. It has to stay out of the shared</span>
+        <span class="c1"># list: a plain-compute delegate carrying the spec would make the</span>
+        <span class="c1"># un-staging cross-check demand an aliased buffer it never had.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_zero_copy_requested</span> <span class="o">=</span> <span class="nb">any</span><span class="p">(</span>
+            <span class="n">s</span><span class="o">.</span><span class="n">key</span> <span class="o">==</span> <span class="n">ZERO_COPY_KV_COMPILE_SPEC_KEY</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">compile_specs</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_base_compile_specs</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">s</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">compile_specs</span> <span class="k">if</span> <span class="n">s</span><span class="o">.</span><span class="n">key</span> <span class="o">!=</span> <span class="n">ZERO_COPY_KV_COMPILE_SPEC_KEY</span>
+        <span class="p">]</span>
         <span class="c1"># Mirror CudaPartitioner: a target_device CompileSpec drives ExecuTorch's</span>
         <span class="c1"># PropagateDevicePass, which tags delegate I/O TensorSpecs with the device</span>
         <span class="c1"># and serializes it into the .pte's extra_tensor_info. When the caller pins</span>
@@ -635,6 +722,20 @@ document.write(`
                     <span class="s1">'so the value has to be "cuda" or "cuda:N".'</span>
                 <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_has_explicit_target_device</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="n">explicit</span><span class="p">)</span>
+        <span class="c1"># The delegate refuses any other value at load, which is too late: on the device, after the</span>
+        <span class="c1"># program has shipped.</span>
+        <span class="n">cuda_graphs</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">s</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">compile_specs</span> <span class="k">if</span> <span class="n">s</span><span class="o">.</span><span class="n">key</span> <span class="o">==</span> <span class="n">CUDA_GRAPHS_COMPILE_SPEC_KEY</span>
+        <span class="p">]</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">cuda_graphs</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="ow">or</span> <span class="nb">any</span><span class="p">(</span>
+            <span class="n">s</span><span class="o">.</span><span class="n">value</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="sa">b</span><span class="s2">"0"</span><span class="p">,</span> <span class="sa">b</span><span class="s2">"1"</span><span class="p">)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">cuda_graphs</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">CUDA_GRAPHS_COMPILE_SPEC_KEY</span><span class="si">}</span><span class="s2"> must appear at most once, with the value "</span>
+                <span class="sa">f</span><span class="s1">'b"0" or b"1", got </span><span class="si">{</span><span class="p">[</span><span class="n">s</span><span class="o">.</span><span class="n">value</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">s</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="n">cuda_graphs</span><span class="p">]</span><span class="si">!r}</span><span class="s1">.'</span>
+            <span class="p">)</span>
+        <span class="c1"># export() checks this name too, but a caller can lower with this partitioner directly.</span>
+        <span class="n">_external_engine_tag</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">compile_specs</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">delegation_spec</span> <span class="o">=</span> <span class="n">DelegationSpec</span><span class="p">(</span>
             <span class="n">backend_id</span><span class="o">=</span><span class="n">TensorRTBackend</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
             <span class="n">compile_specs</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">compile_specs</span><span class="p">,</span>
@@ -675,6 +776,81 @@ document.write(`
             <span class="p">)</span>
             <span class="k">return</span> <span class="sa">b</span><span class="s2">"cuda:0"</span>
 
+    <span class="k">def</span><span class="w"> </span><span class="nf">_partition_elided_output_names</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">exported_program</span><span class="p">:</span> <span class="n">ExportedProgram</span><span class="p">,</span> <span class="n">partition</span><span class="p">:</span> <span class="n">Partition</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Set</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""Engine output binding names this partition's delegate legitimately drops.</span>
+
+<span class="sd">        Zero-copy KV elides an engine's aliased output when its aliased input is a</span>
+<span class="sd">        buffer export rewired to be written in place -- marked on the placeholder</span>
+<span class="sd">        with ``_torch_tensorrt_aliased_buffer``. This is derived from THIS</span>
+<span class="sd">        partition's own engine (its ``aliased_io`` paired with the marks on its own</span>
+<span class="sd">        input placeholders), never from a method-wide name list, so a second engine</span>
+<span class="sd">        that happens to share an output binding name is never told it may drop that</span>
+<span class="sd">        binding. That is what lets a real lost output on the plain delegate still</span>
+<span class="sd">        raise while the KV delegate's genuine elision is exempted.</span>
+
+<span class="sd">        An extraction failure is survivable only for a method in which nothing was</span>
+<span class="sd">        rewired: the delegate then really does carry every binding, and a genuinely</span>
+<span class="sd">        missing aliased output stays an error in the backend's</span>
+<span class="sd">        ``_validate_output_binding_order``. Where a buffer *was* rewired the aliased</span>
+<span class="sd">        outputs are already gone from the graph -- that happened before partitioning</span>
+<span class="sd">        -- so an empty set stamps nothing, and the export dies downstream blaming a</span>
+<span class="sd">        lost aliased-buffer mark, which is not what went wrong. That case re-raises.</span>
+
+<span class="sd">        A set that is neither empty nor the engine's whole ``aliased_io`` is the</span>
+<span class="sd">        right answer and still not a lowerable one, since the runtime reads</span>
+<span class="sd">        elision off a single argument count: ``TensorRTBackend.preprocess``</span>
+<span class="sd">        refuses that engine.</span>
+<span class="sd">        """</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch._zero_copy</span><span class="w"> </span><span class="kn">import</span> <span class="n">_aliased_inputs_by_output_index</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">engine_nodes</span> <span class="o">=</span> <span class="n">_get_engine_nodes_in</span><span class="p">(</span><span class="n">partition</span><span class="o">.</span><span class="n">nodes</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">engine_nodes</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="k">return</span> <span class="nb">set</span><span class="p">()</span>
+            <span class="n">engine</span> <span class="o">=</span> <span class="n">engine_nodes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">aliased</span> <span class="o">=</span> <span class="n">_aliased_inputs_by_output_index</span><span class="p">(</span><span class="n">exported_program</span><span class="p">,</span> <span class="n">engine</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">aliased</span><span class="p">:</span>
+                <span class="k">return</span> <span class="nb">set</span><span class="p">()</span>
+            <span class="c1"># Only OUTPUT_BINDING_NAMES_IDX is read, never the engine itself.</span>
+            <span class="n">engine_info</span> <span class="o">=</span> <span class="n">_get_engine_info_for_node</span><span class="p">(</span>
+                <span class="n">exported_program</span><span class="p">,</span> <span class="n">engine</span><span class="p">,</span> <span class="n">metadata_only</span><span class="o">=</span><span class="kc">True</span>
+            <span class="p">)</span>
+            <span class="n">output_names</span> <span class="o">=</span> <span class="n">deserialize_binding_names</span><span class="p">(</span>
+                <span class="n">_get_str</span><span class="p">(</span><span class="n">engine_info</span><span class="p">,</span> <span class="n">OUTPUT_BINDING_NAMES_IDX</span><span class="p">)</span>
+            <span class="p">)</span>
+            <span class="n">elided</span><span class="p">:</span> <span class="n">Set</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">output_index</span><span class="p">,</span> <span class="n">input_node</span> <span class="ow">in</span> <span class="n">aliased</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="k">if</span> <span class="p">(</span>
+                    <span class="nb">isinstance</span><span class="p">(</span><span class="n">input_node</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">Node</span><span class="p">)</span>
+                    <span class="ow">and</span> <span class="n">input_node</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"_torch_tensorrt_aliased_buffer"</span><span class="p">)</span>
+                    <span class="ow">and</span> <span class="mi">0</span> <span class="o">&lt;=</span> <span class="n">output_index</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">output_names</span><span class="p">)</span>
+                <span class="p">):</span>
+                    <span class="n">elided</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">output_names</span><span class="p">[</span><span class="n">output_index</span><span class="p">])</span>
+            <span class="k">return</span> <span class="n">elided</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="c1"># Broad in the same shape as _resolve_target_device_for_partition, but</span>
+            <span class="c1"># not with the same licence: that fallback picks a default device and</span>
+            <span class="c1"># is genuinely harmless, while this one can only be harmless where no</span>
+            <span class="c1"># output was elided. The question is asked of the graph, not of the</span>
+            <span class="c1"># engine metadata that just failed to read, so it cannot fail the same</span>
+            <span class="c1"># way.</span>
+            <span class="k">if</span> <span class="nb">any</span><span class="p">(</span>
+                <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"placeholder"</span>
+                <span class="ow">and</span> <span class="n">node</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"_torch_tensorrt_aliased_buffer"</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">graph_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span>
+            <span class="p">):</span>
+                <span class="k">raise</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="s2">"zero-copy KV: could not resolve elided outputs for partition </span><span class="si">%s</span><span class="s2"> "</span>
+                <span class="s2">"(</span><span class="si">%s</span><span class="s2">); no buffer in this method was rewired, so the delegate "</span>
+                <span class="s2">"carries every binding."</span><span class="p">,</span>
+                <span class="nb">getattr</span><span class="p">(</span><span class="n">partition</span><span class="p">,</span> <span class="s2">"id"</span><span class="p">,</span> <span class="s2">"?"</span><span class="p">),</span>
+                <span class="n">e</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="nb">set</span><span class="p">()</span>
+
     <span class="k">def</span><span class="w"> </span><span class="nf">partition</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exported_program</span><span class="p">:</span> <span class="n">ExportedProgram</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PartitionResult</span><span class="p">:</span>
         <span class="n">capability_partitioner</span> <span class="o">=</span> <span class="n">CapabilityBasedPartitioner</span><span class="p">(</span>
             <span class="n">exported_program</span><span class="o">.</span><span class="n">graph_module</span><span class="p">,</span>
@@ -688,21 +864,31 @@ document.write(`
             <span class="n">tag</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"tensorrt_</span><span class="si">{</span><span class="n">partition</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2">"</span>
             <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">partition</span><span class="o">.</span><span class="n">nodes</span><span class="p">:</span>
                 <span class="n">node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">"delegation_tag"</span><span class="p">]</span> <span class="o">=</span> <span class="n">tag</span>
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_has_explicit_target_device</span><span class="p">:</span>
-                <span class="n">partition_tags</span><span class="p">[</span><span class="n">tag</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">delegation_spec</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">partition_tags</span><span class="p">[</span><span class="n">tag</span><span class="p">]</span> <span class="o">=</span> <span class="n">DelegationSpec</span><span class="p">(</span>
-                    <span class="n">backend_id</span><span class="o">=</span><span class="n">TensorRTBackend</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
-                    <span class="n">compile_specs</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">compile_specs</span>
-                    <span class="o">+</span> <span class="p">[</span>
-                        <span class="n">CompileSpec</span><span class="p">(</span>
-                            <span class="n">_TARGET_DEVICE_COMPILE_SPEC_KEY</span><span class="p">,</span>
-                            <span class="bp">self</span><span class="o">.</span><span class="n">_resolve_target_device_for_partition</span><span class="p">(</span>
-                                <span class="n">exported_program</span><span class="p">,</span> <span class="n">partition</span>
-                            <span class="p">),</span>
-                        <span class="p">)</span>
-                    <span class="p">],</span>
+            <span class="n">specs</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_base_compile_specs</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_has_explicit_target_device</span><span class="p">:</span>
+                <span class="n">specs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="n">CompileSpec</span><span class="p">(</span>
+                        <span class="n">_TARGET_DEVICE_COMPILE_SPEC_KEY</span><span class="p">,</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_resolve_target_device_for_partition</span><span class="p">(</span>
+                            <span class="n">exported_program</span><span class="p">,</span> <span class="n">partition</span>
+                        <span class="p">),</span>
+                    <span class="p">)</span>
                 <span class="p">)</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_zero_copy_requested</span><span class="p">:</span>
+                <span class="n">elided</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_partition_elided_output_names</span><span class="p">(</span>
+                    <span class="n">exported_program</span><span class="p">,</span> <span class="n">partition</span>
+                <span class="p">)</span>
+                <span class="k">if</span> <span class="n">elided</span><span class="p">:</span>
+                    <span class="n">specs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                        <span class="n">CompileSpec</span><span class="p">(</span>
+                            <span class="n">ZERO_COPY_KV_COMPILE_SPEC_KEY</span><span class="p">,</span>
+                            <span class="n">_serialize_elided_output_names</span><span class="p">(</span><span class="n">elided</span><span class="p">),</span>
+                        <span class="p">)</span>
+                    <span class="p">)</span>
+            <span class="n">partition_tags</span><span class="p">[</span><span class="n">tag</span><span class="p">]</span> <span class="o">=</span> <span class="n">DelegationSpec</span><span class="p">(</span>
+                <span class="n">backend_id</span><span class="o">=</span><span class="n">TensorRTBackend</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
+                <span class="n">compile_specs</span><span class="o">=</span><span class="n">specs</span><span class="p">,</span>
+            <span class="p">)</span>
 
         <span class="n">tag_constant_data</span><span class="p">(</span><span class="n">exported_program</span><span class="p">)</span>
         <span class="n">_keep_mutated_buffers_above_delegate</span><span class="p">(</span><span class="n">exported_program</span><span class="p">)</span>

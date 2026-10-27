@@ -4,12 +4,15 @@
 # ExecuTorch TensorRT backend: serialize engines to a libtorch-free runtime blob.
 
 import copy
+import hashlib
 import json
+import logging
 import operator
 from typing import Any, Container, Iterable, List, Optional, Set, final
 
 import torch
 import torch.fx
+from executorch.exir._serialize._named_data_store import NamedDataStore
 from executorch.exir.backend.backend_details import (
     BackendDetails,
     CompileSpec,
@@ -29,13 +32,37 @@ from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
     TARGET_PLATFORM_IDX,
     deserialize_aliased_io,
 )
+from torch_tensorrt.executorch._export_utils import ENGINE_BYTES_ATTR
 from torch_tensorrt.executorch.serialization import (
     TensorRTBlobMetadata,
     TensorRTIOBinding,
     serialize_engine,
 )
 
+logger = logging.getLogger(__name__)
+
 _BINDING_DELIM = "%"
+
+_warned_engine_copy = False
+
+
+def _warn_engine_copy() -> None:
+    """Warn once that preprocess copies an engine instead of reusing the export's bytes.
+
+    The export stages each engine as a tensor that remembers its ``bytes``
+    (``engine_bytes_tensor``); a ``detach()`` or ``state_dict()`` along the way drops
+    that, and the copy here is then a second host copy of the engine during the save.
+    """
+    global _warned_engine_copy
+    if not _warned_engine_copy:
+        _warned_engine_copy = True
+        logger.warning(
+            "TensorRTBackend.preprocess: an engine tensor no longer carries the bytes it "
+            "was staged from (%s), so the engine is copied once more and the save holds an "
+            "extra host copy of it.",
+            ENGINE_BYTES_ATTR,
+        )
+
 
 # CompileSpec key naming the aliased outputs a delegate deliberately does not
 # carry. Its value is the JSON list of those engine output binding names (see
@@ -49,6 +76,11 @@ _BINDING_DELIM = "%"
 # short of its aliased outputs is a bug, not a zero-copy program, and stays an
 # error.
 ZERO_COPY_KV_COMPILE_SPEC_KEY = "zero_copy_kv"
+
+# CompileSpec key naming the ExecuTorch data file (.ptd) that receives each engine of the
+# method, so the .pte keeps only the engine's key. The value is the file name without the
+# .ptd extension. Absent, every engine is stored in the .pte.
+EXTERNAL_ENGINE_DATA_COMPILE_SPEC_KEY = "external_engine_data"
 
 
 def _schema_name(target: Any) -> str:
@@ -265,7 +297,7 @@ def _reorder_input_names_for_executorch(
     tagged into a delegate its spec becomes ``BUFFER_MUTATION``, the delegate's
     outputs are permuted, and they would need the same node-identity reordering as
     the inputs below. ``_validate_output_binding_order`` checks that correspondence
-    on every preprocess, so it would fail loudly rather than mis-bind.
+    on every preprocess, so it would fail loudly rather than bind wrongly.
     """
     input_nodes = list(engine_node.args[0])
     if len(input_nodes) != len(input_names):
@@ -481,6 +513,40 @@ def _elided_output_names(compile_specs: List[CompileSpec]) -> Optional[Set[str]]
     return None
 
 
+def _external_engine_tag(compile_specs: List[CompileSpec]) -> Optional[str]:
+    """The .ptd file name, without the extension, that engines go to, or ``None``."""
+    from torch_tensorrt.executorch.partitioner import normalize_external_engine_data
+
+    tags = [
+        spec.value
+        for spec in compile_specs
+        if getattr(spec, "key", None) == EXTERNAL_ENGINE_DATA_COMPILE_SPEC_KEY
+    ]
+    if not tags:
+        return None
+    if len(tags) > 1:
+        raise ValueError(
+            "TensorRT ExecuTorch backend: compile spec "
+            f"'{EXTERNAL_ENGINE_DATA_COMPILE_SPEC_KEY}' must appear at most once."
+        )
+    value = tags[0]
+    if not isinstance(value, (bytes, bytearray)):
+        raise ValueError(
+            "TensorRT ExecuTorch backend: compile spec "
+            f"'{EXTERNAL_ENGINE_DATA_COMPILE_SPEC_KEY}' must hold the file name as UTF-8 "
+            f"bytes, not {type(value).__name__}."
+        )
+    try:
+        tag = bytes(value).decode("utf-8")
+    except UnicodeDecodeError as e:
+        raise ValueError(
+            "TensorRT ExecuTorch backend: compile spec "
+            f"'{EXTERNAL_ENGINE_DATA_COMPILE_SPEC_KEY}' is not valid UTF-8: {value!r}."
+        ) from e
+    normalize_external_engine_data(tag)
+    return tag
+
+
 def _get_str(engine_info: List[Any], index: int, default: str = "") -> str:
     if index < 0 or index >= len(engine_info):
         return default
@@ -497,7 +563,9 @@ class TensorRTBackend(BackendDetails):  # type: ignore[misc]
     """Backend that serializes TensorRT engines for the native ExecuTorch runtime.
 
     The partition contains a single execute_engine node; we extract the engine
-    and metadata and encode them as a standalone blob. The C++ runtime
+    and metadata, store the engine as named data (in the .pte, or with
+    external_engine_data in a .ptd file), and encode its key and the metadata as a
+    standalone blob. The C++ runtime
     backend parses that blob directly without the legacy Torch-TensorRT C++ runtime.
     """
 
@@ -525,19 +593,26 @@ class TensorRTBackend(BackendDetails):  # type: ignore[misc]
         engine_info = list(engine_info)
         _validate_engine_info(engine_info)
         serialized_engine = engine_info[ENGINE_IDX]
-        if isinstance(serialized_engine, torch.Tensor):
-            # `bytes(storage)` looks equivalent but has two problems. It iterates
-            # the storage element by element in Python, costing about two seconds
-            # per megabyte, and it returns the whole backing allocation rather than
-            # the tensor's own extent, so a view of a larger buffer serializes too
-            # many bytes. A view and not a bytes copy, because serialize_engine
-            # already copies the engine into the blob once, and an engine can be
-            # several gigabytes. `.view(torch.uint8)` keeps `.numpy()` from
-            # rejecting a dtype it has no equivalent for.
-            engine_bytes = serialized_engine.cpu().contiguous().view(torch.uint8)
-            engine_info[ENGINE_IDX] = memoryview(engine_bytes.numpy())
-        elif not isinstance(serialized_engine, (bytes, bytearray)):
-            engine_info[ENGINE_IDX] = bytes(serialized_engine)
+        # ExecuTorch writes named data only from `bytes`, and an engine can be several
+        # gigabytes, so reuse the `bytes` the export staged the engine from
+        # (engine_bytes_tensor) and copy only a tensor that did not come from one.
+        engine_bytes = getattr(serialized_engine, ENGINE_BYTES_ATTR, None)
+        if not isinstance(engine_bytes, bytes):
+            if isinstance(serialized_engine, torch.Tensor):
+                _warn_engine_copy()
+                # `bytes(storage)` looks equivalent but iterates element by element in
+                # Python, about two seconds per megabyte, and returns the whole backing
+                # allocation rather than the tensor's own extent. `.view(torch.uint8)`
+                # keeps `.numpy()` from rejecting a dtype it has no equivalent for.
+                engine_bytes = (
+                    serialized_engine.cpu()
+                    .contiguous()
+                    .view(torch.uint8)
+                    .numpy()
+                    .tobytes()
+                )
+            else:
+                engine_bytes = bytes(serialized_engine)
         input_names = _reorder_input_names_for_executorch(
             edge_program,
             engine_node,
@@ -587,6 +662,21 @@ class TensorRTBackend(BackendDetails):  # type: ignore[misc]
             device_id=_parse_device_id(engine_info[DEVICE_IDX]),
             serialized_metadata=_get_str(engine_info, SERIALIZED_METADATA_IDX),
             target_platform=_get_str(engine_info, TARGET_PLATFORM_IDX),
+            # Content-keyed, so identical engines in different methods share one
+            # entry and different engines can never collide on a key.
+            engine_key="tensorrt_engine_" + hashlib.sha256(engine_bytes).hexdigest(),
         )
-        blob = serialize_engine(engine_info[ENGINE_IDX], metadata)
-        return PreprocessResult(processed_bytes=blob)
+        # The engine goes to named data by reference and is streamed into the .pte, or
+        # into <external_engine_data>.ptd when set, so the delegate blob holds only the
+        # header and metadata.
+        named_data = NamedDataStore()
+        named_data.add_named_data(
+            metadata.engine_key,
+            engine_bytes,
+            alignment=16,
+            external_tag=_external_engine_tag(compile_specs),
+        )
+        return PreprocessResult(
+            processed_bytes=serialize_engine(b"", metadata),
+            data_store_output=named_data.get_named_data_store_output(),
+        )

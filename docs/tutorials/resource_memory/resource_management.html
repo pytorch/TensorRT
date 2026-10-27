@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=0866734c"></script>
+    <script src="../../_static/documentation_options.js?v=ede72c6b"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -471,6 +471,8 @@ document.write(`
 <li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/nvrtc_aot_plugin.html">Example: Custom Kernels with NVRTC in TensorRT AOT Plugins</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/cuda_kernel_op.html">Example: Auto-derived CUDA Kernel Plugins via cuda_kernel_op</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/ptx_op.html">Example: Pre-compiled PTX Kernels via ptx_op</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/triton_op.html">Example: Triton Kernel AOT Plugins via triton_op</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/cutile_op.html">Example: cuTile Kernel AOT Plugins via cutile_op</a></li>
 </ul>
 </details></li>
 </ul>
@@ -607,10 +609,34 @@ to reduce both CPU and GPU memory consumption.</p>
 </section>
 <section id="memory-usage-control">
 <h2>Memory Usage Control<a class="headerlink" href="#memory-usage-control" title="Link to this heading">#</a></h2>
+<p>Peak memory during compilation, as multiples of the model’s weight size, measured on a
+3 GiB fp16 model. The GPU column includes the model’s own copy. TensorRT’s builder also
+needs about 2 GB of host working memory that does not grow with the model.</p>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Setting</p></th>
+<th class="head"><p>Peak CPU memory</p></th>
+<th class="head"><p>Peak GPU memory</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Default</p></td>
+<td><p>~1x</p></td>
+<td><p>~2x</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">offload_module_to_cpu=True</span></code></p></td>
+<td><p>~2x</p></td>
+<td><p>~1x</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Once compilation finishes, the compiled module holds only the TensorRT engine, about 1x
+the weight size on the GPU. Delete the original PyTorch model if you no longer need it.
+Models whose lowering creates new weight tensors (for example by folding transposes or
+casts of weights) need more.</p>
 <section id="cpu-memory">
 <h3>CPU Memory<a class="headerlink" href="#cpu-memory" title="Link to this heading">#</a></h3>
-<p>By default, Torch-TensorRT may consume up to <strong>5x</strong> the model size in CPU memory.
-This can exceed system limits when compiling large models.</p>
 <p><strong>Common symptoms of high CPU memory usage:</strong></p>
 <ul class="simple">
 <li><p>Program freeze</p></li>
@@ -618,27 +644,27 @@ This can exceed system limits when compiling large models.</p>
 </ul>
 <p><strong>Ways to lower CPU memory usage:</strong></p>
 <ol class="arabic">
-<li><p><strong>Enable memory trimming</strong></p>
-<p>Set the following environment variable:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">TORCHTRT_ENABLE_BUILDER_MALLOC_TRIM</span><span class="o">=</span><span class="m">1</span>
+<li><p><strong>Keep memory trimming enabled</strong></p>
+<p>On Linux, Torch-TensorRT returns the memory the TensorRT builder frees to the
+operating system after each engine build (glibc <code class="docutils literal notranslate"><span class="pre">malloc_trim</span></code>). Without it the
+process keeps on the order of gigabytes of freed builder memory for the rest of its
+life. Trimming is on by default; to turn it off, set:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">TORCHTRT_ENABLE_BUILDER_MALLOC_TRIM</span><span class="o">=</span><span class="m">0</span>
 </pre></div>
 </div>
-<p>This reduces approximately <strong>2x</strong> of redundant model copies, limiting
-total CPU memory usage to up to <strong>3x</strong> the model size.</p>
 </li>
 <li><p><strong>Disable CPU offloading</strong></p>
 <p>In compilation settings, set:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">offload_module_to_cpu</span> <span class="o">=</span> <span class="kc">False</span>
 </pre></div>
 </div>
-<p>This removes another <strong>1x</strong> model copy, reducing peak CPU memory
-usage to about <strong>2x</strong> the model size.</p>
+<p>The weights then stay on the GPU instead of moving to the CPU. TensorRT still builds
+from a host copy of them, but that copy is freed as soon as the engine is built.</p>
 </li>
 </ol>
 </section>
 <section id="gpu-memory">
 <h3>GPU Memory<a class="headerlink" href="#gpu-memory" title="Link to this heading">#</a></h3>
-<p>By default, Torch-TensorRT may consume up to <strong>2x</strong> the model size in GPU memory.</p>
 <p><strong>Common symptoms of high GPU memory usage:</strong></p>
 <ul class="simple">
 <li><p>CUDA out-of-memory errors</p></li>
@@ -651,11 +677,21 @@ usage to about <strong>2x</strong> the model size.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">offload_module_to_cpu</span> <span class="o">=</span> <span class="kc">True</span>
 </pre></div>
 </div>
-<p>This shifts one model copy from GPU to CPU memory.
-As a result, peak GPU memory usage decreases to about <strong>1x</strong>
-the model size, while one more copy of the model will occupy the CPU memory so CPU memory usage increases by roughly <strong>1x</strong>.</p>
+<p>This moves the model’s weights to CPU memory before the engine builds, a block at a
+time, and TensorRT reads them there in place. Peak GPU memory drops to about the size
+of the engine (<strong>1x</strong>), while CPU memory holds the weights for the rest of
+compilation (about <strong>2x</strong> at peak, while the engine is handed to the runtime).</p>
 </li>
 </ol>
+</section>
+<section id="unified-memory-systems">
+<h3>Unified Memory Systems<a class="headerlink" href="#unified-memory-systems" title="Link to this heading">#</a></h3>
+<p>On systems where the CPU and GPU share physical memory, such as Jetson or DGX Spark,
+CPU and GPU allocations come out of the same pool, so budget for their sum. Counting
+the model itself, compilation peaks at about <strong>3.8x</strong> the weight size with default
+settings and about <strong>3.2x</strong> with <code class="docutils literal notranslate"><span class="pre">offload_module_to_cpu=True</span></code>. Moving the weights to
+the CPU frees no memory on these systems, but TensorRT then builds from them directly
+instead of from a second copy.</p>
 </section>
 </section>
 <hr class="docutils" />
@@ -722,6 +758,11 @@ the cost of slightly higher per-call latency:</p>
 <span class="c1"># Submodules revert to static allocation on exit</span>
 </pre></div>
 </div>
+<p>Some memory stays allocated between calls. With CUDA graphs on, the C++ runtime keeps
+each engine’s memory for as long as its captured graph, because a replay writes to the
+memory the graph was recorded with. The Python runtime keeps each engine’s memory from
+its last call, with or without CUDA graphs, until a later call replaces it or a settings
+change drops it.</p>
 <p>Use <code class="docutils literal notranslate"><span class="pre">dynamically_allocate_resources=False</span></code> to force static allocation inside the
 context (the opposite direction — useful for profiling or benchmarking).</p>
 </section>
@@ -777,6 +818,7 @@ context (the opposite direction — useful for profiling or benchmarking).</p>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#memory-usage-control">Memory Usage Control</a><ul class="visible nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#cpu-memory">CPU Memory</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#gpu-memory">GPU Memory</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#unified-memory-systems">Unified Memory Systems</a></li>
 </ul>
 </li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#runtime-weight-streaming">Runtime Weight Streaming</a></li>

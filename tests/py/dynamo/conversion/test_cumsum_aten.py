@@ -144,7 +144,7 @@ class TestCumsumConverter(DispatchTestCase):
         """
         if not is_tensorrt_version_supported("10.8.0"):
             self.skipTest(
-                "exact integer cumsum needs the cumulative layer (TensorRT >= 10.8)"
+                "exact integer cumsum needs the cumulativTensorRT-RTX on Windowse layer (TensorRT >= 10.8)"
             )
 
         class Cumsum(nn.Module):
@@ -284,7 +284,7 @@ class TestCumsumConverter(DispatchTestCase):
             Cumsum(),
             inputs,
             use_dynamo_tracer=True,
-            immutable_weights=False,
+            immutable_weights=True,
         )
 
     @parameterized.expand(
@@ -310,7 +310,7 @@ class TestCumsumConverter(DispatchTestCase):
             rtol=0,
             atol=0,
             use_dynamo_tracer=True,
-            immutable_weights=False,
+            immutable_weights=True,
         )
 
     @parameterized.expand([(torch.float16,), (torch.bfloat16,)])
@@ -331,7 +331,8 @@ class TestCumsumConverter(DispatchTestCase):
         self.run_test_with_dynamic_shape(
             Cumsum(),
             inputs,
-            immutable_weights=False,
+            use_dynamo_tracer=True,
+            immutable_weights=True,
         )
 
 

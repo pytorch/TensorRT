@@ -7,12 +7,12 @@ import json
 import sys
 
 RELEASE_CUDA_VERSION = {
-    # Wheels follow the CUDA rows in filter-matrix.py; libtorch still ships cu130 tarballs.
+    # Wheels and tarballs follow the CUDA rows in filter-matrix.py.
     "wheel": ["cu132", "cu134"],
-    "tarball": ["cu130", "cu132", "cu134"],
+    "tarball": ["cu132", "cu134"],
 }
 RELEASE_PYTHON_VERSION = {
-    "wheel": ["3.10", "3.11", "3.12", "3.13", "3.14"],
+    "wheel": ["3.11", "3.12", "3.13", "3.14"],
     "tarball": ["3.11"],
 }
 sbsa_container_image: str = "quay.io/pypa/manylinux_2_39_aarch64"

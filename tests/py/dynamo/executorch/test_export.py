@@ -858,6 +858,51 @@ def test_python_only_build_can_export_a_pte(tmp_path):
 
 
 @pytest.mark.unit
+def test_lowering_stores_the_staged_engine_bytes_as_named_data(monkeypatch, caplog):
+    """The rewrite stages each engine as ``bytes``, and lowering must hand that same
+    object to named data. A ``detach()`` or ``state_dict()`` on the way drops it,
+    and preprocess then copies the engine, holding it twice during the save."""
+    import logging
+
+    from executorch.exir.lowered_backend_module import LoweredBackendModule
+    from torch_tensorrt.executorch import _export_utils
+    from torch_tensorrt.executorch import backend as backend_module
+
+    staged = []
+    real_engine_bytes_tensor = _export_utils.engine_bytes_tensor
+
+    def recording(engine_bytes):
+        staged.append(engine_bytes)
+        return real_engine_bytes_tensor(engine_bytes)
+
+    monkeypatch.setattr(_export_utils, "engine_bytes_tensor", recording)
+    monkeypatch.setattr(backend_module, "_warned_engine_copy", False)
+
+    class AddOne(torch.nn.Module):
+        def forward(self, value):
+            return value + 1
+
+    example = (torch.randn(2, 3, 4, 4, device="cuda"),)
+    compiled = torch_tensorrt.dynamo.compile(
+        torch.export.export(AddOne().eval().cuda(), example),
+        arg_inputs=example,
+        min_block_size=1,
+    )
+    with caplog.at_level(logging.WARNING, logger=backend_module.__name__):
+        edge = torch_tensorrt.executorch.export(compiled, arg_inputs=example)
+
+    named = [
+        buffer
+        for module in edge.exported_program().graph_module.modules()
+        if isinstance(module, LoweredBackendModule)
+        for buffer in module.named_data_store_output.buffers
+    ]
+    assert staged and named
+    assert all(any(buffer is engine for engine in staged) for buffer in named)
+    assert _export_utils.ENGINE_BYTES_ATTR not in caplog.text
+
+
+@pytest.mark.unit
 def test_export_preserves_independent_method_mapping(monkeypatch):
     prefill = FakeExportedProgram()
     decode = FakeExportedProgram()
@@ -1273,12 +1318,12 @@ def test_export_rejects_inputs_and_arg_inputs(monkeypatch):
 
 
 @pytest.mark.unit
-def test_export_rejects_non_linux_platform(monkeypatch):
+def test_export_rejects_unsupported_platform(monkeypatch):
     export_module, lower = _patch_lowering(monkeypatch)
-    monkeypatch.setattr(export_module.platform, "system", lambda: "Windows")
+    monkeypatch.setattr(export_module.platform, "system", lambda: "Darwin")
     graph_module = torch.fx.GraphModule(torch.nn.Module(), torch.fx.Graph())
 
-    with pytest.raises(ValueError, match="only supported on Linux"):
+    with pytest.raises(ValueError, match="supports Linux and Windows x86-64"):
         export_module.export(graph_module)
 
     lower.assert_not_called()

@@ -20,10 +20,12 @@
 #   )
 #
 # kernels_optimized supplies the et_copy host/device copy operators.
-# There is nothing to include. The delegate exposes no public header: it
+# There is nothing to include. The wheel ships no header: the delegate
 # registers itself with ExecuTorch's backend registry from a static initializer
 # inside the shared library, and everything a caller does afterwards is
-# ExecuTorch's own Runtime API.
+# ExecuTorch's own Runtime API. Choosing an optimization profile needs
+# OptimizationProfileGuard, which only the source tree and the release tarball
+# carry; linked from this wheel, every engine runs its profile 0.
 #
 # Point CMake at it with either of the two lines below. Which one matters: importing this package loads the delegate,
 # which raises where ExecuTorch is not installed yet, and asking for a path does not need it loaded.
@@ -58,14 +60,28 @@ include(FindPackageHandleStandardArgs)
 # missing one.
 get_filename_component(_executorch_backend_tensorrt_root "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
 unset(EXECUTORCH_BACKEND_TENSORRT_BACKEND_LIBRARY)
-if(EXISTS "${_executorch_backend_tensorrt_root}/lib/libexecutorch_backend_tensorrt.so")
+if(WIN32)
+  set(_executorch_backend_tensorrt_filename "executorch_backend_tensorrt.dll")
+else()
+  set(_executorch_backend_tensorrt_filename "libexecutorch_backend_tensorrt.so")
+endif()
+if(EXISTS "${_executorch_backend_tensorrt_root}/lib/${_executorch_backend_tensorrt_filename}")
   set(EXECUTORCH_BACKEND_TENSORRT_BACKEND_LIBRARY
-    "${_executorch_backend_tensorrt_root}/lib/libexecutorch_backend_tensorrt.so")
+    "${_executorch_backend_tensorrt_root}/lib/${_executorch_backend_tensorrt_filename}")
+endif()
+set(_executorch_backend_tensorrt_required_vars EXECUTORCH_BACKEND_TENSORRT_BACKEND_LIBRARY)
+if(WIN32)
+  unset(EXECUTORCH_BACKEND_TENSORRT_IMPORT_LIBRARY)
+  if(EXISTS "${_executorch_backend_tensorrt_root}/lib/executorch_backend_tensorrt.lib")
+    set(EXECUTORCH_BACKEND_TENSORRT_IMPORT_LIBRARY
+      "${_executorch_backend_tensorrt_root}/lib/executorch_backend_tensorrt.lib")
+  endif()
+  list(APPEND _executorch_backend_tensorrt_required_vars EXECUTORCH_BACKEND_TENSORRT_IMPORT_LIBRARY)
 endif()
 
 find_package_handle_standard_args(
   executorch_backend_tensorrt
-  REQUIRED_VARS EXECUTORCH_BACKEND_TENSORRT_BACKEND_LIBRARY
+  REQUIRED_VARS ${_executorch_backend_tensorrt_required_vars}
 )
 
 if(NOT executorch_backend_tensorrt_FOUND)
@@ -118,6 +134,13 @@ set_target_properties(
     IMPORTED_LOCATION "${EXECUTORCH_BACKEND_TENSORRT_BACKEND_LIBRARY}"
     INTERFACE_COMPILE_FEATURES cxx_std_17
 )
+if(WIN32)
+  set_target_properties(executorch::backend_tensorrt PROPERTIES
+    IMPORTED_IMPLIB "${EXECUTORCH_BACKEND_TENSORRT_IMPORT_LIBRARY}"
+    INTERFACE_COMPILE_FEATURES cxx_std_20)
+  set_property(TARGET executorch::backend_tensorrt APPEND PROPERTY
+    INTERFACE_LINK_OPTIONS "LINKER:/INCLUDE:torch_tensorrt_owns_executorch_registration")
+endif()
 
 # Retain the static registration even when the consumer references no delegate symbol.
 # Scope --no-as-needed to this library so unrelated dependencies can still be dropped.

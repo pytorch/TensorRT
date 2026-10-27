@@ -20,10 +20,11 @@ foreach(_torchtrt_cmake_module_dir IN ITEMS
 endforeach()
 
 find_package(TensorRT REQUIRED)
-find_package(CUDAToolkit REQUIRED)
+find_package(CUDAToolkit 12.5 REQUIRED)
 find_package(Threads REQUIRED)
 
 set(_executorch_backend_tensorrt_sources
+    "${CMAKE_CURRENT_LIST_DIR}/ExecutionGraph.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/PooledScratchInstall.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/TensorRTBackend.cpp"
     "${CMAKE_CURRENT_LIST_DIR}/TensorRTBlobHeader.cpp"
@@ -243,7 +244,18 @@ add_library(torchtrt::executorch_backend ALIAS executorch_backend_tensorrt_backe
 add_library(torchtrt_executorch_backend ALIAS executorch_backend_tensorrt_backend)
 add_dependencies(executorch_backend_tensorrt_backend executorch_trt_backend)
 
+# The archive is linked by file below rather than by target, so the include path
+# does not come along with it. Carry it here: a runner that scopes
+# OptimizationProfileGuard needs the public header. (The caller-stream guard now
+# comes from ExecuTorch, not from this header.)
+target_include_directories(executorch_backend_tensorrt_backend
+    INTERFACE
+        "${CMAKE_CURRENT_LIST_DIR}/../../../include"
+)
+
 if(MSVC)
+    target_link_options(executorch_backend_tensorrt_backend INTERFACE
+        "LINKER:/WHOLEARCHIVE:$<TARGET_FILE:executorch_trt_backend>")
     target_link_libraries(executorch_backend_tensorrt_backend
         INTERFACE
             executorch_trt_backend
