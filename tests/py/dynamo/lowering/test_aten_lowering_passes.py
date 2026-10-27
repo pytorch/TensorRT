@@ -454,6 +454,37 @@ class TestEliminateSymMinInt64Max(TestCase):
         self.assertEqual(output_node.args[0], (x, x))
 
 
+class TestPreserveAttentionOutputLayout(TestCase):
+    def test_view_after_decomposed_attention(self):
+        # Fused attention returns this transposed query's layout, so export drops the
+        # .contiguous() below and records a view that only works on that layout. The
+        # attention output must stay a tensor of its own (detach_), the in-place
+        # update through the view must reach it, and the no_grad region puts all of
+        # it in a subgraph.
+        class ViewAfterAttention(torch.nn.Module):
+            def forward(self, query, key, value):
+                with torch.no_grad():
+                    query, key, value = (t.transpose(1, 2) for t in (query, key, value))
+                    out = torch.nn.functional.scaled_dot_product_attention(
+                        query, key, value
+                    )
+                    out.detach_()
+                    flat = out.transpose(1, 2).contiguous()
+                    flat = flat.view(flat.shape[0], flat.shape[1], -1)
+                    flat.add_(1)
+                return out, flat
+
+        inputs = [torch.randn(2, 16, 4, 32).half().cuda() for _ in range(3)]
+        model = ViewAfterAttention().cuda()
+        ep = torch.export.export(model, tuple(inputs))
+        trt_module = torch_tensorrt.dynamo.compile(
+            ep, inputs, min_block_size=1, decompose_attention=True
+        )
+        torch.testing.assert_close(
+            model(*inputs), trt_module(*inputs), rtol=1e-2, atol=1e-2
+        )
+
+
 class TestRewriteEfficientAttention(TestCase):
     def test_force_causal_efficient_attention(self):
         class RewriteEfficientAttention(torch.nn.Module):

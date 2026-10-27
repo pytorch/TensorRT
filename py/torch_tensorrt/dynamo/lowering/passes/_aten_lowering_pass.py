@@ -36,6 +36,7 @@ from .fuse_prims_broadcast import fuse_prims_broadcast
 from .lower_associative_scan import lower_associative_scan
 from .normalize_negative_slice_stop import normalize_negative_slice_stop  # noqa: F401
 from .pass_manager import DynamoPassManager
+from .preserve_attention_output_layout import preserve_attention_output_layout
 from .remove_alias import remove_alias
 from .remove_assert_nodes import remove_assert_nodes
 from .remove_detach import remove_detach
@@ -51,6 +52,7 @@ pre_lowering_pass_list = [
     remove_detach,
     remove_assert_nodes,
     rule_based_autocast,
+    preserve_attention_output_layout,
 ]
 
 
