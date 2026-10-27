@@ -201,16 +201,14 @@ def pull_cached_engine(
             symbolic_shape_expressions=symbolic_shape_expressions,
             aliased_io=aliased_io,
             # The cached graph is identical; recover its user-output boundary
-            # without changing the cache's on-disk tuple format.
+            # without changing the cache's on-disk tuple format. The interpreter
+            # marks one engine output per output position.
             num_user_outputs=len(
-                {
-                    id(value)
-                    for value in torch.utils._pytree.tree_leaves(
-                        next(
-                            node for node in module.graph.nodes if node.op == "output"
-                        ).args[0]
-                    )
-                }
+                torch.utils._pytree.tree_leaves(
+                    next(
+                        node for node in module.graph.nodes if node.op == "output"
+                    ).args[0]
+                )
             ),
         )
     return None

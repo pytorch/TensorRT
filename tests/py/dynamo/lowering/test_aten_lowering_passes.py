@@ -3,6 +3,7 @@
 
 import operator
 import sys
+import tempfile
 
 import torch
 import torch_tensorrt
@@ -59,6 +60,51 @@ class TestInputAsOutput(TestCase):
             msg=f"InputAsOutput TRT outputs don't match with the original model.",
         )
         torch._dynamo.reset()
+
+    class ReturnsInput(torch.nn.Module):
+        def __init__(self, copies):
+            super().__init__()
+            self.copies = copies
+
+        def forward(self, x, y):
+            return (x + y,) + (y,) * self.copies
+
+    def _assert_matches_eager(self, mod, **settings):
+        inputs = (torch.randn(5, 7).cuda(), torch.randn(5, 7).cuda())
+        trt_mod = torch_tensorrt.dynamo.compile(
+            torch.export.export(mod, inputs),
+            list(inputs),
+            min_block_size=1,
+            require_full_compilation=True,
+            **settings,
+        )
+        torch.testing.assert_close(trt_mod(*inputs), mod(*inputs))
+
+    def test_input_returned_next_to_a_computed_output(self):
+        self._assert_matches_eager(self.ReturnsInput(copies=1))
+
+    def test_input_returned_twice(self):
+        self._assert_matches_eager(self.ReturnsInput(copies=2))
+
+    def test_computed_output_returned_twice(self):
+        class M(torch.nn.Module):
+            def forward(self, x, y):
+                z = x + y
+                return z, z
+
+        self._assert_matches_eager(M())
+
+    def test_input_returned_twice_from_the_engine_cache(self):
+        """An engine loaded from the cache has as many outputs as a fresh build."""
+        with tempfile.TemporaryDirectory() as cache_dir:
+            for _ in range(2):
+                self._assert_matches_eager(
+                    self.ReturnsInput(copies=2),
+                    immutable_weights=False,
+                    cache_built_engines=True,
+                    reuse_cached_engines=True,
+                    engine_cache_dir=cache_dir,
+                )
 
 
 class TestLoweringPassMembership(TestCase):

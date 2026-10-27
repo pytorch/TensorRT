@@ -79,6 +79,27 @@ class TestSliceScatterFallback(TestCase):
         self.assertTrue(torch.allclose(actual, expected))
         self.assertTrue(torch.equal(cache_run, cache))
 
+    def test_write_on_a_clone_leaves_the_input_alone(self):
+        """The clone converter hands back its input, which the write must not then
+        update in place as a KV cache."""
+
+        class M(torch.nn.Module):
+            def forward(self, cache, update):
+                out = cache.clone()
+                out[:, :, 3:4] = update
+                return out
+
+        cache = torch.zeros(2, 4, 16, 8, device="cuda")
+        update = torch.ones(2, 4, 1, 8, device="cuda")
+        compiled = _compile_cpp(M().cuda(), (cache.clone(), update))
+
+        cache_run = cache.clone()
+        actual = compiled(cache_run, update)
+        actual = actual[0] if isinstance(actual, tuple) else actual
+
+        self.assertTrue(torch.allclose(actual, M()(cache.clone(), update)))
+        self.assertTrue(torch.equal(cache_run, cache))
+
 
 class TestUserInputKVCache(TestCase):
     """User passes the cache tensor on every call; engine mutates in place."""
@@ -143,6 +164,29 @@ class TestUserInputKVCache(TestCase):
         self.assertTrue(torch.allclose(ck_run, ck_eager))
         self.assertTrue(torch.allclose(cv_run, cv_eager))
         self.assertTrue(torch.allclose(ret_val, ck_eager.sum() + cv_eager.sum()))
+
+    def test_update_of_another_dtype(self):
+        """torch writes the update in the cache's dtype, and IKVCacheUpdateLayer
+        requires the two dtypes to match."""
+
+        class M(torch.nn.Module):
+            def forward(self, cache, update):
+                cache.copy_(
+                    torch.ops.aten.slice_scatter.default(cache, update, 2, 3, 4)
+                )
+                return cache.sum()
+
+        cache = torch.zeros(2, 4, 16, 8, device="cuda")
+        update = torch.full((2, 4, 1, 8), 7.25, device="cuda", dtype=torch.float16)
+        compiled = _compile_cpp(M().cuda(), (cache.clone(), update))
+        self.assertEqual(len(_find_aliased_io(compiled)), 1)
+
+        cache_run, cache_eager = cache.clone(), cache.clone()
+        ret = compiled(cache_run, update)
+        ret_val = ret[0] if isinstance(ret, tuple) else ret
+        eager_ret = M()(cache_eager, update)
+        self.assertTrue(torch.allclose(cache_run, cache_eager))
+        self.assertTrue(torch.allclose(ret_val, eager_ret))
 
     def test_streaming_state_accumulates(self):
         """Repeated calls on the same cache tensor should observe the
@@ -280,7 +324,7 @@ class TestAliasedIORegressions(TestCase):
 
     def test_slice_scatter_fallback_path(self):
         """A slice_scatter that doesn't qualify for KVCacheUpdate should
-        still produce correct results via the scatter fallback."""
+        still produce correct results via the fallback."""
 
         class M(torch.nn.Module):
             def forward(self, x, y):
