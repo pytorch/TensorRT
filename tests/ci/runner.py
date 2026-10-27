@@ -182,6 +182,13 @@ def _setup_commands(step: str) -> list[tuple[list[str], Path]]:
                 REPO_ROOT,
             )
         ]
+    if step == "cutedsl":
+        return [
+            (
+                launcher + ["-m", "pip", "install", "nvidia-cutlass-dsl>=4.8.1,<5"],
+                REPO_ROOT,
+            )
+        ]
     if step == "mpi":
         return [
             (
@@ -249,7 +256,7 @@ def run_suite(
                 # explicitly. Other steps keep warning and continuing, because their
                 # suites fail visibly on a missing dependency and a flaky checkpoint download
                 # should not fail a suite that would otherwise report honestly.
-                if step in {"executorch", "cuda-tile"}:
+                if step in {"executorch", "cuda-tile", "cutedsl"}:
                     print(
                         f"::error::setup step {step!r} exited {rc}, so the suite cannot test "
                         "what it was asked to test",

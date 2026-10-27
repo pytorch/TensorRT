@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import pytest
 import torch
 
-from torch_tensorrt.kernels import _common, _cutile, _triton
+from torch_tensorrt.kernels import _common, _cutedsl, _cutile, _triton
 
 from .conftest import register_once, skip_no_qdp
 
@@ -23,6 +23,13 @@ def _validator(frontend, user_validator=None):
         )
 
     layout = _triton.analyze_signature({"x": "*fp32", "out": "*fp32"}, (1, 1))
+    if frontend == "cutedsl":
+        return _cutedsl.make_capability_validator(
+            "test_common::op",
+            layout,
+            _cutedsl.CompiledCuteDSLArtifact(b"ptx", "kernel", (128, 1, 1), 0, (9, 0)),
+            user_validator,
+        )
     artifact = _triton.CompiledTritonArtifact(
         b"ptx", "kernel", 4, 0, SimpleNamespace(arch=90), 90
     )
@@ -33,23 +40,24 @@ def _validator(frontend, user_validator=None):
 
 @pytest.fixture
 def reject_target_check(monkeypatch):
-    monkeypatch.setattr(
-        _triton,
-        "validate_target",
-        lambda *args, **kwargs: pytest.fail(
-            "Declined conversion checked its GPU target"
-        ),
-    )
+    for frontend in (_triton, _cutedsl):
+        monkeypatch.setattr(
+            frontend,
+            "validate_target",
+            lambda *args, **kwargs: pytest.fail(
+                "Declined conversion checked its GPU target"
+            ),
+        )
 
 
-@pytest.mark.parametrize("frontend", ["triton", "cutile"])
+@pytest.mark.parametrize("frontend", ["triton", "cutile", "cutedsl"])
 def test_frontend_declines_missing_positional_arguments(frontend, reject_target_check):
     node = SimpleNamespace(args=None, meta={"val": torch.empty(1)})
 
     assert _validator(frontend)(node) is False
 
 
-@pytest.mark.parametrize("frontend", ["triton", "cutile"])
+@pytest.mark.parametrize("frontend", ["triton", "cutile", "cutedsl"])
 def test_frontend_user_rejection_precedes_metadata_and_target_checks(
     frontend, reject_target_check
 ):
@@ -119,15 +127,30 @@ def test_dtype_guard(inputs, output, expected):
     assert validate(_FakeNode(inputs, output)) is expected
 
 
-@pytest.mark.parametrize("frontend", ["triton", "cutile"])
+@pytest.mark.parametrize("frontend", ["triton", "cutile", "cutedsl"])
 def test_frontend_dtype_guard(frontend, monkeypatch):
     monkeypatch.setattr(_triton, "validate_target", lambda *a, **k: None)
+    monkeypatch.setattr(_cutedsl, "validate_target", lambda *a, **k: None)
     validate = _validator(frontend)
     assert validate(_FakeNode([torch.float32], torch.float32)) is True
     assert validate(_FakeNode([torch.float16], torch.float32)) is False
     assert (
         validate(SimpleNamespace(args=_FakeNode([torch.float32], None).args)) is False
     )
+
+
+@pytest.mark.parametrize("frontend", ["triton", "cutedsl"])
+def test_frontend_resolves_unspecified_target_to_current_device(frontend, monkeypatch):
+    seen = []
+
+    def device_arch(device=None):
+        seen.append(device)
+        return (9, 0)
+
+    monkeypatch.setattr(torch.cuda, "get_device_capability", device_arch)
+    settings = SimpleNamespace(device=SimpleNamespace(gpu_id=-1))
+    assert _validator(frontend)(_FakeNode([torch.float32], torch.float32), settings)
+    assert seen == [None]
 
 
 @skip_no_qdp

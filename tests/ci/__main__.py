@@ -128,7 +128,7 @@ def _cmd_doctor(_: argparse.Namespace) -> int:
     if jdupes:
         problems.append(f"colliding junit paths: {sorted(jdupes)}")
 
-    valid_setup = {"hub", "executorch", "cuda-core", "cuda-tile", "mpi"}
+    valid_setup = {"hub", "executorch", "cuda-core", "cuda-tile", "cutedsl", "mpi"}
     for s in SUITES:
         for step in s.setup:
             if step not in valid_setup:

@@ -11,7 +11,7 @@ import tensorrt.plugin as trtp
 import torch
 
 import torch_tensorrt.kernels as ttk
-from torch_tensorrt.kernels import _common, _cutile, _register, _triton
+from torch_tensorrt.kernels import _common, _cutedsl, _cutile, _register, _triton
 
 from .conftest import register_once, skip_no_qdp
 
@@ -83,7 +83,7 @@ def test_truncated_engine_bindings_cannot_pass_an_fp64_metadata_guard():
     assert not validator(node, SimpleNamespace(truncate_double=True))
 
 
-@pytest.fixture(params=["cutile", "cutile_custom", "triton"])
+@pytest.fixture(params=["cutile", "cutile_custom", "triton", "cutedsl"])
 def aot_callback(request, monkeypatch):
     captured = {}
     monkeypatch.setattr(
@@ -110,7 +110,31 @@ def aot_callback(request, monkeypatch):
         raise RuntimeError("launch callback reached")
 
     op = "dtype_safety::descriptor_check"
-    if request.param == "triton":
+    if request.param == "cutedsl":
+        monkeypatch.setattr(
+            _cutedsl,
+            "validate_config",
+            lambda op, kernel, signature, constants, arity, extra: _common.analyze_signature(
+                signature, arity
+            ),
+        )
+        monkeypatch.setattr(
+            _cutedsl,
+            "compile_to_ptx",
+            lambda *args: _cutedsl.CompiledCuteDSLArtifact(
+                b"ptx", "kernel", (128, 1, 1), 0, (9, 0)
+            ),
+        )
+        monkeypatch.setattr(_cutedsl, "validate_target", lambda *args: None)
+        ttk.cutedsl_op(
+            op,
+            object(),
+            {"x": "*fp32", "out": "*fp16"},
+            meta,
+            grid=launch,
+            block_size=128,
+        )
+    elif request.param == "triton":
         kernel = SimpleNamespace(
             arg_names=["x", "out"],
             params=[

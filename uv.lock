@@ -2469,14 +2469,14 @@ wheels = [
 
 [[package]]
 name = "nvidia-cutlass-dsl"
-version = "4.8.0"
+version = "4.8.1"
 source = { registry = "https://pypi.nvidia.com/" }
 dependencies = [
-    { name = "nvidia-cutlass-dsl-libs-base", marker = "python_full_version < '3.14' and sys_platform != 'win32'" },
-    { name = "nvidia-cutlass-dsl-libs-cu12", marker = "python_full_version < '3.14' and sys_platform != 'win32'" },
+    { name = "nvidia-cutlass-dsl-libs-base" },
+    { name = "nvidia-cutlass-dsl-libs-cu12" },
 ]
 wheels = [
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl/nvidia_cutlass_dsl-4.8.0-py3-none-any.whl", hash = "sha256:24f996e0e5fa88c8b417f4893e615af135bdfdfdbdbed7e239faf36a88df711b" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl/nvidia_cutlass_dsl-4.8.1-py3-none-any.whl", hash = "sha256:43ed46b21d151aa643c6765457c7310827b938c1cf45d5109a0152de4ef06227" },
 ]
 
 [package.optional-dependencies]
@@ -2486,76 +2486,76 @@ cu13 = [
 
 [[package]]
 name = "nvidia-cutlass-dsl-libs-base"
-version = "4.8.0"
+version = "4.8.1"
 source = { registry = "https://pypi.nvidia.com/" }
 dependencies = [
-    { name = "cuda-bindings", marker = "python_full_version < '3.14' and sys_platform != 'win32'" },
-    { name = "nvidia-cutlass-dsl-libs-core", marker = "python_full_version < '3.14' and sys_platform != 'win32'" },
-    { name = "protobuf", marker = "python_full_version < '3.14' and sys_platform != 'win32'" },
-    { name = "typing-extensions", marker = "python_full_version < '3.14' and sys_platform != 'win32'" },
+    { name = "cuda-bindings" },
+    { name = "nvidia-cutlass-dsl-libs-core" },
+    { name = "protobuf" },
+    { name = "typing-extensions" },
 ]
 wheels = [
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-base/nvidia_cutlass_dsl_libs_base-4.8.0-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:04de038e0af658b644421c4df4c78f161a1d3c2cf9e5bcdff63b24c727dcd95c" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-base/nvidia_cutlass_dsl_libs_base-4.8.0-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:ce3aec4c37b68880e85a7f3f763f8fe4d0503f49516cc855c80012e0fadf92e0" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-base/nvidia_cutlass_dsl_libs_base-4.8.0-cp311-cp311-win_amd64.whl", hash = "sha256:fa0c5017d8af462fa40dbb01d6d89defa013ac0508ef2e2339227b83b109f0ca" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-base/nvidia_cutlass_dsl_libs_base-4.8.0-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:3affcaefb59a976ff5195dd2bff4c13594233cb4941540b74e372b63e497d3f2" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-base/nvidia_cutlass_dsl_libs_base-4.8.0-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:5bdc80989b0fbbac3d58960057e74e2ce8676fafa76b852d9422b9c4b9b74bdd" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-base/nvidia_cutlass_dsl_libs_base-4.8.0-cp312-cp312-win_amd64.whl", hash = "sha256:f3ae1fc18c1353e329dc481a4010e7f738746745a20d6badea2e6035d1493c9a" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-base/nvidia_cutlass_dsl_libs_base-4.8.0-cp313-cp313-manylinux_2_28_aarch64.whl", hash = "sha256:4d26dd2848b2fa03954151cfd6da92b79e2f4175d87f4d661eedc77c36b7a054" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-base/nvidia_cutlass_dsl_libs_base-4.8.0-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:5e36773748f5a8061afe999264f1c3dccc5ff18ec9548a9c769d8e72632c8b00" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-base/nvidia_cutlass_dsl_libs_base-4.8.0-cp313-cp313-win_amd64.whl", hash = "sha256:49bdb4ac523fb8e618c485c42c451ccc99a2664a6a6996ac64627fcc35a6948c" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-base/nvidia_cutlass_dsl_libs_base-4.8.0-cp314-cp314-manylinux_2_28_aarch64.whl", hash = "sha256:752f1715d50a4af4704aa2f199986b99653b40dfb574dd0c6aa5cf264dddc800" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-base/nvidia_cutlass_dsl_libs_base-4.8.0-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:728abf1bc065fa950ad4f4506928300d7e32f3148312b93f83f3f2e8f756329a" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-base/nvidia_cutlass_dsl_libs_base-4.8.0-cp314-cp314-win_amd64.whl", hash = "sha256:25f8b98c4d42f3a41c131556616827d49c619a7a79e4884c3e36d15048cc9062" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-base/nvidia_cutlass_dsl_libs_base-4.8.0-cp314-cp314t-manylinux_2_28_aarch64.whl", hash = "sha256:c137f5b1df0eba5c3bd64f49a2b72ac1748a371c7a75bd461ce4b8602fcced25" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-base/nvidia_cutlass_dsl_libs_base-4.8.0-cp314-cp314t-manylinux_2_28_x86_64.whl", hash = "sha256:0c9759725b5e3967606bcaa8f28d7218729fed5f90cbb73fdac96802802f1408" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-base/nvidia_cutlass_dsl_libs_base-4.8.0-cp314-cp314t-win_amd64.whl", hash = "sha256:8701b91be993b621d892796fa252aa9b63cb75fb5a7fe894536fe132b57d554e" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-base/nvidia_cutlass_dsl_libs_base-4.8.1-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:8d51bae072ed83cf559a8a28335d40eb40f1fef5e0511c405d9e1da6fd2b1320" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-base/nvidia_cutlass_dsl_libs_base-4.8.1-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:04f60d4815d40b8588dc12bc58572923619f1b9547936195e80634a9468c0fb2" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-base/nvidia_cutlass_dsl_libs_base-4.8.1-cp311-cp311-win_amd64.whl", hash = "sha256:ec9f23be0e64adadac3e5b0aaea3c27511fc6bfce466707e8fece1a1f5c13189" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-base/nvidia_cutlass_dsl_libs_base-4.8.1-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:c6312f8b2f1aadd959a0276daf3c4bacc05c783c6ea1119859ed4ebd3c07e3b1" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-base/nvidia_cutlass_dsl_libs_base-4.8.1-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:ac2fd8c7fa3d6ded00917fa7cba8686061005da8c4703c6a29e03c1504543909" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-base/nvidia_cutlass_dsl_libs_base-4.8.1-cp312-cp312-win_amd64.whl", hash = "sha256:4a3d2d6f2db309fcc736566f7f674caacfb98c74cceaf053cd37992406bdc822" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-base/nvidia_cutlass_dsl_libs_base-4.8.1-cp313-cp313-manylinux_2_28_aarch64.whl", hash = "sha256:7bc199a0244176849b1a971cbc37fc4164f70b7121a7b426c9c42bdf2403cb19" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-base/nvidia_cutlass_dsl_libs_base-4.8.1-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:334d8b219ff9504479e50ef86fadaa5695a11f21a87e5c87a75354b0d6ba10fc" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-base/nvidia_cutlass_dsl_libs_base-4.8.1-cp313-cp313-win_amd64.whl", hash = "sha256:d093fe25c6d75fac44c1dac6a307fc1f7c83103a00e86ababa3a8e747ecd3fda" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-base/nvidia_cutlass_dsl_libs_base-4.8.1-cp314-cp314-manylinux_2_28_aarch64.whl", hash = "sha256:e84b1ca6a138a4f462b40ba0554b017fbced3b6e825333512d9e1b01d6518f89" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-base/nvidia_cutlass_dsl_libs_base-4.8.1-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:16941a44d4e8a7633dbe66d3e5b64ed4c136134bf14fd57db84cbdf57092e72b" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-base/nvidia_cutlass_dsl_libs_base-4.8.1-cp314-cp314-win_amd64.whl", hash = "sha256:4f6fbb14a8ceeb4ff269be21566b42801cb47343b07fd76c07d9d9da964b5fcf" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-base/nvidia_cutlass_dsl_libs_base-4.8.1-cp314-cp314t-manylinux_2_28_aarch64.whl", hash = "sha256:d7124b03a7d6d5a88c8e3ba12842db769a1fe79b6b6ad611991650e25cbcb616" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-base/nvidia_cutlass_dsl_libs_base-4.8.1-cp314-cp314t-manylinux_2_28_x86_64.whl", hash = "sha256:d3cba2ee3f2a7cfa130afefd1ae9361f1b0d199a54664e4ae3e8a6ec5d90d009" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-base/nvidia_cutlass_dsl_libs_base-4.8.1-cp314-cp314t-win_amd64.whl", hash = "sha256:cc66cfbed72e8f126ff774a667638a3bee180efe7c42ff136564722720464a2c" },
 ]
 
 [[package]]
 name = "nvidia-cutlass-dsl-libs-core"
-version = "4.8.0"
+version = "4.8.1"
 source = { registry = "https://pypi.nvidia.com/" }
 dependencies = [
-    { name = "cuda-bindings", marker = "python_full_version < '3.14' and sys_platform != 'win32'" },
-    { name = "protobuf", marker = "python_full_version < '3.14' and sys_platform != 'win32'" },
-    { name = "typing-extensions", marker = "python_full_version < '3.14' and sys_platform != 'win32'" },
+    { name = "cuda-bindings" },
+    { name = "protobuf" },
+    { name = "typing-extensions" },
 ]
 wheels = [
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-core/nvidia_cutlass_dsl_libs_core-4.8.0-py3-none-any.whl", hash = "sha256:b32716d2ed10c185cdbbb6b5c6fca26a3113a60e6e2fe4e2f0cb15966422b621" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-core/nvidia_cutlass_dsl_libs_core-4.8.1-py3-none-any.whl", hash = "sha256:bacc6760e3286db447d45720d32ae58ac2e6cecade1152345ef784b2d5e44431" },
 ]
 
 [[package]]
 name = "nvidia-cutlass-dsl-libs-cu12"
-version = "4.8.0"
+version = "4.8.1"
 source = { registry = "https://pypi.nvidia.com/" }
 dependencies = [
-    { name = "cuda-bindings", marker = "python_full_version < '3.14' and sys_platform != 'win32'" },
-    { name = "nvidia-cutlass-dsl-libs-base", marker = "python_full_version < '3.14' and sys_platform != 'win32'" },
-    { name = "protobuf", marker = "python_full_version < '3.14' and sys_platform != 'win32'" },
-    { name = "typing-extensions", marker = "python_full_version < '3.14' and sys_platform != 'win32'" },
+    { name = "cuda-bindings" },
+    { name = "nvidia-cutlass-dsl-libs-base" },
+    { name = "protobuf" },
+    { name = "typing-extensions" },
 ]
 wheels = [
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu12/nvidia_cutlass_dsl_libs_cu12-4.8.0-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:6f88ae52d6e2aedb4a34fda32c974aa3543064cfeed3fa7e96123c32402ff2ca" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu12/nvidia_cutlass_dsl_libs_cu12-4.8.0-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:5dac7aef97fc51df882b68620e1c430e7b4362d0aca17d220727da7681f061df" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu12/nvidia_cutlass_dsl_libs_cu12-4.8.0-cp311-cp311-win_amd64.whl", hash = "sha256:b0d6bac5f04dfad8fb6c8966b3dd1f1f6d172adcc1a48b86c9a47c8464c39e01" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu12/nvidia_cutlass_dsl_libs_cu12-4.8.0-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:32766847abe3bef711eb6052ab78c0f24c090edd1f83322f6e74531d399e8117" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu12/nvidia_cutlass_dsl_libs_cu12-4.8.0-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:2374cfdff635ceaf7e2c5bd17b4beb410830420a4fd65b12b7f24b5d5cbb9d4c" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu12/nvidia_cutlass_dsl_libs_cu12-4.8.0-cp312-cp312-win_amd64.whl", hash = "sha256:d1d942de8ea20dea9ce86fdc5c4dab6c572bab81c9f708f7e8ca54cfd78bddc4" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu12/nvidia_cutlass_dsl_libs_cu12-4.8.0-cp313-cp313-manylinux_2_28_aarch64.whl", hash = "sha256:08af2b89f33081df69b64be1cad133f9f767274b33669882cbee6a5fa35c5fcc" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu12/nvidia_cutlass_dsl_libs_cu12-4.8.0-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:a06ea6a42c921ec66b190f14849e152a95a45f28819214488b9b0aa34168da33" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu12/nvidia_cutlass_dsl_libs_cu12-4.8.0-cp313-cp313-win_amd64.whl", hash = "sha256:4963300d4242dd5ee122be0367008c57a9bb9fb11fa4d9fc8e0befb491dccecd" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu12/nvidia_cutlass_dsl_libs_cu12-4.8.0-cp314-cp314-manylinux_2_28_aarch64.whl", hash = "sha256:41f9d49087f18200c4516e00abade67f542795f363c7f195bb53404b81a866f8" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu12/nvidia_cutlass_dsl_libs_cu12-4.8.0-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:889918c32fe6cad047ae718343fedb374a9c4275903b4ab2d8f42e811a6a0dac" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu12/nvidia_cutlass_dsl_libs_cu12-4.8.0-cp314-cp314-win_amd64.whl", hash = "sha256:74e5f9d291eb689422695e36c8c85ae65fca05c743e60d8bce392bdb9dc4f68e" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu12/nvidia_cutlass_dsl_libs_cu12-4.8.0-cp314-cp314t-manylinux_2_28_aarch64.whl", hash = "sha256:0746ff56576d63abf616d242fd1c3884713012448461d0f2bbf25bc397b410a0" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu12/nvidia_cutlass_dsl_libs_cu12-4.8.0-cp314-cp314t-manylinux_2_28_x86_64.whl", hash = "sha256:54125669fc51e70ce97e85554ae089cc745c4b2b8d740750b315e5777304ea6c" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu12/nvidia_cutlass_dsl_libs_cu12-4.8.0-cp314-cp314t-win_amd64.whl", hash = "sha256:bad2b4cab99ebf4211d305f77254b5edaa29421d6e56767b0ae6f1b835d10742" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu12/nvidia_cutlass_dsl_libs_cu12-4.8.1-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:70ac0e10918387e5b1b32bb3bc08ea56556c4e500c389dc68a178c5d4e98f3df" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu12/nvidia_cutlass_dsl_libs_cu12-4.8.1-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:dfa8be20b257bfb50a8843928277176b69a58ec3a0fcf22d7d4825f2c383ed81" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu12/nvidia_cutlass_dsl_libs_cu12-4.8.1-cp311-cp311-win_amd64.whl", hash = "sha256:bf7fc30af28cd73f0f3be95d67286dca7752993d9f1c019cd69897572c961ffd" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu12/nvidia_cutlass_dsl_libs_cu12-4.8.1-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:c89d9ff9574e94561e17be23c0c06d67fc1edb6a4bc3eb067f38a1dc1f682b6e" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu12/nvidia_cutlass_dsl_libs_cu12-4.8.1-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:440b88739120c65d96c5f15bbe496a3bd7c26392874d5af6061d38497f84c70c" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu12/nvidia_cutlass_dsl_libs_cu12-4.8.1-cp312-cp312-win_amd64.whl", hash = "sha256:519a7c5e87894b13f69a769a27a37f80b3c61d6e4a55a1f37af5f6494c7dc4bc" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu12/nvidia_cutlass_dsl_libs_cu12-4.8.1-cp313-cp313-manylinux_2_28_aarch64.whl", hash = "sha256:249b2947f500d13aec562bd527c99135c43b520332d982f047a86661e7c6a929" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu12/nvidia_cutlass_dsl_libs_cu12-4.8.1-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:49d2a6413aef69b606bded3c4bc481233542b9f93cde241f8695a7ea62b4f228" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu12/nvidia_cutlass_dsl_libs_cu12-4.8.1-cp313-cp313-win_amd64.whl", hash = "sha256:9fe84fd5a095f7e2f561d5389e8a5dafd6dbaeff6b88e7513494aff4f8fc38d2" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu12/nvidia_cutlass_dsl_libs_cu12-4.8.1-cp314-cp314-manylinux_2_28_aarch64.whl", hash = "sha256:e4d3e7c07dfe9d57f85a623853bf8f0e453ce70613079bf1e9be68da0ef07aca" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu12/nvidia_cutlass_dsl_libs_cu12-4.8.1-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:e21d95e78c80f63c90eb00481458994906ef0f7fd1eb4ab57b23425b38d4c7a1" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu12/nvidia_cutlass_dsl_libs_cu12-4.8.1-cp314-cp314-win_amd64.whl", hash = "sha256:290d7989b78f28e0084788c4021217565add1fda7fae6df3e3d6fa8346c8adf8" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu12/nvidia_cutlass_dsl_libs_cu12-4.8.1-cp314-cp314t-manylinux_2_28_aarch64.whl", hash = "sha256:a466618640b88f94126ce65938ee44cde80e133da3383b7ba3e285f602a70244" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu12/nvidia_cutlass_dsl_libs_cu12-4.8.1-cp314-cp314t-manylinux_2_28_x86_64.whl", hash = "sha256:d2432a07093c477f97d127647628ec0f3a8fd8fe9fbfeb32fb0f6e20d7a3abfd" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu12/nvidia_cutlass_dsl_libs_cu12-4.8.1-cp314-cp314t-win_amd64.whl", hash = "sha256:88a09aa154634fe521a5ac5151ac0f91468199a2486e12ea5641389a4e7fd45e" },
 ]
 
 [[package]]
 name = "nvidia-cutlass-dsl-libs-cu13"
-version = "4.8.0"
+version = "4.8.1"
 source = { registry = "https://pypi.nvidia.com/" }
 dependencies = [
     { name = "cuda-bindings", marker = "python_full_version < '3.14' and sys_platform != 'win32'" },
@@ -2564,21 +2564,21 @@ dependencies = [
     { name = "typing-extensions", marker = "python_full_version < '3.14' and sys_platform != 'win32'" },
 ]
 wheels = [
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu13/nvidia_cutlass_dsl_libs_cu13-4.8.0-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:ba1ec6d671f008152e73986893509676d0e0102ab242d533491814cde5c8e741" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu13/nvidia_cutlass_dsl_libs_cu13-4.8.0-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:1866559c8da5c3c0815047a1fb414e1745f47069b14bac5168885785b8553dc2" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu13/nvidia_cutlass_dsl_libs_cu13-4.8.0-cp311-cp311-win_amd64.whl", hash = "sha256:bc7c3a1bce134bde5cb99bf06c60cfc541a474e18c25fca2b85bea95d33deb4a" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu13/nvidia_cutlass_dsl_libs_cu13-4.8.0-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:d61ebe2416cae8a2d5377889549df9cb5008af006a1692d7d006d8f747e62e6c" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu13/nvidia_cutlass_dsl_libs_cu13-4.8.0-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:463cd7f0c452ffeeecb530a15aeb1b10cbbd2c8da6c5aa2fecf65f836258a732" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu13/nvidia_cutlass_dsl_libs_cu13-4.8.0-cp312-cp312-win_amd64.whl", hash = "sha256:8684f4fef26bedab100931c8f65098e2aa3c3b0e9d730fad3b92780ad2773634" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu13/nvidia_cutlass_dsl_libs_cu13-4.8.0-cp313-cp313-manylinux_2_28_aarch64.whl", hash = "sha256:5741a783dc09e294dada6844c9b8df8ff14fcc19db20be482055911a4fb9b73f" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu13/nvidia_cutlass_dsl_libs_cu13-4.8.0-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:41378cfa94ef3e74084d5157064ea807a92096123d378697a2d58bdbd582240a" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu13/nvidia_cutlass_dsl_libs_cu13-4.8.0-cp313-cp313-win_amd64.whl", hash = "sha256:cc92f1c5e9bdaa5c6d7e5d0e3a859b3364ae3c5b82726e1d1951d2ee1ad73d14" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu13/nvidia_cutlass_dsl_libs_cu13-4.8.0-cp314-cp314-manylinux_2_28_aarch64.whl", hash = "sha256:bbdb2b14a74a35d382a30bee6f17e31faf0aabb6d87909b2b99c7d134a6cac10" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu13/nvidia_cutlass_dsl_libs_cu13-4.8.0-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:09d17524a55f40df411616a771b7537be8ee056612681abc705424eebb30ba8e" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu13/nvidia_cutlass_dsl_libs_cu13-4.8.0-cp314-cp314-win_amd64.whl", hash = "sha256:95bd45c1e50b387b2d065b45d87b1ed40a61997ba48f0c1c498b5292a2a5f845" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu13/nvidia_cutlass_dsl_libs_cu13-4.8.0-cp314-cp314t-manylinux_2_28_aarch64.whl", hash = "sha256:e73a78a79304e71d3832bdfbcbb52a5245e28fe49a8a1a61dbebbfca562184c0" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu13/nvidia_cutlass_dsl_libs_cu13-4.8.0-cp314-cp314t-manylinux_2_28_x86_64.whl", hash = "sha256:4bd241512a43bb936e34a76fafe9b13f8c282f0fa6041e2cc5fcb6cab47f5097" },
-    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu13/nvidia_cutlass_dsl_libs_cu13-4.8.0-cp314-cp314t-win_amd64.whl", hash = "sha256:74da9cd5ed4c9407d1963a0456107304f26db76b890b2bbd2d057fa5822101d6" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu13/nvidia_cutlass_dsl_libs_cu13-4.8.1-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:0f0aa394eb2101134c44a9633bea776daf315f2fea2ab723ccc6c9114f89d7ea" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu13/nvidia_cutlass_dsl_libs_cu13-4.8.1-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:969cdb8ecfe8c8b5181001f7f48429f7dd531d43c6609ae58ebf8c928185cf4f" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu13/nvidia_cutlass_dsl_libs_cu13-4.8.1-cp311-cp311-win_amd64.whl", hash = "sha256:441cf8b0f95ebbed4f7f1361a656920c4354e83ae88e888d800bbb6afee6e9e7" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu13/nvidia_cutlass_dsl_libs_cu13-4.8.1-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:862378c0c51a3af2e053b363656501b06f9a54f777eee5be8c0046d780b66956" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu13/nvidia_cutlass_dsl_libs_cu13-4.8.1-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:50191a381d8cc1393373ae0bc879b0aefa9a256c23c22d4fa1c2fe3dfe57bc90" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu13/nvidia_cutlass_dsl_libs_cu13-4.8.1-cp312-cp312-win_amd64.whl", hash = "sha256:362c88258f5bc3146510d4a27be00f1cc8d320b1dfad78359dcd414b476104d8" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu13/nvidia_cutlass_dsl_libs_cu13-4.8.1-cp313-cp313-manylinux_2_28_aarch64.whl", hash = "sha256:d7d85ff421d83134aef05673e9a468949fefd8a7ccaf7e39011f5bffb98d9890" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu13/nvidia_cutlass_dsl_libs_cu13-4.8.1-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:e0637fc7ec1f119cf88fc42d5007c77f76f527cb820920e47665bc193b78b0be" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu13/nvidia_cutlass_dsl_libs_cu13-4.8.1-cp313-cp313-win_amd64.whl", hash = "sha256:c94b5c1b4b836e2394bcd25f10a6c46fb41ab4e840286cb5be30cfe243732861" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu13/nvidia_cutlass_dsl_libs_cu13-4.8.1-cp314-cp314-manylinux_2_28_aarch64.whl", hash = "sha256:0ff2a8943e1243b9335e6d185cec841de2733f0c07f8508a5418b3bfb98460f9" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu13/nvidia_cutlass_dsl_libs_cu13-4.8.1-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:31d7f25c91bee24a9758cd699a675269fb8a592953876029bee8c3e478f7765b" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu13/nvidia_cutlass_dsl_libs_cu13-4.8.1-cp314-cp314-win_amd64.whl", hash = "sha256:b75e3e3100a698341e33521f9d8e9ff82089a3f48fadab20b79a3eb9a4878bd3" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu13/nvidia_cutlass_dsl_libs_cu13-4.8.1-cp314-cp314t-manylinux_2_28_aarch64.whl", hash = "sha256:a0c8f244835aee52c2f3ee7432f960140a2dc1cfdf1bab0f0babf0b2055db688" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu13/nvidia_cutlass_dsl_libs_cu13-4.8.1-cp314-cp314t-manylinux_2_28_x86_64.whl", hash = "sha256:d6d785779dfc6cbe743ef1f5150c368beab3902a986a83193d183e19d5267587" },
+    { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-cu13/nvidia_cutlass_dsl_libs_cu13-4.8.1-cp314-cp314t-win_amd64.whl", hash = "sha256:ae7116533bf47b0b24b0ad0eb05ddedadeedf4a6769a06d01991168ed49e86c6" },
 ]
 
 [[package]]
@@ -4364,6 +4364,7 @@ kernels = [
     { name = "cuda-core" },
     { name = "cuda-python" },
     { name = "cuda-tile" },
+    { name = "nvidia-cutlass-dsl" },
 ]
 lint = [
     { name = "black" },
@@ -4466,6 +4467,7 @@ kernels = [
     { name = "cuda-core" },
     { name = "cuda-python" },
     { name = "cuda-tile", specifier = ">=1.3.0,<2" },
+    { name = "nvidia-cutlass-dsl", specifier = ">=4.8.1,<5" },
 ]
 lint = [
     { name = "black", specifier = ">=24.0.0" },
