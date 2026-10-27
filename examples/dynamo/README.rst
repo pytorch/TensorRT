@@ -41,3 +41,4 @@ Model Zoo
 * :ref:`execute_in_torch_example`: Run annotated operations with PyTorch eager or Inductor while keeping surrounding operations in TensorRT
 * :ref:`fused_op_example`: Replace a region with an existing custom operator that executes in PyTorch
 * :ref:`fused_kernel_example`: Use ``fused_kernel`` to register a supplied Triton kernel automatically inside TensorRT
+* :ref:`agentic_region_kernel_generation_example`: Generate and evaluate a Triton or cuTile kernel for an annotated region during compilation

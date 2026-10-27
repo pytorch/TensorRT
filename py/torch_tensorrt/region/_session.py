@@ -15,6 +15,8 @@ if TYPE_CHECKING:
 
     from torch_tensorrt.kernels import KernelSpec
 
+    from ._generation import KernelGenerator
+
 _CURRENT_SESSION: ContextVar[Optional[RegionCompilationSession]] = ContextVar(
     "torch_tensorrt_region_session", default=None
 )
@@ -26,7 +28,7 @@ class RegionCompilationSession:
     def __init__(self, *, strict: bool) -> None:
         self.strict = strict
         self.capture_error: Optional[str] = None
-        self.plugins: dict[int, KernelSpec | partial[None]] = {}
+        self.plugins: dict[int, KernelSpec | partial[None] | KernelGenerator] = {}
         self.operators: dict[int, OpOverload] = {}
         self._context_token: Optional[Token[Optional[RegionCompilationSession]]] = None
 

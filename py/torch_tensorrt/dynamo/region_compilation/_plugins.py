@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import copy
+import inspect
 import logging
 import uuid
 from dataclasses import dataclass, replace
@@ -284,6 +285,32 @@ def register_region_plugin(
                 aot_fn=_common.check_aot_dtypes(
                     op_name,
                     _derive._make_aot_fn(cuda_spec),
+                    [boundary.dtype for boundary in input_specs],
+                    [boundary.dtype for boundary in output_specs],
+                ),
+                **common,
+            )
+        elif registration.func is kernels.cutile_op:
+            # cuTile checks the callback's named inputs against the explicit schema.
+            meta_fn.__signature__ = inspect.Signature(  # type: ignore[attr-defined]
+                [
+                    inspect.Parameter(
+                        f"arg{i}", inspect.Parameter.POSITIONAL_OR_KEYWORD
+                    )
+                    for i in range(len(input_specs))
+                ]
+            )
+            registration(op_name, **common)
+        elif registration.func is kernels.ptx_op:
+            from torch_tensorrt.kernels._common import check_aot_dtypes
+
+            # Generated CUDA already validated and compiled this pointer ABI.
+            # Keep the engine binding guard when using the precompiled funnel.
+            registration(
+                op_name,
+                aot_fn=check_aot_dtypes(
+                    op_name,
+                    registration.keywords["aot_fn"],
                     [boundary.dtype for boundary in input_specs],
                     [boundary.dtype for boundary in output_specs],
                 ),

@@ -393,9 +393,13 @@ Tensor boundary values, read-only state, and one device per region.
 
 ``execute_in_torch`` accepts the optional ``name`` and ``backend`` keywords.
 ``fused_op`` accepts a custom operator and an optional ``name``.
-``fused_kernel`` accepts a kernel factory and its launch configuration.
-These APIs do not generate custom kernel implementations or invoke external
-kernel-generation providers.
+``fused_kernel`` accepts either a kernel factory and launch configuration or
+``generator=KernelGenerator(...)`` for compilation-time kernel generation.
+``SearchPolicy`` controls candidate batches, launch tuning, search budgets,
+resume, and final validation alternatives. See the
+:ref:`agent-generated kernel example <agentic_region_kernel_generation_example>`
+and :ref:`region annotation API <torch_tensorrt_region_py>` for
+configuration and provider requirements.
 
 Inspect placement and measure performance
 ---------------------------------------------
