@@ -23,6 +23,7 @@ from typing import (
 
 import tensorrt as trt
 import torch
+import torch.utils._pytree as pytree
 from torch import SymBool, SymFloat, SymInt
 from torch._ops import OpOverloadPacket
 from torch.fx.node import Argument, Node, Target, _get_qualified_name
@@ -83,6 +84,7 @@ class ConverterSupport:
             whether that node can be supported by its companion converter. Note that
             this function must not modify the node or its graph
         supports_dynamic_shapes: Boolean flag indicating if the converter has support for dynamic inputs.
+        supports_uint8: Boolean flag indicating if the converter can take a uint8 tensor input or produce a uint8 output (see node_has_uint8_tensors).
         requires_output_allocator: Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators).
         requires_aliased_plugin_io: Boolean flag indicating if the converter creates plugins with aliased I/O (in-place mutation), requiring the ALIASED_PLUGIN_IO preview feature at build time.
     """
@@ -92,6 +94,7 @@ class ConverterSupport:
         default=lambda node, compilation_settings: True
     )
     supports_dynamic_shapes: bool = False
+    supports_uint8: bool = False
     requires_output_allocator: bool = False
     requires_native_multidevice: bool = False
     requires_aliased_plugin_io: bool = False
@@ -110,6 +113,43 @@ def has_static_shapes(node: torch.fx.Node) -> bool:
 def node_has_dynamic_shapes(node: torch.fx.Node) -> bool:
     """Returns True if a node has dynamic args, kwargs, or outputs"""
     return _has_dynamic_shapes(node=node)
+
+
+def node_has_uint8_tensors(node: torch.fx.Node) -> bool:
+    """Returns True if an ATen node reads a uint8 tensor input or produces a uint8 output.
+
+    TensorRT holds a UInt8 tensor only as a network input or output, and accepts one
+    only into an identity, a cast or a shape read, so most converters cannot take one:
+    a permute of a uint8 camera frame fails with "Could not get tensor shape", and a
+    comparison with a scalar makes a uint8 constant. Converters that can declare
+    supports_uint8. Constant inputs are not counted, since FP4 weights arrive packed in
+    uint8, and neither are non-ATen operators, which handle their own types.
+    """
+    if (
+        not isinstance(node.target, torch._ops.OpOverload)
+        or node.target.namespace != "aten"
+    ):
+        return False
+
+    def _is_uint8(value: Any) -> bool:
+        return isinstance(value, torch.Tensor) and value.dtype == torch.uint8
+
+    if any(_is_uint8(output) for output in pytree.tree_leaves(node.meta.get("val"))):
+        return True
+    return any(
+        input_node.op != "get_attr" and _is_uint8(input_node.meta.get("val"))
+        for input_node in node.all_input_nodes
+    )
+
+
+def produces_floating_output(node: torch.fx.Node) -> bool:
+    """Returns True if every tensor output of a node has a floating-point dtype"""
+    outputs = [
+        output
+        for output in pytree.tree_leaves(node.meta.get("val"))
+        if isinstance(output, torch.Tensor)
+    ]
+    return bool(outputs) and all(output.is_floating_point() for output in outputs)
 
 
 def has_dynamic_shapes_in_args(
@@ -206,6 +246,7 @@ def dynamo_tensorrt_converter(
     capability_validator: Optional[Callable[[Node, CompilationSettings], bool]] = None,
     priority: ConverterPriority = ConverterPriority.STANDARD,
     supports_dynamic_shapes: bool = False,
+    supports_uint8: bool = False,
     requires_output_allocator: bool = False,
     requires_native_multidevice: bool = False,
     requires_aliased_plugin_io: bool = False,
@@ -225,6 +266,9 @@ def dynamo_tensorrt_converter(
         priority: Converter's level of priority relative to other converters with the
             same target
         supports_dynamic_shapes: Boolean flag indicating if the converter has support for dynamic shapes.
+        supports_uint8: Boolean flag indicating if the converter can take a uint8 tensor input or produce a uint8 output.
+            TensorRT accepts uint8 only into an identity, a cast or a shape read, so leave this False unless the
+            converter casts a uint8 input before any other layer reads it.
         requires_output_allocator: Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators).
         requires_native_multidevice: Boolean flag indicating if the converter creates operators which require native TensorRT multi device collectives.
         requires_aliased_plugin_io: Boolean flag indicating if the converter creates plugins with aliased I/O (in-place mutation), requiring the ALIASED_PLUGIN_IO preview feature at build time.
@@ -241,6 +285,7 @@ def dynamo_tensorrt_converter(
             converter_support = ConverterSupport(
                 converter_implementation=converter,
                 supports_dynamic_shapes=supports_dynamic_shapes,
+                supports_uint8=supports_uint8,
                 requires_output_allocator=requires_output_allocator,
                 requires_native_multidevice=requires_native_multidevice,
                 requires_aliased_plugin_io=requires_aliased_plugin_io,
@@ -253,6 +298,7 @@ def dynamo_tensorrt_converter(
                 converter_implementation=converter,
                 capability_validator=capability_validator,
                 supports_dynamic_shapes=supports_dynamic_shapes,
+                supports_uint8=supports_uint8,
                 requires_output_allocator=requires_output_allocator,
                 requires_native_multidevice=requires_native_multidevice,
                 requires_aliased_plugin_io=requires_aliased_plugin_io,
@@ -473,17 +519,26 @@ class ConverterRegistry:
                 if isinstance(converters, (list, tuple)):
                     logger.debug(f"Converter options for {key}: {len(converters)}")
                     for i, candidate in enumerate(converters):
-                        # We enable the converter under 4 conditions
-                        # 1) capability validator is True
-                        # 2) Assume dynamic_shape support is True
-                        # 3) Node only has static shaped inputs
-                        # 4) Node has dynamic inputs and the converter has supports_dynamic_shapes=True
-                        if is_valid := candidate.capability_validator(
-                            node, self.compilation_settings
-                        ) and (
-                            assume_dynamic_shape_support
-                            or not node_has_dynamic_shapes(node)
-                            or candidate.supports_dynamic_shapes
+                        # We enable the converter when
+                        # 1) capability validator is True, and
+                        # 2) dynamic shape support is assumed, the node only has static
+                        #    shaped inputs, or the converter has supports_dynamic_shapes=True,
+                        #    and
+                        # 3) the node has no uint8 tensors, or the converter has
+                        #    supports_uint8=True
+                        if (
+                            is_valid := candidate.capability_validator(
+                                node, self.compilation_settings
+                            )
+                            and (
+                                assume_dynamic_shape_support
+                                or not node_has_dynamic_shapes(node)
+                                or candidate.supports_dynamic_shapes
+                            )
+                            and (
+                                candidate.supports_uint8
+                                or not node_has_uint8_tensors(node)
+                            )
                         ):
                             logger.debug(
                                 f"Selecting converter option {i} for converting {key}"
@@ -500,12 +555,14 @@ class ConverterRegistry:
                             )
                         else:
                             logger.debug(
-                                f"Skipping option {i} for {key}: (validator: {is_valid}, supports dynamic shapes: {candidate.supports_dynamic_shapes})"
+                                f"Skipping option {i} for {key}: (validator: {is_valid}, supports dynamic shapes: {candidate.supports_dynamic_shapes}, supports uint8: {candidate.supports_uint8})"
                             )
                             continue
                 else:
-                    # Assuming FX converters don't have dynamic shapes supported
-                    if not node_has_dynamic_shapes(node):
+                    # Assuming FX converters support neither dynamic shapes nor uint8
+                    if not node_has_dynamic_shapes(node) and not node_has_uint8_tensors(
+                        node
+                    ):
                         return (
                             converters,
                             calling_convention,
