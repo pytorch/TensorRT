@@ -10,14 +10,18 @@ module(
 bazel_dep(name = "googletest", version = "1.14.0")
 bazel_dep(name = "platforms", version = "0.0.10")
 bazel_dep(name = "rules_cc", version = "0.0.9")
-bazel_dep(name = "rules_python", version = "0.34.0")
+bazel_dep(name = "rules_python", version = "1.7.0")
 bazel_dep(name = "bazel_skylib", version = "1.7.1")
 bazel_dep(name = "rules_foreign_cc", version = "0.15.1")
 
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
-python.toolchain(
-    ignore_root_user_error = True,
+python.override(register_all_versions = True)
+
+# Bazel's own Python interpreter follows the container's Python version via the
+# PYVER env var (set by the NGC build), falling back to 3.12 when unset.
+python.defaults(
     python_version = "3.12",
+    python_version_env = "PYVER",
 )
 
 bazel_dep(name = "rules_pkg", version = "1.0.1")
@@ -39,16 +43,18 @@ local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl"
 new_local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl", "new_local_repository")
 new_git_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:git.bzl", "new_git_repository")
 
+local_torch = use_repo_rule("//toolchains:local_torch.bzl", "local_torch")
+
 torch_nccl_detect = use_repo_rule("//toolchains/torch_nccl:defs.bzl", "torch_nccl_detect")
 
 torch_nccl_detect(name = "torch_nccl")
 
 
 # External dependency for torch_tensorrt if you already have precompiled binaries.
-new_local_repository(
+local_torch(
     name = "torch_tensorrt",
     build_file = "@//third_party/torch_tensorrt:BUILD",
-    path = "/usr/local/lib/python3.12/dist-packages/torch_tensorrt/",
+    package = "torch_tensorrt",
 )
 
 
@@ -68,11 +74,7 @@ http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "ht
 
 # NOTE: If you are using a local build of torch, just point the Libtorch dep to that path.
 
-new_local_repository(
-    name = "libtorch",
-    path = "/usr/local/lib/python3.12/dist-packages/torch/",
-    build_file = "third_party/libtorch/BUILD"
-)
+local_torch(name = "libtorch")
 
 # Use the source revision recorded by the pinned ExecuTorch wheel.
 new_git_repository(
@@ -95,11 +97,7 @@ new_git_repository(
 
 # This is a workaround (WAR), not a functional Bazel repository.
 # It directly references a system-installed PyTorch package, which breaks hermeticity
-new_local_repository(
-    name = "torch_l4t",
-    path = "/usr/local/lib/python3.12/dist-packages/torch/",
-    build_file = "third_party/libtorch/BUILD"
-)
+local_torch(name = "torch_l4t")
 
 new_local_repository(
    name = "tensorrt",
