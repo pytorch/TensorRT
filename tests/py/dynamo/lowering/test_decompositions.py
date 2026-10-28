@@ -1362,17 +1362,14 @@ class TestLowering(TestCase):
         model = ScatterAdd().eval()
         base = torch.zeros((16, 8))
         index = torch.zeros((4, 8), dtype=torch.int64)
-        src = torch.ones((4, 8))
-        src_rows = torch.export.Dim("src_rows", min=1, max=16)
+        src = torch.ones((16, 8))
+        index_rows = torch.export.Dim("index_rows", min=1, max=16)
 
+        # The decomposition loops over index, so only its extent matters.
         dynamic_export = torch.export.export(
             model,
             (base, index, src),
-            dynamic_shapes={
-                "base": {},
-                "index": {0: src_rows},
-                "src": {0: src_rows},
-            },
+            dynamic_shapes={"base": {}, "index": {0: index_rows}, "src": {}},
         )
         base_decompositions = get_decompositions()
         dynamic_decompositions = filter_decomposition_table(
@@ -1395,9 +1392,9 @@ class TestLowering(TestCase):
             for node in dynamic_export.graph_module.graph.nodes
             if node.target == torch.ops.aten.scatter_add.default
         )
-        dynamic_src = dynamic_scatter.args[3]
-        self.assertIsInstance(dynamic_src, torch.fx.Node)
-        dynamic_src.meta["example_value"] = dynamic_src.meta.pop("val")
+        dynamic_index = dynamic_scatter.args[2]
+        self.assertIsInstance(dynamic_index, torch.fx.Node)
+        dynamic_index.meta["example_value"] = dynamic_index.meta.pop("val")
         dynamo_decompositions = filter_decomposition_table(
             get_decompositions(), dynamic_export.graph_module
         )
@@ -1408,6 +1405,75 @@ class TestLowering(TestCase):
             get_decompositions(), static_export.graph_module
         )
         self.assertIn(torch.ops.aten.scatter_add.default, static_decompositions)
+
+    @parameterized.expand(
+        [
+            ("rule_enabled", (), 1, "input", True),
+            ("rule_disabled", {"scatter_add_positions"}, 1, "input", False),
+            ("decomposed_twice", (), 2, "input", True),
+            ("constant_src_folds", (), 1, "ones", False),
+            ("random_src", (), 1, "randint", True),
+        ]
+    )
+    def test_scatter_add_constant_index_positions_not_folded(
+        self,
+        _,
+        disabled_constant_fold_exclusions,
+        decompositions_runs,
+        src_kind,
+        positions_kept,
+    ):
+        class ConstantIndexScatterAdd(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("index", torch.randint(0, 64, (16, 8)))
+
+            def forward(self, input, src):
+                if src_kind == "ones":
+                    src = torch.ones_like(self.index)
+                elif src_kind == "randint":
+                    src = torch.randint_like(self.index, 5)
+                return input.scatter_add(0, self.index, src)
+
+        exported = torch.export.export(
+            ConstantIndexScatterAdd().cuda(),
+            (
+                torch.zeros(64, 8, dtype=torch.int64).cuda(),
+                torch.ones(16, 8, dtype=torch.int64).cuda(),
+            ),
+        )
+        for _ in range(decompositions_runs):
+            exported = exported.run_decompositions(get_decompositions())
+        gm = post_lowering(
+            exported.module(),
+            CompilationSettings(
+                disabled_constant_fold_exclusions=disabled_constant_fold_exclusions
+            ),
+        )
+        has_arange = any(
+            getattr(node.target, "overloadpacket", None) is torch.ops.aten.arange
+            for node in gm.graph.nodes
+        )
+        self.assertEqual(has_arange, positions_kept)
+
+    def test_scatter_add_large_comparison_keeps_loop(self):
+        class ScatterAdd(torch.nn.Module):
+            def forward(self, input, index, src):
+                return input.scatter_add(0, index, src)
+
+        def lowered_targets(updates):
+            inputs = (
+                torch.zeros(2**20, dtype=torch.int64),
+                torch.zeros(updates, dtype=torch.int64),
+                # src longer than index also exercises the loop above the bound.
+                torch.ones(updates + 1, dtype=torch.int64),
+            )
+            exported = torch.export.export(ScatterAdd(), inputs)
+            lowered = exported.run_decompositions(get_decompositions())
+            return {node.target for node in lowered.graph.nodes}
+
+        self.assertNotIn(torch.ops.aten.scatter.src, lowered_targets(64))
+        self.assertIn(torch.ops.aten.scatter.src, lowered_targets(128))
 
     @parameterized.expand(
         [
@@ -1448,11 +1514,21 @@ class TestLowering(TestCase):
                 1,
                 torch.tensor([[0, 1, 2, 0], [1, 2, 1, 1], [3, 2, 1, 2]]).cuda(),
                 torch.tensor(
-                    [[1, 2, 3, 1], [5, 6, 5, 5], [2, 4, 3, 2]], dtype=torch.int32
+                    [[1, 2, 3, 1], [5, 6, 5, 5], [2, 4, 3, 2]], dtype=torch.float32
                 ).cuda(),
                 {
                     torch.ops.aten.add.Tensor,
                 },
+            ),
+            (
+                "scatter_add_zero_dim_src_larger_than_index",
+                0,
+                torch.tensor([[0, 1, 2, 0], [2, 2, 0, 1]]).cuda(),
+                torch.tensor(
+                    [[1, 2, 3, 4, 5], [6, 2**40, 8, 9, 10], [11, 12, 13, 14, 15]],
+                    dtype=torch.int64,
+                ).cuda(),
+                {torch.ops.aten.add.Tensor},
             ),
         ]
     )
@@ -1467,8 +1543,11 @@ class TestLowering(TestCase):
         # Operations expected to be included in the traced graph after decompositions
         expected_ops = expected_ops_param
         unexpected_ops = {torch.ops.aten.scatter_add.default}
+        if not src.is_floating_point():
+            unexpected_ops.add(torch.ops.aten.scatter.src)
 
-        input = torch.zeros(3, 5, dtype=torch.int32).cuda()
+        # Nonzero, so cells without updates must keep their values.
+        input = torch.arange(15).reshape(3, 5).to(src.dtype).cuda()
         inputs = [input]
 
         fx_graph = torch.fx.symbolic_trace(TestModule())
