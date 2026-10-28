@@ -509,7 +509,7 @@ def scaled_dot_product_attention_decomposition(
         attn_bias = torch.where(temp_mask.logical_not(), negative, zero)
 
     if attn_mask is not None:
-        # Unconditional: mark_constant_fold_exclusions revokes these marks when the
+        # Unconditional: mark_constant_fold_exclusions ignores the tags when the
         # rule is disabled, so the decompositions do not need the setting.
         exclude_attn_mask_aranges_from_constant_fold(attn_mask)
         if attn_mask.dtype == torch.bool:
