@@ -25,7 +25,7 @@ You can also generate a sample `.pte` from the Torch-TensorRT source tree:
 python examples/torchtrt_executorch_example/export_static_shape.py --model_path=model.pte
 
 # Two-profile Gemma-3 engine for the multi-profile runner below. Needs
-# transformers (pip install "transformers>=5.4.0") for the Gemma-3 definition;
+# transformers (pip install "transformers>=5.17.0") for the Gemma-3 definition;
 # the executorch extra does not pull it in. Defaults to a mini Gemma-3 that
 # needs no download and exports in about a minute, most of it spent serializing
 # the engine into the .pte. Add --weights google/gemma-3-1b-it for the real 1B
