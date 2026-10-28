@@ -593,7 +593,8 @@ def export(
             update discarded. ``torch_tensorrt.save(output_format="executorch",
             zero_copy_kv=True)`` owns both steps and needs only the one flag.
         generate_etrecord (bool): Ask ExecuTorch for an ETRecord for later debugging.
-            This copies the whole program, engines included.
+            This copies the whole program, engines included. Saving the record does not
+            work for a program with TensorRT engines: it raises a ``SerializeError``.
         weight_streaming_budget_per_engine (Optional[int]): Bytes of engine weights that
             may stay resident in GPU memory, with the rest streamed from host memory.
             It applies to **each** TensorRT engine separately, not as a total for the
@@ -608,9 +609,10 @@ def export(
             program total split proportionally across engines.
         use_cuda_graphs (Optional[bool]): Bake CUDA graph replay on (True) or off
             (False) into every method's TensorRT compile specs. None leaves the choice
-            unset so the runtime default applies. A load-time option overrides this
-            value. Non-booleans and raw ``CompileSpec("use_cuda_graphs", ...)`` entries
-            are rejected; use this keyword instead.
+            unset so the runtime default applies. A load option, or a process option
+            set to False, overrides this value. Non-booleans and raw
+            ``CompileSpec("use_cuda_graphs", ...)`` entries are rejected; use this
+            keyword instead.
         external_engine_data (Optional[str]): Write every TensorRT engine to an
             ExecuTorch data file named ``<external_engine_data>.ptd`` instead of into
             the ``.pte``, which then holds only a key per engine. Pass the name without

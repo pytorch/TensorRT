@@ -186,11 +186,10 @@ class TensorRTPartitioner(Partitioner):  # type: ignore[misc]
     each such node becomes its own partition so the backend can serialize
     the engine to the same format as the TRT runtime.
 
-    If `compile_specs` does not already contain a ``target_device`` entry,
-    one defaulting to ``cuda:0`` is auto-appended (mirroring CudaPartitioner).
-    Callers targeting a non-default GPU should pre-populate
-    ``compile_specs`` with the desired ``CompileSpec("target_device",
-    b"cuda:<index>")`` to override the default.
+    If `compile_specs` has no ``target_device`` entry, each partition gets one
+    naming the GPU its own engine was built on, or ``cuda:0`` if that cannot be
+    read. A ``CompileSpec("target_device", b"cuda:<index>")`` in
+    ``compile_specs`` sets it for every partition instead.
 
     Note: ``target_device`` is AOT metadata only -- it drives ExecuTorch's
     PropagateDevicePass tagging at export time. At runtime the C++ backend

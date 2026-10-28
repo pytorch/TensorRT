@@ -936,15 +936,29 @@ def test_install_channel_guard_rejects_unsupported_nightly_recipes(
 
 @pytest.mark.unit
 @pytest.mark.parametrize(
-    ("path", "command", "allowed"),
+    ("path", "command", "error"),
     [
-        ("docsrc/install.rst", 'pip install "torch-tensorrt[executorch]"', True),
-        ("README.md", 'pip install "torch-tensorrt[executorch]"', False),
-        ("docsrc/install.rst", 'pip install --pre "torch-tensorrt[executorch]"', False),
+        ("docsrc/install.rst", 'pip install "torch-tensorrt[executorch]"', None),
+        (
+            "README.md",
+            'pip install "torch-tensorrt[executorch]"',
+            "names no nightly channel",
+        ),
+        (
+            "docsrc/install.rst",
+            'pip install --pre "torch-tensorrt[executorch]"',
+            "names no nightly channel",
+        ),
+        (
+            "docsrc/install.rst",
+            'pip install "torch-tensorrt[executorch]" '
+            "--index-url https://download.pytorch.org/whl/nightly/cu132",
+            "without --pre",
+        ),
     ],
 )
 def test_only_user_docs_may_print_the_release_install(
-    tmp_path, monkeypatch, path, command, allowed
+    tmp_path, monkeypatch, path, command, error
 ):
     recipe = tmp_path / path
     recipe.parent.mkdir(parents=True, exist_ok=True)
@@ -952,10 +966,10 @@ def test_only_user_docs_may_print_the_release_install(
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
     subprocess.run(["git", "-C", str(tmp_path), "add", path], check=True)
     monkeypatch.setattr(sys.modules[__name__], "REPO_ROOT", tmp_path)
-    if allowed:
+    if error is None:
         test_every_printed_install_instruction_names_the_nightly_channel()
     else:
-        with pytest.raises(AssertionError, match="names no nightly channel"):
+        with pytest.raises(AssertionError, match=error):
             test_every_printed_install_instruction_names_the_nightly_channel()
 
 
