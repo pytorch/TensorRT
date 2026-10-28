@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=3fea7915"></script>
+    <script src="../_static/documentation_options.js?v=5c214475"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -577,7 +577,8 @@ document.write(`
 then load and run programs through ExecuTorch’s Module API.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>This module requires ExecuTorch and is only supported on Linux.</p>
+<p>This module needs the <code class="docutils literal notranslate"><span class="pre">executorch</span></code> extra. It runs on Linux and on Windows x86-64. See
+<a class="reference internal" href="../user_guide/runtime_performance/executorch.html#executorch-deployment"><span class="std std-ref">ExecuTorch Deployment</span></a>.</p>
 </div>
 <section id="overview">
 <h2>Overview<a class="headerlink" href="#overview" title="Link to this heading">#</a></h2>
@@ -699,7 +700,8 @@ and finalizing without the config leaves the buffer staged and every
 update discarded. <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.save(output_format=&quot;executorch&quot;,</span>
 <span class="pre">zero_copy_kv=True)</span></code> owns both steps and needs only the one flag.</p></li>
 <li><p><strong>generate_etrecord</strong> (<em>bool</em>) – Ask ExecuTorch for an ETRecord for later debugging.
-This copies the whole program, engines included.</p></li>
+This copies the whole program, engines included. Saving the record does not
+work for a program with TensorRT engines: it raises a <code class="docutils literal notranslate"><span class="pre">SerializeError</span></code>.</p></li>
 <li><p><strong>weight_streaming_budget_per_engine</strong> (<em>Optional</em><em>[</em><em>python:int</em><em>]</em>) – Bytes of engine weights that
 may stay resident in GPU memory, with the rest streamed from host memory.
 It applies to <strong>each</strong> TensorRT engine separately, not as a total for the
@@ -714,9 +716,10 @@ actually loads on. This is a different unit from
 program total split proportionally across engines.</p></li>
 <li><p><strong>use_cuda_graphs</strong> (<em>Optional</em><em>[</em><em>bool</em><em>]</em>) – Bake CUDA graph replay on (True) or off
 (False) into every method’s TensorRT compile specs. None leaves the choice
-unset so the runtime default applies. A load-time option overrides this
-value. Non-booleans and raw <code class="docutils literal notranslate"><span class="pre">CompileSpec(&quot;use_cuda_graphs&quot;,</span> <span class="pre">...)</span></code> entries
-are rejected; use this keyword instead.</p></li>
+unset so the runtime default applies. A load option, or a process option
+set to False, overrides this value. Non-booleans and raw
+<code class="docutils literal notranslate"><span class="pre">CompileSpec(&quot;use_cuda_graphs&quot;,</span> <span class="pre">...)</span></code> entries are rejected; use this
+keyword instead.</p></li>
 <li><p><strong>external_engine_data</strong> (<em>Optional</em><em>[</em><em>str</em><em>]</em>) – Write every TensorRT engine to an
 ExecuTorch data file named <code class="docutils literal notranslate"><span class="pre">&lt;external_engine_data&gt;.ptd</span></code> instead of into
 the <code class="docutils literal notranslate"><span class="pre">.pte</span></code>, which then holds only a key per engine. Pass the name without
@@ -978,11 +981,10 @@ what the first three refusals above are.</p>
 <p>Only nodes that are torch.ops.tensorrt.execute_engine are supported;
 each such node becomes its own partition so the backend can serialize
 the engine to the same format as the TRT runtime.</p>
-<p>If <cite>compile_specs</cite> does not already contain a <code class="docutils literal notranslate"><span class="pre">target_device</span></code> entry,
-one defaulting to <code class="docutils literal notranslate"><span class="pre">cuda:0</span></code> is auto-appended (mirroring CudaPartitioner).
-Callers targeting a non-default GPU should pre-populate
-<code class="docutils literal notranslate"><span class="pre">compile_specs</span></code> with the desired <code class="docutils literal notranslate"><span class="pre">CompileSpec(&quot;target_device&quot;,</span>
-<span class="pre">b&quot;cuda:&lt;index&gt;&quot;)</span></code> to override the default.</p>
+<p>If <cite>compile_specs</cite> has no <code class="docutils literal notranslate"><span class="pre">target_device</span></code> entry, each partition gets one
+naming the GPU its own engine was built on, or <code class="docutils literal notranslate"><span class="pre">cuda:0</span></code> if that cannot be
+read. A <code class="docutils literal notranslate"><span class="pre">CompileSpec(&quot;target_device&quot;,</span> <span class="pre">b&quot;cuda:&lt;index&gt;&quot;)</span></code> in
+<code class="docutils literal notranslate"><span class="pre">compile_specs</span></code> sets it for every partition instead.</p>
 <p>Note: <code class="docutils literal notranslate"><span class="pre">target_device</span></code> is AOT metadata only – it drives ExecuTorch’s
 PropagateDevicePass tagging at export time. At runtime the C++ backend
 selects the GPU from the device baked into the serialized engine blob,

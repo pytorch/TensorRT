@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=3fea7915"></script>
+    <script src="../../_static/documentation_options.js?v=5c214475"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -965,6 +965,18 @@ converters. When combined with <code class="docutils literal notranslate"><span 
 keeps its intermediate calculation in FP32 and casts only the final output back
 to FP16.</p></td>
 </tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">fold_shared_kv_attention</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">False</span></code></p></td>
+<td><p>For attention where all query heads share one key/value head (multi-query
+attention), compute it against that one head instead of the copies that
+Hugging Face models make for each query head. TensorRT then runs two plain
+matrix products instead of its fused attention kernel. This can be faster or
+slower depending on the GPU, so measure it. In FP16 the result can round
+differently; <code class="docutils literal notranslate"><span class="pre">use_fp32_acc=True</span></code> reduces that. Only static shapes are
+rewritten, and <code class="docutils literal notranslate"><span class="pre">scaled_dot_product_attention</span></code> also needs
+<code class="docutils literal notranslate"><span class="pre">decompose_attention=True</span></code>. The setting has no effect under <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code>
+with <code class="docutils literal notranslate"><span class="pre">use_distributed_mode_trace</span></code>.</p></td>
+</tr>
 </tbody>
 </table>
 </div>
@@ -1095,7 +1107,8 @@ rebuilt from scratch:</p>
 <code class="docutils literal notranslate"><span class="pre">l2_limit_for_tiling</span></code>, <code class="docutils literal notranslate"><span class="pre">enable_autocast</span></code>, <code class="docutils literal notranslate"><span class="pre">autocast_low_precision_type</span></code>,
 <code class="docutils literal notranslate"><span class="pre">autocast_excluded_nodes</span></code>, <code class="docutils literal notranslate"><span class="pre">autocast_excluded_ops</span></code>,
 <code class="docutils literal notranslate"><span class="pre">autocast_max_output_threshold</span></code>, <code class="docutils literal notranslate"><span class="pre">autocast_max_depth_of_reduction</span></code>,
-<code class="docutils literal notranslate"><span class="pre">autocast_calibration_dataloader</span></code>, <code class="docutils literal notranslate"><span class="pre">decompose_attention</span></code>, <code class="docutils literal notranslate"><span class="pre">attn_bias_is_causal</span></code>.</p>
+<code class="docutils literal notranslate"><span class="pre">autocast_calibration_dataloader</span></code>, <code class="docutils literal notranslate"><span class="pre">decompose_attention</span></code>, <code class="docutils literal notranslate"><span class="pre">attn_bias_is_causal</span></code>,
+<code class="docutils literal notranslate"><span class="pre">fold_shared_kv_attention</span></code>.</p>
 <p>Settings not in this list (e.g., <code class="docutils literal notranslate"><span class="pre">debug</span></code>, <code class="docutils literal notranslate"><span class="pre">dryrun</span></code>, <code class="docutils literal notranslate"><span class="pre">pass_through_build_failures</span></code>)
 can be changed without invalidating the cache.</p>
 </section>

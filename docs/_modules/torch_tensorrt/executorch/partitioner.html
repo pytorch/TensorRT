@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=3fea7915"></script>
+    <script src="../../../_static/documentation_options.js?v=5c214475"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -667,11 +667,10 @@ document.write(`
 <span class="sd">    each such node becomes its own partition so the backend can serialize</span>
 <span class="sd">    the engine to the same format as the TRT runtime.</span>
 
-<span class="sd">    If `compile_specs` does not already contain a ``target_device`` entry,</span>
-<span class="sd">    one defaulting to ``cuda:0`` is auto-appended (mirroring CudaPartitioner).</span>
-<span class="sd">    Callers targeting a non-default GPU should pre-populate</span>
-<span class="sd">    ``compile_specs`` with the desired ``CompileSpec("target_device",</span>
-<span class="sd">    b"cuda:&lt;index&gt;")`` to override the default.</span>
+<span class="sd">    If `compile_specs` has no ``target_device`` entry, each partition gets one</span>
+<span class="sd">    naming the GPU its own engine was built on, or ``cuda:0`` if that cannot be</span>
+<span class="sd">    read. A ``CompileSpec("target_device", b"cuda:&lt;index&gt;")`` in</span>
+<span class="sd">    ``compile_specs`` sets it for every partition instead.</span>
 
 <span class="sd">    Note: ``target_device`` is AOT metadata only -- it drives ExecuTorch's</span>
 <span class="sd">    PropagateDevicePass tagging at export time. At runtime the C++ backend</span>

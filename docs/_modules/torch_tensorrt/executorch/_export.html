@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=3fea7915"></script>
+    <script src="../../../_static/documentation_options.js?v=5c214475"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -1074,7 +1074,8 @@ document.write(`
 <span class="sd">            update discarded. ``torch_tensorrt.save(output_format="executorch",</span>
 <span class="sd">            zero_copy_kv=True)`` owns both steps and needs only the one flag.</span>
 <span class="sd">        generate_etrecord (bool): Ask ExecuTorch for an ETRecord for later debugging.</span>
-<span class="sd">            This copies the whole program, engines included.</span>
+<span class="sd">            This copies the whole program, engines included. Saving the record does not</span>
+<span class="sd">            work for a program with TensorRT engines: it raises a ``SerializeError``.</span>
 <span class="sd">        weight_streaming_budget_per_engine (Optional[int]): Bytes of engine weights that</span>
 <span class="sd">            may stay resident in GPU memory, with the rest streamed from host memory.</span>
 <span class="sd">            It applies to **each** TensorRT engine separately, not as a total for the</span>
@@ -1089,9 +1090,10 @@ document.write(`
 <span class="sd">            program total split proportionally across engines.</span>
 <span class="sd">        use_cuda_graphs (Optional[bool]): Bake CUDA graph replay on (True) or off</span>
 <span class="sd">            (False) into every method's TensorRT compile specs. None leaves the choice</span>
-<span class="sd">            unset so the runtime default applies. A load-time option overrides this</span>
-<span class="sd">            value. Non-booleans and raw ``CompileSpec("use_cuda_graphs", ...)`` entries</span>
-<span class="sd">            are rejected; use this keyword instead.</span>
+<span class="sd">            unset so the runtime default applies. A load option, or a process option</span>
+<span class="sd">            set to False, overrides this value. Non-booleans and raw</span>
+<span class="sd">            ``CompileSpec("use_cuda_graphs", ...)`` entries are rejected; use this</span>
+<span class="sd">            keyword instead.</span>
 <span class="sd">        external_engine_data (Optional[str]): Write every TensorRT engine to an</span>
 <span class="sd">            ExecuTorch data file named ``&lt;external_engine_data&gt;.ptd`` instead of into</span>
 <span class="sd">            the ``.pte``, which then holds only a key per engine. Pass the name without</span>

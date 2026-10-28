@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=3fea7915"></script>
+    <script src="../../_static/documentation_options.js?v=5c214475"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -1319,8 +1319,9 @@ document.write(`
 <span class="sd">                  parameter takes precedence.</span>
 <span class="sd">        use_cuda_graphs (Optional[bool]): Bake CUDA graph replay on (True) or off</span>
 <span class="sd">                (False) into every TensorRT delegate for ``output_format="executorch"``.</span>
-<span class="sd">                None leaves the choice unset so the runtime default applies. A load-time</span>
-<span class="sd">                option overrides this value. Non-booleans are rejected for ExecuTorch;</span>
+<span class="sd">                None leaves the choice unset so the runtime default applies. A load</span>
+<span class="sd">                option, or a process option set to False, overrides this value.</span>
+<span class="sd">                Non-booleans are rejected for ExecuTorch;</span>
 <span class="sd">                other formats ignore non-None values with a warning. Use this keyword,</span>
 <span class="sd">                not a raw ``CompileSpec("use_cuda_graphs", ...)``.</span>
 <span class="sd">        kwargs: Additional format-specific kwargs. ``partitioners=``,</span>
@@ -1329,8 +1330,9 @@ document.write(`
 <span class="sd">                ``weight_streaming_budget_per_engine=``, ``zero_copy_kv=`` and</span>
 <span class="sd">                ``external_engine_data=`` are</span>
 <span class="sd">                only used with ``output_format="executorch"``; otherwise they are</span>
-<span class="sd">                ignored with a warning. Pass ``compile_specs=[CompileSpec("target_device",</span>
-<span class="sd">                b"cuda:&lt;i&gt;")]`` to override the default target device (``cuda:0``).</span>
+<span class="sd">                ignored with a warning. A ``CompileSpec("target_device", ...)`` in</span>
+<span class="sd">                ``compile_specs=`` only labels the delegate's inputs and outputs; each</span>
+<span class="sd">                engine runs on the GPU it was built on.</span>
 <span class="sd">                ``backend_config=`` takes an ``Optional[ExecutorchBackendConfig]``</span>
 <span class="sd">                and is forwarded to ``to_executorch(config=...)`` to customize</span>
 <span class="sd">                ExecuTorch lowering (e.g. memory planning or device placement).</span>
@@ -1338,9 +1340,9 @@ document.write(`
 <span class="sd">                boundary TensorRT needs for every input and output.</span>
 <span class="sd">                ``partitioners=`` appends caller partitioners after the TensorRT</span>
 <span class="sd">                partitioner, so ops TensorRT does not take can be routed to another</span>
-<span class="sd">                delegate -- e.g. a ``CudaPartitioner`` for a coalesced TensorRT +</span>
-<span class="sd">                CUDA ``.pte``. See :ref:`the ExecuTorch save guide</span>
-<span class="sd">                &lt;executorch_save&gt;` for the ``CudaPartitioner`` recipe, its</span>
+<span class="sd">                delegate, for example a ``CudaPartitioner`` for a coalesced TensorRT +</span>
+<span class="sd">                CUDA ``.pte``. See :ref:`the ExecuTorch deployment guide</span>
+<span class="sd">                &lt;executorch_deployment&gt;` for the ``CudaPartitioner`` recipe, its</span>
 <span class="sd">                export-time requirements (CUDA backend + nvcc), and the external</span>
 <span class="sd">                ``.ptd`` weight caveats.</span>
 <span class="sd">                ``constant_methods=``, ``transform_passes=`` and</span>
@@ -1353,7 +1355,8 @@ document.write(`
 <span class="sd">                TRT engines.</span>
 <span class="sd">                ``generate_etrecord=True`` writes an ETRecord to</span>
 <span class="sd">                ``&lt;model&gt;_etrecord.bin`` next to the ``.pte`` for use with the</span>
-<span class="sd">                ExecuTorch Inspector.</span>
+<span class="sd">                ExecuTorch Inspector. It does not work for a program with</span>
+<span class="sd">                TensorRT engines: writing the record raises a ``SerializeError``.</span>
 <span class="sd">                ``weight_streaming_budget_per_engine=`` takes an ``Optional[int]``</span>
 <span class="sd">                number of bytes of engine weights that may stay resident in GPU</span>
 <span class="sd">                memory, with the rest streamed from host memory. It applies to</span>
@@ -1435,7 +1438,7 @@ document.write(`
     <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">"executorch"</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">_has_executorch_exir</span><span class="p">():</span>
         <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span>
             <span class="s2">"Saving with output_format='executorch' requires executorch.exir. "</span>
-            <span class="s2">"This CUDA integration supports Linux. Setup: "</span>
+            <span class="s2">"This CUDA integration supports Linux and Windows x86-64. Setup: "</span>
             <span class="o">+</span> <span class="n">executorch_install_command</span><span class="p">()</span>
         <span class="p">)</span>
     <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">"executorch"</span><span class="p">:</span>
@@ -2077,7 +2080,8 @@ document.write(`
     <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span>
             <span class="s2">"Could not import the ExecuTorch export integration for "</span>
-            <span class="s2">"output_format='executorch'. This CUDA integration supports Linux. "</span>
+            <span class="s2">"output_format='executorch'. This CUDA integration supports Linux and "</span>
+            <span class="s2">"Windows x86-64. "</span>
             <span class="s2">"Setup: "</span> <span class="o">+</span> <span class="n">executorch_install_command</span><span class="p">()</span>
         <span class="p">)</span>
     <span class="c1"># save() only ever lowers a single method, so keep rejecting the per-method</span>
