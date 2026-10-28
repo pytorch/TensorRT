@@ -3764,8 +3764,8 @@ def turing_rejects_forward_convolution(
     """Whether a forward convolution over ``spatial_rank`` spatial dims must fall back.
 
     No valid kernel config for 3D ConvFwd on SM 7.5 for TensorRT-RTX, a known gap.
-    Transposed 3D is a distinct layer and is unaffected, so callers must only ask about
-    non-transposed convolutions.
+    Transposed convolutions have a separate, dtype-dependent guard in
+    convolution_capability_validator, so callers must only ask about forward ones.
     """
     unsupported_spatial_rank = 3
     if spatial_rank != unsupported_spatial_rank:
@@ -3787,7 +3787,8 @@ def convolution_capability_validator(
     stride > 1 with dilation > 1 on TensorRT-RTX — there is no kernel
     for this case and the build fails with "Strided & Dilated Deconv
     are currently not supported". Applies to 1D / 2D / 3D ConvTranspose;
-    regular convolutions are unaffected.
+    regular convolutions are unaffected. FP32 3D deconvolution also falls back
+    when Turing is a build target.
     """
     if not ENABLED_FEATURES.tensorrt_rtx:
         return True
@@ -3809,12 +3810,23 @@ def convolution_capability_validator(
     # aten.convolution input is (N, C, *spatial), so ndim - 2 is the spatial rank.
     # Like every validator in this module this relies on meta["val"] and fails open
     # when it is absent.
+    input_node = node.args[_CONV_ARG_INPUT]
+    val = input_node.meta.get("val") if hasattr(input_node, "meta") else None
+    spatial_rank = val.ndim - 2 if val is not None else None
     if not args_bounds_check(node.args, _CONV_ARG_TRANSPOSED):
-        input_node = node.args[_CONV_ARG_INPUT]
-        val = input_node.meta.get("val") if hasattr(input_node, "meta") else None
-        spatial_rank = val.ndim - 2 if val is not None else None
         if turing_rejects_forward_convolution(node, spatial_rank, settings):
             return False
+    elif (
+        spatial_rank == 3
+        and val.dtype == torch.float32
+        and trt_rtx_targets_turing(settings)
+    ):
+        _LOGGER.debug(
+            "FP32 3D deconvolution '%s' is not supported on TensorRT-RTX for "
+            "Turing (SM 7.5). Falling back to PyTorch.",
+            node.name,
+        )
+        return False
 
     return True
 
