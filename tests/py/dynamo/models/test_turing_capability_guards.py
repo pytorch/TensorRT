@@ -12,6 +12,9 @@ from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
     TRTInterpreter,
     set_rtx_compute_capabilities,
 )
+from torch_tensorrt.dynamo.conversion.aten_ops_converters import (
+    convolution_capability_validator,
+)
 
 TURING = (7, 5)
 
@@ -271,14 +274,15 @@ class TestTuringCapabilityGuards(TestCase):
         self.assertGreater(_trt_submodule_count(compiled), 0)
         self._assert_matches_eager(mod, compiled, inputs)
 
-    def test_declared_turing_target_keeps_transposed_conv3d_on_trt(self):
-        # Transposed 3D convolution is a distinct layer and does work on Turing.
+    def test_declared_turing_target_falls_back_fp32_transposed_conv3d(self):
+        # TensorRT-RTX rejects FP32 3D deconvolution when SM75 is any build target.
         mod = ConvTranspose3d()
         inputs = (torch.randn(1, 4, 8, 8, 8).cuda(),)
         compiled = self._compile(
             mod, inputs, target_compute_capabilities=_turing_and_current_targets()
         )
-        self.assertGreater(_trt_submodule_count(compiled), 0)
+        self.assertEqual(_trt_submodule_count(compiled), 0)
+        self._assert_matches_eager(mod, compiled, inputs)
 
     def test_declared_turing_target_falls_back_fp32_linear(self):
         mod = Linear()
@@ -408,19 +412,28 @@ class TestTuringCapabilityGuards(TestCase):
     # Asserting on the builder config rather than on compile success is what makes these
     # runnable off Turing, where an unset capability drifts silently instead of failing.
 
-    def _compute_capability_counts(self, mod, inputs, **kwargs):
-        """num_compute_capabilities of every builder config this compile produced."""
+    def _compute_capability_counts(self, mod, inputs, *, build_engine=True, **kwargs):
+        """Inspect builder configs, optionally stopping before the engine build."""
         counts = []
         original = TRTInterpreter._populate_trt_builder_config
+
+        class ConfigInspected(Exception):
+            pass
 
         def spy(interpreter, *args, **kwargs_):
             builder_config = original(interpreter, *args, **kwargs_)
             counts.append(builder_config.num_compute_capabilities)
+            if not build_engine:
+                raise ConfigInspected
             return builder_config
 
         with mock.patch.object(TRTInterpreter, "_populate_trt_builder_config", spy):
-            self._compile(mod, inputs, **kwargs)
-        self.assertTrue(counts, "no engine was built, so nothing was asserted")
+            if build_engine:
+                self._compile(mod, inputs, **kwargs)
+            else:
+                with self.assertRaises(ConfigInspected):
+                    self._compile(mod, inputs, **kwargs)
+        self.assertTrue(counts, "no builder config was inspected")
         return counts
 
     def test_refittable_build_targets_a_compute_capability_by_default(self):
@@ -431,14 +444,61 @@ class TestTuringCapabilityGuards(TestCase):
         self.assertTrue(all(count == 1 for count in counts), counts)
 
     def test_declared_target_sets_a_capability_per_declared_target(self):
+        # RTX's refittable convolution builder requires a single SM target. Inspect
+        # the actual config produced by compile without asking it to build that engine.
         targets = _turing_and_current_targets()
         counts = self._compute_capability_counts(
             Conv2d(),
             (torch.randn(1, 4, 8, 8).cuda(),),
             immutable_weights=False,
             target_compute_capabilities=targets,
+            build_engine=False,
         )
         self.assertTrue(all(count == len(targets) for count in counts), counts)
+
+
+@unittest.skipIf(
+    not ENABLED_FEATURES.tensorrt_rtx,
+    "Turing convolution guards only apply to TensorRT-RTX",
+)
+class TestTuringConvolutionValidator(TestCase):
+    """Check the guard's dtype, spatial rank and target boundaries without a GPU."""
+
+    def test_transposed_convolution_support(self):
+        cases = [
+            (3, torch.float32, [TURING], False),
+            (3, torch.float32, [(8, 9), TURING], False),
+            (3, torch.float32, [(8, 9)], True),
+            (3, torch.float16, [TURING], True),
+            (2, torch.float32, [TURING], True),
+            (1, torch.float32, [TURING], True),
+        ]
+        for rank, dtype, targets, supported in cases:
+            with self.subTest(rank=rank, dtype=dtype, targets=targets):
+                graph = torch.fx.Graph()
+                x = graph.placeholder("x")
+                x.meta["val"] = torch.empty(
+                    (1, 4) + (8,) * rank, dtype=dtype, device="meta"
+                )
+                weight = graph.placeholder("weight")
+                node = graph.call_function(
+                    torch.ops.aten.convolution.default,
+                    (
+                        x,
+                        weight,
+                        None,
+                        [1] * rank,
+                        [1] * rank,
+                        [1] * rank,
+                        True,
+                        [0] * rank,
+                        1,
+                    ),
+                )
+                settings = mock.Mock(target_compute_capabilities=targets)
+                self.assertEqual(
+                    convolution_capability_validator(node, settings), supported
+                )
 
 
 class _FakeBuilderConfig:
