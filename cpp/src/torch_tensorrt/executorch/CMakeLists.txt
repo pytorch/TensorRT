@@ -161,7 +161,24 @@ elseif(_executorch_backend_tensorrt_source_root AND
     # than a copy of it, so this stays correct if ExecuTorch changes the target
     # and so a duplicate definition is a hard error instead of two libraries.
     if(NOT _common_include_directories)
-        set(_common_include_directories "${_executorch_include_parent}")
+        set(_common_include_directories
+            "${_executorch_include_parent}"
+            "${_executorch_backend_tensorrt_source_root}/runtime/core/portable_type/c10"
+        )
+    endif()
+    # extension_cuda links executorch_core. Built standalone, no ExecuTorch build in this project
+    # defines it, so stand in the prebuilt core that the delegate links below.
+    if(NOT TARGET executorch_core)
+        if(NOT DEFINED EXECUTORCH_CORE_LIBRARY)
+            set(EXECUTORCH_CORE_LIBRARY
+                "${_executorch_backend_tensorrt_source_root}/cmake-out/libexecutorch_core.a"
+                CACHE FILEPATH "Path to the ExecuTorch core static library")
+        endif()
+        if(NOT EXISTS "${EXECUTORCH_CORE_LIBRARY}")
+            message(FATAL_ERROR "EXECUTORCH_CORE_LIBRARY='${EXECUTORCH_CORE_LIBRARY}' does not exist")
+        endif()
+        add_library(executorch_core STATIC IMPORTED)
+        set_target_properties(executorch_core PROPERTIES IMPORTED_LOCATION "${EXECUTORCH_CORE_LIBRARY}")
     endif()
     add_subdirectory(
         "${_executorch_backend_tensorrt_source_root}/extension/cuda"

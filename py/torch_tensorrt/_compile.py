@@ -829,8 +829,9 @@ def save(
                   parameter takes precedence.
         use_cuda_graphs (Optional[bool]): Bake CUDA graph replay on (True) or off
                 (False) into every TensorRT delegate for ``output_format="executorch"``.
-                None leaves the choice unset so the runtime default applies. A load-time
-                option overrides this value. Non-booleans are rejected for ExecuTorch;
+                None leaves the choice unset so the runtime default applies. A load
+                option, or a process option set to False, overrides this value.
+                Non-booleans are rejected for ExecuTorch;
                 other formats ignore non-None values with a warning. Use this keyword,
                 not a raw ``CompileSpec("use_cuda_graphs", ...)``.
         kwargs: Additional format-specific kwargs. ``partitioners=``,
@@ -839,8 +840,9 @@ def save(
                 ``weight_streaming_budget_per_engine=``, ``zero_copy_kv=`` and
                 ``external_engine_data=`` are
                 only used with ``output_format="executorch"``; otherwise they are
-                ignored with a warning. Pass ``compile_specs=[CompileSpec("target_device",
-                b"cuda:<i>")]`` to override the default target device (``cuda:0``).
+                ignored with a warning. A ``CompileSpec("target_device", ...)`` in
+                ``compile_specs=`` only labels the delegate's inputs and outputs; each
+                engine runs on the GPU it was built on.
                 ``backend_config=`` takes an ``Optional[ExecutorchBackendConfig]``
                 and is forwarded to ``to_executorch(config=...)`` to customize
                 ExecuTorch lowering (e.g. memory planning or device placement).
@@ -848,9 +850,9 @@ def save(
                 boundary TensorRT needs for every input and output.
                 ``partitioners=`` appends caller partitioners after the TensorRT
                 partitioner, so ops TensorRT does not take can be routed to another
-                delegate -- e.g. a ``CudaPartitioner`` for a coalesced TensorRT +
-                CUDA ``.pte``. See :ref:`the ExecuTorch save guide
-                <executorch_save>` for the ``CudaPartitioner`` recipe, its
+                delegate, for example a ``CudaPartitioner`` for a coalesced TensorRT +
+                CUDA ``.pte``. See :ref:`the ExecuTorch deployment guide
+                <executorch_deployment>` for the ``CudaPartitioner`` recipe, its
                 export-time requirements (CUDA backend + nvcc), and the external
                 ``.ptd`` weight caveats.
                 ``constant_methods=``, ``transform_passes=`` and
@@ -863,7 +865,8 @@ def save(
                 TRT engines.
                 ``generate_etrecord=True`` writes an ETRecord to
                 ``<model>_etrecord.bin`` next to the ``.pte`` for use with the
-                ExecuTorch Inspector.
+                ExecuTorch Inspector. It does not work for a program with
+                TensorRT engines: writing the record raises a ``SerializeError``.
                 ``weight_streaming_budget_per_engine=`` takes an ``Optional[int]``
                 number of bytes of engine weights that may stay resident in GPU
                 memory, with the rest streamed from host memory. It applies to
@@ -945,7 +948,7 @@ def save(
     if output_format == "executorch" and not _has_executorch_exir():
         raise ImportError(
             "Saving with output_format='executorch' requires executorch.exir. "
-            "This CUDA integration supports Linux. Setup: "
+            "This CUDA integration supports Linux and Windows x86-64. Setup: "
             + executorch_install_command()
         )
     if output_format == "executorch":
@@ -1586,7 +1589,8 @@ def _save_as_executorch(exp_program: Any, file_path: str, **kwargs: Any) -> None
     except ImportError:
         raise ImportError(
             "Could not import the ExecuTorch export integration for "
-            "output_format='executorch'. This CUDA integration supports Linux. "
+            "output_format='executorch'. This CUDA integration supports Linux and "
+            "Windows x86-64. "
             "Setup: " + executorch_install_command()
         )
     # save() only ever lowers a single method, so keep rejecting the per-method
