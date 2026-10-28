@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=ede72c6b"></script>
+    <script src="../../_static/documentation_options.js?v=3fea7915"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -561,44 +561,41 @@ requires CUDA 13. Ordinary Torch-TensorRT builds keep their separate CUDA 12 sup
 <hr class="docutils" />
 <section id="installation">
 <h2>Installation<a class="headerlink" href="#installation" title="Link to this heading">#</a></h2>
-<p>Install Torch-TensorRT with the <code class="docutils literal notranslate"><span class="pre">executorch</span></code> extra from the PyTorch channel for your CUDA
-version. Swap <code class="docutils literal notranslate"><span class="pre">cu132</span></code> for <code class="docutils literal notranslate"><span class="pre">cu134</span></code> on CUDA 13.4:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"torch-tensorrt[executorch]"</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--index-url<span class="w"> </span>https://download.pytorch.org/whl/cu132<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--extra-index-url<span class="w"> </span>https://pypi.org/simple
+<p>One command installs everything: PyTorch, Torch-TensorRT, TensorRT, the CUDA build of
+ExecuTorch, and the TensorRT delegate. Use a fresh virtual environment.</p>
+<section id="releases">
+<h3>Releases<a class="headerlink" href="#releases" title="Link to this heading">#</a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"torch_tensorrt[executorch]"</span>
 </pre></div>
 </div>
-<p>The PyTorch channel is needed because the CUDA build of ExecuTorch is published only there.</p>
-<section id="what-the-command-installs">
-<h3>What the command installs<a class="headerlink" href="#what-the-command-installs" title="Link to this heading">#</a></h3>
-<ul class="simple">
-<li><p>ExecuTorch, the CUDA build, from the <code class="docutils literal notranslate"><span class="pre">executorch</span></code> extra. That is all you need to export.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">torch-tensorrt-executorch-runtime</span></code>, one shared library holding the TensorRT delegate,
-which you need to run a <code class="docutils literal notranslate"><span class="pre">.pte</span></code>. The extra installs the one built together with your
-Torch-TensorRT wheel, for the same CUDA version. It requires the exact ExecuTorch build
-it was compiled against, so you get that one rather than the newest.</p></li>
-</ul>
-<p>This works for the standard Linux (x86-64 and aarch64) and Windows x86-64 wheels. On aarch64
-it needs glibc 2.35 or newer, the same as TensorRT itself. The TensorRT-RTX and Python-only
-builds have no delegate.</p>
-<p>Use a fresh virtual environment. To export a coalesced program you also need a CUDA toolkit,
-because ExecuTorch’s CUDA backend compiles the leftover operators with <code class="docutils literal notranslate"><span class="pre">nvcc</span></code>.</p>
+<p>This installs the CUDA 13.2 builds. On Windows, PyPI has only the CPU builds of PyTorch and
+ExecuTorch, so add <code class="docutils literal notranslate"><span class="pre">--extra-index-url</span> <span class="pre">https://download.pytorch.org/whl/cu132</span></code>.</p>
 </section>
 <section id="nightly-builds">
 <h3>Nightly builds<a class="headerlink" href="#nightly-builds" title="Link to this heading">#</a></h3>
 <p>To pick up a change before it ships, or to report a problem against <code class="docutils literal notranslate"><span class="pre">main</span></code>:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>--pre<span class="w"> </span>--upgrade<span class="w"> </span><span class="s2">"torch-tensorrt[executorch]"</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--index-url<span class="w"> </span>https://download.pytorch.org/whl/nightly/cu132<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--extra-index-url<span class="w"> </span>https://pypi.org/simple
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>--pre<span class="w"> </span><span class="s2">"torch_tensorrt[executorch]"</span><span class="w"> </span>--index-url<span class="w"> </span>https://download.pytorch.org/whl/nightly/cu132
 </pre></div>
 </div>
+<p>Swap <code class="docutils literal notranslate"><span class="pre">cu132</span></code> for <code class="docutils literal notranslate"><span class="pre">cu134</span></code> on CUDA 13.4.</p>
+</section>
+<section id="what-these-commands-install">
+<h3>What these commands install<a class="headerlink" href="#what-these-commands-install" title="Link to this heading">#</a></h3>
 <ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">--pre</span></code> is required. Without it pip takes the stable release instead.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">--upgrade</span></code> is required if a nightly is already installed, or pip keeps the old one and
-tells you nothing.</p></li>
-<li><p>PyPI stays in the list because TensorRT is not published on the nightly channel.</p></li>
-<li><p>Keep PyTorch, ExecuTorch and Torch-TensorRT on the same channel.</p></li>
+<li><p>PyTorch and TensorRT, which Torch-TensorRT depends on.</p></li>
+<li><p>ExecuTorch, the CUDA build. That is all you need to export.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">torch-tensorrt-executorch-runtime</span></code>, one shared library holding the TensorRT delegate,
+which you need to run a <code class="docutils literal notranslate"><span class="pre">.pte</span></code>. It is the one built together with your Torch-TensorRT wheel,
+for the same CUDA version. It requires the exact ExecuTorch build it was compiled against, so
+you get that one rather than the newest.</p></li>
 </ul>
+<p>A wheel you build yourself does not bring the delegate. Build it as well, as the runtime wheel
+README shows.</p>
+<p>The delegate is built for the standard Linux wheels (x86-64 and aarch64), and for Windows x86-64.
+On aarch64 it needs glibc 2.35 or newer, the same as TensorRT itself.
+The TensorRT-RTX and Python-only builds have no delegate. To export a coalesced program you also
+need a CUDA toolkit, because ExecuTorch’s CUDA backend compiles the leftover operators with
+<code class="docutils literal notranslate"><span class="pre">nvcc</span></code>.</p>
 </section>
 </section>
 <hr class="docutils" />
@@ -1093,8 +1090,9 @@ C++, including the green-context option.</p></li>
   <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#installation">Installation</a><ul class="visible nav section-nav flex-column">
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#what-the-command-installs">What the command installs</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#releases">Releases</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nightly-builds">Nightly builds</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#what-these-commands-install">What these commands install</a></li>
 </ul>
 </li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#compile-and-save">Compile and Save</a><ul class="visible nav section-nav flex-column">

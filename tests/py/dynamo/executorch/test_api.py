@@ -2465,8 +2465,8 @@ def test_packaging_declares_executorch_extra():
         assert extra_name in extras_by_name
         requirements = extras_by_name[extra_name]
         assert isinstance(requirements, ast.List)
-        # Authoring follows the source pin. The companion is installed explicitly
-        # because its published ABI pins can lag a new source dependency version.
+        # Authoring follows the source pin. A published build adds its companion after
+        # this literal, where its own index also carries the ExecuTorch the companion pins.
         named = [e.id for e in requirements.elts if isinstance(e, ast.Name)]
         assert named == ["EXECUTORCH_REQUIREMENT"], named
 
