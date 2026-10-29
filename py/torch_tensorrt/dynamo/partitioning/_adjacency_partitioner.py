@@ -50,6 +50,8 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
         # Keep impure refusals out of the counters used to decide full support.
         self.fallback_operators: Dict[str, int] = {}
         self.fallback_reasons: Dict[str, Set[str]] = {}
+        self.node_support: Dict[str, bool] = {}
+        self.node_reasons: Dict[str, Set[str]] = {}
         self.torch_executed_ops = torch_executed_ops
         self._non_target_device_cache: Dict[torch.fx.Node, bool] = {}
         self.torch_executed_modules = torch_executed_modules
@@ -57,6 +59,7 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
     def _record_fallback(
         self, node: torch.fx.Node, node_name: str, reason: str
     ) -> None:
+        self.node_reasons.setdefault(node.name, set()).add(reason)
         # Structural nodes must not make a fully supported graph report fallback.
         if node.op in CALLABLE_NODE_OPS:
             self.fallback_operators[node_name] = (
@@ -65,6 +68,13 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
             self.fallback_reasons.setdefault(node_name, set()).add(reason)
 
     def is_node_supported(
+        self, submodules: Dict[str, torch.nn.Module], node: torch.fx.Node
+    ) -> bool:
+        supported = self._is_node_supported(submodules, node)
+        self.node_support[node.name] = supported
+        return supported
+
+    def _is_node_supported(
         self, submodules: Dict[str, torch.nn.Module], node: torch.fx.Node
     ) -> bool:
         node_name = ConverterRegistry.qualified_name_or_str(node.target)
@@ -303,6 +313,10 @@ class TRTPartitioner(_SplitterBase):  # type: ignore
                         "Eliminating acc subgraph because it's smaller than the threshold: "
                         f"{len(subgraph.nodes)} < {self.settings.min_acc_module_size}"
                     )
+                    for node in subgraph.nodes:
+                        node.meta["_torchtrt_partition_fallback_reason"] = (
+                            "below_min_block_size"
+                        )
                     if result:
                         result[-1].nodes.extend(subgraph.nodes)
                     else:

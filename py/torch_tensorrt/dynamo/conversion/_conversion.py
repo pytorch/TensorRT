@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, NamedTuple, Optional, Sequence, Tuple
 
+import tensorrt as trt
 import torch
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
@@ -192,7 +193,7 @@ def pull_cached_engine(
             # The serialization config keeps its engine alive, so free both.
             del engine, serialization_config
 
-        return SerializedInterpreterResult(
+        serialized_interpreter_result = SerializedInterpreterResult(
             serialized_engine=serialized_engine,
             input_names=input_names,
             output_names=output_names,
@@ -211,6 +212,12 @@ def pull_cached_engine(
                 )
             ),
         )
+        # Record a cache hit only after compatibility checks, refitting, and
+        # result reconstruction have all completed successfully.
+        from torch_tensorrt.dynamo._reporting import record_cache_hit
+
+        record_cache_hit()
+        return serialized_interpreter_result
     return None
 
 
@@ -414,6 +421,9 @@ def convert_module(
     serialized_interpreter_result = interpret_module_to_result(
         module, inputs, settings, engine_cache=engine_cache
     )
+    from torch_tensorrt.dynamo._reporting import record_engine_metadata
+
+    record_engine_metadata(name, serialized_interpreter_result)
 
     if not ENABLED_FEATURES.torch_tensorrt_runtime:
         logger.info(

@@ -3,9 +3,23 @@
 
 import os
 import sys
-from typing import Any, Dict, Optional
+import threading
+from typing import Any, Dict, Optional, Protocol
 
 import tensorrt as trt
+from torch_tensorrt.reporting import EventKind, Stage, current_emitter
+
+
+class _TerminalProgressMonitor(Protocol):
+    def __init__(self, engine_name: str = "") -> None: ...
+
+    def phase_start(
+        self, phase_name: str, parent_phase: Optional[str], num_steps: int
+    ) -> None: ...
+
+    def phase_finish(self, phase_name: str) -> None: ...
+
+    def step_complete(self, phase_name: str, step: int) -> bool: ...
 
 
 class _ASCIIMonitor(trt.IProgressMonitor):  # type: ignore
@@ -35,14 +49,14 @@ class _ASCIIMonitor(trt.IProgressMonitor):  # type: ignore
             }
             self._redraw()
         except KeyboardInterrupt:
-            _step_result = False
+            self._step_result = False
 
     def phase_finish(self, phase_name: str) -> None:
         try:
             del self._active_phases[phase_name]
             self._redraw(blank_lines=1)  # Clear the removed phase.
         except KeyboardInterrupt:
-            _step_result = False
+            self._step_result = False
 
     def step_complete(self, phase_name: str, step: int) -> bool:
         try:
@@ -129,7 +143,7 @@ try:
                 self._progress_monitors.refresh()
             except KeyboardInterrupt:
                 # The phase_start callback cannot directly cancel the build, so request the cancellation from within step_complete.
-                _step_result = False
+                self._step_result = False
 
         def phase_finish(self, phase_name: str) -> None:
             try:
@@ -140,7 +154,7 @@ try:
                 self._progress_monitors.remove_task(self._active_phases[phase_name])
                 self._progress_monitors.refresh()
             except KeyboardInterrupt:
-                _step_result = False
+                self._step_result = False
 
         def step_complete(self, phase_name: str, step: int) -> bool:
             try:
@@ -157,6 +171,117 @@ try:
             if self._progress_monitors:
                 self._progress_monitors.stop()
 
-    TRTBulderMonitor: trt.IProgressMonitor = _RichMonitor
+    _TerminalMonitorClass: type[_TerminalProgressMonitor] = _RichMonitor
 except ImportError:
-    TRTBulderMonitor: trt.IProgressMonitor = _ASCIIMonitor  # type: ignore[no-redef]
+    _TerminalMonitorClass = _ASCIIMonitor
+
+
+class _ProgressEvents:
+    """Emit bounded, thread-safe progress events from native builder callbacks."""
+
+    _BUCKETS = 100
+
+    def __init__(self, engine_name: str = "") -> None:
+        self._event_emitter = current_emitter()
+        if not engine_name:
+            from torch_tensorrt.dynamo._reporting import current_collector
+
+            collector = current_collector()
+            engine_name = collector.active_engine if collector else ""
+        self._engine_name = engine_name
+        self._phases: Dict[str, tuple[Optional[str], int, int]] = {}
+        self._lock = threading.RLock()
+
+    def _emit(
+        self,
+        phase_name: str,
+        parent_phase: Optional[str],
+        completed: int,
+        total: int,
+    ) -> None:
+        if self._event_emitter is not None:
+            self._event_emitter.emit(
+                Stage.BUILD,
+                EventKind.PROGRESS,
+                self._engine_name,
+                {
+                    "phase": phase_name,
+                    "parent_phase": parent_phase,
+                    "completed": completed,
+                    "total": total,
+                },
+            )
+
+    def phase_start(
+        self, phase_name: str, parent_phase: Optional[str], num_steps: int
+    ) -> None:
+        with self._lock:
+            self._phases[phase_name] = (parent_phase, num_steps, 0)
+            self._emit(phase_name, parent_phase, 0, num_steps)
+
+    def step_complete(self, phase_name: str, step: int) -> None:
+        with self._lock:
+            phase = self._phases.get(phase_name)
+            if phase is None:
+                return
+            parent_phase, total, last_bucket = phase
+            if total <= 0:
+                return
+            bucket = max(0, min(self._BUCKETS, step * self._BUCKETS // total))
+            # phase_finish emits the final state; intermediate events are limited
+            # to one per percentage bucket to avoid slowing TensorRT callbacks.
+            if bucket <= last_bucket or bucket >= self._BUCKETS:
+                return
+            self._phases[phase_name] = (parent_phase, total, bucket)
+            self._emit(phase_name, parent_phase, step, total)
+
+    def phase_finish(self, phase_name: str) -> None:
+        with self._lock:
+            parent_phase, total, _ = self._phases.pop(phase_name, (None, 0, 0))
+            self._emit(phase_name, parent_phase, total, total)
+
+
+class ReportingBuilderMonitor(trt.IProgressMonitor):  # type: ignore[misc]
+    """Forward terminal progress while emitting report-aware progress events."""
+
+    def __init__(self, engine_name: str = "") -> None:
+        super().__init__()
+        self._progress_events = _ProgressEvents(engine_name)
+        self._terminal_monitor = _TerminalMonitorClass(engine_name)
+
+    def phase_start(
+        self, phase_name: str, parent_phase: Optional[str], num_steps: int
+    ) -> None:
+        self._progress_events.phase_start(phase_name, parent_phase, num_steps)
+        self._terminal_monitor.phase_start(phase_name, parent_phase, num_steps)
+
+    def phase_finish(self, phase_name: str) -> None:
+        self._progress_events.phase_finish(phase_name)
+        self._terminal_monitor.phase_finish(phase_name)
+
+    def step_complete(self, phase_name: str, step: int) -> bool:
+        self._progress_events.step_complete(phase_name, step)
+        return self._terminal_monitor.step_complete(phase_name, step)
+
+
+TRTBulderMonitor = ReportingBuilderMonitor
+
+
+class EventBuilderMonitor(trt.IProgressMonitor):  # type: ignore[misc]
+    """Native progress events without terminal rendering for report-aware jobs."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._progress_events = _ProgressEvents()
+
+    def phase_start(
+        self, phase_name: str, parent_phase: Optional[str], num_steps: int
+    ) -> None:
+        self._progress_events.phase_start(phase_name, parent_phase, num_steps)
+
+    def phase_finish(self, phase_name: str) -> None:
+        self._progress_events.phase_finish(phase_name)
+
+    def step_complete(self, phase_name: str, step: int) -> bool:
+        self._progress_events.step_complete(phase_name, step)
+        return True
