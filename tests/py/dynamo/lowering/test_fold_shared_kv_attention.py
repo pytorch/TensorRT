@@ -8,6 +8,7 @@ import torch.nn.functional as F
 import torch_tensorrt
 from parameterized import parameterized
 from torch._dynamo.backends.common import aot_autograd
+from torch._export.utils import _get_decomp_for_cia
 from torch._functorch.aot_autograd import aot_export_joint_simple
 from torch.fx.experimental.proxy_tensor import make_fx
 from torch_tensorrt.dynamo import CompilationSettings
@@ -104,8 +105,8 @@ class TestFoldSharedKVAttention(unittest.TestCase):
         module = RepeatKVAttention(8, 1, 16).eval()
         decompositions = get_decompositions()
         # Exercise the decomposed form even on PyTorch versions that preserve matmul.
-        decompositions.update(
-            torch._decomp.get_decompositions([torch.ops.aten.matmul.default])
+        decompositions[torch.ops.aten.matmul.default] = _get_decomp_for_cia(
+            torch.ops.aten.matmul.default
         )
 
         def fold(gm, example_inputs):
@@ -307,13 +308,9 @@ class TestFoldSharedKVAttention(unittest.TestCase):
             torch.randn(*x_shape, device="cuda"),
             torch.randn(*kv_shape, device="cuda"),
         )
-        decompositions = get_decompositions()
-        decompositions.update(
-            torch._decomp.get_decompositions([torch.ops.aten.matmul.default])
-        )
         graphs = (
             _lowered(Module(), inputs),
-            make_fx(Module(), decomposition_table=decompositions)(*inputs),
+            make_fx(Module(), decomposition_table=get_decompositions())(*inputs),
         )
         for gm in graphs:
             with self.subTest(targets=_targets(gm)):
