@@ -857,6 +857,44 @@ def test_python_only_build_can_export_a_pte(tmp_path):
     assert output.stat().st_size > 0
 
 
+def test_engine_with_data_dependent_shape_only_inside_exports_a_pte(tmp_path):
+    """The boolean mask selection has a data-dependent shape, the engine output does not."""
+
+    class MaskedSum(torch.nn.Module):
+        def forward(self, value, mask):
+            return value + value[mask].sum()
+
+    class MaskedRows(torch.nn.Module):
+        def forward(self, value, mask):
+            return value[mask] * 2
+
+    value = torch.randn(10, 4, device="cuda")
+    mask = torch.arange(10, device="cuda") % 3 == 0
+
+    def save(model):
+        exported = torch.export.export(model.eval().cuda(), (value, mask))
+        compiled = torch_tensorrt.dynamo.compile(
+            exported,
+            arg_inputs=[value, mask],
+            min_block_size=1,
+            pass_through_build_failures=True,
+        )
+        output = tmp_path / f"{type(model).__name__}.pte"
+        torch_tensorrt.save(
+            compiled,
+            str(output),
+            output_format="executorch",
+            arg_inputs=(value, mask),
+            retrace=False,
+        )
+        return output
+
+    assert save(MaskedSum()).stat().st_size > 0
+    # An output shape that depends on the data still needs an output allocator.
+    with pytest.raises(RuntimeError, match="output allocator"):
+        save(MaskedRows())
+
+
 @pytest.mark.unit
 def test_lowering_stores_the_staged_engine_bytes_as_named_data(monkeypatch, caplog):
     """The rewrite stages each engine as ``bytes``, and lowering must hand that same

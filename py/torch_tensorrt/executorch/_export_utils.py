@@ -12,6 +12,10 @@ import torch
 from torch._library.fake_class_registry import FakeScriptObject
 from torch._subclasses.fake_tensor import is_fake
 from torch.export.graph_signature import InputKind
+from torch.fx.experimental.symbolic_shapes import (
+    guarding_hint_or_throw,
+    has_guarding_hint,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +94,29 @@ def get_engine_info_from_state(
         _warn_missing_accessor("serialize_metadata_only")
     state = engine_obj.__getstate__()
     return list(state[0] if isinstance(state, tuple) else state)
+
+
+def _outputs_depend_on_data(engine_obj: Any, node: Any) -> bool:
+    """Whether the engine leaves an output shape unknown for this node's input shapes.
+
+    Torch-TensorRT marks an engine as needing an output allocator when any of its
+    operations has a data-dependent shape, which also keeps CUDA graphs off for it.
+    Only an output with such a shape needs the allocator ExecuTorch lacks.
+    """
+    input_shapes = []
+    for arg in node.args[0]:
+        val = arg.meta.get("val") if isinstance(arg, torch.fx.Node) else None
+        if not isinstance(val, torch.Tensor):
+            return True
+        if not all(has_guarding_hint(dim) for dim in val.shape):
+            return True
+        input_shapes.append([guarding_hint_or_throw(dim) for dim in val.shape])
+    try:
+        output_shapes = engine_obj.infer_outputs(input_shapes)
+    except RuntimeError:
+        # The C++ engine cannot create a tensor for an unknown dimension.
+        return True
+    return any(-1 in tuple(getattr(shape, "shape", shape)) for shape in output_shapes)
 
 
 def validate_engine_info(engine_info: Sequence[Any], *, node_name: str = "") -> None:
@@ -237,6 +264,10 @@ def validate_engine_program(
     which never reads a cached record's ENGINE_IDX -- so a metadata-only record is
     never cross-served as the engine bytes.
     """
+    from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
+        REQUIRES_OUTPUT_ALLOCATOR_IDX,
+    )
+
     count = 0
     # One engine can feed several execute_engine nodes, and resolving it again would
     # serialize it again and keep a second copy of the bytes.
@@ -263,6 +294,19 @@ def validate_engine_program(
             )
             if engine_node is not None:
                 by_engine_node[engine_node] = engine_info
+        if (
+            node.target is torch.ops.tensorrt.execute_engine.default
+            and len(engine_info) > REQUIRES_OUTPUT_ALLOCATOR_IDX
+            and str(engine_info[REQUIRES_OUTPUT_ALLOCATOR_IDX]) == "1"
+            and not _outputs_depend_on_data(
+                _resolve_engine_object(exported_program, node), node
+            )
+        ):
+            # Every output shape is known, so ExecuTorch needs no output allocator.
+            # This record becomes the ExecuTorch engine's arguments, and the backend
+            # refuses a marked one.
+            engine_info = list(engine_info)
+            engine_info[REQUIRES_OUTPUT_ALLOCATOR_IDX] = "0"
         validate_engine_info(engine_info, node_name=node.name)
         if resolved is not None:
             resolved[node.name] = engine_info
