@@ -14,6 +14,10 @@
 #include "NvInfer.h"
 #include "core/runtime/RuntimeSettings.h"
 
+namespace nvinfer1 {
+class IRuntimeConfig; // TensorRT 10.11 and later; see TRTRuntimeConfig::config
+} // namespace nvinfer1
+
 namespace torch_tensorrt {
 namespace core {
 namespace runtime {
@@ -56,10 +60,10 @@ struct TRTRuntimeConfig {
       nvinfer1::IExecutionContext* exec_ctx,
       cudaStream_t stream) const;
 
-#ifdef TRT_HAS_IRUNTIME_CONFIG
-  // Lazy-constructed live config. `nullptr` until first `ensure_initialized`.
+  // Lazy-constructed live config. `nullptr` until first `ensure_initialized`,
+  // and always without TRT_HAS_IRUNTIME_CONFIG. Declared in every build, so
+  // that TRTEngine's layout does not depend on that macro (see TRTEngine.h).
   std::shared_ptr<nvinfer1::IRuntimeConfig> config;
-#endif
 
  private:
   RuntimeSettings settings_;
