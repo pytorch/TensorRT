@@ -351,8 +351,10 @@ Graph Partitioning
        slower depending on the GPU, so measure it. In FP16 the result can round
        differently; ``use_fp32_acc=True`` reduces that. Only static shapes are
        rewritten, and ``scaled_dot_product_attention`` also needs
-       ``decompose_attention=True``. The setting has no effect under ``torch.compile``
-       with ``use_distributed_mode_trace``.
+       ``decompose_attention=True``. Both preserved matmuls and the reshape/``bmm``
+       form produced by AOT tracing under ``torch.compile`` are supported for
+       ``repeat_kv`` style graphs. In the ``bmm`` form, broadcasting a single KV
+       head with ``enable_gqa=True`` is not folded.
 
 ----
 

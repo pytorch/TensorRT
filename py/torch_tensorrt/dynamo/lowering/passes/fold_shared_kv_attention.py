@@ -16,10 +16,9 @@ matrix products instead of its fused kernel, so float16 results round
 differently. ``use_fp32_acc`` accumulates each matrix product in float32.
 
 Only matmuls with static shapes are rewritten. ``scaled_dot_product_attention``
-becomes matmuls only with ``decompose_attention``. Under ``torch.compile``,
-``use_distributed_mode_trace`` lowers matmuls to ``bmm`` before this pass, and
-``torch.compile`` turns it on by itself for multi-process ``torch.distributed``
-jobs and for graphs that use vmap.
+becomes matmuls only with ``decompose_attention``. AOT tracing under
+``torch.compile`` can lower matmuls to reshapes and ``bmm``; this pass also
+recognizes that form when the reshapes only flatten the batch and head dims.
 """
 
 import logging
@@ -86,6 +85,28 @@ def _shared_kv(node: torch.fx.Node) -> Optional[torch.fx.Node]:
     return source
 
 
+def _unflatten_bmm_operand(node: torch.fx.Node) -> Optional[torch.fx.Node]:
+    """Recover a 4D matmul operand flattened to (batch * heads, rows, cols)."""
+    if not isinstance(node, torch.fx.Node) or node.target not in _RESHAPES:
+        return None
+    source = node.args[0]
+    if _is_call(source, aten.clone.default):
+        source = source.args[0]
+    if _is_call(source, aten.expand.default):
+        # A matmul decomposition may insert an identity expand before flattening.
+        # Broadcasting here would change which batch/head reads each KV tensor.
+        if _static_shape(source) != _static_shape(source.args[0]):
+            return None
+        source = source.args[0]
+    shape = _static_shape(source)
+    if shape is None or len(shape) != 4:
+        return None
+    batch, heads, rows, cols = shape
+    if _static_shape(node) != (batch * heads, rows, cols):
+        return None
+    return source
+
+
 def _add(
     gm: torch.fx.GraphModule,
     target: torch._ops.OpOverload,
@@ -111,9 +132,24 @@ def fold_shared_kv_attention(
         return gm
     folded = 0
     for node in list(gm.graph.nodes):
-        if node.op != "call_function" or node.target != aten.matmul.default:
+        if node.op != "call_function" or node.target not in (
+            aten.matmul.default,
+            aten.bmm.default,
+        ):
             continue
         lhs, rhs = node.args
+        if node.target == aten.bmm.default:
+            lhs = _unflatten_bmm_operand(lhs)
+            rhs = _unflatten_bmm_operand(rhs)
+            lhs_shape, rhs_shape = _static_shape(lhs), _static_shape(rhs)
+            if lhs_shape is None or rhs_shape is None or lhs_shape[:2] != rhs_shape[:2]:
+                continue
+            if _static_shape(node) != (
+                lhs_shape[0] * lhs_shape[1],
+                lhs_shape[2],
+                rhs_shape[-1],
+            ):
+                continue
         transpose = _is_call(rhs, aten.permute.default) and list(rhs.args[1]) == [
             0,
             1,
@@ -128,9 +164,12 @@ def fold_shared_kv_attention(
         out_shape = _static_shape(node)
         if source is None or lhs_shape is None or out_shape is None:
             continue
-        if len(lhs_shape) != 4 or lhs_shape[:2] != out_shape[:2]:
+        if len(lhs_shape) != 4:
             continue
         batch, heads, rows, inner = lhs_shape
+        if node.target == aten.matmul.default:
+            if lhs_shape[:2] != out_shape[:2]:
+                continue
         with gm.graph.inserting_before(node):
             folded_lhs = _add(
                 gm,
@@ -159,10 +198,8 @@ def fold_shared_kv_attention(
             "fold_shared_kv_attention is on but found nothing to fold in this graph. "
             "It needs exactly one key/value head, "
             "static shapes, and decompose_attention=True for "
-            "scaled_dot_product_attention. It does not apply under torch.compile "
-            "with use_distributed_mode_trace, which torch.compile also turns on by "
-            "itself for multi-process torch.distributed jobs and for graphs that use "
-            "vmap. This is logged once per graph, so a torch.cond branch or a graph "
+            "scaled_dot_product_attention. This is logged once per graph, so a "
+            "torch.cond branch or a graph "
             "split off by a graph break can log it even when other attention folded."
         )
     return gm
