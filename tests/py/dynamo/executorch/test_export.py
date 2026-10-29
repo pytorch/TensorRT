@@ -873,6 +873,7 @@ def test_python_only_build_can_export_a_pte(tmp_path):
     assert output.stat().st_size > 0
 
 
+@pytest.mark.unit
 def test_engine_with_data_dependent_shape_only_inside_exports_a_pte(tmp_path):
     """The boolean mask selection has a data-dependent shape, the engine output does not."""
 
