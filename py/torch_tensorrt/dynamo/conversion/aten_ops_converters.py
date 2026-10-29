@@ -1762,8 +1762,8 @@ def select_validator(
     identity layer, so the gather's uint8 result fails the engine build, as it does
     for aten.gather.
     """
-    meta = getattr(args_bounds_check(node.args, 0), "meta", {}).get("val")
-    if isinstance(meta, torch.Tensor) and meta.dtype == torch.uint8:
+    meta = getattr(args_bounds_check(node.args, 0), "meta", {})
+    if getattr(meta.get("val", meta.get("tensor_meta")), "dtype", None) == torch.uint8:
         _LOGGER.debug("select of a uint8 tensor is not supported, falling back")
         return False
     return True

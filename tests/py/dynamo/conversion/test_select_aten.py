@@ -5,8 +5,10 @@ import torch
 import torch.nn as nn
 import torch_tensorrt
 from parameterized import parameterized
+from torch.fx.passes.shape_prop import ShapeProp
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
+from torch_tensorrt.dynamo.conversion.aten_ops_converters import select_validator
 
 from .harness import DispatchTestCase
 
@@ -179,6 +181,17 @@ class TestSelectConverterOne(DispatchTestCase):
             pass_through_build_failures=True,
         )
         torch.testing.assert_close(compiled(frames), model(frames))
+
+    def test_select_validator_reads_tensor_meta(self):
+        class Select(nn.Module):
+            def forward(self, frames):
+                return torch.ops.aten.select.int(frames, 0, 1)
+
+        graph_module = torch.fx.symbolic_trace(Select())
+        ShapeProp(graph_module).propagate(torch.zeros(2, 4, dtype=torch.uint8))
+        node = next(n for n in graph_module.graph.nodes if n.op == "call_function")
+        self.assertNotIn("val", node.args[0].meta)
+        self.assertFalse(select_validator(node))
 
 
 if __name__ == "__main__":
