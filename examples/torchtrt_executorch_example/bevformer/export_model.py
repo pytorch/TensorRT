@@ -6,10 +6,12 @@ accuracy. Keep the entire output directory, including any external .ptd files.
 """
 
 import argparse
+import contextlib
 import json
 from pathlib import Path
 
 import torch
+import torch._inductor.config as inductor_config
 import torch_tensorrt
 from executorch.backends.cuda.cuda_backend import CudaBackend
 from executorch.backends.cuda.cuda_partitioner import CudaPartitioner
@@ -80,18 +82,24 @@ def main():
         compare(compiled(*inputs), expected, "TensorRT graph")
         print("Saving ExecuTorch program", flush=True)
         path = args.output_dir / "bevformer_tiny.pte"
-        torch_tensorrt.save(
-            compiled,
-            str(path),
-            output_format="executorch",
-            arg_inputs=inputs,
-            retrace=False,
-            partitioners=[
-                CudaPartitioner(
-                    [CudaBackend.generate_method_name_compile_spec("forward")]
-                )
-            ],
+        geometry_numerics = (
+            inductor_config.patch({"eager_numerics.division_rounding": True})
+            if args.cuda_geometry
+            else contextlib.nullcontext()
         )
+        with geometry_numerics:
+            torch_tensorrt.save(
+                compiled,
+                str(path),
+                output_format="executorch",
+                arg_inputs=inputs,
+                retrace=False,
+                partitioners=[
+                    CudaPartitioner(
+                        [CudaBackend.generate_method_name_compile_spec("forward")]
+                    )
+                ],
+            )
         serialized = deserialize_pte_binary(path.read_bytes()).program
         delegates = [
             delegate.id
@@ -106,7 +114,9 @@ def main():
         import torch_tensorrt_executorch_runtime  # noqa: F401
         from executorch.runtime import Runtime
 
-        method = Runtime.get().load_program(path).load_method("forward")
+        data = args.output_dir / "aoti_cuda_blob.ptd"
+        data_args = {"data_path": data} if data.is_file() else {}
+        method = Runtime.get().load_program(path, **data_args).load_method("forward")
         results = []
         for seed, history in ((7, False), (19, True), (51, True)):
             samples = example_inputs(seed=seed, history=history)
@@ -120,8 +130,8 @@ def main():
             {"inputs": cpu_inputs, "outputs": expected},
             args.output_dir / "reference.pt",
         )
-        # Raw tensors are for a future native file-input harness, not the
-        # existing all-ones smoke runner. Little-endian FP32, row-major.
+        # Diagnostic snapshot. Use prepare_native_cases.py for the complete
+        # fixture format consumed by native_validation. Little-endian FP32.
         for index, tensor in enumerate(cpu_inputs):
             tensor.contiguous().numpy().tofile(args.output_dir / f"input_{index}.bin")
         for index, tensor in enumerate(expected):

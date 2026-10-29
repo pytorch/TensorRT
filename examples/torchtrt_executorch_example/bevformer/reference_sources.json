@@ -6,6 +6,8 @@
     "torchvision": "v0.10.1"
   },
   "sha256": {
+    "upstream/BEVFormer/projects/mmdet3d_plugin/core/bbox/util.py": "d24c61941209fa7a7be18d3b4c628dc06006f692fde0e7863fb54bca50282beb",
+    "upstream/BEVFormer/projects/mmdet3d_plugin/core/bbox/coders/nms_free_coder.py": "f9cd5871541d3074b29bcdb0a4f458cd2e1164fcefe3379890e6d59bb1ea66bb",
     "upstream/mmdet/resnet.py": "b200eb889837bfcb31bf8e7082f452ecc44bd277dd8b08fc9f1deed05cfe5490",
     "upstream/mmdet/fpn.py": "ccf649237a0715b1af43e4c42ff18b89141d7a7ca22cb95b6f9aeeb06906d18e",
     "upstream/mmdet/positional_encoding.py": "a8d69a71eec49de8bf916a5918389afdf7be77cc2d78bb5bb182dd2f7dc16640",

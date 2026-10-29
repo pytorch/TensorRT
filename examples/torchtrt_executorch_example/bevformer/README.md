@@ -26,14 +26,21 @@ establish compatibility with a different DRIVE release.
 | Strict PyTorch export of the full tensor core | Passed; changed values and history flag also passed |
 | TensorRT compilation of isolated learned regions | Backbone, temporal/spatial attention and decoder attention checks passed |
 | Full graph with geometry outside TensorRT | Numerical comparison passed |
-| Full-model `.pte` | Blocked by missing AOTI fallback for `aten::_reshape_copy` |
-| Full-model native deployment | Not yet validated |
+| Full-model `.pte` | Mixed TensorRT/CUDA export passed with reshape-copy normalization and eager division rounding |
+| Full-model native deployment | All-output comparisons and persistent recurrence passed outside Docker |
 
 For the full-forward comparison, the largest absolute differences observed
 were below 7e-6 for class logits, 4e-5 for box predictions and 1.1e-5 for the
 next BEV state. The reference executes pinned upstream backbone, encoder,
 decoder and head methods, with MMCV's independent PyTorch sampler in place of
 its compiled extension. It is not a comparison against the MMCV CUDA binary.
+
+The later full-model study passed 12 synthetic frames over three scenes with
+native recurrence and explicit resets (7,896,000 output values, zero mismatches
+at `atol=rtol=3e-4`). The standalone C++ decoder matched the pinned upstream
+oracle on those outputs and boundary/empty cases. These are historical results
+on the October 2026 authoring stack, not a new hardware run of this rebased
+branch. No real driving-sequence or nuScenes mAP/NDS result is established.
 
 ## Files and data
 
@@ -42,7 +49,11 @@ its compiled extension. It is not a comparison against the MMCV CUDA binary.
 | `model.py` | Full Tiny tensor core, checkpoint loading and synthetic inputs |
 | `attention.py` | Fixed-shape spatial cross-attention implementation |
 | `validate_model.py` | Full upstream-reference and strict-export checks |
-| `export_model.py` | Full-model TensorRT compilation, `.pte` export and numerical checks |
+| `export_full.py` | Reproducible mixed export, `.ptd` loading and all-output checks |
+| `prepare_native_cases.py` | Independent or changing-scene synthetic reference fixtures |
+| `decode_detections.cpp`, `check_detection_decoder.py` | Native box decoding and pinned upstream comparison |
+| `export_model.py`, `diagnose_compilation.py` | Optional region-selection diagnostics |
+| `../native_validation/` | Native correctness/recurrence runner and memory/latency tools |
 | `validate_attention.py`, `export_attention.py` | Smaller attention-only tests |
 | `prepare_assets.py` | Download or verify pinned sources and checkpoint |
 | `sources.json`, `reference_sources.json` | Revisions and SHA-256 hashes |
@@ -111,45 +122,69 @@ export. Both history branches are tested after export with changed inputs.
 
 ## Export and check the complete program
 
-Current blocker: normal TensorRT selection changes camera projection and BEV
-rotation results in the tested inputs. `--cuda-geometry` keeps those operations
-outside TensorRT, allowing the compiled graph's numerical comparison to pass.
-The subsequent ExecuTorch/AOTI lowering currently fails with
-`Method forward missing fallback kernels: aten::_reshape_copy`. No passing
-full-model `.pte` has been produced; this must be resolved before native testing.
+The maintained full-model path assigns learned regions to TensorRT and the
+complete `Geometry` module to CUDA/AOTInductor. The branch normalizes
+`aten::_reshape_copy` to reshape plus a contiguous clone before ExecuTorch
+partitioning. `export_full.py` explicitly enables
+`eager_numerics.division_rounding=True` while compiling AOTI geometry, because
+small projection differences can change camera-visibility masks. It checks all
+three outputs for reset/history inputs and retains the same 3e-4 tolerances.
 
-Use a fresh output directory for every attempt:
-
-```bash
-python export_model.py --root "$bevformer_data" --cuda-geometry \
-  --output-dir "$bevformer_data/artifacts/full-cuda-geometry"
-```
-
-TensorRT receives supported regions; ExecuTorch's CUDA backend compiles remaining
-supported regions using AOTInductor. `--cuda-geometry` excludes the complete
-`Geometry` module by its exported module type. `--cuda-grid` deliberately excludes
-`grid_sample` from TensorRT to exercise a mixed path; it is not evidence that
-TensorRT cannot handle that operation.
-
-To isolate conversion failures without generating a deployment artifact:
+The original all-TensorRT geometry discrepancy remains unresolved; this routing
+is a numerical workaround for the tested model, not evidence that TensorRT
+cannot implement geometry or grid sampling in general.
 
 ```bash
-python diagnose_compilation.py --root "$bevformer_data" \
-  --report "$bevformer_data/logs/trt-regions.json"
+python export_full.py \
+  --checkpoint "$bevformer_data/checkpoints/bevformer_tiny_epoch_24.pth" \
+  --output-dir "$bevformer_data/artifacts/full-mixed"
+python prepare_native_cases.py \
+  --checkpoint "$bevformer_data/checkpoints/bevformer_tiny_epoch_24.pth" \
+  --output-dir "$bevformer_data/artifacts/cases" \
+  --scenes 3 --frames-per-scene 4 --seed 101
 ```
 
-This records per-region correctness results. Check each region's `pass` field;
-the diagnostic script completes even when a region fails.
+Output directories must be new. Export writes `model.pte`,
+`aoti_cuda_blob.ptd` and `report.json`. Keep both model files together and require
+`FULL BEVFORMER EXPORT PASS`; a partially written artifact is not a passing run.
+The report records versions, hashes, backend IDs and every output comparison.
+The fixture generator writes `sequence.txt` plus raw FP32 input/reference files
+and shape sidecars. Synthetic scenes change motion and history but are not
+recorded camera data.
 
-Require the final `PASS` and `validation.json`; a directory or partially written
-`.pte` alone does not mean the test passed. Preserve all generated `.ptd` files
-beside their `.pte`. The script compares all three outputs using ExecuTorch's
-Python runtime and writes raw FP32 input/reference files for native validation.
+Build and stage the applications following
+[`native_validation/README.md`](../native_validation/README.md). Run its
+`validate_pte --bev-sequence` command on the DRIVE host. It carries its own
+previous-BEV output between frames, loads the model once and resets state at
+scene boundaries. It does not require Python or LibTorch. Audit `ldd` and the
+saved `loaded-maps.txt` files, including dynamically loaded AOTI libraries.
 
-The generic native reference runner currently fills inputs with ones. That was
-adequate for the component smoke test, but it is not a real-camera full-model
-test. File-based native input/output validation, temporal sequence testing,
-image preprocessing and final detection decoding remain follow-up work.
+To decode a saved frame's raw boxes:
+
+```bash
+c++ -std=c++17 -O2 -Wall -Wextra -Werror decode_detections.cpp -o "$decoder"
+"$decoder" "$native_results/frame_0" "$decoded_tsv"
+python check_detection_decoder.py \
+  --upstream "$bevformer_data/upstream/BEVFormer" --decoder "$decoder" \
+  --raw-dir "$native_results" --output-dir "$decoder_checks" --include-synthetic
+python test_decoder_failures.py "$decoder"
+```
+
+The decoder is CPU-only C++ and writes scored class/3D-box records. The Python
+oracle is an offline test, not a deployment dependency. Synthetic predictions
+are not evidence of observed vehicles or detector accuracy. `prepare_assets.py`
+also fetches the hash-pinned decoder-reference sources used by these checks.
+
+`export_model.py --cuda-geometry` remains available for the earlier diagnostic
+workflow; `--cuda-grid` forces sampling out of TensorRT for experimentation.
+Use `export_full.py` for the documented reproducible bundle and
+`prepare_native_cases.py` for the native fixtures.
+
+The shared benchmark compares eager, Python ExecuTorch/Torch-tensor and native
+C++ execution of matching inputs. Its RSS/PSS are process-memory measurements,
+not total GPU memory. See the shared README for timing boundaries and fresh
+process repetitions. No hardware performance numbers are regenerated by this
+branch integration.
 
 ## Source provenance
 
