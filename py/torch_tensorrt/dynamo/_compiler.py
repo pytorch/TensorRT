@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import collections.abc
 import logging
+import operator
 import os
 import platform
 import warnings
@@ -1062,8 +1063,18 @@ def _insert_complex_io_adapters(
         src = outputs[idx]
         if not isinstance(src, torch.fx.Node):
             continue
-        if src.op == "call_module" and (
-            "_run_on_acc" in str(src.target) or "_run_on_gpu" in str(src.target)
+        # A block with several outputs returns this one through a getitem
+        block = (
+            src.args[0]
+            if src.op == "call_function" and src.target is operator.getitem
+            else src
+        )
+        if (
+            isinstance(block, torch.fx.Node)
+            and block.op == "call_module"
+            and (
+                "_run_on_acc" in str(block.target) or "_run_on_gpu" in str(block.target)
+            )
         ):
             with partitioned_module.graph.inserting_before(output_node):
                 complex_node = partitioned_module.graph.call_function(
@@ -1071,7 +1082,7 @@ def _insert_complex_io_adapters(
                 )
             logger.info(
                 f"Inserted view_as_complex for complex output index {idx} "
-                f"from TRT block '{src.target}'"
+                f"from TRT block '{block.target}'"
             )
             outputs[idx] = complex_node
             graph_modified = True
@@ -1085,15 +1096,17 @@ def _insert_complex_io_adapters(
 
     # Ensure the final module's own forward() unflattens its result back to
     # the user's original return shape (e.g. a bare tensor instead of a
-    # 1-tuple). complex_decomposition_adapter's make_fx retrace produces a
-    # plain (non-pytree) codegen partway through the pipeline, and that loss
-    # survives partitioning. Applied here -- after partitioning and boundary
-    # adapter insertion, once the module's true final leaf count is settled
-    # -- because setting it earlier (on the pre-partition graph) mismatches
-    # the leaf count at that intermediate stage and crashes on unflatten.
+    # 1-tuple). The exported program's pytree codegen normally survives
+    # lowering and partitioning, and it takes the inputs by the user's names:
+    # keep it. Rebuild one only if it was lost, from the placeholder names,
+    # which then take the inputs by position only.
     in_spec = getattr(gm, "_in_spec", None)
     out_spec = getattr(gm, "_out_spec", None)
-    if in_spec is not None and out_spec is not None:
+    if (
+        in_spec is not None
+        and out_spec is not None
+        and not isinstance(partitioned_module.graph._codegen, _PyTreeCodeGen)
+    ):
         orig_args = [
             node.name
             for node in partitioned_module.graph.nodes
