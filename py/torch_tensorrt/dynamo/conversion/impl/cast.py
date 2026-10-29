@@ -21,6 +21,20 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
 
 LOGGER: logging.Logger = logging.getLogger(__name__)
 
+# With truncate_double, a float64 result from these sources runs in float32, which
+# holds their values exactly. A float64 source is already float32 inside TensorRT.
+FLOAT64_TRUNCATABLE_SOURCES = frozenset(
+    {
+        torch.bool,
+        torch.int8,
+        torch.uint8,
+        torch.float16,
+        torch.bfloat16,
+        torch.float32,
+        torch.float64,
+    }
+)
+
 
 def to_copy(
     ctx: ConversionContext,
@@ -34,13 +48,12 @@ def to_copy(
     if not isinstance(input, TRTTensor):
         input = get_trt_tensor(ctx, input, f"{name}_copy_tensor")
 
-    # TensorRT has no float64. With truncate_double the caller accepts float32,
-    # which holds these source types exactly but not every larger integer.
+    # TensorRT has no float64. With truncate_double the caller accepts float32.
     if (
         ctx.compilation_settings.truncate_double
         and _enums.dtype._from(dtype) == _enums.dtype.f64
-        and input.dtype
-        in {trt.bool, trt.int8, trt.uint8, trt.float16, trt.bfloat16, trt.float32}
+        and _enums.dtype._from(input.dtype).to(torch.dtype)
+        in FLOAT64_TRUNCATABLE_SOURCES
     ):
         dtype = torch.float32
 

@@ -165,6 +165,46 @@ class TestToCopyConverter(DispatchTestCase):
                     x = torch.rand(n, 5, device="cuda") + 0.5
                     torch.testing.assert_close(compiled(x), model(x))
 
+    def test_float64_copies_share_one_truncation_rule(self):
+        # The float64 rule for _to_copy applies to aten.copy too: a source float32
+        # cannot hold exactly, or a result layout TensorRT cannot produce, stays in
+        # PyTorch, and the other cases convert.
+        class CopyIntoDouble(nn.Module):
+            def __init__(self, memory_format):
+                super().__init__()
+                dest = torch.zeros(2, 3, 4, 5, dtype=torch.double)
+                self.register_buffer("dest", dest.to(memory_format=memory_format))
+
+            def forward(self, x):
+                return torch.ops.aten.copy.default(self.dest, x * 2)
+
+        class BoolToDouble(nn.Module):
+            def forward(self, x):
+                return (x > 0.5).to(torch.float64) * 3
+
+        cases = (
+            (CopyIntoDouble(torch.channels_last), torch.rand(2, 3, 4, 5)),
+            (CopyIntoDouble(torch.contiguous_format), torch.randint(9, (2, 3, 4, 5))),
+            (BoolToDouble(), torch.rand(2, 3, 4, 5)),
+        )
+        for model, x in cases:
+            with self.subTest(type(model).__name__, dtype=x.dtype):
+                model = model.eval().cuda()
+                x = x.cuda()
+                compiled = torch_tensorrt.dynamo.compile(
+                    torch.export.export(model, (x,)),
+                    arg_inputs=[x],
+                    min_block_size=1,
+                    truncate_double=True,
+                )
+                self.assertEqual(
+                    sum("_run_on_acc" in name for name, _ in compiled.named_children()),
+                    1,
+                )
+                out, expected = compiled(x), model(x)
+                torch.testing.assert_close(out, expected)
+                self.assertEqual(out.stride(), expected.stride())
+
     def test_to_copy_multiple_returns(self):
         class ToCopyReturns(nn.Module):
             def forward(self, x):
