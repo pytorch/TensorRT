@@ -640,8 +640,13 @@ def cutedsl_op(
         ),
         supports_dynamic_shapes=supports_dynamic_shapes,
         priority=priority,
-        capability_validator=_cutedsl.make_capability_validator(
-            op_name, layout, artifact, capability_validator
+        capability_validator=_common.make_dtype_capability_validator(
+            op_name,
+            "CuTe DSL",
+            [param.dtype for param in layout.inputs],
+            [param.dtype for param in layout.outputs],
+            capability_validator,
+            target_validator=lambda device: _cutedsl.validate_target(artifact, device),
         ),
         schema=schema_info.schema,
     )

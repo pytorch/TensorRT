@@ -73,7 +73,6 @@ ttk.cutedsl_op(
     constants={"block_size": BLOCK_SIZE},
     extra_args_fn=lambda inputs, outputs: [trtp.SymInt32(inputs[0].shape_expr.numel())],
     eager_fn=add_one_eager,
-    supports_dynamic_shapes=True,
 )
 
 
@@ -101,21 +100,11 @@ if __name__ == "__main__":
             )
         ],
         min_block_size=1,
+        require_full_compilation=True,
         pass_through_build_failures=True,
-    )
-    engine_modules = [
-        module
-        for name, module in trt_model.named_modules()
-        if name.startswith("_run_on_acc_")
-    ]
-    assert len(engine_modules) == 1, (
-        "Expected the custom operator to produce one TensorRT engine; "
-        f"compiled graph was:\n{trt_model.graph}"
     )
 
     for size in (127, 1024, 4097):
         x = torch.randn(size, device="cuda", dtype=torch.float32)
-        reference = x + 1
-        torch.testing.assert_close(model(x), reference)
-        torch.testing.assert_close(trt_model(x), reference, atol=1e-5, rtol=1e-5)
+        torch.testing.assert_close(trt_model(x), model(x), atol=1e-5, rtol=1e-5)
         print(f"CuTe DSL AOT plugin matched the reference for {size} elements")

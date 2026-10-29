@@ -41,21 +41,14 @@ def _cutedsl_import() -> Tuple[Any, Any]:
     try:
         import cutlass
         import cutlass.cute as cute
-    except ImportError as exc:
+
+        version = Version(cutlass.__version__)
+    except (ImportError, AttributeError, InvalidVersion, TypeError) as exc:
         raise ImportError(
-            "cutedsl_op requires NVIDIA CuTe DSL. Install it with: "
-            f"pip install '{requirement}'"
+            f"cutedsl_op requires {requirement}. Install it with: pip install '{requirement}'"
         ) from exc
-    raw_version = getattr(cutlass, "__version__", None)
-    try:
-        version = Version(raw_version)
-    except (InvalidVersion, TypeError):
-        raise ImportError(
-            "cutedsl_op could not determine the installed CuTe DSL version. "
-            f"Install it with: pip install '{requirement}'"
-        ) from None
     if not Version("4.8.1") <= version < Version("5"):
-        raise ImportError(f"cutedsl_op requires {requirement}; found {raw_version}.")
+        raise ImportError(f"cutedsl_op requires {requirement}; found {version}.")
     return cutlass, cute
 
 
@@ -70,10 +63,6 @@ def validate_config(
     layout = _common.analyze_signature(signature, arity, frontend="cutedsl_op")
     for param in layout.inputs + layout.outputs:
         _common.to_trt_dtype(param.dtype)
-    if not isinstance(constants, Mapping) or set(constants) & set(signature):
-        raise ValueError(
-            "cutedsl_op constants must map separate parameter names to values."
-        )
     cutlass, cute = _cutedsl_import()
     if (
         getattr(kernel, "_decorator_kind", None) != "kernel"
@@ -96,6 +85,7 @@ def validate_config(
     runtime_names = [name for name in params if name not in constexpr_names]
     if (
         list(signature) != runtime_names
+        or not isinstance(constants, Mapping)
         or set(constants) != constexpr_names
         or any(
             param.kind
@@ -196,30 +186,21 @@ def _compile_within_driver_isa(compile_fn: Callable[[Optional[int]], str]) -> st
     """Recompile newer PTX for the driver; never relabel an existing artifact."""
     ceiling = _driver_ptx_version()
     ptx = compile_fn(None)
-    emitted = _ptx_version(ptx)
-    if emitted <= ceiling:
+    if _ptx_version(ptx) <= ceiling:
         return ptx
-    label = f"{ceiling // 10}.{ceiling % 10}"
-    guidance = (
-        "Upgrade the CUDA driver or select a CuTe DSL toolchain compatible "
-        "with that driver."
+    requirement = (
+        f"driver PTX ISA {ceiling // 10}.{ceiling % 10}. "
+        "Upgrade the CUDA driver or use a compatible CuTe DSL toolchain."
     )
-    _LOGGER.info(
-        "CuTe DSL emitted PTX ISA %d; recompiling for driver ceiling %d",
-        emitted,
-        ceiling,
-    )
+    _LOGGER.info("Recompiling CuTe DSL for driver PTX ISA %d", ceiling)
     try:
         ptx = compile_fn(ceiling)
     except Exception as exc:
         raise RuntimeError(
-            f"CuTe DSL could not compile this kernel for driver PTX ISA {label}. "
-            + guidance
+            f"CuTe DSL could not compile this kernel for {requirement}"
         ) from exc
     if _ptx_version(ptx) > ceiling:
-        raise RuntimeError(
-            f"CuTe DSL did not honor the driver PTX ISA ceiling {label}. " + guidance
-        )
+        raise RuntimeError(f"CuTe DSL did not honor the {requirement}")
     return ptx
 
 
@@ -269,25 +250,22 @@ def compile_to_ptx(
         for param in params
     ]
     arch = torch.cuda.get_device_capability()
-    target = _target_arch(arch)
     with tempfile.TemporaryDirectory(prefix="torch_tensorrt_cutedsl_") as directory:
+        options: Tuple[Any, ...] = (
+            GPUArch(_target_arch(arch)),
+            KeepPTX(),
+            DumpDir(directory),
+        )
 
         def compile(ptx_version: Optional[int]) -> str:
-            options: Tuple[Any, ...] = (GPUArch(target), KeepPTX(), DumpDir(directory))
+            compile_options = options
             if ptx_version is not None:
-                # CuTe forwards this option to its NVVM lowering pipeline. A
-                # compiler target constrains code generation, unlike editing
-                # the PTX .version header after compilation.
-                options += (ExtraCompilerOpts(f"ptx-version=+ptx{ptx_version}"),)
-            compiled = cute.compile[options](
-                launch,
-                # Host-only placeholders keep grid dimensions dynamic in the compiler.
-                # TensorRT supplies the actual grid independently of device arguments.
-                cutlass.Int32(1),
-                cutlass.Int32(1),
-                cutlass.Int32(1),
-                *args,
-            )
+                compile_options += (
+                    ExtraCompilerOpts(f"ptx-version=+ptx{ptx_version}"),
+                )
+            # Host grid placeholders stay dynamic; TensorRT supplies the actual grid.
+            grid = [cutlass.Int32(1) for _ in range(3)]
+            compiled = cute.compile[compile_options](launch, *grid, *args)
             if compiled.total_added_arguments or compiled.kernel_extra_args:
                 raise RuntimeError(
                     "cutedsl_op cannot supply compiler-added workspace arguments."
@@ -316,19 +294,3 @@ def validate_target(artifact: CompiledCuteDSLArtifact, device: Any = None) -> No
             f"CuTe DSL kernel '{artifact.kernel_name}' was compiled for {artifact.arch}, "
             f"but the TensorRT build targets {actual}. Register on the target CUDA device."
         )
-
-
-def make_capability_validator(
-    op_name: str,
-    layout: _common.SignatureLayout,
-    artifact: CompiledCuteDSLArtifact,
-    user_validator: Optional[Callable[..., Any]],
-) -> Callable[..., bool]:
-    return _common.make_dtype_capability_validator(
-        op_name,
-        "CuTe DSL",
-        [p.dtype for p in layout.inputs],
-        [p.dtype for p in layout.outputs],
-        user_validator,
-        target_validator=lambda device: validate_target(artifact, device),
-    )

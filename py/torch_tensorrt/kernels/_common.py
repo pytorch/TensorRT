@@ -194,9 +194,7 @@ def pack_symint32_args(values: Sequence[Any], trtp: Any) -> Any:
     return args
 
 
-# Pointer element-type spellings -> torch dtypes. This is deliberately a closed
-# set: accepting an unrecognized pointer type would disable the conversion-time
-# dtype guard and let TensorRT reinterpret a tensor's bytes with the wrong ABI.
+# Only accept pointer dtypes covered by the TensorRT ABI checks.
 _POINTER_TO_TORCH_DTYPE: Dict[str, torch.dtype] = {
     "fp16": torch.float16,
     "bf16": torch.bfloat16,
@@ -208,31 +206,6 @@ _POINTER_TO_TORCH_DTYPE: Dict[str, torch.dtype] = {
     "u8": torch.uint8,
     "fp8e4nv": torch.float8_e4m3fn,
 }
-
-_SIGNATURE_TYPE_NAMES = frozenset(
-    {
-        "fp16",
-        "bf16",
-        "fp32",
-        "fp64",
-        "fp8e4nv",
-        "fp8e5",
-        "i1",
-        "i8",
-        "i16",
-        "i32",
-        "i64",
-        "u8",
-        "u16",
-        "u32",
-        "u64",
-    }
-)
-
-# TensorRT's AOT plugin API currently requires every extra kernel argument to be
-# a ``trtp.SymInt32``. Wider integers and floating-point values need a different
-# launch ABI and must not be accepted merely because a frontend can compile them.
-_SUPPORTED_AOT_SCALAR_TYPES = frozenset({"i32"})
 
 
 class SignatureParam(NamedTuple):
@@ -254,12 +227,7 @@ class SignatureLayout(NamedTuple):
 def parse_signature(
     signature: Dict[str, str], *, frontend: str = "triton_op"
 ) -> List[SignatureParam]:
-    """Decode each ``signature`` value into pointer-ness and a torch dtype.
-
-    Accepts exactly one ``*`` followed by a supported pointer element type, or
-    the single supported scalar spelling ``i32``. Specialization metadata must
-    be supplied through the frontend's compiler APIs, not encoded into this type.
-    """
+    """Decode ``*<dtype>`` pointers and ``i32`` extras in declaration order."""
     if not isinstance(signature, dict):
         raise ValueError(
             f"{frontend} signature must be an insertion-ordered dict mapping "
@@ -296,18 +264,10 @@ def parse_signature(
             params.append(SignatureParam(name, True, dtype))
             continue
 
-        element = text
-        if element not in _SUPPORTED_AOT_SCALAR_TYPES:
-            if element not in _SIGNATURE_TYPE_NAMES:
-                raise ValueError(
-                    f"{frontend} signature parameter '{name}' has unsupported scalar "
-                    f"type '{element}'."
-                )
-            supported = ", ".join(sorted(_SUPPORTED_AOT_SCALAR_TYPES))
+        if text != "i32":
             raise ValueError(
-                f"{frontend} signature parameter '{name}' uses scalar type "
-                f"'{element}', but TensorRT AOT extra arguments support only "
-                f"trtp.SymInt32 ({supported})."
+                f"{frontend} signature parameter '{name}' has unsupported scalar "
+                f"type '{text}'; TensorRT AOT extras require trtp.SymInt32 (i32)."
             )
         params.append(SignatureParam(name, False, torch.int32))
     return params
@@ -509,11 +469,7 @@ def normalize_block_dims(
     op_name: str, block_size: Any, *, frontend: str = "cutile_op"
 ) -> Tuple[int, int, int]:
     """Validate a static CUDA block size and normalize it to three dimensions."""
-    if isinstance(block_size, bool):
-        dims: Tuple[Any, ...] = (block_size,)
-    elif isinstance(block_size, int):
-        dims = (block_size,)
-    elif isinstance(block_size, Sequence) and not isinstance(
+    if isinstance(block_size, Sequence) and not isinstance(
         block_size, (str, bytes, bytearray)
     ):
         dims = tuple(block_size)

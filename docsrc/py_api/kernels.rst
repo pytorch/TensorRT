@@ -302,52 +302,25 @@ CuTe DSL entry point
 
 .. autofunction:: cutedsl_op
 
-:func:`cutedsl_op` compiles a ``@cutlass.cute.kernel`` through a generated
-``@cute.jit`` host wrapper, then uses :func:`ptx_op` to register the Torch
-operator, TensorRT AOT plugin, and converter. TensorRT launches the embedded
-PTX directly; inference does not require CuTe DSL. See the :ref:`cutedsl_op`
-example for a complete kernel and dynamic-shape engine.
+See the :ref:`cutedsl_op` example for a complete kernel and dynamic-shape
+engine. Registration uses a generated ``@cute.jit`` host wrapper and the
+shared :func:`ptx_op` registration path. Inference launches embedded PTX
+without importing CuTe DSL.
 
-Install ``nvidia-cutlass-dsl>=4.8.1,<5``. Registration targets the current CUDA
-device; use ``with torch.cuda.device(device):`` to select another. Pointer
-dtypes and GPU architecture are fixed for each registration, and conversion
-rejects mismatches. Use a separate operator name for another dtype or target.
-Architecture-specific targets such as ``sm_90a`` and ``sm_120a`` preserve
-Hopper and Blackwell instructions.
+The current CUDA device determines the target, including architecture-specific
+instructions such as ``sm_90a``. Use ``with torch.cuda.device(device):`` to
+select another target. If CuTe emits a PTX ISA newer than the loaded driver
+supports, the frontend recompiles for that driver and verifies the result
+with a driver load. Kernels that require a newer ISA still need a compatible
+driver; serialized engines retain these compatibility requirements.
 
-The loaded CUDA driver must support the kernel's PTX ISA. If CuTe's bundled
-compiler emits a newer ISA, the frontend recompiles with a driver-compatible
-compiler target and verifies that the driver can load the result. It does not
-rewrite PTX version headers. Kernels or architectures that require a newer
-ISA still need a driver upgrade or a compatible CuTe toolchain; installing a
-newer CUDA toolkit alone does not update the driver's PTX compiler. Serialized
-engines retain the same GPU and driver compatibility requirements.
-
-``signature`` lists runtime parameters in declaration order:
-``(input_ptrs..., extra_scalars..., output_ptrs...)``, using pointer spellings
-such as ``"*fp32"`` and ``"i32"`` scalars. ``constants`` supplies all
-``cutlass.Constexpr`` parameters. The Torch schema must have Tensor inputs
-and outputs only; scalar kernel arguments come from ``extra_args_fn``.
-
-``grid`` and ``extra_args_fn`` receive TensorRT tensor descriptors. Use
-``shape_expr`` and preserve symbolic shapes in ``meta_fn`` for dynamic inputs.
-Each scalar argument must be an ``int`` or ``trtp.SymInt32`` in the signed
-32-bit range. ``block_size`` specifies one to three static thread dimensions;
-``shared_mem`` is the required dynamic shared-memory size in bytes (default
-zero). The caller must provide enough shared memory for the kernel. Launch
-limits and scalar ranges must hold throughout the input profile. Empty tensors
-require a positive grid and a kernel that guards every load and store.
-
-Kernels index contiguous TensorRT buffers and must perform their own bounds
-checks. ``meta_fn`` must describe contiguous outputs with the compiled dtypes.
-Pointers use conservative byte alignment, without assumed divisibility.
-``eager_fn`` optionally provides execution outside TensorRT, using CuTe or an
-equivalent Torch implementation.
-
-Native CuTe tensor arguments, TMA descriptors, clusters, and compiler-added
-workspaces are unsupported. Kernels may construct CuTe tensors internally
-from their pointers. The frontend validates the compiled ABI and embeds PTX
-without rewriting its parameter list.
+Kernels index contiguous TensorRT buffers and must guard their loads and
+stores. ``meta_fn`` must describe contiguous outputs with the compiled dtypes.
+The caller must provide enough ``shared_mem`` for the kernel; launch limits
+and scalar ranges must hold throughout the input profile. Empty tensors
+require a positive grid. Pointers assume only byte alignment. Native tensor
+arguments, TMA descriptors, clusters, and compiler-added workspaces are
+unsupported; kernels may construct CuTe tensors internally from pointers.
 
 cuTile entry point
 ------------------
