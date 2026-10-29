@@ -487,6 +487,13 @@ bool parse_metadata_json(const std::string& json, bool expects_aliased_io, Tenso
       return false;
     }
   }
+  // Only an error message reads it, so a value that is not a string is ignored rather than refused.
+  out.tensorrt_version.clear();
+  const std::size_t version_key = find_top_level_key(json, "\"tensorrt_version\"");
+  if (version_key != std::string::npos &&
+      parse_string(json, skip_ws(json, json.find(':', version_key) + 1), out.tensorrt_version) == std::string::npos) {
+    out.tensorrt_version.clear();
+  }
   const std::size_t hw_key = find_top_level_key(json, "\"hardware_compatible\"");
   const std::size_t device_key = find_top_level_key(json, "\"device_id\"");
   return parse_bool_after_key(json, hw_key, "\"hardware_compatible\"", out.hardware_compatible) &&

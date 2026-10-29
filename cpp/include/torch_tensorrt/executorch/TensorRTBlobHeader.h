@@ -51,6 +51,7 @@ struct TensorRTBlobHeader {
   bool hardware_compatible = false; ///< Engine built hardware-compatible; false when unstated.
   int device_id = 0; ///< Device the engine was built for; 0 when unstated.
   std::string engine_key; ///< Named-data key of an engine stored outside the blob; empty when it is inline.
+  std::string tensorrt_version; ///< TensorRT version that exported the engine; empty when the blob does not say.
 
   /**
    * @brief Start of the serialized engine inside a blob.

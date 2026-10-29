@@ -77,3 +77,33 @@ def test_loading_with_no_visible_gpu_fails_with_a_clear_error(tmp_path):
     )
     assert result.returncode == 3, (result.returncode, result.stderr[-2000:])
     assert "CUDA is unavailable" in result.stdout + result.stderr
+
+
+def test_an_engine_tensorrt_cannot_read_names_both_tensorrt_versions(tmp_path, capfd):
+    """A real version mismatch needs a second TensorRT install, so this corrupts the stored engine.
+
+    TensorRT then refuses it on the same path it takes for an engine from another version, which
+    is the path that has to name both versions.
+    """
+    import tensorrt
+    import torch_tensorrt_executorch_runtime  # noqa: F401
+    from executorch.exir._serialize._program import deserialize_pte_binary
+    from executorch.runtime import Runtime
+
+    pte = tmp_path / "model.pte"
+    _save(pte)
+    data = bytearray(pte.read_bytes())
+    named = deserialize_pte_binary(bytes(data)).named_data
+    (engine,) = [bytes(buffer) for buffer in named.buffers]
+    start = data.find(engine)
+    assert start > 0 and data.find(engine, start + 1) == -1
+    data[start : start + 64] = bytes(64)
+    pte.write_bytes(data)
+
+    program = Runtime.get().load_program(pte)
+    with pytest.raises(RuntimeError, match="0x:?23") as raised:
+        program.load_method("forward")
+    log = str(raised.value) + capfd.readouterr().err
+    runtime_version = ".".join(tensorrt.__version__.split(".")[:3])
+    assert f"exported with TensorRT {tensorrt.__version__}" in log, log
+    assert f"this runtime is TensorRT {runtime_version}" in log, log

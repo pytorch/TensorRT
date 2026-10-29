@@ -130,6 +130,32 @@ Error report_load_error(const char* operation) {
   return out_of_memory ? Error::MemoryAllocationFailed : Error::InvalidProgram;
 }
 
+// TensorRT reads an engine only with the version that built it, unless it was built version
+// compatible, and its own error then names internal serialization tags rather than versions.
+void log_tensorrt_versions(const std::string& exported_version) {
+  // TensorRT 10 and later encode the version as major * 10000 + minor * 100 + patch.
+  const int32_t version = getInferLibVersion();
+  const int major = version / 10000;
+  const int minor = version / 100 % 100;
+  const int patch = version % 100;
+  if (exported_version.empty()) {
+    ET_LOG(
+        Error,
+        "TensorRTBackend::init: this runtime is TensorRT %d.%d.%d, and the program does not record which TensorRT exported the engine",
+        major,
+        minor,
+        patch);
+  } else {
+    ET_LOG(
+        Error,
+        "TensorRTBackend::init: the engine was exported with TensorRT %s, and this runtime is TensorRT %d.%d.%d",
+        exported_version.c_str(),
+        major,
+        minor,
+        patch);
+  }
+}
+
 Error check_registration() {
   if (kRegistrationResult != Error::Ok) {
     ET_LOG(Error, "TensorRTBackend registration failed: %s", ::executorch::runtime::to_string(kRegistrationResult));
@@ -410,11 +436,16 @@ Error load_engine(
     const void* data,
     uint64_t size,
     const WsBudget& request,
+    const std::string& exported_version,
     std::shared_ptr<nvinfer1::ICudaEngine>& out) {
   last_load_error = {};
   std::shared_ptr<nvinfer1::ICudaEngine> engine(runtime.deserializeCudaEngine(data, size), TRTDeleter{});
   if (engine == nullptr) {
-    return report_load_error("deserialize TensorRT engine");
+    const Error err = report_load_error("deserialize TensorRT engine");
+    if (err != Error::MemoryAllocationFailed) {
+      log_tensorrt_versions(exported_version);
+    }
+    return err;
   }
   // A plan serialized without its weights (built with STRIP_PLAN, or saved with EXCLUDE_WEIGHTS)
   // deserializes and runs without an error, but computes with placeholder weights, and this backend
@@ -464,6 +495,7 @@ Error acquire_shared_engine(
     uint64_t size,
     int device_id,
     const WsBudget& request,
+    const std::string& exported_version,
     std::shared_ptr<nvinfer1::ICudaEngine>& out) {
   const SharedEngineKey key = shared_engine_key(data, size, device_id, request.valid ? request.bytes : -1);
   SharedEngines& engines = shared_engines();
@@ -476,7 +508,7 @@ Error acquire_shared_engine(
   // Declared out here so a copy that lost the race is freed after the lock is released.
   std::shared_ptr<nvinfer1::ICudaEngine> loaded;
   if (out == nullptr) {
-    const Error err = load_engine(runtime, data, size, request, loaded);
+    const Error err = load_engine(runtime, data, size, request, exported_version, loaded);
     if (err != Error::Ok) {
       // A racing load of the same bytes may have published its engine meanwhile, and this load may
       // have failed only because the device had no room for a second copy.
@@ -1422,9 +1454,10 @@ Result<DelegateHandle*> TensorRTBackend::init(
   {
     const std::shared_lock<std::shared_mutex> capture_lock(cuda_graph_capture_mutex());
     if (share) {
-      err = acquire_shared_engine(*runtime, engine_data, engine_size, handle->device_id, ws_request, handle->engine);
+      err = acquire_shared_engine(
+          *runtime, engine_data, engine_size, handle->device_id, ws_request, header.tensorrt_version, handle->engine);
     } else {
-      err = load_engine(*runtime, engine_data, engine_size, ws_request, handle->engine);
+      err = load_engine(*runtime, engine_data, engine_size, ws_request, header.tensorrt_version, handle->engine);
     }
     // The engine now lives on the GPU, so release the host copy before building the context.
     named_engine.reset();
