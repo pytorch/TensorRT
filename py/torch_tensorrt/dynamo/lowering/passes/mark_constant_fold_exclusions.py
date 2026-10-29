@@ -28,10 +28,12 @@ def mark_constant_fold_exclusions(
         settings.disabled_constant_fold_exclusions if settings is not None else ()
     )
 
-    for node in gm.graph.nodes:
-        for rule_id, rule in _CONSTANT_FOLD_EXCLUSION_RULES.items():
-            if rule_id in disabled_rule_ids:
-                continue
+    # One rule covers the whole graph before the next starts, so a rule can read
+    # the marks of the rules registered before it.
+    for rule_id, rule in _CONSTANT_FOLD_EXCLUSION_RULES.items():
+        if rule_id in disabled_rule_ids:
+            continue
+        for node in gm.graph.nodes:
             _mark_constant_fold_exclusion(rule(node), rule_id)
 
     if disabled_rule_ids:

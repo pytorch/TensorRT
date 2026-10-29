@@ -1413,6 +1413,9 @@ class TestLowering(TestCase):
             ("decomposed_twice", (), 2, "input", True),
             ("constant_src_folds", (), 1, "ones", False),
             ("random_src", (), 1, "randint", True),
+            # Constant src that constant folding still leaves in the graph.
+            ("attention_mask_src", (), 1, "attention_mask_arange", True),
+            ("returned_src_view", (), 1, "returned_view", True),
         ]
     )
     def test_scatter_add_constant_index_positions_not_folded(
@@ -1433,7 +1436,23 @@ class TestLowering(TestCase):
                     src = torch.ones_like(self.index)
                 elif src_kind == "randint":
                     src = torch.randint_like(self.index, 5)
-                return input.scatter_add(0, self.index, src)
+                elif src_kind == "attention_mask_arange":
+                    sequence = torch.arange(8, device=input.device)
+                    src = sequence.expand_as(self.index)
+                elif src_kind == "returned_view":
+                    src = self.index.t().t()
+                result = input.scatter_add(0, self.index, src)
+                if src_kind == "attention_mask_arange":
+                    # The attention comes after the scatter_add positions in the graph.
+                    mask = sequence.unsqueeze(0) <= sequence.unsqueeze(1)
+                    query = input[:8].float().view(1, 1, 8, 8)
+                    attention = torch.ops.aten.scaled_dot_product_attention.default(
+                        query, query, query, mask
+                    )
+                    return result, attention
+                if src_kind == "returned_view":
+                    return result, src
+                return result
 
         exported = torch.export.export(
             ConstantIndexScatterAdd().cuda(),
@@ -1450,11 +1469,12 @@ class TestLowering(TestCase):
                 disabled_constant_fold_exclusions=disabled_constant_fold_exclusions
             ),
         )
-        has_arange = any(
+        has_positions = any(
             getattr(node.target, "overloadpacket", None) is torch.ops.aten.arange
+            and node.meta["val"].shape == (64,)
             for node in gm.graph.nodes
         )
-        self.assertEqual(has_arange, positions_kept)
+        self.assertEqual(has_positions, positions_kept)
 
     def test_scatter_add_large_comparison_keeps_loop(self):
         class ScatterAdd(torch.nn.Module):

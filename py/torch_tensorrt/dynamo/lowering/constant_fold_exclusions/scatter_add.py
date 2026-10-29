@@ -7,7 +7,10 @@ import torch
 from torch._subclasses.functional_tensor import mb_unwrap_functional_tensor
 from torch.fx.experimental.proxy_tensor import get_proxy_mode, get_proxy_slot
 
-from ._core import register_constant_fold_exclusion_rule
+from ._core import (
+    CONSTANT_FOLD_EXCLUSION_META_KEY,
+    register_constant_fold_exclusion_rule,
+)
 
 SCATTER_ADD_POSITIONS_RULE_ID = "scatter_add_positions"
 _POSITIONS_TAG = "_torch_tensorrt_scatter_add_positions"
@@ -35,7 +38,16 @@ def exclude_scatter_add_positions_from_constant_fold(positions: torch.Tensor) ->
 
 
 def _varies_at_runtime(node: torch.fx.Node) -> bool:
-    """Whether constant folding cannot compute this node ahead of time."""
+    """Whether this node reads a value that constant folding leaves in the graph.
+
+    That is an input, a random op, a node an earlier rule keeps out of folding, or
+    a view whose storage the graph returns or mutates.
+    """
+    from torch_tensorrt.dynamo.lowering.passes.reset_folded_constructors import (
+        _aliases_input,
+        _storage_escapes,
+    )
+
     nodes_to_visit, visited = [node], set()
     while nodes_to_visit:
         current = nodes_to_visit.pop()
@@ -43,6 +55,8 @@ def _varies_at_runtime(node: torch.fx.Node) -> bool:
         if (
             current.op == "placeholder"
             or torch.Tag.nondeterministic_seeded in target_tags
+            or current.meta.get(CONSTANT_FOLD_EXCLUSION_META_KEY)
+            or (_aliases_input(current) and _storage_escapes(current))
         ):
             return True
         if current not in visited:
