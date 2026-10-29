@@ -3,6 +3,7 @@
 
 import torch
 import torch.nn as nn
+import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
@@ -162,6 +163,22 @@ class TestSelectConverterOne(DispatchTestCase):
                 use_dynamo_tracer=False,
                 check_dtype=False,
             )
+
+    def test_select_uint8_input_compiles(self):
+        # The uint8 select would fail the engine build, so it must stay in PyTorch.
+        class SelectThenCast(nn.Module):
+            def forward(self, frames):
+                return frames[1].float() / 255
+
+        frames = torch.randint(0, 256, (2, 8, 8, 3), dtype=torch.uint8, device="cuda")
+        model = SelectThenCast()
+        compiled = torch_tensorrt.dynamo.compile(
+            torch.export.export(model, (frames,)),
+            arg_inputs=[frames],
+            min_block_size=1,
+            pass_through_build_failures=True,
+        )
+        torch.testing.assert_close(compiled(frames), model(frames))
 
 
 if __name__ == "__main__":
