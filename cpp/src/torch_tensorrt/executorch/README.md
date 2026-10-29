@@ -194,6 +194,9 @@ but corrupted engine bytes can load and return wrong answers.
 
 ### Load errors
 
+- With no usable CUDA device, for example under `CUDA_VISIBLE_DEVICES=""`, the delegate reports
+  itself unavailable, so loading returns `Error::NotFound`. The log says CUDA is unavailable and
+  gives CUDA's reason.
 - Loading returns `Error::MemoryAllocationFailed` when TensorRT runs out of memory while it
   deserializes the engine, applies the weight streaming budget, or creates the execution context.
   The log then shows the free and total GPU memory. Other TensorRT load failures return

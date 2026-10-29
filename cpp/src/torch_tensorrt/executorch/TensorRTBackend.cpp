@@ -253,6 +253,18 @@ nvinfer1::IRuntime* TensorRTBackend::shared_runtime() {
   // Retried while null, so one transient failure does not disable the backend for the process.
   if (runtime == nullptr) {
     const std::shared_lock<std::shared_mutex> capture_lock(cuda_graph_capture_mutex());
+    // Without a usable CUDA device, createInferRuntime logs an error and then returns a pointer that
+    // is not null and is not a runtime either (seen with TensorRT 11.4), so check CUDA first.
+    int device_count = 0;
+    const cudaError_t cuda_err = cudaGetDeviceCount(&device_count);
+    if (cuda_err != cudaSuccess) {
+      cudaGetLastError();
+      ET_LOG(
+          Error,
+          "TensorRTBackend: cannot create the TensorRT runtime, because CUDA is unavailable: %s",
+          cudaGetErrorString(cuda_err));
+      return nullptr;
+    }
     if (logger == nullptr) {
       logger = new TRTLogger();
     }
