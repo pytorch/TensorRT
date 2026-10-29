@@ -102,11 +102,12 @@ class TestToCopyConverter(DispatchTestCase):
                 y = x * 2
                 return y, torch.ops.aten._to_copy.default(y, dtype=torch.float64)
 
-        # aten.copy reaches the same cast without the _to_copy validator.
+        # aten.copy reaches the same cast without the _to_copy validator, and
+        # broadcasts its source to the buffer shape.
         class CopyIntoDouble(nn.Module):
             def __init__(self):
                 super().__init__()
-                self.register_buffer("dest", torch.zeros(1, 3, 10, dtype=torch.double))
+                self.register_buffer("dest", torch.zeros(2, 3, 10, dtype=torch.double))
 
             def forward(self, x):
                 return torch.ops.aten.copy.default(self.dest, x * 2)

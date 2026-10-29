@@ -4826,6 +4826,25 @@ def aten_ops_copy(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     dest, src = args[0], args[1]
+    # copy broadcasts src, so the result always has the shape of dest.
+    if tuple(src.shape) != tuple(dest.shape):
+        src = impl.slice.expand(
+            ctx,
+            target,
+            SourceIR.ATEN,
+            f"{name}_expand",
+            src,
+            [
+                (
+                    impl.shape.shape(
+                        ctx, target, SourceIR.ATEN, f"{name}_dest_dim{i}", dest, i
+                    )
+                    if size == DYNAMIC_DIM
+                    else size
+                )
+                for i, size in enumerate(dest.shape)
+            ],
+        )
     return impl.cast.to_copy(
         ctx,
         target,
