@@ -379,7 +379,20 @@ def scatter_reduce_decomposition(
     src_shape = list(src_tensor.shape)
     src_dim = src_shape[dim]
     if not include_self:
-        raise AssertionError("include_self False for scatter reduce not yet supported")
+        # Positions that receive values reduce over src only: start them from the
+        # reduction's identity instead of self, here and in every scatter below
+        lim = torch.finfo if input_tensor.is_floating_point() else torch.iinfo
+        identity = {
+            "amax": lim(input_tensor.dtype).min,
+            "amin": lim(input_tensor.dtype).max,
+        }
+        scattered = torch.zeros_like(input_tensor, dtype=torch.bool).scatter(
+            dim, index, True
+        )
+        input_tensor = torch.where(
+            scattered, identity.get(reduce, 1 if reduce == "prod" else 0), input_tensor
+        )
+        scatter_loop_tensor = input_tensor
     for i in range(0, src_dim):
         src_slice = torch.select(src_tensor, dim, i)
         index_slice = torch.select(index, dim, i)
@@ -414,8 +427,13 @@ def scatter_reduce_decomposition(
     if reduce == "mean":
         scatter_loop_tensor = torch.div(
             scatter_loop_tensor,
-            torch.add(scatter_count_tensor, torch.ones_like(scatter_count_tensor)),
-            rounding_mode="trunc",
+            (
+                torch.add(scatter_count_tensor, torch.ones_like(scatter_count_tensor))
+                if include_self
+                else torch.clamp(scatter_count_tensor, min=1)
+            ),
+            # as PyTorch: true division for floats, floor for integers
+            rounding_mode=None if scatter_loop_tensor.is_floating_point() else "floor",
         )
     return scatter_loop_tensor
 
