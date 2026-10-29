@@ -484,6 +484,28 @@ class TestPreserveAttentionOutputLayout(TestCase):
             model(*inputs), trt_module(*inputs), rtol=1e-2, atol=1e-2
         )
 
+    def test_attention_on_data_dependent_rows(self):
+        # Boolean indexing gives attention a batch size known only at runtime.
+        class MaskedAttention(torch.nn.Module):
+            def forward(self, x, mask):
+                query = x[mask].transpose(1, 2)
+                return torch.nn.functional.scaled_dot_product_attention(
+                    query, query, query
+                )
+
+        model = MaskedAttention().cuda()
+        x = torch.randn(3, 16, 4, 32).half().cuda()
+        mask = torch.tensor([True, False, True]).cuda()
+        ep = torch.export.export(model, (x, mask))
+        trt_module = torch_tensorrt.dynamo.compile(
+            ep, [x, mask], min_block_size=1, decompose_attention=True
+        )
+        for mask in ([True, False, False], [True, True, True]):
+            mask = torch.tensor(mask).cuda()
+            torch.testing.assert_close(
+                model(x, mask), trt_module(x, mask), rtol=1e-2, atol=1e-2
+            )
+
 
 class TestRewriteEfficientAttention(TestCase):
     def test_force_causal_efficient_attention(self):

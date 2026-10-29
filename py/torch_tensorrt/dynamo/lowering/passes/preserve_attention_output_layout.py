@@ -4,6 +4,7 @@
 import logging
 
 import torch
+from torch._prims_common import is_contiguous_or_false
 from torch._subclasses.fake_tensor import FakeTensor
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
@@ -18,7 +19,7 @@ def _preserve_layouts(graph: torch.fx.Graph) -> int:
         val = node.meta.get("val")
         # Under torch.vmap the recorded value is a batched tensor, not a FakeTensor,
         # and those nodes lower without this pass.
-        if not isinstance(val, FakeTensor) or val.is_contiguous():
+        if not isinstance(val, FakeTensor) or is_contiguous_or_false(val):
             continue
         dim_order = val.dim_order()
         if dim_order == tuple(range(val.dim())):
