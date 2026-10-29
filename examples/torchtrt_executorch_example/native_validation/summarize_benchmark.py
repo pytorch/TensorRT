@@ -8,8 +8,8 @@ import argparse
 import csv
 import json
 import math
-from pathlib import Path
 import statistics
+from pathlib import Path
 
 
 def rows(path):

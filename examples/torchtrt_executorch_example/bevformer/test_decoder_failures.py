@@ -4,10 +4,10 @@
 """Small dependency-free failure-path tests for the standalone box decoder."""
 
 import argparse
-from pathlib import Path
 import struct
 import subprocess
 import tempfile
+from pathlib import Path
 
 parser = argparse.ArgumentParser()
 parser.add_argument("decoder", type=Path)

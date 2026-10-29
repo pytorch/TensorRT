@@ -33,7 +33,8 @@ using executorch::runtime::EValue;
 
 namespace {
 void require(bool condition, const std::string& message) {
-  if (!condition) throw std::runtime_error(message);
+  if (!condition)
+    throw std::runtime_error(message);
 }
 void cuda_check(cudaError_t status, const char* operation) {
   require(status == cudaSuccess, std::string(operation) + ": " + cudaGetErrorString(status));
@@ -42,25 +43,32 @@ double elapsed(Clock::time_point start) {
   return std::chrono::duration<double, std::milli>(Clock::now() - start).count();
 }
 size_t positive_count(const std::string& value) {
-  require(!value.empty() && value.find_first_not_of("0123456789") == std::string::npos,
-          "Iteration counts must be positive integers");
+  require(
+      !value.empty() && value.find_first_not_of("0123456789") == std::string::npos,
+      "Iteration counts must be positive integers");
   const auto count = std::stoull(value);
   require(count > 0 && count <= 100000, "Iteration count outside 1..100000");
   return count;
 }
 struct Stream {
   cudaStream_t value = nullptr;
-  Stream() { cuda_check(cudaStreamCreate(&value), "cudaStreamCreate"); }
-  ~Stream() { if (value) cudaStreamDestroy(value); }
+  Stream() {
+    cuda_check(cudaStreamCreate(&value), "cudaStreamCreate");
+  }
+  ~Stream() {
+    if (value)
+      cudaStreamDestroy(value);
+  }
 };
 std::vector<float> read_floats(const fs::path& path, size_t count) {
   require(fs::file_size(path) == count * sizeof(float), "Wrong file size: " + path.string());
   std::vector<float> result(count);
   std::ifstream file(path, std::ios::binary);
-  require(bool(file.read(reinterpret_cast<char*>(result.data()), count * sizeof(float))),
-          "Cannot read " + path.string());
-  require(std::all_of(result.begin(), result.end(), [](float x) { return std::isfinite(x); }),
-          "Nonfinite fixture: " + path.string());
+  require(
+      bool(file.read(reinterpret_cast<char*>(result.data()), count * sizeof(float))), "Cannot read " + path.string());
+  require(
+      std::all_of(result.begin(), result.end(), [](float x) { return std::isfinite(x); }),
+      "Nonfinite fixture: " + path.string());
   return result;
 }
 std::vector<int64_t> read_shape(const fs::path& path) {
@@ -82,17 +90,16 @@ long long read_kib(const fs::path& path, const std::string& key) {
     std::istringstream fields(line);
     std::string found, unit;
     long long value;
-    if (fields >> found >> value >> unit && found == key && unit == "kB") return value;
+    if (fields >> found >> value >> unit && found == key && unit == "kB")
+      return value;
   }
-  return -1;  // Explicitly unavailable, never silently report zero.
+  return -1; // Explicitly unavailable, never silently report zero.
 }
 void memory_snapshot(std::ostream& out, const char* phase) {
   size_t free = 0, total = 0;
   cuda_check(cudaMemGetInfo(&free, &total), "cudaMemGetInfo");
-  out << phase << '\t' << read_kib("/proc/self/status", "VmRSS:")
-      << '\t' << read_kib("/proc/self/status", "VmHWM:")
-      << '\t' << read_kib("/proc/self/smaps_rollup", "Pss:")
-      << '\t' << free << '\t' << total << '\n';
+  out << phase << '\t' << read_kib("/proc/self/status", "VmRSS:") << '\t' << read_kib("/proc/self/status", "VmHWM:")
+      << '\t' << read_kib("/proc/self/smaps_rollup", "Pss:") << '\t' << free << '\t' << total << '\n';
   require(bool(out), "Cannot write memory report");
 }
 struct Output {
@@ -106,8 +113,7 @@ void materialize(const std::vector<EValue>& values, std::vector<Output>& outputs
     require(values[i].isTensor(), "Non-tensor output unsupported");
     const auto tensor = values[i].toTensor();
     auto& output = outputs[i];
-    require(tensor.scalar_type() == executorch::aten::ScalarType::Float,
-            "Only FP32 outputs supported");
+    require(tensor.scalar_type() == executorch::aten::ScalarType::Float, "Only FP32 outputs supported");
     require(static_cast<size_t>(tensor.dim()) == output.shape.size(), "Output rank differs");
     int64_t stride = 1;
     for (int64_t d = tensor.dim() - 1; d >= 0; --d) {
@@ -120,8 +126,7 @@ void materialize(const std::vector<EValue>& values, std::vector<Output>& outputs
     cudaPointerAttributes attributes{};
     const auto status = cudaPointerGetAttributes(&attributes, source);
     if (status == cudaSuccess && attributes.type == cudaMemoryTypeDevice) {
-      cuda_check(cudaMemcpy(output.actual.data(), source, tensor.nbytes(), cudaMemcpyDeviceToHost),
-                 "output download");
+      cuda_check(cudaMemcpy(output.actual.data(), source, tensor.nbytes(), cudaMemcpyDeviceToHost), "output download");
     } else {
       require(status == cudaSuccess || status == cudaErrorInvalidValue, "Unknown output memory type");
       cudaGetLastError();
@@ -138,11 +143,12 @@ void compare(const std::vector<Output>& outputs, std::ostream& report, const cha
     for (size_t j = 0; j < output.actual.size(); ++j) {
       const double actual = output.actual[j], expected = output.expected[j];
       const double error = std::abs(actual - expected);
-      if (!std::isfinite(actual) || error > 3e-4 + 3e-4 * std::abs(expected)) ++bad;
-      if (std::isfinite(error)) max_error = std::max(max_error, error);
+      if (!std::isfinite(actual) || error > 3e-4 + 3e-4 * std::abs(expected))
+        ++bad;
+      if (std::isfinite(error))
+        max_error = std::max(max_error, error);
     }
-    report << phase << '\t' << i << '\t' << output.actual.size() << '\t'
-           << max_error << '\t' << bad << '\n';
+    report << phase << '\t' << i << '\t' << output.actual.size() << '\t' << max_error << '\t' << bad << '\n';
     passed &= bad == 0;
   }
   report.flush();
@@ -167,17 +173,25 @@ int main(int argc, char** argv) {
     size_t warmup = 20, iterations = 100;
     for (int i = 1; i < argc; ++i) {
       const std::string arg(argv[i]);
-      if (arg.rfind("--model=", 0) == 0) model = arg.substr(8);
-      else if (arg.rfind("--data=", 0) == 0) data = arg.substr(7);
-      else if (arg.rfind("--case=", 0) == 0) fixture = arg.substr(7);
-      else if (arg.rfind("--output=", 0) == 0) destination = arg.substr(9);
-      else if (arg.rfind("--warmup=", 0) == 0) warmup = positive_count(arg.substr(9));
-      else if (arg.rfind("--iterations=", 0) == 0) iterations = positive_count(arg.substr(13));
-      else throw std::runtime_error("Unknown argument: " + arg);
+      if (arg.rfind("--model=", 0) == 0)
+        model = arg.substr(8);
+      else if (arg.rfind("--data=", 0) == 0)
+        data = arg.substr(7);
+      else if (arg.rfind("--case=", 0) == 0)
+        fixture = arg.substr(7);
+      else if (arg.rfind("--output=", 0) == 0)
+        destination = arg.substr(9);
+      else if (arg.rfind("--warmup=", 0) == 0)
+        warmup = positive_count(arg.substr(9));
+      else if (arg.rfind("--iterations=", 0) == 0)
+        iterations = positive_count(arg.substr(13));
+      else
+        throw std::runtime_error("Unknown argument: " + arg);
     }
-    require(!model.empty() && !fixture.empty() && !destination.empty(),
-            "Usage: benchmark_pte --model=file.pte [--data=file.ptd] --case=fixture "
-            "--output=new-dir [--warmup=20] [--iterations=100]");
+    require(
+        !model.empty() && !fixture.empty() && !destination.empty(),
+        "Usage: benchmark_pte --model=file.pte [--data=file.ptd] --case=fixture "
+        "--output=new-dir [--warmup=20] [--iterations=100]");
     require(fs::is_regular_file(model), "Missing model");
     require(data.empty() || fs::is_regular_file(data), "Missing external data");
     require(fs::is_directory(fixture), "Missing fixture directory");
@@ -193,9 +207,8 @@ int main(int argc, char** argv) {
     phases << std::setprecision(12) << "phase\twall_ms\n";
     comparisons << std::setprecision(12) << "phase\toutput\telements\tmax_abs_error\tmismatches\n";
     memory << "phase\trss_kib\tprocess_hwm_kib\tpss_kib\tcuda_free_bytes\tcuda_total_bytes\n";
-    info << "key\tvalue\nmodel\t" << model << "\nexternal_data\t" << data
-         << "\nfixture\t" << fixture << "\nwarmup\t" << warmup
-         << "\niterations\t" << iterations
+    info << "key\tvalue\nmodel\t" << model << "\nexternal_data\t" << data << "\nfixture\t" << fixture << "\nwarmup\t"
+         << warmup << "\niterations\t" << iterations
          << "\nboundary\tforward + device fence + owned CPU output materialization"
          << "\ninput_mode\tfixed snapshot, no recurrent feedback\n";
 
@@ -222,8 +235,8 @@ int main(int argc, char** argv) {
     memory_snapshot(memory, "method_loaded");
     const auto meta = module->method_meta("forward");
     require(meta.ok(), "Missing forward metadata");
-    info << "TensorRTBackend\t" << meta->uses_backend("TensorRTBackend")
-         << "\nCudaBackend\t" << meta->uses_backend("CudaBackend") << '\n';
+    info << "TensorRTBackend\t" << meta->uses_backend("TensorRTBackend") << "\nCudaBackend\t"
+         << meta->uses_backend("CudaBackend") << '\n';
 
     start = Clock::now();
     std::vector<std::vector<float>> inputs(meta->num_inputs());
@@ -232,13 +245,13 @@ int main(int argc, char** argv) {
     size_t input_bytes = 0, output_bytes = 0;
     for (size_t i = 0; i < inputs.size(); ++i) {
       const auto desc = meta->input_tensor_meta(i);
-      require(desc.ok() && desc->scalar_type() == executorch::aten::ScalarType::Float,
-              "Only FP32 tensor inputs supported");
+      require(
+          desc.ok() && desc->scalar_type() == executorch::aten::ScalarType::Float, "Only FP32 tensor inputs supported");
       for (size_t d = 0; d < desc->dim_order().size(); ++d) {
         require(desc->dim_order()[d] == d, "Only contiguous inputs supported");
       }
-      inputs[i] = read_floats(fs::path(fixture) / ("input_" + std::to_string(i) + ".bin"),
-                              desc->nbytes() / sizeof(float));
+      inputs[i] =
+          read_floats(fs::path(fixture) / ("input_" + std::to_string(i) + ".bin"), desc->nbytes() / sizeof(float));
       input_bytes += desc->nbytes();
       std::vector<executorch::aten::SizesType> shape(desc->sizes().begin(), desc->sizes().end());
       tensors.push_back(executorch::extension::from_blob(inputs[i].data(), shape, desc->scalar_type()));
@@ -247,8 +260,9 @@ int main(int argc, char** argv) {
     std::vector<Output> outputs(meta->num_outputs());
     for (size_t i = 0; i < outputs.size(); ++i) {
       const auto desc = meta->output_tensor_meta(i);
-      require(desc.ok() && desc->scalar_type() == executorch::aten::ScalarType::Float,
-              "Only FP32 tensor outputs supported");
+      require(
+          desc.ok() && desc->scalar_type() == executorch::aten::ScalarType::Float,
+          "Only FP32 tensor outputs supported");
       const auto stem = fs::path(fixture) / ("output_" + std::to_string(i));
       outputs[i].shape = read_shape(stem.string() + ".shape");
       outputs[i].expected = read_floats(stem.string() + ".bin", desc->nbytes() / sizeof(float));
@@ -276,23 +290,30 @@ int main(int argc, char** argv) {
     std::vector<double> warmup_times, measured_times;
     warmup_times.reserve(warmup);
     measured_times.reserve(iterations);
-    for (size_t i = 0; i < warmup; ++i) warmup_times.push_back(run());
+    for (size_t i = 0; i < warmup; ++i)
+      warmup_times.push_back(run());
     compare(outputs, comparisons, "after_warmup");
     memory_snapshot(memory, "after_warmup");
-    for (size_t i = 0; i < iterations; ++i) measured_times.push_back(run());
+    for (size_t i = 0; i < iterations; ++i)
+      measured_times.push_back(run());
     compare(outputs, comparisons, "after_measurement");
     memory_snapshot(memory, "after_measurement");
     save_maps(fs::path(destination) / "loaded-maps.txt");
-    for (size_t i = 0; i < warmup_times.size(); ++i) timing << "warmup\t" << i << '\t' << warmup_times[i] << '\n';
-    for (size_t i = 0; i < measured_times.size(); ++i) timing << "measured\t" << i << '\t' << measured_times[i] << '\n';
-    timing.flush(); phases.flush(); memory.flush(); info.flush();
+    for (size_t i = 0; i < warmup_times.size(); ++i)
+      timing << "warmup\t" << i << '\t' << warmup_times[i] << '\n';
+    for (size_t i = 0; i < measured_times.size(); ++i)
+      timing << "measured\t" << i << '\t' << measured_times[i] << '\n';
+    timing.flush();
+    phases.flush();
+    memory.flush();
+    info.flush();
     require(timing && phases && memory && info, "Cannot flush reports");
     std::ofstream success(fs::path(destination) / "PASS");
     success << "All-output comparisons passed before/after timing; no Torch/Python mapped.\n";
     success.close();
     require(bool(success), "Cannot write PASS marker");
-    std::cout << "PASS: warmup=" << warmup << " measured=" << iterations
-              << " first_ms=" << first_ms << " fixed-input host-boundary benchmark\n";
+    std::cout << "PASS: warmup=" << warmup << " measured=" << iterations << " first_ms=" << first_ms
+              << " fixed-input host-boundary benchmark\n";
     return 0;
   } catch (const std::exception& error) {
     std::cerr << "FAIL: " << error.what() << '\n';

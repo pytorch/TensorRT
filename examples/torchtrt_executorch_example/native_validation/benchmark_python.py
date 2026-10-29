@@ -13,10 +13,10 @@ import csv
 import hashlib
 import importlib.metadata
 import json
-from pathlib import Path
 import statistics
 import sys
 import time
+from pathlib import Path
 
 from process_memory import log_memory
 from summarize_benchmark import percentile

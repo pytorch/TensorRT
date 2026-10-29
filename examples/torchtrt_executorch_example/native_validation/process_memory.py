@@ -11,9 +11,9 @@ Unavailable measurements are None with an explicit error, never zero.
 import argparse
 import json
 import os
-from pathlib import Path
 import sys
 import time
+from pathlib import Path
 
 
 def parse_kib(text, key):

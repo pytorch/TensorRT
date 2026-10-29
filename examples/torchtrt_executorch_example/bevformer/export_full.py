@@ -12,8 +12,8 @@ import argparse
 import hashlib
 import importlib.metadata
 import json
-from pathlib import Path
 import sys
+from pathlib import Path
 
 import torch
 import torch._inductor.config as inductor_config
