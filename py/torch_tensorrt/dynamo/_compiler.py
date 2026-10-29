@@ -47,6 +47,7 @@ from torch_tensorrt.dynamo.lowering import (
     get_decompositions,
     post_lowering,
     pre_export_lowering,
+    remove_alias_from_exported_program,
 )
 from torch_tensorrt.dynamo.lowering._buffer_lifting import (
     aliased_input_bindings,
@@ -419,6 +420,7 @@ def cross_compile_for_windows(
             exported_program.graph_module,
         )
     )
+    exported_program = remove_alias_from_exported_program(exported_program)
 
     gm = exported_program.module()
     logger.debug("Input graph: " + str(gm.graph))
@@ -875,6 +877,7 @@ def compile(
             exported_program.graph_module,
         )
     )
+    exported_program = remove_alias_from_exported_program(exported_program)
 
     gm = exported_program.module()
     # Move the weights in the state_dict to CPU
@@ -2282,6 +2285,7 @@ def convert_exported_program_to_serialized_trt_engine(
             exported_program.graph_module,
         )
     )
+    exported_program = remove_alias_from_exported_program(exported_program)
 
     gm = exported_program.module()
     # Move the weights in the state_dict to CPU
