@@ -484,6 +484,35 @@ class TestPreserveAttentionOutputLayout(TestCase):
             model(*inputs), trt_module(*inputs), rtol=1e-2, atol=1e-2
         )
 
+    def test_view_after_attention_in_cond_branch(self):
+        class CondViewAfterAttention(torch.nn.Module):
+            def forward(self, pred, query, key, value):
+                def attend(query, key, value):
+                    query, key, value = (t.transpose(1, 2) for t in (query, key, value))
+                    out = torch.nn.functional.scaled_dot_product_attention(
+                        query, key, value
+                    )
+                    out = out.transpose(1, 2).contiguous()
+                    return out.view(out.shape[0], out.shape[1], -1)
+
+                def flatten(query, key, value):
+                    return query.flatten(2).clone()
+
+                return torch.cond(pred, attend, flatten, (query, key, value))
+
+        inputs = [torch.randn(2, 16, 4, 32).half().cuda() for _ in range(3)]
+        model = CondViewAfterAttention().cuda()
+        pred = torch.tensor(True).cuda()
+        ep = torch.export.export(model, (pred, *inputs))
+        trt_module = torch_tensorrt.dynamo.compile(
+            ep, [pred, *inputs], min_block_size=1, decompose_attention=True
+        )
+        for pred in (True, False):
+            pred = torch.tensor(pred).cuda()
+            torch.testing.assert_close(
+                model(pred, *inputs), trt_module(pred, *inputs), rtol=1e-2, atol=1e-2
+            )
+
     def test_attention_on_data_dependent_rows(self):
         # Boolean indexing gives attention a batch size known only at runtime.
         class MaskedAttention(torch.nn.Module):
