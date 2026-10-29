@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import importlib
+import logging
 import os
 import sys
 import unittest
@@ -1036,7 +1037,8 @@ def test_refit_input_written_through_returned_alias():
     "Refit feature is not supported in Python 3.13 or higher",
 )
 @pytest.mark.unit
-def test_complex_buffer_refit():
+@pytest.mark.parametrize("dynamic_batch", [False, True])
+def test_complex_buffer_refit(dynamic_batch, caplog):
     """Refit a model whose weights include a complex-valued buffer (e.g. RoPE freqs).
 
     Exercises the combined complex_graph_detection + refit_module_weights path:
@@ -1066,11 +1068,19 @@ def test_complex_buffer_refit():
     model1 = ComplexFreqModel(freqs1).eval()
     model2 = ComplexFreqModel(freqs2).eval()
 
-    z = torch.randn(SEQ, DIM // 2, dtype=torch.complex64).cuda()
+    shape = (3, SEQ, DIM // 2) if dynamic_batch else (SEQ, DIM // 2)
+    z = torch.randn(shape, dtype=torch.complex64).cuda()
     inputs = [z]
 
-    exp_program1 = torch.export.export(model1, tuple(inputs))
-    exp_program2 = torch.export.export(model2, tuple(inputs))
+    dynamic_shapes = (
+        ({0: torch.export.Dim("batch", min=1, max=4)},) if dynamic_batch else None
+    )
+    exp_program1 = torch.export.export(
+        model1, tuple(inputs), dynamic_shapes=dynamic_shapes
+    )
+    exp_program2 = torch.export.export(
+        model2, tuple(inputs), dynamic_shapes=dynamic_shapes
+    )
 
     trt_gm = torchtrt.dynamo.compile(
         exp_program1,
@@ -1079,12 +1089,14 @@ def test_complex_buffer_refit():
         immutable_weights=False,
     )
 
-    new_trt_gm = refit_module_weights(
-        compiled_module=trt_gm,
-        new_weight_module=exp_program2,
-        arg_inputs=inputs,
-        verify_output=True,
-    )
+    with caplog.at_level(logging.INFO, logger="torch_tensorrt.dynamo._refit"):
+        new_trt_gm = refit_module_weights(
+            compiled_module=trt_gm,
+            new_weight_module=exp_program2,
+            arg_inputs=inputs,
+            verify_output=True,
+        )
+    assert "Refitting Succeed!" in caplog.text
 
     expected_output = exp_program2.module()(*inputs)
     refitted_output = new_trt_gm(*inputs)
@@ -1093,6 +1105,15 @@ def test_complex_buffer_refit():
         torch.allclose(expected_output, refitted_output, atol=1e-2, rtol=1e-2),
         "Refit with complex buffer failed: output mismatch after refit",
     )
+
+    if dynamic_batch:
+        for batch_size in (1, 4):
+            other_z = torch.randn(
+                batch_size, SEQ, DIM // 2, dtype=torch.complex64, device="cuda"
+            )
+            torch.testing.assert_close(
+                new_trt_gm(other_z), model2(other_z), atol=1e-2, rtol=1e-2
+            )
 
     torch._dynamo.reset()
 
