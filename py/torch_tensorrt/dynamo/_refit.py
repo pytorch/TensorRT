@@ -32,6 +32,7 @@ from torch_tensorrt.dynamo.lowering import (
     get_decompositions,
     post_lowering,
     pre_export_lowering,
+    remove_alias_from_exported_program,
 )
 from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
     ENGINE_IDX,
@@ -276,6 +277,7 @@ def refit_module_weights(
             new_weight_module.graph_module,
         )
     )
+    new_weight_module = remove_alias_from_exported_program(new_weight_module)
     new_gm = new_weight_module.module()
 
     logger.debug("Input graph: " + str(new_gm.graph))

@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=2e33cd36"></script>
+    <script src="../_static/documentation_options.js?v=cdeeec50"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -455,8 +455,9 @@ document.write(`
 <li class="toctree-l3"><a class="reference internal" href="namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1Device.html">Struct Device</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1AliasedBinding.html">Struct AliasedBinding</a></li>
-<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle.html">Struct EngineHandle</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1InputProfileBounds.html">Struct InputProfileBounds</a></li>
+<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1OptimizationProfileGuard_1_1AutoTag.html">Struct OptimizationProfileGuard::AutoTag</a></li>
+<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1ProfileTable.html">Struct ProfileTable</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1TensorRTBlobHeader.html">Struct TensorRTBlobHeader</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1TRTDeleter.html">Struct TRTDeleter</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1WsBudget.html">Struct WsBudget</a></li>
@@ -465,13 +466,20 @@ document.write(`
 <li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1torchscript_1_1CompileSpec.html">Struct CompileSpec</a></li>
 <li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1DataType.html">Class DataType</a></li>
 <li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1Device_1_1DeviceType.html">Class Device::DeviceType</a></li>
+<li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1OptimizationProfileGuard.html">Class OptimizationProfileGuard</a></li>
 <li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1TensorRTBackend.html">Class TensorRTBackend</a></li>
 <li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1TRTLogger.html">Class TRTLogger</a></li>
 <li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html">Class TensorFormat</a></li>
 <li class="toctree-l3"><a class="reference internal" href="enum_torch__tensorrt_8h_1a3fbe5d72e4fc624dbd038853079620eb.html">Enum EngineCapability</a></li>
+<li class="toctree-l3"><a class="reference internal" href="enum_OptimizationProfileSelection_8h_1a5e828f9e4f3fea51423b5c701d803840.html">Enum ProfileRequest</a></li>
+<li class="toctree-l3"><a class="reference internal" href="enum_OptimizationProfileSelection_8h_1a327ad4db9a647e041f8c082b069975d8.html">Enum ProfileSelection</a></li>
 <li class="toctree-l3"><a class="reference internal" href="enum_logging_8h_1a130f65408ad8cbaee060f05e8db69558.html">Enum Level</a></li>
 <li class="toctree-l3"><a class="reference internal" href="function_torch__tensorrt_8h_1ad6a4ee8ca6c8f6e5519eb1128ec7f4a1.html">Function torch_tensorrt::dump_build_info</a></li>
+<li class="toctree-l3"><a class="reference internal" href="function_OptimizationProfileSelection_8h_1a415ea7d183f608f93a9447eac6393135.html">Function torch_tensorrt::executorch_backend::dims_fit</a></li>
 <li class="toctree-l3"><a class="reference internal" href="function_WeightStreamingBudget_8h_1ad04b467472f3cbcb8d5d02a35ec73b40.html">Function torch_tensorrt::executorch_backend::parse_weight_streaming_budget</a></li>
+<li class="toctree-l3"><a class="reference internal" href="function_OptimizationProfileSelection_8h_1ab53602e32219b5bee50f56c8ac09d47e.html">Function torch_tensorrt::executorch_backend::profile_fits</a></li>
+<li class="toctree-l3"><a class="reference internal" href="function_OptimizationProfileSelection_8h_1a611c9746189bfa9db2efa54e2718cb92.html">Function torch_tensorrt::executorch_backend::select_profile</a></li>
+<li class="toctree-l3"><a class="reference internal" href="function_OptimizationProfileSelection_8h_1a4f6ab33f9a46a8df5d8e205ebe6cbf3c.html">Template Function torch_tensorrt::executorch_backend::to_profile_index</a></li>
 <li class="toctree-l3"><a class="reference internal" href="function_torch__tensorrt_8h_1ac4ab8313ae72c2c899ea31548b528528.html">Function torch_tensorrt::get_build_info</a></li>
 <li class="toctree-l3"><a class="reference internal" href="function_logging_8h_1a56e110feaaba2c3fd44bd201fd21a76a.html">Function torch_tensorrt::logging::get_is_colored_output_on</a></li>
 <li class="toctree-l3"><a class="reference internal" href="function_logging_8h_1a0593f776f469c20469e2f729fc7861a3.html">Function torch_tensorrt::logging::get_logging_prefix</a></li>
@@ -569,7 +577,7 @@ document.write(`
 <ul class="treeView" id="class-treeView">
   <li>
     <ul class="collapsibleList">
-      <li class="lastChild">Namespace <a href="namespace_torch_tensorrt.html#namespace-torch-tensorrt">torch_tensorrt</a><ul><li>Namespace <a href="namespace_torch_tensorrt__executorch_backend.html#namespace-torch-tensorrt-executorch-backend">torch_tensorrt::executorch_backend</a><ul><li>Struct <a href="structtorch__tensorrt_1_1executorch__backend_1_1AliasedBinding.html#exhale-struct-structtorch-tensorrt-1-1executorch-backend-1-1AliasedBinding">AliasedBinding</a></li><li>Struct <a href="structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle.html#exhale-struct-structtorch-tensorrt-1-1executorch-backend-1-1EngineHandle">EngineHandle</a></li><li>Struct <a href="structtorch__tensorrt_1_1executorch__backend_1_1InputProfileBounds.html#exhale-struct-structtorch-tensorrt-1-1executorch-backend-1-1InputProfileBounds">InputProfileBounds</a></li><li>Struct <a href="structtorch__tensorrt_1_1executorch__backend_1_1TensorRTBlobHeader.html#exhale-struct-structtorch-tensorrt-1-1executorch-backend-1-1TensorRTBlobHeader">TensorRTBlobHeader</a></li><li>Struct <a href="structtorch__tensorrt_1_1executorch__backend_1_1TRTDeleter.html#exhale-struct-structtorch-tensorrt-1-1executorch-backend-1-1TRTDeleter">TRTDeleter</a></li><li>Struct <a href="structtorch__tensorrt_1_1executorch__backend_1_1WsBudget.html#exhale-struct-structtorch-tensorrt-1-1executorch-backend-1-1WsBudget">WsBudget</a></li><li>Class <a href="classtorch__tensorrt_1_1executorch__backend_1_1TensorRTBackend.html#exhale-class-classtorch-tensorrt-1-1executorch-backend-1-1TensorRTBackend">TensorRTBackend</a></li><li class="lastChild">Class <a href="classtorch__tensorrt_1_1executorch__backend_1_1TRTLogger.html#exhale-class-classtorch-tensorrt-1-1executorch-backend-1-1TRTLogger">TRTLogger</a></li></ul></li><li>Namespace <a href="namespace_torch_tensorrt__logging.html#namespace-torch-tensorrt-logging">torch_tensorrt::logging</a><ul><li class="lastChild">Enum <a href="enum_logging_8h_1a130f65408ad8cbaee060f05e8db69558.html#exhale-enum-logging-8h-1a130f65408ad8cbaee060f05e8db69558">Level</a></li></ul></li><li>Namespace <a href="namespace_torch_tensorrt__torchscript.html#namespace-torch-tensorrt-torchscript">torch_tensorrt::torchscript</a><ul><li class="lastChild">Struct <a href="structtorch__tensorrt_1_1torchscript_1_1CompileSpec.html#exhale-struct-structtorch-tensorrt-1-1torchscript-1-1CompileSpec">CompileSpec</a></li></ul></li><li>Struct <a href="structtorch__tensorrt_1_1Device.html#exhale-struct-structtorch-tensorrt-1-1Device">Device</a><ul><li class="lastChild">Class <a href="classtorch__tensorrt_1_1Device_1_1DeviceType.html#exhale-class-classtorch-tensorrt-1-1Device-1-1DeviceType">Device::DeviceType</a></li></ul></li><li>Struct <a href="structtorch__tensorrt_1_1GraphInputs.html#exhale-struct-structtorch-tensorrt-1-1GraphInputs">GraphInputs</a></li><li>Struct <a href="structtorch__tensorrt_1_1Input.html#exhale-struct-structtorch-tensorrt-1-1Input">Input</a></li><li>Class <a href="classtorch__tensorrt_1_1DataType.html#exhale-class-classtorch-tensorrt-1-1DataType">DataType</a></li><li>Class <a href="classtorch__tensorrt_1_1TensorFormat.html#exhale-class-classtorch-tensorrt-1-1TensorFormat">TensorFormat</a></li><li class="lastChild">Enum <a href="enum_torch__tensorrt_8h_1a3fbe5d72e4fc624dbd038853079620eb.html#exhale-enum-torch-tensorrt-8h-1a3fbe5d72e4fc624dbd038853079620eb">EngineCapability</a></li></ul></li>
+      <li class="lastChild">Namespace <a href="namespace_torch_tensorrt.html#namespace-torch-tensorrt">torch_tensorrt</a><ul><li>Namespace <a href="namespace_torch_tensorrt__executorch_backend.html#namespace-torch-tensorrt-executorch-backend">torch_tensorrt::executorch_backend</a><ul><li>Struct <a href="structtorch__tensorrt_1_1executorch__backend_1_1AliasedBinding.html#exhale-struct-structtorch-tensorrt-1-1executorch-backend-1-1AliasedBinding">AliasedBinding</a></li><li>Struct <a href="structtorch__tensorrt_1_1executorch__backend_1_1InputProfileBounds.html#exhale-struct-structtorch-tensorrt-1-1executorch-backend-1-1InputProfileBounds">InputProfileBounds</a></li><li>Struct <a href="structtorch__tensorrt_1_1executorch__backend_1_1ProfileTable.html#exhale-struct-structtorch-tensorrt-1-1executorch-backend-1-1ProfileTable">ProfileTable</a></li><li>Struct <a href="structtorch__tensorrt_1_1executorch__backend_1_1TensorRTBlobHeader.html#exhale-struct-structtorch-tensorrt-1-1executorch-backend-1-1TensorRTBlobHeader">TensorRTBlobHeader</a></li><li>Struct <a href="structtorch__tensorrt_1_1executorch__backend_1_1TRTDeleter.html#exhale-struct-structtorch-tensorrt-1-1executorch-backend-1-1TRTDeleter">TRTDeleter</a></li><li>Struct <a href="structtorch__tensorrt_1_1executorch__backend_1_1WsBudget.html#exhale-struct-structtorch-tensorrt-1-1executorch-backend-1-1WsBudget">WsBudget</a></li><li>Class <a href="classtorch__tensorrt_1_1executorch__backend_1_1OptimizationProfileGuard.html#exhale-class-classtorch-tensorrt-1-1executorch-backend-1-1OptimizationProfileGuard">OptimizationProfileGuard</a><ul><li class="lastChild">Struct <a href="structtorch__tensorrt_1_1executorch__backend_1_1OptimizationProfileGuard_1_1AutoTag.html#exhale-struct-structtorch-tensorrt-1-1executorch-backend-1-1OptimizationProfileGuard-1-1AutoTag">OptimizationProfileGuard::AutoTag</a></li></ul></li><li>Class <a href="classtorch__tensorrt_1_1executorch__backend_1_1TensorRTBackend.html#exhale-class-classtorch-tensorrt-1-1executorch-backend-1-1TensorRTBackend">TensorRTBackend</a></li><li>Class <a href="classtorch__tensorrt_1_1executorch__backend_1_1TRTLogger.html#exhale-class-classtorch-tensorrt-1-1executorch-backend-1-1TRTLogger">TRTLogger</a></li><li>Enum <a href="enum_OptimizationProfileSelection_8h_1a5e828f9e4f3fea51423b5c701d803840.html#exhale-enum-OptimizationProfileSelection-8h-1a5e828f9e4f3fea51423b5c701d803840">ProfileRequest</a></li><li class="lastChild">Enum <a href="enum_OptimizationProfileSelection_8h_1a327ad4db9a647e041f8c082b069975d8.html#exhale-enum-OptimizationProfileSelection-8h-1a327ad4db9a647e041f8c082b069975d8">ProfileSelection</a></li></ul></li><li>Namespace <a href="namespace_torch_tensorrt__logging.html#namespace-torch-tensorrt-logging">torch_tensorrt::logging</a><ul><li class="lastChild">Enum <a href="enum_logging_8h_1a130f65408ad8cbaee060f05e8db69558.html#exhale-enum-logging-8h-1a130f65408ad8cbaee060f05e8db69558">Level</a></li></ul></li><li>Namespace <a href="namespace_torch_tensorrt__torchscript.html#namespace-torch-tensorrt-torchscript">torch_tensorrt::torchscript</a><ul><li class="lastChild">Struct <a href="structtorch__tensorrt_1_1torchscript_1_1CompileSpec.html#exhale-struct-structtorch-tensorrt-1-1torchscript-1-1CompileSpec">CompileSpec</a></li></ul></li><li>Struct <a href="structtorch__tensorrt_1_1Device.html#exhale-struct-structtorch-tensorrt-1-1Device">Device</a><ul><li class="lastChild">Class <a href="classtorch__tensorrt_1_1Device_1_1DeviceType.html#exhale-class-classtorch-tensorrt-1-1Device-1-1DeviceType">Device::DeviceType</a></li></ul></li><li>Struct <a href="structtorch__tensorrt_1_1GraphInputs.html#exhale-struct-structtorch-tensorrt-1-1GraphInputs">GraphInputs</a></li><li>Struct <a href="structtorch__tensorrt_1_1Input.html#exhale-struct-structtorch-tensorrt-1-1Input">Input</a></li><li>Class <a href="classtorch__tensorrt_1_1DataType.html#exhale-class-classtorch-tensorrt-1-1DataType">DataType</a></li><li>Class <a href="classtorch__tensorrt_1_1TensorFormat.html#exhale-class-classtorch-tensorrt-1-1TensorFormat">TensorFormat</a></li><li class="lastChild">Enum <a href="enum_torch__tensorrt_8h_1a3fbe5d72e4fc624dbd038853079620eb.html#exhale-enum-torch-tensorrt-8h-1a3fbe5d72e4fc624dbd038853079620eb">EngineCapability</a></li></ul></li>
     </ul>
   </li><!-- only tree view element -->
 </ul><!-- /treeView class-treeView --></section>
@@ -578,7 +586,7 @@ document.write(`
 <ul class="treeView" id="file-treeView">
   <li>
     <ul class="collapsibleList">
-      <li class="lastChild">Directory <a href="dir_cpp.html#dir-cpp">cpp</a><ul><li class="lastChild">Directory <a href="dir_cpp_include.html#dir-cpp-include">include</a><ul><li class="lastChild">Directory <a href="dir_cpp_include_torch_tensorrt.html#dir-cpp-include-torch-tensorrt">torch_tensorrt</a><ul><li>Directory <a href="dir_cpp_include_torch_tensorrt_executorch.html#dir-cpp-include-torch-tensorrt-executorch">executorch</a><ul><li>File <a href="file_cpp_include_torch_tensorrt_executorch_TensorRTBackend.h.html#file-cpp-include-torch-tensorrt-executorch-TensorRTBackend.h">TensorRTBackend.h</a></li><li>File <a href="file_cpp_include_torch_tensorrt_executorch_TensorRTBindingNames.h.html#file-cpp-include-torch-tensorrt-executorch-TensorRTBindingNames.h">TensorRTBindingNames.h</a></li><li>File <a href="file_cpp_include_torch_tensorrt_executorch_TensorRTBlobHeader.h.html#file-cpp-include-torch-tensorrt-executorch-TensorRTBlobHeader.h">TensorRTBlobHeader.h</a></li><li class="lastChild">File <a href="file_cpp_include_torch_tensorrt_executorch_WeightStreamingBudget.h.html#file-cpp-include-torch-tensorrt-executorch-WeightStreamingBudget.h">WeightStreamingBudget.h</a></li></ul></li><li>File <a href="file_cpp_include_torch_tensorrt_logging.h.html#file-cpp-include-torch-tensorrt-logging.h">logging.h</a></li><li>File <a href="file_cpp_include_torch_tensorrt_macros.h.html#file-cpp-include-torch-tensorrt-macros.h">macros.h</a></li><li class="lastChild">File <a href="file_cpp_include_torch_tensorrt_torch_tensorrt.h.html#file-cpp-include-torch-tensorrt-torch-tensorrt.h">torch_tensorrt.h</a></li></ul></li></ul></li></ul></li>
+      <li class="lastChild">Directory <a href="dir_cpp.html#dir-cpp">cpp</a><ul><li class="lastChild">Directory <a href="dir_cpp_include.html#dir-cpp-include">include</a><ul><li class="lastChild">Directory <a href="dir_cpp_include_torch_tensorrt.html#dir-cpp-include-torch-tensorrt">torch_tensorrt</a><ul><li>Directory <a href="dir_cpp_include_torch_tensorrt_executorch.html#dir-cpp-include-torch-tensorrt-executorch">executorch</a><ul><li>File <a href="file_cpp_include_torch_tensorrt_executorch_OptimizationProfileSelection.h.html#file-cpp-include-torch-tensorrt-executorch-OptimizationProfileSelection.h">OptimizationProfileSelection.h</a></li><li>File <a href="file_cpp_include_torch_tensorrt_executorch_TensorRTBackend.h.html#file-cpp-include-torch-tensorrt-executorch-TensorRTBackend.h">TensorRTBackend.h</a></li><li>File <a href="file_cpp_include_torch_tensorrt_executorch_TensorRTBindingNames.h.html#file-cpp-include-torch-tensorrt-executorch-TensorRTBindingNames.h">TensorRTBindingNames.h</a></li><li>File <a href="file_cpp_include_torch_tensorrt_executorch_TensorRTBlobHeader.h.html#file-cpp-include-torch-tensorrt-executorch-TensorRTBlobHeader.h">TensorRTBlobHeader.h</a></li><li class="lastChild">File <a href="file_cpp_include_torch_tensorrt_executorch_WeightStreamingBudget.h.html#file-cpp-include-torch-tensorrt-executorch-WeightStreamingBudget.h">WeightStreamingBudget.h</a></li></ul></li><li>File <a href="file_cpp_include_torch_tensorrt_logging.h.html#file-cpp-include-torch-tensorrt-logging.h">logging.h</a></li><li>File <a href="file_cpp_include_torch_tensorrt_macros.h.html#file-cpp-include-torch-tensorrt-macros.h">macros.h</a></li><li class="lastChild">File <a href="file_cpp_include_torch_tensorrt_torch_tensorrt.h.html#file-cpp-include-torch-tensorrt-torch-tensorrt.h">torch_tensorrt.h</a></li></ul></li></ul></li></ul></li>
     </ul>
   </li><!-- only tree view element -->
 </ul><!-- /treeView file-treeView --></section>
@@ -602,6 +610,7 @@ document.write(`
 <li class="toctree-l1"><a class="reference internal" href="namespace_torch_tensorrt__executorch_backend.html">Namespace torch_tensorrt::executorch_backend</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="namespace_torch_tensorrt__executorch_backend.html#namespaces">Namespaces</a></li>
 <li class="toctree-l2"><a class="reference internal" href="namespace_torch_tensorrt__executorch_backend.html#classes">Classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="namespace_torch_tensorrt__executorch_backend.html#enums">Enums</a></li>
 <li class="toctree-l2"><a class="reference internal" href="namespace_torch_tensorrt__executorch_backend.html#functions">Functions</a></li>
 <li class="toctree-l2"><a class="reference internal" href="namespace_torch_tensorrt__executorch_backend.html#typedefs">Typedefs</a></li>
 <li class="toctree-l2"><a class="reference internal" href="namespace_torch_tensorrt__executorch_backend.html#variables">Variables</a></li>
@@ -682,31 +691,11 @@ document.write(`
 </div>
 <div class="toctree-wrapper compound">
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle.html">Struct EngineHandle</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle.html#struct-documentation">Struct Documentation</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle.html#_CPPv4N14torch_tensorrt18executorch_backend12EngineHandleE"><code class="docutils literal notranslate"><span class="pre">torch_tensorrt::executorch_backend::EngineHandle</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle.html#_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle12EngineHandleEv"><code class="docutils literal notranslate"><span class="pre">EngineHandle()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle.html#_CPPv4N14torch_tensorrt18executorch_backend12EngineHandleD0Ev"><code class="docutils literal notranslate"><span class="pre">~EngineHandle()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle.html#_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle15execution_graphE"><code class="docutils literal notranslate"><span class="pre">execution_graph</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle.html#_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle6engineE"><code class="docutils literal notranslate"><span class="pre">engine</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle.html#_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle8exec_ctxE"><code class="docutils literal notranslate"><span class="pre">exec_ctx</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle.html#_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle19input_binding_namesE"><code class="docutils literal notranslate"><span class="pre">input_binding_names</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle.html#_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle20output_binding_namesE"><code class="docutils literal notranslate"><span class="pre">output_binding_names</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle.html#_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle20input_profile_boundsE"><code class="docutils literal notranslate"><span class="pre">input_profile_bounds</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle.html#_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle17cached_input_ptrsE"><code class="docutils literal notranslate"><span class="pre">cached_input_ptrs</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle.html#_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle18cached_input_sizesE"><code class="docutils literal notranslate"><span class="pre">cached_input_sizes</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle.html#_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle18cached_output_ptrsE"><code class="docutils literal notranslate"><span class="pre">cached_output_ptrs</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle.html#_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle19cached_output_sizesE"><code class="docutils literal notranslate"><span class="pre">cached_output_sizes</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle.html#_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle10num_inputsE"><code class="docutils literal notranslate"><span class="pre">num_inputs</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle.html#_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle11num_outputsE"><code class="docutils literal notranslate"><span class="pre">num_outputs</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle.html#_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle24output_aliased_input_idxE"><code class="docutils literal notranslate"><span class="pre">output_aliased_input_idx</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle.html#_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle21input_is_alias_targetE"><code class="docutils literal notranslate"><span class="pre">input_is_alias_target</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle.html#_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle19num_aliased_outputsE"><code class="docutils literal notranslate"><span class="pre">num_aliased_outputs</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle.html#_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle9device_idE"><code class="docutils literal notranslate"><span class="pre">device_id</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle.html#_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle20pageable_host_accessE"><code class="docutils literal notranslate"><span class="pre">pageable_host_access</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle.html#_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle14shared_scratchE"><code class="docutils literal notranslate"><span class="pre">shared_scratch</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle.html#_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle21claims_pooled_scratchE"><code class="docutils literal notranslate"><span class="pre">claims_pooled_scratch</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle.html#_CPPv4N14torch_tensorrt18executorch_backend12EngineHandle2muE"><code class="docutils literal notranslate"><span class="pre">mu</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1InputProfileBounds.html">Struct InputProfileBounds</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1InputProfileBounds.html#struct-documentation">Struct Documentation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1InputProfileBounds.html#_CPPv4N14torch_tensorrt18executorch_backend18InputProfileBoundsE"><code class="docutils literal notranslate"><span class="pre">torch_tensorrt::executorch_backend::InputProfileBounds</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1InputProfileBounds.html#_CPPv4N14torch_tensorrt18executorch_backend18InputProfileBounds3minE"><code class="docutils literal notranslate"><span class="pre">min</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1InputProfileBounds.html#_CPPv4N14torch_tensorrt18executorch_backend18InputProfileBounds3maxE"><code class="docutils literal notranslate"><span class="pre">max</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -715,11 +704,24 @@ document.write(`
 </div>
 <div class="toctree-wrapper compound">
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1InputProfileBounds.html">Struct InputProfileBounds</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1InputProfileBounds.html#struct-documentation">Struct Documentation</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1InputProfileBounds.html#_CPPv4N14torch_tensorrt18executorch_backend18InputProfileBoundsE"><code class="docutils literal notranslate"><span class="pre">torch_tensorrt::executorch_backend::InputProfileBounds</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1InputProfileBounds.html#_CPPv4N14torch_tensorrt18executorch_backend18InputProfileBounds3minE"><code class="docutils literal notranslate"><span class="pre">min</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1InputProfileBounds.html#_CPPv4N14torch_tensorrt18executorch_backend18InputProfileBounds3maxE"><code class="docutils literal notranslate"><span class="pre">max</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1OptimizationProfileGuard_1_1AutoTag.html">Struct OptimizationProfileGuard::AutoTag</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1OptimizationProfileGuard_1_1AutoTag.html#nested-relationships">Nested Relationships</a></li>
+<li class="toctree-l2"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1OptimizationProfileGuard_1_1AutoTag.html#struct-documentation">Struct Documentation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1OptimizationProfileGuard_1_1AutoTag.html#_CPPv4N14torch_tensorrt18executorch_backend24OptimizationProfileGuard7AutoTagE"><code class="docutils literal notranslate"><span class="pre">torch_tensorrt::executorch_backend::OptimizationProfileGuard::AutoTag</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1ProfileTable.html">Struct ProfileTable</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1ProfileTable.html#struct-documentation">Struct Documentation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1ProfileTable.html#_CPPv4N14torch_tensorrt18executorch_backend12ProfileTableE"><code class="docutils literal notranslate"><span class="pre">torch_tensorrt::executorch_backend::ProfileTable</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1ProfileTable.html#_CPPv4NK14torch_tensorrt18executorch_backend12ProfileTable4sizeEv"><code class="docutils literal notranslate"><span class="pre">size()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1ProfileTable.html#_CPPv4N14torch_tensorrt18executorch_backend12ProfileTable6boundsE"><code class="docutils literal notranslate"><span class="pre">bounds</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1ProfileTable.html#_CPPv4N14torch_tensorrt18executorch_backend12ProfileTable6activeE"><code class="docutils literal notranslate"><span class="pre">active</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -914,6 +916,28 @@ document.write(`
 </div>
 <div class="toctree-wrapper compound">
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1OptimizationProfileGuard.html">Class OptimizationProfileGuard</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1OptimizationProfileGuard.html#nested-relationships">Nested Relationships</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1OptimizationProfileGuard.html#nested-types">Nested Types</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1OptimizationProfileGuard.html#class-documentation">Class Documentation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1OptimizationProfileGuard.html#_CPPv4N14torch_tensorrt18executorch_backend24OptimizationProfileGuardE"><code class="docutils literal notranslate"><span class="pre">torch_tensorrt::executorch_backend::OptimizationProfileGuard</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1OptimizationProfileGuard.html#_CPPv4N14torch_tensorrt18executorch_backend24OptimizationProfileGuard24OptimizationProfileGuardE7int32_t"><code class="docutils literal notranslate"><span class="pre">OptimizationProfileGuard()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1OptimizationProfileGuard.html#_CPPv4I00EN14torch_tensorrt18executorch_backend24OptimizationProfileGuard24OptimizationProfileGuardE1T"><code class="docutils literal notranslate"><span class="pre">OptimizationProfileGuard()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1OptimizationProfileGuard.html#_CPPv4N14torch_tensorrt18executorch_backend24OptimizationProfileGuard24OptimizationProfileGuardEb"><code class="docutils literal notranslate"><span class="pre">OptimizationProfileGuard()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1OptimizationProfileGuard.html#_CPPv4N14torch_tensorrt18executorch_backend24OptimizationProfileGuardD0Ev"><code class="docutils literal notranslate"><span class="pre">~OptimizationProfileGuard()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1OptimizationProfileGuard.html#_CPPv4N14torch_tensorrt18executorch_backend24OptimizationProfileGuard24OptimizationProfileGuardERK24OptimizationProfileGuard"><code class="docutils literal notranslate"><span class="pre">OptimizationProfileGuard()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1OptimizationProfileGuard.html#_CPPv4N14torch_tensorrt18executorch_backend24OptimizationProfileGuardaSERK24OptimizationProfileGuard"><code class="docutils literal notranslate"><span class="pre">operator=()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1OptimizationProfileGuard.html#_CPPv4N14torch_tensorrt18executorch_backend24OptimizationProfileGuard9automaticEv"><code class="docutils literal notranslate"><span class="pre">automatic()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="toctree-wrapper compound">
+<ul>
 <li class="toctree-l1"><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1TensorRTBackend.html">Class TensorRTBackend</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1TensorRTBackend.html#inheritance-relationships">Inheritance Relationships</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1TensorRTBackend.html#base-type">Base Type</a></li>
@@ -991,6 +1015,35 @@ document.write(`
 </div>
 <div class="toctree-wrapper compound">
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="enum_OptimizationProfileSelection_8h_1a5e828f9e4f3fea51423b5c701d803840.html">Enum ProfileRequest</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="enum_OptimizationProfileSelection_8h_1a5e828f9e4f3fea51423b5c701d803840.html#enum-documentation">Enum Documentation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="enum_OptimizationProfileSelection_8h_1a5e828f9e4f3fea51423b5c701d803840.html#_CPPv4N14torch_tensorrt18executorch_backend14ProfileRequestE"><code class="docutils literal notranslate"><span class="pre">ProfileRequest</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="enum_OptimizationProfileSelection_8h_1a5e828f9e4f3fea51423b5c701d803840.html#_CPPv4N14torch_tensorrt18executorch_backend14ProfileRequest6kUnsetE"><code class="docutils literal notranslate"><span class="pre">kUnset</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="enum_OptimizationProfileSelection_8h_1a5e828f9e4f3fea51423b5c701d803840.html#_CPPv4N14torch_tensorrt18executorch_backend14ProfileRequest7kPinnedE"><code class="docutils literal notranslate"><span class="pre">kPinned</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="enum_OptimizationProfileSelection_8h_1a5e828f9e4f3fea51423b5c701d803840.html#_CPPv4N14torch_tensorrt18executorch_backend14ProfileRequest5kAutoE"><code class="docutils literal notranslate"><span class="pre">kAuto</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="enum_OptimizationProfileSelection_8h_1a327ad4db9a647e041f8c082b069975d8.html">Enum ProfileSelection</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="enum_OptimizationProfileSelection_8h_1a327ad4db9a647e041f8c082b069975d8.html#enum-documentation">Enum Documentation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="enum_OptimizationProfileSelection_8h_1a327ad4db9a647e041f8c082b069975d8.html#_CPPv4N14torch_tensorrt18executorch_backend16ProfileSelectionE"><code class="docutils literal notranslate"><span class="pre">ProfileSelection</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="enum_OptimizationProfileSelection_8h_1a327ad4db9a647e041f8c082b069975d8.html#_CPPv4N14torch_tensorrt18executorch_backend16ProfileSelection3kOkE"><code class="docutils literal notranslate"><span class="pre">kOk</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="enum_OptimizationProfileSelection_8h_1a327ad4db9a647e041f8c082b069975d8.html#_CPPv4N14torch_tensorrt18executorch_backend16ProfileSelection24kPinIgnoredSingleProfileE"><code class="docutils literal notranslate"><span class="pre">kPinIgnoredSingleProfile</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="enum_OptimizationProfileSelection_8h_1a327ad4db9a647e041f8c082b069975d8.html#_CPPv4N14torch_tensorrt18executorch_backend16ProfileSelection28kRequestedProfileUnavailableE"><code class="docutils literal notranslate"><span class="pre">kRequestedProfileUnavailable</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="enum_OptimizationProfileSelection_8h_1a327ad4db9a647e041f8c082b069975d8.html#_CPPv4N14torch_tensorrt18executorch_backend16ProfileSelection23kNoProfileMatchesInputsE"><code class="docutils literal notranslate"><span class="pre">kNoProfileMatchesInputs</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="toctree-wrapper compound">
+<ul>
 <li class="toctree-l1"><a class="reference internal" href="enum_logging_8h_1a130f65408ad8cbaee060f05e8db69558.html">Enum Level</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="enum_logging_8h_1a130f65408ad8cbaee060f05e8db69558.html#enum-documentation">Enum Documentation</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="enum_logging_8h_1a130f65408ad8cbaee060f05e8db69558.html#_CPPv4N14torch_tensorrt7logging5LevelE"><code class="docutils literal notranslate"><span class="pre">Level</span></code></a></li>
@@ -1022,9 +1075,53 @@ document.write(`
 </div>
 <div class="toctree-wrapper compound">
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="function_OptimizationProfileSelection_8h_1a415ea7d183f608f93a9447eac6393135.html">Function torch_tensorrt::executorch_backend::dims_fit</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="function_OptimizationProfileSelection_8h_1a415ea7d183f608f93a9447eac6393135.html#function-documentation">Function Documentation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="function_OptimizationProfileSelection_8h_1a415ea7d183f608f93a9447eac6393135.html#_CPPv4N14torch_tensorrt18executorch_backend8dims_fitERKN8nvinfer14DimsERK18InputProfileBounds"><code class="docutils literal notranslate"><span class="pre">dims_fit()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="toctree-wrapper compound">
+<ul>
 <li class="toctree-l1"><a class="reference internal" href="function_WeightStreamingBudget_8h_1ad04b467472f3cbcb8d5d02a35ec73b40.html">Function torch_tensorrt::executorch_backend::parse_weight_streaming_budget</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="function_WeightStreamingBudget_8h_1ad04b467472f3cbcb8d5d02a35ec73b40.html#function-documentation">Function Documentation</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="function_WeightStreamingBudget_8h_1ad04b467472f3cbcb8d5d02a35ec73b40.html#_CPPv4N14torch_tensorrt18executorch_backend29parse_weight_streaming_budgetEPKvNSt6size_tE"><code class="docutils literal notranslate"><span class="pre">parse_weight_streaming_budget()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="function_OptimizationProfileSelection_8h_1ab53602e32219b5bee50f56c8ac09d47e.html">Function torch_tensorrt::executorch_backend::profile_fits</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="function_OptimizationProfileSelection_8h_1ab53602e32219b5bee50f56c8ac09d47e.html#function-documentation">Function Documentation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="function_OptimizationProfileSelection_8h_1ab53602e32219b5bee50f56c8ac09d47e.html#_CPPv4N14torch_tensorrt18executorch_backend12profile_fitsERK12ProfileTable7int32_tRKNSt6vectorIN8nvinfer14DimsEEE"><code class="docutils literal notranslate"><span class="pre">profile_fits()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="function_OptimizationProfileSelection_8h_1a611c9746189bfa9db2efa54e2718cb92.html">Function torch_tensorrt::executorch_backend::select_profile</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="function_OptimizationProfileSelection_8h_1a611c9746189bfa9db2efa54e2718cb92.html#function-documentation">Function Documentation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="function_OptimizationProfileSelection_8h_1a611c9746189bfa9db2efa54e2718cb92.html#_CPPv4N14torch_tensorrt18executorch_backend14select_profileERK12ProfileTable14ProfileRequest7int32_tRKNSt6vectorIN8nvinfer14DimsEEER7int32_t"><code class="docutils literal notranslate"><span class="pre">select_profile()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="function_OptimizationProfileSelection_8h_1a4f6ab33f9a46a8df5d8e205ebe6cbf3c.html">Template Function torch_tensorrt::executorch_backend::to_profile_index</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="function_OptimizationProfileSelection_8h_1a4f6ab33f9a46a8df5d8e205ebe6cbf3c.html#function-documentation">Function Documentation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="function_OptimizationProfileSelection_8h_1a4f6ab33f9a46a8df5d8e205ebe6cbf3c.html#_CPPv4I0EN14torch_tensorrt18executorch_backend16to_profile_indexE7int32_t1T"><code class="docutils literal notranslate"><span class="pre">to_profile_index()</span></code></a></li>
 </ul>
 </li>
 </ul>

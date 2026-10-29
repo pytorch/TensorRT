@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=2e33cd36"></script>
+    <script src="../../../_static/documentation_options.js?v=cdeeec50"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -805,6 +805,32 @@ document.write(`
         <span class="n">specs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">CompileSpec</span><span class="p">(</span><span class="n">CUDA_GRAPHS_COMPILE_SPEC_KEY</span><span class="p">,</span> <span class="n">spec_value</span><span class="p">))</span>
 
 
+<span class="k">def</span><span class="w"> </span><span class="nf">_apply_external_engine_data</span><span class="p">(</span>
+    <span class="n">method_compile_specs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="n">Any</span><span class="p">]],</span>
+    <span class="n">external_engine_data</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Point every method's TensorRT engines at the named .ptd file, rejecting raw specs."""</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">executorch.exir.backend.compile_spec_schema</span><span class="w"> </span><span class="kn">import</span> <span class="n">CompileSpec</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch.backend</span><span class="w"> </span><span class="kn">import</span> <span class="n">EXTERNAL_ENGINE_DATA_COMPILE_SPEC_KEY</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch.partitioner</span><span class="w"> </span><span class="kn">import</span> <span class="n">normalize_external_engine_data</span>
+
+    <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">specs</span> <span class="ow">in</span> <span class="n">method_compile_specs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">if</span> <span class="nb">any</span><span class="p">(</span>
+            <span class="nb">getattr</span><span class="p">(</span><span class="n">spec</span><span class="p">,</span> <span class="s2">"key"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="o">==</span> <span class="n">EXTERNAL_ENGINE_DATA_COMPILE_SPEC_KEY</span>
+            <span class="k">for</span> <span class="n">spec</span> <span class="ow">in</span> <span class="n">specs</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"compile_specs for </span><span class="si">{</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> carries a "</span>
+                <span class="sa">f</span><span class="s2">"CompileSpec(</span><span class="si">{</span><span class="n">EXTERNAL_ENGINE_DATA_COMPILE_SPEC_KEY</span><span class="si">!r}</span><span class="s2">, ...). Pass "</span>
+                <span class="s2">"external_engine_data= instead."</span>
+            <span class="p">)</span>
+    <span class="n">spec_value</span> <span class="o">=</span> <span class="n">normalize_external_engine_data</span><span class="p">(</span><span class="n">external_engine_data</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">spec_value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span>
+    <span class="k">for</span> <span class="n">specs</span> <span class="ow">in</span> <span class="n">method_compile_specs</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+        <span class="n">specs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">CompileSpec</span><span class="p">(</span><span class="n">EXTERNAL_ENGINE_DATA_COMPILE_SPEC_KEY</span><span class="p">,</span> <span class="n">spec_value</span><span class="p">))</span>
+
+
 <span class="k">def</span><span class="w"> </span><span class="nf">_apply_zero_copy_kv</span><span class="p">(</span>
     <span class="n">program_map</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">ExportedProgram</span><span class="p">],</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]]:</span>
@@ -937,6 +963,7 @@ document.write(`
     <span class="n">generate_etrecord</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">weight_streaming_budget_per_engine</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">use_cuda_graphs</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">external_engine_data</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"EdgeProgramManager"</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Prepare TensorRT-compiled programs for composable ExecuTorch lowering.</span>
 
@@ -1047,7 +1074,8 @@ document.write(`
 <span class="sd">            update discarded. ``torch_tensorrt.save(output_format="executorch",</span>
 <span class="sd">            zero_copy_kv=True)`` owns both steps and needs only the one flag.</span>
 <span class="sd">        generate_etrecord (bool): Ask ExecuTorch for an ETRecord for later debugging.</span>
-<span class="sd">            This copies the whole program, engines included.</span>
+<span class="sd">            This copies the whole program, engines included. Saving the record does not</span>
+<span class="sd">            work for a program with TensorRT engines: it raises a ``SerializeError``.</span>
 <span class="sd">        weight_streaming_budget_per_engine (Optional[int]): Bytes of engine weights that</span>
 <span class="sd">            may stay resident in GPU memory, with the rest streamed from host memory.</span>
 <span class="sd">            It applies to **each** TensorRT engine separately, not as a total for the</span>
@@ -1062,9 +1090,23 @@ document.write(`
 <span class="sd">            program total split proportionally across engines.</span>
 <span class="sd">        use_cuda_graphs (Optional[bool]): Bake CUDA graph replay on (True) or off</span>
 <span class="sd">            (False) into every method's TensorRT compile specs. None leaves the choice</span>
-<span class="sd">            unset so the runtime default applies. A load-time option overrides this</span>
-<span class="sd">            value. Non-booleans and raw ``CompileSpec("use_cuda_graphs", ...)`` entries</span>
-<span class="sd">            are rejected; use this keyword instead.</span>
+<span class="sd">            unset so the runtime default applies. A load option, or a process option</span>
+<span class="sd">            set to False, overrides this value. Non-booleans and raw</span>
+<span class="sd">            ``CompileSpec("use_cuda_graphs", ...)`` entries are rejected; use this</span>
+<span class="sd">            keyword instead.</span>
+<span class="sd">        external_engine_data (Optional[str]): Write every TensorRT engine to an</span>
+<span class="sd">            ExecuTorch data file named ``&lt;external_engine_data&gt;.ptd`` instead of into</span>
+<span class="sd">            the ``.pte``, which then holds only a key per engine. Pass the name without</span>
+<span class="sd">            the ``.ptd`` extension. Use only ASCII letters, digits, ``.``, ``-`` and</span>
+<span class="sd">            ``_``, and start with a letter, a digit or ``_``. The engine is the same</span>
+<span class="sd">            bytes either way. Load the program with that file as its data file,</span>
+<span class="sd">            for example ``Runtime.get().load_program(pte, data_path=ptd)``; without it</span>
+<span class="sd">            the method fails to load. That loader takes one data file. If another</span>
+<span class="sd">            backend in the program writes its own ``.ptd``, pass that backend's name</span>
+<span class="sd">            here so both share one file. For the CUDA backend that name is</span>
+<span class="sd">            ``aoti_cuda_blob``. After ``to_executorch()``, write the ``.ptd`` with</span>
+<span class="sd">            ``write_tensor_data_to_file(directory)``; ``torch_tensorrt.save`` does this</span>
+<span class="sd">            next to the ``.pte``. None, the default, keeps every engine in the ``.pte``.</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        executorch.exir.EdgeProgramManager: The Edge program, ready for inspection,</span>
@@ -1146,6 +1188,7 @@ document.write(`
         <span class="n">method_compile_specs</span><span class="p">,</span> <span class="n">weight_streaming_budget_per_engine</span>
     <span class="p">)</span>
     <span class="n">_apply_use_cuda_graphs</span><span class="p">(</span><span class="n">method_compile_specs</span><span class="p">,</span> <span class="n">use_cuda_graphs</span><span class="p">)</span>
+    <span class="n">_apply_external_engine_data</span><span class="p">(</span><span class="n">method_compile_specs</span><span class="p">,</span> <span class="n">external_engine_data</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">constant_methods</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">invalid</span> <span class="o">=</span> <span class="p">[</span>

@@ -1200,7 +1200,9 @@ def test_the_backend_refuses_a_buffer_on_another_device(mutation) -> None:
         _assert_wrong_device_buffers_are_refused(source)
 
 
-@pytest.mark.parametrize("mutation", [None, "availability-builds-one", "commented-out"])
+@pytest.mark.parametrize(
+    "mutation", [None, "availability-builds-one", "commented-out", "handle-owns-one"]
+)
 @pytest.mark.unit
 def test_the_backend_shares_one_tensorrt_runtime(mutation) -> None:
     """A runtime per program bought nothing and warned on every load after the first.
@@ -1220,13 +1222,19 @@ def test_the_backend_shares_one_tensorrt_runtime(mutation) -> None:
     source = (
         _ROOT / "cpp/src/torch_tensorrt/executorch/TensorRTBackend.cpp"
     ).read_text(encoding="utf-8")
-    header = (
-        _ROOT / "cpp/include/torch_tensorrt/executorch/TensorRTBackend.h"
-    ).read_text(encoding="utf-8")
+    header = (_ROOT / "cpp/src/torch_tensorrt/executorch/EngineHandle.h").read_text(
+        encoding="utf-8"
+    )
     if mutation is None:
         _assert_one_shared_runtime(source, header)
         return
-    if mutation == "availability-builds-one":
+    if mutation == "handle-owns-one":
+        original = "  std::shared_ptr<nvinfer1::ICudaEngine> engine;"
+        assert original in header
+        header = header.replace(
+            original, "  TRTUniquePtr<nvinfer1::IRuntime> runtime;\n" + original
+        )
+    elif mutation == "availability-builds-one":
         # The arrangement this change replaced: its own runtime, from a logger on the stack.
         original = "return shared_runtime() != nullptr;"
         assert original in source

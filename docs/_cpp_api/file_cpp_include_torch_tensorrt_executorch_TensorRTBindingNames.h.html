@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=2e33cd36"></script>
+    <script src="../_static/documentation_options.js?v=cdeeec50"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -488,12 +488,14 @@ document.write(`
   <section id="file-tensorrtbindingnames-h">
 <span id="file-cpp-include-torch-tensorrt-executorch-tensorrtbindingnames-h"></span><h1>File TensorRTBindingNames.h<a class="headerlink" href="#file-tensorrtbindingnames-h" title="Link to this heading">#</a></h1>
 <p>↰ <a class="reference internal" href="dir_cpp_include_torch_tensorrt_executorch.html#dir-cpp-include-torch-tensorrt-executorch"><span class="std std-ref">Parent directory</span></a> (<code class="docutils literal notranslate"><span class="pre">cpp/include/torch_tensorrt/executorch</span></code>)</p>
+<p>Re-exports the shared binding-name helpers into the ExecuTorch backend.</p>
 <nav class="contents local" id="contents">
 <p class="topic-title">Contents</p>
 <ul class="simple">
 <li><p><a class="reference internal" href="#definition-cpp-include-torch-tensorrt-executorch-tensorrtbindingnames-h" id="id1">Definition (<code class="docutils literal notranslate"><span class="pre">cpp/include/torch_tensorrt/executorch/TensorRTBindingNames.h</span></code>)</a></p></li>
-<li><p><a class="reference internal" href="#includes" id="id2">Includes</a></p></li>
-<li><p><a class="reference internal" href="#namespaces" id="id3">Namespaces</a></p></li>
+<li><p><a class="reference internal" href="#detailed-description" id="id2">Detailed Description</a></p></li>
+<li><p><a class="reference internal" href="#includes" id="id3">Includes</a></p></li>
+<li><p><a class="reference internal" href="#namespaces" id="id4">Namespaces</a></p></li>
 </ul>
 </nav>
 <section id="definition-cpp-include-torch-tensorrt-executorch-tensorrtbindingnames-h">
@@ -503,6 +505,11 @@ document.write(`
 <li class="toctree-l1"><a class="reference internal" href="program_listing_file_cpp_include_torch_tensorrt_executorch_TensorRTBindingNames.h.html">Program Listing for File TensorRTBindingNames.h</a></li>
 </ul>
 </div>
+</section>
+<section id="detailed-description">
+<h2>Detailed Description<a class="headerlink" href="#detailed-description" title="Link to this heading">#</a></h2>
+<p>The delegate has to map ExecuTorch’s positional arguments onto TensorRT’s named bindings, and the rules for that are shared with the standard runtime. Rather than restate them, this header pulls torch_tensorrt::core::runtime’s helpers in, so both runtimes agree by construction. The include is spelled two ways because the installed tarball and the in-repo build lay the core runtime out differently.
+Everything here lives in a <code class="docutils literal notranslate"><span class="pre">detail</span></code> namespace: it is shared with the standard runtime, not part of the ExecuTorch backend’s public API.</p>
 </section>
 <section id="includes">
 <h2>Includes<a class="headerlink" href="#includes" title="Link to this heading">#</a></h2>
@@ -549,6 +556,7 @@ document.write(`
   <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#definition-cpp-include-torch-tensorrt-executorch-tensorrtbindingnames-h">Definition (<code class="docutils literal notranslate"><span class="pre">cpp/include/torch_tensorrt/executorch/TensorRTBindingNames.h</span></code>)</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#detailed-description">Detailed Description</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#includes">Includes</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#namespaces">Namespaces</a></li>
 </ul>

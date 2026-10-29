@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=2e33cd36"></script>
+    <script src="../_static/documentation_options.js?v=cdeeec50"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -534,7 +534,8 @@ declaring that an engine output shares its buffer with one of its inputs.</p>
 <li><p>The <code class="docutils literal notranslate"><span class="pre">aten.slice_scatter.default</span></code> decomposition is disabled; a converter
 handles it directly, emitting <code class="docutils literal notranslate"><span class="pre">IKVCacheUpdateLayer</span></code> when the cache is a
 direct network input with a 4-D static shape and write on dim 2,
-otherwise falling back to a scatter sequence.</p></li>
+otherwise falling back to a concatenation for a contiguous write whose
+source is static on the written dim, and to a scatter sequence otherwise.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">aliased_io</span></code> (mapping <code class="docutils literal notranslate"><span class="pre">output_binding</span> <span class="pre">-&gt;</span> <span class="pre">(input_binding,</span> <span class="pre">kind)</span></code>) is
 plumbed from the converter through <code class="docutils literal notranslate"><span class="pre">TRTInterpreterResult</span></code>,
 <code class="docutils literal notranslate"><span class="pre">SerializedInterpreterResult</span></code>, the Python wrapper, and the serialized
@@ -983,9 +984,9 @@ dropped, whereas previously it was constant-folded into the engine.</p>
 point — the engine aliases the output back into the buffer’s storage and the
 mutation is observable across calls. For a mutation that does <strong>not</strong> match
 the fast path (wrong rank/shape/dim, dynamic <code class="docutils literal notranslate"><span class="pre">s_max</span></code>, a plain elementwise
-<code class="docutils literal notranslate"><span class="pre">copy_</span></code>), the converter falls back to the scatter path and the output is
-<strong>not</strong> aliased. The buffer is still lifted to an input and threaded through
-<code class="docutils literal notranslate"><span class="pre">BufferThreadingModule</span></code>, so the mutated value is produced and carried
+<code class="docutils literal notranslate"><span class="pre">copy_</span></code>), the converter falls back to a concatenation or a scatter and the
+output is <strong>not</strong> aliased. The buffer is still lifted to an input and threaded
+through <code class="docutils literal notranslate"><span class="pre">BufferThreadingModule</span></code>, so the mutated value is produced and carried
 forward correctly, but without the in-place aliasing benefit — behavior is
 equivalent to the pre-existing copy-back, just wired through a binding rather
 than a folded constant. Ordinary functional <code class="docutils literal notranslate"><span class="pre">.copy_</span></code> residue that is <em>not</em>

@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=2e33cd36"></script>
+    <script src="../../../_static/documentation_options.js?v=cdeeec50"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -504,6 +504,7 @@ document.write(`
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch.backend</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">ZERO_COPY_KV_COMPILE_SPEC_KEY</span><span class="p">,</span>
     <span class="n">TensorRTBackend</span><span class="p">,</span>
+    <span class="n">_external_engine_tag</span><span class="p">,</span>
     <span class="n">_get_engine_info_for_node</span><span class="p">,</span>
     <span class="n">_get_engine_nodes_in</span><span class="p">,</span>
     <span class="n">_get_str</span><span class="p">,</span>
@@ -588,6 +589,53 @@ document.write(`
     <span class="k">return</span> <span class="sa">b</span><span class="s2">"1"</span> <span class="k">if</span> <span class="n">use_cuda_graphs</span> <span class="k">else</span> <span class="sa">b</span><span class="s2">"0"</span>
 
 
+<span class="c1"># Characters every file system accepts in a file name, with no path separator or drive colon. A</span>
+<span class="c1"># leading dot or dash would make a hidden file or a name that reads as a command line option.</span>
+<span class="n">_EXTERNAL_ENGINE_DATA_NAME</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">"[A-Za-z0-9_][A-Za-z0-9_.-]*"</span><span class="p">)</span>
+<span class="c1"># ExecuTorch writes &lt;name&gt;.ptd, and most file systems limit a file name to 255 bytes.</span>
+<span class="n">_MAX_EXTERNAL_ENGINE_DATA_LENGTH</span> <span class="o">=</span> <span class="mi">255</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="s2">".ptd"</span><span class="p">)</span>
+<span class="c1"># Windows opens these as devices, with any extension.</span>
+<span class="n">_WINDOWS_DEVICE_NAMES</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">(</span>
+    <span class="p">[</span><span class="s2">"CON"</span><span class="p">,</span> <span class="s2">"PRN"</span><span class="p">,</span> <span class="s2">"AUX"</span><span class="p">,</span> <span class="s2">"NUL"</span><span class="p">]</span>
+    <span class="o">+</span> <span class="p">[</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">port</span><span class="si">}{</span><span class="n">i</span><span class="si">}</span><span class="s2">"</span> <span class="k">for</span> <span class="n">port</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"COM"</span><span class="p">,</span> <span class="s2">"LPT"</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">)]</span>
+<span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">normalize_external_engine_data</span><span class="p">(</span><span class="n">external_engine_data</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Validate the .ptd file name, given without its extension; None embeds every engine."""</span>
+    <span class="k">if</span> <span class="n">external_engine_data</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">external_engine_data</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+            <span class="s2">"external_engine_data must be a str or None, got "</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">external_engine_data</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">."</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">_EXTERNAL_ENGINE_DATA_NAME</span><span class="o">.</span><span class="n">fullmatch</span><span class="p">(</span><span class="n">external_engine_data</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"external_engine_data must use only ASCII letters, digits, '.', '-' and '_', and "</span>
+            <span class="sa">f</span><span class="s2">"start with a letter, a digit or '_', got </span><span class="si">{</span><span class="n">external_engine_data</span><span class="si">!r}</span><span class="s2">."</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">external_engine_data</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">_MAX_EXTERNAL_ENGINE_DATA_LENGTH</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"external_engine_data must be at most </span><span class="si">{</span><span class="n">_MAX_EXTERNAL_ENGINE_DATA_LENGTH</span><span class="si">}</span><span class="s2"> "</span>
+            <span class="s2">"characters, so the .ptd file name fits the 255 byte limit, got "</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">external_engine_data</span><span class="p">)</span><span class="si">}</span><span class="s2">."</span>
+        <span class="p">)</span>
+    <span class="c1"># ExecuTorch adds .ptd only when it is missing, so "x.ptd" would share x.ptd with another</span>
+    <span class="c1"># backend's "x" data and the second write would replace the first.</span>
+    <span class="k">if</span> <span class="n">external_engine_data</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">".ptd"</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"external_engine_data must not end with .ptd, which ExecuTorch adds, got "</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">external_engine_data</span><span class="si">!r}</span><span class="s2">."</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="n">external_engine_data</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">"."</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span> <span class="ow">in</span> <span class="n">_WINDOWS_DEVICE_NAMES</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"external_engine_data must not be a Windows device name such as NUL or CON, got "</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">external_engine_data</span><span class="si">!r}</span><span class="s2">."</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="n">external_engine_data</span><span class="o">.</span><span class="n">encode</span><span class="p">()</span>
+
+
 <span class="k">def</span><span class="w"> </span><span class="nf">_keep_mutated_buffers_above_delegate</span><span class="p">(</span><span class="n">exported_program</span><span class="p">:</span> <span class="n">ExportedProgram</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Undo tag_constant_data freezing a delegate-mutated buffer as constant.</span>
 
@@ -619,11 +667,10 @@ document.write(`
 <span class="sd">    each such node becomes its own partition so the backend can serialize</span>
 <span class="sd">    the engine to the same format as the TRT runtime.</span>
 
-<span class="sd">    If `compile_specs` does not already contain a ``target_device`` entry,</span>
-<span class="sd">    one defaulting to ``cuda:0`` is auto-appended (mirroring CudaPartitioner).</span>
-<span class="sd">    Callers targeting a non-default GPU should pre-populate</span>
-<span class="sd">    ``compile_specs`` with the desired ``CompileSpec("target_device",</span>
-<span class="sd">    b"cuda:&lt;index&gt;")`` to override the default.</span>
+<span class="sd">    If `compile_specs` has no ``target_device`` entry, each partition gets one</span>
+<span class="sd">    naming the GPU its own engine was built on, or ``cuda:0`` if that cannot be</span>
+<span class="sd">    read. A ``CompileSpec("target_device", b"cuda:&lt;index&gt;")`` in</span>
+<span class="sd">    ``compile_specs`` sets it for every partition instead.</span>
 
 <span class="sd">    Note: ``target_device`` is AOT metadata only -- it drives ExecuTorch's</span>
 <span class="sd">    PropagateDevicePass tagging at export time. At runtime the C++ backend</span>
@@ -686,6 +733,8 @@ document.write(`
                 <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">CUDA_GRAPHS_COMPILE_SPEC_KEY</span><span class="si">}</span><span class="s2"> must appear at most once, with the value "</span>
                 <span class="sa">f</span><span class="s1">'b"0" or b"1", got </span><span class="si">{</span><span class="p">[</span><span class="n">s</span><span class="o">.</span><span class="n">value</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">s</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="n">cuda_graphs</span><span class="p">]</span><span class="si">!r}</span><span class="s1">.'</span>
             <span class="p">)</span>
+        <span class="c1"># export() checks this name too, but a caller can lower with this partitioner directly.</span>
+        <span class="n">_external_engine_tag</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">compile_specs</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">delegation_spec</span> <span class="o">=</span> <span class="n">DelegationSpec</span><span class="p">(</span>
             <span class="n">backend_id</span><span class="o">=</span><span class="n">TensorRTBackend</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
             <span class="n">compile_specs</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">compile_specs</span><span class="p">,</span>

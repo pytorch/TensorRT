@@ -29,12 +29,14 @@ from .constant_folding import constant_fold
 from .decompose_dynamic_slice_scatter import decompose_dynamic_slice_scatter
 from .decompose_unsupported_attention import decompose_unsupported_attention
 from .eliminate_sym_min_int64_max import eliminate_sym_min_int64_max  # noqa: F401
+from .fold_shared_kv_attention import fold_shared_kv_attention
 from .force_causal_efficient_attention import force_causal_efficient_attention
 from .fuse_pad_into_convolution import fuse_pad_into_convolution
 from .fuse_prims_broadcast import fuse_prims_broadcast
 from .lower_associative_scan import lower_associative_scan
 from .normalize_negative_slice_stop import normalize_negative_slice_stop  # noqa: F401
 from .pass_manager import DynamoPassManager
+from .remove_alias import remove_alias
 from .remove_assert_nodes import remove_assert_nodes
 from .remove_detach import remove_detach
 from .remove_input_alias_fixing_clones import remove_input_alias_fixing_clones
@@ -66,6 +68,7 @@ def complex_lowering_pass(
 
 
 post_lowering_pass_list = [
+    remove_alias,
     replace_fused_rms_norm,
     remove_input_alias_fixing_clones,
     lower_associative_scan,
@@ -79,6 +82,7 @@ post_lowering_pass_list = [
     # One cleanup cycle for non-conflicting node repairs.
     batch_cheap_fx_cleanups,
     complex_lowering_pass,
+    fold_shared_kv_attention,
     force_causal_efficient_attention,
     decompose_unsupported_attention,
     annotate_fp8_sdpa,

@@ -387,11 +387,12 @@ TRTEngine::TRTEngine(
 }
 
 TRTEngine::~TRTEngine() {
+  // Release the captured graph and context before the TensorRT objects below, which unload the kernels it runs.
+  invalidate_exec_ctx();
   // Disk persistence for runtime caches is owned by the Python side
   // (`RuntimeCacheHandle.save()` invoked from the runtime_cache CM or the engine
   // wrapper). The C++ side just lets refcounts drop.
   trt_engine_profiler.reset();
-  exec_ctx_.reset();
   cuda_engine.reset();
   if (empty_tensor_placeholder) {
     cudaFree(empty_tensor_placeholder);
@@ -521,8 +522,6 @@ bool TRTEngine::set_device_memory_budget(int64_t budget) {
     bind_nccl_comm();
   }
 #endif
-  // Indicates to reevaluate the runtime settings
-  runtime_states.context_changed = true;
 
   return result;
 }
@@ -676,6 +675,7 @@ std::vector<std::string> TRTEngine::serialize() {
 
 void TRTEngine::reset_captured_graph() {
   cudagraph.reset();
+  cudagraph_workspace.reset();
 }
 
 void TRTEngine::setup_input_binding_infos() {
@@ -755,15 +755,34 @@ void TRTEngine::set_active_profile(int64_t profile_index) {
 }
 
 void TRTEngine::set_active_profile_with_stream(int64_t profile_index, const c10::cuda::CUDAStream& stream) {
-  if (num_optimization_profiles <= 1) {
+  // An index this engine does not have cannot be honored. A single-profile engine
+  // is the one case where that is not a mistake to fail on: it has profile 0 and
+  // nothing to switch to, so a pin aimed at some other engine is ignored with a
+  // warning rather than raising. A multi-profile engine handed an index it lacks
+  // could have done something different, and a negative index is a computed value
+  // gone wrong on any engine, so both stay hard errors -- silently running on
+  // mistuned kernels is worse than stopping. Same split as the ExecuTorch backend
+  // (kPinIgnoredSingleProfile vs kRequestedProfileUnavailable).
+  //
+  // Reachable only by driving the engine directly; the Python wrapper validates
+  // the index against the profile count first.
+  if (num_optimization_profiles <= 1 && profile_index > 0) {
+    LOG_WARNING(
+        "Ignoring optimization profile index " << profile_index << ": this engine has " << num_optimization_profiles
+                                               << " optimization profile(s), so it stays on profile "
+                                               << active_profile_index << ".");
     return;
   }
+  TORCHTRT_CHECK(
+      profile_index >= 0 && profile_index < num_optimization_profiles,
+      "Optimization profile index " << profile_index << " is out of range: this engine has "
+                                    << num_optimization_profiles << " optimization profile(s).");
   if (profile_index == active_profile_index) {
     return;
   }
 
-  // setOptimizationProfileAsync returns false for an out-of-range index; the
-  // index is validated upstream in TorchTensorRTModule.resolve_profile_index.
+  // The index is in range by the check above, so a false return here is TensorRT
+  // refusing the switch for some other reason.
   TORCHTRT_CHECK(
       exec_ctx()->setOptimizationProfileAsync(static_cast<int32_t>(profile_index), stream.stream()),
       "Failed to switch to optimization profile index " << profile_index);
@@ -1019,10 +1038,6 @@ bool TRTEngine::runtime_settings(RuntimeSettings new_settings) {
   // the next ``execute_engine`` must re-bind via ``bind_nccl_comm()``.
   nccl_initialized = false;
 #endif
-  // Existing recreate sites set runtime_states.context_changed for cudagraph
-  // re-record; do the same here so a settings flip inside an active CM forces
-  // the next enqueue to re-record any captured graph.
-  runtime_states.context_changed = true;
   return true;
 }
 
@@ -1034,6 +1049,9 @@ nvinfer1::IExecutionContext* TRTEngine::exec_ctx() {
 }
 
 void TRTEngine::invalidate_exec_ctx() noexcept {
+  // A captured graph replays this context's kernels and memory, so the graph must not outlive the context.
+  reset_captured_graph();
+  runtime_states.context_changed = true;
   exec_ctx_.reset();
 }
 

@@ -43,6 +43,7 @@ from torch_tensorrt.dynamo.lowering.passes.mark_constant_fold_exclusions import 
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     clean_up_graph_after_modifications,
 )
+from torch_tensorrt.dynamo.lowering.passes.remove_alias import remove_alias
 
 # Reuse the I/O-signature capture helpers already written for the legacy pass.
 from .complex_graph_rewrite import (
@@ -85,6 +86,7 @@ def complex_decomposition_adapter(
     # the unflatten step is silently skipped and callers get a raw tuple.
     original_in_spec = getattr(gm, "_in_spec", None)
     original_out_spec = getattr(gm, "_out_spec", None)
+    original_codegen = gm.graph._codegen
     if not complex_input_names and not complex_output_indices:
         # No complex I/O and no interior complex work -> nothing to do.  (Interior-
         # only complex still shows up via inputs/outputs of the complex region, so
@@ -99,6 +101,13 @@ def complex_decomposition_adapter(
 
     flat_args = _fake_flat_args(gm)
     logger.debug("complex_decomposition_adapter: retracing under ComplexTensor")
+    # The retrace calls the module with flat positional args. Under the exported
+    # program's pytree codegen it would return the user's output structure, which
+    # make_fx records as built by the graph (a namedtuple becomes one node); under
+    # a plain codegen it returns the graph's flat outputs, which the original
+    # codegen then unflattens again.
+    gm.graph._codegen = torch.fx.graph.CodeGen()
+    gm.recompile()
     try:
         # Both retraces return a new graph. Keep the original for the existing
         # unsupported-op fallback rather than replacing it before success.
@@ -124,8 +133,16 @@ def complex_decomposition_adapter(
             f"complex decomposition failed ({type(e).__name__}: {e}); "
             "falling back to the legacy complex_graph_detection pass."
         )
+        gm.graph._codegen = original_codegen
+        gm.recompile()
         return complex_graph_detection(gm, settings)
+    gm.graph._codegen = original_codegen  # the caller's module, as it was
+    gm.recompile()
     gm = decomposed_gm
+
+    # The retrace brings back alias nodes. aten.alias has no converter, so the
+    # partitioner would split the graph around them.
+    gm = remove_alias(gm, settings)
 
     # (3) Fold constants again. The retrace builds the module from scratch, so
     #     a constant that the constant-folding stage had already reduced to one
@@ -147,6 +164,10 @@ def complex_decomposition_adapter(
         gm._in_spec = original_in_spec
     if original_out_spec is not None:
         gm._out_spec = original_out_spec
+    # The retrace returns a plain codegen (positional flat args); restore the
+    # exported program's, which takes the inputs by name
+    gm.graph._codegen = original_codegen
+    gm.recompile()
     return gm
 
 
@@ -187,9 +208,9 @@ def _trt_decomposition_table(
     it returns is built from whatever ``ComplexTensor`` dispatched to, not from
     the ops that survived the decomposition run at export time. Without a table
     that retrace re-introduces ops the flow has already decided to expand
-    (``aten.stack``) or to drop (``aten.alias``), long after the stage that
-    would have handled them, and the partitioner then cuts the graph around
-    them. Handing the retrace the same table keeps the two in step.
+    (``aten.stack``), long after the stage that would have handled them, and
+    the partitioner then cuts the graph around them. Handing the retrace the
+    same table keeps the two in step.
     """
     from torch_tensorrt.dynamo.lowering import (
         filter_decomposition_table,

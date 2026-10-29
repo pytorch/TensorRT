@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=2e33cd36"></script>
+    <script src="../_static/documentation_options.js?v=cdeeec50"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -59,7 +59,7 @@
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Class TRTLogger" href="classtorch__tensorrt_1_1executorch__backend_1_1TRTLogger.html" />
-    <link rel="prev" title="Class Device::DeviceType" href="classtorch__tensorrt_1_1Device_1_1DeviceType.html" />
+    <link rel="prev" title="Class OptimizationProfileGuard" href="classtorch__tensorrt_1_1executorch__backend_1_1OptimizationProfileGuard.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   </head>
@@ -455,8 +455,9 @@ document.write(`
 <li class="toctree-l3"><a class="reference internal" href="namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1Device.html">Struct Device</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1AliasedBinding.html">Struct AliasedBinding</a></li>
-<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1EngineHandle.html">Struct EngineHandle</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1InputProfileBounds.html">Struct InputProfileBounds</a></li>
+<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1OptimizationProfileGuard_1_1AutoTag.html">Struct OptimizationProfileGuard::AutoTag</a></li>
+<li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1ProfileTable.html">Struct ProfileTable</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1TensorRTBlobHeader.html">Struct TensorRTBlobHeader</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1TRTDeleter.html">Struct TRTDeleter</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1executorch__backend_1_1WsBudget.html">Struct WsBudget</a></li>
@@ -465,13 +466,20 @@ document.write(`
 <li class="toctree-l3"><a class="reference internal" href="structtorch__tensorrt_1_1torchscript_1_1CompileSpec.html">Struct CompileSpec</a></li>
 <li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1DataType.html">Class DataType</a></li>
 <li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1Device_1_1DeviceType.html">Class Device::DeviceType</a></li>
+<li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1OptimizationProfileGuard.html">Class OptimizationProfileGuard</a></li>
 <li class="toctree-l3 current active"><a class="current reference internal" href="#">Class TensorRTBackend</a></li>
 <li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1TRTLogger.html">Class TRTLogger</a></li>
 <li class="toctree-l3"><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html">Class TensorFormat</a></li>
 <li class="toctree-l3"><a class="reference internal" href="enum_torch__tensorrt_8h_1a3fbe5d72e4fc624dbd038853079620eb.html">Enum EngineCapability</a></li>
+<li class="toctree-l3"><a class="reference internal" href="enum_OptimizationProfileSelection_8h_1a5e828f9e4f3fea51423b5c701d803840.html">Enum ProfileRequest</a></li>
+<li class="toctree-l3"><a class="reference internal" href="enum_OptimizationProfileSelection_8h_1a327ad4db9a647e041f8c082b069975d8.html">Enum ProfileSelection</a></li>
 <li class="toctree-l3"><a class="reference internal" href="enum_logging_8h_1a130f65408ad8cbaee060f05e8db69558.html">Enum Level</a></li>
 <li class="toctree-l3"><a class="reference internal" href="function_torch__tensorrt_8h_1ad6a4ee8ca6c8f6e5519eb1128ec7f4a1.html">Function torch_tensorrt::dump_build_info</a></li>
+<li class="toctree-l3"><a class="reference internal" href="function_OptimizationProfileSelection_8h_1a415ea7d183f608f93a9447eac6393135.html">Function torch_tensorrt::executorch_backend::dims_fit</a></li>
 <li class="toctree-l3"><a class="reference internal" href="function_WeightStreamingBudget_8h_1ad04b467472f3cbcb8d5d02a35ec73b40.html">Function torch_tensorrt::executorch_backend::parse_weight_streaming_budget</a></li>
+<li class="toctree-l3"><a class="reference internal" href="function_OptimizationProfileSelection_8h_1ab53602e32219b5bee50f56c8ac09d47e.html">Function torch_tensorrt::executorch_backend::profile_fits</a></li>
+<li class="toctree-l3"><a class="reference internal" href="function_OptimizationProfileSelection_8h_1a611c9746189bfa9db2efa54e2718cb92.html">Function torch_tensorrt::executorch_backend::select_profile</a></li>
+<li class="toctree-l3"><a class="reference internal" href="function_OptimizationProfileSelection_8h_1a4f6ab33f9a46a8df5d8e205ebe6cbf3c.html">Template Function torch_tensorrt::executorch_backend::to_profile_index</a></li>
 <li class="toctree-l3"><a class="reference internal" href="function_torch__tensorrt_8h_1ac4ab8313ae72c2c899ea31548b528528.html">Function torch_tensorrt::get_build_info</a></li>
 <li class="toctree-l3"><a class="reference internal" href="function_logging_8h_1a56e110feaaba2c3fd44bd201fd21a76a.html">Function torch_tensorrt::logging::get_is_colored_output_on</a></li>
 <li class="toctree-l3"><a class="reference internal" href="function_logging_8h_1a0593f776f469c20469e2f729fc7861a3.html">Function torch_tensorrt::logging::get_logging_prefix</a></li>
@@ -586,32 +594,54 @@ document.write(`
 <dl class="cpp class">
 <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt18executorch_backend15TensorRTBackendE">
 <span class="target" id="classtorch__tensorrt_1_1executorch__backend_1_1TensorRTBackend"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">TensorRTBackend</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><span class="n"><span class="pre">BackendInterface</span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt18executorch_backend15TensorRTBackendE" title="Link to this definition">#</a><br /></dt>
-<dd><div class="breathe-sectiondef docutils container">
+<dd><p>The delegate ExecuTorch calls to run a TensorRT engine. </p>
+<p>Registered under the backend id <code class="docutils literal notranslate"><a class="reference internal" href="#classtorch__tensorrt_1_1executorch__backend_1_1TensorRTBackend"><span class="std std-ref"><span class="pre">TensorRTBackend</span></span></a></code>, the name the partitioner writes into the <code class="docutils literal notranslate"><span class="pre">.pte</span></code>; a <code class="docutils literal notranslate"><span class="pre">.pte</span></code> produced by torch_tensorrt.save(output_format=”executorch”) dispatches to it. </p>
+<div class="breathe-sectiondef docutils container">
 <p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4NK14torch_tensorrt18executorch_backend15TensorRTBackend12is_availableEv">
 <span class="target" id="classtorch__tensorrt_1_1executorch__backend_1_1TensorRTBackend_1ab6d7401a38d715e76f5fc0904e18c86f"></span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">is_available</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="k"><span class="pre">override</span></span><a class="headerlink" href="#_CPPv4NK14torch_tensorrt18executorch_backend15TensorRTBackend12is_availableEv" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Whether a usable CUDA device and TensorRT runtime are present. </p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4NK14torch_tensorrt18executorch_backend15TensorRTBackend4initERN10executorch7runtime18BackendInitContextEPN10executorch7runtime14FreeableBufferEN10executorch7runtime8ArrayRefIN10executorch7runtime11CompileSpecEEE">
 <span class="target" id="classtorch__tensorrt_1_1executorch__backend_1_1TensorRTBackend_1a59ce3819595d0a1ccd6290c28907a10b"></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">executorch</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">runtime</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Result</span></span><span class="p"><span class="pre">&lt;</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">executorch</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">runtime</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">DelegateHandle</span></span><span class="p"><span class="pre">*</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">init</span></span></span><span class="sig-paren">(</span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">executorch</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">runtime</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">BackendInitContext</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">context</span></span>, <span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">executorch</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">runtime</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">FreeableBuffer</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">processed</span></span>, <span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">executorch</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">runtime</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">ArrayRef</span></span><span class="p"><span class="pre">&lt;</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">executorch</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">runtime</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">CompileSpec</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">compile_specs</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="k"><span class="pre">override</span></span><a class="headerlink" href="#_CPPv4NK14torch_tensorrt18executorch_backend15TensorRTBackend4initERN10executorch7runtime18BackendInitContextEPN10executorch7runtime14FreeableBufferEN10executorch7runtime8ArrayRefIN10executorch7runtime11CompileSpecEEE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Deserializes one engine from its processed blob into a handle. </p>
+</dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4NK14torch_tensorrt18executorch_backend15TensorRTBackend7executeERN10executorch7runtime23BackendExecutionContextEPN10executorch7runtime14DelegateHandleEN10executorch7runtime4SpanIPN10executorch7runtime6EValueEEE">
 <span class="target" id="classtorch__tensorrt_1_1executorch__backend_1_1TensorRTBackend_1a29b22ac15cc79551155771a7f06b826f"></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">executorch</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">runtime</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Error</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">execute</span></span></span><span class="sig-paren">(</span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">executorch</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">runtime</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">BackendExecutionContext</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">context</span></span>, <span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">executorch</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">runtime</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">DelegateHandle</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">handle</span></span>, <span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">executorch</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">runtime</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Span</span></span><span class="p"><span class="pre">&lt;</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">executorch</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">runtime</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">EValue</span></span><span class="p"><span class="pre">*</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">args</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="k"><span class="pre">override</span></span><a class="headerlink" href="#_CPPv4NK14torch_tensorrt18executorch_backend15TensorRTBackend7executeERN10executorch7runtime23BackendExecutionContextEPN10executorch7runtime14DelegateHandleEN10executorch7runtime4SpanIPN10executorch7runtime6EValueEEE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Binds <code class="docutils literal notranslate"><span class="pre">args</span></code> and runs the engine, selecting the optimization profile the calling thread’s <a class="reference internal" href="classtorch__tensorrt_1_1executorch__backend_1_1OptimizationProfileGuard.html#classtorch__tensorrt_1_1executorch__backend_1_1OptimizationProfileGuard"><span class="std std-ref">OptimizationProfileGuard</span></a> asked for, on the CUDA stream its executorch::extension::cuda::CallerStreamGuard selected. </p>
+<p>Returns once the work is finished, whatever memory it was given, so outputs are readable as soon as this returns. The stream in use must be on the engine’s device, and calls on one handle must not overlap each other or its destruction. Every buffer passed in must stay alive and unchanged until this returns. Freeing one while the call runs is not detectable here or anywhere below, and returns a plausible wrong answer rather than an error.</p>
+<p>With the shared activation scratch pool (kSharedActivationScratchKey) one buffer per device backs every context created while the option was on. What a caller has to know:<ul class="simple">
+<li><p>Calls on two such handles on one device are serialized at submission. The backend does that itself, with a per-device lock held across the enqueue. A handle loaded with the option off keeps its own scratch, and so does one whose engine needs no activation scratch under any shape; neither is affected.</p></li>
+<li><p>A call can wait on the host for pooled work submitted earlier on that device, and a call that grows the pool can wait for an unbounded amount of it. If the caller parks work that only the caller will release once <a class="reference internal" href="#classtorch__tensorrt_1_1executorch__backend_1_1TensorRTBackend_1a29b22ac15cc79551155771a7f06b826f"><span class="std std-ref">execute()</span></a> returns, the call does not return. Do not hold a pooled call behind something it has to come back to release.</p></li>
+<li><p>Capturing a CUDA graph around this delegate is not supported, with the option on or off. A handle that claims pooled scratch refuses a capturing selected stream with Error::NotSupported. Other streams are not checked. Do not overlap execution with a Global capture on any thread or a ThreadLocal capture on the calling thread, even with the option off or with an engine that needs no scratch: the call can invalidate it.</p></li>
+<li><p>cudaDeviceReset() invalidates the pool without emptying it, and the next call on that device uses what it destroyed. There is no guard: do not reset a device this backend has run a pooled engine on.</p></li>
+<li><p>Pool failures share error codes with other failures in <a class="reference internal" href="#classtorch__tensorrt_1_1executorch__backend_1_1TensorRTBackend_1a29b22ac15cc79551155771a7f06b826f"><span class="std std-ref">execute()</span></a>. Error::NotSupported can also mean an output resize was refused. Error::Internal can mean handoff event creation, cudaFree(nullptr), or the final stream synchronization failed. The CUDA call can fail because of a capture or an earlier device fault. Check the error log for the cause.</p></li>
+</ul>
+</p>
+<p>The mechanism behind all of that, the measurements, and which calls grow the pool are in the backend README rather than here. </p>
+</dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt18executorch_backend15TensorRTBackend10set_optionERN9ET_UNUSED10executorch7runtime20BackendOptionContextERKN10executorch7runtime4SpanIN10executorch7runtime13BackendOptionEEE">
 <span class="target" id="classtorch__tensorrt_1_1executorch__backend_1_1TensorRTBackend_1a4fdcb127d79211488a8fb982f559b9c8"></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">executorch</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">runtime</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Error</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">set_option</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">ET_UNUSED</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">executorch</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">runtime</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">BackendOptionContext</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">context</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">executorch</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">runtime</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">Span</span></span><span class="p"><span class="pre">&lt;</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">executorch</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">runtime</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">BackendOption</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">backend_options</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">override</span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt18executorch_backend15TensorRTBackend10set_optionERN9ET_UNUSED10executorch7runtime20BackendOptionContextERKN10executorch7runtime4SpanIN10executorch7runtime13BackendOptionEEE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Applies the runtime backend options a caller passes to <code class="docutils literal notranslate"><span class="pre">executorch::runtime::set_option(&quot;TensorRTBackend&quot;,</span> <span class="pre">...)</span></code>. </p>
+<p>The keys read are kSharedActivationScratchKey and kCudaGraphsKey, both booleans. A kCudaGraphsKey load option wins over this one, and an explicit false refuses a saved true. kSharedEnginesKey is load-only and is rejected here. </p>
+</dd></dl>
 
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4NK14torch_tensorrt18executorch_backend15TensorRTBackend7destroyEPN10executorch7runtime14DelegateHandleE">
 <span class="target" id="classtorch__tensorrt_1_1executorch__backend_1_1TensorRTBackend_1ac934b7b409052d8c0d540116f9392b7a"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">destroy</span></span></span><span class="sig-paren">(</span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">executorch</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">runtime</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">DelegateHandle</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">handle</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="k"><span class="pre">override</span></span><a class="headerlink" href="#_CPPv4NK14torch_tensorrt18executorch_backend15TensorRTBackend7destroyEPN10executorch7runtime14DelegateHandleE" title="Link to this definition">#</a><br /></dt>
-<dd></dd></dl>
+<dd><p>Releases the handle; <a class="reference internal" href="#classtorch__tensorrt_1_1executorch__backend_1_1TensorRTBackend_1a29b22ac15cc79551155771a7f06b826f"><span class="std std-ref">execute()</span></a> already waited for its work. </p>
+</dd></dl>
 
 </div>
 </dd></dl>
@@ -630,12 +660,12 @@ document.write(`
                   
 <div class="prev-next-area">
     <a class="left-prev"
-       href="classtorch__tensorrt_1_1Device_1_1DeviceType.html"
+       href="classtorch__tensorrt_1_1executorch__backend_1_1OptimizationProfileGuard.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">Class Device::DeviceType</p>
+        <p class="prev-next-title">Class OptimizationProfileGuard</p>
       </div>
     </a>
     <a class="right-next"

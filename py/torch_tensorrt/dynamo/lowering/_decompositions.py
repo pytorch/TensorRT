@@ -115,11 +115,6 @@ def lift_fresh_copy_replacement(x: torch.Tensor) -> torch.Tensor:
     return x
 
 
-@register_torch_trt_decomposition(aten.alias, registry=TORCH_TRT_DECOMPOSITIONS)
-def alias_replacement(x: torch.Tensor) -> torch.Tensor:
-    return x
-
-
 @register_torch_trt_decomposition(
     torch.ops.aten.reciprocal.default, registry=TORCH_TRT_DECOMPOSITIONS
 )
@@ -193,8 +188,8 @@ def empty_permuted_decomposition(*args, **kwargs) -> torch.Tensor:  # type: igno
 # NOTE: slice_scatter is intentionally NOT registered as a Torch-TRT decomposition.
 # It is handled by the slice_scatter converter, which can emit either
 # IKVCacheUpdateLayer (with aliased I/O) for KV-cache update patterns, or fall
-# back to a scatter sequence equivalent to this function for the general case.
-# The converter calls slice_scatter_decomposition directly for the fallback path.
+# back to a concatenation for a contiguous write whose src is static on the
+# written dim, and to a scatter sequence equivalent to this function otherwise.
 def slice_scatter_decomposition(
     input_tensor: torch.Tensor,
     src_tensor: torch.Tensor,
@@ -249,8 +244,18 @@ def select_scatter_decomposition(
     input_tensor: torch.Tensor,
     src_tensor: torch.Tensor,
     dim: int,
-    index: int,
+    index: Union[int, torch.SymInt],
 ) -> torch.Tensor:
+    dim_size = input_tensor.shape[dim]
+    if isinstance(index, int):
+        # As torch does. Only an int index on a static dim can be checked here.
+        if isinstance(dim_size, int) and not -dim_size <= index < dim_size:
+            raise IndexError(
+                f"select_scatter: index {index} is out of range for dim {dim} of size {dim_size}"
+            )
+        # Left negative, index -1 would give the empty slice -1:0.
+        if index < 0:
+            index = index + dim_size
     src_tensor = torch.unsqueeze(src_tensor, dim)
     return torch.slice_scatter(input_tensor, src_tensor, dim, index, index + 1, 1)
 

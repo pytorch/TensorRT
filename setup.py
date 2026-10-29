@@ -209,14 +209,15 @@ else:
 # The delegate is compiled from the ExecuTorch source revision pinned in MODULE.bazel, so the
 # installed wheel should agree with it. The upper bound is the load-bearing half: ExecuTorch's C++
 # runtime API is not stable across minor releases, and an unbounded floor would resolve a future
-# minor against a backend built for this one. Everything below that ceiling resolves: later 1.5
-# nightlies, a 1.5 release candidate, and 1.5 patch releases alike, since the exact pin belongs in
-# the runtime package, which does derive it.
+# minor against a backend built for this one. Everything below that ceiling resolves: later
+# nightlies of the pinned minor, its release candidate, and its patch releases alike, since the
+# exact pin belongs in the runtime package, which does derive it. Where a wheel's extras also
+# require that package, they admit only the one ExecuTorch build it pins.
 # The floor currently names a dev build, because the runtime split the delegate needs does not
 # exist in any ExecuTorch release yet: 1.4.1's executorch/lib carries no standalone linkable
 # runtime, and no CUDA wheel at all.
-# That also makes this range prefer a release as soon as one exists, since 1.5.0 sorts above
-# every 1.5.0.devN, so nothing here changes on the day it ships.
+# That also makes this range prefer a release as soon as one exists, since a release sorts above
+# every development build of the same version, so nothing here changes on the day it ships.
 _executorch_major, _executorch_minor = __executorch_version__.split(".")[:2]
 # ExecuTorch CUDA wheels support Linux and Windows x86-64. Windows ARM64 is
 # excluded until ExecuTorch publishes a matching runtime wheel.
@@ -226,13 +227,37 @@ EXECUTORCH_REQUIREMENT = (
     "(platform_system == 'Linux' or "
     "(platform_system == 'Windows' and platform_machine == 'AMD64'))"
 )
-# Install the native companion separately from the matching build artifacts. Its
-# exact ABI dependencies can lag the source pins while a new nightly is building,
-# so resolving it here would prevent locking or installing the current project.
 EXTRAS_REQUIRE = {
     "executorch": [EXECUTORCH_REQUIREMENT],
     "all": [EXECUTORCH_REQUIREMENT],
 }
+# A published wheel's extras also require the exact companion its build job produced, but only
+# where the wheel's own index carries the ExecuTorch build that companion pins: pip does not fail on
+# an extra it cannot meet, it quietly installs another torch-tensorrt. A development build is only
+# on the nightly index. A release is on the test index, and on Linux PyPI carries its CUDA build for
+# the CUDA version of PyTorch's PyPI wheel, the one the PyPI companion is built for. A Windows PyPI
+# wheel records no channel, because PyPI's Windows ExecuTorch is the CPU build. After promotion,
+# the extra stays installable only if ExecuTorch and the companion reach the stable index before
+# torch-tensorrt does. The workflow names the version and the channel before building either
+# wheel, and the companion build reads the same version. Source builds leave both out, so the lock
+# keeps following the source pins.
+EXECUTORCH_CHANNEL = "nightly" if ".dev" in __executorch_version__ else "test"
+EXECUTORCH_RUNTIME_VERSION = (
+    os.environ.get("TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION", "") if RELEASE else ""
+)
+EXECUTORCH_RUNTIME_CHANNEL = (
+    os.environ.get("TORCH_TENSORRT_EXECUTORCH_RUNTIME_CHANNEL", "")
+    if EXECUTORCH_RUNTIME_VERSION
+    else ""
+)
+if EXECUTORCH_RUNTIME_CHANNEL == EXECUTORCH_CHANNEL or (
+    EXECUTORCH_RUNTIME_CHANNEL == "pypi" and EXECUTORCH_CHANNEL == "test"
+):
+    for _extra in ("executorch", "all"):
+        EXTRAS_REQUIRE[_extra].append(
+            f"torch-tensorrt-executorch-runtime=={EXECUTORCH_RUNTIME_VERSION}; "
+            + EXECUTORCH_REQUIREMENT.partition(";")[2].strip()
+        )
 
 if "--ci" in sys.argv:
     sys.argv.remove("--ci")
@@ -391,6 +416,13 @@ def gen_version_file():
         f.write('__tensorrt_version__ = "' + __tensorrt_version__ + '"\n')
         f.write('__tensorrt_rtx_version__ = "' + __tensorrt_rtx_version__ + '"\n')
         f.write('__tensorrt_llm_version__ = "' + __tensorrt_llm_version__ + '"\n')
+        f.write(
+            '__executorch_runtime_version__ = "' + EXECUTORCH_RUNTIME_VERSION + '"\n'
+        )
+        f.write(
+            '__executorch_runtime_channel__ = "' + EXECUTORCH_RUNTIME_CHANNEL + '"\n'
+        )
+        f.write('__executorch_channel__ = "' + EXECUTORCH_CHANNEL + '"\n')
 
 
 def copy_libtorchtrt(multilinux=False, rt_only=False):
@@ -1068,7 +1100,7 @@ def get_requirements():
     base_requirements = [
         "packaging>=23",
         "typing-extensions>=4.7.0",
-        "filelock",
+        "filelock>=4.2.1",
         "dllist",
         "psutil",
     ]

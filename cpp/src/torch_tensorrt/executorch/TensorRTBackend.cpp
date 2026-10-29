@@ -11,6 +11,7 @@
  */
 
 #include "torch_tensorrt/executorch/TensorRTBackend.h"
+#include "EngineHandle.h"
 #include "torch_tensorrt/executorch/ExecutionGraph.h"
 #include "torch_tensorrt/executorch/PooledScratchInstall.h"
 #include "torch_tensorrt/executorch/SharedEngineKey.h"
@@ -136,7 +137,32 @@ Error check_registration() {
   return kRegistrationResult;
 }
 
+// The profile request in effect for this thread. `g_profile_index` is read only
+// when the request is kPinned. Read by execute(), never by the guard itself.
+thread_local ProfileRequest g_profile_request = ProfileRequest::kUnset;
+thread_local int32_t g_profile_index = 0;
+
 } // namespace
+
+OptimizationProfileGuard::OptimizationProfileGuard(int32_t profile_index)
+    : prev_request_(g_profile_request), prev_index_(g_profile_index) {
+  g_profile_request = ProfileRequest::kPinned;
+  g_profile_index = profile_index;
+}
+
+OptimizationProfileGuard::OptimizationProfileGuard(AutoTag)
+    : prev_request_(g_profile_request), prev_index_(g_profile_index) {
+  g_profile_request = ProfileRequest::kAuto;
+}
+
+OptimizationProfileGuard OptimizationProfileGuard::automatic() {
+  return OptimizationProfileGuard(AutoTag{});
+}
+
+OptimizationProfileGuard::~OptimizationProfileGuard() {
+  g_profile_request = prev_request_;
+  g_profile_index = prev_index_;
+}
 
 void TRTLogger::log(Severity severity, const char* msg) noexcept {
   if (severity <= Severity::kERROR) {
@@ -378,6 +404,22 @@ Error load_engine(
   if (engine == nullptr) {
     return report_load_error("deserialize TensorRT engine");
   }
+  // A plan serialized without its weights (built with STRIP_PLAN, or saved with EXCLUDE_WEIGHTS)
+  // deserializes and runs without an error, but computes with placeholder weights, and this backend
+  // never refits. For such a plan TensorRT reports the weight bytes it still holds, which equal the
+  // total when there was nothing to strip. A plain re-save keeps that. Any other plan reports -1,
+  // including a stripped one saved again with EXCLUDE_WEIGHTS cleared and no refit, so that case is
+  // not caught here. A plan with no weights cannot lack any, and skipping the query for it avoids
+  // the warning TensorRT logs for a plan that is not stripped.
+  const int64_t total_weights = engine->getEngineStat(nvinfer1::EngineStat::kTOTAL_WEIGHTS_SIZE);
+  const int64_t kept_weights =
+      total_weights > 0 ? engine->getEngineStat(nvinfer1::EngineStat::kSTRIPPED_WEIGHTS_SIZE) : -1;
+  if (kept_weights >= 0 && kept_weights < total_weights) {
+    ET_LOG(
+        Error,
+        "TensorRTBackend::init: the TensorRT engine was serialized without its weights, and this backend cannot refit them. Compile it with strip_engine_weights=False, or serialize it with its weights, and export again.");
+    return Error::InvalidProgram;
+  }
   const Error err = apply_weight_streaming_budget(*engine, request);
   if (err != Error::Ok) {
     return report_load_error("set TensorRT weight streaming budget");
@@ -537,19 +579,121 @@ Error initialize_input_profiles(EngineHandle& handle) {
     }
   }
 
-  handle.input_profile_bounds.reserve(handle.num_inputs);
-  for (const auto& name : handle.input_binding_names) {
-    InputProfileBounds bounds;
-    bounds.min = handle.engine->getProfileShape(name.c_str(), 0, nvinfer1::OptProfileSelector::kMIN);
-    bounds.max = handle.engine->getProfileShape(name.c_str(), 0, nvinfer1::OptProfileSelector::kMAX);
-    if (bounds.min.nbDims < 0 || bounds.max.nbDims < 0) {
-      ET_LOG(Error, "TensorRTBackend::init: getProfileShape failed for input '%s'", name.c_str());
-      return Error::InvalidProgram;
+  const int32_t num_profiles = handle.engine->getNbOptimizationProfiles();
+  if (num_profiles < 1) {
+    ET_LOG(Error, "TensorRTBackend::init: engine reports %d optimization profiles", num_profiles);
+    return Error::InvalidProgram;
+  }
+
+  handle.profiles.bounds.resize(static_cast<size_t>(num_profiles));
+  for (int32_t p = 0; p < num_profiles; ++p) {
+    auto& bounds_for_profile = handle.profiles.bounds[static_cast<size_t>(p)];
+    bounds_for_profile.reserve(handle.num_inputs);
+    for (const auto& name : handle.input_binding_names) {
+      InputProfileBounds bounds;
+      bounds.min = handle.engine->getProfileShape(name.c_str(), p, nvinfer1::OptProfileSelector::kMIN);
+      bounds.max = handle.engine->getProfileShape(name.c_str(), p, nvinfer1::OptProfileSelector::kMAX);
+      if (bounds.min.nbDims < 0 || bounds.max.nbDims < 0) {
+        ET_LOG(Error, "TensorRTBackend::init: getProfileShape failed for input '%s' in profile %d", name.c_str(), p);
+        return Error::InvalidProgram;
+      }
+      bounds_for_profile.push_back(bounds);
     }
-    handle.input_profile_bounds.push_back(bounds);
   }
 
   return Error::Ok;
+}
+
+std::string dims_to_string(const nvinfer1::Dims& dims) {
+  std::string out = "(";
+  for (int d = 0; d < dims.nbDims; ++d) {
+    if (d > 0) {
+      out += ", ";
+    }
+    out += std::to_string(dims.d[d]);
+  }
+  return out + ")";
+}
+
+// Auto-selection failing says nothing on its own about which input is out of
+// range, and the offending shapes and every profile's envelope are already in
+// hand. Print them so the fix does not need a rebuild with extra logging.
+void log_no_profile_matches(const EngineHandle& handle, const std::vector<nvinfer1::Dims>& input_dims) {
+  ET_LOG(
+      Error,
+      "TensorRTBackend::execute: none of the engine's %d optimization profiles accept the input shapes; "
+      "fix the shapes or pin a profile with OptimizationProfileGuard",
+      handle.profiles.size());
+  for (size_t i = 0; i < input_dims.size(); ++i) {
+    std::string ranges;
+    for (int32_t p = 0; p < handle.profiles.size(); ++p) {
+      const auto& bounds = handle.profiles.bounds[static_cast<size_t>(p)][i];
+      ranges += "  profile " + std::to_string(p) + ": [" + dims_to_string(bounds.min) + ", " +
+          dims_to_string(bounds.max) + "]";
+    }
+    ET_LOG(
+        Error,
+        "  input '%s' is %s;%s",
+        handle.input_binding_names[i].c_str(),
+        dims_to_string(input_dims[i]).c_str(),
+        ranges.c_str());
+  }
+}
+
+// Redundant with profile_fits() on the auto path, which already established the
+// selected profile accepts these shapes. It is the only bounds check on the
+// pinned and unset paths, where select_profile() never tests fit.
+Error validate_input_dims(const EngineHandle& handle, int32_t profile, const std::vector<nvinfer1::Dims>& input_dims) {
+  const auto& bounds = handle.profiles.bounds[static_cast<size_t>(profile)];
+  // With no guard in scope this is the error a caller who forgot one gets, so say
+  // that other profiles exist and how to reach them.
+  const auto hint = [&handle]() -> std::string {
+    if (handle.profiles.size() <= 1) {
+      return "";
+    }
+    return "; this engine has " + std::to_string(handle.profiles.size()) +
+        " profiles, so pin another with OptimizationProfileGuard or use OptimizationProfileGuard::automatic()";
+  };
+  for (size_t i = 0; i < input_dims.size(); ++i) {
+    const char* name = handle.input_binding_names[i].c_str();
+    const nvinfer1::Dims& dims = input_dims[i];
+    if (dims.nbDims != bounds[i].min.nbDims) {
+      ET_LOG(
+          Error,
+          "TensorRTBackend::execute: input '%s' rank %d does not match profile %d rank %d%s",
+          name,
+          dims.nbDims,
+          profile,
+          bounds[i].min.nbDims,
+          hint().c_str());
+      return Error::InvalidArgument;
+    }
+    for (int d = 0; d < dims.nbDims; ++d) {
+      if (dims.d[d] < bounds[i].min.d[d] || dims.d[d] > bounds[i].max.d[d]) {
+        ET_LOG(
+            Error,
+            "TensorRTBackend::execute: input '%s' dim %d is %ld, outside profile %d bounds [%ld, %ld]%s",
+            name,
+            d,
+            static_cast<long>(dims.d[d]),
+            profile,
+            static_cast<long>(bounds[i].min.d[d]),
+            static_cast<long>(bounds[i].max.d[d]),
+            hint().c_str());
+        return Error::InvalidArgument;
+      }
+    }
+  }
+  return Error::Ok;
+}
+
+// setTensorAddress documents this alignment and does not check it. A tensor viewed at an offset into a
+// larger buffer misses it, and the engine then returns a wrong answer or faults and leaves the CUDA
+// context unusable.
+constexpr uintptr_t kTensorAddressAlignment = 256;
+
+bool is_tensor_address_aligned(const void* ptr) {
+  return reinterpret_cast<uintptr_t>(ptr) % kTensorAddressAlignment == 0;
 }
 
 bool is_cuda_accessible_ptr(const void* ptr) {
@@ -822,7 +966,7 @@ constexpr size_t kMinPooledScratchBytes = 1;
 // execute() calls this ahead of every CUDA call it makes that a capture cannot
 // take, not just the pool's own: the cudaFree(nullptr) that makes a context
 // current for a default stream, the cudaEventSynchronize on a previous enqueue,
-// the cudaMalloc that grows a host-input staging buffer, and the
+// the cudaMalloc that grows an input staging buffer, and the
 // cudaStreamSynchronize that ends a call this backend does not let return early.
 // Any of them leaves a refusal made after it nothing to save. Only the device
 // query and the device switch run earlier, and a capture takes both.
@@ -1234,13 +1378,28 @@ Result<DelegateHandle*> TensorRTBackend::init(
   std::size_t engine_size = header.engine_size;
   std::optional<FreeableBuffer> named_engine;
   if (!header.engine_key.empty()) {
+    // A program exported with external_engine_data keeps its engines in a .ptd file, so a
+    // missing map or key most likely means that file was not passed at load.
     const auto* named_data = context.get_named_data_map();
     TORCHTRT_ET_CHECK_NOT_NULL(
-        named_data, Error::InvalidProgram, "TensorRTBackend::init: engine is named data but the program has none");
+        named_data,
+        Error::InvalidExternalData,
+        "TensorRTBackend::init: the TensorRT engine is named data, but the program has none. If it was exported with external_engine_data, load it together with its .ptd file.");
     auto engine_buffer = named_data->get_data(header.engine_key);
     if (!engine_buffer.ok()) {
-      ET_LOG(Error, "TensorRTBackend::init: named engine '%s' not found", header.engine_key.c_str());
-      return engine_buffer.error();
+      if (engine_buffer.error() != Error::NotFound) {
+        ET_LOG(
+            Error,
+            "TensorRTBackend::init: failed to read TensorRT engine '%s' from named data: %s",
+            header.engine_key.c_str(),
+            ::executorch::runtime::to_string(engine_buffer.error()));
+        return engine_buffer.error();
+      }
+      ET_LOG(
+          Error,
+          "TensorRTBackend::init: the program's data has no TensorRT engine with key '%s'. If it was exported with external_engine_data, load it together with the .ptd file written with it.",
+          header.engine_key.c_str());
+      return Error::InvalidExternalData;
     }
     named_engine.emplace(std::move(engine_buffer.get()));
     engine_data = named_engine->data();
@@ -1530,16 +1689,19 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   }
 
   // ------------------------------------------------------------------
-  // 1. Bind input shapes and addresses
+  // 1. Collect the input shapes and settle on an optimization profile
+  //
+  // TensorRT requires setOptimizationProfileAsync() to precede setInputShape()
+  // for dynamic inputs, so the shapes are gathered and the profile chosen,
+  // validated, and switched up front rather than inside the binding loop below.
   // ------------------------------------------------------------------
   // Device pointer each input binding was bound to; aliased outputs reuse the
   // pointer of the input they alias so their update lands in-place.
   std::vector<void*> input_bind_ptrs(num_inputs, nullptr);
   std::vector<size_t> binding_bytes(num_inputs + num_outputs);
   size_t arg_idx = 0; // running index into delegate args
+  std::vector<nvinfer1::Dims> input_dims(num_inputs);
   for (size_t i = 0; i < num_inputs; ++i) {
-    const std::string& name = engine->input_binding_names[i];
-
     EValue* arg = args[arg_idx++];
     TORCHTRT_ET_CHECK_NOT_NULL(
         arg, Error::InvalidArgument, "TensorRTBackend::execute: input arg %zu is not a tensor", i);
@@ -1547,7 +1709,6 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
       ET_LOG(Error, "TensorRTBackend::execute: input %zu is not a tensor", i);
       return Error::InvalidArgument;
     }
-
     exec_aten::Tensor et_in = arg->toTensor();
     binding_bytes[i] = et_in.nbytes();
     // Caught here rather than at submission. Device memory on the wrong GPU binds without complaint
@@ -1560,56 +1721,137 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
           "TensorRTBackend::execute: input '%s' is on CUDA device %d, this engine on %d. Move it, or "
           "load the program on that device. Cards able to reach each other is not enough: the "
           "mapping must be on, and nothing here turns it on.",
-          name.c_str(),
+          engine->input_binding_names[i].c_str(),
           input_device,
           engine->device_id);
       return Error::InvalidArgument;
     }
-    nvinfer1::Dims dims = to_trt_dims(et_in);
-    if (dims.nbDims > nvinfer1::Dims::MAX_DIMS) {
-      ET_LOG(Error, "TensorRTBackend::execute: input '%s' rank exceeds TensorRT limit", name.c_str());
-      return Error::InvalidArgument;
-    }
-
-    const auto& bounds = engine->input_profile_bounds[i];
-    if (dims.nbDims != bounds.min.nbDims) {
+    input_dims[i] = to_trt_dims(et_in);
+    if (input_dims[i].nbDims > nvinfer1::Dims::MAX_DIMS) {
       ET_LOG(
           Error,
-          "TensorRTBackend::execute: input '%s' rank %d does not match profile rank %d",
-          name.c_str(),
-          dims.nbDims,
-          bounds.min.nbDims);
+          "TensorRTBackend::execute: input '%s' rank exceeds TensorRT limit",
+          engine->input_binding_names[i].c_str());
       return Error::InvalidArgument;
     }
-    for (int d = 0; d < dims.nbDims; ++d) {
-      if (dims.d[d] < bounds.min.d[d] || dims.d[d] > bounds.max.d[d]) {
-        ET_LOG(Error, "TensorRTBackend::execute: input '%s' dim %d is outside profile bounds", name.c_str(), d);
-        return Error::InvalidArgument;
+  }
+
+  // Snapshot the thread-local once: reading it again below would tie the log
+  // messages to the fact that only kPinned can reach them.
+  const ProfileRequest request = g_profile_request;
+  const int32_t requested_index = g_profile_index;
+
+  int32_t profile = 0;
+  switch (select_profile(engine->profiles, request, requested_index, input_dims, profile)) {
+    case ProfileSelection::kOk:
+      break;
+    case ProfileSelection::kPinIgnoredSingleProfile:
+      if (!engine->pin_ignored_reported) {
+        engine->pin_ignored_reported = true;
+        ET_LOG(
+            Info,
+            "TensorRTBackend::execute: ignoring the pin on profile %d; this engine has one profile, "
+            "so it runs profile 0 (reported once per engine)",
+            requested_index);
       }
+      break;
+    case ProfileSelection::kRequestedProfileUnavailable:
+      ET_LOG(
+          Error,
+          "TensorRTBackend::execute: OptimizationProfileGuard requested profile %d but this engine has %d profile(s)",
+          requested_index,
+          engine->profiles.size());
+      return Error::InvalidArgument;
+    case ProfileSelection::kNoProfileMatchesInputs:
+      log_no_profile_matches(*engine, input_dims);
+      return Error::InvalidArgument;
+  }
+
+  Error profile_err = validate_input_dims(*engine, profile, input_dims);
+  if (profile_err != Error::Ok) {
+    return profile_err;
+  }
+  // A new thread has no current context, and the device guard sets one only when it switches devices.
+  // cudaFree(nullptr) sets the primary context only if none is current, so it keeps one the caller set.
+  const auto make_context_current = [&engine]() -> Error {
+    const cudaError_t err = cudaFree(nullptr);
+    if (err == cudaSuccess) {
+      return Error::Ok;
     }
+    ET_LOG(
+        Error,
+        "TensorRTBackend::execute: cudaFree(nullptr) on device %d failed: %s",
+        engine->device_id,
+        cudaGetErrorString(err));
+    // The error is this call's, so it is cleared rather than left for the caller's next CUDA call to
+    // report. A sticky fault survives the clear.
+    cudaGetLastError();
+    return Error::Internal;
+  };
+
+  if (profile != engine->profiles.active) {
+    // On every stream, TensorRT fails the switch with no current context.
+    const Error context_err = make_context_current();
+    if (context_err != Error::Ok) {
+      return context_err;
+    }
+    // The switch enqueues work on the stream, and TensorRT forbids reconfiguring or
+    // destroying a context while it runs. The binding loop below can still fail and
+    // return, so arm the drain before the switch is submitted. It writes none of a
+    // user-managed context's scratch, which is why it can precede the pool claim.
+    drain_on_early_return.arm();
+    if (!ctx->setOptimizationProfileAsync(profile, stream)) {
+      ET_LOG(Error, "TensorRTBackend::execute: setOptimizationProfileAsync(%d) failed", profile);
+      return Error::InvalidState;
+    }
+    engine->profiles.active = profile;
+    // Debug, not Info: a decode/prefill loop switches on nearly every call.
+    ET_LOG(Debug, "TensorRTBackend::execute: switched to optimization profile %d", profile);
+  }
+
+  // ------------------------------------------------------------------
+  // 2. Bind input shapes and addresses
+  // ------------------------------------------------------------------
+  const auto report_unaligned = [&engine](const std::string& name, const void* ptr) {
+    if (engine->unaligned_io_reported) {
+      return;
+    }
+    engine->unaligned_io_reported = true;
+    ET_LOG(
+        Info,
+        "TensorRTBackend::execute: '%s' is at an address %zu bytes past a %zu-byte boundary, and TensorRT "
+        "needs that boundary, so it is copied through an aligned buffer (reported once per engine)",
+        name.c_str(),
+        static_cast<size_t>(reinterpret_cast<uintptr_t>(ptr) % kTensorAddressAlignment),
+        static_cast<size_t>(kTensorAddressAlignment));
+  };
+  // Caller-owned KV: (dst, src, nbytes) copies issued after enqueue. One kind reflects an engine
+  // in-place update into the delegate output EValue, so ExecuTorch's write-back copy_ sees the updated
+  // cache. The other carries that update from an aligned staging buffer back to the caller's input.
+  std::vector<std::tuple<void*, void*, size_t>> aliased_reflects;
+  for (size_t i = 0; i < num_inputs; ++i) {
+    exec_aten::Tensor et_in = args[i]->toTensor();
+    const std::string& name = engine->input_binding_names[i];
+    const nvinfer1::Dims& dims = input_dims[i];
 
     if (!ctx->setInputShape(name.c_str(), dims)) {
       ET_LOG(Error, "TensorRTBackend::execute: setInputShape failed for '%s'", name.c_str());
       return Error::InvalidState;
     }
 
+    const bool device_reachable =
+        et_in.nbytes() > 0 && (engine->pageable_host_access || is_cuda_accessible_ptr(et_in.const_data_ptr()));
     // Caller-owned aliased input: an aliased output binds in-place to this
-    // input's device pointer, so its update must land in the caller's storage.
-    // If it isn't device-resident the branches below would stage it through
-    // delegate scratch, and the in-place update (bound to that scratch) would be
-    // silently lost on the next execute() when the staging copy re-reads the
-    // caller's unchanged buffer. Fail loudly instead.
-    if (engine->input_is_alias_target[i]) {
-      const bool device_resident =
-          et_in.nbytes() > 0 && (engine->pageable_host_access || is_cuda_accessible_ptr(et_in.const_data_ptr()));
-      if (!device_resident) {
-        ET_LOG(
-            Error,
-            "TensorRTBackend::execute: aliased input '%s' must be device-reachable without staging, "
-            "because its caller-owned in-place update cannot go through host scratch",
-            name.c_str());
-        return Error::InvalidArgument;
-      }
+    // input's pointer, so its update must land in the caller's storage. Host
+    // memory is refused. A device buffer the branches below stage for alignment
+    // gets its update copied back after the enqueue.
+    if (engine->input_is_alias_target[i] && !device_reachable) {
+      ET_LOG(
+          Error,
+          "TensorRTBackend::execute: aliased input '%s' must be device-reachable, "
+          "because its caller-owned in-place update cannot go through host scratch",
+          name.c_str());
+      return Error::InvalidArgument;
     }
 
     void* bind_ptr = nullptr;
@@ -1622,9 +1864,12 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
         engine->cached_input_sizes[i] = 1;
       }
       bind_ptr = engine->cached_input_ptrs[i];
-    } else if (engine->pageable_host_access || is_cuda_accessible_ptr(et_in.const_data_ptr())) {
+    } else if (device_reachable && is_tensor_address_aligned(et_in.const_data_ptr())) {
       bind_ptr = et_in.mutable_data_ptr();
     } else {
+      if (device_reachable) {
+        report_unaligned(name, et_in.const_data_ptr());
+      }
       const size_t needed = et_in.nbytes();
       if (needed > engine->cached_input_sizes[i]) {
         if (engine->cached_input_ptrs[i] != nullptr) {
@@ -1639,15 +1884,18 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
         engine->cached_input_sizes[i] = needed;
       }
       bind_ptr = engine->cached_input_ptrs[i];
-      cuda_err = cudaMemcpyAsync(bind_ptr, et_in.const_data_ptr(), needed, cudaMemcpyHostToDevice, stream);
+      cuda_err = cudaMemcpyAsync(bind_ptr, et_in.const_data_ptr(), needed, cudaMemcpyDefault, stream);
       drain_on_early_return.arm();
       if (cuda_err != cudaSuccess) {
         ET_LOG(
             Error,
-            "TensorRTBackend::execute: H2D copy failed for input '%s': %s",
+            "TensorRTBackend::execute: staging copy failed for input '%s': %s",
             name.c_str(),
             cudaGetErrorString(cuda_err));
         return Error::InvalidProgram;
+      }
+      if (engine->input_is_alias_target[i]) {
+        aliased_reflects.emplace_back(et_in.mutable_data_ptr(), bind_ptr, needed);
       }
     }
 
@@ -1659,7 +1907,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   }
 
   // ------------------------------------------------------------------
-  // 2. Infer output shapes (requires all input shapes to be set first)
+  // 3. Infer output shapes (requires all input shapes to be set first)
   // ------------------------------------------------------------------
   {
     const int32_t io_size = engine->engine->getNbIOTensors();
@@ -1672,20 +1920,15 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   }
 
   // ------------------------------------------------------------------
-  // 3. Bind output addresses
+  // 4. Bind output addresses
   // ExecuTorch pre-allocates output tensors at the maximum shape for
   // dynamic models.  After inferShapes() TRT knows the actual output
   // dims, so update the ExecuTorch TensorImpl's sizes before computing
   // nbytes() and before the Python binding reads back the shape.
-  // If the buffer is CPU, stage through a temporary CUDA allocation.
+  // If the buffer is CPU or not aligned for TensorRT, stage through a CUDA allocation.
   // ------------------------------------------------------------------
   // (arg index, device_src ptr) for outputs staged through a device buffer.
   std::vector<std::pair<size_t, void*>> outputs_needing_copy;
-  // Caller-owned KV: (dst = delegate output EValue ptr, src = aliased input ptr,
-  // nbytes). The engine updates the aliased input in place; reflect that into the
-  // delegate output EValue after enqueue so ExecuTorch's write-back copy_ sees the
-  // updated cache.
-  std::vector<std::tuple<void*, void*, size_t>> aliased_reflects;
   for (size_t o = 0; o < num_outputs; ++o) {
     const std::string& name = engine->output_binding_names[o];
 
@@ -1703,7 +1946,8 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
         return Error::InvalidState;
       }
       // Elided: setTensorAddress above pointed this output binding at the caller's
-      // buffer, so the engine writes the buffer itself; nothing to reflect into.
+      // buffer, or at the aligned copy the input loop already copies back, so the
+      // engine's write reaches the buffer; nothing to reflect into.
       if (aliased_outputs_elided) {
         continue;
       }
@@ -1825,6 +2069,8 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
 
     binding_bytes[num_inputs + o] = et_out.nbytes();
     void* bind_ptr = nullptr;
+    const bool device_reachable =
+        et_out.nbytes() > 0 && (engine->pageable_host_access || is_cuda_accessible_ptr(et_out.const_data_ptr()));
     if (et_out.nbytes() == 0) {
       if (engine->cached_output_sizes[o] == 0) {
         cuda_err = cudaMalloc(&engine->cached_output_ptrs[o], 1);
@@ -1834,9 +2080,12 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
         engine->cached_output_sizes[o] = 1;
       }
       bind_ptr = engine->cached_output_ptrs[o];
-    } else if (engine->pageable_host_access || is_cuda_accessible_ptr(et_out.const_data_ptr())) {
+    } else if (device_reachable && is_tensor_address_aligned(et_out.const_data_ptr())) {
       bind_ptr = et_out.mutable_data_ptr();
     } else {
+      if (device_reachable) {
+        report_unaligned(name, et_out.const_data_ptr());
+      }
       const size_t needed = et_out.nbytes();
       if (needed > engine->cached_output_sizes[o]) {
         if (engine->cached_output_ptrs[o] != nullptr) {
@@ -1861,28 +2110,19 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   }
 
   // TensorRT's enqueue can look up a default stream's context through the driver, and graph replay compares the
-  // stream's context with the current one, and both fail while no context is current. A new thread has none, and
-  // the device guard sets one only when it switches devices.
-  // cudaFree(nullptr) sets the primary context only if none is current, so it keeps one the caller set. Outside
-  // cudaStreamCaptureModeRelaxed a capture cannot take it, so it runs after the pooled capture refusal and the
-  // argument checks. Any earlier, it would fail first under a capture, hiding their error and invalidating the capture.
+  // stream's context with the current one, and both fail while no context is current. Outside
+  // cudaStreamCaptureModeRelaxed a capture cannot take make_context_current, so it runs after the pooled capture
+  // refusal and the argument checks. Any earlier, it would fail first under a capture, hiding their error and
+  // invalidating the capture.
   if (engine->execution_graph || stream == nullptr || stream == cudaStreamLegacy || stream == cudaStreamPerThread) {
-    cuda_err = cudaFree(nullptr);
-    if (cuda_err != cudaSuccess) {
-      ET_LOG(
-          Error,
-          "TensorRTBackend::execute: cudaFree(nullptr) on device %d failed: %s",
-          engine->device_id,
-          cudaGetErrorString(cuda_err));
-      // The error is this call's, so it is cleared rather than left for the caller's next CUDA call to
-      // report. A sticky fault survives the clear.
-      cudaGetLastError();
-      return Error::Internal;
+    const Error context_err = make_context_current();
+    if (context_err != Error::Ok) {
+      return context_err;
     }
   }
 
   // ------------------------------------------------------------------
-  // 4. Back activation scratch with the shared per-device pool
+  // 5. Back activation scratch with the shared per-device pool
   // ------------------------------------------------------------------
   // The query requires every input shape to be bound, which they are by here, and
   // whatever it answers is binding rather than advisory: an engine backed by less
@@ -1934,7 +2174,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   }
 
   // ------------------------------------------------------------------
-  // 5. Enqueue inference on the current CUDA stream
+  // 6. Enqueue inference on the current CUDA stream
   // ------------------------------------------------------------------
   // Armed before the launch, so a partial launch still drains what it submitted.
   drain_on_early_return.arm();
@@ -1968,7 +2208,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   }
 
   // Caller-owned KV: reflect each engine in-place update into its delegate output
-  // EValue (D2D on the same stream, after the engine work).
+  // EValue or the input it was staged from (on the same stream, after the engine work).
   for (const auto& r : aliased_reflects) {
     cuda_err = cudaMemcpyAsync(std::get<0>(r), std::get<1>(r), std::get<2>(r), cudaMemcpyDefault, stream);
     drain_on_early_return.arm();
@@ -1987,8 +2227,7 @@ Error TensorRTBackend::execute(BackendExecutionContext& context, DelegateHandle*
   Error copy_err = Error::Ok;
   for (auto& output : outputs_needing_copy) {
     exec_aten::Tensor et_out = args[output.first]->toTensor();
-    cuda_err =
-        cudaMemcpyAsync(et_out.mutable_data_ptr(), output.second, et_out.nbytes(), cudaMemcpyDeviceToHost, stream);
+    cuda_err = cudaMemcpyAsync(et_out.mutable_data_ptr(), output.second, et_out.nbytes(), cudaMemcpyDefault, stream);
     if (cuda_err != cudaSuccess) {
       // Name the output and number it the way the caller does. output.first indexes the whole
       // argument list, so on a one-input engine the first output read as "output 1", and the

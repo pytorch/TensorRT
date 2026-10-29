@@ -94,17 +94,6 @@ def aot_torch_tensorrt_aten_backend(
             ),
             gm,
         )
-        # This is added since detach lowering leads to alias nodes
-        # Error - View operation returned a tensor that is the same as the input base tensor
-        # torch nop_decompositions in torch/_decomp/decompositions.py
-        # transpose key deleted since not desirable to lower it to permute
-        to_delete = {
-            key
-            for key in settings_aot_autograd["decompositions"]
-            if "detach" in key._name
-        }
-        for key in to_delete:
-            del settings_aot_autograd["decompositions"][key]
 
         return aot_autograd(
             fw_compiler=_pretraced_backend_autograd,
@@ -147,10 +136,6 @@ def aot_torch_tensorrt_aten_backend(
             ),
             gm,
         )
-        # Remove detach decompositions to avoid alias node errors.
-        to_delete = {k for k in aot_decomps if "detach" in k._name}
-        for k in to_delete:
-            del aot_decomps[k]
         return aot_autograd(
             fw_compiler=_pretraced_backend_autograd,
             decompositions=aot_decomps,

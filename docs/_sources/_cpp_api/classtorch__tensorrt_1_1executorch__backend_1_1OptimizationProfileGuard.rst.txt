@@ -1,0 +1,27 @@
+.. _exhale_class_classtorch__tensorrt_1_1executorch__backend_1_1OptimizationProfileGuard:
+
+Class OptimizationProfileGuard
+==============================
+
+- Defined in :ref:`file_cpp_include_torch_tensorrt_executorch_TensorRTBackend.h`
+
+
+Nested Relationships
+--------------------
+
+
+Nested Types
+************
+
+- :ref:`exhale_struct_structtorch__tensorrt_1_1executorch__backend_1_1OptimizationProfileGuard_1_1AutoTag`
+
+
+Class Documentation
+-------------------
+
+
+.. doxygenclass:: torch_tensorrt::executorch_backend::OptimizationProfileGuard
+   :project: Torch-TensorRT
+   :members:
+   :protected-members:
+   :undoc-members:

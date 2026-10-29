@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=2e33cd36"></script>
+    <script src="../../_static/documentation_options.js?v=cdeeec50"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -1213,6 +1213,7 @@ document.write(`
     <span class="s2">"weight_streaming_budget_per_engine"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
     <span class="s2">"use_cuda_graphs"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
     <span class="s2">"zero_copy_kv"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="s2">"external_engine_data"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">}</span>
 
 
@@ -1229,7 +1230,7 @@ document.write(`
     <span class="n">inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">|</span> <span class="n">Input</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">arg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">|</span> <span class="n">Input</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">kwarg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">retrace</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">retrace</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">use_legacy_exporter</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">pickle_protocol</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span>
     <span class="n">dynamic_shapes</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -1245,7 +1246,10 @@ document.write(`
 <span class="sd">        arg_inputs (Tuple[Union[torch.Tensor, torch_tensorrt.Input], ...]): Same as inputs. Alias for better understanding with kwarg_inputs.</span>
 <span class="sd">        kwarg_inputs (dict[str, Union[torch.Tensor, torch_tensorrt.Input]]): Optional, kwarg inputs to the module forward function.</span>
 <span class="sd">        output_format (str): Format to save the model. Options include exported_program | torchscript | aot_inductor | executorch.</span>
-<span class="sd">        retrace (bool): When the module type is a fx.GraphModule, this option re-exports the graph using torch.export.export(strict=False) to save it.</span>
+<span class="sd">        retrace (Optional[bool]): When the module type is a fx.GraphModule, this option re-exports the graph using torch.export.export(strict=False) to save it.</span>
+
+<span class="sd">                Defaults to True, except for ``output_format="executorch"``, where it defaults to False:</span>
+<span class="sd">                the compiled graph is lowered as it is, so no example inputs are needed.</span>
 
 <span class="sd">                For TRT-compiled modules with dynamic shapes, both retrace=True and retrace=False are supported:</span>
 
@@ -1315,25 +1319,30 @@ document.write(`
 <span class="sd">                  parameter takes precedence.</span>
 <span class="sd">        use_cuda_graphs (Optional[bool]): Bake CUDA graph replay on (True) or off</span>
 <span class="sd">                (False) into every TensorRT delegate for ``output_format="executorch"``.</span>
-<span class="sd">                None leaves the choice unset so the runtime default applies. A load-time</span>
-<span class="sd">                option overrides this value. Non-booleans are rejected for ExecuTorch;</span>
+<span class="sd">                None leaves the choice unset so the runtime default applies. A load</span>
+<span class="sd">                option, or a process option set to False, overrides this value.</span>
+<span class="sd">                Non-booleans are rejected for ExecuTorch;</span>
 <span class="sd">                other formats ignore non-None values with a warning. Use this keyword,</span>
 <span class="sd">                not a raw ``CompileSpec("use_cuda_graphs", ...)``.</span>
 <span class="sd">        kwargs: Additional format-specific kwargs. ``partitioners=``,</span>
 <span class="sd">                ``compile_specs=``, ``backend_config=``, ``constant_methods=``,</span>
 <span class="sd">                ``transform_passes=``, ``compile_config=``, ``generate_etrecord=``,</span>
-<span class="sd">                ``weight_streaming_budget_per_engine=`` and ``zero_copy_kv=`` are</span>
+<span class="sd">                ``weight_streaming_budget_per_engine=``, ``zero_copy_kv=`` and</span>
+<span class="sd">                ``external_engine_data=`` are</span>
 <span class="sd">                only used with ``output_format="executorch"``; otherwise they are</span>
-<span class="sd">                ignored with a warning. Pass ``compile_specs=[CompileSpec("target_device",</span>
-<span class="sd">                b"cuda:&lt;i&gt;")]`` to override the default target device (``cuda:0``).</span>
+<span class="sd">                ignored with a warning. A ``CompileSpec("target_device", ...)`` in</span>
+<span class="sd">                ``compile_specs=`` only labels the delegate's inputs and outputs; each</span>
+<span class="sd">                engine runs on the GPU it was built on.</span>
 <span class="sd">                ``backend_config=`` takes an ``Optional[ExecutorchBackendConfig]``</span>
 <span class="sd">                and is forwarded to ``to_executorch(config=...)`` to customize</span>
 <span class="sd">                ExecuTorch lowering (e.g. memory planning or device placement).</span>
+<span class="sd">                Its ``MemoryPlanningPass`` is aligned to 256 bytes on a copy, the</span>
+<span class="sd">                boundary TensorRT needs for every input and output.</span>
 <span class="sd">                ``partitioners=`` appends caller partitioners after the TensorRT</span>
 <span class="sd">                partitioner, so ops TensorRT does not take can be routed to another</span>
-<span class="sd">                delegate -- e.g. a ``CudaPartitioner`` for a coalesced TensorRT +</span>
-<span class="sd">                CUDA ``.pte``. See :ref:`the ExecuTorch save guide</span>
-<span class="sd">                &lt;executorch_save&gt;` for the ``CudaPartitioner`` recipe, its</span>
+<span class="sd">                delegate, for example a ``CudaPartitioner`` for a coalesced TensorRT +</span>
+<span class="sd">                CUDA ``.pte``. See :ref:`the ExecuTorch deployment guide</span>
+<span class="sd">                &lt;executorch_deployment&gt;` for the ``CudaPartitioner`` recipe, its</span>
 <span class="sd">                export-time requirements (CUDA backend + nvcc), and the external</span>
 <span class="sd">                ``.ptd`` weight caveats.</span>
 <span class="sd">                ``constant_methods=``, ``transform_passes=`` and</span>
@@ -1346,7 +1355,8 @@ document.write(`
 <span class="sd">                TRT engines.</span>
 <span class="sd">                ``generate_etrecord=True`` writes an ETRecord to</span>
 <span class="sd">                ``&lt;model&gt;_etrecord.bin`` next to the ``.pte`` for use with the</span>
-<span class="sd">                ExecuTorch Inspector.</span>
+<span class="sd">                ExecuTorch Inspector. It does not work for a program with</span>
+<span class="sd">                TensorRT engines: writing the record raises a ``SerializeError``.</span>
 <span class="sd">                ``weight_streaming_budget_per_engine=`` takes an ``Optional[int]``</span>
 <span class="sd">                number of bytes of engine weights that may stay resident in GPU</span>
 <span class="sd">                memory, with the rest streamed from host memory. It applies to</span>
@@ -1366,9 +1376,23 @@ document.write(`
 <span class="sd">                :func:`torch_tensorrt.executorch.check_zero_copy_kv` on the</span>
 <span class="sd">                finalized program before writing the file, so a single</span>
 <span class="sd">                ``zero_copy_kv=True`` is enough.</span>
+<span class="sd">                ``external_engine_data=`` (default ``None``) takes a file name without</span>
+<span class="sd">                the ``.ptd`` extension and</span>
+<span class="sd">                writes every TensorRT engine to ``&lt;name&gt;.ptd`` next to the ``.pte``</span>
+<span class="sd">                instead of into it. Pass that file as the program's data file when</span>
+<span class="sd">                loading. An existing file with that name is replaced, so give each</span>
+<span class="sd">                program in a directory its own name, for example</span>
+<span class="sd">                ``external_engine_data="model"`` for ``model.pte``. A program that also</span>
+<span class="sd">                has a CUDA backend part needs its own directory and</span>
+<span class="sd">                ``external_engine_data="aoti_cuda_blob"`` instead. See</span>
+<span class="sd">                :func:`torch_tensorrt.executorch.export`.</span>
 <span class="sd">    """</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">CudaGraphsTorchTensorRTModule</span><span class="p">):</span>
         <span class="n">module</span> <span class="o">=</span> <span class="n">module</span><span class="o">.</span><span class="n">compiled_module</span>
+    <span class="k">if</span> <span class="n">retrace</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># Match torch_tensorrt.executorch.export, which lowers a compiled GraphModule as it</span>
+        <span class="c1"># is, so writing a .pte needs no example inputs.</span>
+        <span class="n">retrace</span> <span class="o">=</span> <span class="n">output_format</span> <span class="o">!=</span> <span class="s2">"executorch"</span>
     <span class="n">module_type</span> <span class="o">=</span> <span class="n">_parse_module_type</span><span class="p">(</span><span class="n">module</span><span class="p">)</span>
     <span class="n">accepted_formats</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"exported_program"</span><span class="p">,</span> <span class="s2">"torchscript"</span><span class="p">,</span> <span class="s2">"aot_inductor"</span><span class="p">,</span> <span class="s2">"executorch"</span><span class="p">}</span>
     <span class="k">if</span> <span class="n">arg_inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span>
@@ -1405,6 +1429,7 @@ document.write(`
         <span class="s2">"weight_streaming_budget_per_engine"</span>
     <span class="p">]</span>
     <span class="n">executorch_zero_copy_kv</span> <span class="o">=</span> <span class="n">executorch_options</span><span class="p">[</span><span class="s2">"zero_copy_kv"</span><span class="p">]</span>
+    <span class="n">executorch_external_engine_data</span> <span class="o">=</span> <span class="n">executorch_options</span><span class="p">[</span><span class="s2">"external_engine_data"</span><span class="p">]</span>
 
     <span class="k">if</span> <span class="n">output_format</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">accepted_formats</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
@@ -1413,7 +1438,7 @@ document.write(`
     <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">"executorch"</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">_has_executorch_exir</span><span class="p">():</span>
         <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span>
             <span class="s2">"Saving with output_format='executorch' requires executorch.exir. "</span>
-            <span class="s2">"This CUDA integration supports Linux. Setup: "</span>
+            <span class="s2">"This CUDA integration supports Linux and Windows x86-64. Setup: "</span>
             <span class="o">+</span> <span class="n">executorch_install_command</span><span class="p">()</span>
         <span class="p">)</span>
     <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">"executorch"</span><span class="p">:</span>
@@ -1428,6 +1453,7 @@ document.write(`
             <span class="p">)</span>
         <span class="c1"># Validate options before input and model-shape checks can obscure type errors.</span>
         <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch.partitioner</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+            <span class="n">normalize_external_engine_data</span><span class="p">,</span>
             <span class="n">normalize_use_cuda_graphs</span><span class="p">,</span>
             <span class="n">normalize_weight_streaming_budget_per_engine</span><span class="p">,</span>
         <span class="p">)</span>
@@ -1436,6 +1462,7 @@ document.write(`
             <span class="n">executorch_weight_streaming_budget_per_engine</span>
         <span class="p">)</span>
         <span class="n">normalize_use_cuda_graphs</span><span class="p">(</span><span class="n">use_cuda_graphs</span><span class="p">)</span>
+        <span class="n">normalize_external_engine_data</span><span class="p">(</span><span class="n">executorch_external_engine_data</span><span class="p">)</span>
         <span class="c1"># For the same reason, the one refusal zero-copy makes on the config</span>
         <span class="c1"># alone. _save_as_executorch reaches it only through</span>
         <span class="c1"># zero_copy_backend_config, which it calls after export() has partitioned</span>
@@ -1445,6 +1472,15 @@ document.write(`
             <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch._zero_copy</span><span class="w"> </span><span class="kn">import</span> <span class="n">_refuse_skip_h2d</span>
 
             <span class="n">_refuse_skip_h2d</span><span class="p">(</span><span class="n">executorch_backend_config</span><span class="p">)</span>
+        <span class="c1"># Every backend writes its data as &lt;name&gt;.ptd beside the program, so a</span>
+        <span class="c1"># program named *.ptd can be replaced by one. Windows ignores case and</span>
+        <span class="c1"># trailing dots and spaces in a file name.</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">fspath</span><span class="p">(</span><span class="n">file_path</span><span class="p">)</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(</span><span class="s2">". "</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">".ptd"</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"file_path must not end with .ptd, got </span><span class="si">{</span><span class="n">file_path</span><span class="si">!r}</span><span class="s2">. save() writes the "</span>
+                <span class="s2">"program's data files as &lt;name&gt;.ptd beside it, so one of them could replace "</span>
+                <span class="s2">"the program. Use the .pte extension."</span>
+            <span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_all_are_input_objects</span><span class="p">(</span><span class="n">obj</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""Recursively check if all elements in nested collections are Input objects."""</span>
@@ -1599,6 +1635,11 @@ document.write(`
             <span class="s2">"use_cuda_graphs= is only used with output_format='executorch' and will "</span>
             <span class="sa">f</span><span class="s2">"be ignored for output_format='</span><span class="si">{</span><span class="n">output_format</span><span class="si">}</span><span class="s2">'."</span>
         <span class="p">)</span>
+    <span class="k">if</span> <span class="n">executorch_external_engine_data</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">output_format</span> <span class="o">!=</span> <span class="s2">"executorch"</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">"external_engine_data= is only used with output_format='executorch' and "</span>
+            <span class="sa">f</span><span class="s2">"will be ignored for output_format='</span><span class="si">{</span><span class="n">output_format</span><span class="si">}</span><span class="s2">'."</span>
+        <span class="p">)</span>
     <span class="k">if</span> <span class="n">executorch_zero_copy_kv</span> <span class="ow">and</span> <span class="n">output_format</span> <span class="o">!=</span> <span class="s2">"executorch"</span><span class="p">:</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
             <span class="s2">"zero_copy_kv= is only used with output_format='executorch' and will "</span>
@@ -1701,6 +1742,7 @@ document.write(`
                     <span class="n">weight_streaming_budget_per_engine</span><span class="o">=</span><span class="n">executorch_weight_streaming_budget_per_engine</span><span class="p">,</span>
                     <span class="n">use_cuda_graphs</span><span class="o">=</span><span class="n">use_cuda_graphs</span><span class="p">,</span>
                     <span class="n">zero_copy_kv</span><span class="o">=</span><span class="n">executorch_zero_copy_kv</span><span class="p">,</span>
+                    <span class="n">external_engine_data</span><span class="o">=</span><span class="n">executorch_external_engine_data</span><span class="p">,</span>
                 <span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
@@ -1820,6 +1862,7 @@ document.write(`
                         <span class="n">weight_streaming_budget_per_engine</span><span class="o">=</span><span class="n">executorch_weight_streaming_budget_per_engine</span><span class="p">,</span>
                         <span class="n">use_cuda_graphs</span><span class="o">=</span><span class="n">use_cuda_graphs</span><span class="p">,</span>
                         <span class="n">zero_copy_kv</span><span class="o">=</span><span class="n">executorch_zero_copy_kv</span><span class="p">,</span>
+                        <span class="n">external_engine_data</span><span class="o">=</span><span class="n">executorch_external_engine_data</span><span class="p">,</span>
                     <span class="p">)</span>
                 <span class="k">else</span><span class="p">:</span>
                     <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
@@ -1948,6 +1991,7 @@ document.write(`
                         <span class="n">weight_streaming_budget_per_engine</span><span class="o">=</span><span class="n">executorch_weight_streaming_budget_per_engine</span><span class="p">,</span>
                         <span class="n">use_cuda_graphs</span><span class="o">=</span><span class="n">use_cuda_graphs</span><span class="p">,</span>
                         <span class="n">zero_copy_kv</span><span class="o">=</span><span class="n">executorch_zero_copy_kv</span><span class="p">,</span>
+                        <span class="n">external_engine_data</span><span class="o">=</span><span class="n">executorch_external_engine_data</span><span class="p">,</span>
                     <span class="p">)</span>
                 <span class="k">else</span><span class="p">:</span>
                     <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
@@ -1960,23 +2004,69 @@ document.write(`
 <span class="w">    </span><span class="sd">"""Write an ExecuTorch program's external named tensor data (``.ptd``) next to the ``.pte``.</span>
 
 <span class="sd">    The CUDA (AOTInductor) backend emits its weights as external named data</span>
-<span class="sd">    (``save_data_externally``), which ExecuTorch serializes only via</span>
+<span class="sd">    (``save_data_externally``), and so does the TensorRT backend for its engines</span>
+<span class="sd">    when saved with ``external_engine_data=``. ExecuTorch serializes that data only via</span>
 <span class="sd">    ``write_tensor_data_to_file`` -- ``ExecutorchProgram.write_to_file`` does not</span>
-<span class="sd">    persist it. So a partition that carries external weights (e.g. a</span>
-<span class="sd">    ``CudaPartitioner`` delegate) would lose its blob and the ``.pte`` could not</span>
+<span class="sd">    persist it. So a partition that carries external data (e.g. a</span>
+<span class="sd">    ``CudaPartitioner`` delegate) would lose it and the ``.pte`` could not</span>
 <span class="sd">    load. This writes the ``.ptd`` data file(s) into the ``.pte``'s directory when</span>
 <span class="sd">    the program has any; the runtime must then be given those data file(s) (e.g.</span>
-<span class="sd">    via the ExecuTorch ``Module`` data-files argument) to load the weights.</span>
+<span class="sd">    via the ExecuTorch ``Module`` data-files argument) to load the program.</span>
 <span class="sd">    """</span>
     <span class="c1"># Direct attribute access (no getattr default) so a future rename fails loud.</span>
     <span class="k">if</span> <span class="n">executorch_program</span><span class="o">.</span><span class="n">_tensor_data</span><span class="p">:</span>
         <span class="n">out_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">file_path</span><span class="p">))</span>
         <span class="n">executorch_program</span><span class="o">.</span><span class="n">write_tensor_data_to_file</span><span class="p">(</span><span class="n">out_dir</span><span class="p">)</span>
+        <span class="c1"># write_tensor_data_to_file adds .ptd unless the name already ends with it.</span>
+        <span class="n">paths</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">out_dir</span><span class="p">,</span> <span class="n">name</span> <span class="k">if</span> <span class="n">name</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">".ptd"</span><span class="p">)</span> <span class="k">else</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">.ptd"</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">executorch_program</span><span class="o">.</span><span class="n">_tensor_data</span>
+        <span class="p">]</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-            <span class="s2">"Wrote external delegate weights (.ptd) to </span><span class="si">%s</span><span class="s2">; point the runtime's "</span>
-            <span class="s2">"data-files at this directory to load them."</span><span class="p">,</span>
-            <span class="n">out_dir</span><span class="p">,</span>
+            <span class="s2">"Wrote external delegate data to </span><span class="si">%s</span><span class="s2">. Pass </span><span class="si">%s</span><span class="s2">, not the directory, "</span>
+            <span class="s2">"when loading the program."</span><span class="p">,</span>
+            <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">paths</span><span class="p">),</span>
+            <span class="s2">"this file"</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">paths</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">else</span> <span class="s2">"these files"</span><span class="p">,</span>
         <span class="p">)</span>
+
+
+<span class="c1"># TensorRT needs every input and output address to be a multiple of this, and the delegate copies a</span>
+<span class="c1"># buffer that misses it.</span>
+<span class="n">_TENSORRT_ADDRESS_ALIGNMENT</span> <span class="o">=</span> <span class="mi">256</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_with_tensorrt_alignment</span><span class="p">(</span><span class="n">backend_config</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Return ``backend_config`` with memory planning on TensorRT's 256-byte boundary.</span>
+
+<span class="sd">    ExecuTorch plans buffers on 16-byte boundaries by default, so a planned delegate input or output</span>
+<span class="sd">    can miss 256 and be copied on every call. Each ``MemoryPlanningPass`` gets the least common</span>
+<span class="sd">    multiple of its own alignment and 256, on a copy, so the caller's alignment still holds and the</span>
+<span class="sd">    caller's planner keeps its own. Any other planner is left as it is.</span>
+<span class="sd">    """</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">copy</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">dataclasses</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+
+    <span class="kn">from</span><span class="w"> </span><span class="nn">executorch.exir</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExecutorchBackendConfig</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">executorch.exir.passes</span><span class="w"> </span><span class="kn">import</span> <span class="n">MemoryPlanningPass</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">aligned</span><span class="p">(</span><span class="n">planner</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">planner</span><span class="p">,</span> <span class="n">MemoryPlanningPass</span><span class="p">)</span>
+            <span class="ow">or</span> <span class="n">planner</span><span class="o">.</span><span class="n">alignment</span> <span class="o">%</span> <span class="n">_TENSORRT_ADDRESS_ALIGNMENT</span> <span class="o">==</span> <span class="mi">0</span>
+        <span class="p">):</span>
+            <span class="k">return</span> <span class="n">planner</span>
+        <span class="n">planner</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">planner</span><span class="p">)</span>
+        <span class="n">planner</span><span class="o">.</span><span class="n">alignment</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">lcm</span><span class="p">(</span><span class="n">planner</span><span class="o">.</span><span class="n">alignment</span><span class="p">,</span> <span class="n">_TENSORRT_ADDRESS_ALIGNMENT</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">planner</span>
+
+    <span class="n">config</span> <span class="o">=</span> <span class="n">backend_config</span> <span class="k">if</span> <span class="n">backend_config</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">ExecutorchBackendConfig</span><span class="p">()</span>
+    <span class="n">planner</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">memory_planning_pass</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">planner</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+        <span class="n">planner</span> <span class="o">=</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="n">aligned</span><span class="p">(</span><span class="n">p</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">planner</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">planner</span> <span class="o">=</span> <span class="n">aligned</span><span class="p">(</span><span class="n">planner</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">dataclasses</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">memory_planning_pass</span><span class="o">=</span><span class="n">planner</span><span class="p">)</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_save_as_executorch</span><span class="p">(</span><span class="n">exp_program</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">file_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -1990,7 +2080,8 @@ document.write(`
     <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span>
             <span class="s2">"Could not import the ExecuTorch export integration for "</span>
-            <span class="s2">"output_format='executorch'. This CUDA integration supports Linux. "</span>
+            <span class="s2">"output_format='executorch'. This CUDA integration supports Linux and "</span>
+            <span class="s2">"Windows x86-64. "</span>
             <span class="s2">"Setup: "</span> <span class="o">+</span> <span class="n">executorch_install_command</span><span class="p">()</span>
         <span class="p">)</span>
     <span class="c1"># save() only ever lowers a single method, so keep rejecting the per-method</span>
@@ -2022,7 +2113,9 @@ document.write(`
         <span class="p">),</span>
         <span class="n">use_cuda_graphs</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"use_cuda_graphs"</span><span class="p">),</span>
         <span class="n">zero_copy_kv</span><span class="o">=</span><span class="n">zero_copy_kv</span><span class="p">,</span>
+        <span class="n">external_engine_data</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"external_engine_data"</span><span class="p">),</span>
     <span class="p">)</span>
+    <span class="n">backend_config</span> <span class="o">=</span> <span class="n">_with_tensorrt_alignment</span><span class="p">(</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"backend_config"</span><span class="p">))</span>
     <span class="c1"># Unlike the direct export()+to_executorch() path -- where the two steps</span>
     <span class="c1"># belong to different owners and pairing them is the caller's job -- save()</span>
     <span class="c1"># owns both, so it installs the finalization pass itself. Wrapping preserves</span>
@@ -2031,7 +2124,6 @@ document.write(`
     <span class="c1"># writes, and the pass refuses it. A backend_config that already carries</span>
     <span class="c1"># the pass is wrapped again here; the second run finds the buffers already</span>
     <span class="c1"># un-staged and changes nothing.</span>
-    <span class="n">backend_config</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"backend_config"</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">zero_copy_kv</span><span class="p">:</span>
         <span class="n">backend_config</span> <span class="o">=</span> <span class="n">zero_copy_backend_config</span><span class="p">(</span><span class="n">backend_config</span><span class="p">)</span>
     <span class="n">executorch_program</span> <span class="o">=</span> <span class="n">edge_program</span><span class="o">.</span><span class="n">to_executorch</span><span class="p">(</span><span class="n">config</span><span class="o">=</span><span class="n">backend_config</span><span class="p">)</span>

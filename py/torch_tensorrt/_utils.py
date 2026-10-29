@@ -38,7 +38,7 @@ def sanitized_torch_version() -> Any:
 
 
 def executorch_install_channel() -> str | None:
-    """Return the nightly channel matching the active PyTorch CUDA build, if supported.
+    """Return the CUDA channel, such as cu132, matching the active PyTorch CUDA build, if supported.
 
     Names the channel matching the installed torch. It does not promise that channel exists,
     because PyTorch publishes a new CUDA minor before ExecuTorch fills it.
@@ -57,11 +57,49 @@ def is_platform_supported_for_executorch() -> bool:
     )
 
 
+def _build_record(name: str) -> str:
+    """Return a value the build wrote into _version.py, or an empty string if it wrote none."""
+    from torch_tensorrt import _version
+
+    return getattr(_version, name, "")
+
+
+def _executorch_index_options(cuda: str) -> str:
+    """Return the pip options naming the indexes with this wheel's delegate and pinned ExecuTorch.
+
+    A development ExecuTorch build is only on the nightly index, a release candidate on the test
+    index, and a release on the stable index.
+    """
+    # A version file older than this record was written by a source build pinning a development
+    # ExecuTorch.
+    executorch = _build_record("__executorch_channel__") or "nightly"
+    delegate = executorch
+    if _build_record("__executorch_runtime_version__"):
+        # A PyPI wheel records pypi, or no channel on Windows or before that record existed. PyPI has
+        # one delegate per platform at most, while the stable index keeps the release's delegate, and
+        # the ExecuTorch release it pins, for every CUDA version.
+        delegate = _build_record("__executorch_runtime_channel__")
+        if delegate in ("", "pypi"):
+            delegate = ""
+            if executorch == "test":
+                executorch = ""
+    indexes = [
+        f"{channel}/{cuda}" if channel else cuda
+        for channel in dict.fromkeys((delegate, executorch))
+    ]
+    return " ".join(
+        f"--extra-index-url https://download.pytorch.org/whl/{index}"
+        for index in indexes
+    )
+
+
 def executorch_install_command() -> str:
     """Return an install command, or guidance for an unsupported CUDA build.
 
-    Adding this package's missing extra does not need a blanket --upgrade, but pip
-    may still change dependencies to satisfy it. --pre permits prerelease candidates.
+    Adding this package's missing extra does not need a blanket --upgrade. Naming the installed
+    version keeps pip from swapping in a different torch_tensorrt release to satisfy the extra.
+    Naming the recorded delegate keeps the ExecuTorch build it pins where the extra leaves the
+    delegate out. --pre permits prerelease candidates.
     """
     channel = executorch_install_channel()
     if channel is None or not is_platform_supported_for_executorch():
@@ -70,9 +108,36 @@ def executorch_install_command() -> str:
             f"{EXECUTORCH_CUDA_MAJOR} build. Use matching PyTorch, ExecuTorch and "
             "Torch-TensorRT wheels in a fresh environment."
         )
+    delegate = _build_record("__executorch_runtime_version__")
+    # The extra may require the delegate built for this wheel's CUDA channel, not torch's.
+    cuda = delegate.partition("+")[2] or channel
+    requirements = f'"torch_tensorrt[executorch]=={_build_record("__version__")}" '
+    if delegate:
+        requirements += f'"torch-tensorrt-executorch-runtime=={delegate}" '
+    return f"pip install --pre {requirements}" + _executorch_index_options(cuda)
+
+
+def executorch_runtime_install_command() -> str:
+    """Return the install command for the delegate built with this wheel, or why there is none.
+
+    The build records the companion built beside this wheel. Where the executorch extra can find
+    it, the extra requires exactly that version; otherwise a hand install has to name it.
+    """
+    version = _build_record("__executorch_runtime_version__")
+    if not version:
+        return (
+            "This Torch-TensorRT build has no matching delegate. The standard CUDA "
+            f"{EXECUTORCH_CUDA_MAJOR} wheels for Linux (x86-64 and aarch64) and Windows x86-64 "
+            "have one; TensorRT-RTX, Python-only and JetPack builds do not. To build it from "
+            "source, see py/torch-tensorrt-executorch-runtime/README.md in the Torch-TensorRT "
+            "repository."
+        )
+    cuda = version.partition("+")[2] or executorch_install_channel()
+    if cuda is None:
+        return executorch_install_command()
     return (
-        'pip install --pre "torch_tensorrt[executorch]" '
-        f"--extra-index-url https://download.pytorch.org/whl/nightly/{channel}"
+        f'pip install "torch-tensorrt-executorch-runtime=={version}" '
+        + _executorch_index_options(cuda)
     )
 
 
