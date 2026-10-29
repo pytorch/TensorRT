@@ -109,7 +109,7 @@ auto results = trt_mod.forward({input_tensor});
 | ------------------- | ------------------------------------------------ |
 | Linux AMD64 / GPU   | **Supported**                                    |
 | Linux SBSA / GPU    | **Supported**                                    |
-| NVIDIA DRIVE OS / GPU | **Source Compilation (DRIVE OS 7.2.4 / TensorRT 10.16)** |
+| NVIDIA DRIVE OS / GPU | **Source Compilation (Thor / ExecuTorch deployment)** |
 | Windows / GPU       | **Supported (Dynamo only)**                      |
 | Linux Jetson / GPU | **Source Compilation Supported on JetPack-4.4+**  |
 | Linux Jetson / DLA | **Source Compilation Supported on JetPack-4.4+**  |
@@ -120,24 +120,24 @@ auto results = trt_mod.forward({input_tensor});
 ### Building on DRIVE OS
 
 DRIVE OS builds use dedicated `@cuda_driveos` and `@tensorrt_driveos` repositories
-with a target-compatible TensorRT 10.16 development installation under `/usr`
+with a target-compatible TensorRT development installation under `/usr`
 in the build container, following the existing NGC layout. Normal Linux, JetPack,
 and Windows builds retain their existing repositories. In an NVIDIA
-runtime-enabled build container, provide the injected DRIVE CUDA root; an
-additional CUDA target-library directory may be provided when the required
-library is not present below that root. The build consumes the common and
-Thor-specific header trees directly;
-it does not require a merged CUDA toolkit directory.
+runtime-enabled build container, the DRIVE CUDA rule defaults to
+`/usr/local/cuda`, normally a symlink to the selected toolkit. Set
+`TORCHTRT_DRIVE_CUDA_ROOT` only when a different root is needed. The selected
+root must expose the DRIVE layout; a conventional SBSA toolkit alone is not
+sufficient. The build consumes the common and Thor-specific header trees
+directly; it does not require a merged CUDA toolkit directory.
 
 ```bash
-TORCHTRT_DRIVE_CUDA_ROOT=/path/to/injected/drive-cuda \
 TORCHTRT_TARGET_PLATFORM=driveos \
 python -m pip install --pre --editable '.[executorch]' \
   --index-url https://download.pytorch.org/whl/nightly/cu132 \
   --extra-index-url https://pypi.org/simple
 ```
 
-`TORCHTRT_DRIVE_CUDA_ROOT` must contain
+The selected CUDA root must contain
 `targets/aarch64-linux/include`, `thor/targets/aarch64-linux/include`, and
 `bin/nvcc`. The DRIVE CUDA repository accepts either an unversioned
 `libcudart.so` or a versioned `libcudart.so.*` below
@@ -145,6 +145,16 @@ python -m pip install --pre --editable '.[executorch]' \
 override that search when a build container supplies CUDA target libraries
 separately. Preserve any other container CUDA libraries required at runtime
 outside paths that NVIDIA runtime injection masks.
+
+For a nonstandard installation, set the optional root override before building:
+
+```bash
+export TORCHTRT_DRIVE_CUDA_ROOT=/path/to/injected/drive-cuda
+```
+
+An invalid explicit override produces an error rather than silently selecting
+another toolkit. This default applies to the Bazel DRIVE repository; the CMake
+runner retains its `CUDAToolkit_ROOT` / `TORCHTRT_DRIVE_CUDA_ROOT` configuration.
 
 The container's TensorRT development installation must provide
 `/usr/include/aarch64-linux-gnu/NvInfer.h` and
@@ -160,9 +170,14 @@ SDK matches the deployment target. Normal SBSA builds continue to use
 The CMake reference runner discovers TensorRT through standard system search
 paths. CMake users can still specify `-DTensorRT_ROOT=...` for a non-system SDK.
 
-The resulting package requires PyTorch 2.15 nightly and TensorRT 10.16. The
-DRIVE configuration is opt-in and does not change the conventional CUDA
-repository used by default Linux and SBSA builds.
+The resulting package uses the branch's normal PyTorch requirement and pins
+the TensorRT Python version detected in the build environment. Development
+validation included DRIVE OS 7.2.4 with TensorRT 10.16 / CUDA 13.2 and later
+DRIVE OS 7.2.5 with native TensorRT 11.0.1.7 / CUDA 13.3. These are historical
+tested configurations, not a compatibility guarantee for every release or a
+fresh validation of the latest source. The DRIVE configuration is opt-in and
+does not change the conventional CUDA repository used by default Linux and SBSA
+builds.
 
 ### Dependencies
 

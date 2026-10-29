@@ -3,7 +3,10 @@
 def _require_file(root, relative, description):
     path = root.get_child(relative)
     if not path.exists:
-        fail("{} is missing {} ({})".format(root, relative, description))
+        fail(
+            "{} is missing {} ({}). ".format(root, relative, description) +
+            "Set TORCHTRT_DRIVE_CUDA_ROOT to the injected DRIVE CUDA toolkit root.",
+        )
 
 def _find_cudart(directory):
     if not directory or not directory.exists:
@@ -25,14 +28,10 @@ def _find_cudart(directory):
     return directory.get_child(versioned[0]) if versioned else None
 
 def _drive_cuda_repository_impl(ctx):
-    cuda_root_value = ctx.os.environ.get("TORCHTRT_DRIVE_CUDA_ROOT", "").strip()
+    # Follow the container's selected toolkit unless the caller overrides it.
+    # Validate the DRIVE layout below; an ordinary SBSA toolkit is not sufficient.
+    cuda_root_value = ctx.os.environ.get("TORCHTRT_DRIVE_CUDA_ROOT", "").strip() or "/usr/local/cuda"
     library_dir_value = ctx.os.environ.get("TORCHTRT_DRIVE_CUDA_LIB_DIR", "").strip()
-
-    if not cuda_root_value:
-        fail(
-            "Set TORCHTRT_DRIVE_CUDA_ROOT to the CUDA root injected into the " +
-            "build container by the NVIDIA runtime.",
-        )
 
     cuda_root = ctx.path(cuda_root_value)
     _require_file(
