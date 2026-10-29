@@ -190,6 +190,44 @@ def test_mixed_real_complex_input_real_output():
     torch._dynamo.reset()
 
 
+@pytest.mark.unit
+def test_complex_input_complex_output_by_keyword():
+    """The compiled module takes its inputs by the names the model's forward gives
+    them, also when they are complex (the input boundary renames their placeholders)."""
+    model = ComplexInputComplexOutput().eval().cuda()
+    a = _make_freqs(8, 64)
+    b = _make_freqs(8, 64)
+    trt_model = torchtrt.compile(model, inputs=(a, b), **_COMPILE)
+    py_out = model(a, b)
+    trt_out = trt_model(a=a, b=b)
+    _cossim_complex(py_out, trt_out, "complex_io_by_keyword")
+    torch._dynamo.reset()
+
+
+class ComplexAndRealOutputs(nn.Module):
+    """A complex and a real output, both computed in one TRT block."""
+
+    def forward(self, a: torch.Tensor, b: torch.Tensor) -> dict:
+        prod = a * b
+        return {"prod": prod, "energy": torch.view_as_real(prod).square().sum()}
+
+
+@pytest.mark.unit
+def test_complex_output_of_a_multi_output_block():
+    """A block with several outputs returns each through a getitem; the complex one
+    must still be turned back into a complex tensor."""
+    model = ComplexAndRealOutputs().eval().cuda()
+    a = _make_freqs(8, 64)
+    b = _make_freqs(8, 64)
+    inputs = (a, b)
+    trt_model = torchtrt.compile(model, inputs=inputs, **_COMPILE)
+    py_out = model(*inputs)
+    trt_out = trt_model(*inputs)
+    _cossim_complex(py_out["prod"], trt_out["prod"], "multi_output_complex")
+    _cossim_real(py_out["energy"], trt_out["energy"], "multi_output_real")
+    torch._dynamo.reset()
+
+
 # ===========================================================================
 # 2. Operator coverage
 # ===========================================================================
