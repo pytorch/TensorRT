@@ -141,9 +141,11 @@ class TestCondCompilation(TestCase):
     def test_cond_keeps_branches_returned_by_lowering(self):
         # The complex lowering returns a new branch module rather than editing it.
         x = torch.randn(2, 4)
-        pred = torch.tensor(True)
-        gm = _export_lowered(_ComplexCond(), (x, pred))
+        model = _ComplexCond()
+        gm = _export_lowered(model, (x, torch.tensor(True)))
         self.assertTrue(_cond_node(gm) in CONVERTERS)
+        for pred in (torch.tensor(True), torch.tensor(False)):
+            torch.testing.assert_close(gm(x, pred), model(x, pred))
 
     def test_cond_keeps_branch_when_lowering_changes_output_layout(self):
         pred = torch.tensor(True)
