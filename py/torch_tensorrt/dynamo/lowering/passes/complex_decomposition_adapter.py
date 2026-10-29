@@ -30,7 +30,7 @@ such as ``aten.log2``/``aten.log10`` as of torch 2.14.dev).
 import gc
 import logging
 from contextlib import contextmanager
-from typing import Any, Iterator
+from typing import Any, Iterator, Optional
 
 import torch
 from torch._export.utils import _detect_fake_mode_from_gm
@@ -110,6 +110,7 @@ def complex_decomposition_adapter(
     # codegen then unflattens again.
     gm.graph._codegen = torch.fx.graph.CodeGen()
     gm.recompile()
+    decomposed_gm: Optional[GraphModule] = None
     try:
         # Both retraces return a new graph. Keep the original for the existing
         # unsupported-op fallback rather than replacing it before success.
@@ -136,11 +137,12 @@ def complex_decomposition_adapter(
             f"complex decomposition failed ({type(e).__name__}: {e}); "
             "falling back to the legacy complex_graph_detection pass."
         )
-        gm.graph._codegen = original_codegen
-        gm.recompile()
-        return complex_graph_detection(gm, settings)
     gm.graph._codegen = original_codegen  # the caller's module, as it was
     gm.recompile()
+    if decomposed_gm is None:
+        # Not inside the except block: there the failed retrace's frames are still
+        # alive, and with them its device copies of the offloaded constants.
+        return complex_graph_detection(gm, settings)
     _restore_offloaded_constants(decomposed_gm, offloaded)
     if offloaded:
         # The retrace leaves the device copies in reference cycles. Free them now
