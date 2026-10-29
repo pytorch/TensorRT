@@ -279,6 +279,9 @@ def _patch_lowering(monkeypatch, engine_counts=None):
     )
     monkeypatch.setattr(export_utils, "stage_exported_program", lambda program: program)
     monkeypatch.setattr(
+        export_module, "_normalize_reshape_copy", lambda program: program
+    )
+    monkeypatch.setattr(
         export_utils,
         "replace_execute_engine",
         lambda program, resolved=None: ("rewritten", program),

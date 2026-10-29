@@ -21,6 +21,31 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _normalize_reshape_copy(program: ExportedProgram) -> ExportedProgram:
+    """Decompose TRT's copy-reshape for downstream ExecuTorch backends.
+
+    TRT lowering replaces view with _reshape_copy before partitioning, so the
+    operator can also reach regions excluded from TRT. AOTInductor has neither
+    a lowering nor a portable fallback for it. Keep its fresh, contiguous result
+    using ordinary reshape + clone, without changing TRT's decomposition table.
+    Programs without this operator take the no-retrace path (notably TRT-only
+    exports with large serialized engines).
+    """
+    reshape_copy = torch.ops.aten._reshape_copy.default
+    if not any(
+        node.op == "call_function" and node.target == reshape_copy
+        for module in program.graph_module.modules()
+        if isinstance(module, torch.fx.GraphModule)
+        for node in module.graph.nodes
+    ):
+        return program
+
+    def decompose(x: torch.Tensor, size: list[int]) -> torch.Tensor:
+        return x.reshape(size).clone(memory_format=torch.contiguous_format)
+
+    return program.run_decompositions({reshape_copy: decompose})
+
+
 def _contains_dynamic_input(value: Any) -> bool:
     if isinstance(value, Input):
         return bool(value.shape_mode == Input._ShapeMode.DYNAMIC)
@@ -794,7 +819,9 @@ def export(
                     engine_call_counts[name],
                 )
         # Drop this method's engine payloads as soon as they are in the graph.
-        rewritten[name] = replace_execute_engine(program, resolved_engines.pop(name))
+        rewritten[name] = _normalize_reshape_copy(
+            replace_execute_engine(program, resolved_engines.pop(name))
+        )
         trt_compile_specs = list(method_compile_specs[name])
         if name in zero_copy_methods:
             # Signal to TensorRTPartitioner that this method elided aliased
