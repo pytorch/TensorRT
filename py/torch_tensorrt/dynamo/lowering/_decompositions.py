@@ -349,7 +349,9 @@ def _use_integer_scatter_add(
     elif index.dim() and isinstance(index.shape[dim], int):
         extent = input_tensor.shape[dim]
     else:
-        # Otherwise keep the loop, as before. It specializes a dynamic extent.
+        # Otherwise keep the loop, as before. On a dynamic extent the loop would
+        # specialize it, which is why filter_decomposition_table keeps such an op
+        # out of decomposition on the compile paths.
         return False
     comparisons = index.numel() * extent
     return statically_known_true(comparisons <= _MAX_INTEGER_SCATTER_ADD_COMPARISONS)

@@ -19,8 +19,9 @@ _POSITIONS_TAG = "_torch_tensorrt_scatter_add_positions"
 def exclude_scatter_add_positions_from_constant_fold(positions: torch.Tensor) -> None:
     """Tag the positions arange of the scatter_add decomposition.
 
-    With a constant index, folding it would store the whole comparison of every
-    index with every position as an engine constant. Retraces keep
+    With a constant index, folding it would store the comparison of every index
+    with every position, the 0/1 mask that src is multiplied by, as an engine
+    constant, even when src varies at run time. Retraces keep
     ``node.meta["custom"]``, so the rule below finds the tag after the
     decomposed op is gone, for example after the complex decomposition retrace
     or a second ``run_decompositions``.
