@@ -130,6 +130,32 @@ class TestLiftMutableBuffersAPI(TestCase):
         self.assertEqual(in_name, "buf_cache")
         self.assertEqual(kind, "kv_cache_update")
 
+    def test_flag_on_buffer_written_through_an_alias(self):
+        """A buffer written through ``self.cache[...]`` is lifted and aliased the same way."""
+
+        class M(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("cache", torch.zeros(1, 4, 16, 8))
+
+            def forward(self, x):
+                cache = self.cache[...]
+                cache[:, :, 3:4, :] = x
+                return self.cache.sum()
+
+        x = torch.ones(1, 4, 1, 8, device="cuda")
+        engine_bytes = convert_exported_program_to_serialized_trt_engine(
+            export(M().cuda(), (x.clone(),)),
+            inputs=[x.clone()],
+            enabled_precisions={torch.float32},
+            min_block_size=1,
+            lift_mutable_buffers=True,
+        )
+        inputs, _, aliased = _introspect_engine(engine_bytes)
+
+        self.assertEqual(inputs, ["x", "buf_cache"])
+        self.assertEqual(list(aliased.values()), [("buf_cache", "kv_cache_update")])
+
     def test_caller_threads_buffer_for_in_place_mutation(self):
         """End-to-end: caller takes the engine, threads the buffer in,
         observes in-place mutation."""

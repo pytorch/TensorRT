@@ -115,11 +115,6 @@ def lift_fresh_copy_replacement(x: torch.Tensor) -> torch.Tensor:
     return x
 
 
-@register_torch_trt_decomposition(aten.alias, registry=TORCH_TRT_DECOMPOSITIONS)
-def alias_replacement(x: torch.Tensor) -> torch.Tensor:
-    return x
-
-
 @register_torch_trt_decomposition(
     torch.ops.aten.reciprocal.default, registry=TORCH_TRT_DECOMPOSITIONS
 )

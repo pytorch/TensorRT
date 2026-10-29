@@ -18,12 +18,21 @@ from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering import (
     filter_decomposition_table,
     get_decompositions,
+    remove_alias_from_exported_program,
 )
 from torch_tensorrt.dynamo.lowering.passes._aten_lowering_pass import post_lowering
 from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 from torch_tensorrt.dynamo.utils import ATOL, RTOL
 
 from ..testing_utilities import DECIMALS_OF_AGREEMENT, lower_graph_testing
+
+# Ways code reaches aten.alias: called directly, from indexing, from a decomposition.
+ALIASES = [
+    ("alias", lambda t: torch.ops.aten.alias.default(t)),
+    ("ellipsis", lambda t: t[...]),
+    ("no_op_transpose", lambda t: t.transpose(1, 1)),
+    ("detach", lambda t: t.detach()),
+]
 
 
 class TestLowering(TestCase):
@@ -61,7 +70,7 @@ class TestLowering(TestCase):
             f"The following expected ops were not encountered: {expected_ops_unseen}",
         )
 
-    def test_lowering_alias_replacement(self):
+    def test_lowering_alias_removed(self):
         class Alias(torch.nn.Module):
             def __init__(self, *args, **kwargs) -> None:
                 super().__init__(*args, **kwargs)
@@ -70,7 +79,7 @@ class TestLowering(TestCase):
                 y = torch.ops.aten.alias.default(x) + 1
                 return y
 
-        # Operations expected to be removed in the traced graph after decompositions
+        # The remove_alias pass in post_lowering is expected to drop the alias
         unexpected_ops = {torch.ops.aten.alias.default}
 
         inputs = [
@@ -89,6 +98,104 @@ class TestLowering(TestCase):
             0,
             f"The following unexpected ops were encountered: {unexpected_ops_seen}",
         )
+
+    @parameterized.expand(ALIASES)
+    def test_lowering_alias_written_in_place_torch_compile(self, _, make_alias):
+        class AliasWrittenInPlace(torch.nn.Module):
+            def forward(self, x):
+                y = make_alias(x + 1)
+                y[:, 0] = 0
+                return y
+
+        model = AliasWrittenInPlace().cuda()
+        x = torch.rand(2, 3, device="cuda")
+        # Selects the backend's aot_autograd path, where this write used to fail.
+        compiled = torch.compile(
+            model,
+            backend="torch_tensorrt",
+            options={
+                "min_block_size": 1,
+                "pass_through_build_failures": True,
+                "use_distributed_mode_trace": True,
+            },
+        )
+
+        torch.testing.assert_close(compiled(x), model(x))
+        torch._dynamo.reset()
+
+    @parameterized.expand(ALIASES)
+    def test_lowering_alias_written_in_place(self, _, make_alias):
+        class AliasWrittenInPlace(torch.nn.Module):
+            def forward(self, x):
+                y = make_alias(x + 1)
+                y[:, 0] = 0
+                return y
+
+        class WrittenInPlace(torch.nn.Module):
+            def forward(self, x):
+                y = x + 1
+                y[:, 0] = 0
+                return y
+
+        def lower(model, x):
+            exported = torch.export.export(model, (x,))
+            decomposed = exported.run_decompositions(get_decompositions(False))
+            lowered = remove_alias_from_exported_program(decomposed)
+            # The output specs have to follow the edited graph.
+            lowered.validate()
+            return lowered.module()
+
+        def targets(gm):
+            return [
+                node.target for node in gm.graph.nodes if node.op == "call_function"
+            ]
+
+        x = torch.rand(2, 3)
+        lowered = lower(AliasWrittenInPlace(), x)
+
+        self.assertEqual(targets(lowered), targets(lower(WrittenInPlace(), x)))
+        torch.testing.assert_close(lowered(x), AliasWrittenInPlace()(x), rtol=0, atol=0)
+
+    @parameterized.expand(ALIASES)
+    def test_lowering_input_written_through_returned_alias(self, _, make_alias):
+        class InputWrittenThroughAlias(torch.nn.Module):
+            def forward(self, x):
+                return make_alias(x).add_(1)
+
+        x = torch.rand(2, 3, device="cuda")
+        compiled = torch_tensorrt.dynamo.compile(
+            torch.export.export(InputWrittenThroughAlias(), (x.clone(),)),
+            inputs=[x.clone()],
+            min_block_size=1,
+        )
+        x_eager, x_trt = x.clone(), x.clone()
+
+        torch.testing.assert_close(compiled(x_trt), InputWrittenThroughAlias()(x_eager))
+        torch.testing.assert_close(x_trt, x_eager)
+
+    @parameterized.expand(ALIASES)
+    def test_lowering_alias_in_cond_branch(self, _, make_alias):
+        class AliasInCondBranch(torch.nn.Module):
+            def forward(self, x):
+                return torch.cond(
+                    x.sum() > 0, lambda t: make_alias(t) + 1, lambda t: t - 1, (x,)
+                )
+
+        x = torch.rand(2, 3, device="cuda")
+        compiled = torch_tensorrt.dynamo.compile(
+            torch.export.export(AliasInCondBranch(), (x,)),
+            inputs=[x],
+            min_block_size=1,
+        )
+        segments = [name for name, _ in compiled.named_children()]
+
+        # An alias left in a branch has no converter, so the cond would run in PyTorch.
+        self.assertFalse(
+            any("_run_on_gpu" in segment for segment in segments),
+            msg=f"segments: {segments}",
+        )
+        for value in (x, -x):
+            torch.testing.assert_close(compiled(value), AliasInCondBranch()(value))
 
     def test_lowering_rsqrt(self):
         class Rsqrt(torch.nn.Module):
