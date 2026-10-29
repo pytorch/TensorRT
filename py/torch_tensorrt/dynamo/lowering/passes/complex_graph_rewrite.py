@@ -711,23 +711,6 @@ class ComplexGraphRewriter:
             self.gm.graph.erase_node(node)
             return True
 
-    @_complex_unpacker(torch.ops.aten.prod.dim_int)
-    def _rewrite_prod_dim(self, node: Node) -> bool:
-        # prod.dim_int(inp, dim, keepdim=False, dtype=None)
-        inp = node.args[0]
-        dim = node.args[1]
-        if dim >= 0:
-            return False  # positive dim — pass-through is correct
-        new_dim = dim - 1
-        keepdim = node.args[2] if len(node.args) > 2 else False
-        extra = list(node.args[3:])
-        with SubgraphBuilder(self.gm.graph, node) as b:
-            out = b(torch.ops.aten.prod.dim_int, inp, new_dim, keepdim, *extra)
-            node.replace_all_uses_with(out)
-            out.meta["is_complex_layout"] = True
-            self.gm.graph.erase_node(node)
-            return True
-
     @_complex_unpacker(torch.ops.aten.narrow.default)
     def _rewrite_narrow(self, node: Node) -> bool:
         # narrow(inp, dim, start, length) — shift negative dim by -1

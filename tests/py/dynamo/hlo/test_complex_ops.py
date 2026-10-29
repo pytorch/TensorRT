@@ -905,6 +905,45 @@ def test_complex_output_dynamic_batch():
     torch._dynamo.reset()
 
 
+class ComplexOp(nn.Module):
+    """Apply one complex op to a real (..., 2) input viewed as complex."""
+
+    def __init__(self, op):
+        super().__init__()
+        self.op = op
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return torch.view_as_real(self.op(torch.view_as_complex(x)))
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("dynamic", [False, True], ids=["static", "dynamic"])
+@pytest.mark.parametrize(
+    "op",
+    [
+        lambda z: torch.prod(z, dim=1),
+        lambda z: torch.prod(z, dim=-1, keepdim=True),
+    ],
+    ids=["prod_dim", "prod_neg_dim_keepdim"],
+)
+def test_complex_op_matches_eager(op, dynamic):
+    model = ComplexOp(op).eval().cuda()
+    x = torch.randn(2, 4, 2).cuda()
+    dynamic_shapes = ({0: Dim("batch", min=2, max=8)},) if dynamic else None
+    ep = torch.export.export(model, (x,), dynamic_shapes=dynamic_shapes)
+    trt_model = torchtrt.dynamo.compile(
+        ep,
+        inputs=[x],
+        min_block_size=1,
+        pass_through_build_failures=True,
+        **_DECOMP,
+    )
+    for batch in (2, 5) if dynamic else (2,):
+        xb = torch.randn(batch, 4, 2).cuda()
+        torch.testing.assert_close(trt_model(xb), model(xb), rtol=1e-3, atol=1e-3)
+    torch._dynamo.reset()
+
+
 # ===========================================================================
 # 11. Numerical precision: complex64 vs truncated complex128
 # ===========================================================================
