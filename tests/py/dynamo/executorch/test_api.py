@@ -2612,7 +2612,7 @@ def test_driveos_cuda_discovery_and_cmake_use_standard_root_hints():
     cuda_rule = _DRIVE_CUDA_REPOSITORY_RULE.read_text()
     assert 'ctx.os.environ.get("TORCHTRT_DRIVE_CUDA_ROOT"' in cuda_rule
     assert 'ctx.os.environ.get("TORCHTRT_DRIVE_CUDA_LIB_DIR"' in cuda_rule
-    assert "/usr/local/cuda" not in cuda_rule
+    assert 'or "/usr/local/cuda"' in cuda_rule
     assert '"libcudart.so.13"' in cuda_rule
 
     module = _MODULE_BAZEL.read_text()
