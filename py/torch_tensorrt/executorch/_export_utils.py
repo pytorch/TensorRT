@@ -111,16 +111,20 @@ def _outputs_depend_on_data(engine_obj: Any, node: Any) -> bool:
         if not all(has_guarding_hint(dim) for dim in val.shape):
             return True
         input_shapes.append([guarding_hint_or_throw(dim) for dim in val.shape])
-    try:
-        output_shapes = engine_obj.infer_outputs(input_shapes)
-    except RuntimeError:
-        # The C++ engine cannot create a tensor for an unknown dimension.
-        return True
+    output_shapes = engine_obj.infer_outputs(input_shapes)
     return any(-1 in tuple(getattr(shape, "shape", shape)) for shape in output_shapes)
 
 
-def validate_engine_info(engine_info: Sequence[Any], *, node_name: str = "") -> None:
-    """Reject engine configurations unsupported by ExecuTorch export."""
+def validate_engine_info(
+    engine_info: Sequence[Any],
+    *,
+    node_name: str = "",
+    cause: BaseException | None = None,
+) -> None:
+    """Reject engine configurations unsupported by ExecuTorch export.
+
+    ``cause`` is chained to the refusal, so the error behind it stays visible.
+    """
     from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
         REQUIRES_OUTPUT_ALLOCATOR_IDX,
     )
@@ -134,7 +138,7 @@ def validate_engine_info(engine_info: Sequence[Any], *, node_name: str = "") -> 
             "ExecuTorch export does not support TensorRT engines that require "
             "an output allocator (data-dependent output shapes)"
             f"{node_suffix}."
-        )
+        ) from cause
 
 
 def _schema_name(node: Any) -> str:
@@ -294,20 +298,28 @@ def validate_engine_program(
             )
             if engine_node is not None:
                 by_engine_node[engine_node] = engine_info
+        inference_error = None
         if (
             node.target is torch.ops.tensorrt.execute_engine.default
             and len(engine_info) > REQUIRES_OUTPUT_ALLOCATOR_IDX
             and str(engine_info[REQUIRES_OUTPUT_ALLOCATOR_IDX]) == "1"
-            and not _outputs_depend_on_data(
-                _resolve_engine_object(exported_program, node), node
-            )
         ):
-            # Every output shape is known, so ExecuTorch needs no output allocator.
-            # This record becomes the ExecuTorch engine's arguments, and the backend
-            # refuses a marked one.
-            engine_info = list(engine_info)
-            engine_info[REQUIRES_OUTPUT_ALLOCATOR_IDX] = "0"
-        validate_engine_info(engine_info, node_name=node.name)
+            try:
+                depends_on_data = _outputs_depend_on_data(
+                    _resolve_engine_object(exported_program, node), node
+                )
+            except RuntimeError as error:
+                # The C++ engine raises when it cannot create an output for an
+                # unknown dimension, but also when anything else fails, so the
+                # refusal keeps the error as its cause.
+                depends_on_data, inference_error = True, error
+            if not depends_on_data:
+                # Every output shape is known, so ExecuTorch needs no output
+                # allocator. This record becomes the ExecuTorch engine's
+                # arguments, and the backend refuses a marked one.
+                engine_info = list(engine_info)
+                engine_info[REQUIRES_OUTPUT_ALLOCATOR_IDX] = "0"
+        validate_engine_info(engine_info, node_name=node.name, cause=inference_error)
         if resolved is not None:
             resolved[node.name] = engine_info
         count += 1
