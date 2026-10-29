@@ -1,0 +1,7 @@
+# Additional model packages for the configured authoring environment.
+# Preserve the tested Torch/CUDA/TensorRT stack; inspect the resolver plan first.
+transformers==4.55.4
+huggingface-hub==0.34.4
+tokenizers==0.21.4
+safetensors==0.6.2
+Pillow==11.3.0
