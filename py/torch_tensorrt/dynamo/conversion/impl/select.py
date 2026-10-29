@@ -789,13 +789,12 @@ def index_put_converter(
                             0,
                         )
                     )
-        # When any index has a dynamic size, use the first dynamic value
-        # (all valid indices are guaranteed to have the same N after broadcasting).
-        # Python's max() cannot compare ITensors, so we avoid it when dynamic.
-        if any(isinstance(s, ITensor) for s in index_shapes):
-            N = next(s for s in index_shapes if isinstance(s, ITensor))
-        else:
-            N = max(index_shapes) if index_shapes else 1
+        # Index lengths broadcast together. A dynamic length must be 1 or equal a
+        # static length larger than 1, so that static length is N. Otherwise use
+        # the first dynamic length, since Python's max() cannot compare ITensors.
+        static_n = max((s for s in index_shapes if isinstance(s, int)), default=1)
+        dynamic_n = [s for s in index_shapes if isinstance(s, ITensor)]
+        N = dynamic_n[0] if dynamic_n and static_n == 1 else static_n
     else:
         N = 1
 

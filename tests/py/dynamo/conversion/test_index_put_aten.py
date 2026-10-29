@@ -541,12 +541,20 @@ class TestIndexPutConverter(DispatchTestCase):
         values = torch.randn(4, 8, device="cuda")
         mask = torch.zeros(1, 10, dtype=torch.bool, device="cuda")
         mask[0, 3:7] = True
+        one_true = torch.zeros(10, dtype=torch.bool, device="cuda")
+        one_true[5] = True
         cases = [
-            (AddRows(), torch.randn(1, 10, 8, device="cuda"), mask),
-            (SetRows(), torch.randn(10, 8, device="cuda"), mask[0]),
-            (SetRowsAtColumns(), torch.randn(10, 6, 8, device="cuda"), mask[0]),
+            (AddRows(), torch.randn(1, 10, 8, device="cuda"), mask, ()),
+            (SetRows(), torch.randn(10, 8, device="cuda"), mask[0], ()),
+            # One True entry broadcasts across the four column indices.
+            (
+                SetRowsAtColumns(),
+                torch.randn(10, 6, 8, device="cuda"),
+                mask[0],
+                (one_true,),
+            ),
         ]
-        for model, data, case_mask in cases:
+        for model, data, case_mask, other_masks in cases:
             with self.subTest(type(model).__name__):
                 inputs = (data, case_mask, values)
                 compiled = torchtrt.dynamo.compile(
@@ -555,7 +563,10 @@ class TestIndexPutConverter(DispatchTestCase):
                     min_block_size=1,
                     pass_through_build_failures=True,
                 )
-                torch.testing.assert_close(compiled(*inputs), model(*inputs))
+                for run_mask in (case_mask, *other_masks):
+                    torch.testing.assert_close(
+                        compiled(data, run_mask, values), model(data, run_mask, values)
+                    )
                 # A True count that differs from the value rows fails, as in PyTorch.
                 fewer = case_mask.clone()
                 fewer[..., 6] = False
