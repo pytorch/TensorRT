@@ -2051,10 +2051,6 @@ def _setup_tree():
     return ast.parse(_SETUP_PY.read_text(encoding="utf-8"))
 
 
-def _runtime_setup_tree():
-    return ast.parse(_RUNTIME_SETUP_PY.read_text(encoding="utf-8"))
-
-
 def _assignment_value(tree, name):
     for node in tree.body:
         if isinstance(node, ast.Assign) and any(
@@ -2626,7 +2622,7 @@ def test_driveos_packaging_pins_installed_tensorrt(
     assert requirements == [
         "base",
         "numpy",
-        "torch>=2.15.0.dev,<2.16.0",
+        "torch>=2.16.0.dev,<2.17.0",
         f"tensorrt=={expected_tensorrt}",
     ]
     assert queries == ["tensorrt"]
