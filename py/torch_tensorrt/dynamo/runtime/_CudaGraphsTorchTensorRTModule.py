@@ -7,9 +7,10 @@ import logging
 from typing import Any, List, Optional, Sequence, Tuple
 
 import torch
-import torch_tensorrt
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.utils._pytree import tree_flatten, tree_map, tree_unflatten
+
+import torch_tensorrt
 from torch_tensorrt.dynamo import partitioning
 
 logger = logging.getLogger(__name__)
@@ -52,7 +53,7 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
     Args:
         compiled_module: Complied fx graphModule that will be wrapped
     Returns:
-        Output tensor or tensor list
+        Model outputs with their original container structure
     """
 
     def __init__(
@@ -61,17 +62,23 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
     ):
         super(CudaGraphsTorchTensorRTModule, self).__init__()
         self.compiled_module = compiled_module
-        self.inputs = partitioning.construct_submodule_inputs(compiled_module)
         self.is_weight_streaming_set = False
 
         self._input_buffers: List[torch.Tensor] = []
-        self._output_buffers: List[torch.Tensor] = []
+        self._input_storage_buffers: List[torch.Tensor] = []
+        self._output_buffers: Any = None
         self.cudagraph: Optional[torch.cuda.CUDAGraph] = None
         self.use_output_allocator_outputs = False
-        self.shape_key: Optional[str] = None
+        self.shape_key: Optional[Tuple[Any, ...]] = None
         self._caller_stream: Optional[torch.cuda.Stream] = None
         self._engine_stream: Optional[torch.cuda.Stream] = None
         self._owned_pool_stream: Optional[torch.cuda.Stream] = None
+        from torch_tensorrt.dynamo.region_compilation import get_region_records
+
+        self._has_torch_regions = any(
+            record.route == "torch" for record in get_region_records(compiled_module)
+        )
+        self._capture_context: Optional[Tuple[Any, ...]] = None
         # Bind to the device of the wrapped module's first CUDA parameter so
         # multi-GPU deployments cache the right default stream.
         target = next(
@@ -84,7 +91,9 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             else torch.device("cuda", torch.cuda.current_device())
         )
         self._default_stream = torch.cuda.default_stream(self._target_device)
-        self.warm_up()
+        # Region backends need real inputs and the caller's context for warmup.
+        if not self._has_torch_regions:
+            self.warm_up()
 
     def warm_up(self) -> None:
         """
@@ -94,7 +103,8 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
 
         with torch_tensorrt.logging.errors():
             with unset_fake_temporarily():
-                args, kwargs = _unflatten_inputs(self.inputs, self.compiled_module)
+                inputs = partitioning.construct_submodule_inputs(self.compiled_module)
+                args, kwargs = _unflatten_inputs(inputs, self.compiled_module)
                 s = torch.cuda.Stream()
                 s.wait_stream(torch.cuda.current_stream())
                 with torch.cuda.stream(s):
@@ -103,21 +113,84 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                 torch.cuda.current_stream().wait_stream(s)
 
     def validate_input_shapes(self, inputs: Sequence[torch.Tensor]) -> bool:
-        """
-        Validates the input shapes of the forward function has changed
-        And infer output shapes if dynamic input shape has changed.
-        """
-        # Representation of input shapes to a given model
-        # Shapes are concatenated as so:
-        # x: (3, 4), y: (4, 5) --> Key: (3,4)(4,5)
-        new_shape_key = "".join(str(tuple(t.shape)).replace(" ", "") for t in inputs)
+        """Invalidate capture when inputs need different buffers or kernels."""
+        if self._has_torch_regions:
+            storage_groups: dict[int, int] = {}
+            metadata = []
+            for tensor in inputs:
+                if (
+                    not isinstance(tensor, torch.Tensor)
+                    or not tensor.is_cuda
+                    or tensor.layout != torch.strided
+                    or tensor.is_quantized
+                    or tensor.is_conj()
+                    or tensor.is_neg()
+                ):
+                    raise RuntimeError(
+                        "CUDA graph capture of PyTorch regions requires strided CUDA "
+                        "tensor inputs without quantization or conjugate/negative view bits"
+                    )
+                storage = tensor.untyped_storage()
+                group = storage_groups.setdefault(storage._cdata, len(storage_groups))
+                metadata.append(
+                    (
+                        tuple(tensor.shape),
+                        tensor.dtype,
+                        tensor.device,
+                        tensor.stride(),
+                        tensor.storage_offset(),
+                        storage.nbytes(),
+                        group,
+                        tensor.requires_grad,
+                    )
+                )
+            if len({tensor.device for tensor in inputs}) > 1:
+                raise RuntimeError(
+                    "CUDA graph capture of PyTorch regions requires inputs on one CUDA device"
+                )
+            new_shape_key: Tuple[Any, ...] = tuple(metadata)
+        else:
+            new_shape_key = tuple((tuple(t.shape), t.dtype, t.device) for t in inputs)
 
         if new_shape_key != self.shape_key:
-            logger.debug(f"Input shape changed {self.shape_key} -> {new_shape_key}")
+            logger.debug(
+                "Input metadata changed %s -> %s", self.shape_key, new_shape_key
+            )
             self.shape_key = new_shape_key
             return True
 
         return False
+
+    def _copy_region_inputs(
+        self, inputs: Sequence[torch.Tensor], *, recapture: bool
+    ) -> None:
+        """Copy backing storage once, preserving input views and shared storage."""
+        if recapture:
+            self._input_buffers = []
+            self._input_storage_buffers = []
+        storage_groups: dict[int, int] = {}
+        for tensor in inputs:
+            storage = tensor.untyped_storage()
+            group = storage_groups.get(storage._cdata)
+            if group is None:
+                group = len(storage_groups)
+                storage_groups[storage._cdata] = group
+                # as_strided may read storage outside the input's visible elements.
+                source = torch.empty(0, dtype=torch.uint8, device=tensor.device).set_(
+                    storage, 0, (storage.nbytes(),), (1,)
+                )
+                if recapture:
+                    self._input_storage_buffers.append(source.clone())
+                else:
+                    self._input_storage_buffers[group].copy_(source)
+            if recapture:
+                view = torch.empty(0, dtype=tensor.dtype, device=tensor.device).set_(
+                    self._input_storage_buffers[group].untyped_storage(),
+                    tensor.storage_offset(),
+                    tensor.shape,
+                    tensor.stride(),
+                )
+                self._input_buffers.append(view.requires_grad_(tensor.requires_grad))
 
     def _reset_captured_graph(self) -> None:
         if self.cudagraph:
@@ -178,9 +251,32 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                     "(using outer monolithic capture instead)"
                 )
 
-    def forward(
-        self, *args: Any, **kwargs: Any
-    ) -> torch.Tensor | Tuple[torch.Tensor, ...]:
+    def _warm_up_regions(self, args: Any, kwargs: Any) -> None:
+        """Initialize Torch kernels and compiled backends before capture."""
+        if not self._has_torch_regions:
+            return
+        if torch.cuda.is_current_stream_capturing():
+            raise RuntimeError(
+                "PyTorch regions must warm up before CUDA graph capture; "
+                "enable_cudagraphs cannot be entered inside another capture."
+            )
+        assert self._engine_stream is not None
+        values, _ = tree_flatten((args, kwargs))
+        values.extend(self.compiled_module.parameters())
+        values.extend(self.compiled_module.buffers())
+        devices = {
+            value.device
+            for value in values
+            if isinstance(value, torch.Tensor) and value.is_cuda
+        }
+        devices.add(self._engine_stream.device)
+        # Warmup must not consume the caller's CPU or CUDA random sequence.
+        with torch.random.fork_rng(devices=devices, device_type="cuda"):
+            for _ in range(3):
+                self.compiled_module(*args, **kwargs)
+            self._engine_stream.synchronize()
+
+    def forward(self, *args: Any, **kwargs: Any) -> Any:
         inputs, _ = tree_flatten((args, kwargs))
         cudagraphs_enabled = torch_tensorrt.runtime.get_whole_cudagraphs_mode()
         if cudagraphs_enabled:
@@ -191,6 +287,10 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                 if inputs and inputs[0].is_cuda
                 else self._target_device
             )
+            if self._has_torch_regions and current_device != self._target_device:
+                self._target_device = current_device
+                self._default_stream = torch.cuda.default_stream(current_device)
+                self._owned_pool_stream = None
             default_stream = self._default_stream
             previous_engine_stream = self._engine_stream
             self._caller_stream = torch.cuda.current_stream(current_device)
@@ -205,51 +305,53 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                 self._engine_stream = self._caller_stream
             stream_changed = self._engine_stream != previous_engine_stream
 
+            capture_context = (
+                torch.is_grad_enabled(),
+                torch.is_inference_mode_enabled(),
+                torch.is_autocast_enabled("cuda"),
+                torch.get_autocast_dtype("cuda"),
+            )
+            context_changed = (
+                self._has_torch_regions and capture_context != self._capture_context
+            )
+
             need_cudagraphs_record = (
-                shape_changed or self.is_weight_streaming_set or stream_changed
+                self.cudagraph is None
+                or shape_changed
+                or self.is_weight_streaming_set
+                or stream_changed
+                or context_changed
             )
             if need_cudagraphs_record:
                 self._reset_captured_graph()
                 self._input_buffers = [None] * len(inputs)
 
             self.is_weight_streaming_set = False
-            # Ensure inputs are available in all scopes and cast symbolic integers to Tensors
-            contiguous_inputs: List[torch.Tensor] = [
-                (
-                    i.contiguous()
-                    if isinstance(i, torch.Tensor)
-                    else torch.tensor(i).cuda()
-                )
-                for i in inputs
-            ]
-            assert len(contiguous_inputs) == len(
-                inputs
-            ), f"Wrong number of inputs, expect {len(inputs)} get {len(contiguous_inputs)}."
-
-            for i, _ in enumerate(inputs):
-                if not contiguous_inputs[i].is_cuda:
-                    logger.warning(
-                        f"Detected input[{i}] is not on a cuda device. "
-                        "This tensor is being moved by the runtime but for performance considerations, "
-                        "ensure your inputs are all on GPU and open an issue here "
-                        "(https://github.com/pytorch/TensorRT/issues) if this warning persists."
+            if self._has_torch_regions:
+                self._copy_region_inputs(inputs, recapture=need_cudagraphs_record)
+            else:
+                contiguous_inputs: List[torch.Tensor] = [
+                    (
+                        i.contiguous()
+                        if isinstance(i, torch.Tensor)
+                        else torch.tensor(i).cuda()
                     )
-                    contiguous_inputs = (
-                        contiguous_inputs[:i]
-                        + [contiguous_inputs[i].cuda()]
-                        + contiguous_inputs[i + 1 :]
-                    )
-
-                assert (
-                    contiguous_inputs[i].dtype == inputs[i].dtype
-                ), f"Dtype mismatch for {i}th input. Expect {inputs[i].dtype}, got {contiguous_inputs[i].dtype}."
-
-                if need_cudagraphs_record:
-                    # If cudagraphs is enabled, this memory is reserved for future cudagraph runs
-                    # Clone is required to avoid re-using user-provided GPU memory
-                    self._input_buffers[i] = contiguous_inputs[i].clone()
-                else:
-                    self._input_buffers[i].copy_(contiguous_inputs[i])
+                    for i in inputs
+                ]
+                for i, tensor in enumerate(contiguous_inputs):
+                    if not tensor.is_cuda:
+                        logger.warning(
+                            "Input[%s] is not on CUDA and is being moved by the runtime",
+                            i,
+                        )
+                        tensor = tensor.cuda()
+                    assert (
+                        tensor.dtype == inputs[i].dtype
+                    ), f"Dtype mismatch for input {i}: expected {inputs[i].dtype}, got {tensor.dtype}"
+                    if need_cudagraphs_record:
+                        self._input_buffers[i] = tensor.clone()
+                    else:
+                        self._input_buffers[i].copy_(tensor)
 
             if need_cudagraphs_record:
                 # Reconstruct the original args and kwargs structure from static input buffers
@@ -263,23 +365,25 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
 
             with torch.cuda.stream(self._engine_stream):
                 if need_cudagraphs_record:
+                    self._warm_up_regions(args, kwargs)
                     self._check_monolithic_capturability(self._engine_stream)
-                    self.cudagraph = torch.cuda.CUDAGraph()
-                    with torch.cuda.graph(self.cudagraph, stream=self._engine_stream):
+                    captured_graph = torch.cuda.CUDAGraph()
+                    with torch.cuda.graph(captured_graph, stream=self._engine_stream):
                         self._output_buffers = self.compiled_module(*args, **kwargs)
+                    self.cudagraph = captured_graph
+                    self._capture_context = capture_context
 
                 self.cudagraph.replay()  # type: ignore
             if caller_on_default:
                 self._caller_stream.wait_stream(self._engine_stream)
 
-            if isinstance(self._output_buffers, (list, tuple)):
-                output_buffers = self._output_buffers
-            else:
-                output_buffers = [self._output_buffers]
-            outputs = [output.clone() for output in output_buffers]
-            if len(outputs) == 1:
-                return outputs[0]
-            return outputs
+            # Copy captured tensors while preserving the model's output structure.
+            return tree_map(
+                lambda value: (
+                    value.clone() if isinstance(value, torch.Tensor) else value
+                ),
+                self._output_buffers,
+            )
         else:
             self._reset_captured_graph()
             return self.compiled_module(*args, **kwargs)

@@ -9,7 +9,6 @@ Discover requirements independently of the writer, and require known sites to re
 import ast
 import builtins
 import importlib.abc
-import json
 import os
 import re
 import runpy
@@ -1506,6 +1505,11 @@ def test_import_errors_preserve_context_and_install_guidance(
     ]
     namespace = {
         "importlib": importlib,
+        # Only isinstance() is needed before the missing-ExecuTorch error. Keep
+        # this source-only check runnable without installing torch.
+        "torch": types.SimpleNamespace(
+            fx=types.SimpleNamespace(GraphModule=type("GraphModuleStub", (), {}))
+        ),
         "executorch_install_command": command,
         "CudaGraphsTorchTensorRTModule": type("CudaGraphsStub", (), {}),
         "_parse_module_type": lambda value: None,

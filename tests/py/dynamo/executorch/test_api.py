@@ -314,20 +314,46 @@ def test_public_api_symbols_are_bound_not_just_advertised():
 
 
 @pytest.mark.unit
-def test_python_only_wheel_packages_the_executorch_export_ops():
+@pytest.mark.parametrize("fx_frontend", [False, True])
+def test_python_only_wheel_packages_the_executorch_export_ops(fx_frontend):
     """The placeholder registration module must not live in the C++-only arm."""
+    from setuptools import Distribution
+    from setuptools.command.build_py import build_py
+
     tree = ast.parse(_SETUP_PY.read_text(encoding="utf-8"))
-    assignments = {
-        node.targets[0].id: ast.literal_eval(node.value)
+    # Execute the real, unconditional package declarations, without setup.py's
+    # native build discovery. Test setuptools' file selection rather than the
+    # names or literal shape of intermediate package-directory dictionaries.
+    declarations = [
+        node
         for node in tree.body
         if isinstance(node, ast.Assign)
         and len(node.targets) == 1
         and isinstance(node.targets[0], ast.Name)
-        and node.targets[0].id in {"dynamo_packages", "dynamo_package_dir"}
+        and node.targets[0].id
+        in {"fx_packages", "dynamo_packages", "packages", "package_dir"}
+    ]
+    namespace = {"_FX_FE_AVAIL": fx_frontend}
+    exec(compile(ast.Module(declarations, []), str(_SETUP_PY), "exec"), namespace)
+    distribution = Distribution(
+        {
+            "packages": namespace["packages"],
+            "package_dir": {
+                package: str(_REPO_ROOT / directory)
+                for package, directory in namespace["package_dir"].items()
+            },
+        }
+    )
+    distribution.script_name = str(_SETUP_PY)
+    command = build_py(distribution)
+    command.ensure_finalized()
+    selected = {Path(path).resolve() for path in command.get_source_files()}
+    required = {
+        _REPO_ROOT / "py/torch_tensorrt/dynamo/runtime/meta_ops/register_meta_ops.py",
+        _REPO_ROOT / "py/torch_tensorrt/region/__init__.py",
+        _REPO_ROOT / "py/torch_tensorrt/dynamo/region_compilation/__init__.py",
     }
-    package = "torch_tensorrt.dynamo.runtime.meta_ops"
-    assert package in assignments["dynamo_packages"]
-    assert package in assignments["dynamo_package_dir"]
+    assert required <= selected, f"Python-only wheel omits {required - selected}"
 
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
@@ -2769,6 +2795,7 @@ def _patch_executorch_lowering(monkeypatch, captured):
     compile_config -- land in `captured`; and records backend_config from
     to_executorch(). Fills `captured`; returns nothing."""
     import executorch.exir as exir
+
     import torch_tensorrt._compile as tc
     import torch_tensorrt.executorch as tte
 
@@ -2820,8 +2847,9 @@ def _patch_executorch_lowering(monkeypatch, captured):
 @pytest.mark.unit
 def test_save_executorch_forwards_lowering_kwargs(monkeypatch, tmp_path):
     pytest.importorskip("executorch.exir")
-    import torch_tensorrt._compile as tc
     from executorch.exir import EdgeCompileConfig, ExecutorchBackendConfig
+
+    import torch_tensorrt._compile as tc
 
     captured = {}
     _patch_executorch_lowering(monkeypatch, captured)
@@ -2955,8 +2983,9 @@ def _assert_lowering_kwargs_forwarded(kw, methods, passes, cfg):
 @pytest.mark.unit
 def test_public_save_forwards_lowering_kwargs_exported_program(monkeypatch, tmp_path):
     pytest.importorskip("executorch.exir")
-    import torch_tensorrt
     from executorch.exir import EdgeCompileConfig
+
+    import torch_tensorrt
 
     calls = _stub_save_as_executorch(monkeypatch)
     methods = {"get_max_seq_len": 128}
@@ -2988,8 +3017,9 @@ def test_public_save_forwards_lowering_kwargs_graphmodule_retrace(
     monkeypatch, tmp_path
 ):
     pytest.importorskip("executorch.exir")
-    import torch_tensorrt
     from executorch.exir import EdgeCompileConfig
+
+    import torch_tensorrt
 
     calls = _stub_save_as_executorch(monkeypatch)
     methods = {"get_max_seq_len": 128}
@@ -3022,9 +3052,10 @@ def test_public_save_forwards_lowering_kwargs_graphmodule_no_retrace(
     monkeypatch, tmp_path
 ):
     pytest.importorskip("executorch.exir")
+    from executorch.exir import EdgeCompileConfig
+
     import torch_tensorrt
     import torch_tensorrt.dynamo._exporter as _exporter
-    from executorch.exir import EdgeCompileConfig
 
     calls = _stub_save_as_executorch(monkeypatch)
     # retrace=False routes through the dynamo exporter (TRT-specific graph surgery);
@@ -3109,8 +3140,9 @@ def test_save_executorch_real_etrecord_is_inspector_consumable(tmp_path):
     devtools can parse back into an Inspector-consumable ETRecord."""
     pytest.importorskip("executorch.exir")
     pytest.importorskip("executorch.devtools")
-    import torch_tensorrt
     from executorch.devtools.etrecord import parse_etrecord
+
+    import torch_tensorrt
     from torch_tensorrt._features import ENABLED_FEATURES
 
     if not ENABLED_FEATURES.torch_tensorrt_runtime:

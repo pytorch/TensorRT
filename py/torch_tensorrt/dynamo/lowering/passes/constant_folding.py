@@ -5,6 +5,8 @@ import logging
 from typing import Any, Set
 
 import torch
+
+from packaging import version
 from torch_tensorrt._utils import sanitized_torch_version
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.constant_fold_exclusions import (
@@ -18,8 +20,6 @@ from torch_tensorrt.dynamo.lowering.passes.reset_folded_constructors import (
     _aliases_input,
     _storage_escapes,
 )
-
-from packaging import version
 
 # Modify import location of utilities based on Torch version
 if version.parse(sanitized_torch_version()) < version.parse("2.1.1"):
@@ -233,8 +233,17 @@ class _TorchTensorRTConstantFolder(ConstantFolder):  # type: ignore[misc]
         except Exception:
             pass
 
+    def run_node(self, node: torch.fx.Node) -> Any:
+        from torch_tensorrt.dynamo.region_compilation._types import REGION_META_KEY
+
+        # Skip before evaluation: upstream's impurity check misses tuple outputs.
+        if REGION_META_KEY in node.meta and node.op != "placeholder":
+            return self.unknown_value
+        return super().run_node(node)
+
     # TODO: Update this function when quantization is added
     def is_impure(self, node: torch.fx.node.Node) -> bool:
+        from torch_tensorrt.dynamo.region_compilation._types import REGION_META_KEY
 
         # Folding an observable view loses its relation to the original storage.
         # Keep the view so the reset pass can clone a fresh allocation once and
@@ -242,6 +251,9 @@ class _TorchTensorRTConstantFolder(ConstantFolder):  # type: ignore[misc]
         if _aliases_input(node) and _storage_escapes(node):
             return True
 
+        # Constant-input regions must still execute on their requested backend.
+        if REGION_META_KEY in node.meta and node.op != "placeholder":
+            return True
         if node.target in self.quantization_ops:
             return True
         # The meta value holds the IDs of the rules that marked this node; it is
