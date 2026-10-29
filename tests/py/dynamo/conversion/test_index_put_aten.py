@@ -556,6 +556,11 @@ class TestIndexPutConverter(DispatchTestCase):
                     pass_through_build_failures=True,
                 )
                 torch.testing.assert_close(compiled(*inputs), model(*inputs))
+                # A True count that differs from the value rows fails, as in PyTorch.
+                fewer = case_mask.clone()
+                fewer[..., 6] = False
+                with self.assertRaises(RuntimeError):
+                    compiled(data, fewer, values)
 
     def test_updates_are_cast_to_int64_destination_dtype(self):
         class IndexPutArgmax(torch.nn.Module):

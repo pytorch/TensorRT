@@ -310,6 +310,14 @@ def expand(
     # After the above padding, the shape and tensor rank must be equal
     assert len(input_t.shape) == shape_rank
 
+    # PyTorch only expands a dim larger than 1 to its own size, so a runtime
+    # target there must equal the static input dim. Keep the dim instead of
+    # broadcasting its first element.
+    shape = [
+        i if isinstance(o, TRTTensor) and i not in (1, DYNAMIC_DIM) else o
+        for i, o in zip(input_t.shape, shape)
+    ]
+
     # Configure the start, strides and output shape tensors
     start = tuple([0] * shape_rank)
 

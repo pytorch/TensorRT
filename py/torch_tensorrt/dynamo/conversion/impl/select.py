@@ -683,29 +683,6 @@ def index_put_scatter_add_plugin(
     return out
 
 
-def _broadcast_target(
-    expected_shape: Sequence[Union[int, ITensor]], tensor_shape: Sequence[int]
-) -> List[Union[int, ITensor]]:
-    """The shape to expand a tensor laid out as (N, ...) to, broadcasting like PyTorch.
-
-    expand broadcasts any static dim whose target is an ITensor, which is only right
-    for size 1. A data-dependent N, such as the True count of a boolean mask, must
-    match a larger static first dim at runtime in PyTorch, so keep that dim.
-    """
-    tensor_shape = [1] * (len(expected_shape) - len(tensor_shape)) + list(tensor_shape)
-    shape: List[Union[int, ITensor]] = []
-    for k, (exp_dim, dim) in enumerate(zip(expected_shape, tensor_shape)):
-        if k == 0 and isinstance(exp_dim, ITensor) and dim not in (1, DYNAMIC_DIM):
-            shape.append(dim)
-        elif dim in (1, DYNAMIC_DIM) or exp_dim == dim:
-            shape.append(exp_dim)
-        else:
-            raise ValueError(
-                f"Cannot broadcast {tuple(tensor_shape)} to {expected_shape}"
-            )
-    return shape
-
-
 def index_put_converter(
     ctx: ConversionContext,
     target: Target,
@@ -876,7 +853,7 @@ def index_put_converter(
             source_ir,
             f"{name}_expand_idx_I_{i}",
             idx_reshaped,
-            tuple(_broadcast_target((N, F_volume), idx_reshaped.shape)),
+            (N, F_volume),
         )
         I_tensors.append(expanded_idx)
 
@@ -1022,7 +999,6 @@ def index_put_converter(
 
     # Define the expected shape based on (N,) + F_shape_values.
     # N may be a ITensor when it comes from a dynamic source (e.g. nonzero).
-    # _broadcast_target decides which values dims expand to it.
     expected_shape = (N,) + tuple(F_shape_values)
 
     # Broadcast 'values' to match the expected shape
@@ -1059,7 +1035,7 @@ def index_put_converter(
                 source_ir,
                 f"{name}_expand_values",
                 values_permuted,
-                tuple(_broadcast_target(expected_shape, values_permuted.shape)),
+                expected_shape,
             )
         elif K == 1 and len(values.shape) == 1 and F and I[0] > max(F):
             # For data[..., idx] = values, a 1-D values tensor carries the
@@ -1136,13 +1112,25 @@ def index_put_converter(
             )
         else:
             # Discontinuous case (K > 1 or K == 0)
+            values_shape_padded = [1] * (
+                len(expected_shape) - len(values.shape)
+            ) + list(values.shape)
+            for exp_dim, val_dim in zip(expected_shape, values_shape_padded):
+                if not (
+                    isinstance(exp_dim, ITensor)
+                    or DYNAMIC_DIM in (exp_dim, val_dim)
+                    or val_dim in (1, exp_dim)
+                ):
+                    raise ValueError(
+                        f"Cannot broadcast {values.shape} to {expected_shape}"
+                    )
             values_expanded = impl.slice.expand(
                 ctx,
                 target,
                 source_ir,
                 f"{name}_expand_values",
                 values,
-                tuple(_broadcast_target(expected_shape, values.shape)),
+                expected_shape,
             )
 
     # Flatten values to (N * F_volume,)
