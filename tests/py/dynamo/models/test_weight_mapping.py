@@ -250,6 +250,7 @@ def test_release_storage_drops_pages_of_mapped_weights(tmp_path):
     assert release_storage(mapped) == mapped.nbytes() > 0  # pages dropped, not resized
     torch.testing.assert_close(model.proj.weight, ref.proj.weight)
     plain = torch.ones(4).untyped_storage()
+    assert release_storage(plain, mapped_only=True) == 0 and plain.nbytes() == 16
     assert release_storage(plain) == 16 and plain.nbytes() == 0  # resize_(0) as before
 
 

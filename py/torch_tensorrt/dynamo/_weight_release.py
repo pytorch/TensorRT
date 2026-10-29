@@ -7,8 +7,9 @@ TensorRT holds a network's weights by reference only until its engine is built, 
 its own copy. With several engines (resource partitioning, PyTorch fallbacks), a weight is dead once the
 last engine that reads it is built, yet the model, the ``ExportedProgram`` and the partitioned graph
 modules keep it referenced until compilation ends. ``compile_module`` uses these helpers, when
-``release_weights_after_build`` is set, to free that memory: the storage itself is released, because
-dropping references cannot free what the caller's model still points to.
+``release_weights_after_build`` isn't ``False``, to free that memory: the storage itself is released,
+because dropping references cannot free what the caller's model still points to. By default (``None``)
+only weights mapped by ``map_weights`` are released, which only drops pages the file can give back.
 """
 
 import logging
@@ -16,6 +17,7 @@ from collections import Counter
 from typing import Dict, Iterable
 
 import torch
+from torch._subclasses.fake_tensor import FakeTensor
 from torch.utils._python_dispatch import is_traceable_wrapper_subclass
 from torch_tensorrt.dynamo.tools.weight_mapping import release_mapped_storage
 
@@ -30,8 +32,14 @@ def _get_attr(module: torch.nn.Module, target: str) -> object:
 
 
 def _add_storage(found: Dict[int, torch.UntypedStorage], tensor: torch.Tensor) -> None:
-    if tensor.is_meta or is_traceable_wrapper_subclass(tensor):
-        return  # a wrapper subclass's storage is a placeholder; its inner tensors are not reachable here
+    # No real storage: a meta tensor, a fake one (torch.compile's backend), or a wrapper subclass, whose
+    # storage is a placeholder and whose inner tensors are not reachable here.
+    if (
+        tensor.is_meta
+        or is_traceable_wrapper_subclass(tensor)
+        or isinstance(tensor, FakeTensor)
+    ):
+        return
     storage = tensor.untyped_storage()
     if storage.nbytes():
         found[storage.data_ptr()] = storage
@@ -64,8 +72,9 @@ def parameter_storages(module: torch.nn.Module) -> Dict[int, torch.UntypedStorag
     return found
 
 
-def release_storage(storage: torch.UntypedStorage) -> int:
-    """Release a storage's memory; return the bytes released (0 if it could not be released)."""
+def release_storage(storage: torch.UntypedStorage, mapped_only: bool = False) -> int:
+    """Release a storage's memory; return the bytes released (0 if it could not be released).
+    With ``mapped_only``, only a mapped weight is released."""
     nbytes = int(storage.nbytes())
     if nbytes == 0:
         return 0
@@ -73,6 +82,8 @@ def release_storage(storage: torch.UntypedStorage) -> int:
     # dropped (re-read from the file if used again).
     if release_mapped_storage(storage):
         return nbytes
+    if mapped_only:
+        return 0
     try:
         storage.resize_(0)
     except RuntimeError as e:  # e.g. a non-resizable storage over an external buffer
@@ -85,9 +96,13 @@ class WeightReleaser:
     """Counts, for each weight storage, the graphs that read it, and releases a storage once the last
     TensorRT partition that reads it has been built. Graphs that run in PyTorch (PyTorch partitions,
     the partitioned module's own graph) are counted but never built, so their storages are never
-    released."""
+    released. With ``mapped_only``, only weights mapped by ``map_weights`` are released.
+    """
 
-    def __init__(self, readers: Iterable[torch.fx.GraphModule]):
+    def __init__(
+        self, readers: Iterable[torch.fx.GraphModule], mapped_only: bool = False
+    ):
+        self.mapped_only = mapped_only
         self.uses: Counter[int] = Counter()
         for reader in readers:
             self.uses.update(weight_storages(reader).keys())
@@ -95,7 +110,9 @@ class WeightReleaser:
     def release_unread(self, candidates: Dict[int, torch.UntypedStorage]) -> int:
         """Release the candidate storages that no graph reads."""
         released = sum(
-            release_storage(s) for ptr, s in candidates.items() if ptr not in self.uses
+            release_storage(s, self.mapped_only)
+            for ptr, s in candidates.items()
+            if ptr not in self.uses
         )
         if released:
             logger.info(
@@ -113,7 +130,7 @@ class WeightReleaser:
             if self.uses[ptr] == 0:
                 # A later allocation at this address is a different storage.
                 del self.uses[ptr]
-                released += release_storage(storage)
+                released += release_storage(storage, self.mapped_only)
         if released:
             logger.info(
                 f"Released {released / 2**20:.0f} MiB of weights after building {name}"

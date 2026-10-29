@@ -13,16 +13,16 @@ from torch_tensorrt.dynamo._weight_release import (
 )
 
 
-def test_release_weights_after_build_default_off():
-    assert CompilationSettings().release_weights_after_build is False
+def test_release_weights_after_build_defaults_to_mapped_weights_only():
+    assert CompilationSettings().release_weights_after_build is None
 
 
-def test_old_pickle_without_field_defaults_to_false():
+def test_old_pickle_without_field_defaults_to_none():
     state = CompilationSettings().__dict__.copy()
     state.pop("release_weights_after_build", None)
     restored = CompilationSettings.__new__(CompilationSettings)
     restored.__setstate__(state)
-    assert restored.release_weights_after_build is False
+    assert restored.release_weights_after_build is None
 
 
 class _Linear(torch.nn.Module):
@@ -111,7 +111,7 @@ class _TwoEngines(torch.nn.Module):
 
 
 @pytest.mark.parametrize("use_fast_partitioner", [True, False])
-@pytest.mark.parametrize("release", [True, False])
+@pytest.mark.parametrize("release", [True, None, False])
 def test_compile_releases_weights(release, use_fast_partitioner):
     torch.manual_seed(0)
     model = _TwoEngines().eval().cuda()
@@ -133,8 +133,9 @@ def test_compile_releases_weights(release, use_fast_partitioner):
 
     state = ep.state_dict
     # A read-only buffer read by an engine is a weight like any other: released after its build.
+    # None (the default) releases only mapped weights, and these aren't mapped.
     for name in ("w_a", "w_b", "w_shared", "unused_head", "bias"):
-        assert (state[name].untyped_storage().nbytes() == 0) == release, name
+        assert (state[name].untyped_storage().nbytes() == 0) == (release is True), name
     assert (
         state["w_torch"].untyped_storage().nbytes() > 0
     )  # read by the PyTorch partition
