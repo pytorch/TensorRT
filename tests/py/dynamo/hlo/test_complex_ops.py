@@ -932,6 +932,7 @@ class ComplexOp(nn.Module):
         lambda z: z.imag - (1 + 2j),
         lambda z: (z.real * 4).to(torch.int64) + (1.25 + 2.75j),
         lambda z: torch.add(z, 1 + 2j, alpha=2),
+        lambda z: torch.complex(z.real * 2, z.imag),
     ],
     ids=[
         "prod_dim",
@@ -945,6 +946,7 @@ class ComplexOp(nn.Module):
         "real_tensor_sub_complex_scalar",
         "int_tensor_add_complex_scalar",
         "add_complex_scalar_alpha",
+        "complex_from_parts",
     ],
 )
 def test_complex_op_matches_eager(op, dynamic):

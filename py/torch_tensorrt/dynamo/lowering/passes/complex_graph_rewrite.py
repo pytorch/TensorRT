@@ -959,6 +959,15 @@ class ComplexGraphRewriter:
             self.gm.graph.erase_node(node)
             return True
 
+    @_complex_unpacker(torch.ops.aten.complex.default)
+    def _rewrite_complex(self, node: Node) -> bool:
+        # complex(re, im) is the [..., 2] layout of its two real inputs.
+        with SubgraphBuilder(self.gm.graph, node) as b:
+            out = self._inline_cat_re_im(b, node.args[0], node.args[1])
+            node.replace_all_uses_with(out)
+            self.gm.graph.erase_node(node)
+            return True
+
     @_complex_unpacker(torch.ops.aten.polar.default)
     def _rewrite_polar(self, node: Node) -> bool:
         # polar(r, theta) = r*cos(theta) + i*r*sin(theta)
