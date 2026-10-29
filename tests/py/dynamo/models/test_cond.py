@@ -12,6 +12,7 @@ from torch_tensorrt.dynamo.lowering import (
     post_lowering,
     pre_export_lowering,
 )
+from torch_tensorrt.dynamo.lowering.passes._aten_lowering_pass import _same_io
 
 
 def _cond_node(gm: torch.fx.GraphModule) -> torch.fx.Node:
@@ -173,6 +174,25 @@ class TestCondCompilation(TestCase):
         model = _ComplexOutputCond()
         gm = _export_lowered(model, (x, pred))
         torch.testing.assert_close(gm(x, pred), model(x, pred))
+
+    def test_cond_branch_check_compares_sizes_and_device(self):
+        def identity(value):
+            graph = torch.fx.Graph()
+            node = graph.placeholder("x")
+            node.meta["val"] = value
+            graph.output(node)
+            return torch.fx.GraphModule(torch.nn.Module(), graph)
+
+        storage = torch.empty(12)
+        cases = {
+            # Same dtype, strides, storage size and offset.
+            "sizes": (storage[:8].view(2, 4), storage.view(3, 4)),
+            "device": (torch.empty(2, 4), torch.empty(2, 4, device="meta")),
+        }
+        for name, (a, b) in cases.items():
+            with self.subTest(name):
+                self.assertTrue(_same_io(identity(a), identity(a)))
+                self.assertFalse(_same_io(identity(a), identity(b)))
 
     def test_cond_falls_back_when_branch_has_unsupported_op(self):
         x = torch.randn(1, 4).abs() + 0.1

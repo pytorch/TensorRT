@@ -224,7 +224,11 @@ def _io_values(gm: torch.fx.GraphModule) -> List[Any]:
 
 
 def _same_io(a: torch.fx.GraphModule, b: torch.fx.GraphModule) -> bool:
-    """Whether two modules take and return tensors of the same dtype and layout."""
+    """Whether two modules take and return tensors of the same kind and layout.
+
+    Tensors match when their dtype, device, sizes, strides, storage offset and
+    storage size match.
+    """
 
     def same(x: Any, y: Any) -> bool:
         if not isinstance(x, torch.Tensor) or not isinstance(y, torch.Tensor):
@@ -232,7 +236,9 @@ def _same_io(a: torch.fx.GraphModule, b: torch.fx.GraphModule) -> bool:
         # A symbolic value that cannot be proven equal counts as different.
         return (
             x.dtype == y.dtype
+            and x.device == y.device
             and x.dim() == y.dim()
+            and all(statically_known_true(p == q) for p, q in zip(x.shape, y.shape))
             and statically_known_true(
                 x.untyped_storage().nbytes() == y.untyped_storage().nbytes()
             )
