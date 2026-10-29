@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=bb6d21c2"></script>
+    <script src="../../../_static/documentation_options.js?v=23546ba4"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -523,6 +523,7 @@ document.write(`
     <span class="n">get_decompositions</span><span class="p">,</span>
     <span class="n">post_lowering</span><span class="p">,</span>
     <span class="n">pre_export_lowering</span><span class="p">,</span>
+    <span class="n">remove_alias_from_exported_program</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.lowering._buffer_lifting</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">aliased_input_bindings</span><span class="p">,</span>
@@ -895,6 +896,7 @@ document.write(`
             <span class="n">exported_program</span><span class="o">.</span><span class="n">graph_module</span><span class="p">,</span>
         <span class="p">)</span>
     <span class="p">)</span>
+    <span class="n">exported_program</span> <span class="o">=</span> <span class="n">remove_alias_from_exported_program</span><span class="p">(</span><span class="n">exported_program</span><span class="p">)</span>
 
     <span class="n">gm</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">"Input graph: "</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="p">))</span>
@@ -1353,6 +1355,7 @@ document.write(`
             <span class="n">exported_program</span><span class="o">.</span><span class="n">graph_module</span><span class="p">,</span>
         <span class="p">)</span>
     <span class="p">)</span>
+    <span class="n">exported_program</span> <span class="o">=</span> <span class="n">remove_alias_from_exported_program</span><span class="p">(</span><span class="n">exported_program</span><span class="p">)</span>
 
     <span class="n">gm</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
     <span class="c1"># Move the weights in the state_dict to CPU</span>
@@ -2763,6 +2766,7 @@ document.write(`
             <span class="n">exported_program</span><span class="o">.</span><span class="n">graph_module</span><span class="p">,</span>
         <span class="p">)</span>
     <span class="p">)</span>
+    <span class="n">exported_program</span> <span class="o">=</span> <span class="n">remove_alias_from_exported_program</span><span class="p">(</span><span class="n">exported_program</span><span class="p">)</span>
 
     <span class="n">gm</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
     <span class="c1"># Move the weights in the state_dict to CPU</span>
