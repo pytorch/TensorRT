@@ -388,3 +388,66 @@ def test_dynamic_dims_stay_dynamic():
 
     x = torch.randn(2, 5, 8)
     torch.testing.assert_close(out(x), model(x))
+
+
+@pytest.mark.skipif(
+    not cda.has_complex_decomposition(),
+    reason="decompose_complex_in_graph requires torch>=2.14.dev",
+)
+@pytest.mark.parametrize(
+    "operation",
+    [
+        pytest.param(lambda z: z.prod(dim=1), id="prod"),
+        pytest.param(lambda z: z + (1 + 2j), id="add_complex_scalar"),
+        pytest.param(lambda z: z * (2 - 1j), id="mul_complex_scalar"),
+        pytest.param(lambda z: torch.complex(z.real * 2, z.imag), id="complex"),
+    ],
+)
+@pytest.mark.parametrize("symbolic_factory", [False, True])
+def test_dynamic_complex_ops_keep_upstream_semantics(
+    monkeypatch, operation, symbolic_factory
+):
+    """Dynamic complex inputs must retain upstream's arithmetic and I/O layout.
+
+    Include a symbolic arange alongside the complex op so preserving rotary
+    shapes cannot come at the cost of correctness elsewhere in the same graph.
+    """
+    from torch_tensorrt.dynamo._settings import CompilationSettings
+    from torch_tensorrt.dynamo.lowering import get_decompositions
+
+    class M(torch.nn.Module):
+        def forward(self, z):
+            result = operation(z)
+            if symbolic_factory:
+                result = result + torch.arange(z.shape[0]).reshape(
+                    [-1] + [1] * (result.ndim - 1)
+                )
+            return result
+
+    def unexpected_legacy(*args, **kwargs):
+        pytest.fail("supported dynamic complex ops must not use the legacy rewriter")
+
+    monkeypatch.setattr(cda, "complex_graph_detection", unexpected_legacy)
+    model = M().eval()
+    batch = torch.export.Dim("batch", min=1, max=8)
+    gm = (
+        torch.export.export(
+            model,
+            (torch.randn(3, 4, dtype=torch.complex64),),
+            dynamic_shapes=({0: batch},),
+        )
+        .run_decompositions(get_decompositions())
+        .module()
+    )
+    out = cda.complex_decomposition_adapter(gm, CompilationSettings())
+
+    # Refit verifies against this lowered module using the original complex input.
+    placeholder = next(n for n in out.graph.nodes if n.op == "placeholder")
+    assert placeholder.meta["val"].dtype == torch.complex64
+    assert isinstance(placeholder.meta["val"].shape[0], torch.SymInt)
+    assert out.meta["complex_input_names"] == ["z"]
+    assert out.meta["complex_output_indices"] == [0]
+    for size in (2, 5):
+        z = torch.randn(size, 4, dtype=torch.complex64)
+        actual = out(z)
+        torch.testing.assert_close(torch.view_as_complex(actual), model(z))

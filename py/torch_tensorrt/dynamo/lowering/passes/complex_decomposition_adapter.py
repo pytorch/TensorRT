@@ -11,6 +11,8 @@ interior complex -> real expansion to PyTorch's ``decompose_complex_in_graph``
   1. capture the complex I/O signature before rewriting (drives the boundary
      adapters in ``_compiler._insert_complex_io_adapters``);
   2. call upstream to expand every complex op into real ops on separate re/im;
+     for dynamic inputs, use its wrapper with symbolic tracing to avoid
+     specializing dimensions in tensor factories such as ``arange(seq)``;
   3. put back what the retrace undid: upstream returns a module rebuilt from
      scratch, so the decomposition and constant-folding stages that ran earlier
      find their work partly reverted;
@@ -96,19 +98,16 @@ def complex_decomposition_adapter(
     )
 
     flat_args = _fake_flat_args(gm)
-    if any(free_symbols(arg) for arg in flat_args):
-        # Upstream retraces with make_fx in real mode, where an op building a
-        # tensor of symbolic size (arange(seq) for rotary positions) needs a
-        # concrete value: the exported program's dynamic dims get specialized.
-        return complex_graph_detection(gm, settings)
     logger.debug("complex_decomposition_adapter: retracing under ComplexTensor")
     try:
-        # NOTE: returns a new module -- assign to a fresh name so that on
-        # failure `gm` still refers to the original, untouched module (this
-        # call either fully succeeds or raises; it never partially mutates
-        # anything, since it builds a new GraphModule rather than editing
-        # the existing one in place).
-        decomposed_gm = decompose_complex_in_graph(
+        # Both retraces return a new graph. Keep the original for the existing
+        # unsupported-op fallback rather than replacing it before success.
+        decompose = (
+            _decompose_complex_symbolically
+            if any(free_symbols(arg) for arg in flat_args)
+            else decompose_complex_in_graph
+        )
+        decomposed_gm = decompose(
             gm,
             flat_args,
             decompositions=_trt_decomposition_table(settings, gm),
@@ -151,6 +150,34 @@ def complex_decomposition_adapter(
     return gm
 
 
+def _decompose_complex_symbolically(
+    gm: GraphModule, flat_args: list[Any], decompositions: dict[Any, Any]
+) -> GraphModule:
+    """Use upstream's complex dispatch with a symbolic make_fx retrace.
+
+    Upstream's entry point hardcodes real tracing, which specializes symbols in
+    factories such as arange(seq). Until it accepts a tracing mode, mirror its
+    wrapper here while keeping its dispatch and mutation checks. Sending dynamic
+    graphs to the legacy rewriter instead regresses complex operator correctness.
+    """
+    from torch._functorch._aot_autograd import complex_decomposition as upstream
+    from torch.fx.experimental.proxy_tensor import make_fx
+    from torch.utils import _pytree as pytree
+
+    upstream._assert_no_incorrect_aliasing_mutation(gm)
+
+    def wrapper(*args: Any) -> Any:
+        wrapped = tuple(upstream._maybe_wrap(arg) for arg in args)
+        with upstream.WrapComplexMode():
+            result = torch.fx.Interpreter(gm).run(*wrapped)
+        return pytree.tree_map(upstream._maybe_unwrap, result)
+
+    with torch.fx.traceback.preserve_node_meta():
+        return make_fx(
+            wrapper, decomposition_table=decompositions, tracing_mode="symbolic"
+        )(*flat_args)
+
+
 def _trt_decomposition_table(
     settings: CompilationSettings, graph_module: GraphModule
 ) -> dict[Any, Any]:
@@ -169,7 +196,7 @@ def _trt_decomposition_table(
         get_decompositions,
     )
 
-    return filter_decomposition_table(
+    decompositions: dict[Any, Any] = filter_decomposition_table(
         get_decompositions(
             settings.enable_experimental_decompositions,
             settings.decompose_attention,
@@ -178,6 +205,7 @@ def _trt_decomposition_table(
         ),
         graph_module,
     )
+    return decompositions
 
 
 def _graph_has_complex(gm: GraphModule) -> bool:
