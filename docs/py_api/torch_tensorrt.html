@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=3fea7915"></script>
+    <script src="../_static/documentation_options.js?v=bb6d21c2"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -765,8 +765,9 @@ parameter takes precedence.</p></li>
 </p></li>
 <li><p><strong>use_cuda_graphs</strong> (<em>Optional</em><em>[</em><em>bool</em><em>]</em>) – Bake CUDA graph replay on (True) or off
 (False) into every TensorRT delegate for <code class="docutils literal notranslate"><span class="pre">output_format=&quot;executorch&quot;</span></code>.
-None leaves the choice unset so the runtime default applies. A load-time
-option overrides this value. Non-booleans are rejected for ExecuTorch;
+None leaves the choice unset so the runtime default applies. A load
+option, or a process option set to False, overrides this value.
+Non-booleans are rejected for ExecuTorch;
 other formats ignore non-None values with a warning. Use this keyword,
 not a raw <code class="docutils literal notranslate"><span class="pre">CompileSpec(&quot;use_cuda_graphs&quot;,</span> <span class="pre">...)</span></code>.</p></li>
 <li><p><strong>kwargs</strong> – Additional format-specific kwargs. <code class="docutils literal notranslate"><span class="pre">partitioners=</span></code>,
@@ -775,8 +776,9 @@ not a raw <code class="docutils literal notranslate"><span class="pre">CompileSp
 <code class="docutils literal notranslate"><span class="pre">weight_streaming_budget_per_engine=</span></code>, <code class="docutils literal notranslate"><span class="pre">zero_copy_kv=</span></code> and
 <code class="docutils literal notranslate"><span class="pre">external_engine_data=</span></code> are
 only used with <code class="docutils literal notranslate"><span class="pre">output_format=&quot;executorch&quot;</span></code>; otherwise they are
-ignored with a warning. Pass <code class="docutils literal notranslate"><span class="pre">compile_specs=[CompileSpec(&quot;target_device&quot;,</span>
-<span class="pre">b&quot;cuda:&lt;i&gt;&quot;)]</span></code> to override the default target device (<code class="docutils literal notranslate"><span class="pre">cuda:0</span></code>).
+ignored with a warning. A <code class="docutils literal notranslate"><span class="pre">CompileSpec(&quot;target_device&quot;,</span> <span class="pre">...)</span></code> in
+<code class="docutils literal notranslate"><span class="pre">compile_specs=</span></code> only labels the delegate’s inputs and outputs; each
+engine runs on the GPU it was built on.
 <code class="docutils literal notranslate"><span class="pre">backend_config=</span></code> takes an <code class="docutils literal notranslate"><span class="pre">Optional[ExecutorchBackendConfig]</span></code>
 and is forwarded to <code class="docutils literal notranslate"><span class="pre">to_executorch(config=...)</span></code> to customize
 ExecuTorch lowering (e.g. memory planning or device placement).
@@ -784,8 +786,8 @@ Its <code class="docutils literal notranslate"><span class="pre">MemoryPlanningP
 boundary TensorRT needs for every input and output.
 <code class="docutils literal notranslate"><span class="pre">partitioners=</span></code> appends caller partitioners after the TensorRT
 partitioner, so ops TensorRT does not take can be routed to another
-delegate – e.g. a <code class="docutils literal notranslate"><span class="pre">CudaPartitioner</span></code> for a coalesced TensorRT +
-CUDA <code class="docutils literal notranslate"><span class="pre">.pte</span></code>. See <a class="reference internal" href="../user_guide/runtime_performance/saving_models.html#executorch-save"><span class="std std-ref">the ExecuTorch save guide</span></a> for the <code class="docutils literal notranslate"><span class="pre">CudaPartitioner</span></code> recipe, its
+delegate, for example a <code class="docutils literal notranslate"><span class="pre">CudaPartitioner</span></code> for a coalesced TensorRT +
+CUDA <code class="docutils literal notranslate"><span class="pre">.pte</span></code>. See <a class="reference internal" href="../user_guide/runtime_performance/executorch.html#executorch-deployment"><span class="std std-ref">the ExecuTorch deployment guide</span></a> for the <code class="docutils literal notranslate"><span class="pre">CudaPartitioner</span></code> recipe, its
 export-time requirements (CUDA backend + nvcc), and the external
 <code class="docutils literal notranslate"><span class="pre">.ptd</span></code> weight caveats.
 <code class="docutils literal notranslate"><span class="pre">constant_methods=</span></code>, <code class="docutils literal notranslate"><span class="pre">transform_passes=</span></code> and
@@ -798,7 +800,8 @@ graph fails edge IR validation); a caller-supplied
 TRT engines.
 <code class="docutils literal notranslate"><span class="pre">generate_etrecord=True</span></code> writes an ETRecord to
 <code class="docutils literal notranslate"><span class="pre">&lt;model&gt;_etrecord.bin</span></code> next to the <code class="docutils literal notranslate"><span class="pre">.pte</span></code> for use with the
-ExecuTorch Inspector.
+ExecuTorch Inspector. It does not work for a program with
+TensorRT engines: writing the record raises a <code class="docutils literal notranslate"><span class="pre">SerializeError</span></code>.
 <code class="docutils literal notranslate"><span class="pre">weight_streaming_budget_per_engine=</span></code> takes an <code class="docutils literal notranslate"><span class="pre">Optional[int]</span></code>
 number of bytes of engine weights that may stay resident in GPU
 memory, with the rest streamed from host memory. It applies to

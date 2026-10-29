@@ -29,6 +29,7 @@ from .constant_folding import constant_fold
 from .decompose_dynamic_slice_scatter import decompose_dynamic_slice_scatter
 from .decompose_unsupported_attention import decompose_unsupported_attention
 from .eliminate_sym_min_int64_max import eliminate_sym_min_int64_max  # noqa: F401
+from .fold_shared_kv_attention import fold_shared_kv_attention
 from .force_causal_efficient_attention import force_causal_efficient_attention
 from .fuse_pad_into_convolution import fuse_pad_into_convolution
 from .fuse_prims_broadcast import fuse_prims_broadcast
@@ -79,6 +80,7 @@ post_lowering_pass_list = [
     # One cleanup cycle for non-conflicting node repairs.
     batch_cheap_fx_cleanups,
     complex_lowering_pass,
+    fold_shared_kv_attention,
     force_causal_efficient_attention,
     decompose_unsupported_attention,
     annotate_fp8_sdpa,

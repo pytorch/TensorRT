@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=3fea7915"></script>
+    <script src="../../_static/documentation_options.js?v=bb6d21c2"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -550,13 +550,13 @@ use the AOT path: <code class="docutils literal notranslate"><span class="pre">t
 <section id="dynamo-ir">
 <h2>Dynamo IR<a class="headerlink" href="#dynamo-ir" title="Link to this heading">#</a></h2>
 <p>The output type of <cite>ir=dynamo</cite> compilation of Torch-TensorRT is <cite>torch.fx.GraphModule</cite> object by default.
-We can save this object in either <cite>TorchScript</cite> (<cite>torch.jit.ScriptModule</cite>), <cite>ExportedProgram</cite> (<cite>torch.export.ExportedProgram</cite>) or <cite>PT2</cite> formats by
+We can save this object in either <cite>TorchScript</cite> (<cite>torch.jit.ScriptModule</cite>), <cite>ExportedProgram</cite> (<cite>torch.export.ExportedProgram</cite>), <cite>PT2</cite> or ExecuTorch formats by
 specifying the <cite>output_format</cite> flag. Here are the options <cite>output_format</cite> will accept</p>
 <ul class="simple">
 <li><p><cite>exported_program</cite> : This is the default. We perform transformations on the graphmodule first and use <cite>torch.export.save</cite> to save the module.</p></li>
 <li><p><cite>torchscript</cite> : We trace the graphmodule via <cite>torch.jit.trace</cite> and save it via <cite>torch.jit.save</cite>.</p></li>
 <li><p><cite>PT2 Format</cite> : This is a next generation runtime for PyTorch models, allowing them to run in Python and in C++</p></li>
-<li><p><cite>executorch</cite> : We lower the graphmodule to an ExecuTorch <code class="docutils literal notranslate"><span class="pre">.pte</span></code> program, delegating the TensorRT engines to the ExecuTorch backend. Linux-only; requires the <code class="docutils literal notranslate"><span class="pre">executorch</span></code> package.</p></li>
+<li><p><cite>executorch</cite> : We lower the graphmodule to an ExecuTorch <code class="docutils literal notranslate"><span class="pre">.pte</span></code> program, with the TensorRT engines stored inside it. Requires the <code class="docutils literal notranslate"><span class="pre">executorch</span></code> extra; see <a class="reference internal" href="executorch.html#executorch-deployment"><span class="std std-ref">ExecuTorch Deployment</span></a>.</p></li>
 </ul>
 <section id="a-exportedprogram">
 <h3>a) ExportedProgram<a class="headerlink" href="#a-exportedprogram" title="Link to this heading">#</a></h3>
@@ -735,43 +735,22 @@ see <a class="reference internal" href="aot_inductor.html#aot-inductor"><span cl
 <span id="executorch-save"></span><h3>c) ExecuTorch (.pte)<a class="headerlink" href="#c-executorch-pte" title="Link to this heading">#</a></h3>
 <div class="admonition seealso">
 <p class="admonition-title">See also</p>
-<p><a class="reference internal" href="executorch.html#executorch-deployment"><span class="std std-ref">ExecuTorch Deployment</span></a> is the end to end guide: install the stack, run the
-saved program from Python and from C++, and tune the runtime. This section covers
-the saving step itself.</p>
+<p><a class="reference internal" href="executorch.html#executorch-deployment"><span class="std std-ref">ExecuTorch Deployment</span></a> is the end to end guide. It shows how to install the packages,
+run the saved program from Python and from C++, and tune it at run time. This section covers
+the saving step.</p>
 </div>
-<p>The <code class="docutils literal notranslate"><span class="pre">executorch</span></code> output format lowers the compiled module to an ExecuTorch
-<code class="docutils literal notranslate"><span class="pre">.pte</span></code> program, delegating the TensorRT engines to the Torch-TensorRT ExecuTorch
-backend. This CUDA integration links CUDA 13 libraries, so it supports Linux with
-any CUDA 13 PyTorch build and needs an ExecuTorch nightly wheel. Install from the
-channel matching your CUDA, for example a CUDA 13.2 environment:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>--pre<span class="w"> </span><span class="s2">"torch_tensorrt[executorch]"</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--extra-index-url<span class="w"> </span>https://download.pytorch.org/whl/nightly/cu132
-</pre></div>
-</div>
-<p>Substitute the channel for your CUDA, such as <code class="docutils literal notranslate"><span class="pre">cu134</span></code> for CUDA 13.4. ExecuTorch
-publishes a channel later than PyTorch does, so a very new CUDA minor may not have
-ExecuTorch wheels yet. Keep PyTorch, ExecuTorch and Torch-TensorRT on the
-same CUDA channel. <code class="docutils literal notranslate"><span class="pre">--pre</span></code> permits prereleases; it does not request an upgrade
-of an installed package. An existing version that declares the extra can gain
-its missing dependencies, and dependency resolution may change other packages.
-If an older version does not declare the extra, deliberately install the intended
-compatible Torch-TensorRT wheel first. A fresh virtual environment avoids changing
-an existing working stack.</p>
-<p>There are two ways to produce a <code class="docutils literal notranslate"><span class="pre">.pte</span></code>, and they suit different needs:</p>
+<p><code class="docutils literal notranslate"><span class="pre">output_format=&quot;executorch&quot;</span></code> writes an ExecuTorch <code class="docutils literal notranslate"><span class="pre">.pte</span></code> program. The TensorRT engines are
+stored in it, and the TensorRT delegate runs them at run time. There are two ways to write one:</p>
 <ul class="simple">
-<li><p><strong>Use</strong> <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.save()</span></code>. This is the default, and the right choice
-whenever a <code class="docutils literal notranslate"><span class="pre">.pte</span></code> file is all that is needed. It runs the whole pipeline in one
-call and writes the file.</p></li>
-<li><p><strong>Use</strong> <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.executorch.export()</span></code> only when the program has to be
-changed before it is written to disk. It stops at the Edge program, hands it back
-for inspection or customization, and leaves serialization to the caller.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">torch_tensorrt.save()</span></code> does everything in one call and writes the file. Start here.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">torch_tensorrt.executorch.export()</span></code> stops before the file is written, and returns
+ExecuTorch’s Edge program, the form the program has before it becomes a file. Use it to inspect
+or change the program first, or to put several methods in one file.</p></li>
 </ul>
-<p>Start with <code class="docutils literal notranslate"><span class="pre">save()</span></code>. Reach for <code class="docutils literal notranslate"><span class="pre">export()</span></code> when something below is required.</p>
 <section id="default-save">
 <h4>Default: <code class="docutils literal notranslate"><span class="pre">save()</span></code><a class="headerlink" href="#default-save" title="Link to this heading">#</a></h4>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch</span>
 
 <span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
 <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">cuda</span><span class="p">()]</span>
@@ -779,53 +758,87 @@ for inspection or customization, and leaves serialization to the caller.</p></li
 <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="s2">"trt.pte"</span><span class="p">,</span> <span class="n">output_format</span><span class="o">=</span><span class="s2">"executorch"</span><span class="p">)</span>
 </pre></div>
 </div>
-<p><code class="docutils literal notranslate"><span class="pre">save</span></code> writes both the <code class="docutils literal notranslate"><span class="pre">.pte</span></code> and any external <code class="docutils literal notranslate"><span class="pre">.ptd</span></code> tensor-data files. To keep the
-TensorRT engines in a <code class="docutils literal notranslate"><span class="pre">.ptd</span></code> file instead of the <code class="docutils literal notranslate"><span class="pre">.pte</span></code>, see
-<a class="reference internal" href="executorch.html#executorch-external-engine-data"><span class="std std-ref">Keeping engines in a .ptd file</span></a>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">save()</span></code> writes the <code class="docutils literal notranslate"><span class="pre">.pte</span></code>, and any <code class="docutils literal notranslate"><span class="pre">.ptd</span></code> data files next to it. It writes one method,
+<code class="docutils literal notranslate"><span class="pre">forward</span></code>, plus any constant methods you pass.</p>
+<p>These keyword arguments of <code class="docutils literal notranslate"><span class="pre">save()</span></code> apply only to this format. With any other format they log a
+warning and are ignored. With this format, an unknown keyword raises a <code class="docutils literal notranslate"><span class="pre">TypeError</span></code>.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">partitioners</span></code>: more partitioners, run after TensorRT’s. For example, a <code class="docutils literal notranslate"><span class="pre">CudaPartitioner</span></code>
+sends the operators TensorRT rejects to ExecuTorch’s CUDA backend. See
+<a class="reference internal" href="executorch.html#executorch-deployment"><span class="std std-ref">ExecuTorch Deployment</span></a> for that recipe.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">compile_specs</span></code>: extra compile specs for TensorRT’s partitioner. You rarely need it: the
+options below set their own specs, and passing one of those specs here raises a <code class="docutils literal notranslate"><span class="pre">ValueError</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">backend_config</span></code>: an <code class="docutils literal notranslate"><span class="pre">ExecutorchBackendConfig</span></code> for ExecuTorch’s <code class="docutils literal notranslate"><span class="pre">to_executorch()</span></code>, for
+example to keep inputs and outputs on the GPU. <code class="docutils literal notranslate"><span class="pre">save()</span></code> plans its memory on the 256-byte
+boundary TensorRT needs, on a copy of the config you pass.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">constant_methods</span></code>: extra methods that return a constant, such as
+<code class="docutils literal notranslate"><span class="pre">{&quot;get_max_seq_len&quot;:</span> <span class="pre">2048}</span></code> for an LLM runner.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">transform_passes</span></code>: extra Edge transform passes to run before lowering.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">compile_config</span></code>: an <code class="docutils literal notranslate"><span class="pre">EdgeCompileConfig</span></code>. The default turns off Edge IR validation
+(<code class="docutils literal notranslate"><span class="pre">_check_ir_validity=False</span></code>), because the TensorRT engine placeholder does not pass it. A
+config you pass is used as it is, so set <code class="docutils literal notranslate"><span class="pre">_check_ir_validity=False</span></code> on it yourself.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">use_cuda_graphs</span></code>: save CUDA graph replay on or off for every engine.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">weight_streaming_budget_per_engine</span></code>: how many bytes of each engine’s weights stay on the GPU,
+for an engine compiled with <code class="docutils literal notranslate"><span class="pre">enable_weight_streaming=True</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">external_engine_data</span></code>: a file name, without <code class="docutils literal notranslate"><span class="pre">.ptd</span></code>, to store the engines in instead of the
+<code class="docutils literal notranslate"><span class="pre">.pte</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">zero_copy_kv</span></code>: let an engine update its KV cache in place. See
+<a class="reference internal" href="#executorch-zero-copy-kv"><span class="std std-ref">Zero-copy KV cache</span></a>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">generate_etrecord</span></code>: also write an ETRecord, a debug record for the ExecuTorch Developer Tools
+<code class="docutils literal notranslate"><span class="pre">Inspector</span></code>, as <code class="docutils literal notranslate"><span class="pre">&lt;name&gt;_etrecord.bin</span></code>. It does not work for a program with TensorRT
+engines: writing the record fails with a <code class="docutils literal notranslate"><span class="pre">SerializeError</span></code>.</p></li>
+</ul>
+<p><a class="reference internal" href="executorch.html#executorch-deployment"><span class="std std-ref">ExecuTorch Deployment</span></a> explains the run time side of <code class="docutils literal notranslate"><span class="pre">use_cuda_graphs</span></code>,
+<code class="docutils literal notranslate"><span class="pre">weight_streaming_budget_per_engine</span></code> and <code class="docutils literal notranslate"><span class="pre">external_engine_data</span></code>.</p>
+<p>For example:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">executorch.exir</span><span class="w"> </span><span class="kn">import</span> <span class="n">EdgeCompileConfig</span>
+
+<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span>
+    <span class="n">trt_gm</span><span class="p">,</span>
+    <span class="s2">"trt.pte"</span><span class="p">,</span>
+    <span class="n">output_format</span><span class="o">=</span><span class="s2">"executorch"</span><span class="p">,</span>
+    <span class="n">constant_methods</span><span class="o">=</span><span class="p">{</span><span class="s2">"get_max_seq_len"</span><span class="p">:</span> <span class="mi">2048</span><span class="p">},</span>
+    <span class="n">compile_config</span><span class="o">=</span><span class="n">EdgeCompileConfig</span><span class="p">(</span><span class="n">_check_ir_validity</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
+<span class="p">)</span>
+</pre></div>
+</div>
 </section>
 <section id="advanced-export">
 <h4>Advanced: <code class="docutils literal notranslate"><span class="pre">export()</span></code><a class="headerlink" href="#advanced-export" title="Link to this heading">#</a></h4>
-<p>Stop at the standard Edge program boundary when the program needs work before it is
-serialized: inspecting the delegated graph, adding metadata, controlling final memory
-planning, or carrying more than one method. The caller then serializes it:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">edge</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">executorch</span><span class="o">.</span><span class="n">export</span><span class="p">(</span>
+<p><code class="docutils literal notranslate"><span class="pre">torch_tensorrt.executorch.export()</span></code> takes a TensorRT-compiled <code class="docutils literal notranslate"><span class="pre">GraphModule</span></code>, an
+<code class="docutils literal notranslate"><span class="pre">ExportedProgram</span></code> that already holds engines, or a dict that maps method names to such
+programs. It runs TensorRT’s partitioner first, then yours in order, and returns ExecuTorch’s
+<code class="docutils literal notranslate"><span class="pre">EdgeProgramManager</span></code>. You then finalize and write the program yourself. Here
+<code class="docutils literal notranslate"><span class="pre">extra_partitioners</span></code>, <code class="docutils literal notranslate"><span class="pre">passes</span></code>, <code class="docutils literal notranslate"><span class="pre">edge_config</span></code> and <code class="docutils literal notranslate"><span class="pre">backend_config</span></code> stand for your own
+values of the options above:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch</span>
+
+<span class="n">edge</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">executorch</span><span class="o">.</span><span class="n">export</span><span class="p">(</span>
     <span class="n">trt_gm</span><span class="p">,</span>
-    <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
-    <span class="n">retrace</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
     <span class="n">partitioners</span><span class="o">=</span><span class="n">extra_partitioners</span><span class="p">,</span>
     <span class="n">transform_passes</span><span class="o">=</span><span class="n">passes</span><span class="p">,</span>
     <span class="n">compile_config</span><span class="o">=</span><span class="n">edge_config</span><span class="p">,</span>
     <span class="n">constant_methods</span><span class="o">=</span><span class="p">{</span><span class="s2">"get_vocab_size"</span><span class="p">:</span> <span class="mi">256</span><span class="p">},</span>
 <span class="p">)</span>
 
-<span class="c1"># Inspect edge.exported_program() or apply additional Edge transforms here.</span>
+<span class="c1"># Inspect edge.exported_program() or apply more Edge transforms here.</span>
 <span class="n">program</span> <span class="o">=</span> <span class="n">edge</span><span class="o">.</span><span class="n">to_executorch</span><span class="p">(</span><span class="n">config</span><span class="o">=</span><span class="n">backend_config</span><span class="p">)</span>
 <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">"trt.pte"</span><span class="p">,</span> <span class="s2">"wb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">output</span><span class="p">:</span>
     <span class="n">program</span><span class="o">.</span><span class="n">write_to_file</span><span class="p">(</span><span class="n">output</span><span class="p">)</span>
 <span class="n">program</span><span class="o">.</span><span class="n">write_tensor_data_to_file</span><span class="p">(</span><span class="s2">"."</span><span class="p">)</span>
 </pre></div>
 </div>
+<p>It takes the same options as <code class="docutils literal notranslate"><span class="pre">save()</span></code>, except <code class="docutils literal notranslate"><span class="pre">backend_config</span></code>, which goes to
+<code class="docutils literal notranslate"><span class="pre">to_executorch()</span></code>. <code class="docutils literal notranslate"><span class="pre">partitioners</span></code>, <code class="docutils literal notranslate"><span class="pre">compile_specs</span></code> and <code class="docutils literal notranslate"><span class="pre">transform_passes</span></code> can also be a dict
+keyed by method name.</p>
 <p>TensorRT needs every input and output on a 256-byte boundary, and ExecuTorch plans memory on
-16-byte boundaries by default. <code class="docutils literal notranslate"><span class="pre">save</span></code> plans on 256 for you. Here, give <code class="docutils literal notranslate"><span class="pre">backend_config</span></code> a
+16-byte boundaries by default. <code class="docutils literal notranslate"><span class="pre">save()</span></code> plans on 256 for you. Here, give <code class="docutils literal notranslate"><span class="pre">backend_config</span></code> a
 <code class="docutils literal notranslate"><span class="pre">MemoryPlanningPass(alignment=256)</span></code>, or the delegate copies each misaligned buffer on every call.</p>
-<p><code class="docutils literal notranslate"><span class="pre">executorch.export</span></code> accepts a TensorRT-compiled <code class="docutils literal notranslate"><span class="pre">GraphModule</span></code>, an
-engine-bearing <code class="docutils literal notranslate"><span class="pre">ExportedProgram</span></code>, or a mapping of independently exported
-methods. It always applies the TensorRT partitioner first, followed by caller
-<code class="docutils literal notranslate"><span class="pre">partitioners</span></code> in order, and returns ExecuTorch’s native
-<code class="docutils literal notranslate"><span class="pre">EdgeProgramManager</span></code>. Use <code class="docutils literal notranslate"><span class="pre">save</span></code> for the one-shot path where Torch-TensorRT
-manages Edge lowering, finalization, and persistence.</p>
 <p><strong>Several methods in one .pte</strong></p>
-<p>Pass a mapping of method name to <code class="docutils literal notranslate"><span class="pre">ExportedProgram</span></code> to keep independent entry
-points, such as a separate prefill and decode, in one program. Give each method
-its own partitioner instances when a partitioner carries method-specific state: a
-partitioner holds its compile specs from construction, so one instance whose specs
-name a method would tag every method sharing it with that same name. Reusing such
-an instance across methods is rejected.</p>
-<p>Sharing an instance whose specs name no method is not rejected, because some
-backends are built to share one. A backend that instead reads its own method name
-from its specs, such as the CUDA backend below, raises
-<code class="docutils literal notranslate"><span class="pre">Could</span> <span class="pre">not</span> <span class="pre">find</span> <span class="pre">method</span> <span class="pre">name</span> <span class="pre">in</span> <span class="pre">compile</span> <span class="pre">specs</span></code> during lowering, so give it one
-instance per method carrying that method’s name spec.</p>
+<p>Pass a dict of method name to <code class="docutils literal notranslate"><span class="pre">ExportedProgram</span></code> to keep separate entry points, such as prefill
+and decode, in one program. Give each method its own partitioner instances. The CUDA backend
+reads its method name from its compile specs, so it needs one <code class="docutils literal notranslate"><span class="pre">CudaPartitioner</span></code> per method,
+each with that method’s name:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">executorch.backends.cuda.cuda_backend</span><span class="w"> </span><span class="kn">import</span> <span class="n">CudaBackend</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">executorch.backends.cuda.cuda_partitioner</span><span class="w"> </span><span class="kn">import</span> <span class="n">CudaPartitioner</span>
 
@@ -833,283 +846,66 @@ instance per method carrying that method’s name spec.</p>
     <span class="p">{</span><span class="s2">"prefill"</span><span class="p">:</span> <span class="n">prefill_program</span><span class="p">,</span> <span class="s2">"decode"</span><span class="p">:</span> <span class="n">decode_program</span><span class="p">},</span>
     <span class="n">partitioners</span><span class="o">=</span><span class="p">{</span>
         <span class="s2">"prefill"</span><span class="p">:</span> <span class="p">[</span>
-            <span class="n">CudaPartitioner</span><span class="p">(</span>
-                <span class="p">[</span><span class="n">CudaBackend</span><span class="o">.</span><span class="n">generate_method_name_compile_spec</span><span class="p">(</span><span class="s2">"prefill"</span><span class="p">)]</span>
-            <span class="p">)</span>
+            <span class="n">CudaPartitioner</span><span class="p">([</span><span class="n">CudaBackend</span><span class="o">.</span><span class="n">generate_method_name_compile_spec</span><span class="p">(</span><span class="s2">"prefill"</span><span class="p">)])</span>
         <span class="p">],</span>
         <span class="s2">"decode"</span><span class="p">:</span> <span class="p">[</span>
-            <span class="n">CudaPartitioner</span><span class="p">(</span>
-                <span class="p">[</span><span class="n">CudaBackend</span><span class="o">.</span><span class="n">generate_method_name_compile_spec</span><span class="p">(</span><span class="s2">"decode"</span><span class="p">)]</span>
-            <span class="p">)</span>
+            <span class="n">CudaPartitioner</span><span class="p">([</span><span class="n">CudaBackend</span><span class="o">.</span><span class="n">generate_method_name_compile_spec</span><span class="p">(</span><span class="s2">"decode"</span><span class="p">)])</span>
         <span class="p">],</span>
     <span class="p">},</span>
 <span class="p">)</span>
 </pre></div>
 </div>
-<p>Each method is validated before any program is rewritten, so an error in one
-method leaves the others untouched. A method mapping preserves independent entry
-points but does not by itself give them shared mutable state.</p>
+<p><code class="docutils literal notranslate"><span class="pre">export()</span></code> refuses one partitioner instance shared by methods when its specs name a method. The
+methods share no state: two methods do not share a buffer unless you plan it that way.</p>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
-<p><strong>The returned Edge program shares tensor storage with the programs you
-passed in.</strong> Only structure is copied: the graph, the graph signature, the
-<code class="docutils literal notranslate"><span class="pre">state_dict</span></code> keys, and node metadata. Weights and every other tensor
-payload are shared by reference.</p>
-<p>TensorRT engines are not shared. Export never deep copies an engine object,
-since that would serialize and deserialize it, but every engine is decoded
-once into a byte buffer the returned program owns. Plan for the bytes of a
-multi-gigabyte engine to be resident twice while both programs are alive.</p>
-<p>Two consequences to plan for:</p>
-<ul class="simple">
-<li><p>A transform pass must not modify a shared payload in place. An in-place
-edit such as <code class="docutils literal notranslate"><span class="pre">weight.data.mul_(scale)</span></code> changes the program you passed in,
-and every other Edge program exported from it. Build a new tensor and
-rebind it instead of mutating the existing one.</p></li>
-<li><p>Modifying a source program after calling <code class="docutils literal notranslate"><span class="pre">export</span></code> is also visible in the
-Edge program. Finish preparing a program before exporting it.</p></li>
-</ul>
-<p>Neither case raises an error or a warning, so treat every shared payload as
-read-only.</p>
+<p><strong>The returned Edge program shares its weights with the programs you passed in.</strong> Do not
+change a weight in place in a transform pass, for example with <code class="docutils literal notranslate"><span class="pre">weight.data.mul_(scale)</span></code>,
+and do not change a source program after <code class="docutils literal notranslate"><span class="pre">export()</span></code>. Either change shows up in the other
+program too, with no error. Build a new tensor instead.</p>
+<p>Engines are not shared. <code class="docutils literal notranslate"><span class="pre">export()</span></code> copies each engine into the Edge program once, so a large
+engine is in host memory twice while both programs exist.</p>
 </div>
 <p id="executorch-zero-copy-kv"><strong>Zero-copy KV cache</strong></p>
-<p>When a TensorRT engine has aliased I/O – a KV cache it updates through an
-aliased binding – running the engine over the cache already is the update.
-ExecuTorch does not know that, so by default it pays for the update twice per
-execution: it hands the delegate an <code class="docutils literal notranslate"><span class="pre">_h2d_copy</span></code> staging copy of the buffer
-instead of the buffer itself, then copies the engine’s aliased output back into
-the buffer afterwards. For a KV cache both copies are cache-sized, per token.</p>
-<p><code class="docutils literal notranslate"><span class="pre">zero_copy_kv=True</span></code> removes them, so the engine writes the caller’s buffer
-directly. Through the two-step <code class="docutils literal notranslate"><span class="pre">export</span></code> + <code class="docutils literal notranslate"><span class="pre">to_executorch</span></code> path it takes two
-calls, one at each end of the Edge boundary:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-    <span class="n">check_zero_copy_kv</span><span class="p">,</span>
-    <span class="n">export</span><span class="p">,</span>
-    <span class="n">zero_copy_backend_config</span><span class="p">,</span>
-<span class="p">)</span>
+<p>An LLM’s TensorRT engine can update its KV cache in place, through an input and an output that
+alias the same buffer. By default ExecuTorch does not know that. It hands the engine a copy of
+the cache, and then copies the engine’s result back: two cache-sized copies for every token.
+<code class="docutils literal notranslate"><span class="pre">zero_copy_kv=True</span></code> removes both, so the engine writes the cache directly.</p>
+<p>With <code class="docutils literal notranslate"><span class="pre">save()</span></code>, one flag does it:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="s2">"decode.pte"</span><span class="p">,</span> <span class="n">output_format</span><span class="o">=</span><span class="s2">"executorch"</span><span class="p">,</span> <span class="n">zero_copy_kv</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>With <code class="docutils literal notranslate"><span class="pre">export()</span></code>, it takes two more calls, one at each end of the Edge program:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch</span><span class="w"> </span><span class="kn">import</span> <span class="n">check_zero_copy_kv</span><span class="p">,</span> <span class="n">export</span><span class="p">,</span> <span class="n">zero_copy_backend_config</span>
 
-<span class="n">edge</span> <span class="o">=</span> <span class="n">export</span><span class="p">(</span>
-    <span class="p">{</span><span class="s2">"prefill"</span><span class="p">:</span> <span class="n">prefill_program</span><span class="p">,</span> <span class="s2">"decode"</span><span class="p">:</span> <span class="n">decode_program</span><span class="p">},</span>
-    <span class="n">zero_copy_kv</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-<span class="p">)</span>
-
-<span class="c1"># The argument is optional. Pass your own ExecutorchBackendConfig and</span>
-<span class="c1"># zero_copy_backend_config composes onto it; every other field (memory</span>
-<span class="c1"># planning, passes) is preserved, so give it MemoryPlanningPass(alignment=256)</span>
-<span class="c1"># to keep the cache on the boundary TensorRT needs.</span>
+<span class="n">edge</span> <span class="o">=</span> <span class="n">export</span><span class="p">({</span><span class="s2">"prefill"</span><span class="p">:</span> <span class="n">prefill_program</span><span class="p">,</span> <span class="s2">"decode"</span><span class="p">:</span> <span class="n">decode_program</span><span class="p">},</span> <span class="n">zero_copy_kv</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="n">program</span> <span class="o">=</span> <span class="n">edge</span><span class="o">.</span><span class="n">to_executorch</span><span class="p">(</span><span class="n">zero_copy_backend_config</span><span class="p">())</span>
-
-<span class="c1"># Neither call is enforced -- see the warning below.</span>
 <span class="n">check_zero_copy_kv</span><span class="p">(</span><span class="n">program</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>Two fields of that config are not merely carried. The engine writes the cache
-wherever memory planning put it, so <code class="docutils literal notranslate"><span class="pre">enable_non_cpu_memory_planning=False</span></code> –
-which plans every tensor into a single host arena whatever device its
-<code class="docutils literal notranslate"><span class="pre">TensorSpec</span></code> asks for – cannot be combined with zero-copy KV:
-<code class="docutils literal notranslate"><span class="pre">to_executorch</span></code> raises instead of writing a <code class="docutils literal notranslate"><span class="pre">.pte</span></code> whose every <code class="docutils literal notranslate"><span class="pre">execute()</span></code>
-fails on a host pointer. That refusal reads the config object
-<code class="docutils literal notranslate"><span class="pre">zero_copy_backend_config</span></code> returned, so two ways of setting the field are
-outside it. Building a new config out of the returned one with
-<code class="docutils literal notranslate"><span class="pre">dataclasses.replace</span></code> copies the field by value and the pass by reference, so
-the pass goes on reading the config it was built for: call
-<code class="docutils literal notranslate"><span class="pre">zero_copy_backend_config</span></code> again on the derived config. And a
-<code class="docutils literal notranslate"><span class="pre">memory_planning_pass</span></code> of your own that does not already have an attribute of
-that name never receives the field at all – <code class="docutils literal notranslate"><span class="pre">to_executorch</span></code> assigns it onto
-the planner rather than passing it – so where the caches land is that planner’s
-own business. Neither has to be left to the runtime to discover:
-<code class="docutils literal notranslate"><span class="pre">check_zero_copy_kv</span></code> reads the arena planning actually chose – on this path
-it is yours to call, as the warning below says. That planner does have to record
-the device of each arena it places, or the check refuses the program for saying
-nothing about where the cache lives – see below. And
-<code class="docutils literal notranslate"><span class="pre">propagate_device_config.skip_h2d_for_method_inputs</span></code> is refused outright:
-<code class="docutils literal notranslate"><span class="pre">PropagateDevicePass</span></code> refuses to un-stage a method input
-whose placeholder does not have exactly one user, and a zero-copy cache always
-has two, so preserving that option would hand back a configuration that cannot
-finalize at all. It is refused wherever it is written – in one
-<code class="docutils literal notranslate"><span class="pre">PropagateDeviceConfig</span></code> or in a per-method dict of them – and on every value
-that pass reads as on rather than only on <code class="docutils literal notranslate"><span class="pre">True</span></code>, because it tests the field
-for truth without ever resolving it per method, so even a dict of <code class="docutils literal notranslate"><span class="pre">False</span></code> is
-on for every method. <code class="docutils literal notranslate"><span class="pre">False</span></code> and the empty dict are what it reads as off, and
-those are carried unchanged.</p>
-<p>It is opt-in rather than automatic because the resulting <code class="docutils literal notranslate"><span class="pre">.pte</span></code> needs a
-runtime that understands a delegate whose aliased outputs are elided. Producing
-one silently would break a runner built before this feature.</p>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
-<p><strong>Both calls are required, and nothing enforces them.</strong> Exporting with
-<code class="docutils literal notranslate"><span class="pre">zero_copy_kv=True</span></code> removes the copy-back; finalizing without
-<code class="docutils literal notranslate"><span class="pre">zero_copy_backend_config</span></code> leaves the engine writing a per-call staging
-copy that is discarded, so the cache never updates. For a KV cache that is
-wrong output, not a crash – and it is a <code class="docutils literal notranslate"><span class="pre">.pte</span></code> that was written without
-complaint, since <code class="docutils literal notranslate"><span class="pre">to_executorch</span></code> belongs to ExecuTorch and finalizes
-whatever config it is given.</p>
-<p>So finalizing a zero-copy export yourself is two obligations, on any manager
-and by whatever route it was reached: pass <code class="docutils literal notranslate"><span class="pre">zero_copy_backend_config</span></code>, and
-hand the program that comes back to
-<code class="docutils literal notranslate"><span class="pre">torch_tensorrt.executorch.check_zero_copy_kv</span></code>, which reads the finalized
-program and refuses one whose caches never reach the engine or ended up
-planned somewhere it cannot write them – while there is still no <code class="docutils literal notranslate"><span class="pre">.pte</span></code>:</p>
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">program</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">edge</span><span class="p">.</span><span class="n">transform</span><span class="p">(</span><span class="n">passes</span><span class="p">).</span><span class="n">to_executorch</span><span class="p">(</span><span class="n">zero_copy_backend_config</span><span class="p">())</span>
-<span class="n">torch_tensorrt</span><span class="p">.</span><span class="n">executorch</span><span class="p">.</span><span class="n">check_zero_copy_kv</span><span class="p">(</span><span class="n">program</span><span class="p">)</span>
-</pre></div>
+<p><strong>Nothing makes you call both.</strong> If you finalize with a config that did not come from
+<code class="docutils literal notranslate"><span class="pre">zero_copy_backend_config</span></code>, <code class="docutils literal notranslate"><span class="pre">to_executorch()</span></code> still writes a program, but the engine then
+writes a copy that is thrown away, so the cache never updates. That is wrong output, not a
+crash. <code class="docutils literal notranslate"><span class="pre">check_zero_copy_kv</span></code> refuses such a program before you write the file.
+<code class="docutils literal notranslate"><span class="pre">save(...,</span> <span class="pre">zero_copy_kv=True)</span></code> does both steps for you.</p>
 </div>
-<p><code class="docutils literal notranslate"><span class="pre">torch_tensorrt.save</span></code> owns both ends and does both for you; it is the path
-on which forgetting is not possible, and it is single-method only – a
-multi-method program has to take the two calls above.</p>
-</div>
-<p><code class="docutils literal notranslate"><span class="pre">torch_tensorrt.save</span></code> finalizes the program itself, so a single
-<code class="docutils literal notranslate"><span class="pre">zero_copy_kv=True</span></code> covers both steps:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span>
-    <span class="n">trt_gm</span><span class="p">,</span> <span class="s2">"decode.pte"</span><span class="p">,</span> <span class="n">output_format</span><span class="o">=</span><span class="s2">"executorch"</span><span class="p">,</span>
-    <span class="n">zero_copy_kv</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-<span class="p">)</span>
-</pre></div>
-</div>
-<p>It installs <code class="docutils literal notranslate"><span class="pre">zero_copy_backend_config</span></code> for you, so there is no need to hand it
-one as <code class="docutils literal notranslate"><span class="pre">backend_config</span></code> as well: that installs the pass twice, which is
-redundant rather than an error – the second run finds the buffers already
-un-staged. The two entry points are alternatives, not a pair.</p>
-<p>Three further responsibilities are the caller’s. The first two nothing checks;
-the third is refused where it is visible in the <code class="docutils literal notranslate"><span class="pre">.pte</span></code>:</p>
 <ul class="simple">
-<li><p><strong>One CUDA stream for every delegate</strong>, if the <code class="docutils literal notranslate"><span class="pre">.pte</span></code> is coalesced. Getting
-this wrong is a race, not a deterministic error: it is intermittent and can
-surface as wrong results <em>or</em> as an illegal memory access. See
-<a class="reference internal" href="#executorch-single-stream"><span class="std std-ref">Running a coalesced .pte</span></a>.</p></li>
-<li><p><strong>Synchronizing that stream before reading a cache on the host</strong>, for any
-zero-copy <code class="docutils literal notranslate"><span class="pre">.pte</span></code> a runner drives on a caller stream, coalesced or not. A
-delegate whose aliased outputs are threaded through it reflects each one into
-its delegate output and so waits for the engine before returning; zero-copy
-elides those outputs, so there is nothing to reflect and <code class="docutils literal notranslate"><span class="pre">execute()</span></code> returns
-with the engine still running. A single-delegate decode loop owes the
-synchronization as much as a coalesced program does. It is only the caller
-stream that brings the duty: with none installed <code class="docutils literal notranslate"><span class="pre">execute()</span></code> synchronizes
-before it returns, as it does whenever a delegate input or output is staged
-through the host.</p></li>
-<li><p><strong>Sharing one cache between methods.</strong> Zero-copy is per method: it makes each
-method’s engine write that method’s buffer. Giving a prefill and a decode
-method <em>the same</em> cache is a memory-planning question – their mutable buffers
-have to land at the same arena offsets – which ExecuTorch’s memory planner
-owns and which is deployment-specific. Supply your own
-<code class="docutils literal notranslate"><span class="pre">memory_planning_pass</span></code> for it; <code class="docutils literal notranslate"><span class="pre">zero_copy_backend_config</span></code> preserves it.
-Such a planner has to record the device of each arena it places, which means
-running ExecuTorch’s <code class="docutils literal notranslate"><span class="pre">apply_algo</span></code> – the only thing that writes
-<code class="docutils literal notranslate"><span class="pre">non_const_buffer_device</span></code> – and running it with
-<code class="docutils literal notranslate"><span class="pre">enable_non_cpu_memory_planning=True</span></code>, since that parameter defaults to
-<code class="docutils literal notranslate"><span class="pre">False</span></code> and with it off <code class="docutils literal notranslate"><span class="pre">apply_algo</span></code> plans every spec into one CPU bucket
-and records nothing either. Without that record the <code class="docutils literal notranslate"><span class="pre">.pte</span></code> reports every
-planned buffer as CPU, and a runner that honours it backs the cache with host
-memory the engine cannot write. <code class="docutils literal notranslate"><span class="pre">check_zero_copy_kv</span></code> refuses a program in
-that state, under a message of its own rather than the host-arena one: what
-it can read is that nothing says where the cache lives, not that your planner
-put it among the host tensors.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">zero_copy_backend_config(config)</span></code> starts from your own config, if you pass one, and keeps
+every field of it, so give that config <code class="docutils literal notranslate"><span class="pre">MemoryPlanningPass(alignment=256)</span></code> as above. It refuses <code class="docutils literal notranslate"><span class="pre">skip_h2d_for_method_inputs</span></code>. The caches have to be planned in
+GPU memory, so <code class="docutils literal notranslate"><span class="pre">enable_non_cpu_memory_planning=False</span></code> makes finalizing fail.</p></li>
+<li><p>If you build a new config from the returned one, for example with <code class="docutils literal notranslate"><span class="pre">dataclasses.replace</span></code>,
+call <code class="docutils literal notranslate"><span class="pre">zero_copy_backend_config</span></code> again on the new one.</p></li>
+<li><p>It is opt-in because the <code class="docutils literal notranslate"><span class="pre">.pte</span></code> needs a runtime that knows about it. A runner built before
+this feature would break on it.</p></li>
+<li><p>To share one cache between two methods, such as prefill and decode, both methods’ buffers have
+to be planned at the same place. Pass your own <code class="docutils literal notranslate"><span class="pre">memory_planning_pass</span></code> for that.
+<code class="docutils literal notranslate"><span class="pre">zero_copy_backend_config</span></code> keeps it. That planner must record which device each memory area
+is on, which ExecuTorch’s <code class="docutils literal notranslate"><span class="pre">apply_algo</span></code> does when it runs with
+<code class="docutils literal notranslate"><span class="pre">enable_non_cpu_memory_planning=True</span></code>. Otherwise <code class="docutils literal notranslate"><span class="pre">check_zero_copy_kv</span></code> refuses the program.</p></li>
 </ul>
-<p><strong>Coalesced TensorRT + CUDA .pte</strong></p>
-<p>To run the ops TensorRT does not take on ExecuTorch’s CUDA (AOTInductor) backend
-instead of leaving them non-delegated, pass a <code class="docutils literal notranslate"><span class="pre">CudaPartitioner</span></code> via
-<code class="docutils literal notranslate"><span class="pre">partitioners=</span></code>. It is appended after the TensorRT partitioner, so TensorRT
-claims what it can and the <code class="docutils literal notranslate"><span class="pre">CudaPartitioner</span></code> picks up the rest as a catch-all:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">executorch.backends.cuda.cuda_backend</span><span class="w"> </span><span class="kn">import</span> <span class="n">CudaBackend</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">executorch.backends.cuda.cuda_partitioner</span><span class="w"> </span><span class="kn">import</span> <span class="n">CudaPartitioner</span>
-
-<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span>
-    <span class="n">trt_gm</span><span class="p">,</span> <span class="s2">"trt.pte"</span><span class="p">,</span> <span class="n">output_format</span><span class="o">=</span><span class="s2">"executorch"</span><span class="p">,</span>
-    <span class="n">partitioners</span><span class="o">=</span><span class="p">[</span>
-        <span class="n">CudaPartitioner</span><span class="p">(</span>
-            <span class="p">[</span><span class="n">CudaBackend</span><span class="o">.</span><span class="n">generate_method_name_compile_spec</span><span class="p">(</span><span class="s2">"forward"</span><span class="p">)]</span>
-        <span class="p">)</span>
-    <span class="p">],</span>
-<span class="p">)</span>
-</pre></div>
-</div>
-<p>This needs ExecuTorch’s CUDA backend and a CUDA toolkit (nvcc/ptxas) at export
-time, and produces a <code class="docutils literal notranslate"><span class="pre">.pte</span></code> that requires a CUDA runtime at load. Any external
-CUDA weights are written as <code class="docutils literal notranslate"><span class="pre">.ptd</span></code> data file(s) next to the <code class="docutils literal notranslate"><span class="pre">.pte</span></code>; the runtime
-must be pointed at those data files to load them.</p>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p>The CUDA backend names its external weight blob per-device (e.g.
-<code class="docutils literal notranslate"><span class="pre">aoti_cuda_blob.ptd</span></code>), not per-model, so saving two different coalesced
-<code class="docutils literal notranslate"><span class="pre">.pte</span></code> into the same directory overwrites the blob and the first <code class="docutils literal notranslate"><span class="pre">.pte</span></code>
-will fail to load. Save each coalesced model into its own directory.</p>
-</div>
-<p id="executorch-single-stream"><strong>Running a coalesced .pte: use a single CUDA stream</strong></p>
-<p>A coalesced <code class="docutils literal notranslate"><span class="pre">.pte</span></code> runs on more than one backend delegate (the TensorRT delegate
-plus the CUDA backend). By default each backend enqueues its GPU work on its <em>own</em>
-CUDA stream, and delegate execution is asynchronous – a delegate returns after
-<em>enqueuing</em> its work, not after it completes. Because separate CUDA streams are not
-ordered relative to one another, at a delegate boundary the consuming delegate can
-begin before the producing delegate’s writes have finished, reading incomplete
-data. This is a race: it is intermittent and can surface as wrong results or an
-illegal memory access.</p>
-<p>The runtime does not impose a shared stream across delegates, so it is the
-<strong>runner’s responsibility</strong> to run all delegates on one CUDA stream. Create a
-single stream and scope <code class="docutils literal notranslate"><span class="pre">executorch::extension::cuda::CallerStreamGuard</span></code> over it
-for the duration of execution. That one guard reaches every CUDA-capable
-delegate: they resolve a single shared <code class="docutils literal notranslate"><span class="pre">libextension_cuda</span></code>, so the TensorRT
-backend and the CUDA backend read the same caller-stream storage. All GPU work is
-then enqueued in order and every cross-boundary dependency is satisfied, while
-execution stays asynchronous.</p>
-<p>If the runner reads a delegate’s outputs between calls (for example, an
-autoregressive decode loop), synchronize the shared stream before reading: the
-work may still be in flight when <code class="docutils literal notranslate"><span class="pre">execute()</span></code> returns, and a host-side copy on
-the default stream will not wait for a non-blocking stream. A model that threads
-its aliased outputs through the delegate is insulated from this in practice:
-reflecting each aliased output into its delegate output makes the delegate wait
-for the engine before it returns. Under
-<a class="reference internal" href="#executorch-zero-copy-kv"><span class="std std-ref">zero-copy KV</span></a> those outputs are elided, so there
-is nothing to reflect and the delegate returns with the engine still running –
-the synchronization is then the only thing making a host read see the new values.</p>
-<p><strong>ExecuTorch lowering options</strong></p>
-<p><code class="docutils literal notranslate"><span class="pre">torch_tensorrt.save</span></code> takes these extra keyword arguments. They are only
-consulted for the <code class="docutils literal notranslate"><span class="pre">executorch</span></code> format; passing them with any other
-<code class="docutils literal notranslate"><span class="pre">output_format</span></code> logs a warning and is otherwise ignored. Of the six below,
-<code class="docutils literal notranslate"><span class="pre">constant_methods</span></code>, <code class="docutils literal notranslate"><span class="pre">transform_passes</span></code> and <code class="docutils literal notranslate"><span class="pre">compile_config</span></code> are forwarded
-to ExecuTorch’s <code class="docutils literal notranslate"><span class="pre">to_edge_transform_and_lower(...)</span></code>, and so is
-<code class="docutils literal notranslate"><span class="pre">generate_etrecord</span></code>, which <code class="docutils literal notranslate"><span class="pre">save</span></code> also reads itself to write the record
-beside the <code class="docutils literal notranslate"><span class="pre">.pte</span></code>. <code class="docutils literal notranslate"><span class="pre">backend_config</span></code> goes to <code class="docutils literal notranslate"><span class="pre">to_executorch(...)</span></code> instead,
-and <code class="docutils literal notranslate"><span class="pre">zero_copy_kv</span></code> is read by <code class="docutils literal notranslate"><span class="pre">save</span></code> on both sides of that boundary.</p>
-<ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">constant_methods</span></code> — a <code class="docutils literal notranslate"><span class="pre">dict</span></code> of extra constant methods to embed in the
-<code class="docutils literal notranslate"><span class="pre">.pte</span></code> (e.g. <code class="docutils literal notranslate"><span class="pre">{&quot;get_max_seq_len&quot;:</span> <span class="pre">2048}</span></code> for an LLM runner).</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">transform_passes</span></code> — additional edge-dialect transform passes to run before
-lowering.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">compile_config</span></code> — an <code class="docutils literal notranslate"><span class="pre">EdgeCompileConfig</span></code>. When omitted, Torch-TensorRT
-supplies a default with <code class="docutils literal notranslate"><span class="pre">_check_ir_validity=False</span></code> (the TensorRT
-<code class="docutils literal notranslate"><span class="pre">execute_engine</span></code> placeholder graph does not pass edge-IR validation). A
-caller-supplied config is forwarded <strong>verbatim</strong>, so if you pass your own and
-your graph carries TensorRT engines, set <code class="docutils literal notranslate"><span class="pre">_check_ir_validity=False</span></code> explicitly.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">backend_config</span></code> — an <code class="docutils literal notranslate"><span class="pre">ExecutorchBackendConfig</span></code> forwarded to
-<code class="docutils literal notranslate"><span class="pre">to_executorch(...)</span></code>, with its <code class="docutils literal notranslate"><span class="pre">MemoryPlanningPass</span></code> aligned to 256 bytes on a copy.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">zero_copy_kv</span></code> — a <code class="docutils literal notranslate"><span class="pre">bool</span></code> (default <code class="docutils literal notranslate"><span class="pre">False</span></code>, single-method only). Lets the
-TensorRT engine update an aliased KV cache in place. <code class="docutils literal notranslate"><span class="pre">save</span></code> owns both ends of
-the Edge boundary, so this one argument covers what the two-call path spells
-out; see <a class="reference internal" href="#executorch-zero-copy-kv"><span class="std std-ref">Zero-copy KV cache</span></a>.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">generate_etrecord</span></code> — a <code class="docutils literal notranslate"><span class="pre">bool</span></code> (default <code class="docutils literal notranslate"><span class="pre">False</span></code>). When <code class="docutils literal notranslate"><span class="pre">True</span></code>, an
-<a class="reference external" href="https://pytorch.org/executorch/stable/etrecord.html">ETRecord</a> is written
-next to the <code class="docutils literal notranslate"><span class="pre">.pte</span></code> as <code class="docutils literal notranslate"><span class="pre">&lt;base&gt;_etrecord.bin</span></code> (e.g. <code class="docutils literal notranslate"><span class="pre">trt.pte</span></code> →
-<code class="docutils literal notranslate"><span class="pre">trt_etrecord.bin</span></code>) for use with the ExecuTorch Developer Tools <code class="docutils literal notranslate"><span class="pre">Inspector</span></code>.</p></li>
-</ul>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">executorch.exir</span><span class="w"> </span><span class="kn">import</span> <span class="n">EdgeCompileConfig</span>
-
-<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span>
-    <span class="n">trt_gm</span><span class="p">,</span> <span class="s2">"trt.pte"</span><span class="p">,</span> <span class="n">output_format</span><span class="o">=</span><span class="s2">"executorch"</span><span class="p">,</span>
-    <span class="n">constant_methods</span><span class="o">=</span><span class="p">{</span><span class="s2">"get_max_seq_len"</span><span class="p">:</span> <span class="mi">2048</span><span class="p">},</span>
-    <span class="n">compile_config</span><span class="o">=</span><span class="n">EdgeCompileConfig</span><span class="p">(</span><span class="n">_check_ir_validity</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
-    <span class="n">generate_etrecord</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-<span class="p">)</span>
-</pre></div>
-</div>
-<p>The ETRecord sidecar can be parsed back and paired with a runtime ETDump in the
-Developer Tools <code class="docutils literal notranslate"><span class="pre">Inspector</span></code>:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">executorch.devtools</span><span class="w"> </span><span class="kn">import</span> <span class="n">Inspector</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">executorch.devtools.etrecord</span><span class="w"> </span><span class="kn">import</span> <span class="n">parse_etrecord</span>
-
-<span class="n">etrecord</span> <span class="o">=</span> <span class="n">parse_etrecord</span><span class="p">(</span><span class="s2">"trt_etrecord.bin"</span><span class="p">)</span>
-<span class="n">inspector</span> <span class="o">=</span> <span class="n">Inspector</span><span class="p">(</span><span class="n">etdump_path</span><span class="o">=</span><span class="s2">"etdump.etdp"</span><span class="p">,</span> <span class="n">etrecord</span><span class="o">=</span><span class="n">etrecord</span><span class="p">)</span>
-<span class="n">inspector</span><span class="o">.</span><span class="n">print_data_tabular</span><span class="p">()</span>
-</pre></div>
-</div>
+<p>The <a class="reference internal" href="../../py_api/executorch.html#torch-tensorrt-executorch-py"><span class="std std-ref">API reference</span></a> describes every refusal in detail.</p>
 </section>
 </section>
 </section>
@@ -1118,7 +914,7 @@ Developer Tools <code class="docutils literal notranslate"><span class="pre">Ins
 <p><code class="docutils literal notranslate"><span class="pre">torch.compile(backend=&quot;torch_tensorrt&quot;)</span></code> is a <strong>JIT</strong> path — TRT engines are built
 lazily on the first call and live in memory only. There is no direct way to call
 <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.save()</span></code> on a <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code>-compiled model.</p>
-<p><strong>Workaround: switch to the AOT path</strong></p>
+<p><strong>Use the AOT path instead</strong></p>
 <p>Replace <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> with <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.compile(ir=&quot;dynamo&quot;)</span></code> to get a
 serializable <code class="docutils literal notranslate"><span class="pre">torch.fx.GraphModule</span></code>:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>

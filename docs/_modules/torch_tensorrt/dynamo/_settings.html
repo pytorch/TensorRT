@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=3fea7915"></script>
+    <script src="../../../_static/documentation_options.js?v=bb6d21c2"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -516,6 +516,7 @@ document.write(`
     <span class="n">ENABLE_WEIGHT_STREAMING</span><span class="p">,</span>
     <span class="n">ENGINE_CAPABILITY</span><span class="p">,</span>
     <span class="n">FALLBACK_DATA_DEPENDENT_OPS</span><span class="p">,</span>
+    <span class="n">FOLD_SHARED_KV_ATTENTION</span><span class="p">,</span>
     <span class="n">HARDWARE_COMPATIBLE</span><span class="p">,</span>
     <span class="n">IMMUTABLE_WEIGHTS</span><span class="p">,</span>
     <span class="n">L2_LIMIT_FOR_TILING</span><span class="p">,</span>
@@ -640,6 +641,7 @@ document.write(`
 <span class="sd">            foldable. Supported IDs: ``"attention_mask_arange"``.</span>
 <span class="sd">            Default is empty.</span>
 <span class="sd">        attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.</span>
+<span class="sd">        fold_shared_kv_attention (bool): For attention where all query heads share one key/value head (multi-query attention), compute it against that one head instead of the copies that Hugging Face models make for each query head. TensorRT then runs two plain matrix products instead of its fused attention kernel, which can be faster or slower depending on the GPU, so measure it. In float16 the result can round differently; use_fp32_acc=True reduces that. Only static shapes are rewritten, and scaled_dot_product_attention also needs decompose_attention=True. The setting has no effect under torch.compile with use_distributed_mode_trace. Default is False.</span>
 <span class="sd">        fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.</span>
 <span class="sd">        build_route (Optional[str]): TensorRT Global Performance Tuning build route string (space-separated "-knob=value" tokens). None uses the default route. This feature requires TensorRT with Global Performance Tuning enabled; currently unavailable on TensorRT-RTX / Windows.</span>
 <span class="sd">        tune_build_routes (Optional[str]): Build-route expression for an autotuning sweep that runs each candidate in a spawned child process (e.g. "-slice_fusion=[on|off] -kgen:codegen:cuda_tile=[0|1|2|3]"). None disables tuning.</span>
@@ -719,6 +721,7 @@ document.write(`
         <span class="n">DISABLED_CONSTANT_FOLD_EXCLUSIONS</span>
     <span class="p">)</span>
     <span class="n">attn_bias_is_causal</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">ATTN_BIAS_IS_CAUSAL</span>
+    <span class="n">fold_shared_kv_attention</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">FOLD_SHARED_KV_ATTENTION</span>
     <span class="n">fallback_data_dependent_ops</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">FALLBACK_DATA_DEPENDENT_OPS</span>
     <span class="n">build_route</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">BUILD_ROUTE</span>
     <span class="n">tune_build_routes</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">TUNE_BUILD_ROUTES</span>
@@ -768,6 +771,7 @@ document.write(`
             <span class="p">)</span>
         <span class="p">)</span>
         <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"fallback_data_dependent_ops"</span><span class="p">,</span> <span class="n">FALLBACK_DATA_DEPENDENT_OPS</span><span class="p">)</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"fold_shared_kv_attention"</span><span class="p">,</span> <span class="n">FOLD_SHARED_KV_ATTENTION</span><span class="p">)</span>
         <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"build_route"</span><span class="p">,</span> <span class="n">BUILD_ROUTE</span><span class="p">)</span>
         <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"tune_build_routes"</span><span class="p">,</span> <span class="n">TUNE_BUILD_ROUTES</span><span class="p">)</span>
         <span class="n">state</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"tune_build_route_file"</span><span class="p">,</span> <span class="n">TUNE_BUILD_ROUTE_FILE</span><span class="p">)</span>
@@ -809,6 +813,7 @@ document.write(`
     <span class="s2">"decompose_attention"</span><span class="p">,</span>
     <span class="s2">"disabled_constant_fold_exclusions"</span><span class="p">,</span>
     <span class="s2">"attn_bias_is_causal"</span><span class="p">,</span>
+    <span class="s2">"fold_shared_kv_attention"</span><span class="p">,</span>
     <span class="s2">"build_route"</span><span class="p">,</span>
 <span class="p">}</span>
 
