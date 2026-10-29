@@ -477,6 +477,16 @@ class TestPreserveAttentionOutputLayout(TestCase):
         inputs = [torch.randn(2, 16, 4, 32).half().cuda() for _ in range(3)]
         model = ViewAfterAttention().cuda()
         ep = torch.export.export(model, tuple(inputs))
+        # With a contiguous attention output, export keeps the .contiguous() and
+        # this test passes without the pass.
+        (attention,) = (
+            node
+            for module in ep.graph_module.modules()
+            if isinstance(module, torch.fx.GraphModule)
+            for node in module.graph.nodes
+            if node.target == torch.ops.aten.scaled_dot_product_attention.default
+        )
+        self.assertFalse(attention.meta["val"].is_contiguous())
         trt_module = torch_tensorrt.dynamo.compile(
             ep, inputs, min_block_size=1, decompose_attention=True
         )
