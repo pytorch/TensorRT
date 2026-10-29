@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=f85fec6a"></script>
+    <script src="../../_static/documentation_options.js?v=cdeeec50"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -974,8 +974,10 @@ matrix products instead of its fused attention kernel. This can be faster or
 slower depending on the GPU, so measure it. In FP16 the result can round
 differently; <code class="docutils literal notranslate"><span class="pre">use_fp32_acc=True</span></code> reduces that. Only static shapes are
 rewritten, and <code class="docutils literal notranslate"><span class="pre">scaled_dot_product_attention</span></code> also needs
-<code class="docutils literal notranslate"><span class="pre">decompose_attention=True</span></code>. The setting has no effect under <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code>
-with <code class="docutils literal notranslate"><span class="pre">use_distributed_mode_trace</span></code>.</p></td>
+<code class="docutils literal notranslate"><span class="pre">decompose_attention=True</span></code>. Both preserved matmuls and the reshape/<code class="docutils literal notranslate"><span class="pre">bmm</span></code>
+form produced by AOT tracing under <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> are supported for
+<code class="docutils literal notranslate"><span class="pre">repeat_kv</span></code> style graphs. In the <code class="docutils literal notranslate"><span class="pre">bmm</span></code> form, broadcasting a single KV
+head with <code class="docutils literal notranslate"><span class="pre">enable_gqa=True</span></code> is not folded.</p></td>
 </tr>
 </tbody>
 </table>
