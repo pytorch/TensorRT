@@ -929,6 +929,34 @@ class TestLowering(TestCase):
             f"Slice_scatter TRT outputs don't match with the original model.",
         )
 
+    @parameterized.expand(
+        [
+            # PatchTST trims its context to whole patches, then unfolds
+            ("patches_of_a_slice", lambda x: x[:, 8:, :].unfold(-2, 12, 12)),
+            ("overlapping_windows", lambda x: x.unfold(1, 16, 8)),
+        ]
+    )
+    def test_lowering_unfold_dynamic_batch(self, _, unfold):
+        class Unfold(torch.nn.Module):
+            def forward(self, x):
+                return unfold(x)
+
+        batch = torch.export.Dim("batch", min=1, max=4)
+        exported_program = torch.export.export(
+            Unfold(), (torch.randn(2, 512, 7).cuda(),), dynamic_shapes=({0: batch},)
+        )
+        trt_model = torch_tensorrt.dynamo.compile(
+            exported_program,
+            [
+                torch_tensorrt.Input(
+                    min_shape=(1, 512, 7), opt_shape=(2, 512, 7), max_shape=(4, 512, 7)
+                )
+            ],
+            min_block_size=1,
+        )
+        x = torch.randn(3, 512, 7).cuda()
+        torch.testing.assert_close(trt_model(x), Unfold()(x), rtol=RTOL, atol=ATOL)
+
     def test_lowering_slice_scatter_dynamic_module(self):
         class sliceScatter(torch.nn.Module):
             def __init__(self, *args, **kwargs) -> None:

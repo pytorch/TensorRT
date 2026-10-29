@@ -659,6 +659,23 @@ def cudnn_grid_sampler_decomposition(
 
 
 @register_torch_trt_decomposition(
+    aten.unfold.default, registry=TORCH_TRT_DECOMPOSITIONS
+)
+def unfold_decomposition(
+    input: torch.Tensor, dimension: int, size: int, step: int
+) -> torch.Tensor:
+    # Gather the windows: PyTorch's as_strided decomposition reads the input
+    # through its strides, which TensorRT does not keep (e.g. for a slice).
+    if dimension < 0:
+        dimension += input.dim()
+    n = (input.shape[dimension] - size) // step + 1
+    starts = torch.arange(n, device=input.device).unsqueeze(1) * step
+    index = (starts + torch.arange(size, device=input.device)).flatten()
+    windows = input.index_select(dimension, index).unflatten(dimension, (n, size))
+    return windows.movedim(dimension + 1, -1)
+
+
+@register_torch_trt_decomposition(
     aten.masked_scatter, registry=TORCH_TRT_DECOMPOSITIONS
 )
 def masked_scatter_decomposition(
