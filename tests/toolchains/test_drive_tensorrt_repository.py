@@ -58,7 +58,7 @@ class TensorRTSelectionTest(unittest.TestCase):
                 self.assertEqual(
                     attrs["build_file"], "@//third_party/tensorrt/archive:BUILD"
                 )
-                self.assertEqual(attrs["strip_prefix"], "TensorRT-11.3.0.99")
+                self.assertEqual(attrs["strip_prefix"], "TensorRT-11.4.0.106")
                 # The local TensorRT BUILD also refers to the DRIVE CUDA repository.
                 self.assertEqual(
                     named_call(source, "cuda_driveos").func.id, "drive_cuda_repository"

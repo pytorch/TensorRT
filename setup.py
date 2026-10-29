@@ -106,10 +106,7 @@ if WINDOWS_ON_ARM:
     # before command-line processing. The environment variable remains
     # supported for CI and scripted builds.
     sys.argv.remove("--windows-on-arm")
-FORCED_WINDOWS_ARM64 = (
-    WINDOWS_ON_ARM
-    or TARGET_PLATFORM == "windows-arm64"
-)
+FORCED_WINDOWS_ARM64 = WINDOWS_ON_ARM or TARGET_PLATFORM == "windows-arm64"
 if FORCED_WINDOWS_ARM64 and not IS_WINDOWS:
     raise RuntimeError("Windows ARM64 builds are supported only on Windows")
 if IS_DRIVEOS and not IS_AARCH64:
@@ -1102,7 +1099,7 @@ def get_driveos_requirements(base_requirements):
     # a vendor-local suffix that may not be available on package indexes.
     tensorrt_version = tensorrt_version.partition("+")[0]
     return requirements + [
-        "torch>=2.15.0.dev,<2.16.0",
+        "torch>=2.16.0.dev,<2.17.0",
         f"tensorrt=={tensorrt_version}",
     ]
 

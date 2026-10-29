@@ -254,8 +254,8 @@ http_archive(
 # Use the container's target-compatible TensorRT installation, as in MODULE.bazel.ngc.
 new_local_repository(
     name = "tensorrt_driveos",
-    path = "/usr/",
     build_file = "@//third_party/tensorrt/local:BUILD",
+    path = "/usr/",
 )
 
 http_archive(
