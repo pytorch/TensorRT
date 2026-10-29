@@ -923,8 +923,29 @@ class ComplexOp(nn.Module):
     [
         lambda z: torch.prod(z, dim=1),
         lambda z: torch.prod(z, dim=-1, keepdim=True),
+        lambda z: z + (1 + 2j),
+        lambda z: torch.ops.aten.sub.Scalar(z, 1 + 2j),
+        lambda z: (2 - 1j) * z,
+        lambda z: z / (2 - 1j),
+        lambda z: torch.ops.aten.mul.Scalar(z, 2 - 1j),
+        lambda z: z.real * (2 - 1j),
+        lambda z: z.imag - (1 + 2j),
+        lambda z: (z.real * 4).to(torch.int64) + (1.25 + 2.75j),
+        lambda z: torch.add(z, 1 + 2j, alpha=2),
     ],
-    ids=["prod_dim", "prod_neg_dim_keepdim"],
+    ids=[
+        "prod_dim",
+        "prod_neg_dim_keepdim",
+        "add_complex_scalar",
+        "sub_complex_scalar",
+        "mul_complex_scalar",
+        "div_complex_scalar",
+        "mul_scalar_overload_complex_scalar",
+        "real_tensor_mul_complex_scalar",
+        "real_tensor_sub_complex_scalar",
+        "int_tensor_add_complex_scalar",
+        "add_complex_scalar_alpha",
+    ],
 )
 def test_complex_op_matches_eager(op, dynamic):
     model = ComplexOp(op).eval().cuda()
@@ -941,6 +962,30 @@ def test_complex_op_matches_eager(op, dynamic):
     for batch in (2, 5) if dynamic else (2,):
         xb = torch.randn(batch, 4, 2).cuda()
         torch.testing.assert_close(trt_model(xb), model(xb), rtol=1e-3, atol=1e-3)
+    torch._dynamo.reset()
+
+
+class ComplexDivBySize(nn.Module):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        z = torch.view_as_complex(x)
+        size = torch.sym_float(x.shape[0])
+        return torch.view_as_real(torch.ops.aten.div.Scalar(z, size))
+
+
+@pytest.mark.unit
+def test_complex_divided_by_symbolic_size():
+    # Under torch.compile with dynamic shapes the divisor stays a graph value.
+    model = ComplexDivBySize().eval().cuda()
+    compiled = torch.compile(
+        model,
+        backend="torch_tensorrt",
+        fullgraph=True,
+        dynamic=True,
+        options={"min_block_size": 1, "pass_through_build_failures": True, **_DECOMP},
+    )
+    for batch in (3, 5):
+        x = torch.randn(batch, 4, 2).cuda()
+        torch.testing.assert_close(compiled(x), model(x), rtol=1e-3, atol=1e-3)
     torch._dynamo.reset()
 
 
