@@ -789,13 +789,12 @@ def index_put_converter(
                             0,
                         )
                     )
-        # When any index has a dynamic size, use the first dynamic value
-        # (all valid indices are guaranteed to have the same N after broadcasting).
-        # Python's max() cannot compare ITensors, so we avoid it when dynamic.
-        if any(isinstance(s, ITensor) for s in index_shapes):
-            N = next(s for s in index_shapes if isinstance(s, ITensor))
-        else:
-            N = max(index_shapes) if index_shapes else 1
+        # Index lengths broadcast together. A dynamic length must be 1 or equal a
+        # static length larger than 1, so that static length is N. Otherwise use
+        # the first dynamic length, since Python's max() cannot compare ITensors.
+        static_n = max((s for s in index_shapes if isinstance(s, int)), default=1)
+        dynamic_n = [s for s in index_shapes if isinstance(s, ITensor)]
+        N = dynamic_n[0] if dynamic_n and static_n == 1 else static_n
     else:
         N = 1
 
@@ -999,8 +998,6 @@ def index_put_converter(
 
     # Define the expected shape based on (N,) + F_shape_values.
     # N may be a ITensor when it comes from a dynamic source (e.g. nonzero).
-    # Pass it directly — impl.slice.expand handles ITensor shape elements and
-    # will emit a stride-0 broadcast when expanding a size-1 dim to a dynamic N.
     expected_shape = (N,) + tuple(F_shape_values)
 
     # Broadcast 'values' to match the expected shape
@@ -1117,17 +1114,15 @@ def index_put_converter(
             values_shape_padded = [1] * (
                 len(expected_shape) - len(values.shape)
             ) + list(values.shape)
-            broadcast_shape = []
             for exp_dim, val_dim in zip(expected_shape, values_shape_padded):
-                if val_dim == DYNAMIC_DIM or exp_dim == DYNAMIC_DIM:
-                    broadcast_shape.append(-1)
-                elif val_dim == 1 or exp_dim == val_dim:
-                    broadcast_shape.append(exp_dim)
-                else:
+                if not (
+                    isinstance(exp_dim, ITensor)
+                    or DYNAMIC_DIM in (exp_dim, val_dim)
+                    or val_dim in (1, exp_dim)
+                ):
                     raise ValueError(
                         f"Cannot broadcast {values.shape} to {expected_shape}"
                     )
-
             values_expanded = impl.slice.expand(
                 ctx,
                 target,

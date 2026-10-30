@@ -64,6 +64,9 @@ class TensorRTBlobMetadata:
     # Named-data key of the engine when it is stored outside the blob, which then
     # carries an empty engine. Empty means the engine follows the metadata inline.
     engine_key: str = ""
+    # TensorRT version that exported the engine, so a runtime whose TensorRT cannot
+    # read the engine can name both versions. Empty when unknown.
+    tensorrt_version: str = ""
 
     def to_json(self) -> bytes:
         # Keep field order stable because the C++ parser is intentionally small.
@@ -92,6 +95,7 @@ class TensorRTBlobMetadata:
             "device_id": self.device_id,
             "serialized_metadata": self.serialized_metadata,
             "target_platform": self.target_platform,
+            "tensorrt_version": self.tensorrt_version,
         }
         if self.engine_key:
             data["engine_key"] = self.engine_key
@@ -119,6 +123,7 @@ class TensorRTBlobMetadata:
             serialized_metadata=parsed.get("serialized_metadata", ""),
             target_platform=parsed.get("target_platform", ""),
             engine_key=parsed.get("engine_key", ""),
+            tensorrt_version=parsed.get("tensorrt_version", ""),
         )
 
 

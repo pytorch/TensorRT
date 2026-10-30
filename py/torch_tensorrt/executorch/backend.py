@@ -10,6 +10,7 @@ import logging
 import operator
 from typing import Any, Container, Iterable, List, Optional, Set, final
 
+import tensorrt
 import torch
 import torch.fx
 from executorch.exir._serialize._named_data_store import NamedDataStore
@@ -662,6 +663,7 @@ class TensorRTBackend(BackendDetails):  # type: ignore[misc]
             device_id=_parse_device_id(engine_info[DEVICE_IDX]),
             serialized_metadata=_get_str(engine_info, SERIALIZED_METADATA_IDX),
             target_platform=_get_str(engine_info, TARGET_PLATFORM_IDX),
+            tensorrt_version=tensorrt.__version__,
             # Content-keyed, so identical engines in different methods share one
             # entry and different engines can never collide on a key.
             engine_key="tensorrt_engine_" + hashlib.sha256(engine_bytes).hexdigest(),

@@ -518,6 +518,62 @@ class TestIndexPutConverter(DispatchTestCase):
 
         torch.allclose(result, torch_output, atol=1e-4, rtol=1e-4)
 
+    def test_bool_mask_with_data_dependent_count(self):
+        # The True count is only known at runtime, while values has a static row count.
+        class AddRows(torch.nn.Module):
+            def forward(self, data, mask, values):
+                data = data.clone()
+                data[mask, :] += values  # Qwen3-VL adds visual embeddings this way
+                return data
+
+        class SetRows(torch.nn.Module):
+            def forward(self, data, mask, values):
+                data = data.clone()
+                data[mask] = values
+                return data
+
+        class SetRowsAtColumns(torch.nn.Module):
+            def forward(self, data, mask, values):
+                data = data.clone()
+                data[mask, torch.tensor([0, 2, 4, 5], device=data.device)] = values
+                return data
+
+        values = torch.randn(4, 8, device="cuda")
+        mask = torch.zeros(1, 10, dtype=torch.bool, device="cuda")
+        mask[0, 3:7] = True
+        one_true = torch.zeros(10, dtype=torch.bool, device="cuda")
+        one_true[5] = True
+        cases = [
+            (AddRows(), torch.randn(1, 10, 8, device="cuda"), mask, ()),
+            (SetRows(), torch.randn(10, 8, device="cuda"), mask[0], ()),
+            # One True entry broadcasts across the four column indices.
+            (
+                SetRowsAtColumns(),
+                torch.randn(10, 6, 8, device="cuda"),
+                mask[0],
+                (one_true,),
+            ),
+        ]
+        for model, data, case_mask, other_masks in cases:
+            with self.subTest(type(model).__name__):
+                inputs = (data, case_mask, values)
+                compiled = torchtrt.dynamo.compile(
+                    torch.export.export(model, inputs),
+                    arg_inputs=inputs,
+                    min_block_size=1,
+                    pass_through_build_failures=True,
+                )
+                for run_mask in (case_mask, *other_masks):
+                    torch.testing.assert_close(
+                        compiled(data, run_mask, values), model(data, run_mask, values)
+                    )
+                # A True count that differs from the value rows fails, as in PyTorch,
+                # which raises IndexError when the op runs outside TensorRT.
+                fewer = case_mask.clone()
+                fewer[..., 6] = False
+                with self.assertRaises((RuntimeError, IndexError)):
+                    compiled(data, fewer, values)
+
     def test_updates_are_cast_to_int64_destination_dtype(self):
         class IndexPutArgmax(torch.nn.Module):
             def forward(self, data, idx, scores):
