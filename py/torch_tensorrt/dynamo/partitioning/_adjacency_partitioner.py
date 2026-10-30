@@ -110,6 +110,14 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
             self._record_fallback(node, node_name, "complex tensor dtype")
             return False
 
+        if TorchTensorRTOperatorSupport._makes_uint8_tensor(node):
+            if not node.is_impure():
+                self.unsupported_operators[node_name] = (
+                    self.unsupported_operators.get(node_name, 0) + 1
+                )
+            self._record_fallback(node, node_name, "uint8 tensor inside the engine")
+            return False
+
         if TorchTensorRTOperatorSupport._has_bf16_on_turing(node, settings):
             # bfloat16 has no Turing hardware; compiling it for SM 7.5 crashes the
             # process, so force the PyTorch fallback.
