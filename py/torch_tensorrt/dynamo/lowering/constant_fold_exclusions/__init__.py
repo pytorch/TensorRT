@@ -9,11 +9,13 @@ from ._core import (
     validate_disabled_constant_fold_exclusions,
 )
 from .attention_mask import ATTENTION_MASK_ARANGE_RULE_ID
+from .scatter_add import SCATTER_ADD_POSITIONS_RULE_ID
 
 __all__ = [
     "ATTENTION_MASK_ARANGE_RULE_ID",
     "CONSTANT_FOLD_EXCLUSION_META_KEY",
     "ConstantFoldExclusionRule",
+    "SCATTER_ADD_POSITIONS_RULE_ID",
     "register_constant_fold_exclusion_rule",
     "unregister_constant_fold_exclusion_rule",
     "validate_disabled_constant_fold_exclusions",

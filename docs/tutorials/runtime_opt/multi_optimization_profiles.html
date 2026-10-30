@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=0866734c"></script>
+    <script src="../../_static/documentation_options.js?v=d9553575"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -471,6 +471,8 @@ document.write(`
 <li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/nvrtc_aot_plugin.html">Example: Custom Kernels with NVRTC in TensorRT AOT Plugins</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/cuda_kernel_op.html">Example: Auto-derived CUDA Kernel Plugins via cuda_kernel_op</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/ptx_op.html">Example: Pre-compiled PTX Kernels via ptx_op</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/triton_op.html">Example: Triton Kernel AOT Plugins via triton_op</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/cutile_op.html">Example: cuTile Kernel AOT Plugins via cutile_op</a></li>
 </ul>
 </details></li>
 </ul>
@@ -684,15 +686,21 @@ on enter and restored on exit, so blocks nest cleanly.</p>
     <span class="n">logits</span> <span class="o">=</span> <span class="n">trt_model</span><span class="p">(</span><span class="n">prefill_ids</span><span class="p">)</span>     <span class="c1"># seq == 256</span>
 </pre></div>
 </div>
-<p>Pass <code class="docutils literal notranslate"><span class="pre">&quot;auto&quot;</span></code> to let Torch-TensorRT choose from the input shapes. Auto-selection
-is <strong>lazy / first-working</strong>: it scans profiles in index order and uses the first
-whose <code class="docutils literal notranslate"><span class="pre">[min,</span> <span class="pre">max]</span></code> contains the input. Order matters when profiles overlap –
-declaring <code class="docutils literal notranslate"><span class="pre">decode</span></code> first lets it win the <code class="docutils literal notranslate"><span class="pre">seq</span> <span class="pre">==</span> <span class="pre">1</span></code> overlap:</p>
+<p>Pass <code class="docutils literal notranslate"><span class="pre">&quot;auto&quot;</span></code> to let Torch-TensorRT choose from the input shapes.
+Auto-selection is <strong>sticky first-fit</strong>: it keeps the active profile as long as
+that profile still accepts the input, and only when it does not does it rescan
+from index 0 and take the lowest profile that fits.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">optimization_profile</span><span class="p">(</span><span class="n">trt_model</span><span class="p">,</span> <span class="s2">"auto"</span><span class="p">):</span>
-    <span class="n">trt_model</span><span class="p">(</span><span class="n">decode_ids</span><span class="p">)</span>    <span class="c1"># seq == 1   -&gt; index 0 (decode) accepts -&gt; decode</span>
-    <span class="n">trt_model</span><span class="p">(</span><span class="n">prefill_ids</span><span class="p">)</span>   <span class="c1"># seq == 256 -&gt; index 0 rejects -&gt; index 1 (prefill)</span>
+    <span class="n">trt_model</span><span class="p">(</span><span class="n">decode_ids</span><span class="p">)</span>    <span class="c1"># seq == 1   -&gt; profile 0 is active and accepts -&gt; decode</span>
+    <span class="n">trt_model</span><span class="p">(</span><span class="n">prefill_ids</span><span class="p">)</span>   <span class="c1"># seq == 256 -&gt; profile 0 rejects -&gt; rescan -&gt; prefill</span>
+    <span class="n">trt_model</span><span class="p">(</span><span class="n">decode_ids</span><span class="p">)</span>    <span class="c1"># seq == 1   -&gt; prefill still accepts it -&gt; stays on prefill</span>
 </pre></div>
 </div>
+<p>Order therefore decides overlaps only on a rescan, not on every call: <code class="docutils literal notranslate"><span class="pre">decode</span></code>
+declared first wins <code class="docutils literal notranslate"><span class="pre">seq</span> <span class="pre">==</span> <span class="pre">1</span></code> when the scan runs, but a call that arrives
+while <code class="docutils literal notranslate"><span class="pre">prefill</span></code> is active keeps <code class="docutils literal notranslate"><span class="pre">prefill</span></code>, since its range covers <code class="docutils literal notranslate"><span class="pre">seq</span> <span class="pre">==</span> <span class="pre">1</span></code>
+too. Pin explicitly wherever the regime matters more than avoiding a switch –
+a decode loop entered right after a prefill is exactly that case.</p>
 </section>
 <section id="profiles-graph-breaks-and-serialization">
 <h2>Profiles, graph breaks, and serialization<a class="headerlink" href="#profiles-graph-breaks-and-serialization" title="Link to this heading">#</a></h2>
@@ -711,11 +719,11 @@ remain interchangeable.</p></li>
 </section>
 <section id="why-it-helps-a-worked-latency-example">
 <h2>Why it helps: a worked latency example<a class="headerlink" href="#why-it-helps-a-worked-latency-example" title="Link to this heading">#</a></h2>
-<p>The example <span class="xref std std-ref">multi_optimization_profiles</span> compiles <code class="docutils literal notranslate"><span class="pre">google/gemma-3-1b-it</span></code>
-twice – once with a single profile (tuned at the prefill length) and once with
-separate decode/prefill profiles – then compares per-call latency. The
-multi-profile engine dedicates a <strong>static</strong> profile (<code class="docutils literal notranslate"><span class="pre">seq</span></code> pinned to 1) to
-decode, letting TensorRT specialize that path (measured on an NVIDIA A40, FP16):</p>
+<p>A multi-profile engine dedicates a <strong>static</strong> profile (<code class="docutils literal notranslate"><span class="pre">seq</span></code> pinned to 1) to
+decode, letting TensorRT specialize that path. Compiling <code class="docutils literal notranslate"><span class="pre">google/gemma-3-1b-it</span></code>
+twice – once with a single profile tuned at the prefill length, once with
+separate decode/prefill profiles – and comparing per-call latency (NVIDIA A40,
+FP16, Python runtime) gives:</p>
 <div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Per-call latency (ms), batch=1
 regime                single-profile   multi-profile   speedup
 --------------------------------------------------------------
@@ -727,13 +735,22 @@ prefill (seq=128)              7.152           7.534     0.95x
 while decode – the regime executed once per generated token – is faster. Exact
 numbers depend on the model and GPU; the takeaway is that one engine can be tuned
 well for <em>both</em> regimes instead of compromising on a single <code class="docutils literal notranslate"><span class="pre">opt</span></code> shape.</p>
+<p>The runnable example <span class="xref std std-ref">multi_optimization_profiles</span> measures a related but
+different thing. It compiles <strong>once</strong> and pins the two profiles of that single
+engine in turn, so what it reports is the worth of the active profile with the
+engine held fixed: 1.30x on decode on the same A40, a larger win than the 1.14x
+above, where the decode baseline came from its own single-profile build. Use the
+two-engine numbers to decide whether multiple profiles are worth adopting, and
+the example’s to see what selecting between them is worth per call. The
+ExecuTorch delegate is measured separately in
+<code class="docutils literal notranslate"><span class="pre">examples/executorch_reference_runner/README.md</span></code>; that is a different runtime,
+so those numbers are not comparable with either of these.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>Because the model has two dynamic inputs (<code class="docutils literal notranslate"><span class="pre">input_ids</span></code> and <code class="docutils literal notranslate"><span class="pre">position_ids</span></code>),
 the example passes one profiled <code class="docutils literal notranslate"><span class="pre">Input</span></code> for each, both declaring the same
-profiles. The HuggingFace attention path also needs a TensorRT-friendly SDPA
-lowering (<code class="docutils literal notranslate"><span class="pre">tools/llm/torchtrt_ext/register_sdpa</span></code>), and <code class="docutils literal notranslate"><span class="pre">gemma-3-1b-it</span></code> is a
-gated model requiring Hugging Face authentication.</p>
+profiles. <code class="docutils literal notranslate"><span class="pre">gemma-3-1b-it</span></code> is a gated model requiring Hugging Face
+authentication.</p>
 </div>
 <div class="admonition seealso">
 <p class="admonition-title">See also</p>

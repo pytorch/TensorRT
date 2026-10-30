@@ -3,9 +3,11 @@
 
 import logging
 import operator
-from typing import Any, Callable, Optional, Sequence, Union
+from typing import Any, Callable, List, Optional, Sequence, Union
 
 import torch
+import torch.utils._pytree as pytree
+from torch.fx.experimental.symbolic_shapes import statically_known_true
 from torch_tensorrt._utils import is_tegra_platform
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes._FakeTensorUpdater import FakeTensorUpdater
@@ -13,11 +15,14 @@ from torch_tensorrt.dynamo.lowering.passes.mark_constant_fold_exclusions import 
     mark_constant_fold_exclusions,
 )
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
+    flush_deferred_graph_cleanup,
     iter_cond_subgraphs,
+    set_defer_graph_cleanup,
     trace_intermediate_node_outputs,
 )
 
 from .annotate_fp8_sdpa import annotate_fp8_sdpa
+from .batch_cheap_fx_cleanups import batch_cheap_fx_cleanups
 from .complex_decomposition_adapter import (
     complex_decomposition_adapter as _complex_decomposition_adapter_pass,
 )
@@ -25,17 +30,20 @@ from .complex_graph_rewrite import complex_graph_detection
 from .constant_folding import constant_fold
 from .decompose_dynamic_slice_scatter import decompose_dynamic_slice_scatter
 from .decompose_unsupported_attention import decompose_unsupported_attention
-from .eliminate_sym_min_int64_max import eliminate_sym_min_int64_max
+from .eliminate_sym_min_int64_max import eliminate_sym_min_int64_max  # noqa: F401
+from .fold_shared_kv_attention import fold_shared_kv_attention
 from .force_causal_efficient_attention import force_causal_efficient_attention
 from .fuse_pad_into_convolution import fuse_pad_into_convolution
 from .fuse_prims_broadcast import fuse_prims_broadcast
 from .lower_associative_scan import lower_associative_scan
-from .normalize_negative_slice_stop import normalize_negative_slice_stop
+from .normalize_negative_slice_stop import normalize_negative_slice_stop  # noqa: F401
 from .pass_manager import DynamoPassManager
+from .preserve_attention_output_layout import preserve_attention_output_layout
+from .remove_alias import remove_alias
 from .remove_assert_nodes import remove_assert_nodes
 from .remove_detach import remove_detach
 from .remove_input_alias_fixing_clones import remove_input_alias_fixing_clones
-from .remove_num_users_is_0_nodes import remove_num_users_is_0_nodes
+from .remove_num_users_is_0_nodes import remove_num_users_is_0_nodes  # noqa: F401
 from .repair_input_as_output import repair_input_as_output
 from .replace_fused_rms_norm import replace_fused_rms_norm
 from .replace_max_pool_with_indices import replace_max_pool_with_indices
@@ -46,6 +54,7 @@ pre_lowering_pass_list = [
     remove_detach,
     remove_assert_nodes,
     rule_based_autocast,
+    preserve_attention_output_layout,
 ]
 
 
@@ -63,6 +72,7 @@ def complex_lowering_pass(
 
 
 post_lowering_pass_list = [
+    remove_alias,
     replace_fused_rms_norm,
     remove_input_alias_fixing_clones,
     lower_associative_scan,
@@ -73,13 +83,12 @@ post_lowering_pass_list = [
     fuse_prims_broadcast,
     replace_max_pool_with_indices,
     fuse_pad_into_convolution,
-    remove_assert_nodes,
-    remove_num_users_is_0_nodes,
+    # One cleanup cycle for non-conflicting node repairs.
+    batch_cheap_fx_cleanups,
     complex_lowering_pass,
+    fold_shared_kv_attention,
     force_causal_efficient_attention,
     decompose_unsupported_attention,
-    eliminate_sym_min_int64_max,
-    normalize_negative_slice_stop,
     annotate_fp8_sdpa,
     decompose_dynamic_slice_scatter,
 ]
@@ -177,14 +186,70 @@ def post_lowering(
     )
     fake_mode = torch._export.utils._detect_fake_mode_from_gm(gm)
     fake_tensor_updater = FakeTensorUpdater(gm)
-    gm = ATEN_POST_LOWERING_PASSES(gm, settings)
+    # Batch DCE/lint/recompile across passes: each pass may still call
+    # clean_up_graph_after_modifications, but only the final flush pays for it.
+    set_defer_graph_cleanup(True)
+    try:
+        gm = ATEN_POST_LOWERING_PASSES(gm, settings)
+        gm = flush_deferred_graph_cleanup(gm)
+    finally:
+        set_defer_graph_cleanup(False)
     if fake_mode is not None:
         fake_tensor_updater.incremental_update(fake_mode)
 
-    for sub in iter_cond_subgraphs(gm):
-        post_lowering(sub, settings)
+    # A branch shared by several cond nodes is lowered once.
+    for branch in dict.fromkeys(iter_cond_subgraphs(gm)):
+        lowered = post_lowering(branch, settings)
+        # A pass can return a new module instead of editing the branch in place.
+        # The cond node was traced against the old one, so take the new module only
+        # if its inputs and outputs keep their dtypes and memory layout.
+        if lowered is branch or not _same_io(lowered, branch):
+            continue
+        for name, module in list(gm.named_modules(remove_duplicate=False)):
+            if module is branch:
+                gm.set_submodule(name, lowered)
 
     return gm
+
+
+def _io_values(gm: torch.fx.GraphModule) -> List[Any]:
+    """The meta value of each graph input and output, in order."""
+
+    def value(node: Any) -> Any:
+        return node.meta.get("val") if isinstance(node, torch.fx.Node) else None
+
+    placeholders = [value(n) for n in gm.graph.nodes if n.op == "placeholder"]
+    outputs = [value(n) for n in pytree.tree_leaves(gm.graph.output_node().args)]
+    return placeholders + outputs
+
+
+def _same_io(a: torch.fx.GraphModule, b: torch.fx.GraphModule) -> bool:
+    """Whether two modules take and return tensors of the same kind and layout.
+
+    Tensors match when their dtype, device, sizes, strides, storage offset and
+    storage size match.
+    """
+
+    def same(x: Any, y: Any) -> bool:
+        if not isinstance(x, torch.Tensor) or not isinstance(y, torch.Tensor):
+            return not isinstance(x, torch.Tensor) and not isinstance(y, torch.Tensor)
+        # A symbolic value that cannot be proven equal counts as different.
+        return (
+            x.dtype == y.dtype
+            and x.device == y.device
+            and x.dim() == y.dim()
+            and all(statically_known_true(p == q) for p, q in zip(x.shape, y.shape))
+            and statically_known_true(
+                x.untyped_storage().nbytes() == y.untyped_storage().nbytes()
+            )
+            and statically_known_true(x.storage_offset() == y.storage_offset())
+            and all(
+                statically_known_true(p == q) for p, q in zip(x.stride(), y.stride())
+            )
+        )
+
+    a_values, b_values = _io_values(a), _io_values(b)
+    return len(a_values) == len(b_values) and all(map(same, a_values, b_values))
 
 
 def pre_export_lowering(

@@ -16,6 +16,7 @@ Directory executorch
 Files
 -----
 
+- :ref:`file_cpp_include_torch_tensorrt_executorch_OptimizationProfileSelection.h`
 - :ref:`file_cpp_include_torch_tensorrt_executorch_TensorRTBackend.h`
 - :ref:`file_cpp_include_torch_tensorrt_executorch_TensorRTBindingNames.h`
 - :ref:`file_cpp_include_torch_tensorrt_executorch_TensorRTBlobHeader.h`

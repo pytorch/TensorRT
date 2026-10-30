@@ -27,8 +27,10 @@ def reshape(
     name: str,
     input: TRTTensor,
     shape: Sequence[int],
+    zero_is_placeholder: bool = True,
 ) -> TRTTensor:
     layer = ctx.net.add_shuffle(input)
+    layer.zero_is_placeholder = zero_is_placeholder
     if all(isinstance(s, int) for s in shape):
         layer.reshape_dims = tuple(shape)
     else:

@@ -9,6 +9,7 @@
 #include <cuda_runtime.h>
 #include <executorch/runtime/core/error.h>
 
+#include <cstdint>
 #include <shared_mutex>
 #include <vector>
 
@@ -33,12 +34,17 @@ class ExecutionGraph {
 
   // Requires the engine's device and a context to be current and the handle lock to be held. The
   // caller drains the stream before it releases that lock. binding_bytes holds one byte count per
-  // binding, the inputs and then the outputs. Rebind every address before each call. Returns Ok
-  // after submission, before the stream is drained.
+  // binding, the inputs and then the outputs. scratch is the pooled activation scratch this call
+  // installed on the context, or null when it installed none. The caller holds the pool's claim
+  // until the stream is drained or the enqueue is recorded on the pool's handoff event, so the
+  // buffer stays live for the work submitted here. With scratch set, a call never waits for
+  // cuda_graph_capture_mutex(): if it is taken, recording moves to a later call. Rebind every
+  // address before each call. Returns Ok after submission, before the stream is drained.
   ::executorch::runtime::Error enqueue(
       EngineHandle& handle,
       cudaStream_t stream,
-      const std::vector<size_t>& binding_bytes);
+      const std::vector<size_t>& binding_bytes,
+      const void* scratch);
 
   bool is_captured() const {
     return graph_exec_ != nullptr;
@@ -51,6 +57,11 @@ class ExecutionGraph {
   std::vector<void*> buffers_;
   std::vector<size_t> capacities_;
   std::vector<nvinfer1::Dims> shapes_;
+  // Borrowed: any growth of the pool frees it, this engine's own included. Compared, never
+  // dereferenced. A later buffer at the same address keeps the graph safely, since the pool always
+  // hands over at least what these shapes need.
+  const void* scratch_ = nullptr;
+  int32_t profile_ = -1;
   cudaGraphExec_t graph_exec_ = nullptr;
   cudaStream_t capture_stream_ = nullptr;
   int failed_captures_ = 0;

@@ -9,7 +9,8 @@ torch_tensorrt.executorch
 
 .. note::
 
-   This module requires ExecuTorch and is only supported on Linux.
+   This module needs the ``executorch`` extra. It runs on Linux and on Windows x86-64. See
+   :ref:`executorch_deployment`.
 
 Overview
 --------
@@ -37,6 +38,8 @@ Functions
 
 .. autofunction:: export
 .. autofunction:: get_edge_compile_config
+.. autofunction:: zero_copy_backend_config
+.. autofunction:: check_zero_copy_kv
 
 Classes
 --------

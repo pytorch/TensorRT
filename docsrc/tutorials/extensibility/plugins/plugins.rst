@@ -151,6 +151,15 @@ Declare every modified tensor in ``mutates_args``. Operators that return
             state_add(state, update)
             return state * 2
 
+    state = torch.zeros(4, 8, device="cuda")
+    update = torch.ones(4, 8, device="cuda")
+    # This graph has fewer operators than the default min_block_size (5),
+    # so without min_block_size=1 it would run entirely in PyTorch.
+    trt_model = torch_tensorrt.compile(
+        Model(), ir="dynamo", inputs=[state, update], min_block_size=1
+    )
+    out = trt_model(state, update)  # state is now all 1s, and out is all 2s
+
 The generated plugin has one synthetic aliased output per mutated tensor, in
 tensor-argument order. Torch-TensorRT preserves these outputs even when the
 model returns ``None``, and binds outputs that update engine inputs to those

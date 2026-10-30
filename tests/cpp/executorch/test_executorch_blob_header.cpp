@@ -20,6 +20,7 @@ namespace {
 
 constexpr char TENSORRT_MAGIC[4] = {'T', 'R', '0', '1'};
 constexpr char TENSORRT_MAGIC_ALIASED_IO[4] = {'T', 'R', '0', '2'};
+constexpr char TENSORRT_MAGIC_NAMED_ENGINE[4] = {'T', 'R', '0', '3'};
 constexpr uint32_t METADATA_OFFSET_FIELD_OFFSET = 4;
 constexpr uint32_t METADATA_SIZE_FIELD_OFFSET = 8;
 constexpr uint32_t ENGINE_OFFSET_FIELD_OFFSET = 12;
@@ -31,6 +32,10 @@ constexpr uint32_t ENGINE_ALIGNMENT = 16;
 // check it targets and not by the metadata parser.
 constexpr const char* VALID_METADATA =
     R"({"io_bindings":[{"name":"input_0","is_input":true},{"name":"output_0","is_input":false}]})";
+// The same for a blob whose engine is named data: it carries no engine bytes of its own (TR03, size 0).
+constexpr const char* VALID_NAMED_METADATA =
+    R"({"io_bindings":[{"name":"input_0","is_input":true},{"name":"output_0","is_input":false}],)"
+    R"("engine_key":"tensorrt_engine_ab"})";
 
 template <typename T>
 void write_field(std::vector<uint8_t>& blob, std::size_t offset, T value) {
@@ -188,10 +193,10 @@ TEST(ExecuTorchTensorRTBlobHeader, RejectsABlobShorterThanTheHeader) {
 }
 
 TEST(ExecuTorchTensorRTBlobHeader, RejectsAnEngineOffsetPastEndOfBlob) {
-  auto blob = make_blob(VALID_METADATA);
+  // A named engine, so an engine size of 0 is valid and only the offset bound can refuse the blob.
+  auto blob = make_blob(VALID_NAMED_METADATA, 0, TENSORRT_MAGIC_NAMED_ENGINE);
   const auto past_end = static_cast<uint32_t>(align_up(blob.size() + ENGINE_ALIGNMENT, ENGINE_ALIGNMENT));
   write_field(blob, ENGINE_OFFSET_FIELD_OFFSET, past_end);
-  write_field(blob, ENGINE_SIZE_FIELD_OFFSET, uint64_t{0});
 
   TensorRTBlobHeader header;
   EXPECT_FALSE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
@@ -487,11 +492,14 @@ TEST(ExecuTorchTensorRTBlobHeader, RejectsWrappingEngineExtent) {
 
 TEST(ExecuTorchTensorRTBlobHeader, RejectsEngineOffsetPastEndOfBlob) {
   // The offset alone is out of range. The subtraction form has to refuse that
-  // before it evaluates size - engine_offset, which would itself wrap.
-  auto blob = make_blob(R"({"io_bindings":[{"name":"x","is_input":true}]})");
+  // before it evaluates size - engine_offset, which would itself wrap. A named
+  // engine, so the size of 0 is valid and only that bound can refuse the blob.
+  auto blob = make_blob(
+      R"({"io_bindings":[{"name":"x","is_input":true}],"engine_key":"tensorrt_engine_ab"})",
+      0,
+      TENSORRT_MAGIC_NAMED_ENGINE);
   const auto past_end = static_cast<uint32_t>(align_up(blob.size() + ENGINE_ALIGNMENT, ENGINE_ALIGNMENT));
   write_field(blob, ENGINE_OFFSET_FIELD_OFFSET, past_end);
-  write_field(blob, ENGINE_SIZE_FIELD_OFFSET, uint64_t{0});
 
   TensorRTBlobHeader header;
   EXPECT_FALSE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
@@ -751,12 +759,39 @@ TEST(ExecuTorchTensorRTBlobHeader, RejectsIoBindingsWhoseValueIsNotAnArray) {
 }
 
 TEST(ExecuTorchTensorRTBlobHeader, RejectsUnknownFutureMagic) {
-  constexpr char kFutureMagic[4] = {'T', 'R', '0', '3'};
+  constexpr char kFutureMagic[4] = {'T', 'R', '0', '4'};
   const std::string metadata = R"({"io_bindings":[{"name":"x","is_input":true}]})";
   const auto blob = make_blob(metadata, 4, kFutureMagic);
 
   TensorRTBlobHeader header;
   EXPECT_FALSE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
+}
+
+TEST(ExecuTorchTensorRTBlobHeader, ReadsTheEngineKeyOfAnEngineStoredAsNamedData) {
+  const std::string bindings = R"({"io_bindings":[{"name":"x","is_input":true}],)";
+  const std::string keyed = bindings + R"("engine_key":"tensorrt_engine_ab"})";
+  const auto blob = make_blob(keyed, 0, TENSORRT_MAGIC_NAMED_ENGINE);
+  TensorRTBlobHeader header;
+  ASSERT_TRUE(TensorRTBlobHeader::parse(blob.data(), blob.size(), header));
+  EXPECT_EQ(header.engine_key, "tensorrt_engine_ab");
+  EXPECT_EQ(header.engine_size, 0u);
+
+  // Inline and named at once leaves one of the two engines unread, and neither leaves none to load.
+  const auto both = make_blob(keyed, 4, TENSORRT_MAGIC_NAMED_ENGINE);
+  EXPECT_FALSE(TensorRTBlobHeader::parse(both.data(), both.size(), header));
+  const auto neither = make_blob(VALID_METADATA, 0);
+  EXPECT_FALSE(TensorRTBlobHeader::parse(neither.data(), neither.size(), header));
+  // An inline engine with an empty key: only the explicit empty-key check refuses this, since the
+  // inline-or-named rule alone would read an empty key as no key.
+  const auto empty_key = make_blob(bindings + R"("engine_key":""})", 4);
+  EXPECT_FALSE(TensorRTBlobHeader::parse(empty_key.data(), empty_key.size(), header));
+
+  // The magic has to say where the engine is: a named engine under TR01 is what a parser that
+  // predates engine_key would misread, and TR03 without a key names nothing.
+  const auto named_as_tr01 = make_blob(keyed, 0);
+  EXPECT_FALSE(TensorRTBlobHeader::parse(named_as_tr01.data(), named_as_tr01.size(), header));
+  const auto inline_as_tr03 = make_blob(VALID_METADATA, 4, TENSORRT_MAGIC_NAMED_ENGINE);
+  EXPECT_FALSE(TensorRTBlobHeader::parse(inline_as_tr03.data(), inline_as_tr03.size(), header));
 }
 
 } // namespace

@@ -190,6 +190,44 @@ def test_mixed_real_complex_input_real_output():
     torch._dynamo.reset()
 
 
+@pytest.mark.unit
+def test_complex_input_complex_output_by_keyword():
+    """The compiled module takes its inputs by the names the model's forward gives
+    them, also when they are complex (the input boundary renames their placeholders)."""
+    model = ComplexInputComplexOutput().eval().cuda()
+    a = _make_freqs(8, 64)
+    b = _make_freqs(8, 64)
+    trt_model = torchtrt.compile(model, inputs=(a, b), **_COMPILE)
+    py_out = model(a, b)
+    trt_out = trt_model(a=a, b=b)
+    _cossim_complex(py_out, trt_out, "complex_io_by_keyword")
+    torch._dynamo.reset()
+
+
+class ComplexAndRealOutputs(nn.Module):
+    """A complex and a real output, both computed in one TRT block."""
+
+    def forward(self, a: torch.Tensor, b: torch.Tensor) -> dict:
+        prod = a * b
+        return {"prod": prod, "energy": torch.view_as_real(prod).square().sum()}
+
+
+@pytest.mark.unit
+def test_complex_output_of_a_multi_output_block():
+    """A block with several outputs returns each through a getitem; the complex one
+    must still be turned back into a complex tensor."""
+    model = ComplexAndRealOutputs().eval().cuda()
+    a = _make_freqs(8, 64)
+    b = _make_freqs(8, 64)
+    inputs = (a, b)
+    trt_model = torchtrt.compile(model, inputs=inputs, **_COMPILE)
+    py_out = model(*inputs)
+    trt_out = trt_model(*inputs)
+    _cossim_complex(py_out["prod"], trt_out["prod"], "multi_output_complex")
+    _cossim_real(py_out["energy"], trt_out["energy"], "multi_output_real")
+    torch._dynamo.reset()
+
+
 # ===========================================================================
 # 2. Operator coverage
 # ===========================================================================
@@ -864,6 +902,92 @@ def test_complex_output_dynamic_batch():
     py_out = model(*inputs)
     trt_out = trt_model(*inputs)
     _cossim_complex(py_out, trt_out, "complex_output_dynamic_batch")
+    torch._dynamo.reset()
+
+
+class ComplexOp(nn.Module):
+    """Apply one complex op to a real (..., 2) input viewed as complex."""
+
+    def __init__(self, op):
+        super().__init__()
+        self.op = op
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return torch.view_as_real(self.op(torch.view_as_complex(x)))
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("dynamic", [False, True], ids=["static", "dynamic"])
+@pytest.mark.parametrize(
+    "op",
+    [
+        lambda z: torch.prod(z, dim=1),
+        lambda z: torch.prod(z, dim=-1, keepdim=True),
+        lambda z: z + (1 + 2j),
+        lambda z: torch.ops.aten.sub.Scalar(z, 1 + 2j),
+        lambda z: (2 - 1j) * z,
+        lambda z: z / (2 - 1j),
+        lambda z: torch.ops.aten.mul.Scalar(z, 2 - 1j),
+        lambda z: z.real * (2 - 1j),
+        lambda z: z.imag - (1 + 2j),
+        lambda z: (z.real * 4).to(torch.int64) + (1.25 + 2.75j),
+        lambda z: torch.add(z, 1 + 2j, alpha=2),
+        lambda z: torch.complex(z.real * 2, z.imag),
+    ],
+    ids=[
+        "prod_dim",
+        "prod_neg_dim_keepdim",
+        "add_complex_scalar",
+        "sub_complex_scalar",
+        "mul_complex_scalar",
+        "div_complex_scalar",
+        "mul_scalar_overload_complex_scalar",
+        "real_tensor_mul_complex_scalar",
+        "real_tensor_sub_complex_scalar",
+        "int_tensor_add_complex_scalar",
+        "add_complex_scalar_alpha",
+        "complex_from_parts",
+    ],
+)
+def test_complex_op_matches_eager(op, dynamic):
+    model = ComplexOp(op).eval().cuda()
+    x = torch.randn(2, 4, 2).cuda()
+    dynamic_shapes = ({0: Dim("batch", min=2, max=8)},) if dynamic else None
+    ep = torch.export.export(model, (x,), dynamic_shapes=dynamic_shapes)
+    trt_model = torchtrt.dynamo.compile(
+        ep,
+        inputs=[x],
+        min_block_size=1,
+        pass_through_build_failures=True,
+        **_DECOMP,
+    )
+    for batch in (2, 5) if dynamic else (2,):
+        xb = torch.randn(batch, 4, 2).cuda()
+        torch.testing.assert_close(trt_model(xb), model(xb), rtol=1e-3, atol=1e-3)
+    torch._dynamo.reset()
+
+
+class ComplexDivBySize(nn.Module):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        z = torch.view_as_complex(x)
+        size = torch.sym_float(x.shape[0])
+        return torch.view_as_real(torch.ops.aten.div.Scalar(z, size))
+
+
+@pytest.mark.unit
+def test_complex_divided_by_symbolic_size():
+    # Under torch.compile with dynamic shapes the divisor stays a graph value.
+    model = ComplexDivBySize().eval().cuda()
+    compiled = torch.compile(
+        model,
+        backend="torch_tensorrt",
+        fullgraph=True,
+        dynamic=True,
+        options={"min_block_size": 1, "pass_through_build_failures": True, **_DECOMP},
+    )
+    for batch in (3, 5):
+        x = torch.randn(batch, 4, 2).cuda()
+        torch.testing.assert_close(compiled(x), model(x), rtol=1e-3, atol=1e-3)
     torch._dynamo.reset()
 
 

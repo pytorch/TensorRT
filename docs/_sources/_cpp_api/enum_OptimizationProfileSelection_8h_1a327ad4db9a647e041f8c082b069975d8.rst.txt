@@ -1,0 +1,14 @@
+.. _exhale_enum_OptimizationProfileSelection_8h_1a327ad4db9a647e041f8c082b069975d8:
+
+Enum ProfileSelection
+=====================
+
+- Defined in :ref:`file_cpp_include_torch_tensorrt_executorch_OptimizationProfileSelection.h`
+
+
+Enum Documentation
+------------------
+
+
+.. doxygenenum:: torch_tensorrt::executorch_backend::ProfileSelection
+   :project: Torch-TensorRT

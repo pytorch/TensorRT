@@ -209,40 +209,55 @@ else:
 # The delegate is compiled from the ExecuTorch source revision pinned in MODULE.bazel, so the
 # installed wheel should agree with it. The upper bound is the load-bearing half: ExecuTorch's C++
 # runtime API is not stable across minor releases, and an unbounded floor would resolve a future
-# minor against a backend built for this one. Everything below that ceiling resolves: later 1.5
-# nightlies, a 1.5 release candidate, and 1.5 patch releases alike, since the exact pin belongs in
-# the runtime package, which does derive it.
+# minor against a backend built for this one. Everything below that ceiling resolves: later
+# nightlies of the pinned minor, its release candidate, and its patch releases alike, since the
+# exact pin belongs in the runtime package, which does derive it. Where a wheel's extras also
+# require that package, they admit only the one ExecuTorch build it pins.
 # The floor currently names a dev build, because the runtime split the delegate needs does not
 # exist in any ExecuTorch release yet: 1.4.1's executorch/lib carries no standalone linkable
 # runtime, and no CUDA wheel at all.
-# That also makes this range prefer a release as soon as one exists, since 1.5.0 sorts above
-# every 1.5.0.devN, so nothing here changes on the day it ships.
+# That also makes this range prefer a release as soon as one exists, since a release sorts above
+# every development build of the same version, so nothing here changes on the day it ships.
 _executorch_major, _executorch_minor = __executorch_version__.split(".")[:2]
-# Linux-only, and not incidentally: the delegate is a Linux shared object, ExecuTorch publishes
-# CUDA wheels for no other platform, and the feature is documented Linux-only. Without the marker
-# the extra also has to resolve for the win32 entry in pyproject.toml's uv required-environments,
-# where the only candidates are PyPI's, which stop at 1.4.1 -- so raising this floor above that
-# makes `uv lock` fail outright rather than pick something older.
+# ExecuTorch CUDA wheels support Linux and Windows x86-64. Windows ARM64 is
+# excluded until ExecuTorch publishes a matching runtime wheel.
 EXECUTORCH_REQUIREMENT = (
     f"executorch>={__executorch_version__},"
     f"<{_executorch_major}.{int(_executorch_minor) + 1}; "
-    "platform_system == 'Linux'"
+    "(platform_system == 'Linux' or "
+    "(platform_system == 'Windows' and platform_machine == 'AMD64'))"
 )
-# No version: the delegate pins ExecuTorch itself, so a mismatch is refused from its side.
-EXECUTORCH_RUNTIME_REQUIREMENT = (
-    "torch-tensorrt-executorch-runtime; platform_system == 'Linux'"
-)
-# The companion is the only thing named here. It pins the exact ExecuTorch it was
-# compiled against, so naming a range beside it states the version twice, and the
-# two statements cannot both hold on the day the pin moves: the range asks for the
-# new build while every published companion still asks for the previous one, and a
-# resolver has nothing left to choose. Leaving the companion as the single source
-# of the version keeps a bump resolvable, and a mismatch is still refused, by the
-# companion itself at import rather than by a range here.
 EXTRAS_REQUIRE = {
-    "executorch": [EXECUTORCH_RUNTIME_REQUIREMENT],
-    "all": [EXECUTORCH_RUNTIME_REQUIREMENT],
+    "executorch": [EXECUTORCH_REQUIREMENT],
+    "all": [EXECUTORCH_REQUIREMENT],
 }
+# A published wheel's extras also require the exact companion its build job produced, but only
+# where the wheel's own index carries the ExecuTorch build that companion pins: pip does not fail on
+# an extra it cannot meet, it quietly installs another torch-tensorrt. A development build is only
+# on the nightly index. A release is on the test index, and on Linux PyPI carries its CUDA build for
+# the CUDA version of PyTorch's PyPI wheel, the one the PyPI companion is built for. A Windows PyPI
+# wheel records no channel, because PyPI's Windows ExecuTorch is the CPU build. After promotion,
+# the extra stays installable only if ExecuTorch and the companion reach the stable index before
+# torch-tensorrt does. The workflow names the version and the channel before building either
+# wheel, and the companion build reads the same version. Source builds leave both out, so the lock
+# keeps following the source pins.
+EXECUTORCH_CHANNEL = "nightly" if ".dev" in __executorch_version__ else "test"
+EXECUTORCH_RUNTIME_VERSION = (
+    os.environ.get("TORCH_TENSORRT_EXECUTORCH_RUNTIME_VERSION", "") if RELEASE else ""
+)
+EXECUTORCH_RUNTIME_CHANNEL = (
+    os.environ.get("TORCH_TENSORRT_EXECUTORCH_RUNTIME_CHANNEL", "")
+    if EXECUTORCH_RUNTIME_VERSION
+    else ""
+)
+if EXECUTORCH_RUNTIME_CHANNEL == EXECUTORCH_CHANNEL or (
+    EXECUTORCH_RUNTIME_CHANNEL == "pypi" and EXECUTORCH_CHANNEL == "test"
+):
+    for _extra in ("executorch", "all"):
+        EXTRAS_REQUIRE[_extra].append(
+            f"torch-tensorrt-executorch-runtime=={EXECUTORCH_RUNTIME_VERSION}; "
+            + EXECUTORCH_REQUIREMENT.partition(";")[2].strip()
+        )
 
 if "--ci" in sys.argv:
     sys.argv.remove("--ci")
@@ -401,6 +416,13 @@ def gen_version_file():
         f.write('__tensorrt_version__ = "' + __tensorrt_version__ + '"\n')
         f.write('__tensorrt_rtx_version__ = "' + __tensorrt_rtx_version__ + '"\n')
         f.write('__tensorrt_llm_version__ = "' + __tensorrt_llm_version__ + '"\n')
+        f.write(
+            '__executorch_runtime_version__ = "' + EXECUTORCH_RUNTIME_VERSION + '"\n'
+        )
+        f.write(
+            '__executorch_runtime_channel__ = "' + EXECUTORCH_RUNTIME_CHANNEL + '"\n'
+        )
+        f.write('__executorch_channel__ = "' + EXECUTORCH_CHANNEL + '"\n')
 
 
 def copy_libtorchtrt(multilinux=False, rt_only=False):
@@ -1020,10 +1042,10 @@ def get_tensorrt_requirements():
     # TensorRT does not build wheels for Tegra, so SBSA takes the plain `tensorrt`
     # package from the tarball install; everywhere else takes the CUDA 13 trio.
     return [
-        f"tensorrt>=11.3.0,<11.4.0; {SBSA_MARKER}",
-        f"tensorrt-cu13>=11.3.0,<11.4.0; {NON_SBSA_MARKER}",
-        f"tensorrt-cu13-bindings>=11.3.0,<11.4.0; {NON_SBSA_MARKER}",
-        f"tensorrt-cu13-libs>=11.3.0,<11.4.0; {NON_SBSA_MARKER}",
+        f"tensorrt>=11.4.0,<11.5.0; {SBSA_MARKER}",
+        f"tensorrt-cu13>=11.4.0,<11.5.0; {NON_SBSA_MARKER}",
+        f"tensorrt-cu13-bindings>=11.4.0,<11.5.0; {NON_SBSA_MARKER}",
+        f"tensorrt-cu13-libs>=11.4.0,<11.5.0; {NON_SBSA_MARKER}",
     ]
 
 
@@ -1038,7 +1060,7 @@ def get_sbsa_requirements(base_requirements):
         if USE_TRT_RTX:
             # TensorRT-RTX ships an aarch64 (SBSA) wheel; mirror get_x86_64_requirements.
             return requirements + [
-                "tensorrt_rtx>=1.6.1.120,<1.7.0.0",
+                "tensorrt_rtx>=1.7.1.116,<1.8.0.0",
             ]
         # The sbsa torch_tensorrt wheel is the one thor uses, so the sbsa build takes the
         # plain tensorrt dependency; get_tensorrt_requirements carries that split.
@@ -1062,7 +1084,7 @@ def get_x86_64_requirements(base_requirements):
         ]
         if USE_TRT_RTX:
             return requirements + [
-                "tensorrt_rtx>=1.6.1.120,<1.7.0.0",
+                "tensorrt_rtx>=1.7.1.116,<1.8.0.0",
             ]
         else:
             cuda_version = torch.version.cuda
@@ -1078,7 +1100,7 @@ def get_requirements():
     base_requirements = [
         "packaging>=23",
         "typing-extensions>=4.7.0",
-        "filelock",
+        "filelock>=4.2.1",
         "dllist",
         "psutil",
     ]

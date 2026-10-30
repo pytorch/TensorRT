@@ -1,0 +1,97 @@
+{
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "\n\n# Register a Triton kernel as an AOT QDP plugin via ``torch_tensorrt.kernels.triton_op``\n\nThis is the productized form of `aot_plugin`. That example shows the raw\nmechanism \u2014 a ``@triton.jit`` kernel wired to a TensorRT AOT Quick Deployable\nPlugin by hand: you write ``@torch.library.custom_op`` + ``register_fake``,\n``@trtp.register``, and a ~40-line ``@trtp.aot_impl`` that builds the\n``ASTSource`` signature, calls ``triton.compile``, and assembles the launch\nparameters, then ``generate_plugin_converter``.\n\n``triton_op`` collapses all of that into a single call. You provide the Triton\n``signature`` / ``constexprs`` / ``grid`` and a ``meta_fn``; the library\ncompiles the kernel to PTX, derives the AOT launch, registers the PyTorch op,\nthe plugin descriptor + AOT impl, and the Torch-TensorRT converter.\n\nCalling convention: the kernel's non-constexpr parameters must be declared as\n``(input_ptrs..., extra_scalars..., output_ptrs...)`` so no PTX rewriting is\nneeded.\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "import argparse\n\nimport tensorrt.plugin as trtp\nimport torch\nimport triton\nimport triton.language as tl\n\nimport torch_tensorrt\nimport torch_tensorrt.kernels as ttk"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Step 1: Define the Triton kernel (pure Triton, unchanged from aot_plugin.py)\n\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "@triton.jit\ndef add_one_kernel(x_ptr, n_elements, y_ptr, BLOCK_SIZE: tl.constexpr):\n    pid = tl.program_id(0)\n    block_start = pid * BLOCK_SIZE\n    offsets = block_start + tl.arange(0, BLOCK_SIZE)\n    mask = offsets < n_elements\n    x = tl.load(x_ptr + offsets, mask=mask)\n    output = x + 1\n    tl.store(y_ptr + offsets, output, mask=mask)"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Step 2: Describe the op and register it with a single ``triton_op`` call\n\n* ``meta_fn`` \u2014 shape/dtype inference for FakeTensors (the schema is inferred\n  from its type hints).\n* ``signature`` / ``constexprs`` \u2014 exactly what ``triton.compile`` needs.\n* ``grid`` / ``extra_args_fn`` \u2014 computed from ``trtp.TensorDesc`` inputs,\n  using symbolic shapes so one engine works across sizes.\n* ``eager_fn`` \u2014 optional; lets the registered ``torch.ops`` call also run\n  eagerly outside TensorRT.\n\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "BLOCK_SIZE = 256\n\n\ndef add_one_meta(x: torch.Tensor) -> torch.Tensor:\n    return torch.empty_like(x)\n\n\ndef add_one_eager(x: torch.Tensor) -> torch.Tensor:\n    y = torch.empty_like(x)\n    grid = lambda meta: (triton.cdiv(x.numel(), meta[\"BLOCK_SIZE\"]),)\n    add_one_kernel[grid](x, x.numel(), y, BLOCK_SIZE=BLOCK_SIZE)\n    return y\n\n\nttk.triton_op(\n    \"torch_tensorrt_example::triton_add_one\",\n    kernel=add_one_kernel,\n    signature={\"x_ptr\": \"*fp32\", \"n_elements\": \"i32\", \"y_ptr\": \"*fp32\"},\n    constexprs={\"BLOCK_SIZE\": BLOCK_SIZE},\n    grid=lambda inputs, outputs: (trtp.cdiv(inputs[0].shape_expr.numel(), BLOCK_SIZE),),\n    meta_fn=add_one_meta,\n    extra_args_fn=lambda inputs, outputs: [trtp.SymInt32(inputs[0].shape_expr.numel())],\n    eager_fn=add_one_eager,\n    supports_dynamic_shapes=True,\n)"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Step 3: Use it \u2014 the op lowers to the AOT QDP plugin inside the engine\n\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "class AddOne(torch.nn.Module):\n    def forward(self, x: torch.Tensor) -> torch.Tensor:\n        return torch.ops.torch_tensorrt_example.triton_add_one(x)\n\n\nif __name__ == \"__main__\":\n    parser = argparse.ArgumentParser()\n    parser.add_argument(\"--min_block_size\", type=int, default=1)\n    args = parser.parse_args()\n\n    x = torch.randn(4, 256, device=\"cuda\", dtype=torch.float32)\n    model = AddOne().cuda().eval()\n\n    ref = x + 1\n    eager_out = model(x)\n    torch.testing.assert_close(eager_out, ref)\n    print(\"eager path OK\")\n\n    trt_model = torch_tensorrt.compile(\n        model,\n        inputs=[x],\n        min_block_size=args.min_block_size,\n    )\n    engine_modules = [\n        module\n        for name, module in trt_model.named_modules()\n        if name.startswith(\"_run_on_acc_\")\n    ]\n    assert len(engine_modules) == 1, (\n        \"Expected the single custom-op graph to produce one TensorRT engine; \"\n        f\"compiled graph was:\\n{trt_model.graph}\"\n    )\n    print(\"engine compiled with the AOT QDP plugin\")\n\n    trt_out = trt_model(x)\n    torch.testing.assert_close(trt_out, ref, atol=1e-5, rtol=1e-5)\n    print(\"triton_op AOT QDP plugin ran correctly under Torch-TensorRT\")"
+      ]
+    }
+  ],
+  "metadata": {
+    "kernelspec": {
+      "display_name": "Python 3",
+      "language": "python",
+      "name": "python3"
+    },
+    "language_info": {
+      "codemirror_mode": {
+        "name": "ipython",
+        "version": 3
+      },
+      "file_extension": ".py",
+      "mimetype": "text/x-python",
+      "name": "python",
+      "nbconvert_exporter": "python",
+      "pygments_lexer": "ipython3",
+      "version": "3.11.18"
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 0
+}
