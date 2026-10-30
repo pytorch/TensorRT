@@ -15,6 +15,7 @@ from torch._library.fake_class_registry import FakeScriptObject
 from torch.export import ExportedProgram, ExportGraphSignature
 from torch.export._trace import _combine_args
 from torch.export.exported_program import (
+    ConstantArgument,
     CustomObjArgument,
     InputKind,
     InputSpec,
@@ -639,6 +640,25 @@ def create_trt_exp_program(
     # Lift parameters/buffers/constants in the graph
     # torch.export serialization expects them to be lifted
     gm, trt_graph_signature, state_dict, constants = lift(gm, trt_graph_signature)
+
+    # Keep tensor-like specs until after lift(), which uses user-input names to
+    # position lifted parameters. ConstantArgument makes user_inputs expose the
+    # constant value instead of its placeholder name.
+    placeholders = {
+        node.name: node for node in gm.graph.nodes if node.op == "placeholder"
+    }
+    for spec in trt_graph_signature.input_specs:
+        if spec.kind != InputKind.USER_INPUT:
+            continue
+        node = placeholders[spec.arg.name]
+        if "val" in node.meta and type(node.meta["val"]) in (
+            int,
+            float,
+            bool,
+            str,
+            type(None),
+        ):
+            spec.arg = ConstantArgument(name=node.name, value=node.meta["val"])
 
     trt_exp_program = ExportedProgram(
         root=gm,
