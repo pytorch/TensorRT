@@ -160,7 +160,8 @@ class TestDeallocateModule(unittest.TestCase):
 class TestEngineSetupMemory(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.plan, cls.weights = _build_plan()
+        # Keep ~64 MiB of weights while reducing accumulated FP16 rounding error.
+        cls.plan, cls.weights = _build_plan(width=4096, layers=2)
 
     def _module(self) -> TorchTensorRTModule:
         return TorchTensorRTModule(
@@ -178,7 +179,7 @@ class TestEngineSetupMemory(unittest.TestCase):
         # of the plan; it used to hold two while it was converted for the C++ runtime.
         self.assertLess(growth, len(self.plan) // 2)
 
-        x = torch.randn(4, 2048, dtype=torch.float16, device="cuda")
+        x = torch.randn(4, 4096, dtype=torch.float16, device="cuda")
         expected = x
         for w in self.weights:
             expected = expected @ w.cuda().T
