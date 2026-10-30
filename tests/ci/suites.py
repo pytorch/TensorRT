@@ -327,6 +327,9 @@ _L2: list[Suite] = [
         tier="l2",
         lanes=("full", "nightly"),
         paths=("models/test_torchao*.py",),
+        # Enable only after verifying MSLK with PyTorch 2.15.0 or 2.16.0.
+        # Until then, the MSLK-dependent INT4 test skips on missing MSLK.
+        # setup=("mslk",),
         jobs=_HEAVY,
     ),
     Suite(

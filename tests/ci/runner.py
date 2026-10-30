@@ -138,6 +138,30 @@ def build_pytest_args(suite: Suite, variant: Variant) -> list[str]:
 def _setup_commands(step: str) -> list[tuple[list[str], Path]]:
     """(argv, cwd) pairs for a named setup step."""
     launcher = _launcher()
+    if step == "mslk":
+        # Optional TorchAO kernels: enable only for a verified PyTorch pairing.
+        # Never let MSLK change the PyTorch version selected by the job.
+        index = (
+            "https://download.pytorch.org/whl/"
+            f"{os.environ['CHANNEL']}/{os.environ['CU_VERSION']}"
+        )
+        return [
+            (
+                launcher
+                + [
+                    "-m",
+                    "pip",
+                    "install",
+                    "--pre",
+                    "--no-deps",
+                    "mslk",
+                    "--index-url",
+                    index,
+                ],
+                REPO_ROOT,
+            ),
+            (launcher + ["-c", "import torch; import mslk"], REPO_ROOT),
+        ]
     if step == "hub":
         return [(launcher + ["hub.py"], REPO_ROOT / "tests/modules")]
     if step == "executorch":
@@ -242,6 +266,9 @@ def run_suite(
             print(f"==> setup[{step}]: {shlex.join(argv)}", flush=True)
             rc = subprocess.run(argv, cwd=scwd, env=env).returncode
             if rc != 0:
+                if step == "mslk":
+                    print(f"::error::MSLK setup failed with exit code {rc}", flush=True)
+                    return rc
                 # These suites gate on optional dependencies, so a failed setup skips
                 # those files, leaves the rest passing, and reports success with a populated
                 # junit xml: the run looks green precisely when the thing it exists to test is
