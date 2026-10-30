@@ -196,6 +196,28 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
         return False
 
     @staticmethod
+    def _makes_uint8_tensor(node: torch.fx.Node) -> bool:
+        """Return True if the node would make a uint8 tensor inside a TensorRT engine.
+
+        TensorRT allows uint8 only at engine inputs and outputs, so a layer that makes
+        one, such as a reshape, a slice or a concatenation of uint8 data, fails the
+        build. A clone, and a slice_scatter that overwrites the whole tensor, can hand
+        an engine input through as it is, so they are left to their converters. uint8
+        constants are packed FP4 weights that the quantization converters read
+        themselves.
+        """
+        if node.op not in CALLABLE_NODE_OPS or node.target in (
+            torch.ops.aten.clone.default,
+            torch.ops.aten.slice_scatter.default,
+        ):
+            return False
+        leaves, _ = tree_flatten(node.meta.get("val"))
+        return any(
+            isinstance(leaf, torch.Tensor) and leaf.dtype == torch.uint8
+            for leaf in leaves
+        )
+
+    @staticmethod
     def _tensor_devices(node: torch.fx.Node) -> List[torch.device]:
         leaves, _ = tree_flatten(node.meta.get("val"))
         return [leaf.device for leaf in leaves if isinstance(leaf, torch.Tensor)]
@@ -351,6 +373,14 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
                     self.unsupported_operators.get(node_name, 0) + 1
                 )
             self._record_fallback(node, node_name, "complex tensor dtype")
+            return False
+
+        if self._makes_uint8_tensor(node):
+            if not node.is_impure():
+                self.unsupported_operators[node_name] = (
+                    self.unsupported_operators.get(node_name, 0) + 1
+                )
+            self._record_fallback(node, node_name, "uint8 tensor inside the engine")
             return False
 
         if self._has_bf16_on_turing(node, settings):

@@ -287,6 +287,37 @@ class TestUInt8Support(TestCase):
             msg=f"Torch outputs and TRT outputs don't match close enough.",
         )
 
+    def test_uint8_shape_op_before_cast(self):
+        # TensorRT has no layer that reshapes uint8, so these must stay in PyTorch.
+        shape_ops = {
+            "permute": lambda image: image.permute(2, 0, 1),
+            "unsqueeze": lambda image: image.unsqueeze(0),
+            "slice": lambda image: image[2:6],
+            "stack": lambda image: torch.stack([image, image]),
+        }
+
+        class ImageModule(nn.Module):
+            def __init__(self, shape_op):
+                super().__init__()
+                self.shape_op = shape_op
+
+            def forward(self, image):
+                return self.shape_op(image).float() / 255
+
+        in_tensor = torch.randint(0, 256, (8, 8, 3), dtype=torch.uint8, device="cuda")
+        for name, shape_op in shape_ops.items():
+            with self.subTest(name):
+                mod = ImageModule(shape_op)
+                trt_mod = torch_tensorrt.dynamo.compile(
+                    torch.export.export(mod, (in_tensor,)),
+                    inputs=[in_tensor],
+                    pass_through_build_failures=True,
+                    min_block_size=1,
+                    cache_built_engines=False,
+                    reuse_cached_engines=False,
+                )
+                torch.testing.assert_close(trt_mod(in_tensor), mod(in_tensor))
+
     def test_uint8_output(self):
         trt_mod = _build_engine(
             trt.float32, lambda network, x: network.add_cast(x, trt.uint8)

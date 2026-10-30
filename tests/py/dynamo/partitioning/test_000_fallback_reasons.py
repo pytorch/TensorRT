@@ -48,6 +48,7 @@ class TestFallbackReasons(TestCase):
         x = torch.empty(2, device="cuda")
         high_rank = torch.empty((1,) * (trt.Dims.MAX_DIMS + 1), device="cuda")
         complex_value = torch.empty(2, dtype=torch.complex64, device="cuda")
+        uint8_value = torch.empty(2, dtype=torch.uint8, device="cuda")
         cases = [
             (
                 torch.ops.aten._to_copy.default,
@@ -66,6 +67,12 @@ class TestFallbackReasons(TestCase):
                 complex_value,
                 complex_value,
                 "complex tensor dtype",
+            ),
+            (
+                torch.ops.aten.relu.default,
+                uint8_value,
+                uint8_value,
+                "uint8 tensor inside the engine",
             ),
             (
                 torch.ops.aten.nonzero.default,
