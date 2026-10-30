@@ -567,10 +567,11 @@ class TestIndexPutConverter(DispatchTestCase):
                     torch.testing.assert_close(
                         compiled(data, run_mask, values), model(data, run_mask, values)
                     )
-                # A True count that differs from the value rows fails, as in PyTorch.
+                # A True count that differs from the value rows fails, as in PyTorch,
+                # which raises IndexError when the op runs outside TensorRT.
                 fewer = case_mask.clone()
                 fewer[..., 6] = False
-                with self.assertRaises(RuntimeError):
+                with self.assertRaises((RuntimeError, IndexError)):
                     compiled(data, fewer, values)
 
     def test_updates_are_cast_to_int64_destination_dtype(self):
