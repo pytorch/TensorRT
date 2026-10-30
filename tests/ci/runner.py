@@ -165,17 +165,20 @@ def _setup_commands(step: str) -> list[tuple[list[str], Path]]:
     if step == "hub":
         return [(launcher + ["hub.py"], REPO_ROOT / "tests/modules")]
     if step == "executorch":
-        # ExecuTorch publishes CUDA builds only on the nightly channel matching the row's CUDA,
-        # so a CUDA 13 row installs from its own channel. Any other row gets no index, which
-        # leaves pip resolving the pinned dev build against PyPI, where no dev build exists.
-        # That install fails, and it is meant to: the suite runs only on CUDA 13 rows, so a
-        # failure here means the matrix sent it somewhere the delegate cannot work. Raising
-        # earlier was worse, because it also broke the CPU and Jetson rows that never install.
+        # ExecuTorch publishes its CUDA builds on the PyTorch channels matching the row's CUDA:
+        # a dated development build on the nightly one, a release on the test one. Both are
+        # named, as the build workflows do, so the step works whichever kind the pin is. Any
+        # other row gets no index: the suite runs only on CUDA 13 rows, so reaching one means
+        # the matrix sent it somewhere the delegate cannot work, and a channel for another CUDA
+        # carries no matching build. Raising earlier was worse, because it also broke the CPU
+        # and Jetson rows that never install.
         cuda = os.environ.get("CU_VERSION") or ""
         index_args = (
             [
                 "--extra-index-url",
                 f"https://download.pytorch.org/whl/nightly/{cuda}",
+                "--extra-index-url",
+                f"https://download.pytorch.org/whl/test/{cuda}",
             ]
             if re.fullmatch(rf"cu{EXECUTORCH_CUDA_MAJOR}\d+", cuda)
             else []

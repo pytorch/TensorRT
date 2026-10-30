@@ -61,8 +61,8 @@ suites:
 #   just suite dynamo-runtime -- -k test_foo -x        just variant=rtx suite dynamo-converters
 #
 # The executorch suite additionally needs CU_VERSION set, because it installs the exact pinned
-# ExecuTorch nightly and that build exists only on the matching PyTorch nightly channel, never on
-# PyPI. CI always sets it; a local shell does not, so without it setup fails before any test runs:
+# ExecuTorch CUDA build from the PyTorch channels for that CUDA version. CI always sets it; a
+# local shell does not, so set it yourself:
 #   CU_VERSION=cu134 just suite executorch
 suite name *args:
     {{_ci}} run {{name}} --variant {{variant}} {{args}}
