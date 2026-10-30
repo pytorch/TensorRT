@@ -53,6 +53,7 @@ TIMING_CACHE_PATH = os.path.join(
     tempfile.gettempdir(), "torch_tensorrt_engine_cache", "timing_cache.bin"
 )
 LAZY_ENGINE_INIT = False
+ENGINE_OUTPUT_DIR = None
 CACHE_BUILT_ENGINES = False
 REUSE_CACHED_ENGINES = False
 ENGINE_CACHE_DIR = os.path.join(tempfile.gettempdir(), "torch_tensorrt_engine_cache")

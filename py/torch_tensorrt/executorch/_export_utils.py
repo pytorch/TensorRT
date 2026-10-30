@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import copy
 import logging
+import os
 import warnings
 from typing import Any, Sequence
 
@@ -256,6 +257,40 @@ def engine_bytes_tensor(engine_bytes: bytes) -> "torch.Tensor":
         tensor = torch.frombuffer(engine_bytes, dtype=torch.uint8)
     setattr(tensor, ENGINE_BYTES_ATTR, engine_bytes)
     return tensor
+
+
+# Engine files mapped by engine_file_tensor, by the address of their mapping. Lowering hands
+# the backend another tensor object over the same storage, so an attribute would be lost.
+_ENGINE_FILES: dict[int, str] = {}
+
+
+def engine_file_tensor(path: str) -> "torch.Tensor":
+    """A uint8 tensor mapped from an engine file (``engine_output_dir``).
+
+    ``TensorRTBackend.preprocess`` finds the file again with ``engine_file_of`` and hands
+    ExecuTorch the file itself, which streams it into the ``.pte``, so the engine is never
+    read into memory.
+    """
+    tensor = torch.from_file(
+        path, shared=False, size=os.path.getsize(path), dtype=torch.uint8
+    )
+    _ENGINE_FILES[tensor.data_ptr()] = path
+    return tensor
+
+
+def engine_file_of(tensor: Any) -> "str | None":
+    """The engine file ``tensor`` was mapped from by ``engine_file_tensor``, else None."""
+    if not isinstance(tensor, torch.Tensor) or tensor.dtype != torch.uint8:
+        return None
+    path = _ENGINE_FILES.get(tensor.data_ptr())
+    # The size check keeps a reused address from naming a file it did not come from.
+    if (
+        path is None
+        or not os.path.exists(path)
+        or os.path.getsize(path) != tensor.numel()
+    ):
+        return None
+    return path
 
 
 def validate_engine_program(

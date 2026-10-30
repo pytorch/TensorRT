@@ -526,6 +526,7 @@ def compile(
     cpu_memory_budget: Optional[int] = _defaults.CPU_MEMORY_BUDGET,
     enable_resource_partitioning: bool = _defaults.ENABLE_RESOURCE_PARTITIONING,
     dynamically_allocate_resources: bool = _defaults.DYNAMICALLY_ALLOCATE_RESOURCES,
+    engine_output_dir: Optional[str] = _defaults.ENGINE_OUTPUT_DIR,
     decompose_attention: bool = _defaults.DECOMPOSE_ATTENTION,
     disabled_constant_fold_exclusions: Collection[
         str
@@ -635,6 +636,10 @@ def compile(
         enable_resource_partitioning (bool): Enable resource-aware partitioning. This is useful when the model is large and the CPU memory is limited.
         cpu_memory_budget (Optional[int]): The maximum amount of CPU memory to use for the compilation. If the compilation requires more memory than this budget, the compilation will fail.
         dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.
+        engine_output_dir (Optional[str]): Write each TensorRT engine to a file in this directory as soon as it is built, and keep it there
+            instead of in memory, so engines don't accumulate on the GPU or the host during compilation. A module loads its engine from the file
+            when first used; ``torch_tensorrt.save(..., output_format="executorch", retrace=False)`` copies it into the ``.pte`` from the file.
+            The files must outlive the compiled module.
         decompose_attention (bool): Whether to decompose attention layers into smaller operations
             instead of using the attention converters. When combined with ``use_fp32_acc=True``,
             decomposed FP16 attention keeps its intermediate calculation in FP32 and casts only
@@ -850,6 +855,7 @@ def compile(
         "enable_resource_partitioning": enable_resource_partitioning,
         "cpu_memory_budget": cpu_memory_budget,
         "dynamically_allocate_resources": dynamically_allocate_resources,
+        "engine_output_dir": engine_output_dir,
         "decompose_attention": decompose_attention,
         "disabled_constant_fold_exclusions": disabled_constant_fold_exclusions,
         "attn_bias_is_causal": attn_bias_is_causal,
@@ -1741,7 +1747,11 @@ def compile_module(
     # Replace all FX Modules with TRT Modules
     for name, trt_module in trt_modules.items():
         setattr(partitioned_module, name, trt_module)
-        if settings.lazy_engine_init and not settings.enable_cross_compile_for_windows:
+        if (
+            settings.lazy_engine_init
+            and not settings.enable_cross_compile_for_windows
+            and not settings.engine_output_dir
+        ):
             trt_module = getattr(partitioned_module, name)
             trt_module.setup_engine()
 
