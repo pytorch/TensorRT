@@ -27,8 +27,10 @@ older torch (the upstream API only exists in torch>=2.14.0.dev), or if
 such as ``aten.log2``/``aten.log10`` as of torch 2.14.dev).
 """
 
+import gc
 import logging
-from typing import Any
+from contextlib import contextmanager
+from typing import Any, Iterator, Optional
 
 import torch
 from torch._export.utils import _detect_fake_mode_from_gm
@@ -108,6 +110,7 @@ def complex_decomposition_adapter(
     # codegen then unflattens again.
     gm.graph._codegen = torch.fx.graph.CodeGen()
     gm.recompile()
+    decomposed_gm: Optional[GraphModule] = None
     try:
         # Both retraces return a new graph. Keep the original for the existing
         # unsupported-op fallback rather than replacing it before success.
@@ -116,11 +119,12 @@ def complex_decomposition_adapter(
             if any(free_symbols(arg) for arg in flat_args)
             else decompose_complex_in_graph
         )
-        decomposed_gm = decompose(
-            gm,
-            flat_args,
-            decompositions=_trt_decomposition_table(settings, gm),
-        )
+        with _offloaded_constants_on_device(gm) as offloaded:
+            decomposed_gm = decompose(
+                gm,
+                flat_args,
+                decompositions=_trt_decomposition_table(settings, gm),
+            )
     except Exception as e:
         # decompose_complex_in_graph is upstream, experimental PyTorch code
         # (torch._functorch._aot_autograd.complex_decomposition) with
@@ -133,11 +137,17 @@ def complex_decomposition_adapter(
             f"complex decomposition failed ({type(e).__name__}: {e}); "
             "falling back to the legacy complex_graph_detection pass."
         )
-        gm.graph._codegen = original_codegen
-        gm.recompile()
-        return complex_graph_detection(gm, settings)
     gm.graph._codegen = original_codegen  # the caller's module, as it was
     gm.recompile()
+    if decomposed_gm is None:
+        # Not inside the except block: there the failed retrace's frames are still
+        # alive, and with them its device copies of the offloaded constants.
+        return complex_graph_detection(gm, settings)
+    _restore_offloaded_constants(decomposed_gm, offloaded)
+    if offloaded:
+        # The retrace leaves the device copies in reference cycles. Free them now
+        # rather than holding them through the engine build.
+        gc.collect()
     gm = decomposed_gm
 
     # The retrace brings back alias nodes. aten.alias has no converter, so the
@@ -237,6 +247,54 @@ def _graph_has_complex(gm: GraphModule) -> bool:
         if val is not None and getattr(val, "dtype", None) in COMPLEX_DTYPES:
             return True
     return False
+
+
+@contextmanager
+def _offloaded_constants_on_device(
+    gm: GraphModule,
+) -> Iterator[dict[int, torch.Tensor]]:
+    """Hand the retrace each CPU-offloaded constant on the device it was computed on.
+
+    With offload_module_to_cpu, constant folding keeps the folded values on the CPU
+    while their metadata still records the device that computed them. The retrace
+    runs the graph, so a CPU constant next to device activations fails with a device
+    mismatch. Copy each such constant to its metadata device for the retrace only;
+    yields a map from the id of each copy to its CPU tensor, for
+    _restore_offloaded_constants.
+    """
+    swapped = {}
+    for node in gm.graph.nodes:
+        target = str(node.target)
+        if node.op != "get_attr" or not hasattr(gm, target):
+            continue
+        real, val = getattr(gm, target), node.meta.get("val", None)
+        if (
+            isinstance(real, torch.Tensor)
+            and isinstance(val, torch.Tensor)
+            and real.device != val.device
+        ):
+            swapped[target] = (real, real.to(val.device))
+    for target, (_, copy) in swapped.items():
+        delattr(gm, target)
+        setattr(gm, target, copy)
+    try:
+        yield {id(copy): real for real, copy in swapped.values()}
+    finally:
+        for target, (real, _) in swapped.items():
+            delattr(gm, target)
+            setattr(gm, target, real)
+
+
+def _restore_offloaded_constants(
+    gm: GraphModule, offloaded: dict[int, torch.Tensor]
+) -> None:
+    """Put the CPU tensors back wherever the retraced module kept a device copy."""
+    for node in gm.graph.nodes:
+        if node.op != "get_attr":
+            continue
+        real = offloaded.get(id(getattr(gm, str(node.target), None)))
+        if real is not None:
+            setattr(gm, str(node.target), real)
 
 
 def _fake_flat_args(gm: GraphModule) -> list[torch.Tensor]:

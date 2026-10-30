@@ -25,6 +25,7 @@ def test_serialize_engine_writes_tr01_blob():
         ],
         device_id=1,
         hardware_compatible=True,
+        tensorrt_version="11.4.0.106",
     )
 
     blob = serialize_engine(b"engine-bytes", metadata)
@@ -36,6 +37,7 @@ def test_serialize_engine_writes_tr01_blob():
     assert engine == b"engine-bytes"
     assert parsed.device_id == 1
     assert parsed.hardware_compatible is True
+    assert parsed.tensorrt_version == "11.4.0.106"
     assert [b.name for b in parsed.io_bindings] == ["x", "y"]
     assert [b.is_input for b in parsed.io_bindings] == [True, False]
 

@@ -11,6 +11,7 @@ import pytest
 
 executorch = pytest.importorskip("executorch.exir")
 
+import tensorrt  # noqa: E402
 import torch  # noqa: E402
 from executorch.exir.backend.compile_spec_schema import CompileSpec  # noqa: E402
 from torch.export.graph_signature import InputKind  # noqa: E402
@@ -201,6 +202,7 @@ def test_preprocess_serializes_engine_blob():
     assert _named_engine(result) == b"engine-bytes"
     _, metadata = deserialize_engine(result.processed_bytes)
     assert metadata.device_id == 2
+    assert metadata.tensorrt_version == tensorrt.__version__
     assert [binding.name for binding in metadata.io_bindings] == ["x", "y"]
     assert [binding.is_input for binding in metadata.io_bindings] == [True, False]
 

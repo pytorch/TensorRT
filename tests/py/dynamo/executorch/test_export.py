@@ -490,6 +490,22 @@ def test_validate_engine_program_rejects_output_allocator_without_mutation():
 
 
 @pytest.mark.unit
+def test_validate_engine_program_keeps_the_output_shape_error_as_the_cause():
+    export_utils = importlib.import_module("torch_tensorrt.executorch._export_utils")
+    program, _, input_node, engine = _engine_program(
+        lifted=False, requires_output_allocator=True
+    )
+    input_node.meta["val"] = torch.empty(2, 3)
+    error = RuntimeError("Unable to create TensorRT execution context")
+    engine.infer_outputs = MagicMock(side_effect=error)
+
+    with pytest.raises(RuntimeError, match="output allocator") as refusal:
+        export_utils.validate_engine_program(program)
+
+    assert refusal.value.__cause__ is error
+
+
+@pytest.mark.unit
 def test_export_returns_edge_and_forwards_all_options(monkeypatch):
     export_module, lower = _patch_lowering(monkeypatch)
     program = FakeExportedProgram()
@@ -855,6 +871,45 @@ def test_python_only_build_can_export_a_pte(tmp_path):
     )
 
     assert output.stat().st_size > 0
+
+
+@pytest.mark.unit
+def test_engine_with_data_dependent_shape_only_inside_exports_a_pte(tmp_path):
+    """The boolean mask selection has a data-dependent shape, the engine output does not."""
+
+    class MaskedSum(torch.nn.Module):
+        def forward(self, value, mask):
+            return value + value[mask].sum()
+
+    class MaskedRows(torch.nn.Module):
+        def forward(self, value, mask):
+            return value[mask] * 2
+
+    value = torch.randn(10, 4, device="cuda")
+    mask = torch.arange(10, device="cuda") % 3 == 0
+
+    def save(model):
+        exported = torch.export.export(model.eval().cuda(), (value, mask))
+        compiled = torch_tensorrt.dynamo.compile(
+            exported,
+            arg_inputs=[value, mask],
+            min_block_size=1,
+            pass_through_build_failures=True,
+        )
+        output = tmp_path / f"{type(model).__name__}.pte"
+        torch_tensorrt.save(
+            compiled,
+            str(output),
+            output_format="executorch",
+            arg_inputs=(value, mask),
+            retrace=False,
+        )
+        return output
+
+    assert save(MaskedSum()).stat().st_size > 0
+    # An output shape that depends on the data still needs an output allocator.
+    with pytest.raises(RuntimeError, match="output allocator"):
+        save(MaskedRows())
 
 
 @pytest.mark.unit

@@ -194,10 +194,17 @@ but corrupted engine bytes can load and return wrong answers.
 
 ### Load errors
 
+- With no usable CUDA device, for example under `CUDA_VISIBLE_DEVICES=""`, the delegate reports
+  itself unavailable, so loading returns `Error::NotFound`. The log says CUDA is unavailable and
+  gives CUDA's reason.
 - Loading returns `Error::MemoryAllocationFailed` when TensorRT runs out of memory while it
   deserializes the engine, applies the weight streaming budget, or creates the execution context.
   The log then shows the free and total GPU memory. Other TensorRT load failures return
   `Error::InvalidProgram`, with TensorRT's reason in the log.
+- An engine loads only on the TensorRT version that built it, unless it was built version
+  compatible. When TensorRT cannot read an engine, the log names the TensorRT version that exported
+  it and the one the delegate runs on. A program exported before the export side recorded that
+  version says so instead.
 - An engine saved without its weights, for example compiled with
   `immutable_weights=False, strip_engine_weights=True`, is refused with `Error::InvalidProgram`,
   because this delegate cannot refit it. To check, the delegate asks TensorRT how many weight bytes

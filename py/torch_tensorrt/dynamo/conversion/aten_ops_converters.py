@@ -1753,7 +1753,27 @@ def aten_ops_scatter(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.select.int, supports_dynamic_shapes=True)
+def select_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    """Keep a select of a uint8 tensor on the PyTorch path.
+
+    TensorRT allows uint8 only at engine inputs and at outputs made by a cast or
+    identity layer, so the gather's uint8 result fails the engine build, as it does
+    for aten.gather.
+    """
+    meta = getattr(args_bounds_check(node.args, 0), "meta", {})
+    if getattr(meta.get("val", meta.get("tensor_meta")), "dtype", None) == torch.uint8:
+        _LOGGER.debug("select of a uint8 tensor is not supported, falling back")
+        return False
+    return True
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.select.int,
+    capability_validator=select_validator,
+    supports_dynamic_shapes=True,
+)
 def aten_ops_select(
     ctx: ConversionContext,
     target: Target,
@@ -2142,12 +2162,42 @@ def aten_ops_permute(
     )
 
 
+def _truncatable_float64_copy(node: Node, source: Argument) -> bool:
+    """Whether a float64 copy can run as a float32 copy and give PyTorch's result.
+
+    The source has to be a type float32 holds exactly, the same rule impl.cast.to_copy
+    applies, and the PyTorch result has to have the contiguous layout a TensorRT copy
+    produces. The check does not depend on where the copy sits, because partitioning
+    can turn any copy into an engine output and the converter is validated again then.
+    """
+    input_meta = source.meta.get("val") if isinstance(source, Node) else None
+    if (
+        not isinstance(input_meta, torch.Tensor)
+        or input_meta.dtype not in impl.cast.FLOAT64_TRUNCATABLE_SOURCES
+    ):
+        return False
+    # Alone on a placeholder after partitioning, a dynamic copy must also pass
+    # _dynamic_placeholder_copy_supported, which refuses any explicit memory_format.
+    if node.kwargs.get("memory_format") is not None and node_has_dynamic_shapes(node):
+        return False
+    output_meta = node.meta.get("val")
+    if not isinstance(output_meta, torch.Tensor):
+        return False
+    # A data-dependent stride cannot be decided here, so leave the copy to PyTorch.
+    try:
+        return bool(output_meta.is_contiguous())
+    except Exception:
+        return False
+
+
 def to_copy_dtype_validator(
     placeholder_only: bool, settings: Optional[CompilationSettings] = None
 ) -> Callable[[Node, CompilationSettings], bool]:
     """Return validator for to_copy node with placeholder restrictions"""
 
-    def validate_dtype(to_copy_node: Node) -> bool:
+    def validate_dtype(
+        to_copy_node: Node, settings: Optional[CompilationSettings]
+    ) -> bool:
         """Returns true if the to_copy node can be converted to TRT
 
         Based on data type being casted to
@@ -2187,6 +2237,15 @@ def to_copy_dtype_validator(
         if "dtype" in to_copy_node.kwargs:
             if to_copy_node.kwargs["dtype"] in allowed_casts:
                 return True
+            # truncate_double means the caller accepts float32 for float64, and
+            # the converter maps it.
+            elif (
+                to_copy_node.kwargs["dtype"] is torch.float64
+                and settings is not None
+                and settings.truncate_double
+                and _truncatable_float64_copy(to_copy_node, to_copy_node.args[0])
+            ):
+                return True
             else:
                 _LOGGER.debug(
                     f"_to_copy converter rejected node {to_copy_node} with dtype {to_copy_node.kwargs['dtype']}"
@@ -2206,7 +2265,7 @@ def to_copy_dtype_validator(
         """
         # The placeholder restriction is satsfied if placeholder_only is the same
         # truth value as is_only_operator_on_placeholder(to_copy_node)
-        return validate_dtype(to_copy_node) and (
+        return validate_dtype(to_copy_node, settings) and (
             (not placeholder_only) ^ is_only_operator_on_placeholder(to_copy_node)
         )
 
@@ -4750,7 +4809,22 @@ def aten_ops_trunc(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.copy.default, supports_dynamic_shapes=True)
+def _copy_validator(node: Node, settings: Optional[CompilationSettings] = None) -> bool:
+    output_meta = node.meta.get("val")
+    if not isinstance(output_meta, torch.Tensor) or output_meta.dtype != torch.float64:
+        return True
+    return (
+        settings is not None
+        and settings.truncate_double
+        and _truncatable_float64_copy(node, node.args[1])
+    )
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.copy.default,
+    capability_validator=_copy_validator,
+    supports_dynamic_shapes=True,
+)
 @enforce_tensor_types(
     {
         1: (TRTTensor,),
@@ -4764,6 +4838,25 @@ def aten_ops_copy(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     dest, src = args[0], args[1]
+    # copy broadcasts src, so the result always has the shape of dest.
+    if tuple(src.shape) != tuple(dest.shape):
+        src = impl.slice.expand(
+            ctx,
+            target,
+            SourceIR.ATEN,
+            f"{name}_expand",
+            src,
+            [
+                (
+                    impl.shape.shape(
+                        ctx, target, SourceIR.ATEN, f"{name}_dest_dim{i}", dest, i
+                    )
+                    if size == DYNAMIC_DIM
+                    else size
+                )
+                for i, size in enumerate(dest.shape)
+            ],
+        )
     return impl.cast.to_copy(
         ctx,
         target,

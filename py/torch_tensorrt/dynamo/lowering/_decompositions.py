@@ -13,6 +13,7 @@ from torch._export.utils import (
     _get_decomp_for_cia,
 )
 from torch._ops import OpOverload
+from torch.fx.experimental.symbolic_shapes import statically_known_true
 from torch_tensorrt.dynamo._defaults import default_device
 from torch_tensorrt.dynamo.conversion.converter_utils import get_positive_dim
 from torch_tensorrt.dynamo.utils import to_torch_device
@@ -27,6 +28,9 @@ from ._decomposition_groups import (
 )
 from .constant_fold_exclusions.attention_mask import (
     exclude_attn_mask_aranges_from_constant_fold,
+)
+from .constant_fold_exclusions.scatter_add import (
+    exclude_scatter_add_positions_from_constant_fold,
 )
 
 logger = logging.getLogger(__name__)
@@ -292,10 +296,12 @@ def scatter_add_decomposition(
     index: torch.Tensor,
     src_tensor: torch.Tensor,
 ) -> torch.Tensor:
+    if _use_integer_scatter_add(input_tensor, dim, index, src_tensor):
+        return _scatter_add_integer_decomposition(input_tensor, dim, index, src_tensor)
+
     scatter_add_tensor = input_tensor
-    src_shape = list(src_tensor.shape)
-    src_dim = src_shape[dim]
-    for i in range(0, src_dim):
+    # PyTorch reads src only where index has values, so loop over index.
+    for i in range(0, index.shape[dim]):
         to_scatter_tensor = torch.zeros(input_tensor.shape, dtype=input_tensor.dtype)
         # index and src slice
         src_slice = torch.select(src_tensor, dim, i)
@@ -318,6 +324,75 @@ def scatter_add_decomposition(
         )
 
     return scatter_add_tensor
+
+
+# The comparison holds index.numel() * input.shape[dim] elements. Keep it well
+# under TensorRT's tensor volume limit and small enough (512 MiB as int64) for
+# constant folding or a PyTorch fallback to materialize.
+_MAX_INTEGER_SCATTER_ADD_COMPARISONS = 1 << 26
+
+
+def _use_integer_scatter_add(
+    input_tensor: torch.Tensor,
+    dim: int,
+    index: torch.Tensor,
+    src_tensor: torch.Tensor,
+) -> bool:
+    # Integer reductions can regroup updates without changing their values.
+    if src_tensor.dtype not in (torch.int32, torch.int64):
+        return False
+    # The comparison adds one axis, and TensorRT tensors have at most 8.
+    if index.dim() >= 8:
+        return False
+    if input_tensor.dim() == 0:
+        extent = 1
+    elif index.dim() and isinstance(index.shape[dim], int):
+        extent = input_tensor.shape[dim]
+    else:
+        # Otherwise keep the loop, as before. On a dynamic extent the loop would
+        # specialize it, which is why filter_decomposition_table keeps such an op
+        # out of decomposition on the compile paths.
+        return False
+    comparisons = index.numel() * extent
+    return statically_known_true(comparisons <= _MAX_INTEGER_SCATTER_ADD_COMPARISONS)
+
+
+def _scatter_add_integer_decomposition(
+    input_tensor: torch.Tensor,
+    dim: int,
+    index: torch.Tensor,
+    src_tensor: torch.Tensor,
+) -> torch.Tensor:
+    # TensorRT scatter overwrites colliding indices, so compare each index with
+    # every output position along dim and sum the matching src values.
+    if statically_known_true(index.numel() == 0):
+        return input_tensor.clone()
+    if input_tensor.dim() == 0:
+        # PyTorch treats a scalar destination as one element along dim 0.
+        return _scatter_add_integer_decomposition(
+            input_tensor.reshape(1), 0, index.reshape(-1), src_tensor.reshape(-1)
+        ).reshape(())
+    dim = get_positive_dim(dim, input_tensor.dim())
+    for k, size in enumerate(index.shape):
+        if not statically_known_true(src_tensor.shape[k] == size):
+            # A slice view would add guards on dynamic sizes, a gather does not.
+            src_tensor = src_tensor.index_select(
+                k, torch.arange(size, device=src_tensor.device)
+            )
+    index = index.movedim(dim, -1).unsqueeze(-2)
+    src_tensor = src_tensor.movedim(dim, -1).unsqueeze(-2)
+    positions = torch.arange(input_tensor.shape[dim], device=index.device)
+    exclude_scatter_add_positions_from_constant_fold(positions)
+    hits = index == positions.view(-1, 1)
+    # The where converter narrows int64 to int32, multiplying keeps the dtype.
+    added = (hits.to(src_tensor.dtype) * src_tensor).sum(-1, dtype=src_tensor.dtype)
+    added = added.movedim(-1, dim)
+    pad = []
+    for k in reversed(range(input_tensor.dim())):
+        pad += [0, input_tensor.shape[k] - added.shape[k]]
+    if not all(statically_known_true(p == 0) for p in pad):
+        added = torch.constant_pad_nd(added, pad, 0)
+    return input_tensor + added
 
 
 # enum class for reduce operation of scatter_reduce
@@ -509,7 +584,7 @@ def scaled_dot_product_attention_decomposition(
         attn_bias = torch.where(temp_mask.logical_not(), negative, zero)
 
     if attn_mask is not None:
-        # Unconditional: mark_constant_fold_exclusions revokes these marks when the
+        # Unconditional: mark_constant_fold_exclusions ignores the tags when the
         # rule is disabled, so the decompositions do not need the setting.
         exclude_attn_mask_aranges_from_constant_fold(attn_mask)
         if attn_mask.dtype == torch.bool:

@@ -454,6 +454,98 @@ class TestEliminateSymMinInt64Max(TestCase):
         self.assertEqual(output_node.args[0], (x, x))
 
 
+class TestPreserveAttentionOutputLayout(TestCase):
+    def test_view_after_decomposed_attention(self):
+        # Fused attention returns this transposed query's layout, so export drops the
+        # .contiguous() below and records a view that only works on that layout. The
+        # attention output must stay a tensor of its own (detach_), the in-place
+        # update through the view must reach it, and the no_grad region puts all of
+        # it in a subgraph.
+        class ViewAfterAttention(torch.nn.Module):
+            def forward(self, query, key, value):
+                with torch.no_grad():
+                    query, key, value = (t.transpose(1, 2) for t in (query, key, value))
+                    out = torch.nn.functional.scaled_dot_product_attention(
+                        query, key, value
+                    )
+                    out.detach_()
+                    flat = out.transpose(1, 2).contiguous()
+                    flat = flat.view(flat.shape[0], flat.shape[1], -1)
+                    flat.add_(1)
+                return out, flat
+
+        inputs = [torch.randn(2, 16, 4, 32).half().cuda() for _ in range(3)]
+        model = ViewAfterAttention().cuda()
+        ep = torch.export.export(model, tuple(inputs))
+        # With a contiguous attention output, export keeps the .contiguous() and
+        # this test passes without the pass.
+        (attention,) = (
+            node
+            for module in ep.graph_module.modules()
+            if isinstance(module, torch.fx.GraphModule)
+            for node in module.graph.nodes
+            if node.target == torch.ops.aten.scaled_dot_product_attention.default
+        )
+        self.assertFalse(attention.meta["val"].is_contiguous())
+        trt_module = torch_tensorrt.dynamo.compile(
+            ep, inputs, min_block_size=1, decompose_attention=True
+        )
+        torch.testing.assert_close(
+            model(*inputs), trt_module(*inputs), rtol=1e-2, atol=1e-2
+        )
+
+    def test_view_after_attention_in_cond_branch(self):
+        class CondViewAfterAttention(torch.nn.Module):
+            def forward(self, pred, query, key, value):
+                def attend(query, key, value):
+                    query, key, value = (t.transpose(1, 2) for t in (query, key, value))
+                    out = torch.nn.functional.scaled_dot_product_attention(
+                        query, key, value
+                    )
+                    out = out.transpose(1, 2).contiguous()
+                    return out.view(out.shape[0], out.shape[1], -1)
+
+                def flatten(query, key, value):
+                    return query.flatten(2).clone()
+
+                return torch.cond(pred, attend, flatten, (query, key, value))
+
+        inputs = [torch.randn(2, 16, 4, 32).half().cuda() for _ in range(3)]
+        model = CondViewAfterAttention().cuda()
+        pred = torch.tensor(True).cuda()
+        ep = torch.export.export(model, (pred, *inputs))
+        trt_module = torch_tensorrt.dynamo.compile(
+            ep, [pred, *inputs], min_block_size=1, decompose_attention=True
+        )
+        for pred in (True, False):
+            pred = torch.tensor(pred).cuda()
+            torch.testing.assert_close(
+                model(pred, *inputs), trt_module(pred, *inputs), rtol=1e-2, atol=1e-2
+            )
+
+    def test_attention_on_data_dependent_rows(self):
+        # Boolean indexing gives attention a batch size known only at runtime.
+        class MaskedAttention(torch.nn.Module):
+            def forward(self, x, mask):
+                query = x[mask].transpose(1, 2)
+                return torch.nn.functional.scaled_dot_product_attention(
+                    query, query, query
+                )
+
+        model = MaskedAttention().cuda()
+        x = torch.randn(3, 16, 4, 32).half().cuda()
+        mask = torch.tensor([True, False, True]).cuda()
+        ep = torch.export.export(model, (x, mask))
+        trt_module = torch_tensorrt.dynamo.compile(
+            ep, [x, mask], min_block_size=1, decompose_attention=True
+        )
+        for mask in ([True, False, False], [True, True, True]):
+            mask = torch.tensor(mask).cuda()
+            torch.testing.assert_close(
+                model(x, mask), trt_module(x, mask), rtol=1e-2, atol=1e-2
+            )
+
+
 class TestRewriteEfficientAttention(TestCase):
     def test_force_causal_efficient_attention(self):
         class RewriteEfficientAttention(torch.nn.Module):

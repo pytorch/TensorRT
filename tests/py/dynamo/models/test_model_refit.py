@@ -14,6 +14,7 @@ import torch.nn.functional as F
 import torch_tensorrt as torchtrt
 import torch_tensorrt as torch_trt
 from torch import nn
+from torch_tensorrt._features import has_complex_decomposition
 from torch_tensorrt._utils import is_tensorrt_rtx_version_supported
 from torch_tensorrt.dynamo import partitioning, refit_module_weights
 from torch_tensorrt.dynamo._refit import (
@@ -1037,8 +1038,16 @@ def test_refit_input_written_through_returned_alias():
     "Refit feature is not supported in Python 3.13 or higher",
 )
 @pytest.mark.unit
+@pytest.mark.parametrize(
+    "complex_output", [False, True], ids=["real_out", "complex_out"]
+)
 @pytest.mark.parametrize("dynamic_batch", [False, True])
-def test_complex_buffer_refit(dynamic_batch, caplog):
+@pytest.mark.parametrize(
+    "use_complex_decomposition", [False, True], ids=["legacy", "decomp"]
+)
+def test_complex_buffer_refit(
+    use_complex_decomposition, dynamic_batch, complex_output, caplog
+):
     """Refit a model whose weights include a complex-valued buffer (e.g. RoPE freqs).
 
     Exercises the combined complex_graph_detection + refit_module_weights path:
@@ -1046,6 +1055,8 @@ def test_complex_buffer_refit(dynamic_batch, caplog):
       - complex placeholder input goes through view_as_real at the TRT boundary
       - after refitting with new frequencies the output matches the new model
     """
+    if use_complex_decomposition and not has_complex_decomposition():
+        pytest.skip("decompose_complex_in_graph requires torch>=2.14.dev")
 
     class ComplexFreqModel(nn.Module):
         def __init__(self, freqs: torch.Tensor):
@@ -1053,8 +1064,8 @@ def test_complex_buffer_refit(dynamic_batch, caplog):
             self.register_buffer("freqs", freqs.cuda())
 
         def forward(self, z: torch.Tensor) -> torch.Tensor:
-            # complex mul then expose as real so TRT can produce a real output
-            return torch.view_as_real(z * self.freqs)
+            out = z * self.freqs
+            return out if complex_output else torch.view_as_real(out)
 
     SEQ, DIM = 8, 32
 
@@ -1087,6 +1098,7 @@ def test_complex_buffer_refit(dynamic_batch, caplog):
         tuple(inputs),
         min_block_size=1,
         immutable_weights=False,
+        use_complex_decomposition=use_complex_decomposition,
     )
 
     with caplog.at_level(logging.INFO, logger="torch_tensorrt.dynamo._refit"):
