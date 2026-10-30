@@ -2,9 +2,11 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import logging
-from typing import Dict, Optional, Set
+from typing import Any, Dict, Optional, Set
 
 import torch
+from torch._subclasses.fake_tensor import FakeTensor
+from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     clean_up_graph_after_modifications,
@@ -116,13 +118,22 @@ def _is_proven_causal(
         if current in producers:
             copies[current] = graph.node_copy(current, lambda n: copies[n])
     graph.output(copies[attn_bias])
-    try:
-        bias = torch.fx.GraphModule(gm, graph)()
-    except Exception as e:
-        logger.debug(f"Could not compute attn_bias {attn_bias}: {e}")
-        return False
+    # torch.compile lowers under a fake mode, where the bias would have no values.
+    with unset_fake_temporarily():
+        try:
+            bias = torch.fx.GraphModule(gm, graph)()
+        except Exception as e:
+            logger.debug(f"Could not compute attn_bias {attn_bias}: {e}")
+            return False
+        return _is_causal_mask(bias, seq_len)
 
-    if not isinstance(bias, torch.Tensor) or not bias.is_floating_point():
+
+def _is_causal_mask(bias: Any, seq_len: int) -> bool:
+    if (
+        not isinstance(bias, torch.Tensor)
+        or isinstance(bias, FakeTensor)
+        or not bias.is_floating_point()
+    ):
         return False
     try:
         shape = torch.broadcast_shapes(bias.shape, (seq_len, seq_len))
