@@ -23,8 +23,8 @@ Prerequisites
 -------------
 Python 3.12 or newer, which LeRobot requires. On one A40 the script takes about 8 minutes, 3 of them
 compiling, and peaks at 24 GB of host memory and about 24 GB of GPU memory. It downloads the 14.5 GB
-checkpoint and writes a 7.1 GB program. A chunk of 50 actions then takes 104 ms, against about 360 ms
-in PyTorch.
+checkpoint and writes a 7.1 GB program. A chunk of 50 actions then takes 101 ms, against about 360 ms
+in PyTorch. Replaying each call as a CUDA graph accounts for 3 ms of that, for 22 MiB of GPU memory.
 
 Install Torch-TensorRT and its ExecuTorch delegate, ``torch_tensorrt_executorch_runtime``. The delegate
 brings the exact ExecuTorch build it was compiled against, a nightly, hence the nightly index. Then
@@ -151,7 +151,14 @@ def main() -> None:
             exported, arg_inputs=inputs, min_block_size=1
         )
         print(f"compiled in {time.perf_counter() - start:.0f} s")
-        torch_tensorrt.save(trt_model, args.model_path, output_format="executorch")
+        # use_cuda_graphs: the delegate records the engine's kernel launches once and replays them
+        # with a single launch on every later call with the same shapes.
+        torch_tensorrt.save(
+            trt_model,
+            args.model_path,
+            output_format="executorch",
+            use_cuda_graphs=True,
+        )
         print(f"saved {args.model_path}")
 
     # Run the saved program. Importing torch_tensorrt_executorch_runtime registers the TensorRT
