@@ -270,7 +270,11 @@ def test_compile_mapped_weights_and_release_them(tmp_path, monkeypatch):
     x = torch.randn(3, 8)
     ep = torch.export.export(model, (x,))
     trt = torch_tensorrt.dynamo.compile(
-        ep, inputs=[x.cuda()], min_block_size=1, release_weights_after_build=True
+        ep,
+        inputs=[x.cuda()],
+        min_block_size=1,
+        release_weights_after_build=True,
+        disable_tf32=True,  # TF32 matmuls differ from eager by ~2e-3
     )
     torch.testing.assert_close(trt(x.cuda()).cpu(), ref(x), rtol=1e-3, atol=1e-3)
     assert calls and all(calls)  # every released weight was a mapped one

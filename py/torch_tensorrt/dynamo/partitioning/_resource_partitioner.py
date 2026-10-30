@@ -512,32 +512,32 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
         chain recomputed into an attention engine lets TensorRT fuse it into the attention kernel,
         which fails the same way.
         """
+        graph = self.module.graph
         params = self.module.state_dict(keep_vars=True)
+        # Whether each node is weightless and computed from the graph inputs alone. One pass in
+        # graph order, which puts a node's inputs before it: chains can be thousands of nodes
+        # deep, too deep to walk recursively.
         cheap: Dict[torch.fx.Node, bool] = {}
-
-        def is_cheap(node: torch.fx.Node) -> bool:
-            if node not in cheap:
-                if node.op == "placeholder":
-                    cheap[node] = True
-                elif node.op == "get_attr":
-                    weight = params.get(node.target)
-                    limit = (
-                        RECOMPUTE_MAX_FOLDED_BYTES
-                        if str(node.target).startswith("_frozen_param")
-                        else RECOMPUTE_MAX_CONSTANT_BYTES
-                    )
-                    cheap[node] = (
-                        weight is None
-                        or weight.numel() * weight.element_size() <= limit
-                    )
-                else:
-                    cheap[node] = (
-                        node.op == "call_function"
-                        and torch.Tag.nondeterministic_seeded
-                        not in getattr(node.target, "tags", ())
-                        and all(is_cheap(i) for i in node._input_nodes)
-                    )
-            return cheap[node]
+        for node in graph.nodes:
+            if node.op == "placeholder":
+                cheap[node] = True
+            elif node.op == "get_attr":
+                weight = params.get(node.target)
+                limit = (
+                    RECOMPUTE_MAX_FOLDED_BYTES
+                    if str(node.target).startswith("_frozen_param")
+                    else RECOMPUTE_MAX_CONSTANT_BYTES
+                )
+                cheap[node] = (
+                    weight is None or weight.numel() * weight.element_size() <= limit
+                )
+            else:
+                cheap[node] = (
+                    node.op == "call_function"
+                    and torch.Tag.nondeterministic_seeded
+                    not in getattr(node.target, "tags", ())
+                    and all(cheap[i] for i in node._input_nodes)
+                )
 
         def crosses(node: torch.fx.Node) -> bool:
             """Whether the node's value goes to later subgraphs as it is rather than being recomputed."""
@@ -549,7 +549,6 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
                 and value.numel() * value.element_size() <= RECOMPUTE_MIN_OUTPUT_BYTES
             )
 
-        graph = self.module.graph
         where = {n: i for i, s in enumerate(subgraphs) for n in s.nodes}
         order = {
             n: k for k, n in enumerate(graph.nodes)
@@ -558,23 +557,33 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
         for j, subgraph in enumerate(subgraphs):
             copies: Dict[torch.fx.Node, torch.fx.Node] = {}
 
-            def copy(node: torch.fx.Node, before: torch.fx.Node) -> torch.fx.Node:
-                if (
+            def kept(node: torch.fx.Node) -> bool:
+                """Whether subgraph j reads the node itself rather than a copy."""
+                return (
                     node.op in ("placeholder", "get_attr")
                     or where.get(node) == j
                     or crosses(node)
-                ):
-                    return node
-                if node not in copies:
-                    args = {i: copy(i, before) for i in node._input_nodes}
+                )
+
+            def copy(node: torch.fx.Node, before: torch.fx.Node) -> torch.fx.Node:
+                """Copy the chain that computes `node` into subgraph j, ahead of `before`."""
+                chain, stack = set(), [node]
+                while stack:  # not recursive, for the same reason as `cheap`
+                    n = stack.pop()
+                    if n not in chain and n not in copies and not kept(n):
+                        chain.add(n)
+                        stack.extend(n._input_nodes)
+                chain_in_order = sorted(chain, key=order.__getitem__)
+                for n in chain_in_order:
                     with graph.inserting_before(before):
-                        copies[node] = graph.node_copy(node, lambda i: args[i])
-                    subgraph.nodes.insert(subgraph.nodes.index(before), copies[node])
-                return copies[node]
+                        copies[n] = graph.node_copy(n, lambda i: copies.get(i, i))
+                position = subgraph.nodes.index(before)
+                subgraph.nodes[position:position] = [copies[n] for n in chain_in_order]
+                return copies.get(node, node)
 
             for user in sorted(subgraph.nodes, key=order.__getitem__):
                 for node in list(user._input_nodes):
-                    if where.get(node, j) < j and is_cheap(node) and not crosses(node):
+                    if where.get(node, j) < j and cheap[node] and not crosses(node):
                         user.replace_input_with(node, copy(node, user))
                         recomputed += 1
         for subgraph in subgraphs:  # the originals nothing reads any more
