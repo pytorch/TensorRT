@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import logging
-from typing import Any, Dict, Optional, Set
+from typing import Any, Dict, Set
 
 import torch
 from torch._subclasses.fake_tensor import FakeTensor
@@ -58,7 +58,8 @@ def force_causal_efficient_attention(
             )
             continue
 
-        if not _is_proven_causal(gm, attn_bias, query_meta, key_meta):
+        seq_len = query_meta.size(-2) if query_meta is not None else None
+        if key_meta is None or not _is_proven_causal(gm, attn_bias, seq_len):
             logger.debug(
                 f"Keeping attn_bias of node {node} because it is not proven to be a causal mask"
             )
@@ -86,8 +87,7 @@ def force_causal_efficient_attention(
 def _is_proven_causal(
     gm: torch.fx.GraphModule,
     attn_bias: torch.fx.Node,
-    query_meta: Optional[torch.Tensor],
-    key_meta: Optional[torch.Tensor],
+    seq_len: Any,
 ) -> bool:
     """Whether attn_bias is a causal mask for every input.
 
@@ -95,10 +95,7 @@ def _is_proven_causal(
     computed here once, and that value keeps exactly the lower triangle (0) and
     blocks the rest (-inf, or the dtype's lowest value as Hugging Face uses).
     """
-    if query_meta is None or key_meta is None:
-        return False
-    seq_len = query_meta.size(-2)
-    if not isinstance(seq_len, int) or seq_len != key_meta.size(-2):
+    if not isinstance(seq_len, int):
         return False
 
     producers: Set[torch.fx.Node] = set()

@@ -22,8 +22,7 @@ Notes on attn_bias_is_causal
     attn_bias proven to be a causal mask and sets is_causal=True before reaching
     the converter.
     This is an HF-model optimization; most production uses keep the default.
-  Set False: attn_bias is forwarded to IAttentionLayer.mask.  Required for
-    any test that validates actual bias tensor values.
+  Set False: attn_bias is always forwarded to IAttentionLayer.mask.
 
 Test classes
 ------------
@@ -617,7 +616,9 @@ class TestEfficientAttention(DispatchTestCase):
     test_attn_bias_is_causal_opt
         Exercises the force_causal_efficient_attention lowering pass
         (attn_bias_is_causal=True, default) with a causal attn_bias built in
-        the graph, which the pass replaces with is_causal=True.
+        the graph, which the pass replaces with is_causal=True.  This checks
+        the numbers only; test_force_causal_efficient_attention in the lowering
+        tests checks the replacement.
         (decompose_attention=False, attn_bias_is_causal=True)
 
     Note: bool attn_bias is not accepted by _scaled_dot_product_efficient_attention
