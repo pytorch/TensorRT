@@ -93,9 +93,7 @@ DECODE_IDX, PREFILL_IDX = 0, 1
 # narrower and shallower. ``sliding_window`` keeps the 1B model's 512, which is
 # wider than MAX_SEQ, so as in the real model the window never binds over the
 # exported range and every layer attends to the whole prefix. Narrowing it below
-# MAX_SEQ would make the sliding layers genuinely windowed, and the engine would
-# then need ``attn_bias_is_causal=False`` to keep the mask instead of assuming
-# plain causality.
+# MAX_SEQ would make the sliding layers genuinely windowed.
 MINI_CONFIG = dict(
     vocab_size=2048,
     hidden_size=320,
