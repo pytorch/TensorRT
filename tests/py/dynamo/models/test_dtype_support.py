@@ -324,6 +324,23 @@ class TestUInt8Support(TestCase):
                 self.assertEqual(len(engines), 1)
                 torch.testing.assert_close(trt_mod(in_tensor), mod(in_tensor))
 
+    def test_uint8_full_overwrite_from_float(self):
+        class Overwrite(nn.Module):
+            def forward(self, image, values):
+                return torch.slice_scatter(image, values, 0, 0, 8).float() / 255
+
+        image = torch.randint(0, 256, (8, 8, 3), dtype=torch.uint8, device="cuda")
+        values = torch.randint(0, 256, (8, 8, 3), device="cuda").float()
+        mod = Overwrite()
+        trt_mod = torch_tensorrt.dynamo.compile(
+            torch.export.export(mod, (image, values)),
+            arg_inputs=[image, values],
+            min_block_size=1,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
+        )
+        torch.testing.assert_close(trt_mod(image, values), mod(image, values))
+
     def test_uint8_shape_op_in_cond_branch(self):
         class CondModule(nn.Module):
             def forward(self, image, flag):
