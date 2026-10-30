@@ -7,6 +7,10 @@ import torch
 import torch.nn.functional as F
 import torch_tensorrt
 from parameterized import parameterized
+from torch._dynamo.backends.common import aot_autograd
+from torch._export.utils import _get_decomp_for_cia
+from torch._functorch.aot_autograd import aot_export_joint_simple
+from torch.fx.experimental.proxy_tensor import make_fx
 from torch_tensorrt.dynamo import CompilationSettings
 from torch_tensorrt.dynamo.lowering import get_decompositions, post_lowering
 from torch_tensorrt.dynamo.lowering.passes.fold_shared_kv_attention import (
@@ -85,6 +89,63 @@ ON = CompilationSettings(fold_shared_kv_attention=True)
 
 
 class TestFoldSharedKVAttention(unittest.TestCase):
+    @parameterized.expand(
+        [
+            ("joint_export_fp32", False, torch.float32),
+            ("joint_export_fp16", False, torch.float16),
+            ("aot_autograd_fp32", True, torch.float32),
+            ("aot_autograd_fp16", True, torch.float16),
+        ]
+    )
+    def test_folds_aot_bmm_on_cpu(self, _, use_aot_autograd, dtype) -> None:
+        inputs = tuple(
+            torch.randn(shape, dtype=dtype)
+            for shape in ((2, 8, 7, 16), (2, 1, 11, 16), (2, 1, 11, 16), (2, 1, 7, 11))
+        )
+        module = RepeatKVAttention(8, 1, 16).eval()
+        decompositions = get_decompositions()
+        # Exercise the decomposed form even on PyTorch versions that preserve matmul.
+        decompositions[torch.ops.aten.matmul.default] = _get_decomp_for_cia(
+            torch.ops.aten.matmul.default
+        )
+
+        def fold(gm, example_inputs):
+            # Check the actual graph passed to each AOT compiler callback.
+            self.assertEqual(_targets(gm).count(torch.ops.aten.bmm.default), 2)
+            with self.assertLogs(LOGGER, level="DEBUG") as logs:
+                gm = fold_shared_kv_attention(gm, ON)
+            self.assertIn("Folded 2 matmul(s)", "\n".join(logs.output))
+            self.assertNotIn(torch.ops.aten.bmm.default, _targets(gm))
+            self.assertNotIn(torch.ops.aten.expand.default, _targets(gm))
+            return gm
+
+        def backend(gm, example_inputs):
+            if use_aot_autograd:
+                return aot_autograd(fw_compiler=fold, decompositions=decompositions)(
+                    gm, example_inputs
+                )
+            return fold(
+                aot_export_joint_simple(
+                    gm,
+                    example_inputs,
+                    trace_joint=False,
+                    decompositions=decompositions,
+                ),
+                example_inputs,
+            )
+
+        torch._dynamo.reset()
+        try:
+            with torch.no_grad():
+                actual = torch.compile(module, backend=backend)(*inputs)
+                expected = module(*inputs)
+                if dtype == torch.float16:
+                    torch.testing.assert_close(actual, expected, atol=1e-2, rtol=1e-2)
+                else:
+                    torch.testing.assert_close(actual, expected)
+        finally:
+            torch._dynamo.reset()
+
     @parameterized.expand([("plain", False), ("rms_norm_on_q_and_k", True)])
     def test_lowering_folds_both_matmuls_of_multi_query_attention(
         self, _, qk_norm
@@ -247,14 +308,18 @@ class TestFoldSharedKVAttention(unittest.TestCase):
             torch.randn(*x_shape, device="cuda"),
             torch.randn(*kv_shape, device="cuda"),
         )
-        gm = _lowered(Module(), inputs)
-        before = _targets(gm)
+        graphs = (
+            _lowered(Module(), inputs),
+            make_fx(Module(), decomposition_table=get_decompositions())(*inputs),
+        )
+        for gm in graphs:
+            with self.subTest(targets=_targets(gm)):
+                before = _targets(gm)
+                folded = fold_shared_kv_attention(gm, ON)
 
-        folded = fold_shared_kv_attention(gm, ON)
-
-        self.assertEqual(_targets(folded), before)
-        with torch.no_grad():
-            torch.testing.assert_close(folded(*inputs), Module()(*inputs))
+                self.assertEqual(_targets(folded), before)
+                with torch.no_grad():
+                    torch.testing.assert_close(folded(*inputs), Module()(*inputs))
 
     @parameterized.expand([("query_length", True), ("key_length", False)])
     def test_leaves_dynamic_shapes_alone(self, _, dynamic_query) -> None:

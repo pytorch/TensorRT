@@ -12,6 +12,10 @@ import torch
 from torch._library.fake_class_registry import FakeScriptObject
 from torch._subclasses.fake_tensor import is_fake
 from torch.export.graph_signature import InputKind
+from torch.fx.experimental.symbolic_shapes import (
+    guarding_hint_or_throw,
+    has_guarding_hint,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -92,8 +96,39 @@ def get_engine_info_from_state(
     return list(state[0] if isinstance(state, tuple) else state)
 
 
-def validate_engine_info(engine_info: Sequence[Any], *, node_name: str = "") -> None:
-    """Reject engine configurations unsupported by ExecuTorch export."""
+def _output_shapes_are_known(engine_obj: Any, node: Any) -> bool:
+    """Whether the engine knows every output shape for this node's input shapes.
+
+    Torch-TensorRT marks an engine as needing an output allocator when any of its
+    operations has a data-dependent shape, which also keeps CUDA graphs off for it.
+    Only an output with such a shape needs the allocator ExecuTorch lacks. An input
+    without a concrete example shape makes the answer False, since nothing proves
+    the outputs known.
+    """
+    input_shapes = []
+    for arg in node.args[0]:
+        val = arg.meta.get("val") if isinstance(arg, torch.fx.Node) else None
+        if not isinstance(val, torch.Tensor):
+            return False
+        if not all(has_guarding_hint(dim) for dim in val.shape):
+            return False
+        input_shapes.append([guarding_hint_or_throw(dim) for dim in val.shape])
+    output_shapes = engine_obj.infer_outputs(input_shapes)
+    return all(
+        -1 not in tuple(getattr(shape, "shape", shape)) for shape in output_shapes
+    )
+
+
+def validate_engine_info(
+    engine_info: Sequence[Any],
+    *,
+    node_name: str = "",
+    cause: BaseException | None = None,
+) -> None:
+    """Reject engine configurations unsupported by ExecuTorch export.
+
+    ``cause`` is chained to the refusal, so the error behind it stays visible.
+    """
     from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
         REQUIRES_OUTPUT_ALLOCATOR_IDX,
     )
@@ -107,7 +142,7 @@ def validate_engine_info(engine_info: Sequence[Any], *, node_name: str = "") -> 
             "ExecuTorch export does not support TensorRT engines that require "
             "an output allocator (data-dependent output shapes)"
             f"{node_suffix}."
-        )
+        ) from cause
 
 
 def _schema_name(node: Any) -> str:
@@ -231,12 +266,19 @@ def validate_engine_program(
     Resolving an engine serializes it, so pass a dict as ``resolved`` to keep what was
     resolved here and let the rewrite reuse it instead of serializing a second time.
 
-    Validation reads only metadata, so the records kept in ``resolved`` are
-    metadata-only: their ENGINE_IDX slot is empty. The rewrite reuses them for the
+    Validation reads each engine's metadata. For an engine marked as needing an
+    output allocator it also asks the live engine for its output shapes, which sets
+    the node's input shapes on the engine's execution context and creates the context
+    if no run has yet. The records kept in ``resolved`` are metadata-only: their
+    ENGINE_IDX slot is empty. The rewrite reuses them for the
     plain-string slots and takes the engine itself from :func:`_resolve_engine_tensor`,
     which never reads a cached record's ENGINE_IDX -- so a metadata-only record is
     never cross-served as the engine bytes.
     """
+    from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
+        REQUIRES_OUTPUT_ALLOCATOR_IDX,
+    )
+
     count = 0
     # One engine can feed several execute_engine nodes, and resolving it again would
     # serialize it again and keep a second copy of the bytes.
@@ -263,7 +305,28 @@ def validate_engine_program(
             )
             if engine_node is not None:
                 by_engine_node[engine_node] = engine_info
-        validate_engine_info(engine_info, node_name=node.name)
+        inference_error = None
+        if (
+            node.target is torch.ops.tensorrt.execute_engine.default
+            and len(engine_info) > REQUIRES_OUTPUT_ALLOCATOR_IDX
+            and str(engine_info[REQUIRES_OUTPUT_ALLOCATOR_IDX]) == "1"
+        ):
+            try:
+                shapes_known = _output_shapes_are_known(
+                    _resolve_engine_object(exported_program, node), node
+                )
+            except RuntimeError as error:
+                # The C++ engine raises when it cannot create an output for an
+                # unknown dimension, but also when anything else fails, so the
+                # refusal keeps the error as its cause.
+                shapes_known, inference_error = False, error
+            if shapes_known:
+                # ExecuTorch needs no output allocator then. This record becomes
+                # the ExecuTorch engine's arguments, and the backend refuses a
+                # marked one.
+                engine_info = list(engine_info)
+                engine_info[REQUIRES_OUTPUT_ALLOCATOR_IDX] = "0"
+        validate_engine_info(engine_info, node_name=node.name, cause=inference_error)
         if resolved is not None:
             resolved[node.name] = engine_info
         count += 1

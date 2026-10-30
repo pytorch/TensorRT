@@ -3,11 +3,13 @@
 
 import copy
 import unittest
+from unittest import mock
 
 import torch
 import torch_tensorrt
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.lowering.passes import complex_decomposition_adapter
 from torch_tensorrt.dynamo.lowering.passes.constant_folding import constant_fold
 
 
@@ -153,6 +155,107 @@ class TestConstantFolding(TestCase):
                     actual = compiled_model(example_input)
 
                 torch.testing.assert_close(actual, expected)
+
+    @unittest.skipIf(
+        not torch.cuda.is_available()
+        or not complex_decomposition_adapter.has_complex_decomposition(),
+        "needs CUDA and the upstream complex decomposition",
+    )
+    def test_offloaded_constants_reach_the_complex_decomposition(self):
+        # offload_module_to_cpu leaves folded constants on the CPU; the complex
+        # decomposition retraces the graph and must not fall back over them.
+        class Rotary(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                angles = torch.outer(torch.arange(16.0), torch.ones(4))
+                self.register_buffer(
+                    "freqs", torch.polar(torch.ones_like(angles), angles)
+                )
+                # Read only by constant folding, so the retraced module drops it.
+                self.scale = torch.nn.Parameter(torch.ones(4))
+
+            def forward(self, x):
+                freqs = self.freqs[: x.shape[0]] * self.scale.mean()
+                z = torch.view_as_complex(x.reshape(x.shape[0], 4, 2))
+                return torch.view_as_real(z * freqs).flatten(1)
+
+        model = Rotary().eval().cuda()
+        example_input = torch.randn(8, 8, device="cuda")
+        with (
+            torch.no_grad(),
+            mock.patch.object(
+                complex_decomposition_adapter,
+                "complex_graph_detection",
+                side_effect=AssertionError("fell back to the legacy complex pass"),
+            ),
+        ):
+            expected = model(example_input)
+            exported_program = torch.export.export(model, (example_input,))
+            compiled_model = torch_tensorrt.dynamo.compile(
+                exported_program,
+                inputs=[example_input],
+                min_block_size=1,
+                offload_module_to_cpu=True,
+            )
+            actual = compiled_model(example_input)
+
+        torch.testing.assert_close(actual, expected)
+        self.assertEqual(model.scale.device.type, "cpu")
+
+    @unittest.skipIf(
+        not torch.cuda.is_available()
+        or not complex_decomposition_adapter.has_complex_decomposition(),
+        "needs CUDA and the upstream complex decomposition",
+    )
+    def test_complex_fallback_does_not_hold_device_copies_of_offloaded_constants(
+        self,
+    ):
+        from torch._functorch._aot_autograd import complex_decomposition
+
+        class Rotary(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                angles = torch.outer(torch.arange(256.0), torch.ones(512))
+                self.register_buffer(
+                    "freqs", torch.polar(torch.ones_like(angles), angles)
+                )
+                self.scale = torch.nn.Parameter(torch.ones(512))
+
+            def forward(self, x):
+                z = torch.view_as_complex(x.reshape(256, 512, 2))
+                return torch.view_as_real(z * (self.freqs * self.scale.mean()))
+
+        settings = CompilationSettings(offload_module_to_cpu=True)
+        example_input = torch.randn(256, 1024, device="cuda")
+        exported_program = torch.export.export(Rotary().cuda(), (example_input,))
+        # Folds freqs * scale into a 1 MiB constant kept on the CPU.
+        gm = constant_fold(exported_program.module(), settings)
+
+        def failing_retrace(gm, flat_args, decompositions):
+            # Like a real retrace, its frame holds the constants it was handed.
+            constants = [
+                getattr(gm, n.target) for n in gm.graph.nodes if n.op == "get_attr"
+            ]
+            raise NotImplementedError(f"unsupported op, {len(constants)} constants")
+
+        allocated = {}
+
+        def legacy_pass(gm, settings):
+            allocated["fallback"] = torch.cuda.memory_allocated()
+            return gm
+
+        with (
+            mock.patch.object(
+                complex_decomposition, "decompose_complex_in_graph", failing_retrace
+            ),
+            mock.patch.object(
+                complex_decomposition_adapter, "complex_graph_detection", legacy_pass
+            ),
+        ):
+            allocated["before"] = torch.cuda.memory_allocated()
+            complex_decomposition_adapter.complex_decomposition_adapter(gm, settings)
+
+        self.assertEqual(allocated["fallback"], allocated["before"])
 
 
 if __name__ == "__main__":

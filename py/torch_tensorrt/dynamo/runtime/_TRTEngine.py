@@ -266,6 +266,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         self._input_buffers: List[torch.Tensor] = []
         self._output_buffers: List[torch.Tensor] = []
         self._bound_inputs_by_name: Dict[str, torch.Tensor] = {}
+        self._shape_input_buffers: List[Any] = []
         self._caller_stream: Optional[torch.cuda.Stream] = None
         self._engine_stream: Optional[torch.cuda.Stream] = None
         self._owned_pool_stream: Optional[torch.cuda.Stream] = None
@@ -407,6 +408,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         self._input_buffers = []
         self._output_buffers = []
         self._bound_inputs_by_name = {}
+        self._shape_input_buffers = []
         self._caller_stream = None
         self._engine_stream = None
         self._owned_pool_stream = None
@@ -1192,6 +1194,7 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
         # create_output_tensors / the output-binding loop to alias outputs to
         # their source-input storage.
         self._bound_inputs_by_name = {}
+        self._shape_input_buffers = []
         for i, binding in enumerate(self._input_binding_infos):
             input_name = binding.name
 
@@ -1208,6 +1211,9 @@ class TRTEngine(OpaqueBase):  # type: ignore[misc]
 
             if binding.is_shape_tensor:
                 inputs_cpu = contiguous_inputs[i].cpu().to(torch.int64).numpy().copy()
+                # TensorRT reads this host memory when the engine runs, so the
+                # array must outlive this loop.
+                self._shape_input_buffers.append(inputs_cpu)
                 self.context.set_tensor_address(input_name, inputs_cpu.ctypes.data)
             else:
                 self.context.set_input_shape(

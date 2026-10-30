@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=bb6d21c2"></script>
+    <script src="../../../_static/documentation_options.js?v=8d39718d"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -481,6 +481,7 @@ document.write(`
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">collections.abc</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">operator</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">platform</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
@@ -523,6 +524,7 @@ document.write(`
     <span class="n">get_decompositions</span><span class="p">,</span>
     <span class="n">post_lowering</span><span class="p">,</span>
     <span class="n">pre_export_lowering</span><span class="p">,</span>
+    <span class="n">remove_alias_from_exported_program</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.lowering._buffer_lifting</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">aliased_input_bindings</span><span class="p">,</span>
@@ -699,11 +701,12 @@ document.write(`
 <span class="sd">        disabled_constant_fold_exclusions (Collection[str]): IDs of predefined</span>
 <span class="sd">            Torch-TensorRT rules to disable. Rules are registered by lowering</span>
 <span class="sd">            implementations and enabled by default; compilation users do not</span>
-<span class="sd">            need to register them. Disabling a rule makes its matching nodes</span>
-<span class="sd">            foldable. Supported IDs: ``"attention_mask_arange"``.</span>
+<span class="sd">            need to register them. Disabling a rule makes the nodes that only</span>
+<span class="sd">            it matches foldable. Supported IDs: ``"attention_mask_arange"``,</span>
+<span class="sd">            ``"scatter_add_positions"``.</span>
 <span class="sd">            Default is empty.</span>
 <span class="sd">        attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.</span>
-<span class="sd">        fold_shared_kv_attention (bool): For attention where all query heads share one key/value head (multi-query attention), compute it against that one head instead of the copies that Hugging Face models make for each query head. TensorRT then runs two plain matrix products instead of its fused attention kernel, which can be faster or slower depending on the GPU, so measure it. In float16 the result can round differently; use_fp32_acc=True reduces that. Only static shapes are rewritten, and scaled_dot_product_attention also needs decompose_attention=True. The setting has no effect under torch.compile with use_distributed_mode_trace. Default is False.</span>
+<span class="sd">        fold_shared_kv_attention (bool): For attention where all query heads share one key/value head (multi-query attention), compute it against that one head instead of the copies that Hugging Face models make for each query head. TensorRT then runs two plain matrix products instead of its fused attention kernel, which can be faster or slower depending on the GPU, so measure it. In float16 the result can round differently; use_fp32_acc=True reduces that. Only static shapes are rewritten, and scaled_dot_product_attention also needs decompose_attention=True. Both preserved matmuls and the reshape/bmm form produced by AOT tracing under torch.compile are supported for repeat_kv style graphs. In the bmm form, broadcasting a single KV head with enable_gqa=True is not folded. Default is False.</span>
 <span class="sd">        fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.</span>
 <span class="sd">        **kwargs: Any,</span>
 <span class="sd">    Returns:</span>
@@ -895,18 +898,23 @@ document.write(`
             <span class="n">exported_program</span><span class="o">.</span><span class="n">graph_module</span><span class="p">,</span>
         <span class="p">)</span>
     <span class="p">)</span>
+    <span class="n">exported_program</span> <span class="o">=</span> <span class="n">remove_alias_from_exported_program</span><span class="p">(</span><span class="n">exported_program</span><span class="p">)</span>
 
     <span class="n">gm</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">"Input graph: "</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="p">))</span>
 
     <span class="c1"># Apply lowering on the graph module. Note: constant_fold runs inside post_lowering and requires</span>
     <span class="c1"># module parameters to still be on GPU, so we must not deallocate before this call.</span>
+    <span class="n">unlowered_gm</span> <span class="o">=</span> <span class="n">gm</span>
     <span class="n">gm</span> <span class="o">=</span> <span class="n">post_lowering</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">"CPU memory usage after post_lowering: </span><span class="si">{</span><span class="n">get_cpu_memory_usage</span><span class="p">()</span><span class="si">}</span><span class="s2"> MB"</span><span class="p">)</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">"Lowered Input graph: "</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="p">))</span>
 
     <span class="c1"># Move the weights in the state_dict to CPU</span>
     <span class="k">if</span> <span class="n">offload_module_to_cpu</span><span class="p">:</span>
+        <span class="c1"># Complex lowering can return a new module without the weights that only</span>
+        <span class="c1"># constant folding read, so offload the module lowering started from too.</span>
+        <span class="n">deallocate_module</span><span class="p">(</span><span class="n">unlowered_gm</span><span class="p">)</span>
         <span class="n">deallocate_module</span><span class="p">(</span><span class="n">gm</span><span class="p">)</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
             <span class="s2">"The PyTorch model was moved to the CPU to allocate all GPU memory to TensorRT. To retain the model on the GPU, set offload_module_to_cpu=False"</span>
@@ -1112,11 +1120,12 @@ document.write(`
 <span class="sd">        disabled_constant_fold_exclusions (Collection[str]): IDs of predefined</span>
 <span class="sd">            Torch-TensorRT rules to disable. Rules are registered by lowering</span>
 <span class="sd">            implementations and enabled by default; compilation users do not</span>
-<span class="sd">            need to register them. Disabling a rule makes its matching nodes</span>
-<span class="sd">            foldable. Supported IDs: ``"attention_mask_arange"``.</span>
+<span class="sd">            need to register them. Disabling a rule makes the nodes that only</span>
+<span class="sd">            it matches foldable. Supported IDs: ``"attention_mask_arange"``,</span>
+<span class="sd">            ``"scatter_add_positions"``.</span>
 <span class="sd">            Default is empty.</span>
 <span class="sd">        attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.</span>
-<span class="sd">        fold_shared_kv_attention (bool): For attention where all query heads share one key/value head (multi-query attention), compute it against that one head instead of the copies that Hugging Face models make for each query head. TensorRT then runs two plain matrix products instead of its fused attention kernel, which can be faster or slower depending on the GPU, so measure it. In float16 the result can round differently; use_fp32_acc=True reduces that. Only static shapes are rewritten, and scaled_dot_product_attention also needs decompose_attention=True. The setting has no effect under torch.compile with use_distributed_mode_trace. Default is False.</span>
+<span class="sd">        fold_shared_kv_attention (bool): For attention where all query heads share one key/value head (multi-query attention), compute it against that one head instead of the copies that Hugging Face models make for each query head. TensorRT then runs two plain matrix products instead of its fused attention kernel, which can be faster or slower depending on the GPU, so measure it. In float16 the result can round differently; use_fp32_acc=True reduces that. Only static shapes are rewritten, and scaled_dot_product_attention also needs decompose_attention=True. Both preserved matmuls and the reshape/bmm form produced by AOT tracing under torch.compile are supported for repeat_kv style graphs. In the bmm form, broadcasting a single KV head with enable_gqa=True is not folded. Default is False.</span>
 <span class="sd">        fallback_data_dependent_ops (bool): If True, operators whose converters require a TensorRT output allocator (i.e. data-dependent output shapes, such as nonzero) are added to torch_executed_ops and run in PyTorch instead of being lowered into a TensorRT engine. This is useful when targeting runtimes that cannot consume a TensorRT output allocator. Default is False.</span>
 <span class="sd">        build_route (Optional[str]): TensorRT Global Performance Tuning build route string (space-separated "-knob=value" tokens). None uses the default route. This feature requires TensorRT with Global Performance Tuning enabled; currently unavailable on TensorRT-RTX / Windows.</span>
 <span class="sd">        tune_build_routes (Optional[str]): Build-route expression for an autotuning sweep that runs each candidate in a spawned child process (e.g. "-slice_fusion=[on|off] -kgen:codegen:cuda_tile=[0|1|2|3]"). None disables tuning.</span>
@@ -1353,6 +1362,7 @@ document.write(`
             <span class="n">exported_program</span><span class="o">.</span><span class="n">graph_module</span><span class="p">,</span>
         <span class="p">)</span>
     <span class="p">)</span>
+    <span class="n">exported_program</span> <span class="o">=</span> <span class="n">remove_alias_from_exported_program</span><span class="p">(</span><span class="n">exported_program</span><span class="p">)</span>
 
     <span class="n">gm</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
     <span class="c1"># Move the weights in the state_dict to CPU</span>
@@ -1383,6 +1393,7 @@ document.write(`
 
     <span class="c1"># Apply lowering on the graph module. Note: constant_fold runs inside post_lowering and requires</span>
     <span class="c1"># module parameters to still be on GPU, so we must not deallocate before this call.</span>
+    <span class="n">unlowered_gm</span> <span class="o">=</span> <span class="n">gm</span>
     <span class="n">gm</span> <span class="o">=</span> <span class="n">post_lowering</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">"CPU memory usage after post_lowering: </span><span class="si">{</span><span class="n">get_cpu_memory_usage</span><span class="p">()</span><span class="si">}</span><span class="s2"> MB"</span><span class="p">)</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">"Lowered Input graph: "</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="p">))</span>
@@ -1395,6 +1406,9 @@ document.write(`
 
     <span class="c1"># Move the weights in the state_dict to CPU</span>
     <span class="k">if</span> <span class="n">offload_module_to_cpu</span><span class="p">:</span>
+        <span class="c1"># Complex lowering can return a new module without the weights that only</span>
+        <span class="c1"># constant folding read, so offload the module lowering started from too.</span>
+        <span class="n">deallocate_module</span><span class="p">(</span><span class="n">unlowered_gm</span><span class="p">)</span>
         <span class="n">deallocate_module</span><span class="p">(</span><span class="n">gm</span><span class="p">)</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
             <span class="s2">"The PyTorch model was moved to the CPU to allocate all GPU memory to TensorRT. To retain the model on the GPU, set offload_module_to_cpu=False"</span>
@@ -1538,8 +1552,18 @@ document.write(`
         <span class="n">src</span> <span class="o">=</span> <span class="n">outputs</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">src</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">Node</span><span class="p">):</span>
             <span class="k">continue</span>
-        <span class="k">if</span> <span class="n">src</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"call_module"</span> <span class="ow">and</span> <span class="p">(</span>
-            <span class="s2">"_run_on_acc"</span> <span class="ow">in</span> <span class="nb">str</span><span class="p">(</span><span class="n">src</span><span class="o">.</span><span class="n">target</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">"_run_on_gpu"</span> <span class="ow">in</span> <span class="nb">str</span><span class="p">(</span><span class="n">src</span><span class="o">.</span><span class="n">target</span><span class="p">)</span>
+        <span class="c1"># A block with several outputs returns this one through a getitem</span>
+        <span class="n">block</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">src</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">src</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"call_function"</span> <span class="ow">and</span> <span class="n">src</span><span class="o">.</span><span class="n">target</span> <span class="ow">is</span> <span class="n">operator</span><span class="o">.</span><span class="n">getitem</span>
+            <span class="k">else</span> <span class="n">src</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="nb">isinstance</span><span class="p">(</span><span class="n">block</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">Node</span><span class="p">)</span>
+            <span class="ow">and</span> <span class="n">block</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">"call_module"</span>
+            <span class="ow">and</span> <span class="p">(</span>
+                <span class="s2">"_run_on_acc"</span> <span class="ow">in</span> <span class="nb">str</span><span class="p">(</span><span class="n">block</span><span class="o">.</span><span class="n">target</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">"_run_on_gpu"</span> <span class="ow">in</span> <span class="nb">str</span><span class="p">(</span><span class="n">block</span><span class="o">.</span><span class="n">target</span><span class="p">)</span>
+            <span class="p">)</span>
         <span class="p">):</span>
             <span class="k">with</span> <span class="n">partitioned_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">inserting_before</span><span class="p">(</span><span class="n">output_node</span><span class="p">):</span>
                 <span class="n">complex_node</span> <span class="o">=</span> <span class="n">partitioned_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">call_function</span><span class="p">(</span>
@@ -1547,7 +1571,7 @@ document.write(`
                 <span class="p">)</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
                 <span class="sa">f</span><span class="s2">"Inserted view_as_complex for complex output index </span><span class="si">{</span><span class="n">idx</span><span class="si">}</span><span class="s2"> "</span>
-                <span class="sa">f</span><span class="s2">"from TRT block '</span><span class="si">{</span><span class="n">src</span><span class="o">.</span><span class="n">target</span><span class="si">}</span><span class="s2">'"</span>
+                <span class="sa">f</span><span class="s2">"from TRT block '</span><span class="si">{</span><span class="n">block</span><span class="o">.</span><span class="n">target</span><span class="si">}</span><span class="s2">'"</span>
             <span class="p">)</span>
             <span class="n">outputs</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">complex_node</span>
             <span class="n">graph_modified</span> <span class="o">=</span> <span class="kc">True</span>
@@ -1561,15 +1585,17 @@ document.write(`
 
     <span class="c1"># Ensure the final module's own forward() unflattens its result back to</span>
     <span class="c1"># the user's original return shape (e.g. a bare tensor instead of a</span>
-    <span class="c1"># 1-tuple). complex_decomposition_adapter's make_fx retrace produces a</span>
-    <span class="c1"># plain (non-pytree) codegen partway through the pipeline, and that loss</span>
-    <span class="c1"># survives partitioning. Applied here -- after partitioning and boundary</span>
-    <span class="c1"># adapter insertion, once the module's true final leaf count is settled</span>
-    <span class="c1"># -- because setting it earlier (on the pre-partition graph) mismatches</span>
-    <span class="c1"># the leaf count at that intermediate stage and crashes on unflatten.</span>
+    <span class="c1"># 1-tuple). The exported program's pytree codegen normally survives</span>
+    <span class="c1"># lowering and partitioning, and it takes the inputs by the user's names:</span>
+    <span class="c1"># keep it. Rebuild one only if it was lost, from the placeholder names,</span>
+    <span class="c1"># which then take the inputs by position only.</span>
     <span class="n">in_spec</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="s2">"_in_spec"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
     <span class="n">out_spec</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="s2">"_out_spec"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
-    <span class="k">if</span> <span class="n">in_spec</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">out_spec</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">if</span> <span class="p">(</span>
+        <span class="n">in_spec</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="ow">and</span> <span class="n">out_spec</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">partitioned_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">_codegen</span><span class="p">,</span> <span class="n">_PyTreeCodeGen</span><span class="p">)</span>
+    <span class="p">):</span>
         <span class="n">orig_args</span> <span class="o">=</span> <span class="p">[</span>
             <span class="n">node</span><span class="o">.</span><span class="n">name</span>
             <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">partitioned_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span>
@@ -2567,11 +2593,12 @@ document.write(`
 <span class="sd">        disabled_constant_fold_exclusions (Collection[str]): IDs of predefined</span>
 <span class="sd">            Torch-TensorRT rules to disable. Rules are registered by lowering</span>
 <span class="sd">            implementations and enabled by default; compilation users do not</span>
-<span class="sd">            need to register them. Disabling a rule makes its matching nodes</span>
-<span class="sd">            foldable. Supported IDs: ``"attention_mask_arange"``.</span>
+<span class="sd">            need to register them. Disabling a rule makes the nodes that only</span>
+<span class="sd">            it matches foldable. Supported IDs: ``"attention_mask_arange"``,</span>
+<span class="sd">            ``"scatter_add_positions"``.</span>
 <span class="sd">            Default is empty.</span>
 <span class="sd">        attn_bias_is_causal (bool): Whether the attn_bias in efficient SDPA is causal. Default is True. This can accelerate models from HF because attn_bias is always a causal mask in HF. If you want to use non-causal attn_bias, you can set this to False.</span>
-<span class="sd">        fold_shared_kv_attention (bool): For attention where all query heads share one key/value head (multi-query attention), compute it against that one head instead of the copies that Hugging Face models make for each query head. TensorRT then runs two plain matrix products instead of its fused attention kernel, which can be faster or slower depending on the GPU, so measure it. In float16 the result can round differently; use_fp32_acc=True reduces that. Only static shapes are rewritten, and scaled_dot_product_attention also needs decompose_attention=True. The setting has no effect under torch.compile with use_distributed_mode_trace. Default is False.</span>
+<span class="sd">        fold_shared_kv_attention (bool): For attention where all query heads share one key/value head (multi-query attention), compute it against that one head instead of the copies that Hugging Face models make for each query head. TensorRT then runs two plain matrix products instead of its fused attention kernel, which can be faster or slower depending on the GPU, so measure it. In float16 the result can round differently; use_fp32_acc=True reduces that. Only static shapes are rewritten, and scaled_dot_product_attention also needs decompose_attention=True. Both preserved matmuls and the reshape/bmm form produced by AOT tracing under torch.compile are supported for repeat_kv style graphs. In the bmm form, broadcasting a single KV head with enable_gqa=True is not folded. Default is False.</span>
 <span class="sd">        **kwargs: Any,</span>
 <span class="sd">    Returns:</span>
 <span class="sd">        bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs</span>
@@ -2763,6 +2790,7 @@ document.write(`
             <span class="n">exported_program</span><span class="o">.</span><span class="n">graph_module</span><span class="p">,</span>
         <span class="p">)</span>
     <span class="p">)</span>
+    <span class="n">exported_program</span> <span class="o">=</span> <span class="n">remove_alias_from_exported_program</span><span class="p">(</span><span class="n">exported_program</span><span class="p">)</span>
 
     <span class="n">gm</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
     <span class="c1"># Move the weights in the state_dict to CPU</span>
