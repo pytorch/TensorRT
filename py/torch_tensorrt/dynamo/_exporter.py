@@ -592,13 +592,9 @@ def create_trt_exp_program(
     #      symbol from tensor shapes and scalar placeholder values, then look up
     #      its bound directly in the shape_env.  This is the retrace=False path where the
     #      caller didn't supply inputs.
-    fake_mode = detect_fake_mode(
-        tuple(
-            node.meta["val"]
-            for node in gm.graph.nodes
-            if node.op == "placeholder" and "val" in node.meta
-        )
-    )
+    # Falls back to the other nodes, so a program whose inputs are all ints keeps
+    # their ranges.
+    fake_mode = _detect_fake_mode_from_gm(gm)
     range_constraints: Dict[Any, Any] = {}
     if fake_mode is not None and fake_mode.shape_env is not None:
         has_inputs = (arg_inputs is not None and len(arg_inputs) > 0) or bool(
