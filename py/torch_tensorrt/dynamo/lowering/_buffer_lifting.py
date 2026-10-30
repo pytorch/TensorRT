@@ -164,7 +164,8 @@ def _kv_write_will_alias(
     source *is* the buffer's new contents -- and the ones that raise never get as far
     as needing one. One more never reaches a converter: a ``slice_scatter`` written
     on a dynamic dim, which its validator runs in PyTorch, and which needs the
-    copy-back like any other.
+    copy-back like any other. Nor does a write that makes a uint8 tensor, which the
+    partitioners keep in PyTorch.
     Imports are local to avoid a lowering<->conversion import cycle.
     """
     if not (isinstance(value_node, torch.fx.Node) and value_node.op == "call_function"):

@@ -205,10 +205,10 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
 
         TensorRT allows uint8 only at engine inputs and outputs, so a layer that makes
         one, such as a reshape, a slice or a concatenation of uint8 data, fails the
-        build. A clone, and a slice_scatter that overwrites the whole tensor, can hand
-        an engine input through as it is, so they are left to their converters. uint8
-        constants are packed FP4 weights that the quantization converters read
-        themselves.
+        build. A clone, and a slice_scatter that overwrites the whole tensor with a
+        uint8 source, can hand an engine input through as it is, so they are left to
+        their converters. uint8 constants are packed FP4 weights that the quantization
+        converters read themselves.
         """
         if node.op not in CALLABLE_NODE_OPS:
             return False
@@ -216,7 +216,12 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
             return False
         if node.target == torch.ops.aten.slice_scatter.default:
             destination = getattr(node.args[0], "meta", {}).get("val")
-            if destination is not None:
+            source = getattr(node.args[1], "meta", {}).get("val")
+            if (
+                destination is not None
+                and source is not None
+                and source.dtype == destination.dtype
+            ):
                 args = node.args
                 *_, status = resolve_slice_scatter_write(
                     tuple(destination.shape),
