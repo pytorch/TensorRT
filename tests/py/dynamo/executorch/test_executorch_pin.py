@@ -1058,7 +1058,7 @@ def test_the_executorch_setup_step_builds_without_pyyaml_installed(monkeypatch) 
 
 @pytest.mark.unit
 def test_required_setup_steps_fail_their_suite(monkeypatch) -> None:
-    """Failed ExecuTorch and CUDA-tile installs must fail the suite.
+    """Failed ExecuTorch, CUDA-tile, and MSLK installs must fail the suite.
 
     Their tests gate on optional dependencies, so a failed install would report success with the
     thing under test absent. The other steps fail visibly on their own, so a flaky download there
@@ -1067,7 +1067,7 @@ def test_required_setup_steps_fail_their_suite(monkeypatch) -> None:
     source = (REPO_ROOT / "tests/ci/runner.py").read_text(encoding="utf-8")
     body = source[source.index('    for step in v["setup"]:') :]
     body = body[: body.index('\n    print(f"==>')]
-    assert 'if step in {"executorch", "cuda-tile"}:' in body, body
+    assert 'if step in {"executorch", "cuda-tile", "mslk"}:' in body, body
     assert body.count("return rc") == 1, body
     assert "::warning::setup step" in body, body
 

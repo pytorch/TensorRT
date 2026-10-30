@@ -266,17 +266,14 @@ def run_suite(
             print(f"==> setup[{step}]: {shlex.join(argv)}", flush=True)
             rc = subprocess.run(argv, cwd=scwd, env=env).returncode
             if rc != 0:
-                if step == "mslk":
-                    print(f"::error::MSLK setup failed with exit code {rc}", flush=True)
-                    return rc
                 # These suites gate on optional dependencies, so a failed setup skips
                 # those files, leaves the rest passing, and reports success with a populated
                 # junit xml: the run looks green precisely when the thing it exists to test is
-                # absent. A missing ExecuTorch build or required cuTile compiler must fail
+                # absent. Missing ExecuTorch, MSLK, or a required cuTile compiler must fail
                 # explicitly. Other steps keep warning and continuing, because their
                 # suites fail visibly on a missing dependency and a flaky checkpoint download
                 # should not fail a suite that would otherwise report honestly.
-                if step in {"executorch", "cuda-tile"}:
+                if step in {"executorch", "cuda-tile", "mslk"}:
                     print(
                         f"::error::setup step {step!r} exited {rc}, so the suite cannot test "
                         "what it was asked to test",
