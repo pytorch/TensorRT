@@ -1071,34 +1071,33 @@ def test_the_runner_follows_the_row_s_cuda_version(monkeypatch) -> None:
     monkeypatch.syspath_prepend(str(REPO_ROOT / "tests"))
     from ci import runner
 
-    def channel_for(cu_version: str | None) -> str | None:
+    def channels_for(cu_version: str | None) -> list[str]:
         if cu_version is None:
             monkeypatch.delenv("CU_VERSION", raising=False)
         else:
             monkeypatch.setenv("CU_VERSION", cu_version)
         commands = runner._setup_commands("executorch")
-        urls = [
-            argument
+        return [
+            argument.removeprefix("https://download.pytorch.org/whl/")
             for command, _ in commands
             for argument in command
             if "download.pytorch.org" in argument
         ]
-        assert len(urls) <= 1, f"expected at most one index URL, got {urls}"
-        return urls[0] if urls else None
 
-    assert channel_for("cu132").endswith("/nightly/cu132")
-    assert channel_for("cu130").endswith("/nightly/cu130")
+    # A development pin is only on the nightly channel and a release only on the test one.
+    assert channels_for("cu132") == ["nightly/cu132", "test/cu132"]
+    assert channels_for("cu130") == ["nightly/cu130", "test/cu130"]
     # The repository's own declared CUDA row has to be installable, or CI installs ExecuTorch
     # from a channel that does not match the torch the job was built with.
     declared = _declared_cuda_channel()
-    assert channel_for(declared).endswith(f"/nightly/{declared}")
+    assert channels_for(declared) == [f"nightly/{declared}", f"test/{declared}"]
     # Rows ExecuTorch publishes no CUDA build for get no index at all. The suite runs only on
     # CUDA 13 rows, so reaching one of these means the matrix sent it somewhere the delegate
     # cannot work, and the install failing there is the correct outcome.
-    assert channel_for("cu126") is None
-    assert channel_for("cu118") is None
-    assert channel_for(None) is None
-    assert channel_for("") is None
+    assert channels_for("cu126") == []
+    assert channels_for("cu118") == []
+    assert channels_for(None) == []
+    assert channels_for("") == []
 
 
 @pytest.mark.unit

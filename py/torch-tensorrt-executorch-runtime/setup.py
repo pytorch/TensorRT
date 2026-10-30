@@ -79,14 +79,14 @@ def executorch_cmake_prefix_path() -> str:
     if not package_root.is_dir():
         raise RuntimeError(
             f"The executorch distribution reports its package at {package_root}, which is not "
-            "a directory. Reinstall ExecuTorch from the pinned nightly CUDA channel."
+            "a directory. Reinstall the pinned ExecuTorch from its PyTorch CUDA channel."
         )
     prefix = package_root / "share" / "cmake"
     if not (prefix / "executorch-config.cmake").is_file():
         raise RuntimeError(
             f"The installed ExecuTorch at {package_root} ships no CMake package, so the "
-            "delegate cannot be configured against it. Install a wheel from the pinned "
-            "nightly CUDA channel."
+            "delegate cannot be configured against it. Install the pinned ExecuTorch from its "
+            "PyTorch CUDA channel."
         )
     # The version too, not just the path. install_requires below names whatever is installed, so
     # building against the wrong wheel produced a coherent-looking artifact: the delegate links

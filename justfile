@@ -61,8 +61,8 @@ suites:
 #   just suite dynamo-runtime -- -k test_foo -x        just variant=rtx suite dynamo-converters
 #
 # The executorch suite additionally needs CU_VERSION set, because it installs the exact pinned
-# ExecuTorch nightly and that build exists only on the matching PyTorch nightly channel, never on
-# PyPI. CI always sets it; a local shell does not, so without it setup fails before any test runs:
+# ExecuTorch CUDA build from the PyTorch channels for that CUDA version. CI always sets it; a
+# local shell does not, so set it yourself:
 #   CU_VERSION=cu134 just suite executorch
 suite name *args:
     {{_ci}} run {{name}} --variant {{variant}} {{args}}
@@ -93,7 +93,8 @@ summary *args:
 # Install optional test deps for Linux with the project's CUDA 13.2 (cu132) default.
 install-test-ext:
     uv pip install --group test-ext --group kernels --group quantization
-    # ExecuTorch's CUDA wheels are only on the PyTorch nightly index, so the channel is needed.
+    # ExecuTorch's CUDA wheels are only on the PyTorch indexes: a development build on the
+    # nightly one, a release on the test one, so both channels are needed.
     # No --pre: a specifier naming a prerelease admits prereleases by itself, and --pre would
     # apply to pyyaml here too. cu132 matches the torch index this project resolves against by
     # default.
@@ -102,7 +103,8 @@ install-test-ext:
     # compiled from the commit this version pairs with.
     uv pip install pyyaml patchelf \
       --extra-index-url https://download.pytorch.org/whl/nightly/cu132 \
-      "executorch==1.6.0.dev20261009"
+      --extra-index-url https://download.pytorch.org/whl/test/cu132 \
+      "executorch==1.6.0"
 
 # ── Linting ───────────────────────────────────────────────────────────────────
 
