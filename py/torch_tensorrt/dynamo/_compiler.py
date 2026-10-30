@@ -62,6 +62,7 @@ from torch_tensorrt.dynamo.lowering._buffer_lifting import (
 from torch_tensorrt.dynamo.lowering.passes.reset_folded_constructors import (
     reset_folded_constructors,
 )
+from torch_tensorrt.dynamo.lowering.passes.restore_reshape import restore_reshape
 from torch_tensorrt.dynamo.partitioning._resource_partitioner import (
     resource_partition,
 )
@@ -1422,6 +1423,7 @@ def compile_module(
         # runs in PyTorch, and its state must go back to the device.
         if settings.offload_module_to_cpu:
             pin_torch_executed_state(gm, to_torch_device(settings.device))
+        restore_reshape(gm)
         return gm
     else:
         logger.debug(
@@ -1770,6 +1772,7 @@ def compile_module(
 
     dryrun_stats_display(dryrun_tracker, settings.dryrun)
 
+    restore_reshape(partitioned_module)
     return partitioned_module
 
 

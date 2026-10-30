@@ -42,6 +42,16 @@ class LowRankBoundary(torch.nn.Module):
         return torch.ops.torchtrt_partition_test.low_rank(x) * 2.0
 
 
+class HighRankView(torch.nn.Module):
+    def forward(self, x):
+        return x.view(RANK_10_SHAPE) * 2.0
+
+
+class HighRankViewAfterConvertibleOp(torch.nn.Module):
+    def forward(self, x):
+        return (x + 1.0).view(RANK_10_SHAPE) * 2.0
+
+
 @unittest.skipIf(not torch.cuda.is_available(), "CUDA is required")
 class TestTensorRankPartitioning(TestCase):
     @parameterized.expand([("fast", True), ("global", False)])
@@ -81,6 +91,29 @@ class TestTensorRankPartitioning(TestCase):
         ]
         self.assertEqual(len(accelerated), 1)
         self.assertEqual(compiled(x), model(x))
+
+    @parameterized.expand([("fast", True), ("global", False)])
+    def test_view_left_to_pytorch_is_a_reshape(self, _, use_fast_partitioner):
+        # aten._reshape_copy is not a core ATen op, so AOTInductor has no kernel for it.
+        x = torch.rand(2, 4, 8, device="cuda")
+        for model in (HighRankView(), HighRankViewAfterConvertibleOp()):
+            with self.subTest(type(model).__name__):
+                compiled = torch_tensorrt.compile(
+                    model.eval().cuda(),
+                    ir="dynamo",
+                    inputs=[x],
+                    min_block_size=1,
+                    use_fast_partitioner=use_fast_partitioner,
+                )
+                targets = {
+                    node.target
+                    for module in compiled.modules()
+                    if isinstance(module, torch.fx.GraphModule)
+                    for node in module.graph.nodes
+                }
+                self.assertNotIn(torch.ops.aten._reshape_copy.default, targets)
+                self.assertIn(torch.ops.aten.reshape.default, targets)
+                self.assertEqual(compiled(x), model(x))
 
 
 if __name__ == "__main__":
