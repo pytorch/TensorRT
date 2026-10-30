@@ -138,41 +138,7 @@ permissions:
   contents: read
 
 jobs:
-  azure-login-check:
-    # Keep this condition in sync with sign-arm64.
-    if: ${{ inputs.cross-compile && !inputs.is-release-tarball }}
-    name: Verify Azure OIDC login
-    runs-on: windows-latest
-    environment: artifact-signing
-    timeout-minutes: 5
-    steps:
-      - name: Validate Azure login configuration
-        shell: pwsh
-        env:
-          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-        run: |
-          $missing = @()
-          foreach ($name in @('AZURE_CLIENT_ID', 'AZURE_TENANT_ID', 'AZURE_SUBSCRIPTION_ID')) {
-            $present = -not [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))
-            Write-Host "${name}: present=$present"
-            if (-not $present) { $missing += $name }
-          }
-          if ($missing.Count -gt 0) {
-            throw "Missing or empty Azure secrets: $($missing -join ', ')"
-          }
-
-      - name: Log in to Azure using GitHub OIDC
-        uses: azure/login@v3
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
   build:
-    needs: azure-login-check
-    if: ${{ !cancelled() && (needs.azure-login-check.result == 'success' || needs.azure-login-check.result == 'skipped') }}
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(inputs.build-matrix) }}
@@ -808,6 +774,7 @@ jobs:
             }
           }
           # Signing changes binary hashes; wheel pack regenerates RECORD.
+          New-Item -ItemType Directory -Path 'dist-signed' -Force | Out-Null
           python -m wheel pack $env:WHEEL_ROOT -d dist-signed
           if ($LASTEXITCODE -ne 0) { throw 'Repacking signed wheel failed' }
           $signedWheel = Join-Path 'dist-signed' $env:WHEEL_FILENAME
