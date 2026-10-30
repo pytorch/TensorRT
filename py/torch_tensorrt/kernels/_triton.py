@@ -9,7 +9,7 @@ import logging
 import operator
 import re
 from collections.abc import Mapping
-from typing import Any, Callable, Dict, Iterable, List, NamedTuple, Optional, Tuple
+from typing import Any, Callable, Dict, NamedTuple, Optional, Tuple
 
 import torch
 
@@ -24,46 +24,6 @@ _LOGGER = logging.getLogger(__name__)
 # us that scratch is zero; it only tells us that Triton did not report it, so
 # fail before compilation instead of weakening the launch validation.
 _MIN_TRITON_VERSION = Version("3.5.0")
-
-# Triton element-type spellings -> torch dtypes. This is deliberately a closed
-# set: accepting an unrecognized pointer type would disable the conversion-time
-# dtype guard and let TensorRT reinterpret a tensor's bytes with the wrong ABI.
-_TRITON_TO_TORCH_DTYPE: Dict[str, torch.dtype] = {
-    "fp16": torch.float16,
-    "bf16": torch.bfloat16,
-    "fp32": torch.float32,
-    "i1": torch.bool,
-    "i8": torch.int8,
-    "i32": torch.int32,
-    "i64": torch.int64,
-    "u8": torch.uint8,
-    "fp8e4nv": torch.float8_e4m3fn,
-}
-
-_TRITON_TYPE_NAMES = frozenset(
-    {
-        "fp16",
-        "bf16",
-        "fp32",
-        "fp64",
-        "fp8e4nv",
-        "fp8e5",
-        "i1",
-        "i8",
-        "i16",
-        "i32",
-        "i64",
-        "u8",
-        "u16",
-        "u32",
-        "u64",
-    }
-)
-
-# TensorRT's AOT plugin API currently requires every extra kernel argument to be
-# a ``trtp.SymInt32``. Wider integers and floating-point values need a different
-# launch ABI and must not be accepted merely because Triton can compile them.
-_SUPPORTED_AOT_SCALAR_TYPES = frozenset({"i32"})
 
 
 class CompiledTritonArtifact(NamedTuple):
@@ -106,80 +66,9 @@ def validate_target(artifact: CompiledTritonArtifact, device: Any = None) -> Non
         )
 
 
-class SignatureParam(NamedTuple):
-    """One entry of a Triton ``signature``, decoded."""
+SignatureParam = _common.SignatureParam
 
-    name: str
-    is_pointer: bool
-    dtype: torch.dtype
-
-
-class SignatureLayout(NamedTuple):
-    """A ``signature`` split along the ``(inputs, extras, outputs)`` convention."""
-
-    inputs: Tuple[SignatureParam, ...]
-    scalars: Tuple[SignatureParam, ...]
-    outputs: Tuple[SignatureParam, ...]
-
-
-def _parse_signature(signature: Dict[str, str]) -> List[SignatureParam]:
-    """Decode each ``signature`` value into pointer-ness and a torch dtype.
-
-    Accepts exactly one ``*`` followed by a supported pointer element type, or
-    the single supported scalar spelling ``i32``. Specialization metadata must
-    be supplied through Triton's compiler APIs, not encoded into this type.
-    """
-    if not isinstance(signature, dict):
-        raise ValueError(
-            "triton_op signature must be an insertion-ordered dict mapping "
-            "parameter names to Triton type strings."
-        )
-
-    params: List[SignatureParam] = []
-    for name, type_str in signature.items():
-        if not isinstance(name, str) or not name:
-            raise ValueError(
-                f"triton_op signature keys must be non-empty strings; got {name!r}."
-            )
-        if not isinstance(type_str, str):
-            raise ValueError(
-                f"triton_op signature parameter '{name}' must use a string type; "
-                f"got {type(type_str).__name__}."
-            )
-        text = type_str.strip()
-        if text.startswith("*"):
-            match = re.fullmatch(r"\*([A-Za-z0-9_]+)", text)
-            if match is None:
-                raise ValueError(
-                    f"triton_op signature parameter '{name}' has malformed pointer "
-                    f"type {type_str!r}; expected exactly '*<dtype>'."
-                )
-            element = match.group(1)
-            dtype = _TRITON_TO_TORCH_DTYPE.get(element)
-            if dtype is None:
-                supported = ", ".join(sorted(_TRITON_TO_TORCH_DTYPE))
-                raise ValueError(
-                    f"triton_op signature parameter '{name}' has unsupported pointer "
-                    f"element type '{element}'. TensorRT-tested types: {supported}."
-                )
-            params.append(SignatureParam(name, True, dtype))
-            continue
-
-        element = text
-        if element not in _SUPPORTED_AOT_SCALAR_TYPES:
-            if element not in _TRITON_TYPE_NAMES:
-                raise ValueError(
-                    f"triton_op signature parameter '{name}' has unsupported scalar "
-                    f"type '{element}'."
-                )
-            supported = ", ".join(sorted(_SUPPORTED_AOT_SCALAR_TYPES))
-            raise ValueError(
-                f"triton_op signature parameter '{name}' uses scalar type "
-                f"'{element}', but TensorRT AOT extra arguments support only "
-                f"trtp.SymInt32 ({supported})."
-            )
-        params.append(SignatureParam(name, False, torch.int32))
-    return params
+SignatureLayout = _common.SignatureLayout
 
 
 def _validate_kernel_parameter_order(
@@ -282,66 +171,7 @@ def _validate_kernel_parameter_order(
         )
 
 
-def analyze_signature(
-    signature: Dict[str, str],
-    arity: Tuple[int, int],
-) -> SignatureLayout:
-    """Split runtime parameters using the Torch schema's input/output counts.
-
-    TensorRT passes ``(input_ptrs..., extra_scalars..., output_ptrs...)``.
-    Reject a different layout before it can bind scalars as device pointers.
-    """
-    if (
-        not isinstance(arity, tuple)
-        or len(arity) != 2
-        or any(
-            isinstance(count, bool) or not isinstance(count, int) or count < 0
-            for count in arity
-        )
-    ):
-        raise ValueError(
-            "triton_op tensor arity must be a pair of non-negative integers."
-        )
-
-    params = _parse_signature(signature)
-    if not params:
-        raise ValueError(
-            "triton_op signature is empty; it must declare the kernel's "
-            "non-constexpr parameters in declaration order."
-        )
-
-    def convention() -> str:
-        order = ", ".join(
-            f"{p.name}={'ptr' if p.is_pointer else 'scalar'}" for p in params
-        )
-        return (
-            f"Expected (input_ptrs..., extra_scalars..., output_ptrs...); got {order}."
-        )
-
-    if not params[0].is_pointer or not params[-1].is_pointer:
-        raise ValueError(
-            f"triton_op signature must begin and end with pointer parameters. "
-            f"{convention()}"
-        )
-
-    num_inputs, num_outputs = arity
-    output_start = len(params) - num_outputs
-    layout = SignatureLayout(
-        inputs=tuple(params[:num_inputs]),
-        scalars=tuple(params[num_inputs:output_start]),
-        outputs=tuple(params[output_start:]),
-    )
-    if (
-        output_start < num_inputs
-        or not all(p.is_pointer for p in layout.inputs + layout.outputs)
-        or any(p.is_pointer for p in layout.scalars)
-    ):
-        raise ValueError(
-            f"triton_op signature must match {num_inputs} tensor input(s), "
-            f"followed by scalar extras and {num_outputs} tensor output(s). "
-            f"{convention()}"
-        )
-    return layout
+analyze_signature = _common.analyze_signature
 
 
 def validate_triton_config(
@@ -384,75 +214,10 @@ def validate_triton_config(
     return layout
 
 
-def make_symint32_args(
-    op_name: str,
-    scalar_params: Tuple[SignatureParam, ...],
-    values: Optional[Iterable[Any]],
-) -> Any:
-    """Validate and materialize the exact AOT scalar argument list."""
-    import tensorrt.plugin as trtp
-
-    try:
-        materialized = [] if values is None else list(values)
-    except TypeError as exc:
-        raise TypeError(
-            f"triton_op '{op_name}' extra_args_fn must return an iterable of "
-            "scalar values."
-        ) from exc
-    if len(materialized) != len(scalar_params):
-        names = [param.name for param in scalar_params]
-        raise ValueError(
-            f"triton_op '{op_name}' extra_args_fn returned {len(materialized)} "
-            f"value(s), but the signature declares {len(scalar_params)} scalar "
-            f"parameter(s) {names}."
-        )
-
-    for index, (param, value) in enumerate(zip(scalar_params, materialized)):
-        if isinstance(value, bool) or not isinstance(value, (int, trtp.SymInt32)):
-            raise TypeError(
-                f"triton_op '{op_name}' extra_args_fn value {index} for "
-                f"'{param.name}' must be an int or trtp.SymInt32; got "
-                f"{type(value).__name__}."
-            )
-        constant = _common.constant_int(value)
-        if constant is not None and not -(2**31) <= constant < 2**31:
-            raise ValueError(
-                f"triton_op '{op_name}' extra_args_fn value {index} for "
-                f"'{param.name}' is outside the signed i32 range: {constant}."
-            )
-    return _common.pack_symint32_args(materialized, trtp)
+make_symint32_args = _common.make_symint32_args
 
 
-def validate_launch_grid(op_name: str, value: Any) -> Tuple[Any, ...]:
-    """Validate and normalize the 1-D to 3-D TensorRT launch grid."""
-    import tensorrt.plugin as trtp
-
-    dims = tuple(value) if isinstance(value, (tuple, list)) else (value,)
-    if not 1 <= len(dims) <= 3:
-        raise ValueError(
-            f"triton_op '{op_name}' grid returned {len(dims)} dimension(s); "
-            "TensorRT launches accept 1 to 3 (grid_x, grid_y, grid_z)."
-        )
-
-    symbolic_types = tuple(
-        cls
-        for cls in (getattr(trtp, "SymInt32", None), getattr(trtp, "ShapeExpr", None))
-        if isinstance(cls, type)
-    )
-    for index, dim in enumerate(dims):
-        if isinstance(dim, bool) or not isinstance(dim, (int, *symbolic_types)):
-            raise TypeError(
-                f"triton_op '{op_name}' grid dimension {index} must be an int or "
-                f"TensorRT symbolic integer; got {type(dim).__name__}."
-            )
-        constant = _common.constant_int(dim)
-        limit = 2**31 - 1 if index == 0 else 65535
-        if constant is not None and not 1 <= constant <= limit:
-            raise ValueError(
-                f"triton_op '{op_name}' grid dimension {index} must be between "
-                f"1 and {limit}; got {constant}."
-            )
-    return dims
+validate_launch_grid = _common.validate_launch_grid
 
 
 def make_dtype_capability_validator(
@@ -463,26 +228,18 @@ def make_dtype_capability_validator(
     artifact: Optional[CompiledTritonArtifact] = None,
 ) -> Callable[..., bool]:
     """Check tensor dtypes before enforcing Triton's compiled device target."""
-    validate_dtypes = _common.make_dtype_capability_validator(
+    return _common.make_dtype_capability_validator(
         op_name,
         "Triton",
         [param.dtype for param in layout.inputs],
         [param.dtype for param in layout.outputs],
         user_validator,
+        target_validator=(
+            None
+            if artifact is None
+            else lambda device: validate_target(artifact, device)
+        ),
     )
-    if artifact is None:
-        return validate_dtypes
-
-    def _validator(node: Any, settings: Any = None) -> bool:
-        if not validate_dtypes(node, settings):
-            return False
-        device = getattr(getattr(settings, "device", None), "gpu_id", None)
-        validate_target(
-            artifact, device if device is not None and device >= 0 else None
-        )
-        return True
-
-    return _validator
 
 
 @functools.lru_cache(maxsize=1)

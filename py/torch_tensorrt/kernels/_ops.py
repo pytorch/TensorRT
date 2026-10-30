@@ -3,7 +3,7 @@
 
 """Public entry points for ``torch_tensorrt.kernels``.
 
-Four functions, four paths into the same registration funnel:
+Kernel frontends share one registration funnel:
 
 * :func:`cuda_kernel_op` — declarative entry for CUDA C++ source. Reads
   a :class:`KernelSpec` and derives meta / eager / aot / schema, with
@@ -16,6 +16,8 @@ Four functions, four paths into the same registration funnel:
 * :func:`cutile_op` — declarative entry for a ``@ct.kernel`` cuTile program.
   Compiles the kernel to PTX for you, reorders its parameters into TensorRT's
   launch order, and derives the AOT launch.
+* :func:`cutedsl_op` — compile a pointer-based ``@cute.kernel`` CuTe DSL program
+  to PTX and derive its AOT launch.
 """
 
 from __future__ import annotations
@@ -275,8 +277,6 @@ def triton_op(
     """
     _require_qdp_plugin()
 
-    import tensorrt.plugin as trtp
-
     from torch_tensorrt.kernels import _triton
     from torch_tensorrt.kernels._register import (
         analyze_op_schema,
@@ -320,31 +320,20 @@ def triton_op(
         op_name, layout, capability_validator, artifact=artifact
     )
 
-    def final_aot(inputs: Any, outputs: Any, _tactic: int) -> Any:
-        _triton.validate_target(artifact)
-        dims = _triton.validate_launch_grid(op_name, grid(inputs, outputs))
-        launch_params = trtp.KernelLaunchParams(
-            grid_x=dims[0],
-            grid_y=dims[1] if len(dims) > 1 else 1,
-            grid_z=dims[2] if len(dims) > 2 else 1,
-            # Triton reports occupancy in warps; TRT wants threads per block.
-            block_x=artifact.num_warps * 32,
-            shared_mem=artifact.shared_mem,
-        )
-
-        values = [] if extra_args_fn is None else extra_args_fn(inputs, outputs)
-        extra_args = _triton.make_symint32_args(op_name, layout.scalars, values)
-        return launch_params, extra_args
-
     register_precompiled_qdp_plugin(
         op_name=op_name,
         ptx=artifact.ptx,
         kernel_name=artifact.kernel_name,
-        aot_fn=_common.check_aot_dtypes(
+        aot_fn=_common.make_pointer_aot_fn(
             op_name,
-            final_aot,
-            [param.dtype for param in layout.inputs],
-            [param.dtype for param in layout.outputs],
+            layout,
+            grid,
+            # Triton reports occupancy in warps; TRT wants threads per block.
+            (artifact.num_warps * 32, 1, 1),
+            artifact.shared_mem,
+            extra_args_fn,
+            lambda: _triton.validate_target(artifact),
+            frontend="triton_op",
         ),
         eager_fn=eager_fn,
         meta_fn=meta_fn,
@@ -553,3 +542,114 @@ def cutile_op(
         schema=schema_info.schema,
     )
     _LOGGER.info("cutile_op '%s' registered (kernel: %s)", op_name, kernel_name)
+
+
+def cutedsl_op(
+    op_name: str,
+    kernel: Any,
+    signature: Dict[str, str],
+    meta_fn: Callable[..., Any],
+    *,
+    grid: Callable[..., Any],
+    block_size: Union[int, Sequence[int]],
+    constants: Optional[Mapping[str, Any]] = None,
+    extra_args_fn: Optional[Callable[..., Any]] = None,
+    eager_fn: Optional[Callable[..., Any]] = None,
+    shared_mem: int = 0,
+    supports_dynamic_shapes: bool = True,
+    priority: ConverterPriority = ConverterPriority.STANDARD,
+    capability_validator: Optional[Callable[..., Any]] = None,
+    schema: Optional[str] = None,
+) -> None:
+    """Register a pointer-based NVIDIA CuTe DSL kernel as a TensorRT AOT plugin.
+
+    ``kernel`` is a ``@cute.kernel`` function. ``signature`` lists its runtime
+    parameters in declaration order: input pointers, optional ``i32`` extras,
+    then output pointers. For example, ``{"x": "*fp32", "n": "i32", "y": "*fp32"}``.
+    ``constants`` supplies all ``cutlass.Constexpr`` parameters.
+
+    ``meta_fn`` describes a functional, Tensor-only Torch op. ``grid(inputs,
+    outputs)`` computes up to three launch dimensions from TensorRT descriptors;
+    ``extra_args_fn(inputs, outputs)`` returns one int or ``trtp.SymInt32`` per
+    scalar parameter. Use symbolic shapes in both callbacks for dynamic inputs.
+    ``block_size`` is a static CUDA thread count or tuple. ``shared_mem`` is the
+    required dynamic shared-memory size in bytes. ``eager_fn`` optionally defines
+    the op's CUDA implementation outside TensorRT.
+
+    Compilation targets the current CUDA device with fixed pointer dtypes and
+    byte alignment. Kernels may construct CuTe tensors from their pointers, but
+    descriptor arguments, clusters, and compiler-added workspaces are unsupported.
+    The resulting engine embeds PTX and does not need CuTe DSL at runtime.
+    Requires ``nvidia-cutlass-dsl>=4.8.1,<5``.
+    """
+    _require_qdp_plugin()
+
+    from torch_tensorrt.kernels import _cutedsl
+    from torch_tensorrt.kernels._register import (
+        analyze_op_schema,
+        validate_registration,
+    )
+
+    validate_registration(
+        op_name,
+        check_available=True,
+        eager_fn=eager_fn,
+        capability_validator=capability_validator,
+    )
+    if not callable(grid):
+        raise ValueError(f"cutedsl_op '{op_name}' grid must be callable.")
+    block = _common.normalize_block_dims(op_name, block_size, frontend="cutedsl_op")
+    if (
+        isinstance(shared_mem, bool)
+        or not isinstance(shared_mem, int)
+        or not 0 <= shared_mem < 2**31
+    ):
+        raise ValueError("cutedsl_op shared_mem must be a non-negative i32 byte count.")
+    schema_info = analyze_op_schema(
+        meta_fn,
+        schema,
+        require_complete_hints=schema is None,
+        tensor_inputs_only=True,
+    )
+    constants = {} if constants is None else constants
+    layout = _cutedsl.validate_config(
+        op_name,
+        kernel,
+        signature,
+        constants,
+        (len(schema_info.tensor_arg_names), schema_info.num_outputs),
+        extra_args_fn,
+    )
+    artifact = _cutedsl.compile_to_ptx(kernel, constants, layout, block, shared_mem)
+
+    ptx_op(
+        op_name,
+        artifact.ptx,
+        artifact.kernel_name,
+        meta_fn,
+        eager_fn,
+        _common.make_pointer_aot_fn(
+            op_name,
+            layout,
+            grid,
+            artifact.block,
+            artifact.shared_mem,
+            extra_args_fn,
+            lambda: _cutedsl.validate_target(artifact),
+            frontend="cutedsl_op",
+        ),
+        supports_dynamic_shapes=supports_dynamic_shapes,
+        priority=priority,
+        capability_validator=_common.make_dtype_capability_validator(
+            op_name,
+            "CuTe DSL",
+            [param.dtype for param in layout.inputs],
+            [param.dtype for param in layout.outputs],
+            capability_validator,
+            target_validator=lambda device: _cutedsl.validate_target(artifact, device),
+        ),
+        schema=schema_info.schema,
+    )
+    _LOGGER.info(
+        "cutedsl_op '%s' registered (kernel: %s)", op_name, artifact.kernel_name
+    )

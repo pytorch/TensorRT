@@ -130,6 +130,20 @@ def test_frontend_dtype_guard(frontend, monkeypatch):
     )
 
 
+def test_unspecified_target_uses_current_device():
+    seen = []
+    validate = _common.make_dtype_capability_validator(
+        "test_common::op",
+        "kernel",
+        [torch.float32],
+        [torch.float32],
+        target_validator=seen.append,
+    )
+    settings = SimpleNamespace(device=SimpleNamespace(gpu_id=-1))
+    assert validate(_FakeNode([torch.float32], torch.float32), settings)
+    assert seen == [None]
+
+
 @skip_no_qdp
 @pytest.mark.parametrize(
     "preserve_input_dtype", [False, True], ids=["cast", "preserve"]

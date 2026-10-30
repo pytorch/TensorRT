@@ -13,23 +13,24 @@ torch_tensorrt.kernels
    ``>=10.7.0`` (and not ``10.14.x``) with Quick Deployable Plugin (QDP)
    support. CUDA C++ kernels require ``cuda-python`` and ``cuda-core``;
    :func:`triton_op` requires ``triton>=3.5.0`` while registering and compiling
-   the kernel. cuTile kernels additionally require ``cuda-tile`` and
+   the kernel. CuTe DSL kernels require ``nvidia-cutlass-dsl>=4.8.1,<5``.
+   cuTile kernels additionally require ``cuda-tile`` and
    ``tileiras`` as described below. From a source checkout, install all
    frontend packages with ``pip install --group kernels``. A serialized AOT
-   engine embeds the resulting PTX and does not need Triton, cuTile, or the
-   Python registration callback to execute.
+   engine embeds the resulting PTX and does not need Triton, CuTe DSL, cuTile,
+   or the Python registration callback to execute.
 
 Overview
 --------
 
 The ``kernels`` module registers custom kernels — CUDA C++ compiled with
-NVRTC, Triton, or cuTile — as TensorRT Quick Deployable Plugins. Tensor-only
+NVRTC, Triton, CuTe DSL, or cuTile — as TensorRT Quick Deployable Plugins. Tensor-only
 declarative kernels use Ahead-of-Time (AOT) plugin launches when
 available; kernels with ``ScalarInput`` compile through TensorRT's QDP JIT
 path because QDP AOT extra arguments currently support symbolic integer
 expressions, not arbitrary runtime floats.
 
-Four entry points share one registration funnel:
+Five entry points share one registration funnel:
 
 * :func:`cuda_kernel_op` handles both the declarative case (drive
   everything from a :class:`KernelSpec` dataclass) and the override case
@@ -38,6 +39,8 @@ Four entry points share one registration funnel:
 * :func:`ptx_op` registers kernels that are already compiled to PTX bytes.
 * :func:`triton_op` registers a ``@triton.jit`` kernel, compiling it to
   PTX and deriving the AOT launch for you.
+* :func:`cutedsl_op` registers a raw ``@cute.kernel`` CuTe DSL kernel,
+  compiling it to PTX and deriving the AOT launch for you.
 * :func:`cutile_op` registers a ``@ct.kernel`` cuTile program, compiling it
   to PTX and deriving the AOT launch for you.
 
@@ -294,6 +297,31 @@ To reproduce that compatibility run without replacing the installed Triton::
 
     python -m tests.ci.triton_compat 3.5.0
 
+CuTe DSL entry point
+-------------------
+
+.. autofunction:: cutedsl_op
+
+See the :ref:`cutedsl_op` example for a complete kernel and dynamic-shape
+engine. Registration uses a generated ``@cute.jit`` host wrapper and the
+shared :func:`ptx_op` registration path. Inference launches embedded PTX
+without importing CuTe DSL.
+
+The current CUDA device determines the target, including architecture-specific
+instructions such as ``sm_90a``. Use ``with torch.cuda.device(device):`` to
+select another target. If CuTe emits a PTX ISA newer than the loaded driver
+supports, the frontend recompiles for that driver and verifies the result
+with a driver load. Kernels that require a newer ISA still need a compatible
+driver; serialized engines retain these compatibility requirements.
+
+Kernels index contiguous TensorRT buffers and must guard their loads and
+stores. ``meta_fn`` must describe contiguous outputs with the compiled dtypes.
+The caller must provide enough ``shared_mem`` for the kernel; launch limits
+and scalar ranges must hold throughout the input profile. Empty tensors
+require a positive grid. Pointers assume only byte alignment. Native tensor
+arguments, TMA descriptors, clusters, and compiler-added workspaces are
+unsupported; kernels may construct CuTe tensors internally from pointers.
+
 cuTile entry point
 ------------------
 
@@ -426,12 +454,12 @@ are checked before TensorRT accepts the launch.
 Kernel signature convention
 ---------------------------
 
-The Triton and tensor-only precompiled AOT paths use this fixed order::
+The Triton, CuTe DSL, and tensor-only precompiled AOT paths use this fixed order::
 
     (input_ptrs..., extras..., output_ptrs...)
 
 This matches the order TensorRT passes tensor pointers and AOT extra
-arguments. In a Triton kernel, pointers are the ``*<dtype>`` parameters
+arguments. In a Triton or CuTe DSL kernel, pointers are the ``*<dtype>`` parameters
 specified in ``signature`` and extras follow the order returned by
 ``extra_args_fn``; no PTX rewriting is needed. A cuTile kernel declares its
 arrays in ``(inputs..., outputs...)`` order, and :func:`cutile_op` rewrites

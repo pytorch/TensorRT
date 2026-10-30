@@ -182,6 +182,13 @@ def _setup_commands(step: str) -> list[tuple[list[str], Path]]:
                 REPO_ROOT,
             )
         ]
+    if step == "cutedsl":
+        return [
+            (
+                launcher + ["-m", "pip", "install", "nvidia-cutlass-dsl>=4.8.1,<5"],
+                REPO_ROOT,
+            )
+        ]
     if step == "mpi":
         return [
             (
@@ -245,11 +252,11 @@ def run_suite(
                 # These suites gate on optional dependencies, so a failed setup skips
                 # those files, leaves the rest passing, and reports success with a populated
                 # junit xml: the run looks green precisely when the thing it exists to test is
-                # absent. A missing ExecuTorch build or required cuTile compiler must fail
+                # absent. Missing ExecuTorch, cuTile or CuTe DSL dependencies must fail
                 # explicitly. Other steps keep warning and continuing, because their
                 # suites fail visibly on a missing dependency and a flaky checkpoint download
                 # should not fail a suite that would otherwise report honestly.
-                if step in {"executorch", "cuda-tile"}:
+                if step in {"executorch", "cuda-tile", "cutedsl"}:
                     print(
                         f"::error::setup step {step!r} exited {rc}, so the suite cannot test "
                         "what it was asked to test",
