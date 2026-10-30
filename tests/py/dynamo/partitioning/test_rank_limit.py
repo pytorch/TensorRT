@@ -115,6 +115,22 @@ class TestTensorRankPartitioning(TestCase):
                 self.assertIn(torch.ops.aten.reshape.default, targets)
                 self.assertEqual(compiled(x), model(x))
 
+    def test_view_left_to_pytorch_does_not_alias_the_input(self):
+        # torch.compile drops the clone of an input, so the reshape must copy.
+        class CloneThenHighRankView(torch.nn.Module):
+            def forward(self, x):
+                return x.clone().view(RANK_10_SHAPE)
+
+        x = torch.rand(2, 4, 8, device="cuda")
+        compiled = torch.compile(
+            CloneThenHighRankView(), backend="tensorrt", options={"min_block_size": 1}
+        )
+        out = compiled(x)
+        self.assertEqual(out, x.view(RANK_10_SHAPE))
+        self.assertNotEqual(
+            out.untyped_storage().data_ptr(), x.untyped_storage().data_ptr()
+        )
+
 
 if __name__ == "__main__":
     run_tests()
