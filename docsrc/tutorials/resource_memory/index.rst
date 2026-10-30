@@ -14,3 +14,4 @@ dynamic memory allocation, and low-CPU-memory compilation.
    Example: Weight Streaming <../_rendered_examples/dynamo/weight_streaming_example>
    Example: Dynamic Memory Allocation <../_rendered_examples/dynamo/dynamic_memory_allocation>
    Example: Low CPU Memory Compilation <../_rendered_examples/dynamo/low_cpu_memory_compilation>
+   Example: Compiling from Memory-Mapped Weights <../_rendered_examples/dynamo/compile_from_mapped_weights>

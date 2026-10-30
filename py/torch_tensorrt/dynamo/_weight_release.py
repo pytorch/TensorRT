@@ -17,6 +17,7 @@ from typing import Dict, Iterable
 
 import torch
 from torch.utils._python_dispatch import is_traceable_wrapper_subclass
+from torch_tensorrt.dynamo.tools.weight_mapping import release_mapped_storage
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +69,10 @@ def release_storage(storage: torch.UntypedStorage) -> int:
     nbytes = int(storage.nbytes())
     if nbytes == 0:
         return 0
+    # A weight mapped by map_weights is a view of a file: resize_ cannot free it, but its pages can be
+    # dropped (re-read from the file if used again).
+    if release_mapped_storage(storage):
+        return nbytes
     try:
         storage.resize_(0)
     except RuntimeError as e:  # e.g. a non-resizable storage over an external buffer
