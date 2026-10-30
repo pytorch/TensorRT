@@ -230,9 +230,9 @@ def lift(
 
             assert lift_val is not None and input_kind is not None
 
-            # Replace get_attr nodes with placeholder nodes and copy metadata. Each one
-            # goes right after the previous one, so they keep the order of input_specs
-            # also when there is no user input to insert before.
+            # Replace get_attr nodes with placeholder nodes and copy metadata. Chaining
+            # each one after the previous one keeps the order of input_specs, also when
+            # there is no user input.
             with (
                 gm.graph.inserting_after(last_lifted)
                 if last_lifted is not None
