@@ -321,6 +321,28 @@ class TestUInt8Support(TestCase):
                 )
                 torch.testing.assert_close(trt_mod(in_tensor), mod(in_tensor))
 
+    def test_uint8_shape_op_in_cond_branch(self):
+        class CondModule(nn.Module):
+            def forward(self, image, flag):
+                return torch.cond(
+                    flag.sum() > 0,
+                    lambda image: image.permute(2, 0, 1).float() / 255,
+                    lambda image: image.permute(2, 0, 1).float() / 127,
+                    (image,),
+                )
+
+        image = torch.randint(0, 256, (8, 8, 3), dtype=torch.uint8, device="cuda")
+        flag = torch.ones(2, device="cuda")
+        mod = CondModule()
+        trt_mod = torch_tensorrt.dynamo.compile(
+            torch.export.export(mod, (image, flag)),
+            arg_inputs=[image, flag],
+            min_block_size=1,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
+        )
+        torch.testing.assert_close(trt_mod(image, flag), mod(image, flag))
+
     def test_uint8_buffer_write(self):
         class Cache(nn.Module):
             def __init__(self):
