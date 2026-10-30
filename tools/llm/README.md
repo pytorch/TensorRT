@@ -1,11 +1,12 @@
 # Optimizing LLMs in Torch-TensorRT
 
-This directory provides utilities and scripts for compiling, optimizing, and benchmarking Large Language Models (LLMs) and Visual Language Models (VLMs) using Torch-TensorRT, with a focus on efficient inference on NVIDIA GPUs. The main entry points are `run_llm.py` for text-only LLMs and `run_vlm.py` for vision-language models. Note that this is an **experimental release** and APIs may change in future versions.
+This directory provides utilities and scripts for compiling, optimizing, and benchmarking Large Language Models (LLMs) and Visual Language Models (VLMs) using Torch-TensorRT, with a focus on efficient inference on NVIDIA GPUs. The main entry points are `run_llm.py` for text-only LLMs, `run_vlm.py` for vision-language models and `run_vla.py` for vision-language-action models (Alpamayo). Note that this is an **experimental release** and APIs may change in future versions.
 
 ### Key Features
 
 - **Model Support:** Works with popular LLMs such as Llama-3, Qwen2.5, etc.
 - **VLM Support:** Supports Visual Language Models like Qwen2.5-VL and Eagle2.
+- **VLA Support:** Runs the Alpamayo 1.5 vision-language-action model (Qwen3-VL backbone + action expert) end to end.
 - **Precision Modes:** Supports FP16, BF16, and FP32.
 - **Quantization:** Supports FP8 and NVFP4 quantization formats for reduced memory usage and improved inference speed.
 - **KV Cache:** Supports static and dynamic KV cache for efficient autoregressive decoding.
@@ -34,6 +35,12 @@ We have officially verified support for the following models:
 | Qwen 2.5 VL | Qwen/Qwen2.5-VL-3B-Instruct | FP16, FP32 | Yes |
 | Eagle2 | nvidia/Eagle2-2B | FP16, FP32 | Yes |
 
+### Supported VLA Models
+
+| Model Series | HF Model Card | Precision | KV Cache Supported ? |
+|--------------|---------------|-----------|-------------------|
+| Alpamayo 1.5 | nvidia/Alpamayo-1.5-10B | FP16, FP8 (ModelOpt checkpoint) | Yes (`static_cache_v2`) |
+
 ### Usage
 
 #### Text-only LLMs: `run_llm.py`
@@ -48,7 +55,35 @@ python run_llm.py --model meta-llama/Llama-3.2-1B-Instruct --prompt "What is par
 python run_vlm.py --model nvidia/Eagle2-2B --precision FP16 --num_tokens 128 --cache static_v1 --enable_pytorch_run --benchmark
 ```
 
+#### Vision-Language-Action models: `run_vla.py`
+
+`run_vla.py` runs [Alpamayo 1.5](https://huggingface.co/nvidia/Alpamayo-1.5-10B) (Qwen3-VL backbone + flow-matching
+action expert) as separate Torch-TensorRT engines for the vision tower, the text decoder (`static_cache_v2` on
+the unmodified Hugging Face layers, split into segments, chunked prefill) and the expert. It needs the
+`alpamayo1_5` package for the model and data.
+
+```bash
+python run_vla.py --mode build --component all --clip_id <clip uuid>      # one process per engine
+python run_vla.py --mode reference --clip_id <clip uuid> --save ref.pt    # PyTorch rollout
+python run_vla.py --mode run --clip_id <clip uuid> --ref ref.pt           # TensorRT rollout + comparison
+```
+
+`--model` can also be a ModelOpt FP8 checkpoint directory (one with a `modelopt_state.pth`; needs `nvidia-modelopt`).
+The FP8 path needs two workarounds for TensorRT problems before TensorRT 11.6, described in `maybe_separate_sibling_input_scales` and `maybe_disable_attention_output_quantizers`.
+
+Key arguments of `run_vla.py`:
+
+- `--mode`: `build` (compile and save the engines), `reference` (PyTorch rollout) or `run` (TensorRT rollout).
+- `--component`: Engine(s) to build (`vision`, `llm`, `expert`, `all`); `all` builds each in its own process.
+- `--model`: Alpamayo checkpoint, `nvidia/Alpamayo-1.5-10B` by default, or a ModelOpt FP8 checkpoint directory.
+- `--clip_id`: Dataset clip to run on (or `--parquet` with `--clip_index`).
+- `--engine_dir`: Where the engines are saved and loaded (`vla_engines` by default).
+- `--llm_segments`: Number of engines the text decoder is split into (2 by default) to keep build memory down.
+- `--save` / `--ref`: Write the reference results / compare the TensorRT rollout against them.
+
 #### Key Arguments
+
+Key arguments of `run_llm.py` (`run_vlm.py` takes a similar set):
 
 - `--model`: Name or path of the HuggingFace LLM/VLM.
 - `--tokenizer`: (Optional) Tokenizer name; defaults to model.
@@ -125,6 +160,10 @@ This codebase can be extended to
 
 - Torch-TensorRT 2.8.0
 - Transformers v4.52.3
+- For the VLA model (run_vla.py), developed with TensorRT 11.4, Transformers 5.20 and a PyTorch nightly:
+  - The `alpamayo1_5` package (model and dataset loading) and access to its dataset
+  - `nvidia-modelopt` for FP8 checkpoints
+  - A Transformers version with Qwen3-VL support
 - For VLM models (run_vlm.py):
   - `pip install qwen-vl-utils` (for Qwen2.5-VL-3B-Instruct model)
   - **Flash Attention**: For models using flash attention operations (e.g., Eagle2-2B), install one of the following:

@@ -1,18 +1,15 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
 
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union
+from typing import Any, Iterable, List, Optional, Tuple, Union
 
-import tensorrt
 import torch
-import torch_tensorrt
 from torch._export.utils import _detect_fake_mode_from_gm
 from torch._ops import OpOverloadPacket
 from torch._subclasses.fake_tensor import FakeTensor, FakeTensorMode
 from torch.fx import Graph, GraphModule, Node
-from torch.fx.node import Target
 from torch.fx.passes.shape_prop import _extract_tensor_metadata
-from torch.utils._pytree import _LEAF_SPEC
+from torch.utils._pytree import _LEAF_SPEC, TreeSpec
 
 
 def get_kv_nodes(gm):
@@ -105,7 +102,45 @@ def create_random_output_tensors(nodes: List[Node]) -> List[torch.Tensor]:
     return random_tensors
 
 
-def _add_graph_input(
+_PYTREE_INFO_FIELDS = ("orig_args", "in_spec", "out_spec")
+
+
+class PytreeInfoUnavailableError(RuntimeError):
+    """The graph has no pytree codegen info (it was not produced with a pytree calling convention)."""
+
+
+def _get_pytree_info(graph: Graph):
+    """Return the graph's pytree codegen info, the one place this module touches the private
+    ``Graph._codegen`` / ``_PyTreeInfo``.
+
+    torch.fx has no public API for changing a GraphModule's calling convention, so the info is read
+    and replaced through the codegen.
+
+    Raises:
+        PytreeInfoUnavailableError: the graph has no pytree codegen info.
+        RuntimeError: the info exists but torch changed its layout, so it cannot be used safely.
+    """
+    info = getattr(getattr(graph, "_codegen", None), "pytree_info", None)
+    if info is None:
+        raise PytreeInfoUnavailableError(
+            "Graph has no pytree codegen info (graph._codegen.pytree_info)"
+        )
+    missing = [f for f in (*_PYTREE_INFO_FIELDS, "_replace") if not hasattr(info, f)]
+    if missing:
+        raise RuntimeError(
+            f"Unsupported torch.fx pytree info layout for torch {torch.__version__}: "
+            f"{type(info).__name__} is missing {missing}"
+        )
+    return info
+
+
+def _set_pytree_info(graph: Graph, **changes: Any) -> None:
+    """Replace fields of the graph's pytree info (see ``_get_pytree_info``)."""
+    info = _get_pytree_info(graph)
+    graph._codegen.pytree_info = info._replace(**changes)
+
+
+def add_graph_input(
     gm: GraphModule, name: str, val: Optional[torch.Tensor] = None, dynamic_shape=None
 ) -> Node:
     """Add a graph input to the given GraphModule and return the newly created node.
@@ -125,25 +160,40 @@ def _add_graph_input(
     # extract graph and input spec
     graph: Graph = gm.graph
 
-    in_spec = graph._codegen.pytree_info.in_spec
-    in_spec_for_args = in_spec.children_specs[0]
-    orig_args = graph._codegen.pytree_info.orig_args
-    assert in_spec_for_args.type is tuple
+    # TreeSpec is frozen: validate everything first, then rebuild the specs with the extra leaf
+    # so a failure cannot leave the graph and its pytree info out of sync.
+    info = _get_pytree_info(graph)
+    in_spec: TreeSpec = info.in_spec
+    if in_spec.type is not tuple or in_spec.num_children != 2:
+        raise ValueError(
+            f"Unexpected in_spec structure (expected (args, kwargs)): {in_spec}"
+        )
+    args_spec = in_spec.child(0)
+    if args_spec.type is not tuple:
+        raise ValueError(
+            f"Expected positional args spec to be a tuple, got {args_spec.type}"
+        )
+    if any(n.name == name for n in graph.nodes):
+        raise ValueError(f"A node named '{name}' already exists in the graph")
+
+    new_args_spec = TreeSpec(
+        tuple, args_spec.context, args_spec.children() + [_LEAF_SPEC]
+    )
+    new_in_spec = TreeSpec(
+        in_spec.type,
+        in_spec.context,
+        [new_args_spec, *in_spec.children()[1:]],
+    )
+    new_orig_args = [*info.orig_args, f"arg_{name}"]
 
     # insert input node after currently last input node
     node_last_input = graph.find_nodes(op="placeholder", sort=True)[-1]
     with graph.inserting_after(node_last_input):
         in_node = graph.placeholder(name)
-        in_spec_for_args.children_specs.append(_LEAF_SPEC)
-        orig_args.append(f"arg_{name}")
 
-    # update pytree info recursively with __post_init__ starting at leaves
-    def call_post_init(spec):
-        for child_spec in spec.children_specs:
-            call_post_init(child_spec)
-        spec.__post_init__()
-
-    call_post_init(in_spec)
+    _set_pytree_info(graph, in_spec=new_in_spec, orig_args=new_orig_args)
+    if hasattr(gm, "_in_spec"):
+        gm._in_spec = new_in_spec
 
     # set fake tensor information if all required information is available
     fake_mode: Optional[FakeTensorMode] = _detect_fake_mode_from_gm(gm)
@@ -167,10 +217,11 @@ def set_output_spec(gm: GraphModule, out_spec: Any) -> None:
     recompiles after the lowering passes). The codegen's ``pytree_info`` is the source of truth.
     """
     gm._out_spec = out_spec
-    codegen = gm.graph._codegen
-    info = getattr(codegen, "pytree_info", None)
-    if info is not None:
-        codegen.pytree_info = info._replace(out_spec=out_spec)
+    try:
+        _set_pytree_info(gm.graph, out_spec=out_spec)
+    except PytreeInfoUnavailableError:
+        # no pytree codegen: ``gm._out_spec`` alone is authoritative
+        pass
 
 
 def is_op(node: Node, ops: Union[OpOverloadPacket, Iterable[OpOverloadPacket]]) -> bool:
