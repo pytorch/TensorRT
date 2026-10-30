@@ -160,7 +160,8 @@ def lift(
     state_dict = gm.state_dict()
     constants = {}
 
-    # A program with no inputs has no placeholder to take the fake mode from.
+    # When no input is a tensor (no inputs, or only ints), the fake mode comes from
+    # the other nodes.
     fake_mode = _detect_fake_mode_from_gm(gm)
     assert fake_mode is not None
 
