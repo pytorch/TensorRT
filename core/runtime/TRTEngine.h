@@ -217,6 +217,14 @@ struct TRTEngine : torch::CustomClassHolder {
   Platform target_platform;
 
   ~TRTEngine();
+  // Allocate in libtorchtrt so callers do not depend on sizeof(TRTEngine).
+  static c10::intrusive_ptr<TRTEngine> create(
+      const std::string& mod_name,
+      std::string_view serialized_engine,
+      const RTDevice& cuda_device,
+      const std::vector<std::string>& in_binding_names,
+      const std::vector<std::string>& out_binding_names);
+
   TRTEngine(
       const std::string& serialized_engine,
       const RTDevice& cuda_device,
