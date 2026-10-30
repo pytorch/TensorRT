@@ -973,6 +973,77 @@ def test_only_user_docs_may_print_the_release_install(
             test_every_printed_install_instruction_names_the_nightly_channel()
 
 
+def _release_installs(text: str) -> list:
+    """Requirements of this project's packages in each release (non ``--pre``) install command.
+
+    Commands are found with the scanner the other install checks use, so every pip spelling
+    counts, and names compare canonically. Installs of unrelated packages are ignored.
+    """
+    from packaging.requirements import InvalidRequirement, Requirement
+
+    ours = {"torch-tensorrt", "executorch", "torch-tensorrt-executorch-runtime"}
+    installs = []
+    for match in _INSTALL_INVOCATION.finditer(_blank_comments_preserving_length(text)):
+        window = _install_invocation_window(text, match.start())
+        argv = shlex.split(window.replace("\\\n", " "))
+        if "--pre" in argv:
+            continue
+        named = []
+        for arg in argv:
+            try:
+                requirement = Requirement(arg)
+            except InvalidRequirement:
+                continue
+            if canonicalize_name(requirement.name) in ours:
+                named.append(requirement)
+        if named:
+            installs.append(named)
+    return installs
+
+
+def _is_the_release_install(installs: list) -> bool:
+    if len(installs) != 1 or len(installs[0]) != 1:
+        return False
+    (requirement,) = installs[0]
+    return (
+        canonicalize_name(requirement.name) == "torch-tensorrt"
+        and requirement.extras == {"executorch"}
+        and not requirement.specifier
+    )
+
+
+@pytest.mark.unit
+def test_the_release_install_is_one_command() -> None:
+    """The guide installs this release from PyPI with the extra alone.
+
+    The release's PyPI wheel is built for the CUDA version of PyTorch's PyPI wheel, and once the
+    pin is an ExecuTorch release its extra brings ExecuTorch's CUDA build and the delegate built
+    with it, so naming either would only let them drift apart.
+    """
+    guide = REPO_ROOT / "docsrc/user_guide/runtime_performance/executorch.rst"
+    installs = _release_installs(guide.read_text(encoding="utf-8"))
+    assert _is_the_release_install(installs), installs
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "extra_line, still_one_command",
+    [
+        ("python -m pip install executorch==1.6.0", False),
+        ("uv pip install torch-tensorrt-executorch-runtime==0.2.0", False),
+        ("pip install pillow", True),
+        ("pip install matplotlib  # the guide's plots", True),
+    ],
+)
+def test_release_install_check_reads_every_pip_spelling(
+    extra_line: str, still_one_command: bool
+) -> None:
+    release = 'pip install "torch-tensorrt[executorch]"\n'
+    assert _is_the_release_install(_release_installs(release))
+    installs = _release_installs(release + extra_line + "\n")
+    assert _is_the_release_install(installs) == still_one_command, installs
+
+
 @pytest.mark.unit
 @pytest.mark.parametrize("variable", [False, True])
 def test_install_channel_check_detects_removed_suffix_fix(
