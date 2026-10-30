@@ -32,10 +32,12 @@ from torch_tensorrt.dynamo.lowering import (
     get_decompositions,
     post_lowering,
     pre_export_lowering,
+    remove_alias_from_exported_program,
 )
 from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
     ENGINE_IDX,
     SERIALIZED_METADATA_IDX,
+    create_cpp_engine,
 )
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
 from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
@@ -275,6 +277,7 @@ def refit_module_weights(
             new_weight_module.graph_module,
         )
     )
+    new_weight_module = remove_alias_from_exported_program(new_weight_module)
     new_gm = new_weight_module.module()
 
     logger.debug("Input graph: " + str(new_gm.graph))
@@ -423,38 +426,41 @@ def refit_module_weights(
         if hasattr(trt.SerializationFlag, "INCLUDE_REFIT"):
             serialization_config.set_flag(trt.SerializationFlag.INCLUDE_REFIT)
         serialized_engine = engine.serialize_with_config(serialization_config)
+        # Only the plan is needed from here on. Free the refitted copy before the
+        # runtime engine is rebuilt from it, so the weights are not on the device twice.
+        # The serialization config keeps its engine alive, so it has to go too.
+        del engine, serialization_config
 
         if isinstance(compiled_submodule, TorchTensorRTModule):
-            new_serialized_engine = bytes(serialized_engine)
-            compiled_submodule.serialized_engine = new_serialized_engine
             if isinstance(compiled_submodule.engine, TRTEngine):
                 # Refit already updated ``cuda_engine`` in place; avoid deserialize (slow).
+                new_serialized_engine = bytes(serialized_engine)
+                compiled_submodule.serialized_engine = new_serialized_engine
                 py_eng = compiled_submodule.engine
                 py_eng.serialized_info[ENGINE_IDX] = new_serialized_engine
                 py_eng.serialized_engine = new_serialized_engine
             else:
+                compiled_submodule.serialized_engine = serialized_engine
                 compiled_submodule.engine = None
                 compiled_submodule.setup_engine()
         elif inline_module:
             new_engine_info = list(engine_info)
-            new_engine_info[ENGINE_IDX] = bytes(serialized_engine)
-            refitted_engine = torch.classes.tensorrt.Engine(tuple(new_engine_info))
+            new_engine_info[ENGINE_IDX] = serialized_engine
+            refitted_engine = create_cpp_engine(new_engine_info)
             setattr(compiled_module, f"{name}_engine", refitted_engine)
         elif isinstance(compiled_submodule, torch.nn.Module):
             # Torch retrace module
             new_engine_info = list(engine_info)
-            new_engine_info[ENGINE_IDX] = bytes(serialized_engine)
-            refitted_engine = torch.classes.tensorrt.Engine(tuple(new_engine_info))
+            new_engine_info[ENGINE_IDX] = serialized_engine
+            refitted_engine = create_cpp_engine(new_engine_info)
             compiled_submodule.engine = refitted_engine
-        del engine
+        del serialized_engine
         gc.collect()
         torch.cuda.empty_cache()
 
     if verify_output and arg_inputs is not None:
         new_gm.to(to_torch_device(settings.device))  # move to device for inference
-        # A complex placeholder stays complex in the lowered reference module; the
-        # unpacking to real happens inside the graph, so both modules take the same
-        # inputs the caller passed.
+        _restore_complex_io(new_gm)
         outputs_match = check_module_output(
             new_module=new_gm,
             refitted_module=compiled_module,
@@ -469,6 +475,42 @@ def refit_module_weights(
         logger.info("Refitting Completed! Output verification skipped.")
 
     return compiled_module
+
+
+def _restore_complex_io(gm: torch.fx.GraphModule) -> None:
+    """Make the lowered reference module take and return complex tensors, as the
+    compiled module does, so the output check can compare the two.
+
+    The legacy complex rewriter replaces a complex input with a real
+    "<name>_unpacked_complex" one, and both complex lowerings return a complex
+    output as a real tensor with a trailing dimension of 2.
+    """
+    graph = gm.graph
+    unpacked = {f"{n}_unpacked_complex" for n in gm.meta.get("complex_input_names", [])}
+    for node in list(graph.nodes):
+        if node.op == "placeholder" and node.name in unpacked:
+            with graph.inserting_after(node):
+                real = graph.call_function(torch.ops.aten.view_as_real.default, (node,))
+            node.replace_all_uses_with(real)
+            real.args = (node,)
+    output_node = list(graph.nodes)[-1]
+    output_arg = output_node.args[0]
+    outputs = (
+        list(output_arg) if isinstance(output_arg, (list, tuple)) else [output_arg]
+    )
+    for idx in gm.meta.get("complex_output_indices", []):
+        with graph.inserting_before(output_node):
+            outputs[idx] = graph.call_function(
+                torch.ops.aten.view_as_complex.default, (outputs[idx],)
+            )
+    output_node.args = (
+        (
+            type(output_arg)(outputs)
+            if isinstance(output_arg, (list, tuple))
+            else outputs[0]
+        ),
+    )
+    gm.recompile()
 
 
 # Util functions -----------

@@ -5,7 +5,6 @@ import base64
 import copy
 import logging
 import operator
-import os
 from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple
 
 import torch
@@ -27,6 +26,10 @@ from torch.export.exported_program import (
 )
 from torch.fx.graph import _PyTreeCodeGen
 from torch_tensorrt._features import ENABLED_FEATURES
+from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
+    create_cpp_engine,
+    plan_buffer,
+)
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import ENGINE_IDX, NAME_IDX
 
 logger = logging.getLogger(__name__)
@@ -587,8 +590,8 @@ def create_trt_exp_program(
     #      gm.meta["inline_constraints"] to be a dict; TRT graph modules don't
     #      set it so we default it to {} if absent.
     #   2. No dynamic_shapes (or no example inputs): harvest every SymInt free
-    #      symbol from placeholder meta["val"] shapes and look up its bound
-    #      directly in the shape_env.  This is the retrace=False path where the
+    #      symbol from tensor shapes and scalar placeholder values, then look up
+    #      its bound directly in the shape_env.  This is the retrace=False path where the
     #      caller didn't supply inputs.
     fake_mode = detect_fake_mode(
         tuple(
@@ -619,15 +622,21 @@ def create_trt_exp_program(
                 num_lifted_inputs=0,
             )
         else:
-            # Path 2: harvest bounds from shape_env for any SymInt dims present.
+            # Path 2: preserve tensor dimensions and scalar inputs such as KV
+            # cache start/end indices. Deserialization needs bounds for both.
             shape_env = fake_mode.shape_env
             for node in gm.graph.nodes:
                 if node.op != "placeholder" or "val" not in node.meta:
                     continue
                 val = node.meta["val"]
-                if not isinstance(val, torch.Tensor):
+                symbolic_values: Sequence[Any]
+                if isinstance(val, torch.Tensor):
+                    symbolic_values = val.shape
+                elif isinstance(val, torch.SymInt):
+                    symbolic_values = (val,)
+                else:
                     continue
-                for d in val.shape:
+                for d in symbolic_values:
                     if isinstance(d, torch.SymInt):
                         for sym in d.node.expr.free_symbols:
                             if (
@@ -1032,7 +1041,9 @@ def inline_trt_modules(
             if cross_compile_module:
                 engine_info = trt_module._pack_engine_info()
                 engine_bytes = engine_info[ENGINE_IDX]
-                engine_info[ENGINE_IDX] = base64.b64encode(engine_bytes).decode("utf-8")
+                engine_info[ENGINE_IDX] = base64.b64encode(
+                    plan_buffer(engine_bytes)
+                ).decode("utf-8")
                 trt_node = gm.graph.call_function(
                     torch.ops.tensorrt.no_op_placeholder_for_execute_engine.default,
                     (tuple(engine_inputs), *engine_info),
@@ -1044,14 +1055,12 @@ def inline_trt_modules(
             ):
                 # The engine is still on disk (engine_output_dir): pass it as a uint8 buffer mapped
                 # from its file, the form the ExecuTorch backend packs, so it is never loaded on the
-                # GPU and its pages are read only when the backend copies them into the program.
+                # GPU; the backend streams the file itself into the program.
                 # A Python-only build registers the placeholder op only with meta_ops.
                 import torch_tensorrt.dynamo.runtime.meta_ops.register_meta_ops  # noqa: F401
+                from torch_tensorrt.executorch._export_utils import engine_file_tensor
 
-                path = trt_module.serialized_engine_path
-                engine_tensor = torch.from_file(
-                    path, shared=False, size=os.path.getsize(path), dtype=torch.uint8
-                )
+                engine_tensor = engine_file_tensor(trt_module.serialized_engine_path)
                 buffer_name = f"{name}_engine"
                 gm.register_buffer(buffer_name, engine_tensor)
                 engine_node = gm.graph.get_attr(buffer_name)
@@ -1281,7 +1290,7 @@ def replace_execute_engine_no_op_node(
                 engine_bytes.encode("utf-8")
             )
             if ENABLED_FEATURES.torch_tensorrt_runtime:
-                trt_engine = torch.classes.tensorrt.Engine(tuple(packed_engine_info))
+                trt_engine = create_cpp_engine(packed_engine_info)
             else:
                 from torch_tensorrt.dynamo.runtime._TRTEngine import TRTEngine
 

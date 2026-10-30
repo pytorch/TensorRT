@@ -17,11 +17,15 @@ namespace torch_tensorrt {
 namespace executorch_backend {
 namespace {
 
-// TR02 marks a blob whose metadata carries aliased_io; TR01 is one without.
-// This parser handles aliased_io, so it accepts either, and holds TR02 to its
-// promise: see the cross-check at the end of parse_metadata_json.
+// TR01: the engine is inline. TR02: inline, and the metadata carries aliased_io.
+// TR03: the engine is named data (engine_key) and the blob carries none, with or
+// without aliased_io; a parser that predates engine_key would read an empty engine,
+// so the new magic makes it refuse the blob up front. This parser accepts all three,
+// holds TR02 to its promise (see the cross-check at the end of parse_metadata_json),
+// and holds TR03 to naming its engine (see the end of parse).
 constexpr char TENSORRT_MAGIC[4] = {'T', 'R', '0', '1'};
 constexpr char TENSORRT_MAGIC_ALIASED_IO[4] = {'T', 'R', '0', '2'};
+constexpr char TENSORRT_MAGIC_NAMED_ENGINE[4] = {'T', 'R', '0', '3'};
 constexpr uint32_t METADATA_OFFSET_FIELD_OFFSET = 4;
 constexpr uint32_t METADATA_SIZE_FIELD_OFFSET = 8;
 constexpr uint32_t ENGINE_OFFSET_FIELD_OFFSET = 12;
@@ -474,6 +478,22 @@ bool parse_metadata_json(const std::string& json, bool expects_aliased_io, Tenso
   if (expects_aliased_io && out.aliased_io.empty()) {
     return false;
   }
+  out.engine_key.clear();
+  const std::size_t engine_key_pos = find_top_level_key(json, "\"engine_key\"");
+  if (engine_key_pos != std::string::npos) {
+    const std::size_t colon = json.find(':', engine_key_pos);
+    if (colon == std::string::npos ||
+        parse_string(json, skip_ws(json, colon + 1), out.engine_key) == std::string::npos || out.engine_key.empty()) {
+      return false;
+    }
+  }
+  // Only an error message reads it, so a value that is not a string is ignored rather than refused.
+  out.tensorrt_version.clear();
+  const std::size_t version_key = find_top_level_key(json, "\"tensorrt_version\"");
+  if (version_key != std::string::npos &&
+      parse_string(json, skip_ws(json, json.find(':', version_key) + 1), out.tensorrt_version) == std::string::npos) {
+    out.tensorrt_version.clear();
+  }
   const std::size_t hw_key = find_top_level_key(json, "\"hardware_compatible\"");
   const std::size_t device_key = find_top_level_key(json, "\"device_id\"");
   return parse_bool_after_key(json, hw_key, "\"hardware_compatible\"", out.hardware_compatible) &&
@@ -493,7 +513,9 @@ bool TensorRTBlobHeader::parse(const void* data, std::size_t size, TensorRTBlobH
 
   const auto* bytes = static_cast<const uint8_t*>(data);
   const bool aliased_io_magic = std::memcmp(bytes, TENSORRT_MAGIC_ALIASED_IO, sizeof(TENSORRT_MAGIC_ALIASED_IO)) == 0;
-  if (!aliased_io_magic && std::memcmp(bytes, TENSORRT_MAGIC, sizeof(TENSORRT_MAGIC)) != 0) {
+  const bool named_engine_magic =
+      std::memcmp(bytes, TENSORRT_MAGIC_NAMED_ENGINE, sizeof(TENSORRT_MAGIC_NAMED_ENGINE)) == 0;
+  if (!aliased_io_magic && !named_engine_magic && std::memcmp(bytes, TENSORRT_MAGIC, sizeof(TENSORRT_MAGIC)) != 0) {
     return false;
   }
 
@@ -532,7 +554,10 @@ bool TensorRTBlobHeader::parse(const void* data, std::size_t size, TensorRTBlobH
   }
 
   std::string json(reinterpret_cast<const char*>(bytes + out.metadata_offset), out.metadata_size);
-  return parse_metadata_json(json, aliased_io_magic, out);
+  // An engine is either inline or named, never both, so neither copy can be silently ignored,
+  // and the magic says which: named exactly when it is TR03.
+  return parse_metadata_json(json, aliased_io_magic, out) && out.engine_key.empty() == (out.engine_size != 0) &&
+      out.engine_key.empty() != named_engine_magic;
 }
 
 } // namespace executorch_backend

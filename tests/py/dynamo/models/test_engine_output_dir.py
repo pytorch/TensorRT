@@ -51,7 +51,7 @@ def test_engines_stay_on_disk_until_first_use(tmp_path):
     files = sorted(glob.glob(str(tmp_path / "*.engine")))
     assert sorted(m.serialized_engine_path for m in engines) == files
     # Nothing loaded on the GPU, nothing held on the host.
-    assert all(m.engine is None and m.serialized_engine is None for m in engines)
+    assert all(m.engine is None and m._serialized_engine is None for m in engines)
     # The last engine's outputs are marked unowned at compile time and applied when it loads.
     assert engines[-1].are_output_tensors_unowned()
 
@@ -107,28 +107,32 @@ def test_executorch_save_reads_engines_from_their_files(tmp_path, monkeypatch):
     assert abs(len(pte) - len(mem)) < 1024
 
 
-@pytest.mark.skipif(not os.path.exists("/proc/self/maps"), reason="reads /proc")
-def test_executorch_backend_drops_only_engine_file_pages(tmp_path):
+def test_executorch_save_streams_engines_from_their_files(tmp_path, monkeypatch):
+    """The backend hands ExecuTorch each engine file itself, which streams it into the
+    .pte, rather than reading the engine into memory first."""
     pytest.importorskip("executorch.exir")
-    from torch_tensorrt.executorch.backend import _drop_engine_file_pages
+    from executorch.exir._serialize._cord import FileBackedData
+    from executorch.exir._serialize._named_data_store import NamedDataStore
 
-    def rss_file_mib():
-        status = dict(line.split(":", 1) for line in open("/proc/self/status"))
-        return int(status["RssFile"].split()[0]) / 1024
+    _, x, trt, engines = _compile(tmp_path, engine_output_dir=str(tmp_path / "engines"))
+    added = []
+    real_add = NamedDataStore.add_named_data
 
-    data = os.urandom(64 << 20)
-    path = tmp_path / "x.engine"
-    path.write_bytes(data)
-    engine = torch.from_file(str(path), shared=False, size=len(data), dtype=torch.uint8)
-    assert engine.numpy().tobytes() == data
-    before = rss_file_mib()
-    _drop_engine_file_pages(engine)
-    assert before - rss_file_mib() > 60
-    assert engine.numpy().tobytes() == data
+    def recording(self, key, data, *args, **kwargs):
+        added.append(data)
+        return real_add(self, key, data, *args, **kwargs)
 
-    anonymous = torch.frombuffer(bytearray(data), dtype=torch.uint8)
-    _drop_engine_file_pages(anonymous)
-    assert anonymous.numpy().tobytes() == data
+    monkeypatch.setattr(NamedDataStore, "add_named_data", recording)
+    torch_tensorrt.save(
+        trt,
+        str(tmp_path / "model.pte"),
+        output_format="executorch",
+        arg_inputs=[x],
+        retrace=False,
+    )
+    assert all(isinstance(data, FileBackedData) for data in added)
+    # ExecuTorch adds each entry again when it merges the delegate's store into the program's.
+    assert {data._path for data in added} == {m.serialized_engine_path for m in engines}
 
 
 def test_engine_files_are_not_needed_in_memory_mode(tmp_path):

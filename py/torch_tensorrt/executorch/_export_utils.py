@@ -5,12 +5,18 @@ from __future__ import annotations
 
 import copy
 import logging
+import os
+import warnings
 from typing import Any, Sequence
 
 import torch
 from torch._library.fake_class_registry import FakeScriptObject
 from torch._subclasses.fake_tensor import is_fake
 from torch.export.graph_signature import InputKind
+from torch.fx.experimental.symbolic_shapes import (
+    guarding_hint_or_throw,
+    has_guarding_hint,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -91,8 +97,39 @@ def get_engine_info_from_state(
     return list(state[0] if isinstance(state, tuple) else state)
 
 
-def validate_engine_info(engine_info: Sequence[Any], *, node_name: str = "") -> None:
-    """Reject engine configurations unsupported by ExecuTorch export."""
+def _output_shapes_are_known(engine_obj: Any, node: Any) -> bool:
+    """Whether the engine knows every output shape for this node's input shapes.
+
+    Torch-TensorRT marks an engine as needing an output allocator when any of its
+    operations has a data-dependent shape, which also keeps CUDA graphs off for it.
+    Only an output with such a shape needs the allocator ExecuTorch lacks. An input
+    without a concrete example shape makes the answer False, since nothing proves
+    the outputs known.
+    """
+    input_shapes = []
+    for arg in node.args[0]:
+        val = arg.meta.get("val") if isinstance(arg, torch.fx.Node) else None
+        if not isinstance(val, torch.Tensor):
+            return False
+        if not all(has_guarding_hint(dim) for dim in val.shape):
+            return False
+        input_shapes.append([guarding_hint_or_throw(dim) for dim in val.shape])
+    output_shapes = engine_obj.infer_outputs(input_shapes)
+    return all(
+        -1 not in tuple(getattr(shape, "shape", shape)) for shape in output_shapes
+    )
+
+
+def validate_engine_info(
+    engine_info: Sequence[Any],
+    *,
+    node_name: str = "",
+    cause: BaseException | None = None,
+) -> None:
+    """Reject engine configurations unsupported by ExecuTorch export.
+
+    ``cause`` is chained to the refusal, so the error behind it stays visible.
+    """
     from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
         REQUIRES_OUTPUT_ALLOCATOR_IDX,
     )
@@ -106,7 +143,7 @@ def validate_engine_info(engine_info: Sequence[Any], *, node_name: str = "") -> 
             "ExecuTorch export does not support TensorRT engines that require "
             "an output allocator (data-dependent output shapes)"
             f"{node_suffix}."
-        )
+        ) from cause
 
 
 def _schema_name(node: Any) -> str:
@@ -188,7 +225,10 @@ def _resolve_engine_tensor(exported_program: Any, node: Any) -> "torch.Tensor":
         engine_obj = _resolve_engine_object(exported_program, node)
         raw = getattr(engine_obj, "serialized_engine_tensor", None)
         if raw is not None:
-            return raw()
+            # raw() views TensorRT's own buffer, and the returned tensor stays registered on
+            # the program until the save ends. ExecuTorch writes named data only from
+            # bytes, so copy now, while TensorRT's buffer is the only other copy.
+            return engine_bytes_tensor(raw().numpy().tobytes())
         _warn_missing_accessor("serialized_engine_tensor")
 
     engine_bytes = _resolve_engine_info(exported_program, node)[ENGINE_IDX]
@@ -196,9 +236,61 @@ def _resolve_engine_tensor(exported_program: Any, node: Any) -> "torch.Tensor":
         import base64
 
         engine_bytes = base64.b64decode(engine_bytes)
-    elif not isinstance(engine_bytes, (bytes, bytearray)):
+    elif not isinstance(engine_bytes, bytes):
         engine_bytes = bytes(engine_bytes)
-    return torch.frombuffer(bytearray(engine_bytes), dtype=torch.uint8)
+    return engine_bytes_tensor(engine_bytes)
+
+
+# The attribute engine_bytes_tensor sets and TensorRTBackend.preprocess reads back.
+ENGINE_BYTES_ATTR = "_trt_engine_bytes"
+
+
+def engine_bytes_tensor(engine_bytes: bytes) -> "torch.Tensor":
+    """A uint8 view of ``engine_bytes`` that remembers the ``bytes`` object.
+
+    ExecuTorch stores named data only as ``bytes``, so ``TensorRTBackend.preprocess``
+    reads ``ENGINE_BYTES_ATTR`` back to hand over this same object rather than a copy.
+    Nothing writes an engine buffer, so viewing read-only memory is safe.
+    """
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="The given buffer is not writable")
+        tensor = torch.frombuffer(engine_bytes, dtype=torch.uint8)
+    setattr(tensor, ENGINE_BYTES_ATTR, engine_bytes)
+    return tensor
+
+
+# Engine files mapped by engine_file_tensor, by the address of their mapping. Lowering hands
+# the backend another tensor object over the same storage, so an attribute would be lost.
+_ENGINE_FILES: dict[int, str] = {}
+
+
+def engine_file_tensor(path: str) -> "torch.Tensor":
+    """A uint8 tensor mapped from an engine file (``engine_output_dir``).
+
+    ``TensorRTBackend.preprocess`` finds the file again with ``engine_file_of`` and hands
+    ExecuTorch the file itself, which streams it into the ``.pte``, so the engine is never
+    read into memory.
+    """
+    tensor = torch.from_file(
+        path, shared=False, size=os.path.getsize(path), dtype=torch.uint8
+    )
+    _ENGINE_FILES[tensor.data_ptr()] = path
+    return tensor
+
+
+def engine_file_of(tensor: Any) -> "str | None":
+    """The engine file ``tensor`` was mapped from by ``engine_file_tensor``, else None."""
+    if not isinstance(tensor, torch.Tensor) or tensor.dtype != torch.uint8:
+        return None
+    path = _ENGINE_FILES.get(tensor.data_ptr())
+    # The size check keeps a reused address from naming a file it did not come from.
+    if (
+        path is None
+        or not os.path.exists(path)
+        or os.path.getsize(path) != tensor.numel()
+    ):
+        return None
+    return path
 
 
 def validate_engine_program(
@@ -209,12 +301,19 @@ def validate_engine_program(
     Resolving an engine serializes it, so pass a dict as ``resolved`` to keep what was
     resolved here and let the rewrite reuse it instead of serializing a second time.
 
-    Validation reads only metadata, so the records kept in ``resolved`` are
-    metadata-only: their ENGINE_IDX slot is empty. The rewrite reuses them for the
+    Validation reads each engine's metadata. For an engine marked as needing an
+    output allocator it also asks the live engine for its output shapes, which sets
+    the node's input shapes on the engine's execution context and creates the context
+    if no run has yet. The records kept in ``resolved`` are metadata-only: their
+    ENGINE_IDX slot is empty. The rewrite reuses them for the
     plain-string slots and takes the engine itself from :func:`_resolve_engine_tensor`,
     which never reads a cached record's ENGINE_IDX -- so a metadata-only record is
     never cross-served as the engine bytes.
     """
+    from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
+        REQUIRES_OUTPUT_ALLOCATOR_IDX,
+    )
+
     count = 0
     # One engine can feed several execute_engine nodes, and resolving it again would
     # serialize it again and keep a second copy of the bytes.
@@ -241,7 +340,28 @@ def validate_engine_program(
             )
             if engine_node is not None:
                 by_engine_node[engine_node] = engine_info
-        validate_engine_info(engine_info, node_name=node.name)
+        inference_error = None
+        if (
+            node.target is torch.ops.tensorrt.execute_engine.default
+            and len(engine_info) > REQUIRES_OUTPUT_ALLOCATOR_IDX
+            and str(engine_info[REQUIRES_OUTPUT_ALLOCATOR_IDX]) == "1"
+        ):
+            try:
+                shapes_known = _output_shapes_are_known(
+                    _resolve_engine_object(exported_program, node), node
+                )
+            except RuntimeError as error:
+                # The C++ engine raises when it cannot create an output for an
+                # unknown dimension, but also when anything else fails, so the
+                # refusal keeps the error as its cause.
+                shapes_known, inference_error = False, error
+            if shapes_known:
+                # ExecuTorch needs no output allocator then. This record becomes
+                # the ExecuTorch engine's arguments, and the backend refuses a
+                # marked one.
+                engine_info = list(engine_info)
+                engine_info[REQUIRES_OUTPUT_ALLOCATOR_IDX] = "0"
+        validate_engine_info(engine_info, node_name=node.name, cause=inference_error)
         if resolved is not None:
             resolved[node.name] = engine_info
         count += 1

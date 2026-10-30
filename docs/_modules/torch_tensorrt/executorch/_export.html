@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=0866734c"></script>
+    <script src="../../../_static/documentation_options.js?v=d9553575"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -755,8 +755,8 @@ document.write(`
 <span class="sd">    """</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">executorch.exir.backend.compile_spec_schema</span><span class="w"> </span><span class="kn">import</span> <span class="n">CompileSpec</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch.partitioner</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-        <span class="n">normalize_weight_streaming_budget_per_engine</span><span class="p">,</span>
         <span class="n">WEIGHT_STREAMING_BUDGET_COMPILE_SPEC_KEY</span><span class="p">,</span>
+        <span class="n">normalize_weight_streaming_budget_per_engine</span><span class="p">,</span>
     <span class="p">)</span>
 
     <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">specs</span> <span class="ow">in</span> <span class="n">method_compile_specs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
@@ -776,6 +776,100 @@ document.write(`
         <span class="k">return</span>
     <span class="k">for</span> <span class="n">specs</span> <span class="ow">in</span> <span class="n">method_compile_specs</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
         <span class="n">specs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">CompileSpec</span><span class="p">(</span><span class="n">WEIGHT_STREAMING_BUDGET_COMPILE_SPEC_KEY</span><span class="p">,</span> <span class="n">spec_value</span><span class="p">))</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_apply_use_cuda_graphs</span><span class="p">(</span>
+    <span class="n">method_compile_specs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="n">Any</span><span class="p">]],</span>
+    <span class="n">use_cuda_graphs</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Apply the typed replay choice to each method, rejecting raw specs."""</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">executorch.exir.backend.compile_spec_schema</span><span class="w"> </span><span class="kn">import</span> <span class="n">CompileSpec</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch.partitioner</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+        <span class="n">CUDA_GRAPHS_COMPILE_SPEC_KEY</span><span class="p">,</span>
+        <span class="n">normalize_use_cuda_graphs</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">specs</span> <span class="ow">in</span> <span class="n">method_compile_specs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">if</span> <span class="nb">any</span><span class="p">(</span>
+            <span class="nb">getattr</span><span class="p">(</span><span class="n">spec</span><span class="p">,</span> <span class="s2">"key"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="o">==</span> <span class="n">CUDA_GRAPHS_COMPILE_SPEC_KEY</span> <span class="k">for</span> <span class="n">spec</span> <span class="ow">in</span> <span class="n">specs</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"compile_specs for </span><span class="si">{</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> carries a "</span>
+                <span class="sa">f</span><span class="s2">"CompileSpec(</span><span class="si">{</span><span class="n">CUDA_GRAPHS_COMPILE_SPEC_KEY</span><span class="si">!r}</span><span class="s2">, ...). Pass "</span>
+                <span class="s2">"use_cuda_graphs= instead."</span>
+            <span class="p">)</span>
+    <span class="n">spec_value</span> <span class="o">=</span> <span class="n">normalize_use_cuda_graphs</span><span class="p">(</span><span class="n">use_cuda_graphs</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">spec_value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span>
+    <span class="k">for</span> <span class="n">specs</span> <span class="ow">in</span> <span class="n">method_compile_specs</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+        <span class="n">specs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">CompileSpec</span><span class="p">(</span><span class="n">CUDA_GRAPHS_COMPILE_SPEC_KEY</span><span class="p">,</span> <span class="n">spec_value</span><span class="p">))</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_apply_external_engine_data</span><span class="p">(</span>
+    <span class="n">method_compile_specs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="n">Any</span><span class="p">]],</span>
+    <span class="n">external_engine_data</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Point every method's TensorRT engines at the named .ptd file, rejecting raw specs."""</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">executorch.exir.backend.compile_spec_schema</span><span class="w"> </span><span class="kn">import</span> <span class="n">CompileSpec</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch.backend</span><span class="w"> </span><span class="kn">import</span> <span class="n">EXTERNAL_ENGINE_DATA_COMPILE_SPEC_KEY</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch.partitioner</span><span class="w"> </span><span class="kn">import</span> <span class="n">normalize_external_engine_data</span>
+
+    <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">specs</span> <span class="ow">in</span> <span class="n">method_compile_specs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">if</span> <span class="nb">any</span><span class="p">(</span>
+            <span class="nb">getattr</span><span class="p">(</span><span class="n">spec</span><span class="p">,</span> <span class="s2">"key"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="o">==</span> <span class="n">EXTERNAL_ENGINE_DATA_COMPILE_SPEC_KEY</span>
+            <span class="k">for</span> <span class="n">spec</span> <span class="ow">in</span> <span class="n">specs</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"compile_specs for </span><span class="si">{</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> carries a "</span>
+                <span class="sa">f</span><span class="s2">"CompileSpec(</span><span class="si">{</span><span class="n">EXTERNAL_ENGINE_DATA_COMPILE_SPEC_KEY</span><span class="si">!r}</span><span class="s2">, ...). Pass "</span>
+                <span class="s2">"external_engine_data= instead."</span>
+            <span class="p">)</span>
+    <span class="n">spec_value</span> <span class="o">=</span> <span class="n">normalize_external_engine_data</span><span class="p">(</span><span class="n">external_engine_data</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">spec_value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span>
+    <span class="k">for</span> <span class="n">specs</span> <span class="ow">in</span> <span class="n">method_compile_specs</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+        <span class="n">specs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">CompileSpec</span><span class="p">(</span><span class="n">EXTERNAL_ENGINE_DATA_COMPILE_SPEC_KEY</span><span class="p">,</span> <span class="n">spec_value</span><span class="p">))</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_apply_zero_copy_kv</span><span class="p">(</span>
+    <span class="n">program_map</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">ExportedProgram</span><span class="p">],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">"""Hand each method's aliased buffers to the engine to update in place.</span>
+
+<span class="sd">    Runs immediately after the mutations are declared and before anything</span>
+<span class="sd">    partitions the program: the rewiring works from those declarations and has to</span>
+<span class="sd">    land before the partition boundary fixes the delegate's outputs. It operates</span>
+<span class="sd">    on the staged programs, never the caller's, so a reused ExportedProgram is</span>
+<span class="sd">    left intact.</span>
+
+<span class="sd">    Returns, per method that actually lost an output, the engine output binding</span>
+<span class="sd">    names it elided -- narrower than the methods the caller asked about, and</span>
+<span class="sd">    narrower than the engine's full aliased_io. Only these names may be exempted</span>
+<span class="sd">    from the backend's output-binding check, so a method that dropped an output</span>
+<span class="sd">    for some other reason, or an aliased output export never rewired, is still</span>
+<span class="sd">    caught.</span>
+<span class="sd">    """</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch._zero_copy</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+        <span class="n">rewire_aliased_mutations_to_buffers</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">elided</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="n">name</span><span class="p">:</span> <span class="n">rewire_aliased_mutations_to_buffers</span><span class="p">(</span><span class="n">program</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">program</span> <span class="ow">in</span> <span class="n">program_map</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="n">elided</span><span class="o">.</span><span class="n">values</span><span class="p">()):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">"zero_copy_kv=True, but no aliased buffer mutation was found in </span><span class="si">%s</span><span class="s2">, "</span>
+            <span class="s2">"so zero-copy KV was not applied. Finalizing this program gives an "</span>
+            <span class="s2">"ordinary staged .pte; the only thing that reports that is "</span>
+            <span class="s2">"torch_tensorrt.executorch.check_zero_copy_kv, which refuses this "</span>
+            <span class="s2">"model and which save(..., zero_copy_kv=True) runs for you. Export "</span>
+            <span class="s2">"without zero_copy_kv to ask for a staged program deliberately."</span><span class="p">,</span>
+            <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">program_map</span><span class="p">)),</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="p">{}</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">"zero-copy KV: elided outputs per method: </span><span class="si">%s</span><span class="s2">"</span><span class="p">,</span> <span class="n">elided</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="n">names</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">names</span> <span class="ow">in</span> <span class="n">elided</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">names</span><span class="p">}</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_per_method_values</span><span class="p">(</span>
@@ -810,6 +904,42 @@ document.write(`
     <span class="k">return</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="n">shared</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">method_names</span><span class="p">}</span>
 
 
+<span class="k">def</span><span class="w"> </span><span class="nf">_reject_caller_set_zero_copy_spec</span><span class="p">(</span>
+    <span class="n">method_compile_specs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="n">Any</span><span class="p">]],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Reject a caller who sets the reserved zero-copy key by hand.</span>
+
+<span class="sd">    export() sets this key itself, and only for the aliased outputs it actually</span>
+<span class="sd">    elided. A hand-set value would tell the backend that outputs were taken out</span>
+<span class="sd">    of the delegate that were not, so the backend would stop rejecting a delegate</span>
+<span class="sd">    that is genuinely short an output -- dropping a real KV update silently.</span>
+
+<span class="sd">    Written for this one key rather than parametrized over a reserved key: the</span>
+<span class="sd">    wording is the safety property this key carries, which no other key shares.</span>
+<span class="sd">    ``_apply_weight_streaming_budget`` rejects its own reserved key inline rather</span>
+<span class="sd">    than through this function: it also *writes* a spec, so its rejection is one</span>
+<span class="sd">    branch of a larger operation, and the two keys fail for different reasons --</span>
+<span class="sd">    that one has a supported argument to point the caller at, this one has a</span>
+<span class="sd">    safety property that no argument can restore.</span>
+
+<span class="sd">    The message names the method whose specs carry the key, as</span>
+<span class="sd">    ``_apply_weight_streaming_budget`` does. A caller who gave one shared list</span>
+<span class="sd">    gets it fanned out to every method, so the name is then whichever method came</span>
+<span class="sd">    first; that imprecision is the sibling's too.</span>
+<span class="sd">    """</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch.backend</span><span class="w"> </span><span class="kn">import</span> <span class="n">ZERO_COPY_KV_COMPILE_SPEC_KEY</span>
+
+    <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">specs</span> <span class="ow">in</span> <span class="n">method_compile_specs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">for</span> <span class="n">spec</span> <span class="ow">in</span> <span class="n">specs</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">spec</span><span class="p">,</span> <span class="s2">"key"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="o">==</span> <span class="n">ZERO_COPY_KV_COMPILE_SPEC_KEY</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">"compile_specs for </span><span class="si">{</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> may not set the reserved key "</span>
+                    <span class="sa">f</span><span class="s2">"'</span><span class="si">{</span><span class="n">ZERO_COPY_KV_COMPILE_SPEC_KEY</span><span class="si">}</span><span class="s2">'; export() sets it "</span>
+                    <span class="s2">"itself when zero_copy_kv=True elides a method's aliased "</span>
+                    <span class="s2">"outputs. Setting it by hand could drop a real KV update silently."</span>
+                <span class="p">)</span>
+
+
 <div class="viewcode-block" id="export">
 <a class="viewcode-back" href="../../../py_api/executorch.html#torch_tensorrt.executorch.export">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">export</span><span class="p">(</span>
@@ -829,8 +959,11 @@ document.write(`
     <span class="p">)</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">compile_config</span><span class="p">:</span> <span class="s2">"EdgeCompileConfig | None"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">constant_methods</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">zero_copy_kv</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">generate_etrecord</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">weight_streaming_budget_per_engine</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">use_cuda_graphs</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">external_engine_data</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"EdgeProgramManager"</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Prepare TensorRT-compiled programs for composable ExecuTorch lowering.</span>
 
@@ -855,6 +988,34 @@ document.write(`
 <span class="sd">    every method sharing it would be tagged with the same name. Sharing an instance whose</span>
 <span class="sd">    specs name no method is not rejected here, but a backend that reads its own method</span>
 <span class="sd">    name from its specs, such as the CUDA backend, then raises during lowering.</span>
+
+<span class="sd">    ``zero_copy_kv=True`` lets a TensorRT engine update an aliased mutable buffer</span>
+<span class="sd">    -- a KV cache -- in place, instead of ExecuTorch handing the delegate a</span>
+<span class="sd">    staging copy and copying the engine's result back afterwards. It is opt-in</span>
+<span class="sd">    rather than automatic for two reasons: the resulting ``.pte`` needs a</span>
+<span class="sd">    runtime that understands a delegate with its aliased outputs elided, so</span>
+<span class="sd">    producing one silently would break an older runner; and it is only half the</span>
+<span class="sd">    change. Finalize such a program with</span>
+<span class="sd">    ``to_executorch(torch_tensorrt.executorch.zero_copy_backend_config(config))``</span>
+<span class="sd">    -- without it the buffer is still staged and its updates would be discarded.</span>
+
+<span class="sd">    **Nothing here enforces that pairing.** The manager returned is ExecuTorch's</span>
+<span class="sd">    own, and its ``to_executorch`` finalizes whatever config it is given: with</span>
+<span class="sd">    an ordinary one it succeeds and writes a ``.pte`` whose caches never update</span>
+<span class="sd">    -- for a KV cache, wrong output rather than a crash. Finalizing a</span>
+<span class="sd">    ``zero_copy_kv=True`` export yourself therefore owes two calls that nothing</span>
+<span class="sd">    checks: pass</span>
+<span class="sd">    :func:`torch_tensorrt.executorch.zero_copy_backend_config` as the config,</span>
+<span class="sd">    and hand the program it returns to</span>
+<span class="sd">    :func:`torch_tensorrt.executorch.check_zero_copy_kv`, which reads back what</span>
+<span class="sd">    the config alone cannot say. ``torch_tensorrt.save(output_format="executorch",</span>
+<span class="sd">    zero_copy_kv=True)`` owns both ends and does both for you.</span>
+
+<span class="sd">    Only a buffer the engine declares aliased is affected. A method may hold both</span>
+<span class="sd">    kinds at once: a mutable buffer with no aliasing available -- a convolution</span>
+<span class="sd">    state, say -- keeps its staging copy and the copy-back that writes it, while</span>
+<span class="sd">    the aliased caches beside it go zero-copy. The two are told apart by the</span>
+<span class="sd">    engine's own ``aliased_io``, not by the graph, in which they look identical.</span>
 
 <span class="sd">    ``generate_etrecord=True`` is outside the payload sharing described above. It makes</span>
 <span class="sd">    ExecuTorch deep copy the whole program, so peak memory grows by roughly the size of</span>
@@ -903,8 +1064,18 @@ document.write(`
 <span class="sd">        constant_methods (Dict[str, Any]): Methods returning a constant, such as a vocab</span>
 <span class="sd">            size. Keys must be valid Python identifiers and must not name a method of</span>
 <span class="sd">            ``source``.</span>
+<span class="sd">        zero_copy_kv (bool): Let a TensorRT engine write its aliased mutable buffer --</span>
+<span class="sd">            a KV cache -- in place, instead of receiving a staging copy that ExecuTorch</span>
+<span class="sd">            copies back. Requires finalizing the returned program with</span>
+<span class="sd">            :func:`torch_tensorrt.executorch.zero_copy_backend_config`, and checking</span>
+<span class="sd">            the result with</span>
+<span class="sd">            :func:`torch_tensorrt.executorch.check_zero_copy_kv`; neither is enforced,</span>
+<span class="sd">            and finalizing without the config leaves the buffer staged and every</span>
+<span class="sd">            update discarded. ``torch_tensorrt.save(output_format="executorch",</span>
+<span class="sd">            zero_copy_kv=True)`` owns both steps and needs only the one flag.</span>
 <span class="sd">        generate_etrecord (bool): Ask ExecuTorch for an ETRecord for later debugging.</span>
-<span class="sd">            This copies the whole program, engines included.</span>
+<span class="sd">            This copies the whole program, engines included. Saving the record does not</span>
+<span class="sd">            work for a program with TensorRT engines: it raises a ``SerializeError``.</span>
 <span class="sd">        weight_streaming_budget_per_engine (Optional[int]): Bytes of engine weights that</span>
 <span class="sd">            may stay resident in GPU memory, with the rest streamed from host memory.</span>
 <span class="sd">            It applies to **each** TensorRT engine separately, not as a total for the</span>
@@ -917,35 +1088,62 @@ document.write(`
 <span class="sd">            actually loads on. This is a different unit from</span>
 <span class="sd">            ``torch_tensorrt.runtime.weight_streaming(...).device_budget``, which is a</span>
 <span class="sd">            program total split proportionally across engines.</span>
+<span class="sd">        use_cuda_graphs (Optional[bool]): Bake CUDA graph replay on (True) or off</span>
+<span class="sd">            (False) into every method's TensorRT compile specs. None leaves the choice</span>
+<span class="sd">            unset so the runtime default applies. A load option, or a process option</span>
+<span class="sd">            set to False, overrides this value. Non-booleans and raw</span>
+<span class="sd">            ``CompileSpec("use_cuda_graphs", ...)`` entries are rejected; use this</span>
+<span class="sd">            keyword instead.</span>
+<span class="sd">        external_engine_data (Optional[str]): Write every TensorRT engine to an</span>
+<span class="sd">            ExecuTorch data file named ``&lt;external_engine_data&gt;.ptd`` instead of into</span>
+<span class="sd">            the ``.pte``, which then holds only a key per engine. Pass the name without</span>
+<span class="sd">            the ``.ptd`` extension. Use only ASCII letters, digits, ``.``, ``-`` and</span>
+<span class="sd">            ``_``, and start with a letter, a digit or ``_``. The engine is the same</span>
+<span class="sd">            bytes either way. Load the program with that file as its data file,</span>
+<span class="sd">            for example ``Runtime.get().load_program(pte, data_path=ptd)``; without it</span>
+<span class="sd">            the method fails to load. That loader takes one data file. If another</span>
+<span class="sd">            backend in the program writes its own ``.ptd``, pass that backend's name</span>
+<span class="sd">            here so both share one file. For the CUDA backend that name is</span>
+<span class="sd">            ``aoti_cuda_blob``. After ``to_executorch()``, write the ``.ptd`` with</span>
+<span class="sd">            ``write_tensor_data_to_file(directory)``; ``torch_tensorrt.save`` does this</span>
+<span class="sd">            next to the ``.pte``. None, the default, keeps every engine in the ``.pte``.</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        executorch.exir.EdgeProgramManager: The Edge program, ready for inspection,</span>
 <span class="sd">        further transformation, or ``to_executorch()``.</span>
 <span class="sd">    """</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._features</span><span class="w"> </span><span class="kn">import</span> <span class="n">ENABLED_FEATURES</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">is_platform_supported_for_executorch</span>
 
-    <span class="k">if</span> <span class="n">platform</span><span class="o">.</span><span class="n">system</span><span class="p">()</span> <span class="o">!=</span> <span class="s2">"Linux"</span><span class="p">:</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">is_platform_supported_for_executorch</span><span class="p">():</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">"The executorch format is only supported on Linux, </span><span class="si">{</span><span class="n">platform</span><span class="o">.</span><span class="n">system</span><span class="p">()</span><span class="si">}</span><span class="s2"> "</span>
+            <span class="sa">f</span><span class="s2">"The executorch format supports Linux and Windows x86-64, </span><span class="si">{</span><span class="n">platform</span><span class="o">.</span><span class="n">system</span><span class="p">()</span><span class="si">}</span><span class="s2"> "</span>
             <span class="s2">"is not a supported platform for this format"</span>
-        <span class="p">)</span>
-    <span class="k">if</span> <span class="ow">not</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torch_tensorrt_runtime</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
-            <span class="s2">"ExecuTorch export requires the Torch-TensorRT runtime "</span>
-            <span class="s2">"(torch_tensorrt_runtime). Reinstall torch_tensorrt with the runtime extension."</span>
         <span class="p">)</span>
     <span class="k">if</span> <span class="n">inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">arg_inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"inputs and arg_inputs are mutually exclusive."</span><span class="p">)</span>
     <span class="n">arguments</span> <span class="o">=</span> <span class="n">inputs</span> <span class="k">if</span> <span class="n">inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">arg_inputs</span>
 
+    <span class="c1"># A Python-only wheel registers execute_engine from _TRTEngine. The C++</span>
+    <span class="c1"># runtime registers that schema itself. meta_ops supplies the shared</span>
+    <span class="c1"># ExecuTorch placeholder op in both configurations and conditionally adds</span>
+    <span class="c1"># only the C++ runtime's fake registrations.</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torch_tensorrt_runtime</span><span class="p">:</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._TRTEngine</span>  <span class="c1"># noqa: F401</span>
     <span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime.meta_ops.register_meta_ops</span>  <span class="c1"># noqa: F401</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">executorch.exir</span><span class="w"> </span><span class="kn">import</span> <span class="n">to_edge_transform_and_lower</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">executorch.exir.backend.compile_spec_schema</span><span class="w"> </span><span class="kn">import</span> <span class="n">CompileSpec</span> <span class="k">as</span> <span class="n">_CompileSpec</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._exporter</span><span class="w"> </span><span class="kn">import</span> <span class="n">_declare_aliased_kv_mutations_on_ep</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch</span><span class="w"> </span><span class="kn">import</span> <span class="n">TensorRTPartitioner</span><span class="p">,</span> <span class="n">get_edge_compile_config</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch._export_utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
         <span class="n">replace_execute_engine</span><span class="p">,</span>
         <span class="n">stage_exported_program</span><span class="p">,</span>
         <span class="n">validate_engine_program</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch._zero_copy</span><span class="w"> </span><span class="kn">import</span> <span class="n">order_copyback_mutations_first</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.executorch.backend</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+        <span class="n">ZERO_COPY_KV_COMPILE_SPEC_KEY</span><span class="p">,</span>
+        <span class="n">_serialize_elided_output_names</span><span class="p">,</span>
     <span class="p">)</span>
 
     <span class="n">programs</span><span class="p">,</span> <span class="n">method_names</span> <span class="o">=</span> <span class="n">_prepare_programs</span><span class="p">(</span>
@@ -985,9 +1183,12 @@ document.write(`
     <span class="n">method_compile_specs</span> <span class="o">=</span> <span class="n">_per_method_values</span><span class="p">(</span>
         <span class="n">compile_specs</span><span class="p">,</span> <span class="n">method_names</span><span class="p">,</span> <span class="s2">"compile_specs"</span>
     <span class="p">)</span>
+    <span class="n">_reject_caller_set_zero_copy_spec</span><span class="p">(</span><span class="n">method_compile_specs</span><span class="p">)</span>
     <span class="n">_apply_weight_streaming_budget</span><span class="p">(</span>
         <span class="n">method_compile_specs</span><span class="p">,</span> <span class="n">weight_streaming_budget_per_engine</span>
     <span class="p">)</span>
+    <span class="n">_apply_use_cuda_graphs</span><span class="p">(</span><span class="n">method_compile_specs</span><span class="p">,</span> <span class="n">use_cuda_graphs</span><span class="p">)</span>
+    <span class="n">_apply_external_engine_data</span><span class="p">(</span><span class="n">method_compile_specs</span><span class="p">,</span> <span class="n">external_engine_data</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">constant_methods</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">invalid</span> <span class="o">=</span> <span class="p">[</span>
@@ -1052,6 +1253,8 @@ document.write(`
         <span class="p">)</span>
         <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">program</span> <span class="ow">in</span> <span class="n">program_map</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
     <span class="p">}</span>
+    <span class="n">zero_copy_methods</span> <span class="o">=</span> <span class="n">_apply_zero_copy_kv</span><span class="p">(</span><span class="n">staged_programs</span><span class="p">)</span> <span class="k">if</span> <span class="n">zero_copy_kv</span> <span class="k">else</span> <span class="p">{}</span>
+
     <span class="n">rewritten</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">ExportedProgram</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="n">method_partitioners</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="n">Partitioner</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">program</span> <span class="ow">in</span> <span class="n">staged_programs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
@@ -1073,8 +1276,29 @@ document.write(`
                 <span class="p">)</span>
         <span class="c1"># Drop this method's engine payloads as soon as they are in the graph.</span>
         <span class="n">rewritten</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">replace_execute_engine</span><span class="p">(</span><span class="n">program</span><span class="p">,</span> <span class="n">resolved_engines</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">name</span><span class="p">))</span>
+        <span class="n">trt_compile_specs</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">method_compile_specs</span><span class="p">[</span><span class="n">name</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">zero_copy_methods</span><span class="p">:</span>
+            <span class="c1"># Signal to TensorRTPartitioner that this method elided aliased</span>
+            <span class="c1"># outputs. Only the presence of the key is read: the partitioner</span>
+            <span class="c1"># drops this spec from the list it applies to every partition and</span>
+            <span class="c1"># re-derives, per engine, exactly which of a delegate's aliased</span>
+            <span class="c1"># outputs were elided, stamping only those onto only that delegate</span>
+            <span class="c1"># (see TensorRTPartitioner._partition_elided_output_names). So a</span>
+            <span class="c1"># method that lowers to several TensorRT delegates marks only the KV</span>
+            <span class="c1"># one and a plain-compute delegate beside it carries no zero-copy</span>
+            <span class="c1"># spec. Without any spec the backend rejects a delegate short of its</span>
+            <span class="c1"># bindings, which keeps an accidentally dropped output an error.</span>
+            <span class="c1"># The method-wide names go in the value so this spec reads like the</span>
+            <span class="c1"># per-partition one the partitioner writes, but nothing decodes this</span>
+            <span class="c1"># one: changing which names are listed here changes no delegate.</span>
+            <span class="n">trt_compile_specs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="n">_CompileSpec</span><span class="p">(</span>
+                    <span class="n">ZERO_COPY_KV_COMPILE_SPEC_KEY</span><span class="p">,</span>
+                    <span class="n">_serialize_elided_output_names</span><span class="p">(</span><span class="n">zero_copy_methods</span><span class="p">[</span><span class="n">name</span><span class="p">]),</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
         <span class="n">method_partitioners</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
-            <span class="n">TensorRTPartitioner</span><span class="p">(</span><span class="n">compile_specs</span><span class="o">=</span><span class="n">method_compile_specs</span><span class="p">[</span><span class="n">name</span><span class="p">]),</span>
+            <span class="n">TensorRTPartitioner</span><span class="p">(</span><span class="n">compile_specs</span><span class="o">=</span><span class="n">trt_compile_specs</span><span class="p">),</span>
             <span class="o">*</span><span class="n">extra_partitioners</span><span class="p">[</span><span class="n">name</span><span class="p">],</span>
         <span class="p">]</span>
 
@@ -1087,7 +1311,7 @@ document.write(`
         <span class="n">edge_programs</span> <span class="o">=</span> <span class="n">rewritten</span><span class="p">[</span><span class="s2">"forward"</span><span class="p">]</span>
         <span class="n">partitioner_pipeline</span> <span class="o">=</span> <span class="n">method_partitioners</span><span class="p">[</span><span class="s2">"forward"</span><span class="p">]</span>
 
-    <span class="k">return</span> <span class="n">to_edge_transform_and_lower</span><span class="p">(</span>
+    <span class="n">edge_manager</span> <span class="o">=</span> <span class="n">to_edge_transform_and_lower</span><span class="p">(</span>
         <span class="n">edge_programs</span><span class="p">,</span>
         <span class="n">transform_passes</span><span class="o">=</span><span class="n">transform_passes</span><span class="p">,</span>
         <span class="n">partitioner</span><span class="o">=</span><span class="n">partitioner_pipeline</span><span class="p">,</span>
@@ -1096,7 +1320,22 @@ document.write(`
             <span class="n">compile_config</span> <span class="k">if</span> <span class="n">compile_config</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">get_edge_compile_config</span><span class="p">()</span>
         <span class="p">),</span>
         <span class="n">generate_etrecord</span><span class="o">=</span><span class="n">generate_etrecord</span><span class="p">,</span>
-    <span class="p">)</span></div>
+    <span class="p">)</span>
+    <span class="c1"># After lowering, not beside the rewiring: to_edge re-derives the graph</span>
+    <span class="c1"># signature, so an order set earlier does not reach the finalizer. See</span>
+    <span class="c1"># order_copyback_mutations_first.</span>
+    <span class="c1">#</span>
+    <span class="c1"># Every method, not only the ones zero-copy rewired, because the crossing</span>
+    <span class="c1"># this repairs is not zero-copy's. A plain nn.Module writing one buffer from</span>
+    <span class="c1"># another buffer and a second buffer from a user input -- no TensorRT, no</span>
+    <span class="c1"># zero_copy_kv -- comes out of stock to_edge().to_executorch() with the first</span>
+    <span class="c1"># buffer's mutation spec naming the copy that writes the second. Gating this</span>
+    <span class="c1"># on zero_copy_methods would make a general repair depend on an unrelated</span>
+    <span class="c1"># opt-in, and would leave a sibling method repaired or not according to</span>
+    <span class="c1"># whether some other method asked for zero-copy.</span>
+    <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">edge_manager</span><span class="o">.</span><span class="n">methods</span><span class="p">:</span>
+        <span class="n">order_copyback_mutations_first</span><span class="p">(</span><span class="n">edge_manager</span><span class="o">.</span><span class="n">exported_program</span><span class="p">(</span><span class="n">name</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">edge_manager</span></div>
 
 </pre></div>
 

@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../../_static/documentation_options.js?v=0866734c"></script>
+    <script src="../../../../_static/documentation_options.js?v=d9553575"></script>
     <script src="../../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -477,12 +477,16 @@ document.write(`
 <span></span><span class="c1"># SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION &amp; AFFILIATES. All rights reserved.</span>
 <span class="c1"># SPDX-License-Identifier: BSD-3-Clause</span>
 
+<span class="kn">import</span><span class="w"> </span><span class="nn">hashlib</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">inspect</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">concurrent.futures</span><span class="w"> </span><span class="kn">import</span> <span class="n">ThreadPoolExecutor</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">copy</span><span class="w"> </span><span class="kn">import</span> <span class="n">deepcopy</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">Enum</span><span class="p">,</span> <span class="n">auto</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Iterator</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Union</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">itertools</span><span class="w"> </span><span class="kn">import</span> <span class="n">islice</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Iterator</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
@@ -493,13 +497,88 @@ document.write(`
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._compiler</span><span class="w"> </span><span class="kn">import</span> <span class="nb">compile</span> <span class="k">as</span> <span class="n">dynamo_compile</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._refit</span><span class="w"> </span><span class="kn">import</span> <span class="n">refit_module_weights</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-    <span class="n">check_output_equal</span><span class="p">,</span>
     <span class="n">deallocate_module</span><span class="p">,</span>
+    <span class="n">pin_torch_executed_state</span><span class="p">,</span>
     <span class="n">to_torch_device</span><span class="p">,</span>
     <span class="n">to_torch_tensorrt_device</span><span class="p">,</span>
 <span class="p">)</span>
 
 <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="c1"># A tensor is hashed in chunks so that one large tensor can still occupy every thread.</span>
+<span class="c1"># GPU-resident weights must be copied to the host to be hashed, so they are grouped into</span>
+<span class="c1"># batches and released as they go rather than briefly duplicating the whole model.</span>
+<span class="n">_DIGEST_CHUNK_BYTES</span> <span class="o">=</span> <span class="mi">4</span> <span class="o">*</span> <span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span>
+<span class="n">_DIGEST_COPY_BUDGET_BYTES</span> <span class="o">=</span> <span class="mi">256</span> <span class="o">*</span> <span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span>
+
+<span class="c1"># One unit of hashing work: the chunked bytes of each tensor in it, in state_dict order.</span>
+<span class="n">_ChunkBatch</span> <span class="o">=</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="nb">memoryview</span><span class="p">]]]</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_sha256</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">bytes</span><span class="p">,</span> <span class="nb">memoryview</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span>
+    <span class="k">return</span> <span class="n">hashlib</span><span class="o">.</span><span class="n">sha256</span><span class="p">(</span><span class="n">data</span><span class="p">)</span><span class="o">.</span><span class="n">digest</span><span class="p">()</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_tensor_chunks</span><span class="p">(</span><span class="n">tensor</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">memoryview</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""The tensor's raw bytes, split small enough that one tensor can fill the pool.</span>
+
+<span class="sd">    ``reshape(-1)`` because a 0-d tensor cannot be viewed as bytes. A tensor already on</span>
+<span class="sd">    the CPU is aliased here rather than copied.</span>
+<span class="sd">    """</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="nb">memoryview</span><span class="p">(</span>
+        <span class="n">tensor</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">"cpu"</span><span class="p">)</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
+    <span class="p">)</span>
+    <span class="n">chunks</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">data</span><span class="p">[</span><span class="n">i</span> <span class="p">:</span> <span class="n">i</span> <span class="o">+</span> <span class="n">_DIGEST_CHUNK_BYTES</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">),</span> <span class="n">_DIGEST_CHUNK_BYTES</span><span class="p">)</span>
+    <span class="p">]</span>
+    <span class="c1"># An empty tensor has no chunks but still needs a digest.</span>
+    <span class="k">return</span> <span class="n">chunks</span> <span class="ow">or</span> <span class="p">[</span><span class="n">data</span><span class="p">]</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_chunk_batches</span><span class="p">(</span><span class="n">state_dict</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="n">_ChunkBatch</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Group tensors so at most ``_DIGEST_COPY_BUDGET_BYTES`` of copies are alive at once.</span>
+
+<span class="sd">    Only a tensor copied down from the GPU holds host memory until it is hashed, so only</span>
+<span class="sd">    those count against the budget. CPU-resident weights are aliased and can all go in a</span>
+<span class="sd">    single batch, which is where the parallelism pays off.</span>
+<span class="sd">    """</span>
+    <span class="n">batch</span><span class="p">:</span> <span class="n">_ChunkBatch</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">copied_bytes</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">tensor</span> <span class="ow">in</span> <span class="n">state_dict</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">batch</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">name</span><span class="p">,</span> <span class="n">_tensor_chunks</span><span class="p">(</span><span class="n">tensor</span><span class="p">)))</span>
+        <span class="k">if</span> <span class="n">tensor</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">"cpu"</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">copied_bytes</span> <span class="o">+=</span> <span class="n">tensor</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span> <span class="o">*</span> <span class="n">tensor</span><span class="o">.</span><span class="n">element_size</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">copied_bytes</span> <span class="o">&gt;=</span> <span class="n">_DIGEST_COPY_BUDGET_BYTES</span><span class="p">:</span>
+            <span class="k">yield</span> <span class="n">batch</span>
+            <span class="n">batch</span><span class="p">,</span> <span class="n">copied_bytes</span> <span class="o">=</span> <span class="p">[],</span> <span class="mi">0</span>
+
+    <span class="k">if</span> <span class="n">batch</span><span class="p">:</span>
+        <span class="k">yield</span> <span class="n">batch</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_digest_state_dict</span><span class="p">(</span><span class="n">state_dict</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""SHA-256 every tensor in ``state_dict``, as a hash over its chunk digests.</span>
+
+<span class="sd">    Keeping 32 bytes per tensor rather than a copy of the weights is what lets</span>
+<span class="sd">    ``update_refit_condition`` compare weight *values* without holding a second copy of</span>
+<span class="sd">    the model. ``hashlib`` releases the GIL, so a whole batch of chunks hashes in</span>
+<span class="sd">    parallel at close to memcmp speed. Byte identity is stricter than ``torch.equal``,</span>
+<span class="sd">    which type-promotes: a dtype change is a different digest, and so is not LIVE.</span>
+<span class="sd">    """</span>
+    <span class="n">digests</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">with</span> <span class="n">ThreadPoolExecutor</span><span class="p">(</span><span class="nb">min</span><span class="p">(</span><span class="mi">32</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">cpu_count</span><span class="p">()</span> <span class="ow">or</span> <span class="mi">1</span><span class="p">))</span> <span class="k">as</span> <span class="n">pool</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">batch</span> <span class="ow">in</span> <span class="n">_chunk_batches</span><span class="p">(</span><span class="n">state_dict</span><span class="p">):</span>
+            <span class="n">hashed</span> <span class="o">=</span> <span class="nb">iter</span><span class="p">(</span><span class="n">pool</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">_sha256</span><span class="p">,</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">cs</span> <span class="ow">in</span> <span class="n">batch</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">cs</span><span class="p">]))</span>
+            <span class="c1"># pool.map preserves order, so each tensor takes its own chunk digests off</span>
+            <span class="c1"># the front of the shared iterator and commits to them in order.</span>
+            <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">chunks</span> <span class="ow">in</span> <span class="n">batch</span><span class="p">:</span>
+                <span class="n">digests</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">_sha256</span><span class="p">(</span><span class="sa">b</span><span class="s2">""</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">islice</span><span class="p">(</span><span class="n">hashed</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">chunks</span><span class="p">))))</span>
+
+    <span class="k">return</span> <span class="n">digests</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_is_modelopt_quantized</span><span class="p">(</span><span class="n">model</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
@@ -510,6 +589,18 @@ document.write(`
         <span class="k">return</span> <span class="nb">any</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="n">TensorQuantizer</span><span class="p">)</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">modules</span><span class="p">())</span>
     <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
         <span class="k">return</span> <span class="kc">False</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_offload_original_model</span><span class="p">(</span><span class="n">module</span><span class="p">:</span> <span class="s2">"MutableTorchTensorRTModule"</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Offload the source PyTorch module without breaking the compiled one.</span>
+
+<span class="sd">    The compiled graph module holds the very same ``torch.nn.Parameter`` objects as the</span>
+<span class="sd">    module it was compiled from, and ``deallocate_module`` moves them in place, so any</span>
+<span class="sd">    weight a PyTorch-executed node still needs has to be put back afterwards.</span>
+<span class="sd">    """</span>
+    <span class="n">deallocate_module</span><span class="p">(</span><span class="n">module</span><span class="o">.</span><span class="n">original_model</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">module</span><span class="o">.</span><span class="n">gm</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">pin_torch_executed_state</span><span class="p">(</span><span class="n">module</span><span class="o">.</span><span class="n">gm</span><span class="p">,</span> <span class="n">to_torch_device</span><span class="p">(</span><span class="n">module</span><span class="o">.</span><span class="n">trt_device</span><span class="p">))</span>
 
 
 <span class="k">class</span><span class="w"> </span><span class="nc">RefitFlag</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
@@ -636,8 +727,11 @@ document.write(`
         <span class="bp">self</span><span class="o">.</span><span class="n">arg_dynamic_shapes</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">kwarg_dynamic_shapes</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">serializable_dynamic_shapes_dims</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">run_info</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">state_dict_metadata</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="c1"># Per-tensor weight digests at last compile/refit. Used by</span>
+        <span class="c1"># update_refit_condition so LIVE does not depend on TRT↔PyTorch</span>
+        <span class="c1"># numerical agreement (H100/B100 gaps exceed ATOL/RTOL; see #4153).</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_state_dict_digests</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_store_state_dict_metadata</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">enable_weight_streaming</span> <span class="o">=</span> <span class="p">(</span>
             <span class="n">kwargs</span><span class="p">[</span><span class="s2">"enable_weight_streaming"</span><span class="p">]</span>
@@ -724,8 +818,19 @@ document.write(`
         <span class="k">return</span> <span class="n">total_dynamic_shape</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_store_state_dict_metadata</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">original_model</span><span class="o">.</span><span class="n">state_dict</span><span class="p">()</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">state_dict_metadata</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">v</span><span class="o">.</span><span class="n">shape</span>
+        <span class="n">state_dict</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">original_model</span><span class="o">.</span><span class="n">state_dict</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">state_dict_metadata</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">v</span><span class="o">.</span><span class="n">shape</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">state_dict</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_state_dict_digests</span> <span class="o">=</span> <span class="n">_digest_state_dict</span><span class="p">(</span><span class="n">state_dict</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_state_dict_values_match</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="c1"># Modules pickled before digests existed have none; treat as changed and refit.</span>
+        <span class="n">digests</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">]]</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">"_state_dict_digests"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">digests</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+        <span class="n">state_dict</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">original_model</span><span class="o">.</span><span class="n">state_dict</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">state_dict</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span> <span class="o">!=</span> <span class="n">digests</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+            <span class="k">return</span> <span class="kc">False</span>
+        <span class="k">return</span> <span class="n">_digest_state_dict</span><span class="p">(</span><span class="n">state_dict</span><span class="p">)</span> <span class="o">==</span> <span class="n">digests</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">load_state_dict</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">state_dict</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">strict</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">assign</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
@@ -738,37 +843,28 @@ document.write(`
         <span class="k">return</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Parameter</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">requires_grad</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">sd</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">update_refit_condition</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="c1"># 2-stage check to determine whether the module should be intact, refitted, or recompiled.</span>
+        <span class="c1"># Decide whether the module should stay LIVE, be refitted, or be recompiled.</span>
 
-        <span class="c1"># Default refit</span>
+        <span class="c1"># Default: value-only weight change → refit.</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">refit_state</span><span class="o">.</span><span class="n">set_state</span><span class="p">(</span><span class="n">RefitFlag</span><span class="o">.</span><span class="n">NEEDS_REFIT</span><span class="p">)</span>
 
-        <span class="c1"># Run the same inputs through pytorch model and compare the result to previous run of graph module</span>
-        <span class="c1"># to determine whether refit/recompilation is needed. If the output is the same, no further process needed.</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">run_info</span><span class="p">:</span>
-            <span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">,</span> <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">run_info</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">original_model</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">to_torch_device</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">trt_device</span><span class="p">))</span>
-            <span class="n">new_result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">original_model</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-            <span class="n">deallocate_module</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">original_model</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">check_output_equal</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">new_result</span><span class="p">):</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">refit_state</span><span class="o">.</span><span class="n">set_state</span><span class="p">(</span><span class="n">RefitFlag</span><span class="o">.</span><span class="n">LIVE</span><span class="p">)</span>
-                <span class="k">return</span>
-
-        <span class="c1"># Since we do not have access to the previous state_dict, we can only use state_dict_metadata</span>
-        <span class="c1"># to determine whether the keys or weight shape is changed.</span>
+        <span class="c1"># Structural changes (keys / shapes) require a full recompile.</span>
         <span class="n">sd</span><span class="p">,</span> <span class="n">sd_meta</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">original_model</span><span class="o">.</span><span class="n">state_dict</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">state_dict_metadata</span>
         <span class="k">if</span> <span class="n">sd</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span> <span class="o">!=</span> <span class="n">sd_meta</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
-            <span class="c1"># If keys are not identical, recompile.</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">refit_state</span><span class="o">.</span><span class="n">set_state</span><span class="p">(</span><span class="n">RefitFlag</span><span class="o">.</span><span class="n">NEEDS_RECOMPILE</span><span class="p">)</span>
             <span class="k">return</span>
 
         <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">sd</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
             <span class="k">if</span> <span class="n">sd</span><span class="p">[</span><span class="n">k</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">sd_meta</span><span class="p">[</span><span class="n">k</span><span class="p">]:</span>
-                <span class="c1"># If weight shapes are not identical, recompile.</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">refit_state</span><span class="o">.</span><span class="n">set_state</span><span class="p">(</span><span class="n">RefitFlag</span><span class="o">.</span><span class="n">NEEDS_RECOMPILE</span><span class="p">)</span>
                 <span class="k">return</span>
 
-        <span class="k">return</span>
+        <span class="c1"># Exact weight match against the last compile/refit snapshot → nothing to do.</span>
+        <span class="c1"># Anything else changed the weights the engine was built from, so it needs a</span>
+        <span class="c1"># refit: comparing outputs instead would only prove the change was invisible</span>
+        <span class="c1"># for one cached input, and would depend on TRT↔PyTorch agreement (#4153).</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_state_dict_values_match</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">refit_state</span><span class="o">.</span><span class="n">set_state</span><span class="p">(</span><span class="n">RefitFlag</span><span class="o">.</span><span class="n">LIVE</span><span class="p">)</span>
 
 <div class="viewcode-block" id="MutableTorchTensorRTModule.refit_gm">
 <a class="viewcode-back" href="../../../../py_api/torch_tensorrt.html#torch_tensorrt.MutableTorchTensorRTModule.refit_gm">[docs]</a>
@@ -799,7 +895,8 @@ document.write(`
             <span class="n">in_place</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
         <span class="p">)</span>
 
-        <span class="n">deallocate_module</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">original_model</span><span class="p">)</span></div>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">additional_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"offload_module_to_cpu"</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+            <span class="n">_offload_original_model</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span></div>
 
 
     <span class="k">def</span><span class="w"> </span><span class="nf">get_exported_program</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">ExportedProgram</span><span class="p">:</span>
@@ -858,7 +955,7 @@ document.write(`
             <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">additional_settings</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">additional_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"offload_module_to_cpu"</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
-            <span class="n">deallocate_module</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">original_model</span><span class="p">)</span>
+            <span class="n">_offload_original_model</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">enable_weight_streaming</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">set_weight_streaming_ctx</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">weight_streaming_budget</span><span class="p">)</span></div>
 
@@ -972,7 +1069,7 @@ document.write(`
 
     <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
         <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
-            <span class="s2">"Direct calls to </span><span class="si">{self.__class__}</span><span class="s2">.forward() are currently broken by due to https://github.com/pytorch/pytorch/issues/157183. Either call </span><span class="si">{self.__class__}</span><span class="s2">(...) directly or use </span><span class="si">{self.__class__}</span><span class="s2">._forward as a work around"</span>
+            <span class="sa">f</span><span class="s2">"Direct calls to </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">.forward() are currently broken by due to https://github.com/pytorch/pytorch/issues/157183. Either call </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">(...) directly or use </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">._forward as a work around"</span>
         <span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_forward</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
@@ -1001,16 +1098,13 @@ document.write(`
                 <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
                 <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">"Model refit failed. Recompiling the graph module."</span><span class="p">)</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">compile</span><span class="p">()</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">_store_state_dict_metadata</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_store_state_dict_metadata</span><span class="p">()</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">refit_state</span><span class="o">.</span><span class="n">set_state</span><span class="p">(</span><span class="n">RefitFlag</span><span class="o">.</span><span class="n">LIVE</span><span class="p">)</span>
 
         <span class="n">weight_streaming_ctx</span> <span class="o">=</span> <span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">weight_streaming_ctx</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">enable_weight_streaming</span> <span class="k">else</span> <span class="kc">None</span>
         <span class="p">)</span>
-        <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">gm</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-        <span class="c1"># Storing inputs and outputs for verification when the state is unknown</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">run_info</span> <span class="o">=</span> <span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">result</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">gm</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">to</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
@@ -1225,7 +1319,8 @@ document.write(`
         <span class="n">module</span><span class="o">.</span><span class="n">exp_program</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">export</span><span class="p">(</span>
             <span class="n">module</span><span class="o">.</span><span class="n">original_model</span><span class="p">,</span> <span class="n">module</span><span class="o">.</span><span class="n">arg_inputs</span><span class="p">,</span> <span class="n">kwargs</span><span class="o">=</span><span class="n">module</span><span class="o">.</span><span class="n">kwarg_inputs</span>
         <span class="p">)</span>
-        <span class="n">deallocate_module</span><span class="p">(</span><span class="n">module</span><span class="o">.</span><span class="n">original_model</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">module</span><span class="o">.</span><span class="n">additional_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"offload_module_to_cpu"</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+            <span class="n">_offload_original_model</span><span class="p">(</span><span class="n">module</span><span class="p">)</span>
         <span class="bp">cls</span> <span class="o">=</span> <span class="n">module</span><span class="o">.</span><span class="vm">__class__</span>
         <span class="n">module</span><span class="o">.</span><span class="vm">__class__</span> <span class="o">=</span> <span class="nb">type</span><span class="p">(</span>
             <span class="n">module</span><span class="o">.</span><span class="n">original_model</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
