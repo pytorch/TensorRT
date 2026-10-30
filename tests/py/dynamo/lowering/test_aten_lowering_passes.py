@@ -602,12 +602,12 @@ class TestRewriteEfficientAttention(TestCase):
                 return out[0]
 
         class BufferBias(InputBias):
-            def __init__(self):
+            def __init__(self, bias):
                 super().__init__()
-                self.register_buffer("causal", causal)
+                self.register_buffer("bias", bias)
 
             def forward(self, query):
-                return super().forward(query, self.causal)
+                return super().forward(query, self.bias)
 
         query = torch.randn(4, 8, 32, 16, device="cuda")
         seq = torch.export.Dim("seq", min=2, max=64)
@@ -629,7 +629,15 @@ class TestRewriteEfficientAttention(TestCase):
                 CompilationSettings(attn_bias_is_causal=True),
                 True,
             ),
-            (BufferBias(), (query,), None, CompilationSettings(), True),
+            (BufferBias(causal), (query,), None, CompilationSettings(), True),
+            # Zeros on the lower triangle, but positions above it are not blocked.
+            (
+                BufferBias(causal.nan_to_num(neginf=5.0)),
+                (query,),
+                None,
+                CompilationSettings(attn_bias_is_causal=True),
+                False,
+            ),
         ]
         for model, inputs, dynamic_shapes, settings, replaced in cases:
             with self.subTest(
