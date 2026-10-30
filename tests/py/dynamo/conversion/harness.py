@@ -395,7 +395,7 @@ class DispatchTestCase(TRTTestCase):
         int32_reqd=False,
         immutable_weights=True,
         decompose_attention=False,
-        attn_bias_is_causal=True,
+        attn_bias_is_causal=None,
         require_full_compilation=False,
         disable_tf32=False,
     ):

@@ -569,9 +569,7 @@ class TestRewriteEfficientAttention(TestCase):
         ep = torch.export.export(model, tuple(inputs))
         # torch.compile runs the lowering passes under a fake mode.
         with FakeTensorMode():
-            gm = force_causal_efficient_attention(
-                ep.module(), CompilationSettings(attn_bias_is_causal=True)
-            )
+            gm = force_causal_efficient_attention(ep.module(), CompilationSettings())
         (attention,) = [
             node
             for node in gm.graph.nodes
@@ -582,15 +580,72 @@ class TestRewriteEfficientAttention(TestCase):
         self.assertTrue(attention.args[6])
 
         trt_module = torch_tensorrt.dynamo.compile(
-            ep,
-            inputs,
-            min_block_size=1,
-            decompose_attention=False,
-            attn_bias_is_causal=True,
+            ep, inputs, min_block_size=1, decompose_attention=False
         )
         torch.testing.assert_close(
             model(*inputs), trt_module(*inputs), rtol=1e-2, atol=1e-2
         )
+
+    def test_force_causal_efficient_attention_trusts_an_unchecked_bias_only_when_asked(
+        self,
+    ):
+        upper = torch.ones(32, 32, dtype=torch.bool, device="cuda").triu(1)
+        causal = torch.zeros(4, 8, 32, 32, device="cuda").masked_fill(
+            upper, float("-inf")
+        )
+
+        class InputBias(torch.nn.Module):
+            def forward(self, query, attn_bias):
+                out = torch.ops.aten._scaled_dot_product_efficient_attention.default(
+                    query, query, query, attn_bias, False
+                )
+                return out[0]
+
+        class BufferBias(InputBias):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("causal", causal)
+
+            def forward(self, query):
+                return super().forward(query, self.causal)
+
+        query = torch.randn(4, 8, 32, 16, device="cuda")
+        seq = torch.export.Dim("seq", min=2, max=64)
+        dynamic_seq = ({2: seq}, {2: seq, 3: seq})
+        # (model, inputs, dynamic shapes, settings, whether the bias is replaced)
+        cases = [
+            (InputBias(), (query, causal), None, CompilationSettings(), False),
+            (
+                InputBias(),
+                (query, causal),
+                None,
+                CompilationSettings(attn_bias_is_causal=True),
+                True,
+            ),
+            (
+                InputBias(),
+                (query, causal),
+                dynamic_seq,
+                CompilationSettings(attn_bias_is_causal=True),
+                True,
+            ),
+            (BufferBias(), (query,), None, CompilationSettings(), True),
+        ]
+        for model, inputs, dynamic_shapes, settings, replaced in cases:
+            with self.subTest(
+                type(model).__name__,
+                dynamic=dynamic_shapes is not None,
+                attn_bias_is_causal=settings.attn_bias_is_causal,
+            ):
+                ep = torch.export.export(model, inputs, dynamic_shapes=dynamic_shapes)
+                gm = force_causal_efficient_attention(ep.module(), settings)
+                (attention,) = [
+                    node
+                    for node in gm.graph.nodes
+                    if node.target
+                    == torch.ops.aten._scaled_dot_product_efficient_attention.default
+                ]
+                self.assertEqual(attention.args[3] is None, replaced)
 
     def test_force_causal_efficient_attention_keeps_block_causal_mask(self):
         # Complex RoPE makes the complex lowering retrace scaled_dot_product_attention
