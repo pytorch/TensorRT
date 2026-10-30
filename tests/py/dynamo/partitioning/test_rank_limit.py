@@ -7,6 +7,7 @@ import torch
 import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import TestCase, run_tests
+from torch_tensorrt.dynamo.lowering.passes.restore_reshape import restore_reshape
 
 RANK_10_SHAPE = (1, 2, 1, 1, 1, 1, 1, 1, 4, 8)
 RANK_8_SHAPE = (1, 2, 1, 1, 1, 1, 4, 8)
@@ -130,6 +131,14 @@ class TestTensorRankPartitioning(TestCase):
         self.assertNotEqual(
             out.untyped_storage().data_ptr(), x.untyped_storage().data_ptr()
         )
+
+    def test_restored_reshape_is_contiguous(self):
+        # aten._reshape_copy returns a contiguous tensor, and so must its replacement.
+        gm = torch.fx.symbolic_trace(
+            lambda x: torch.ops.aten._reshape_copy.default(x.t(), [6, 4, 1])
+        )
+        restore_reshape(gm)
+        self.assertTrue(gm(torch.rand(4, 6)).is_contiguous())
 
 
 if __name__ == "__main__":
