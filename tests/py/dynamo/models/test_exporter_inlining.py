@@ -317,7 +317,8 @@ def test_create_trt_exp_program_reorders_kwargs_to_placeholder_order():
         Sub().eval(), (), {"a": torch.tensor(10.0), "b": torch.tensor(3.0)}
     ).module()
     _drop_guards_fn(gm)
-    # Force the plain-CodeGen fallback branch (see the no-input test above).
+    # Force the plain-CodeGen fallback branch, as in
+    # test_create_trt_exp_program_rebuilds_in_spec_without_inputs.
     gm.graph.set_codegen(torch.fx.graph.CodeGen())
     gm.graph.lint()
     gm.recompile()
@@ -403,7 +404,7 @@ def test_create_trt_exp_program_handles_a_program_without_inputs():
             self.register_buffer("c", torch.arange(4.0))
 
         def forward(self):
-            return self.w * self.c
+            return self.w - self.c
 
     gm = torch.export.export(Constants().eval(), ()).module()
     _drop_guards_fn(gm)
@@ -412,13 +413,13 @@ def test_create_trt_exp_program_handles_a_program_without_inputs():
 
     ep = create_trt_exp_program(gm, arg_inputs=())
 
-    assert sorted((s.kind.name, s.target) for s in ep.graph_signature.input_specs) == [
-        ("BUFFER", "c"),
+    assert [(s.kind.name, s.target) for s in ep.graph_signature.input_specs] == [
         ("PARAMETER", "w"),
+        ("BUFFER", "c"),
     ]
     out = ep.module()()
     out = out[0] if isinstance(out, (tuple, list)) else out
-    assert torch.equal(out, torch.arange(4.0) * 3)
+    assert torch.equal(out, 3 - torch.arange(4.0))
 
 
 @pytest.mark.unit
@@ -482,7 +483,8 @@ def test_create_trt_exp_program_handles_write_only_copyback_buffer():
         dynamic_shapes={"x": {0: batch}},
     ).module()
     _drop_guards_fn(gm)
-    # Force the plain-CodeGen fallback branch (see the no-input test above).
+    # Force the plain-CodeGen fallback branch, as in
+    # test_create_trt_exp_program_rebuilds_in_spec_without_inputs.
     gm.graph.set_codegen(torch.fx.graph.CodeGen())
     gm.graph.lint()
     gm.recompile()
