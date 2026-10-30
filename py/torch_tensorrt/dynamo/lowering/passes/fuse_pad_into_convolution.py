@@ -19,10 +19,12 @@ from typing import List, Optional, Tuple
 
 import torch
 import torch.nn.functional as F
+
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     clean_up_graph_after_modifications,
 )
+from torch_tensorrt.dynamo.partitioning.common import node_in_torch_executed_module
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +100,6 @@ def fuse_pad_into_convolution(
     gm: torch.fx.GraphModule, settings: CompilationSettings
 ) -> torch.fx.GraphModule:
     """Rewrite constant_pad_nd -> convolution into tensorrt::conv_asym_pad."""
-    del settings
     fused = 0
 
     for node in list(gm.graph.nodes):
@@ -129,6 +130,13 @@ def fuse_pad_into_convolution(
             not isinstance(pad_node, torch.fx.Node)
             or pad_node.target != torch.ops.aten.constant_pad_nd.default
             or len(pad_node.users) != 1
+        ):
+            continue
+
+        # Fusion must not erase an explicitly requested PyTorch module boundary.
+        if any(
+            node_in_torch_executed_module(n, settings.torch_executed_modules)
+            for n in (pad_node, node)
         ):
             continue
 

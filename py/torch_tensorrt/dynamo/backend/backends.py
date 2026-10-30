@@ -10,10 +10,11 @@ from typing import Any, Callable, Sequence
 
 import torch
 import torch._dynamo as td
-import torch_tensorrt.logging as torchtrt_logging
 from torch._dynamo.backends.common import aot_autograd
 from torch._dynamo.utils import detect_fake_mode
 from torch._functorch.aot_autograd import aot_export_joint_simple
+
+import torch_tensorrt.logging as torchtrt_logging
 from torch_tensorrt._utils import is_tegra_platform
 from torch_tensorrt.dynamo import CompilationSettings
 from torch_tensorrt.dynamo._compiler import compile_module
@@ -339,20 +340,25 @@ def _pretraced_backend(
             # can handle dynamic shapes natively (mirroring how torch
             # inductor lets aot_autograd resolve them).
             if not settings.use_distributed_mode_trace:
-                gm = aot_export_joint_simple(
-                    gm,
-                    sample_inputs,
-                    trace_joint=False,
-                    decompositions=filter_decomposition_table(
-                        get_decompositions(
-                            settings.enable_experimental_decompositions,
-                            settings.decompose_attention,
-                            settings.use_distributed_mode_trace,
-                            use_fp32_acc=settings.use_fp32_acc,
+                # Executing the generated forward loses node provenance during
+                # retracing. The interpreter preserves each source node's
+                # module stack on its decomposed ATen operations, so explicit
+                # module exclusions still apply after AOTAutograd.
+                with torch.fx.traceback.preserve_node_meta():
+                    gm = aot_export_joint_simple(
+                        torch.fx.Interpreter(gm).run,
+                        sample_inputs,
+                        trace_joint=False,
+                        decompositions=filter_decomposition_table(
+                            get_decompositions(
+                                settings.enable_experimental_decompositions,
+                                settings.decompose_attention,
+                                settings.use_distributed_mode_trace,
+                                use_fp32_acc=settings.use_fp32_acc,
+                            ),
+                            gm,
                         ),
-                        gm,
-                    ),
-                )
+                    )
 
             # Remove sym_int placeholders and inputs *after* AOT tracing
             # so we don't inject sym_size nodes that confuse the tracer.

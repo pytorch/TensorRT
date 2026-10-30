@@ -18,6 +18,7 @@ import sympy
 import torch
 from torch._subclasses.fake_tensor import FakeTensor
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
+
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo.utils import (
     COMPLEX_TO_REAL_DTYPE,
@@ -97,14 +98,28 @@ def _build_submodule_profiles(
     return profiles
 
 
+def get_node_module_types(node: torch.fx.Node) -> Set[str]:
+    """Read qualified module names from export and Dynamo provenance metadata."""
+    # torch.export records qualified names, whereas torch.compile's Dynamo
+    # graph records the class objects. Keep the original metadata unchanged.
+    return {
+        (
+            f"{module_type.__module__}.{module_type.__qualname__}"
+            if isinstance(module_type, type)
+            else module_type
+        )
+        for _, module_type in (node.meta.get("nn_module_stack") or {}).values()
+    }
+
+
 def node_in_torch_executed_module(
     node: torch.fx.Node, torch_executed_modules: Collection[str]
 ) -> bool:
     """
     Determine whether a node traces through a module that should run in Torch.
     A node matches if any level of its nn_module_stack is one of the torch_executed_modules,
-    matched on fully-qualified class name (e.g. "torchvision.models.resnet.BasicBlock"), which
-    torch.export stores as the second element of each nn_module_stack value.
+    matched on fully-qualified class name (e.g. "torchvision.models.resnet.BasicBlock").
+    Both torch.export's strings and torch.compile's class objects are supported.
     Args:
         node: FX node to check
         torch_executed_modules: Collection of fully-qualified module class names to run in Torch
@@ -113,8 +128,7 @@ def node_in_torch_executed_module(
     """
     if not torch_executed_modules:
         return False
-    stack = node.meta.get("nn_module_stack") or {}
-    for _, module_type in stack.values():
+    for module_type in get_node_module_types(node):
         if module_type in torch_executed_modules:
             logger.debug(
                 f"Excluding node {node.name} from TRT because its module type "

@@ -3,6 +3,7 @@ from typing import Any, Callable, Dict, Optional, Tuple
 
 import torch
 from torch.fx.experimental.proxy_tensor import make_fx
+
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion.aten_ops_converters import (
     attention_capability_validator,
@@ -79,8 +80,6 @@ def _inline_traced_decomp(
                 new_args = torch.fx.node.map_arg(n.args, lambda x: env[x])
                 new_kwargs = torch.fx.node.map_arg(n.kwargs, lambda x: env[x])
                 new_n = gm.graph.call_function(n.target, new_args, new_kwargs)
-                if "val" in n.meta:
-                    new_n.meta["val"] = n.meta["val"]
                 env[n] = new_n
             elif n.op == "output":
                 output = torch.fx.node.map_arg(n.args[0], lambda x: env[x])
@@ -88,6 +87,15 @@ def _inline_traced_decomp(
                 raise RuntimeError(
                     f"Unexpected op {n.op} while inlining attention decomposition"
                 )
+
+            if n.op in ("get_attr", "call_function"):
+                # Keep each replacement's own shape/dtype metadata, while
+                # attributing it to the original module for fallback selection
+                # and diagnostics. The standalone trace has no module context.
+                env[n].meta.update(n.meta)
+                for key in ("nn_module_stack", "stack_trace", "source_fn_stack"):
+                    if key in node.meta:
+                        env[n].meta[key] = node.meta[key]
 
     assert output is not None
     node.replace_all_uses_with(output)
