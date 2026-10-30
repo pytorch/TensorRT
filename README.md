@@ -109,12 +109,75 @@ auto results = trt_mod.forward({input_tensor});
 | ------------------- | ------------------------------------------------ |
 | Linux AMD64 / GPU   | **Supported**                                    |
 | Linux SBSA / GPU    | **Supported**                                    |
+| NVIDIA DRIVE OS / GPU | **Source Compilation (Thor / ExecuTorch deployment)** |
 | Windows / GPU       | **Supported (Dynamo only)**                      |
 | Linux Jetson / GPU | **Source Compilation Supported on JetPack-4.4+**  |
 | Linux Jetson / DLA | **Source Compilation Supported on JetPack-4.4+**  |
 | Linux ppc64le / GPU | Not supported                                    |
 
 > Note: Refer [NVIDIA L4T PyTorch NGC container](https://ngc.nvidia.com/catalog/containers/nvidia:l4t-pytorch) for PyTorch libraries on JetPack.
+
+### Building on DRIVE OS
+
+DRIVE OS builds use dedicated `@cuda_driveos` and `@tensorrt_driveos` repositories
+with a target-compatible TensorRT development installation under `/usr`
+in the build container, following the existing NGC layout. Normal Linux, JetPack,
+and Windows builds retain their existing repositories. In an NVIDIA
+runtime-enabled build container, the DRIVE CUDA rule defaults to
+`/usr/local/cuda`, normally a symlink to the selected toolkit. Set
+`TORCHTRT_DRIVE_CUDA_ROOT` only when a different root is needed. The selected
+root must expose the DRIVE layout; a conventional SBSA toolkit alone is not
+sufficient. The build consumes the common and Thor-specific header trees
+directly; it does not require a merged CUDA toolkit directory.
+
+```bash
+TORCHTRT_TARGET_PLATFORM=driveos \
+python -m pip install --pre --editable '.[executorch]' \
+  --index-url https://download.pytorch.org/whl/nightly/cu132 \
+  --extra-index-url https://pypi.org/simple
+```
+
+The selected CUDA root must contain
+`targets/aarch64-linux/include`, `thor/targets/aarch64-linux/include`, and
+`bin/nvcc`. The DRIVE CUDA repository accepts either an unversioned
+`libcudart.so` or a versioned `libcudart.so.*` below
+`targets/aarch64-linux/lib`. Set the optional `TORCHTRT_DRIVE_CUDA_LIB_DIR` to
+override that search when a build container supplies CUDA target libraries
+separately. Preserve any other container CUDA libraries required at runtime
+outside paths that NVIDIA runtime injection masks.
+
+For a nonstandard installation, set the optional root override before building:
+
+```bash
+export TORCHTRT_DRIVE_CUDA_ROOT=/path/to/injected/drive-cuda
+```
+
+An invalid explicit override produces an error rather than silently selecting
+another toolkit. This default applies to the Bazel DRIVE repository; the CMake
+runner retains its `CUDAToolkit_ROOT` / `TORCHTRT_DRIVE_CUDA_ROOT` configuration.
+
+The container's TensorRT development installation must provide
+`/usr/include/aarch64-linux-gnu/NvInfer.h` and
+`/usr/lib/aarch64-linux-gnu/libnvinfer.so`. The Bazel DRIVE repository uses
+`new_local_repository(path = "/usr/")` with the existing local TensorRT BUILD
+file; no TensorRT root environment variable is required. This only exposes
+installed files to Bazel: it does not copy or install anything into `/usr`,
+and it never falls back to downloading the SBSA TensorRT archive. The path
+does not guarantee version or ABI compatibility: use a container whose TensorRT
+SDK matches the deployment target. Normal SBSA builds continue to use
+`@tensorrt_sbsa` unchanged.
+
+The CMake reference runner discovers TensorRT through standard system search
+paths. CMake users can still specify `-DTensorRT_ROOT=...` for a non-system SDK.
+
+The resulting package uses the branch's normal PyTorch requirement and pins
+the TensorRT Python version detected in the build environment. Development
+validation included DRIVE OS 7.2.4 with TensorRT 10.16 / CUDA 13.2 and later
+DRIVE OS 7.2.5 with native TensorRT 11.0.1.7 / CUDA 13.3. These are historical
+tested configurations, not a compatibility guarantee for every release or a
+fresh validation of the latest source. The DRIVE configuration is opt-in and
+does not change the conventional CUDA repository used by default Linux and SBSA
+builds.
 
 ### Dependencies
 
