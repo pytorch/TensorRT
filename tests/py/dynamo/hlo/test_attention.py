@@ -18,10 +18,9 @@ Known limitations
 
 Notes on attn_bias_is_causal
 -----------------------------
-  Default True: the force_causal_efficient_attention lowering pass strips an
+  Default None: the force_causal_efficient_attention lowering pass strips an
     attn_bias proven to be a causal mask and sets is_causal=True before reaching
-    the converter.
-    This is an HF-model optimization; most production uses keep the default.
+    the converter.  True also strips one the pass cannot check.
   Set False: attn_bias is always forwarded to IAttentionLayer.mask.
 
 Test classes
@@ -615,7 +614,7 @@ class TestEfficientAttention(DispatchTestCase):
 
     test_attn_bias_is_causal_opt
         Exercises the force_causal_efficient_attention lowering pass
-        (attn_bias_is_causal=True, default) with a causal attn_bias built in
+        (attn_bias_is_causal=True) with a causal attn_bias built in
         the graph, which the pass replaces with is_causal=True.  This checks
         the numbers only; test_force_causal_efficient_attention in the lowering
         tests checks the replacement.
